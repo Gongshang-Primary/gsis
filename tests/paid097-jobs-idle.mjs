@@ -111,6 +111,17 @@ try{
   assert.equal(db.sql.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='gsis_background_jobs'").get(),undefined,'recovery must not initialize migrated background jobs');
  }
  assert.equal(measurements.length,2);
+ // 0.9.9a quiet mode: the same tick skips lock-heavy deferrable lanes only.
+ {
+  const {startQuietMode}=await moduleAt('shared/roster-quiet-mode.js');
+  now=Date.parse(today+'T06:50:00+08:00');await startQuietMode(db,'smc@gsps.edu.sg',now);
+  serviceCalls.length=0;const pending=[],quietLogs=[];console.info=(...args)=>quietLogs.push(args.join(' '));
+  await worker.scheduled({cron:'* * * * *',scheduledTime:now},env,{waitUntil(promise){pending.push(promise);}});await Promise.all(pending);console.info=realInfo;
+  assert.deepEqual([...serviceCalls].sort(),['claimNotifications','inboxPendingDispatch','nextAbsenceIntake'],'quiet mode keeps absence intake, WhatsApp and inbox; skips peer mail and scheduled allocation');
+  serviceCalls.length=0;const auditPending=[];
+  await worker.scheduled({cron:'2-57/5 * * * *',scheduledTime:now},env,{waitUntil(promise){auditPending.push(promise);}});await Promise.all(auditPending);
+  assert.deepEqual(serviceCalls,[],'quiet mode skips the audit export lane');
+ }
  console.log('PASS recovery minute cron: critical Google lanes run, retained D1 history remains unread and unchanged, no migrated queue/R2 jobs, explicit private idle helpers remain bounded.');
 }finally{
  Date.now=realNow;globalThis.fetch=realFetch;console.info=realInfo;console.warn=realWarn;console.error=realError;db.sql.close();

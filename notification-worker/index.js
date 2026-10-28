@@ -2,6 +2,7 @@ import {runRecoveryTimetableCleanup} from '../roster-update/public/roster-recove
 import {recordJobHealth,safeHealthError} from '../shared/edge-health.js';
 import {assertRecoveryWritable} from '../shared/edge-recovery.js';
 import {rosterRecoveryEnvironment} from '../shared/roster-recovery-profile.js';
+import {readQuietMode} from '../shared/roster-quiet-mode.js';
 import {dispatchNotifications,scheduledRoster,diagnoseNotificationConnections,dispatchInboxPending,dispatchWebhookJobs,dispatchReceivedReports,dispatchPeerMail,dispatchAllocationAudit} from '../roster-update/public/_worker.js';
 /* GSIS_API_SECRET_BEGIN */
 // First-party API credentials share one operator-selected setting. Browser
@@ -68,6 +69,8 @@ export default {
     console.info(JSON.stringify({event:'roster-notification-connections',scheduledTime:event.scheduledTime,...await diagnoseNotificationConnections(env,event.scheduledTime)}));return;
    }
    const run=(job,name,work)=>stage(env,job,name,work,{scheduledTime:event.scheduledTime});
+   // Assign Relief quiet mode pauses lock-heavy, deferrable work while SMCs allocate.
+   const quiet=await readQuietMode(env.GSIS_JOBS,event.scheduledTime).catch(()=>({active:false}));
    // Daily private-cache pruning reads only bounded cache metadata and objects.
    // No timetable build or Google roster read runs in this maintenance lane.
    if(event.cron==='15 18 * * *'){
@@ -76,6 +79,7 @@ export default {
    // Separate execution from the critical minute lane: at most one retained day
    // per five-minute invocation, with backend notification and lock safeguards.
    if(event.cron==='2-57/5 * * * *'){
+    if(quiet.active)return;
     await run('audit-export','roster-allocation-audit',()=>dispatchAllocationAudit(env));return;
    }
    const send=()=>run('notifications','roster-notification-dispatch',()=>dispatchNotifications(env));
@@ -85,10 +89,10 @@ export default {
    const notifications=send();
    const inbox=run('inbox','roster-inbox-dispatch',()=>dispatchInboxPending(env));
    const ingress=env.WHATSAPP_DURABLE_INGRESS==='true'?run('webhook','roster-webhook-drain',()=>dispatchWebhookJobs(env)):Promise.resolve();
-   const peerMail=(async()=>{await received;return run('peer-mail','roster-peer-mail-drain',()=>dispatchPeerMail(env));})();
+   const peerMail=(async()=>{await received;return quiet.active?null:run('peer-mail','roster-peer-mail-drain',()=>dispatchPeerMail(env));})();
    const planning=(async()=>{
     const receiptResult=await received;
-    const result=await run('allocation','roster-scheduled-cycle',()=>scheduledRoster(env,event.scheduledTime));
+    const result=quiet.active?null:await run('allocation','roster-scheduled-cycle',()=>scheduledRoster(env,event.scheduledTime));
     // Reuse the same durable outbox. Never reconstruct or reset provider claims.
     if(result?.notificationsQueued>0||receiptResult?.intake?.notificationsQueued>0){await notifications;await send();}
    })();
@@ -109,7 +113,7 @@ export default {
   const run=(job,work)=>stage(env,job,null,work);
   const received=await run('received-reports',()=>dispatchReceivedReports(env,{budgetMs:150000}));
   const result=await run('notifications',()=>dispatchNotifications(env,{budgetMs:240000}));
-  const peer=await run('peer-mail',()=>dispatchPeerMail(env));
+  const peer=(await readQuietMode(env.GSIS_JOBS).catch(()=>({active:false}))).active?{}:await run('peer-mail',()=>dispatchPeerMail(env));
   console.info(JSON.stringify({event:'roster-notification-queue',...safeSummary(result)}));
   if(received.stageFailed||result.stageFailed||peer.stageFailed||received.hasMore||received.transport?.pending||received.intake?.deferred||result.pending||result.prepareFailures||result.resultFailures||peer.pending||peer.failed||peer.blocked){
    const delaySeconds=Math.max(1,Math.min(900,Math.ceil(((received.hasMore?Date.now()+1000:result.readyAt||Date.now()+60000)-Date.now())/1000)));

@@ -1283,10 +1283,31 @@ var RosterOpsUI = (() => {
   const table=area.querySelector('[data-relief-review]');renderTable(s,table,rows,columns,{name:'Relief Assignments',numbered:true,columnFilters:false});table.querySelector('[data-table-excel]').remove();
   updatePublish(s);area.querySelector('[data-publish-relief]').onclick=()=>publishFromWorkspace(s);installReliefExport(s,area.querySelector('[data-export-slot]'));
  }
+ // Quiet mode pauses lock-heavy background jobs while SMCs allocate. The Worker
+ // ends it after a confirmed publish or WhatsApp send, at 07:15, or after 30 minutes.
+ const quietTime=value=>new Date(value).toLocaleTimeString('en-SG',{hour:'2-digit',minute:'2-digit',hour12:false,timeZone:'Asia/Singapore'});
+ function quietText(q){return q?.active?'Quiet mode on: background jobs paused until '+quietTime(q.expiresAt)+' or until published':'Quiet mode off';}
+ function drawQuiet(s){
+  const button=$(s,'[data-quiet-toggle]'),note=$(s,'[data-quiet-note]'),user=s.ctx.profile?.user,active=!!s.quiet?.active;if(!button)return;
+  button.hidden=!(user?.smc||user?.admin);button.textContent=active?'End quiet mode':'Quiet mode';button.setAttribute('aria-pressed',String(active));button.title=quietText(s.quiet);
+  if(note){note.hidden=!active;note.textContent=active?quietText(s.quiet)+'. New absence reports and WhatsApp keep running.':'';}
+ }
+ async function refreshQuiet(s,force=false){
+  if(!isLive(s)||s.page!=='Assign Relief'||!force&&Date.now()-(s.quietCheckedAt||0)<20000)return;s.quietCheckedAt=Date.now();
+  try{const value=await s.ctx.api('quiet-mode',{},'GET');if(isLive(s))s.quiet=value?.data??value;}catch{if(isLive(s))s.quiet=null;}
+  if(isLive(s))drawQuiet(s);
+ }
+ async function toggleQuiet(s){
+  const button=$(s,'[data-quiet-toggle]');if(!button||button.disabled)return;button.disabled=true;
+  try{const value=await s.ctx.api('quiet-mode',{action:s.quiet?.active?'off':'on'});s.quiet=value?.data??value;s.quietCheckedAt=Date.now();say(s,quietText(s.quiet)+'.');}
+  catch(error){say(s,error.message||'Quiet mode could not be changed.',true);}
+  finally{if(isLive(s)){button.disabled=false;drawQuiet(s);}}
+ }
  function drawAssignRelief(s,body){
   warmExport(s);scheduleAllocationCheck(s);
-  const actions=$(s,'[data-day-actions]');actions.innerHTML='<button type="button" class="primary" data-publish-relief data-notify-mode="all">Let teachers see and send WhatsApp to all</button><button type="button" data-notify-all>Send WhatsApp to all affected</button><button type="button" data-publish-relief data-notify-mode="none">Let teachers see</button><span data-export-slot></span>';
+  const actions=$(s,'[data-day-actions]');actions.innerHTML='<button type="button" data-quiet-toggle hidden aria-pressed="false">Quiet mode</button><span data-quiet-note class="ops-draft-status" role="status" hidden></span><button type="button" class="primary" data-publish-relief data-notify-mode="all">Let teachers see and send WhatsApp to all</button><button type="button" data-notify-all>Send WhatsApp to all affected</button><button type="button" data-publish-relief data-notify-mode="none">Let teachers see</button><span data-export-slot></span>';
   actions.querySelector('[data-notify-all]').onclick=()=>mutate(s,'notifyDaily',{});
+  actions.querySelector('[data-quiet-toggle]').onclick=()=>toggleQuiet(s);drawQuiet(s);void refreshQuiet(s,!s.quietCheckedAt);
   $(s,'[data-save-online]').onclick=()=>{const q=draftFor(s);if(q)sendDraft(q);};
   actions.querySelectorAll('[data-publish-relief]').forEach(button=>button.onclick=()=>publishFromWorkspace(s,button.dataset.notifyMode));installReliefExport(s,actions.querySelector('[data-export-slot]'));installReliefTools(s);
   body.innerHTML='<p class="hint" data-publish-hint></p>'+publicationChangesHtml(s)+'<div data-manual-workspace></div>';drawPlanner(s,body.querySelector('[data-manual-workspace]'));updatePublish(s);s.ctx.status?.('');

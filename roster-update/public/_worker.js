@@ -6,6 +6,7 @@ import {backendAvailable,callOperationalBackend,forwardOperationalRequest} from 
 import {assertRecoveryWritable} from '../../shared/edge-recovery.js';
 import {readSystemHealth,safeHealthError} from '../../shared/edge-health.js';
 import {rosterRecoveryEnvironment} from '../../shared/roster-recovery-profile.js';
+import {readQuietMode,startQuietMode,endQuietMode,QUIET_END_OPERATIONS} from '../../shared/roster-quiet-mode.js';
 /* GSIS_API_SECRET_BEGIN */
 // First-party API credentials share one operator-selected setting. Browser
 // sessions, private relief links and third-party credentials stay independent.
@@ -244,6 +245,21 @@ export async function nextSchoolDay(env,who,now=Date.now(),proof){
  for(const date of dates){const value=values[date];if(value?.available!==true||typeof value.schoolDay!=='boolean')return {today,date:null,available:false,...extra,message:'The next school day could not be verified. Choose a date manually or retry.'};if(value.schoolDay)return {today,date,available:true,...extra};}
  return {today,date:null,available:false,...extra,message:'No school day was found in the next 62 days. Choose a date manually.'};
 }
+// Assign Relief quiet mode. Status is readable by any signed-in user; switching
+// needs current SMC or Admin authority from a fresh signed Google read.
+async function quietModeRoute(req,env,u){
+ let who;try{who=await requestIdentity(req,env);}catch{return json({ok:false,error:'Sign in with your school account.'},401);}
+ try{
+  if(req.method==='GET')return json({ok:true,data:await readQuietMode(env.GSIS_JOBS)});
+  if(req.method!=='POST'||req.headers.get('Origin')!==u.origin)return json({ok:false,error:'Same-origin POST required'},403);
+  let input;try{input=await req.json();}catch{return json({ok:false,error:'Invalid request'},400);}
+  if(!['on','off'].includes(input?.action))return json({ok:false,error:'Choose on or off.'},400);
+  const auth=(await backend(rosterRecoveryEnvironment(env),'rosterOperations',{operation:'read',view:'intake',scope:'mine'},who,crypto.randomUUID())).result;
+  if(!auth?.ok)return json({ok:false,error:'Current school authority could not be confirmed.'},[401,403].includes(auth?.status)?403:503);
+  if(auth.data?.user?.smc!==true&&auth.data?.user?.admin!==true)return json({ok:false,error:'SMC or Admin access is required.'},403);
+  return json({ok:true,data:input.action==='on'?await startQuietMode(env.GSIS_JOBS,who.email):await endQuietMode(env.GSIS_JOBS,who.email,'manual')});
+ }catch(error){return json({ok:false,error:error.status&&error.status<500?error.message:'Quiet mode could not be confirmed.'},error.status||503);}
+}
 const D1_PREPARE_OPERATIONS=new Set(['status','import','export']);
 async function d1PrepareAllows(req,env){
  if(env.ROSTER_D1_PREPARE!=='import'||req.method!=='POST')return false;
@@ -275,6 +291,7 @@ export default {async fetch(req,env,ctx){
   const safe=new Response(response.body,response);safe.headers.set('Cache-Control','no-store');safe.headers.set('Referrer-Policy','no-referrer');safe.headers.set('X-Content-Type-Options','nosniff');safe.headers.set('Content-Security-Policy',"default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'");return safe;
  }
  if(u.pathname==='/api/config'){const {routes,...notifications}=notificationStatus(env);return json({version:'0.9.9',clientId:env.GOOGLE_CLIENT_ID||'',notifications});}
+ if(u.pathname==='/api/quiet-mode')return quietModeRoute(req,env,u);
  const action={'/api/profile':'rosterProfile','/api/read':'rosterRead','/api/upload':'rosterUpload','/api/update':'rosterUpdate','/api/operations':'rosterOperations','/api/edge/migration':'edgeMigration'}[u.pathname];
  if(!action)return json({ok:false,error:'Not found'},404);
  if(req.method!=='POST'||req.headers.get('Origin')!==u.origin)return json({ok:false,error:'Same-origin POST required'},403);
@@ -297,6 +314,8 @@ export default {async fetch(req,env,ctx){
    const calendarOutput={};
    try{const stage=Date.now();input=await trustedOperationsInput(input,env,who,calendarOutput);calendarMs=Date.now()-stage;}catch(error){return json({ok:false,error:error.message},400)}
    const value=input.operation==='timetableBatch'&&!edgeRosterEnabled(env)&&!backendAvailable(env)?await timetableSnapshot(env,input,who,traceId):await backend(env,action,input,who,traceId);backendMs=value.backendMs;
+   // A confirmed publish or WhatsApp send ends quiet mode on the server, not in the browser.
+   if(value.result?.ok&&Object.hasOwn(QUIET_END_OPERATIONS,input.operation))await endQuietMode(env.GSIS_JOBS,who.email,QUIET_END_OPERATIONS[input.operation]).catch(()=>{});
    if(input.operation==='statisticsCalendar'&&!edgeRosterEnabled(env)&&!backendAvailable(env)&&value.result.ok){const stage=Date.now();value.result.data=await statisticsCalendar(env,who,input.year);calendarMs=Date.now()-stage;}
    if(value.result.ok&&['createStapler','importStapler','saveStapler','confirmStapler','publishStapler','resetStapler','moveStapler','restoreStapler','deleteStapler','renameStapler'].includes(input.operation))warmAfterRosterWrite(env,who,traceId,ctx);
    if(value.result.ok&&value.result.data)Object.assign(value.result.data,calendarOutput);
