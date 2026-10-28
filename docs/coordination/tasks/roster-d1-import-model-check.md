@@ -27,6 +27,9 @@
 - Package: `Roster_Backend_v0.9.9a-importfix.gs`, SHA-256 2a8a81b2a92f25ac1047a27bdf9b5d0c76fdca001955c6e800c5d1a6455fb20d (includes fc0abb9 latest-wins). Delivered to owner, not stored in git.
 
 ## Review
+Codex reviewed 41ed57c: `edgeAudit` used the current date-to-archive pointer, not the archive captured by the export; the test did not prove that changed content is refused.
+Fix (next commit): the Worker (`roster-update/public/edge-roster.js`) sends the exported `modelFile` and `archiveFileId`; the backend requires them and returns 409 when the current register entry or archive pointer differs, before reading anything. Tests now cover a changed archive pointer, a changed model file behind the same ID, missing identities, malformed and unreadable archives, and the Worker sending the exported identities. `roster094-edge-roster.mjs` (end-to-end import) still passes.
+Deployment note: backend and Roster frontend must now be deployed together; the backend refuses fetches without the exported identities.
 
 ## Deployment
 
