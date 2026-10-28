@@ -270,3 +270,9 @@ Cloudflare-authoritative timetables (Diagram 1), new allocation rules, and chang
 3. R% is used for ranking but is not shown as a simple per-teacher annual report.
 
 **Proposed:** (a) an SMC tool to enter off-system relief (date, teacher, periods) so annual R% is complete; (b) a per-teacher annual R% report (reliefs, entitlement, %), exportable; (c) a warning when weeks lack entitlement records.
+
+**Owner decisions (29 Oct 2026):**
+1. Teachers see all upcoming suspended dates, not only their own requests.
+2. Teachers ask an SMC for permission to help plan (the request grants planning help, approved by the SMC).
+3. Released peer arrangements notify both peers.
+4. My Relief Duties shows each teacher their relief count for the year and their accumulated annual R%.
