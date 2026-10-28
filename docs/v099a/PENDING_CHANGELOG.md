@@ -295,3 +295,16 @@ Cloudflare-authoritative timetables (Diagram 1), new allocation rules, and chang
 7. Combine with the relief overlay entry above, so the published row also shows relief.
 
 **Scope:** Roster frontend (`roster-update/public/roster.js`); reuse the external page's alignment logic where possible. No data change.
+
+### Deploy: specialist count excludes FAJT staff
+
+**Request (29 Oct 2026):** In Deploy, the specialist count must not include staff whose employment is FAJT.
+
+**Current behaviour (0.9.9a):** `shared/workload.js` builds each specialist subject's pool as every active, eligible teacher who teaches the subject (`const pool=rows.filter(r=>r.active&&r.rules.eligible&&taught(r.teacher.id,s))`, ~line 171). `headcount` is `pool.length` (~lines 190-192), so FAJT teachers are counted. The same pool also feeds `capacity` (FAJT retained ratio 65/84, ~line 209) and the indicator `average` (assigned specialist periods ÷ headcount).
+
+**Planned change:**
+1. Exclude `employment==='FAJT'` from the specialist headcount.
+2. To keep the average honest, exclude FAJT periods from the indicator's assigned periods too (otherwise their periods are divided among fewer people). To confirm.
+3. Capacity: keep or exclude FAJT? To confirm. Default proposal: exclude from headcount and average, keep their periods visible as a separate "FAJT support" line so no load disappears.
+
+**Scope:** `shared/workload.js` (canonical; regenerate Deploy bundles), Deploy and Layout workload UI labels, tests for a pool with and without FAJT staff.
