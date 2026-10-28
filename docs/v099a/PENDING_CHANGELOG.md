@@ -308,3 +308,9 @@ Cloudflare-authoritative timetables (Diagram 1), new allocation rules, and chang
 3. Capacity: keep or exclude FAJT? To confirm. Default proposal: exclude from headcount and average, keep their periods visible as a separate "FAJT support" line so no load disappears.
 
 **Scope:** `shared/workload.js` (canonical; regenerate Deploy bundles), Deploy and Layout workload UI labels, tests for a pool with and without FAJT staff.
+
+**Owner decision (29 Oct 2026):** Count school-wide demand in full, but do not count FAJT staff, who are supplementary manpower.
+- Demand: unchanged; every class and group's specialist periods count, including periods FAJT staff teach.
+- Headcount and capacity: exclude FAJT staff.
+- Average: non-FAJT assigned periods ÷ non-FAJT headcount.
+- FAJT periods shown as a separate "FAJT supplementary" line, so the gap between demand and core capacity stays visible.
