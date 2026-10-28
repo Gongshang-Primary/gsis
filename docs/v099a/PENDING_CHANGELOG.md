@@ -276,3 +276,22 @@ Cloudflare-authoritative timetables (Diagram 1), new allocation rules, and chang
 2. Teachers ask an SMC for permission to help plan (the request grants planning help, approved by the SMC).
 3. Released peer arrangements notify both peers.
 4. My Relief Duties shows each teacher their relief count for the year and their accumulated annual R%.
+
+### Timetable page: on suspended days, show the baseline aligned underneath
+
+**Request (29 Oct 2026, 07:22):** On the Timetable page, for a suspended day, show the usual baseline directly underneath the published suspended timetable.
+
+**Current behaviour (0.9.9a):** Timetable → Teacher timetables shows "Published suspended timetable · <date>" as one table, then a separate "Baseline weekly timetable" section further down with its own Odd/Even week tables. The two are not aligned, so a teacher must scroll and compare by eye (owner screenshot, teacher view on a phone, 29 Oct).
+
+**Reference design already in production:** the private "My published timetable" page (`external.html`) shows one table per date with rows "Today's published timetable" and "Usual baseline" under the same period columns, with changed cells highlighted (owner screenshot, 23 Oct).
+
+**Planned change:**
+1. On a suspended (or published-changed) day, the Teacher, Class and TG timetables render one table with two rows per subject: "Published (suspended)" and "Usual baseline", sharing the same period and time columns.
+2. Cells that differ are highlighted in the same yellow as the external page, with "Changed".
+3. On ordinary days, show only the timetable (no duplicate baseline row).
+4. The separate "Baseline weekly timetable" section stays below for the full week view.
+5. Phone width: the period columns scroll horizontally together; the row labels stay fixed.
+6. PDF/Print and Excel exports of the day include both rows.
+7. Combine with the relief overlay entry above, so the published row also shows relief.
+
+**Scope:** Roster frontend (`roster-update/public/roster.js`); reuse the external page's alignment logic where possible. No data change.
