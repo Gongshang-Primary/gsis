@@ -244,13 +244,21 @@ export async function nextSchoolDay(env,who,now=Date.now(),proof){
  for(const date of dates){const value=values[date];if(value?.available!==true||typeof value.schoolDay!=='boolean')return {today,date:null,available:false,...extra,message:'The next school day could not be verified. Choose a date manually or retry.'};if(value.schoolDay)return {today,date,available:true,...extra};}
  return {today,date:null,available:false,...extra,message:'No school day was found in the next 62 days. Choose a date manually.'};
 }
+const D1_PREPARE_OPERATIONS=new Set(['status','import','export']);
+async function d1PrepareAllows(req,env){
+ if(env.ROSTER_D1_PREPARE!=='import'||req.method!=='POST')return false;
+ try{const input=JSON.parse(await req.clone().text());return D1_PREPARE_OPERATIONS.has(input?.operation);}catch{return false;}
+}
 export default {async fetch(req,env,ctx){
  const u=new URL(req.url);
  env={...rosterRecoveryEnvironment(env),GSIS_REQUEST_ORIGIN:u.origin};
  if(u.pathname.startsWith('/api/')&&!['/api/session','/api/logout'].includes(u.pathname))try{gsisApiSecret(env,'BRIDGE_SECRET');}catch(error){return json({ok:false,code:error.code,error:error.message},503);}
  // Migration is deliberately absent from the restoration release. In
  // particular, an old dashboard binding must not reactivate a second writer.
- if(u.pathname==='/api/edge/migration')return json({ok:false,code:'RECOVERY_MIGRATION_DISABLED',error:'Migration is disabled in this Roster restoration release.'},404);
+ // 0.9.9a D1 preparation: ROSTER_D1_PREPARE=import reopens only read and copy
+ // controls. Activation, restart, pause and resume stay closed, so Google
+ // remains the only writer and users keep the Google route.
+ if(u.pathname==='/api/edge/migration'&&!(await d1PrepareAllows(req,env)))return json({ok:false,code:'RECOVERY_MIGRATION_DISABLED',error:'Migration is disabled in this Roster restoration release.'},404);
  if(u.pathname==='/api/venues-source')return json({ok:false,code:'RECOVERY_VENUES_SUSPENDED',error:'Venue occupancy export is paused during Roster recovery.'},503);
  if(u.pathname==='/api/system-health')return systemHealthRoute(req,env);
  if(u.pathname.startsWith('/api/')&&!['/api/config','/api/session'].includes(u.pathname)){try{assertRecoveryWritable(env);}catch(error){return json({ok:false,code:error.code,error:error.message},503);}}

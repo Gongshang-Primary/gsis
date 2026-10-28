@@ -10,8 +10,8 @@ test('later same-reporter and same-editor shorter future report replaces full-da
  const h=setup(),id=h.save({fullDay:true}).savedIds[0];h.advance();const result=h.save({periods:Array.from({length:11},(_,i)=>i),typeId:'others',reasonDetail:'Updated appointment'});
  assert.deepEqual(result.savedIds,[id]);assert.equal(h.state.absences.length,1);assert.deepEqual(h.state.absences[0].periods,Array.from({length:11},(_,i)=>i));assert.equal(h.state.absences[0].coverage.kind,'timeRange');assert.equal(h.state.absences[0].typeId,'others');assert.equal(h.state.absences[0].reasonDetail,'Updated appointment');
 });
-test('a different original reporter or latest editor keeps shorter coverage awaiting a choice',()=>{
- for(const field of ['reportedBy','updatedBy']){const h=setup();h.save();h.state.absences[0][field]='bob@gsps.edu.sg';h.advance();const before=clone(h.state);assert.throws(()=>h.save({periods:[2,3]}),e=>e.code==='ABSENCE_SHORTER_CONFIRMATION');assert.deepEqual(h.state,before);}
+test('0.9.9a: a later shorter report replaces coverage saved by a different reporter or editor',()=>{
+ for(const field of ['reportedBy','updatedBy']){const h=setup();h.save();h.state.absences[0][field]='bob@gsps.edu.sg';h.advance();h.save({periods:[2,3]});assert.deepEqual(h.state.absences[0].periods,[2,3]);}
 });
 test('missing latest editor uses the original reporter; explicit keep and replace choices still win',()=>{
  {const h=setup();h.save();delete h.state.absences[0].updatedBy;h.advance();h.save({periods:[2,3]});assert.deepEqual(h.state.absences[0].periods,[2,3]);}
@@ -21,21 +21,20 @@ test('missing latest editor uses the original reporter; explicit keep and replac
 test('strict report chronology prevents an old or identical-order report from shortening a newer entry',()=>{
  const h=setup();h.save();const original=h.ctx.reportedAt;h.advance();h.save({periods:[2,3,4,5]});const expected=clone(h.state.absences);
  h.ctx.reportedAt=original;h.ctx.reportSequence=1;h.save({periods:[2,3]});assert.deepEqual(h.state.absences,expected);
- h.ctx.reportedAt=expected[0].lastSubmissionAt;h.ctx.reportSequence=expected[0].lastSubmissionSequence;assert.throws(()=>h.save({periods:[2,3]}),e=>e.code==='ABSENCE_SHORTER_CONFIRMATION');assert.deepEqual(h.state.absences,expected);
+ h.ctx.reportedAt=expected[0].lastSubmissionAt;h.ctx.reportSequence=expected[0].lastSubmissionSequence;h.save({periods:[2,3]});assert.deepEqual(h.state.absences,expected,'an identical-order replay keeps the saved coverage');
  h.ctx.reportSequence++;h.save({periods:[2,3]});assert.deepEqual(h.state.absences[0].periods,[2,3]);
 });
-test('same-actor automatic shortening cannot remove ended or protected SMC, peer or shared covers',()=>{
+test('0.9.9a: a later shorter report releases protected covers but never changes ended periods',()=>{
  for(const protection of [{origin:'smc'},{origin:'mutual'},{protected:true},{manualProtected:true},{combination:true},{sharedLessonKey:'shared-lesson'},{absenceIds:['other-absence','placeholder']}]){
-  const h=setup(),id=h.save().savedIds[0];h.state.assignments.push({id:'protected-assignment',date:h.date,period:4,absenceId:id,status:'draft',origin:'automatic',...protection});h.advance();const before=clone(h.state);assert.throws(()=>h.save({periods:[2,3]}),e=>e.code==='ABSENCE_COVERAGE_REVIEW');assert.deepEqual(h.state,before);
+  const h=setup(),id=h.save().savedIds[0];h.state.assignments.push({id:'protected-assignment',date:h.date,period:4,absenceId:id,status:'draft',origin:'automatic',...protection});h.advance();h.save({periods:[2,3]});assert.deepEqual(h.state.absences[0].periods,[2,3]);
  }
- const h=setup();h.save();h.ctx.today=h.date;h.ctx.minute=900;h.ctx.now=Date.parse(h.date+'T15:00:00+08:00');h.ctx.iso=new Date(h.ctx.now).toISOString();h.ctx.reportedAt=h.ctx.iso;h.ctx.reportSequence++;const before=clone(h.state);assert.throws(()=>h.save({periods:[2,3]}),e=>e.code==='ABSENCE_COVERAGE_REVIEW');assert.deepEqual(h.state,before);
+ const h=setup();h.save();h.ctx.today=h.date;h.ctx.minute=900;h.ctx.now=Date.parse(h.date+'T15:00:00+08:00');h.ctx.iso=new Date(h.ctx.now).toISOString();h.ctx.reportedAt=h.ctx.iso;h.ctx.reportSequence++;h.save({periods:[2,3]});assert.deepEqual(h.state.absences[0].periods,[2,3,4],'ended periods keep their recorded absence');
 });
 test('same-actor shorter attendance does not overwrite instructions written by another actor',()=>{
  const h=setup();h.save();const a=h.state.absences[0],key=a.lessonSnapshot[0].lessonKey;a.instructions={[key]:'SMC note'};a.instructionsNA=false;a.instructionAuthors={[key]:{actor:'bob@gsps.edu.sg',at:h.ctx.reportedAt,sequence:1}};h.advance();const before=clone(h.state);assert.throws(()=>h.save({periods:[2,3],instructionsNA:false,instructionsByDate:{[h.date]:{[key]:'Reporter replacement'}}}),e=>e.code==='ABSENCE_INSTRUCTIONS_CONFLICT');assert.deepEqual(h.state,before);
 });
-test('all overlapping rows must belong to the same reporter and latest editor before shorter auto-replacement',()=>{
- const h=setup();h.save({periods:[2,3]});h.save({periods:[4,5]});h.state.absences[1].updatedBy='bob@gsps.edu.sg';h.advance();const before=clone(h.state);assert.throws(()=>h.save({periods:[2,3,4]}),e=>e.code==='ABSENCE_SHORTER_CONFIRMATION');assert.deepEqual(h.state,before);
- h.state.absences[1].updatedBy=h.ctx.user.email;h.save({periods:[2,3,4]});assert.deepEqual(h.state.absences.flatMap(a=>a.periods),[2,3,4]);
+test('0.9.9a: a later shorter report replaces overlapping rows whoever last edited them',()=>{
+ const h=setup();h.save({periods:[2,3]});h.save({periods:[4,5]});h.state.absences[1].updatedBy='bob@gsps.edu.sg';h.advance();h.save({periods:[2,3,4]});assert.deepEqual(h.state.absences.flatMap(a=>a.periods),[2,3,4]);
 });
 test('retained shorter reviews are claimed only once under N and preserve the existing D overlap recovery',()=>{
  const h=intake(),command=h.command();h.capture(command);let [job]=h.scope.rosterAbsenceIntakeClaim_(1);h.scope.rosterAbsenceIntakeSettle_(job.id,job.claimId,{state:'needsReview',failureCode:'ABSENCE_SHORTER_CONFIRMATION'});

@@ -35,14 +35,14 @@ test('same-actor duplicate, later instructions and wider coverage retain one abs
  assert.deepEqual(h.save([2,3]).savedIds,[id]);h.advance();h.save([2,3],{instructionsNA:false,instructionsByDate:{[h.date]:{[key]:'New worksheet'}}});h.advance();h.save([2,3,4]);
  assert.equal(h.state.absences.length,1);assert.equal(h.state.absences[0].id,id);assert.deepEqual(h.state.absences[0].periods,[2,3,4]);assert.equal(h.state.absences[0].instructions[key],'New worksheet');assert.equal(h.counts.decodes(),0);
 });
-test('shorter-report rejection leaves primary facts unchanged and still retains cold plan identities',()=>{
+test('0.9.9a: later shorter report applies without opening cold plan archives',()=>{
  const h=setup();h.save([2,3,4]);h.state.absences[0].updatedBy='bob@gsps.edu.sg';h.advance();const before=primaryFacts(h.state),archive=h.state.staplerArchives[0].draft;
- assert.throws(()=>h.save([2,3]),error=>error.code==='ABSENCE_SHORTER_CONFIRMATION');assert.deepEqual(primaryFacts(h.state),before);assert.equal(h.state.staplerArchives[0].draft,archive);assert.equal(h.counts.decodes(),0);
+ void before;h.save([2,3]);assert.deepEqual(h.state.absences.find(a=>!a.deletedAt).periods,[2,3]);assert.equal(h.state.staplerArchives[0].draft,archive);assert.equal(h.counts.decodes(),0);
 });
-test('a conflicting later date cannot leave an earlier gap applied',()=>{
+test('0.9.9a: a multi-date later report applies to every date together',()=>{
  const h=setup(),next='2026-10-15';h.ctx.days[next]={...clone(h.ctx.days[h.date]),date:next};h.O.apply(h.state,{...h.ctx,resubmission:false},{operation:'saveAbsence',date:next,staffId:'alice',typeId:'mc',periods:[2,3,4]});h.state.absences[0].updatedBy='bob@gsps.edu.sg';h.advance();
  const before=primaryFacts(h.state),archive=h.state.staplerArchives[0].draft;
- assert.throws(()=>h.O.apply(h.state,h.ctx,{operation:'saveAbsence',dates:[h.date,next],staffId:'alice',typeId:'mc',periods:[2,3]}),error=>error.code==='ABSENCE_SHORTER_CONFIRMATION');assert.deepEqual(primaryFacts(h.state),before);assert.equal(h.state.staplerArchives[0].draft,archive);assert.equal(h.counts.decodes(),0);
+ void before;h.O.apply(h.state,h.ctx,{operation:'saveAbsence',dates:[h.date,next],staffId:'alice',typeId:'mc',periods:[2,3]});for(const d of [h.date,next])assert.deepEqual(h.state.absences.filter(a=>!a.deletedAt&&a.date===d).flatMap(a=>a.periods),[2,3]);assert.equal(h.state.staplerArchives[0].draft,archive);assert.equal(h.counts.decodes(),0);
 });
 test('same-day confirmed timetable contents remain validated when attendance context uses them',()=>{
  const h=setup();let state=h.O.initial();state.staplerPlans=[h.makeRow(h.date)];state=h.scope.rosterOperationsPackPlans_(state);state.staplerPlans[0].draft.validation.digest='0'.repeat(64);state=h.scope.rosterOperationsUnpackPlans_(clone(state));

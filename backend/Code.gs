@@ -4276,23 +4276,23 @@ const next=stapler().effectiveDay(plan,ctx.baselineDays?.[d]||ctx.days[d]);for(c
   const incomingAt=ctx.reportedAt||ctx.iso,sequence=ctx.reportSequence||0;
   for(const date of dates)for(const staffId of staffIds){
    const dd=day(ctx,date),coverage=p.fullDay===true?{kind:'fullDay'}:p.coverage,requested={periods:p.periods||[],coverage},want=resubmissionIntervals([requested],dd);
-   if(candidate.absences.some(a=>a.deletedAt&&Date.parse(a.deletedAt)>=Date.parse(incomingAt)&&a.date===date&&samePerson(ctx,a.staffId,staffId)&&absenceOverlap(a,requested,dd)))fail(409,'This report predates a saved absence deletion. Review the intended coverage.','ABSENCE_COVERAGE_REVIEW');
-   const matches=candidate.absences.filter(a=>!a.deletedAt&&a.date===date&&samePerson(ctx,a.staffId,staffId)&&absenceOverlap(a,requested,dd));
-   if(!matches.length){const command={...p,staffId,date};delete command.staffIds;delete command.dates;delete command.from;delete command.to;const r=apply(candidate,{...ctx,resubmission:false},command);for(const id of r.savedIds){const a=candidate.absences.find(a=>a.id===id);a.lastSubmissionAt=incomingAt;a.lastSubmissionSequence=sequence;if(Object.keys(a.instructions||{}).length){const notes=mergeSubmittedInstructions({...a,instructions:{},instructionAuthors:{}},a.instructions,ctx);Object.assign(a,notes);}}savedIds.push(...r.savedIds);continue;}
+   // 0.9.9a: the latest action wins. A deletion saved after this report supersedes it.
+   if(candidate.absences.some(a=>a.deletedAt&&Date.parse(a.deletedAt)>=Date.parse(incomingAt)&&a.date===date&&samePerson(ctx,a.staffId,staffId)&&absenceOverlap(a,requested,dd)))continue;
+   const overlapping=candidate.absences.filter(a=>!a.deletedAt&&a.date===date&&samePerson(ctx,a.staffId,staffId)&&absenceOverlap(a,requested,dd));
+   if(!overlapping.length){const command={...p,staffId,date};delete command.staffIds;delete command.dates;delete command.from;delete command.to;const r=apply(candidate,{...ctx,resubmission:false},command);for(const id of r.savedIds){const a=candidate.absences.find(a=>a.id===id);a.lastSubmissionAt=incomingAt;a.lastSubmissionSequence=sequence;if(Object.keys(a.instructions||{}).length){const notes=mergeSubmittedInstructions({...a,instructions:{},instructionAuthors:{}},a.instructions,ctx);Object.assign(a,notes);}}savedIds.push(...r.savedIds);continue;}
    const stale=a=>Date.parse(incomingAt)<Date.parse(a.lastSubmissionAt||a.reportedAt)||incomingAt===(a.lastSubmissionAt||a.reportedAt)&&sequence<(a.lastSubmissionSequence||0);
-   if(matches.every(stale)){savedIds.push(...matches.map(a=>a.id));continue;}
-   if(matches.some(stale))fail(409,'Saved absence portions have newer changes. Review the requested coverage.','ABSENCE_COVERAGE_REVIEW');
+   if(overlapping.every(stale)){savedIds.push(...overlapping.map(a=>a.id));continue;}
+   // 0.9.9a: saved portions newer than this report keep their coverage; older portions follow it.
+   savedIds.push(...overlapping.filter(stale).map(a=>a.id));const matches=overlapping.filter(a=>!stale(a));
    const existing=resubmissionIntervals(matches,dd),gaps=subtractAbsenceIntervals(want,existing),outside=subtractAbsenceIntervals(existing,want),shorter=!gaps.length&&outside.length>0;
-   // A later report may revise its own coverage; another actor's saved work
-   // still needs an explicit choice. Equal-order replays are not later reports.
-   const ownLater=matches.every(a=>a.reportedBy===ctx.user.email&&(a.updatedBy||a.reportedBy)===ctx.user.email&&(Date.parse(incomingAt)>Date.parse(a.lastSubmissionAt||a.reportedAt)||incomingAt===(a.lastSubmissionAt||a.reportedAt)&&sequence>(a.lastSubmissionSequence||0))),choice=ctx.resubmissionChoice||(shorter&&ownLater?'replace':null);
-   if(shorter&&!choice)fail(409,'This report is shorter than the saved absence. Choose which coverage to keep.','ABSENCE_SHORTER_CONFIRMATION');
+   // 0.9.9a: a later report replaces the saved coverage without SMC review.
+   // Periods that have already started keep their recorded absence and relief.
+   // Equal-order replays are not later reports: they keep the saved coverage.
+   const later=matches.every(a=>Date.parse(incomingAt)>Date.parse(a.lastSubmissionAt||a.reportedAt)||incomingAt===(a.lastSubmissionAt||a.reportedAt)&&sequence>(a.lastSubmissionSequence||0));
+   const choice=ctx.resubmissionChoice||(shorter?(later?'replace':'keep'):null);
    if(shorter&&choice==='replace'){
-    // Removing past or shared/protected arrangements needs the normal SMC edit
-    // workflow, not an implicit deletion from a received report.
-    for(const a of matches){const removed=absencePeriods(ctx,a).filter(n=>!allocation().absencePeriods(requested,dd).includes(n));
-     if(removed.some(n=>allocation().periodEnded(ctx,date,n))||candidate.assignments.some(x=>['draft','published','completed'].includes(x.status)&&(x.absenceId===a.id||(x.absenceIds||[]).includes(a.id))&&removed.includes(x.period)&&(x.combination||x.sharedLessonKey||x.absenceIds?.length>1||x.origin==='smc'||x.origin==='mutual'||x.protected||x.manualProtected)))fail(409,'Shortening affects past periods or protected relief. Ask SMC to review those periods.','ABSENCE_COVERAGE_REVIEW');
-    }
+    const keep=[...new Set(matches.flatMap(a=>absencePeriods(ctx,a).filter(n=>!allocation().absencePeriods(requested,dd).includes(n)&&allocation().periodEnded(ctx,date,n))))];
+    if(keep.length)want.splice(0,want.length,...resubmissionIntervals([requested,{periods:keep}],dd));
    }
    for(const a of matches){
     const last=a.lastSubmissionAt||a.reportedAt,lastSeq=a.lastSubmissionSequence||0;
@@ -9653,7 +9653,7 @@ function rosterEdgeSnapshot_(){
  if(transport){rosterNotificationOverlayWith_(state,transport);state.notificationTransport={};for(const key of ['cooldownUntil','cooldowns','leases','readyBatches','unmatchedReceipts','senderPacing','providerBackoff','retryAfter'])if(transport[key]!==undefined)state.notificationTransport[key]=transport[key];state.peerMail=transport.peerMail||[];state.deliveryEvents=transport.deliveryEvents||state.deliveryEvents;}
  if(typeof rosterInboxState_==='function'){const inbox=rosterInboxState_();state.inbox={schema:inbox.schema,revision:inbox.revision};for(const key of ['threads','messages','audit','receipts','deliveryEvents','alerts'])state['inbox'+key.charAt(0).toUpperCase()+key.slice(1)]=inbox[key]||[];}
  const properties=props_().getProperties();state.edgeStaplerLeases={};for(const key of Object.keys(properties))if(key.startsWith('ROSTER_STAPLER_LEASE:')){const date=key.slice('ROSTER_STAPLER_LEASE:'.length);try{state.edgeStaplerLeases[date]=JSON.parse(properties[key]);}catch(error){error_(503,'A dated planning lease is malformed. Repair it before migration.');}}
- if(typeof rosterAbsenceIntakePending_==='function'){const pending=rosterAbsenceIntakePending_();if(pending?.blockedDates?.length)error_(409,'Finish the captured absence queue before exporting Roster authority.');}
+ if(typeof rosterAbsenceIntakePending_==='function'){const pending=rosterAbsenceIntakePending_();if(pending?.blockedDates?.length)error_(409,'Finish the captured absence queue before exporting Roster authority. Unresolved report dates: '+pending.blockedDates.join(', ')+'. Resolve them in Manage school-wide absences.');}
  // Include all mutable writer domains, not merely the relief document counter.
  const value={schema:1,state,index};return {...value,sourceDigest:rosterOperationsDigest_(value)};
 }

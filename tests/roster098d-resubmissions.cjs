@@ -12,9 +12,9 @@ function setup(){const f=fixture();f.ctx.minute=360;f.ctx.now=Date.parse(f.date+
 }
 for(const periods of [[2,3,4],[3,4]]){const f=setup();const id=f.save([2,3]).savedIds[0];f.advance();f.save(periods);assert.equal(f.state.absences.length,1);assert.equal(f.state.absences[0].id,id);assert.deepEqual(f.state.absences[0].periods,[2,3,4]);}
 {
- const f=setup();f.save([2,3,4]);f.state.absences[0].updatedBy='bob@gsps.edu.sg';const before=copy(f.state);f.advance();assert.throws(()=>f.save([2,3]),e=>e.code==='ABSENCE_SHORTER_CONFIRMATION');assert.deepEqual(f.state.absences,before.absences);
- f.ctx.resubmissionChoice='keep';f.save([2,3]);assert.deepEqual(f.state.absences[0].periods,[2,3,4]);
- f.ctx.resubmissionChoice='replace';f.save([2,3]);assert.deepEqual(f.state.absences[0].periods,[2,3]);
+ // 0.9.9a: a later shorter report replaces another editor's saved coverage automatically.
+ const f=setup();f.save([2,3,4]);f.state.absences[0].updatedBy='bob@gsps.edu.sg';f.advance();f.save([2,3]);assert.deepEqual(f.state.absences[0].periods,[2,3]);
+ f.ctx.resubmissionChoice='keep';f.advance();f.save([2]);assert.deepEqual(f.state.absences[0].periods,[2,3],'an explicit keep choice is still honoured');
 }
 {
  const f=setup();f.save([2,3]);const old=f.ctx.reportedAt;f.advance();const type=f.state.types.find(t=>t.id!=='mc'&&t.allowSelectAll&&!t.todayOnly&&t.afterMinutes==null&&t.minStartMinutes==null&&!t.requiresDetail&&!t.allowedPeriods);assert(type);f.save([2,3],{typeId:type.id});assert.equal(f.state.absences[0].typeId,type.id);f.ctx.reportedAt=old;f.save([2,3]);assert.equal(f.state.absences[0].typeId,type.id,'late old report cannot restore older type');
@@ -47,5 +47,6 @@ console.log('PASS 098d receipt resubmission merging, instructions, chronology, m
 }
 {
  const f=setup();f.save([2,3]);const accepted=f.ctx.reportedAt;f.advance();f.O.apply(f.state,{...f.ctx,resubmission:false},{operation:'deleteAbsences',ids:[f.state.absences[0].id],confirm:true,date:f.date});f.ctx.reportedAt=accepted;
- assert.throws(()=>f.save([2,3]),error=>error.code==='ABSENCE_COVERAGE_REVIEW','a delayed report must not silently recreate a later deleted absence');assert.equal(f.state.absences.filter(a=>!a.deletedAt).length,0);
+ f.save([2,3]); // 0.9.9a: the later deletion is the latest action; the delayed report is superseded without review.
+ assert.equal(f.state.absences.filter(a=>!a.deletedAt).length,0);
 }

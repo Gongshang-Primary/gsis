@@ -14,7 +14,7 @@ Staging is a private copy of Roster for trying every change before production. R
 
 ### A1. Create the staging D1 database
 1. Cloudflare dashboard → **Storage & Databases → D1 → Create database**.
-2. Name: `gsps-roster-staging`. Location: leave automatic (or Asia-Pacific).
+2. Name: `gsis-staging`. Location: leave automatic (or Asia-Pacific).
 3. Click **Create**.
 
 ### A2. Create the staging Pages project
@@ -25,7 +25,7 @@ Staging is a private copy of Roster for trying every change before production. R
 
 ### A3. Bind the database
 1. Open `gsps-roster-staging` → **Settings → Bindings → Add → D1 database**.
-2. Variable name: `GSIS_JOBS`. Database: `gsps-roster-staging`.
+2. Variable name: `GSIS_JOBS`. Database: `gsis-staging`.
 3. Save.
 
 ### A4. Set staging variables
@@ -34,6 +34,7 @@ Open **Settings → Variables and Secrets** and add these to **Production** (thi
 | Name | Type | Value |
 | --- | --- | --- |
 | `GSIS_SECRET` | Secret | A **new** random value of 40 or more characters. Generate it in a password manager. Never reuse production's. |
+| `BRIDGE_SECRET` | Secret | The same new staging value as the staging Script Property `BRIDGE_SECRET` (32 or more characters). Signs browser sessions; sign-in fails without it. |
 | `ROSTER_PUBLIC_ORIGIN` | Text | The staging address from A2 |
 | `ROSTER_EDGE_AUTHORITY` | Text | `legacy` |
 | `WHATSAPP_ENABLED` | Text | `false` |

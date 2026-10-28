@@ -7,9 +7,9 @@ const assert=require('node:assert/strict'),setup=require('./roster093b-absence-p
  assert.equal(h.process(second).intakeState,'applied');assert.equal(h.state().absences.length,1);assert.equal(h.state().absences[0].id,id);assert.equal(h.state().absences[0].instructions[key],'Read page 5.');
  const third=h.make({periods:[2,3,4],instructionsNA:false,instructionsByDate:{[h.date]:{[key]:'Read page 6.'}}});third.sequence=3;assert.equal(h.process(third).intakeState,'applied');assert.deepEqual(h.state().absences[0].periods,[2,3,4]);assert.equal(h.state().absences[0].instructions[key],'Read page 6.');
  const stale=h.make({periods:[2,3],instructionsNA:false,instructionsByDate:{[h.date]:{[key]:'Old'}}});stale.sequence=1;assert.equal(h.process(stale).intakeState,'applied');assert.equal(h.state().absences[0].instructions[key],'Read page 6.');assert.deepEqual(h.state().absences[0].periods,[2,3,4]);
- const current=h.state();current.absences[0].updatedBy='bob@gsps.edu.sg';h.setState(current);const shorter=h.make({periods:[2,3]});shorter.sequence=4;const review=h.process(shorter);assert.equal(review.failureCode,'ABSENCE_SHORTER_CONFIRMATION');assert.equal(review.absenceApplied,false);
+ const current=h.state();current.absences[0].updatedBy='bob@gsps.edu.sg';h.setState(current);const shorter=h.make({periods:[2,3]});shorter.sequence=4;const applied=h.process(shorter);assert.equal(applied.failureCode??null,null,'0.9.9a: a later shorter report replaces automatically');assert.equal(applied.absenceApplied,true);
 }
-console.log('PASS 098d real pipeline reuses absence identity, later instructions, stale replay and shorter prompt');
+console.log('PASS 098d real pipeline reuses absence identity, later instructions, stale replay and automatic later shorter replacement');
 {
  const h=setup();h.ctx.minute=360;h.ctx.now=Date.parse(h.date+'T06:00:00+08:00');h.ctx.iso=new Date(h.ctx.now).toISOString();
  h.process(h.make({periods:[2]}));h.process(h.make({periods:[3]}));
