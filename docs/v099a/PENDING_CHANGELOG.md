@@ -237,3 +237,36 @@ Cloudflare-authoritative timetables (Diagram 1), new allocation rules, and chang
 **Packages:** `Roster_Backend_v0.9.9a-latestwins.gs` SHA-256 `a504a47d98a422fa37c7152b2fb8941e2c4900818a06792e15d76955f631e905`; `Roster_Frontend_v0.9.9a-latestwins.zip` SHA-256 `85ccb4dc2c06dc5f054a5872743e23fdec1bc896f0690e679e12bccefcb3923c`. Runtime labels still read 0.9.9.
 
 **Rollback:** Apps Script → Manage deployments → previous version; Pages → previous deployment.
+
+## Owner requests logged 29 Oct 2026 (proposed, not implemented)
+
+### Stapler: teachers see upcoming suspended dates and ask an SMC sponsor to plan
+
+**Request:** Teachers can view upcoming suspended dates and ask an SMC sponsor to do the planning. To confirm.
+
+**Current behaviour (0.9.9a):** Largely present. `requestStapler` (`shared/roster-operations.js:761`) lets an active teacher request Stapler planning and publication access for a date, naming an eligible SMC sponsor; the sponsor gets a `stapler_request` notification and decides with `decideStapler`. `staplerDatesView` (`shared/roster-operations.js:170`) lists dates; teachers see their own requests and confirmed dates subject to `confirmedDateAccess`.
+
+**To confirm with the owner:** whether teachers can already see every upcoming suspended date (including ones they did not request), and whether the request should ask the SMC to plan on the teacher's behalf (current flow grants the teacher planning access instead). Change only after that answer.
+
+### Peer arrangements respected?
+
+**Question:** Are peer (mutual) arrangements respected?
+
+**Current behaviour:** Yes for allocation. Assignments from accepted peer arrangements carry `origin:'mutual'` / `peerApproved` (`shared/roster-allocation.js:307`); Auto-allocate and Auto-fill blanks treat them as protected and do not replace them.
+
+**Change introduced by 0.9.9a latest-wins (fc0abb9):** when a later absence report shortens an absence, relief on the removed periods is released, including peer arrangements (owner directive: release protected relief). Ended periods are kept.
+
+**Proposed:** (a) on release, notify both peers that the arrangement is no longer needed; (b) confirm the owner wants peer arrangements released in this case, or kept as the one exception.
+
+### Annual R%: reliefs accumulate across the year regardless of workload changes
+
+**Request:** Count reliefs cumulatively across the year regardless of workload changes, and account for annual R%.
+
+**Current behaviour:** Present in the allocator. `annual()` (`shared/roster-allocation.js` ~179) sums completed plus committed relief cost for the accounting year, and divides by the sum of each week's recorded R entitlement in `s.entitlements` (week by week, so mid-year workload changes are reflected week by week). Candidates are ranked by lower annual utilisation when the "Lower annual R utilisation" preference is on.
+
+**Gaps:**
+1. Relief done outside the system is not counted. 28 Oct 2026 (Excel day) and any day before Roster went live are missing unless entered. R% for those teachers is understated.
+2. Weeks with no recorded entitlement row add nothing to the denominator; `historyVerified` marks whether the year's history is verified.
+3. R% is used for ranking but is not shown as a simple per-teacher annual report.
+
+**Proposed:** (a) an SMC tool to enter off-system relief (date, teacher, periods) so annual R% is complete; (b) a per-teacher annual R% report (reliefs, entitlement, %), exportable; (c) a warning when weeks lack entitlement records.

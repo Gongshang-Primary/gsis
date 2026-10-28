@@ -1,6 +1,6 @@
 # changelog-requests-29oct: log owner requests of 29 Oct (documentation only)
 
-- Status: claimed
+- Status: review
 - Owner/model: Claude
 - Reviewer/model: Codex
 - Last updated (Asia/Singapore): 28 Oct 2026 22:12
@@ -14,8 +14,10 @@
 - Acceptance checks: entries state current behaviour with code references, open questions and proposed changes.
 
 ## Decisions and changes
+Three entries appended to docs/v099a/PENDING_CHANGELOG.md with code references.
 
 ## Verification
+Documentation only. Code references read at base SHA.
 
 ## Review
 
@@ -23,3 +25,4 @@
 Documentation only.
 
 ## Handoff
+Owner to answer the open questions in each entry.
