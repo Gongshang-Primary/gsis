@@ -1,0 +1,25 @@
+{
+  "release": "0.9.8f",
+  "baseline": "0.9.8e",
+  "migration": false,
+  "liveDeploymentPerformed": false,
+  "components": [
+    "rosterFrontend",
+    "rosterBackend",
+    "notificationWorker"
+  ],
+  "validation": {
+    "targeted": {
+      "passed": 24,
+      "total": 24
+    },
+    "fullSuiteComplete": false,
+    "broadPartialPrograms": 271,
+    "observedBroadFailures": [
+      "cap708.cjs",
+      "package.cjs",
+      "release084-absence-browser.cjs"
+    ],
+    "productionVerified": false
+  }
+}

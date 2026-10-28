@@ -1,0 +1,53 @@
+{
+  "version": "0.9.6",
+  "baseline": "0.9.5",
+  "includes": "0.9.5a STAPLER patch",
+  "packagingRevision": "2026-10-26-repacked",
+  "packagingRepair": {
+    "selfContainedPagesWorkers": ["rosterFrontend", "deployFrontend"],
+    "actualZipStandaloneSmokePassed": true,
+    "applicationBehaviorChanged": false,
+    "remoteDeploymentErrorConfirmed": false
+  },
+  "scope": [
+    "cron idle due-work checks",
+    "change-driven timetable preparation",
+    "changed-date audit export",
+    "R2 unused cache cleanup"
+  ],
+  "components": [
+    "rosterFrontend",
+    "rosterBackend",
+    "notificationWorker",
+    "deployFrontend"
+  ],
+  "sourceProvenance": "Local import of the supplied v0.9.5 source plus verified v0.9.5a changes; not an upstream history reconstruction.",
+  "liveDeploymentPerformed": false,
+  "productionDataChanged": false,
+  "r2Cleanup": {
+    "cronUTC": "15 18 * * *",
+    "localTime": "02:15 Asia/Singapore",
+    "prefix": "roster/timetables/v2/parts/",
+    "minimumObjectAgeDays": 30,
+    "minimumQuarantineHours": 24,
+    "scanLimit": 50,
+    "deleteLimit": 10,
+    "protectsAllCurrentManifestAuthorities": true,
+    "rawTimetablesMediaAuditAndRecoveryExcluded": true
+  },
+  "limits": [
+    "Active work is bounded by timetable stages, not individual parts.",
+    "Cloudflare CPU and production D1 billing metrics have not been measured.",
+    "A clean full-suite result is not claimed; scoped results and missing historical fixtures are recorded in VALIDATION.md."
+  ],
+  "skills": "Superpowers, pstack, Ponytail, Vercel, Improve and available gstack review guidance; Thermonuclear was absent from the exposed cloud/executor catalogs.",
+  "validation": {
+    "finalTargetedScriptsPassed": 31,
+    "newRegressionScriptsPassed": 8,
+    "widerAffectedScriptsPassed": 110,
+    "widerAffectedScriptsBlockedByMissingHistoricalTags": 3,
+    "appsScriptFilesParsed": 187,
+    "notificationBundleParity": true,
+    "liveCPUVerified": false
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "profile": "product-admin",
+  "sourceRoots": ["public"],
+  "locale": "en-SG",
+  "canonicalMap": "UX-CONTRACT.md",
+  "requiredCapabilities": ["Table Selection", "Select/Listbox", "Date", "Form", "Scrollbar", "Toast", "CRUD"],
+  "ownership": {"Select/Listbox": "authored", "Date": "native"},
+  "requiredCommands": ["browser"],
+  "commands": {"browser": "node ../tests/venues-browser.cjs"},
+  "evidence": {"crudFullFlow": "../tests/venues-browser.cjs", "failurePaths": "../tests/venues-browser.cjs"}
+}

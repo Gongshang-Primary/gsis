@@ -1,0 +1,15 @@
+'use strict';
+const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),os=require('node:os'),{spawnSync}=require('node:child_process');
+const root=path.resolve(__dirname,'..'),script=path.join(root,'scripts/setup-rehearsal.py');
+test('offline resource plan is read-only; provisioning is bounded to newly created dedicated resources',()=>{
+ const temp=fs.mkdtempSync(path.join(os.tmpdir(),'gsis-rehearsal-setup-')),output=path.join(temp,'new-rehearsal'),fake=path.join(temp,'mock-wrangler');
+ try{
+  let r=spawnSync('python3',[script,'--output-dir',output],{cwd:root,encoding:'utf8'});assert.equal(r.status,0,r.stderr);assert(r.stdout.includes('Offline plan only'));assert(!fs.existsSync(output));
+  fs.writeFileSync(fake,'#!/usr/bin/env python3\nimport json,sys,pathlib\nargs=sys.argv[1:]\nwith open("mock-calls.jsonl","a") as f: f.write(json.dumps(args)+"\\n")\nif args[:2]==["d1","create"]: print(\'database_id = "12345678-1234-1234-1234-123456789012"\')\nelif "--json" in args: print(json.dumps([{ "success":True,"results":[]}]))\n',{mode:0o755});
+  const args=[script,'--create','--output-dir',output,'--wrangler',fake,'--origin','https://gsis-roster-rehearsal.example.workers.dev','--client-id','synthetic-client.apps.googleusercontent.com','--school-domain','school.example','--admin-emails','operator@school.example'];
+  r=spawnSync('python3',args,{cwd:root,encoding:'utf8'});assert.equal(r.status,0,r.stderr);const manifest=JSON.parse(fs.readFileSync(path.join(output,'provisioning.json'),'utf8'));assert.equal(manifest.status,'initialized-not-deployed');assert.equal(manifest.deploys,false);assert.equal(manifest.created.length,2);
+  const calls=fs.readFileSync(path.join(output,'mock-calls.jsonl'),'utf8').trim().split('\n').map(JSON.parse);assert.equal(calls.length,5);assert(calls.every(c=>c.includes('--config')&&c[c.indexOf('--config')+1]===path.join(output,'wrangler.toml')));assert.deepEqual(calls.map(c=>c.slice(0,2)),[['d1','create'],['r2','bucket'],['d1','execute'],['d1','execute'],['r2','object']]);assert(calls[0][2].startsWith('gsis-roster-rehearsal-ledger-'));assert(calls[1][3].startsWith('gsis-roster-rehearsal-timetables-'));assert(calls[3].includes('--remote'));assert(calls[3].includes('--file'));assert(!calls.some(c=>c.includes('deploy')||c.includes('delete')));
+  const config=fs.readFileSync(path.join(output,'wrangler.toml'),'utf8');assert(config.includes('binding = "REHEARSAL_LEDGER"'));assert(config.includes('binding = "REHEARSAL_TIMETABLES"'));assert(!/GSIS_JOBS|ROSTER_EDGE_AUTHORITY|queues|triggers|services/.test(config));const sql=fs.readFileSync(path.join(output,'initialize.sql'),'utf8');assert(sql.includes(manifest.instanceId));assert(!/IF NOT EXISTS|DROP|DELETE/.test(sql));
+  r=spawnSync('python3',args,{cwd:root,encoding:'utf8'});assert.notEqual(r.status,0);assert(r.stderr.includes('must not exist'));assert.equal(fs.readFileSync(path.join(output,'mock-calls.jsonl'),'utf8').trim().split('\n').length,5);
+ }finally{fs.rmSync(temp,{recursive:true,force:true});}
+});

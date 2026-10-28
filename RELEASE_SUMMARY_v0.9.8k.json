@@ -1,0 +1,76 @@
+{
+  "version": "0.9.8k",
+  "baseline": "0.9.8j",
+  "baselineCommit": "a2b436296ceb81ae3463b26b7dd8abd182939c99",
+  "sourceFoundation": "703d3975e05d64acc512511ae2d09b0942cc900c",
+  "scope": [
+    "Restore all enabled allocation rules on confirmed suspended dates",
+    "Preserve ordinary workload formula calculation exemption",
+    "Correct UI/effective-policy diagnostics"
+  ],
+  "componentCount": 4,
+  "productionChangedComponents": [
+    "rosterFrontend",
+    "rosterBackend"
+  ],
+  "sharedHelperParityComponents": [
+    "notificationWorker",
+    "operationsWorker"
+  ],
+  "optionalProductionComponents": [
+    "notificationWorker",
+    "operationsWorker"
+  ],
+  "otherComponentVersions": {
+    "calendarFrontend": "0.9.8j",
+    "calendarBackend": "0.9.8j",
+    "contactsFrontend": "0.9.8j",
+    "contactsBackend": "0.9.8j",
+    "deployFrontend": "0.9.8j",
+    "layoutFrontend": "0.9.8j",
+    "deployBackend": "0.9.8j",
+    "lordFrontend": "0.9.8j",
+    "overlordFrontend": "0.9.8j",
+    "starlordFrontend": "0.9.8j",
+    "lordBackend": "0.9.8j",
+    "venuesFrontend": "0.9.8j",
+    "venuesBackend": "0.9.8j",
+    "calendarJobWorker": "0.9.8j"
+  },
+  "productionAuthority": "Google",
+  "authorityCutoverPerformed": false,
+  "migrationRequired": false,
+  "timetableCacheChanged": false,
+  "newInfrastructureRequired": false,
+  "calendarAppendOnlyHeaderUpgradeRequired": false,
+  "productionDeployed": false,
+  "liveRecordsChanged": false,
+  "messagesSent": false,
+  "automaticRunInvokedByPreparation": false,
+  "existingProtectedChoicesRewritten": false,
+  "optimisationCutoffSingapore": "06:29",
+  "autoAllocateMode": "fill-only",
+  "separateRehearsal": {
+    "archive": "GSiS_v0.9.8i_Rehearsal.zip",
+    "sourceCommit": "f512ac6f584c26a027c1cf2aefb3b19d01fd6838",
+    "unchanged": true,
+    "productionInstallation": false
+  },
+  "verification": {
+    "status": "targeted-local-verified",
+    "singleGreenFullSuiteClaimed": false,
+    "productionValidationPerformed": false,
+    "expectedTag": "v0.9.8k",
+    "sourceCommit": null,
+    "manifest": "PATCH.json",
+    "recovery": "Post-commit external recovery verification record",
+    "targetedProgramsPassed": 66,
+    "targetedProgramsTotal": 66,
+    "newDomainCasesPassed": 15,
+    "newUiAuditCasesPassed": 6,
+    "independentReviewProgramsPassed": 15,
+    "openMaterialReviewFindings": 0,
+    "appsScriptFilesParsed": 228,
+    "fullSuiteRunForK": false
+  }
+}

@@ -1,0 +1,18 @@
+import {toWorkerModuleURL} from './helpers/worker-module.cjs';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+const M=await import(toWorkerModuleURL('data:text/javascript;base64,'+Buffer.from(fs.readFileSync('roster-update/public/_worker.js','utf8')).toString('base64')));
+const env={ROSTER_PUBLIC_ORIGIN:'https://roster.example.test',EXTERNAL_LINK_SECRET:'synthetic-link-'.repeat(4),ROSTER_SERVICE_SECRET:'synthetic-service-'.repeat(4),APPS_SCRIPT_URL:'https://script.google.com/macros/s/test/exec'};
+const date=new Date(Date.now()+8*3600000).toISOString().slice(0,10),claims={staffId:'fixture-teacher',date,purpose:'duties',expiresAt:Date.now()+3600000},token=await M.createCapability(claims,env);
+let calls=[];
+globalThis.fetch=async(url,init)=>{assert.equal(String(url),env.APPS_SCRIPT_URL);const input=JSON.parse(JSON.parse(init.body).payload).input;calls.push(input);return Response.json({ok:true,data:{savedIds:[input.timetableNoticeId||input.snapshotIds[0]]}});};
+const request=(body,auth=token,origin=env.ROSTER_PUBLIC_ORIGIN)=>new Request(env.ROSTER_PUBLIC_ORIGIN+'/api/external',{method:'POST',headers:{Origin:origin,Authorization:'Bearer '+auth,'Content-Type':'application/json'},body:JSON.stringify({operation:'acknowledge',...body})});
+assert.equal((await M.externalRoute(request({snapshotIds:[],timetableNoticeId:'notice-current',staffId:'forged',date:'2099-01-01'}),env)).status,200);
+assert.equal(calls[0].timetableNoticeId,'notice-current');assert.equal(calls[0].capability.staffId,'fixture-teacher');assert.equal(calls[0].capability.date,date);assert.equal(calls[0].staffId,undefined);assert.deepEqual(calls[0].snapshotIds,[]);
+assert.equal((await M.externalRoute(request({snapshotIds:['snapshot-current']}),env)).status,200);
+const before=calls.length;
+for(const body of [{snapshotIds:[]},{snapshotIds:[],timetableNoticeId:''},{snapshotIds:[],timetableNoticeId:' '.repeat(2)},{snapshotIds:[],timetableNoticeId:'x'.repeat(301)},{snapshotIds:[],timetableNoticeId:33},{snapshotIds:[''],timetableNoticeId:'notice-current'},{snapshotIds:'snapshot-current',timetableNoticeId:'notice-current'}])assert.equal((await M.externalRoute(request(body),env)).status,400);
+assert.equal((await M.externalRoute(request({snapshotIds:[],timetableNoticeId:'notice-current'},'invalid'),env)).status,401);
+assert.equal((await M.externalRoute(request({snapshotIds:[],timetableNoticeId:'notice-current'},token,'https://other.example.test'),env)).status,403);
+assert.equal(calls.length,before,'Malformed acknowledgements and invalid capabilities never reach the backend');
+console.log('PASS private timetable acknowledgement forwarding, legacy snapshots, input validation and signed date/staff scope; mocked network only.');

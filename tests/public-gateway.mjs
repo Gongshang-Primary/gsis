@@ -1,0 +1,11 @@
+import {toWorkerModuleURL} from './helpers/worker-module.cjs';
+import assert from 'node:assert/strict';import {readFile} from 'node:fs/promises';
+const {default:worker}=await import(toWorkerModuleURL('data:text/javascript;base64,'+Buffer.from(await readFile('layout-update/public/_worker.js')).toString('base64')));
+const env={APPS_SCRIPT_URL:'https://script.google.com/macros/s/test/exec',BRIDGE_SECRET:'k'.repeat(64),GOOGLE_CLIENT_ID:'test'};let forwarded;
+globalThis.fetch=async(url,opts)=>{forwarded=JSON.parse(JSON.parse(opts.body).payload);return Response.json({ok:true,data:{schemaVersion:2,modelVersion:'1.1.0',repository:'layout-current',layoutYear:2026,layoutRevision:'test',cursor:'test',venues:[],classes:[],groups:[]}})};
+const publicResult=await worker.fetch(new Request('https://layout.example/api/public/campus?versionId=planning&action=bootstrap'),env);assert.equal(publicResult.status,200);assert.equal(publicResult.headers.get('Access-Control-Allow-Origin'),'*');assert.equal(forwarded.action,'publicLayout');assert.equal(forwarded.identity,null);assert.deepEqual(forwarded.input,{});
+assert.equal((await worker.fetch(new Request('https://layout.example/api/unit/rename',{method:'POST',headers:{Origin:'https://layout.example'},body:'{}'}),env)).status,410);
+assert.equal((await worker.fetch(new Request('https://layout.example/api/bootstrap'),env)).status,404);
+console.log('PASS unauthenticated owned Layout public gateway, ignored injected action/version, retired direct mutations are rejected, no generic document route');
+const yearly=await worker.fetch(new Request('https://layout.example/api/public/campus?year=2026&versionId=planning'),env);assert.equal(yearly.status,200);assert.deepEqual(forwarded.input,{year:'2026'});
+globalThis.fetch=async()=>new Response('<html>Unavailable</html>',{status:200});const old=console.error;console.error=()=>{};const failure=await worker.fetch(new Request('https://layout.example/api/public/campus'),env);console.error=old;const body=await failure.json();assert.equal(body.code,'UPSTREAM_RESPONSE');assert.ok(body.diagnosticId);assert.match(body.error,/Refresh/);assert.doesNotMatch(body.error,/unit change/);console.log('PASS malformed upstream response classified with a safe correlation ID.');

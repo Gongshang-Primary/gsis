@@ -1,0 +1,31 @@
+const assert=require('node:assert/strict'),fs=require('node:fs'),serverView=require('./relief-view-fixture');
+const {w,run}=require('./dom-helper.cjs')();
+try{
+ run(fs.readFileSync('public/vendor/katex/katex.min.js','utf8'));
+ w.initial=serverView(JSON.parse(run('JSON.stringify(v())')));
+ run("state.versions=[initial];tab='Relief Settings';render()");
+ assert.equal(w.document.querySelectorAll('.relief-formulas .katex').length,3);
+ assert.equal(w.document.querySelectorAll('.relief-formulas .katex-error').length,0);
+ assert.match(w.document.querySelector('.relief-formulas').textContent,/67.2/);
+ assert.match(w.document.querySelector('.relief-formulas').textContent,/FAJT/);
+ assert.ok(!w.document.querySelector('[data-relief-factor="mode"]'));
+ assert.doesNotMatch(w.document.querySelector('#content').textContent,/Use whole-week|Expected comparison/);
+ const budget=w.document.querySelector('[data-relief-factor="weeklyPeriods"]');budget.value='90';budget.dispatchEvent(new w.Event('input',{bubbles:true}));assert.match(w.document.querySelector('.relief-formulas').textContent,/72/);
+ run("unsavedDraft=false;role='KP';render()");assert.ok(!w.document.querySelector('[data-relief-form]'));assert.equal(w.document.querySelectorAll('.relief-formulas .katex').length,3);
+ run(`role='Admin+KP';tab='Dept';v().teachers=[['st','Alice Ng','ST'],['lt','Alicia Tan','LT'],['mtt','Bob Lim','MTT'],['plain','Charlie Ong',''],['old','Retained Inactive','']].map(([id,name,level])=>({id,name,active:id!=='old',profile:{Role:level||'Teacher','EO Appt Level':level}}));v().organisations={dept:[{id:'dept-x',name:'Science',slots:['',''],tls:['old']}]};render();`);
+ const picker=field=>w.document.querySelector('[data-group-role="'+field+'"]');
+ const search=(field,text)=>{const p=picker(field);p.open=true;const i=p.querySelector('[data-group-role-search]');i.value=text;i.dispatchEvent(new w.Event('input',{bubbles:true}));return p;};
+ const choice=(field,id)=>[...picker(field).querySelectorAll('[data-group-role-choice]')].find(i=>i.value===id);
+ assert.ok(choice('tls','st'));assert.ok(choice('tls','lt'));assert.ok(choice('tls','mtt'));assert.equal(choice('tls','plain'),undefined);
+ assert.ok(choice('tls','old').checked);assert.equal(choice('tls','old').disabled,false);assert.match(picker('tls').textContent,/No longer eligible/);
+ search('tls','LIC');assert.equal(picker('tls').querySelectorAll('[data-group-role-option]:not([hidden])').length,2);
+ choice('tls','st').click();assert.equal(picker('tls').open,true);assert.equal(picker('tls').querySelector('[data-group-role-search]').value,'LIC');assert.equal(w.document.activeElement.value,'st');
+ choice('tls','lt').click();assert.deepEqual(JSON.parse(run("JSON.stringify(v().organisations.dept[0].tls)")),['old','st','lt']);
+ search('tls','no match');assert.equal(picker('tls').querySelector('[data-group-role-empty]').hidden,false);assert.ok(choice('tls','st').checked);
+ picker('tls').querySelector('[data-group-role-clear]').click();assert.equal(picker('tls').querySelector('[data-group-role-search]').value,'');assert.equal(w.document.activeElement.type,'search');
+ choice('tls','old').click();assert.equal(choice('tls','old'),undefined);assert.ok(choice('tls','st').checked);
+ search('deputy','ONG');assert.equal(picker('deputy').querySelectorAll('[data-group-role-option]:not([hidden])').length,1);choice('deputy','plain').click();assert.equal(picker('deputy').querySelector('[data-group-role-search]').value,'ONG');
+ assert.equal(picker('tls').querySelector('[data-group-role-search]').value,'');assert.equal(run("GSISPlanning.deputies(v().organisations.dept[0])[0]"),'plain');
+ assert.equal(run('queuedEdits().length'),1,'Selections remain one explicit queued organisation change');
+ console.log('PASS 600 UI: rendered LaTeX, live budget branches, SMC view, partial-name multiselect, search/open/focus preservation, eligible TL choices, retained inactive removal and independent queries.');
+}finally{w.close();}

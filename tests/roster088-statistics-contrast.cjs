@@ -1,0 +1,6 @@
+'use strict';
+const assert=require('node:assert/strict'),fs=require('node:fs'),{JSDOM}=require('jsdom');
+const dom=new JSDOM('<style>'+fs.readFileSync('roster-update/public/roster.css','utf8')+fs.readFileSync('roster-update/public/roster-statistics.css','utf8')+'</style><main class="roster-stats"><div class="stats-table-scroll"><table><thead><tr><th><button>Date ↓</button></th><th aria-sort="ascending"><button>Teacher ↑</button></th><th aria-sort="descending"><button>Periods ↓</button></th></tr><tr><th><input placeholder="Filter date"></th></tr></thead></table></div></main>');
+const w=dom.window,lum=color=>color.match(/\d+(?:\.\d+)?/g).slice(0,3).map(Number).map(v=>{const n=v/255;return n<=.04045?n/12.92:((n+.055)/1.055)**2.4;}).reduce((n,v,i)=>n+v*[.2126,.7152,.0722][i],0),ratio=(a,b)=>(Math.max(lum(a),lum(b))+.05)/(Math.min(lum(a),lum(b))+.05);
+for(const th of w.document.querySelectorAll('th')){const css=w.getComputedStyle(th);assert(ratio(css.color,css.backgroundColor)>=4.5,'table header text contrast >= 4.5:1');}
+const input=w.getComputedStyle(w.document.querySelector('input'));assert(ratio(input.color,input.backgroundColor)>=4.5);dom.window.close();console.log('PASS Statistics: explicit normal/sorted header and filter foreground/background pairs exceed 4.5:1 contrast.');

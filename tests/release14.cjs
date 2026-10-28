@@ -1,0 +1,21 @@
+const {ctx}=require('./storage.cjs'),vm=require('vm');
+vm.runInContext(`{
+const check=(x,m)=>{if(!x)throw Error(m)},bad=(fn,status)=>{let e;try{fn()}catch(x){e=x}check(e?.status===status,'Expected '+status+', got '+e?.message)};
+const initial=JSON.stringify(publicCampus_()),published=publishedEntry_(index_(book_()));
+const saved=call('change',{operation:'saveDraft',versionId:id,requestId:Utilities.getUuid(),clientId:'draft-only',issuedAt:Date.now(),edits:[{operation:'moveClass',form:'1P',venue:'',expected:'F1-16'}]});
+check(saved.saved,'Draft save missing');check(JSON.stringify(publicCampus_())===initial,'Public snapshot changed on Save');
+check(call('active',{}).classes.length===document_(book_(),published).classes.length,'Active API must use publication');
+bad(()=>dispatch_({action:'sync',identity:who,input:{versionId:id}},{user:{email:'teacher@gsps.edu.sg',roles:[]}}),403);check(dispatch_({action:'active',identity:who,input:{}},{user:{roles:[]}}).activeVersionId===id,'Contacts published export unavailable');
+const op={operation:'setOffload',expected:{tags:[],staff:{}},value:{schema:2,tags:[{id:'training',name:'Training',source:'Role',match:'Teacher',percent:10,actingPercent:'',periods:'',notes:'2027'}],staff:{},baseline:null}};
+const req={action:'change',identity:who,input:{operation:'saveDraft',versionId:planningId,requestId:Utilities.getUuid(),clientId:'offload',issuedAt:Date.now(),edits:[op]}};
+bad(()=>dispatch_(req,{...c,user:{roles:['KP']}}),403);dispatch_(req,c);
+const copy=call('change',{operation:'create',name:'Offload copy',sourceVersionId:planningId,requestId:Utilities.getUuid()}).versionId;
+check(call('sync',{versionId:copy}).current.offload.tags[0].notes==='2027','Offload assignment not inherited');
+const changed=JSON.parse(JSON.stringify(op.value));changed.tags[0].percent=20;call('change',{...req.input,requestId:Utilities.getUuid(),edits:[{...op,value:changed,expected:op.value}]});
+check(call('sync',{versionId:copy}).current.offload.tags[0].percent===10,'Offload copy shares mutable state');
+const lease=call('lease',{versionId:id,key:'meta',clientId:'publisher14'});call('change',{...lease,versionId:id,key:'meta',clientId:'publisher14',operation:'publish',requestId:Utilities.getUuid()});check(publicCampus_().classes.find(c=>c.id==='1P').units.length===0,'Publish did not expose selected revision');
+const now=publishedEntry_(index_(book_())),doc=document_(book_(),now);persist_(book_(),index_(book_()),doc,null);cleanOld_(book_(),id,index_(book_()).versions.find(e=>e.id===id).commit);check(document_(book_(),now).id===id,'Audit purge removed public snapshot');
+for(const role of ['SL','MK','SAT','OSO','SC','SENO','Dentist','Library','DE','Sci Lab','Support Staff'])check(!deployEligible_({role}),'Excluded staff leaked: '+role);check(!deployEligible_({role:'Custom Assistant',groups:['Support']}),'Membership support classification ignored');check(deployEligible_({role:'Teacher',groups:[]}),'Teacher excluded');
+const d=JSON.parse(JSON.stringify(call('sync',{versionId:planningId}).current));d.teachers[1].name=d.teachers[0].name;bad(()=>assertTeacherNames_(d,c),409);
+console.log('PASS v0.3.18 publication isolation, ordinary-reader isolation, Admin Offload permissions, version inheritance, published purge retention and staff eligibility');
+}`,ctx);

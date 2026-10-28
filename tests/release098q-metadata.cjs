@@ -1,0 +1,15 @@
+'use strict';
+const assert=require('node:assert/strict'),fs=require('node:fs'),{JSDOM}=require('jsdom');
+const read=p=>fs.readFileSync(p,'utf8'),p=JSON.parse(read('package.json')),v='0.9.8q',base='a8ce50ef47afe5a57270d440c2cd18b34121c59a',lock=JSON.parse(read('package-lock.json'));
+assert.equal(p.gsisRelease,v);assert.equal(p.version,v);assert.equal(lock.version,v);assert.equal(lock.packages[''].version,v);
+assert.equal(p.gsisBaseline,'0.9.8p');assert.equal(p.gsisPatchSourceBase,base);assert.equal(p.gsisSourceBase,base);assert.equal(p.gsisPackageKind,'component-patch');
+assert.deepEqual(p.gsisPatchComponents,['calendarFrontend','calendarBackend']);assert.deepEqual(p.gsisProductionChangedComponents,p.gsisPatchComponents);assert.deepEqual(p.gsisOptionalProductionComponents,[]);assert.deepEqual(p.gsisVersionHarmonisedComponents,[]);
+assert.equal(Object.keys(p.gsisComponentVersions).length,18);for(const [key,value] of Object.entries(p.gsisComponentVersions))assert.equal(value,p.gsisPatchComponents.includes(key)?v:'0.9.8p',key);
+assert.equal(p.gsisSeparatePackages.length,1);assert.equal(p.gsisSeparatePackages[0].name,'GSiS_v0.9.8o_Timetable_Preparation.zip');assert.equal(p.gsisSeparatePackages[0].productionInstallation,false);
+assert(read('backend/RosterTimetablePreparation.gs').includes("release:'0.9.8o'"));assert(read('timetable-prep-worker/domain.mjs').includes("RELEASE='0.9.8o'"));
+assert(read('calendar-update/public/app.js').includes("FRONTEND_VERSION = '"+v+"'"));assert(read('calendar-update/public/_worker.js').includes("WORKER_VERSION = '"+v+"'"));assert(read('calendar-backend/Code.gs').includes("RELEASE_VERSION: '"+v+"'"));assert(read('calendar-update/public/index.html').includes('v'+v));
+const guide=new JSDOM(read('SETUP_v'+v+'.html')).window.document,markdown=read('SETUP_v'+v+'.md');assert.equal(guide.querySelectorAll('script,iframe,form').length,0);assert.equal(guide.querySelectorAll('h2').length,(markdown.match(/^## /gm)||[]).length);
+for(const phrase of ['Calendar_Backend_v0.9.8q.gs','Calendar_Frontend_v0.9.8q.zip','New version','GSIS_SECRET','Google','Stop waiting','same run','90 seconds'])assert(guide.body.textContent.includes(phrase),phrase);
+const summary=JSON.parse(read('RELEASE_SUMMARY.json'));assert.equal(summary.version,v);assert.equal(summary.baseline,'0.9.8p');assert.equal(summary.baselineCommit,base);assert.equal(summary.componentCount,2);assert.equal(summary.productionAuthorities.calendar,'Google');for(const key of ['productionDeployed','authorityCutoverPerformed','messagesSent','liveRecordsChanged','newInfrastructureRequired','reliefLedgerMigrated'])assert.equal(summary[key],false,key);
+assert(read('README.md').includes('docs/v098q/SETUP.html'));assert(!read('README.md').includes('# GSiS suite 0.9.8q'));
+console.log('PASS Q Calendar-only metadata: matched pair, other 16 products P, isolated preparation O, offline setup and unchanged authority.');

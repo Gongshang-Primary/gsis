@@ -1,0 +1,15 @@
+{
+  "counts": {
+    "passed": 636
+  },
+  "historical": [
+    "model403.cjs",
+    "model405.cjs",
+    "roster700-gateway.mjs",
+    "roster700-operations.cjs",
+    "roster700-review.cjs",
+    "roster700-ui.cjs",
+    "workload407.cjs"
+  ],
+  "note": "Dependency-unavailable tests are NOT passes. npm test requires all declared dependencies."
+}

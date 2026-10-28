@@ -1,0 +1,33 @@
+[
+  {
+    "integrationKey": "conditional_relief_instruction",
+    "templateId": "2516068742237019",
+    "state": "PENDING",
+    "verifiedAfterSubmission": true,
+    "request": {
+      "name": "gsis_relief_instruction_v1",
+      "language": "en_GB",
+      "category": "UTILITY",
+      "parameter_format": "POSITIONAL",
+      "components": [
+        {
+          "type": "BODY",
+          "text": "*Instructions for relief lesson*\n\nHi {{1}}, please note the following instructions for your assigned relief lesson at Gongshang Primary School.\n\nClass: {{2}}\nDate: {{3}}\nPeriod and time: {{4}}\n\nLesson instructions:\n{{5}}\n\nFor clarification, please contact {{6}}, the absent teacher:\n{{7}}\n\nThank you.",
+          "example": {
+            "body_text": [
+              [
+                "Teacher A",
+                "3A",
+                "19 Oct 2026 (Mon)",
+                "Period 3, 8:30 to 9:00 am",
+                "Collect the English worksheet from the staff room before the lesson. Guide pupils through pages 1 and 2. Return completed work to the class tray.",
+                "Teacher B",
+                "https://wa.me/6590000000"
+              ]
+            ]
+          }
+        }
+      ]
+    }
+  }
+]

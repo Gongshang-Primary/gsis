@@ -1,0 +1,14 @@
+'use strict';
+const assert=require('node:assert/strict'),fs=require('node:fs'),{chromium}=require('playwright');
+(async()=>{const browser=await chromium.launch({headless:true,executablePath:process.env.ROSTER_TEST_CHROMIUM||'/tmp/chromium',args:['--no-sandbox']});try{
+ const page=await browser.newPage();page.setDefaultTimeout(5000);const errors=[];page.on('pageerror',e=>errors.push(e.message));await page.route('**/*',r=>new URL(r.request().url()).pathname==='/'?r.fulfill({contentType:'text/html',body:'<main id="content"></main>'}):r.abort());await page.goto('https://roster.test/');
+ for(const file of ['shared/roster-stapler.js','shared/roster-allocation.js','shared/roster-operations.js','tests/roster701-fixture.js','roster-update/public/roster-operations-ui.js'])await page.addScriptTag({content:fs.readFileSync(file,'utf8')});
+ await page.evaluate(async()=>{const f=__fixture;f.setClock(f.ctx.today+'T06:00:00+08:00');window.commands=[];window.failed=false;window.entry={requestId:'10000000-1000-4000-8000-000000000001',acceptedAt:f.ctx.iso,dates:[f.ctx.today],command:{operation:'saveAbsence',staffId:'alice',date:f.ctx.today,periods:[2]},intakeState:'needsReview',absenceApplied:false,savedIds:[],peerState:'none',instructionState:'none',failureCode:'ABSENCE_SHORTER_CONFIRMATION'};
+ window.ui=await RosterOpsUI.render('Assign Relief',{profile:f.profile,today:()=>f.ctx.today,container:document.querySelector('#content'),status:()=>{},api:async(route,p)=>{
+ if(p.view==='intake')return {entries:[structuredClone(entry)],total:1};
+ if(p.view==='intakeReview')return {...entry,readOnly:true,overlapToken:'a'.repeat(64),requested:{periods:[2]},teachers:[{name:'Alice',dates:[{date:f.ctx.today,savedEntries:[{periods:[2,3]}]}]}]};
+ if(p.operation==='retryAbsenceIntake'){commands.push(structuredClone(p));if(!failed){failed=true;throw Error('Response lost');}entry.intakeState='pending';delete entry.failureCode;return {...entry,accepted:true};}
+ const response=await fetch('/'+route,{body:JSON.stringify(p)}),result=await response.json();if(!response.ok)throw Object.assign(Error(result.error),{status:response.status});return result.data;
+ }});});
+ await page.locator('[data-intake-receipt] summary').click();await page.locator('[data-choose-intake]').click();await page.locator('[data-coverage-choice="replace"]').click();await page.getByRole('button',{name:'Retry same choice'}).waitFor();assert(await page.locator('[data-coverage-choice="keep"]').isDisabled());await page.getByRole('button',{name:'Retry same choice'}).click();await page.waitForFunction(()=>commands.length===2&&!document.querySelector('[data-coverage-choice]'));const commands=await page.evaluate(()=>window.commands);assert.deepEqual(commands[0],commands[1]);assert.deepEqual(errors,[]);console.log('PASS browser coverage preview and lost-response retry retain exact choice identity');
+ }finally{await browser.close();}})().catch(e=>{console.error(e);process.exitCode=1});

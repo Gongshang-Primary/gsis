@@ -1,0 +1,14 @@
+'use strict';
+const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
+const {host}=require('./venues-backend.cjs');
+const {fixture}=require('./venues-domain.cjs');
+const h=host(),state=fixture();state.venues[0]={...state.venues[0],unit:'A1-01',bookable:false,aliases:['Old meeting room']};state.venues.push({...state.venues[0],id:'retired',unit:'Z1-99'});h.seed(state);
+if(fs.existsSync('venues-backend/CalendarCatalogue.gs'))vm.runInContext(fs.readFileSync('venues-backend/CalendarCatalogue.gs','utf8'),h.c);
+h.c.venuesReadRegister_=()=>({rows:[{unitNumber:'A1-01',name:'Meeting room',shortName:'Mtg'}]});
+const request=(extra={},input={operation:'calendarLookup'})=>h.signed(input,'calendarCatalogue','bridge',{service:'gsis-calendar-catalogue-v1',purpose:'calendar-venue-catalogue-v1',...extra});
+const commits=h.commits,result=JSON.parse(h.c.doPost(request()).text);assert.equal(result.ok,true,result.error);assert.equal(h.commits,commits,'Catalogue read must never commit state');
+assert.deepEqual(Object.keys(result.data).sort(),['venues']);assert.equal(result.data.venues.length,1);assert.equal(result.data.venues[0].id,state.venues[0].id);assert.equal(result.data.venues[0].active,true);assert.equal(result.data.venues[0].name,'Meeting room');
+assert.deepEqual(Object.keys(result.data.venues[0]).sort(),['active','aliases','id','name','unit']);assert(!JSON.stringify(result).includes('occurrences'));assert(!JSON.stringify(result).includes('ownerIds'));
+assert.equal(JSON.parse(h.c.doPost(request({purpose:'calendar-sync'})).text).ok,false);assert.equal(JSON.parse(h.c.doPost(request({}, {operation:'book'})).text).ok,false);
+h.c.venuesReadRegister_=()=>({rows:[{unitNumber:'A1-01',name:'Meeting room',shortName:'Mtg'},{unitNumber:'MISSING',name:'Unmapped',shortName:''}]});assert.equal(JSON.parse(h.c.doPost(request()).text).code,'CATALOGUE_UNVERIFIED');
+console.log('PASS Calendar catalogue identity, read-only projection, current register and purpose isolation');

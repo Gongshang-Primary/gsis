@@ -1,0 +1,14 @@
+const assert=require('assert/strict'),fs=require('fs'),vm=require('vm'),rules=require('../shared/teaching-rules.js');
+const teacher=(role='HOD SM',employment='',status='Confirmed')=>({active:true,role,profile:{Role:role,'EO Appt Level':'HOD','Employment Modifier':employment,'Appointment Status':status}});
+let cfg=rules.migrate(null);assert.equal(cfg.roleOverrideSchema,1);assert.equal(rules.calculate(teacher(),cfg).offloadPercent,50);
+assert.equal(rules.calculate(teacher('HOD EL'),cfg).offloadPercent,30);assert.equal(rules.calculate(teacher('HOD SM','4/5'),cfg).offloadPercent,60);
+assert.equal(rules.calculate(teacher('HOD SM','','Ag'),cfg).offloadPercent,50,'explicit role replaces acting group rate too');
+const special=cfg.tags.find(r=>r.source==='Role');special.percent=0;assert.equal(rules.calculate(teacher(),cfg).offloadPercent,0);special.percent='';assert.equal(rules.calculate(teacher(),cfg).offloadPercent,30);
+special.percent=42;assert.equal(rules.migrate(cfg).tags.find(r=>r.source==='Role').percent,42);cfg.tags=cfg.tags.filter(r=>r!==special);cfg=rules.migrate(JSON.parse(JSON.stringify(cfg)));assert.equal(cfg.tags.some(r=>r.match==='HOD SM'),false);assert.equal(rules.calculate(teacher(),cfg).offloadPercent,30);
+cfg.tags.push({id:'future',name:'Future',source:'Role',match:'Future HOD',percent:55,actingPercent:'',periods:18,notes:''});assert.equal(rules.calculate(teacher('Future HOD'),cfg).offloadPercent,55);assert.equal(rules.calculate(teacher('Future HOD'),cfg).cap,18);
+const ctx={GSISTeachingRules:rules};vm.createContext(ctx);vm.runInContext(fs.readFileSync('shared/planning.js','utf8'),ctx);const P=ctx.GSISPlanning;
+const d={teachers:['h','d','m'].map(id=>({id,active:true,role:'Teacher'})),organisations:{comm:[{id:'old',name:'Existing committee',slots:['h','d','m']}]}};
+P.init(d);assert.deepEqual(Array.from(d.organisations.comm[0].slots),['','','','','m']);assert.equal(d.organisations.comm[0].legacyLeadership[0].teacher,'h');assert.deepEqual(Array.from(P.members(d.organisations.comm[0])),['','','','','m','h','d']);P.checkGroups(d,'comm',d.organisations.comm);const once=JSON.stringify(d);P.init(d);assert.equal(JSON.stringify(d),once);
+assert.deepEqual(Array.from(P.roles('comm')),['HOD i/c','SH i/c','OIC','2IC']);P.checkGroups(d,'comm',[{id:'members',name:'Only members',slots:['','','','','m'],leadershipSchema:1}]);
+assert.throws(()=>P.checkGroups(d,'comm',[{...d.organisations.comm[0],slots:['h','','','','m']}]),/only once/);
+console.log('PASS 504: replacement precedence, 0/blank/deletion, future roles, independent caps/employment and lossless optional committee migration');

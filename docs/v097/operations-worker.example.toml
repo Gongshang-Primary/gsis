@@ -1,0 +1,52 @@
+name = "gsis-operations"
+main = "index.js"
+compatibility_date = "2026-10-01"
+workers_dev = false
+preview_urls = false
+
+[observability]
+enabled = true
+
+[limits]
+cpu_ms = 10000
+
+[vars]
+GSIS_RELEASE_VERSION = "0.9.7"
+GSIS_RECOVERY_MODE = "false"
+GSIS_BACKGROUND_JOBS = "false"
+# Set these to d1 only after the existing migration controls have verified and
+# activated the original D1 scopes. Flags never activate a database themselves.
+ROSTER_EDGE_AUTHORITY = "legacy"
+DEPLOY_EDGE_AUTHORITY = "legacy"
+# Exact HTTPS origins, OAuth clients, and session settings must mirror each site.
+# ROSTER_PUBLIC_ORIGIN = "https://your-roster.pages.dev"
+# DEPLOY_PUBLIC_ORIGIN = "https://your-deploy.pages.dev"
+# ROSTER_GOOGLE_CLIENT_ID = "...apps.googleusercontent.com"
+# DEPLOY_GOOGLE_CLIENT_ID = "...apps.googleusercontent.com"
+# ROSTER_SESSION_DAYS = "7"
+# DEPLOY_SESSION_DAYS = "7"
+# ROSTER_APPS_SCRIPT_URL = "https://script.google.com/macros/s/.../exec"
+# DEPLOY_APPS_SCRIPT_URL = "https://script.google.com/macros/s/.../exec"
+
+# Select the EXISTING database and private buckets; do not create replacements.
+# [[d1_databases]]
+# binding = "GSIS_JOBS"
+# database_name = "existing-gsis-database"
+# database_id = "copy-existing-database-uuid"
+# [[r2_buckets]]
+# binding = "ROSTER_TIMETABLE_SNAPSHOTS"
+# bucket_name = "existing-private-timetable-bucket"
+# [[r2_buckets]]
+# binding = "WHATSAPP_INBOX_MEDIA"
+# bucket_name = "existing-private-media-bucket"
+# [[queues.producers]]
+# binding = "GSIS_BACKGROUND_QUEUE"
+# queue = "gsis-background-jobs"
+
+# Configure as secrets, never source values: GSIS_BACKEND_SECRET (same private
+# credential on Pages and notification Worker), ROSTER_BRIDGE_SECRET and
+# DEPLOY_BRIDGE_SECRET (mirror each existing browser/source bridge), plus the
+# existing service, integration and provider secrets used by enabled features.
+# The GSIS_BACKEND binding points TO this Worker on callers only. Do not bind
+# this Worker back to itself. No routes, public hostname, cron or Queue consumer.
+# See ../docs/v097/DEPLOYMENT.md for dashboard installation and cutover order.

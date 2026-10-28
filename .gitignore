@@ -1,0 +1,11 @@
+node_modules
+*.zip
+*.zip.*
+*.log
+verification/
+GSiS_v*_Maintainer_Notes.md
+SHA256SUMS.txt
+
+__pycache__/
+*.pyc
+.superpowers/

@@ -1,0 +1,23 @@
+const assert=require('node:assert/strict'),vm=require('node:vm'),{ctx}=require('./storage.cjs'),run=s=>vm.runInContext(s,ctx),json=s=>JSON.parse(JSON.stringify(run(s)));
+run(`var multiId=call('change',{operation:'create',sourceVersionId:id,duplicate:true,name:'2026 Multi TG',requestId:Utilities.getUuid()}).versionId;
+var multiDoc=()=>document_(book_(),index_(book_()).versions.find(x=>x.id===multiId));
+var multiSave=edits=>call('change',{operation:'saveDraft',versionId:multiId,requestId:Utilities.getUuid(),issuedAt:Date.now(),clientId:'multi',edits});
+var multiRefs=['1','2'].map(l=>multiDoc().classes.find(c=>c.level===l).ref);
+var multiAdd={operation:'addTG',localId:'multi-tg',name:'Mixed TL test',subject:'TL',level:'1',levels:['1','2'],weeklyPeriods:6.5,levelWide:false,classRefs:multiRefs,venue:'F1-16',expected:null};
+multiSave([multiAdd]);multiSave([{operation:'addTeacher',localId:'multi-assignment',teacher:'t1',target:'multi-tg',subject:'TL',expected:false}]);
+var multiEdit={operation:'updateTG',groupId:'multi-tg',name:multiAdd.name,subject:'TL',levels:['1','2'],weeklyPeriods:7.5,levelWide:false,classRefs:multiRefs,venue:'F1-16'};
+multiEdit.expected=GSISVenueGroups.state(multiDoc(),multiEdit);multiSave([multiEdit]);`);
+const group=()=>json("multiDoc().groups.find(g=>g.id==='multi-tg')");assert.deepEqual(group().levels,['1','2']);assert.equal(group().weeklyPeriods,7.5);
+assert.equal(run("multiDoc().assignments.filter(a=>a.target==='multi-tg').length"),1);
+assert.equal(run("activeExport_(multiDoc(),{revision:1}).assignments.find(a=>a.target==='multi-tg').periods"),7.5);
+assert.equal(run("GSISWorkload.analyse(multiDoc(),t=>GSISTeachingRules.calculate(t,multiDoc().offload)).ledger.find(a=>a.target==='multi-tg').periods"),7.5);
+assert.throws(()=>run('multiSave([multiEdit])'),e=>e.status===409,'Stale edits cannot overwrite a changed TG');
+const before=json('multiDoc()');assert.throws(()=>run("multiSave([{...multiAdd,localId:'incomplete-scope',name:'Incomplete scope',classRefs:undefined}])"),e=>e.status===400);assert.throws(()=>run("multiSave([{...multiEdit,weeklyPeriods:null,expected:GSISVenueGroups.state(multiDoc(),multiEdit)}])"),e=>e.status===400);assert.deepEqual(json('multiDoc()'),before,'Invalid load cannot partially save');
+run(`var oldPayload={operation:'updateTG',groupId:'multi-tg',name:'Renamed via older UI',subject:'TL',levelWide:true,classRefs:[],venue:'F1-16'};oldPayload.expected=GSISVenueGroups.state(multiDoc(),oldPayload);multiSave([oldPayload]);`);assert.deepEqual(group().levels,['1','2']);assert.equal(group().weeklyPeriods,7.5);
+run(`var multiCopy=call('change',{operation:'create',sourceVersionId:multiId,duplicate:true,name:'2027 Copy',requestId:Utilities.getUuid()}).versionId`);assert.equal(run("document_(book_(),index_(book_()).versions.find(x=>x.id===multiCopy)).groups.find(g=>g.id==='multi-tg').weeklyPeriods"),7.5);
+// Layout repository mirrors and admin edits preserve the new fields.
+run(`var pubMulti=GSISLayoutData.publication(GSISLayoutData.empty(2026),multiDoc(),{id:multiId,revision:1,commit:'multi-commit'},(type,key)=>type+':'+key);`);
+assert.equal(run("layoutRows_(pubMulti).layout_tgs.find(r=>r[1]==='Renamed via older UI')[2]"),'P1, P2');
+run(`var nativeMulti={sheets:new Map(),getSheetByName(n){return this.sheets.get(n)},insertSheet(n){const s=book_().insertSheet('test-multi-'+n);this.sheets.set(n,s);return s}};layoutMirror_(nativeMulti,pubMulti);var adminMulti=layoutAdminTables_(nativeMulti,pubMulti,false);`);
+assert.deepEqual(json("GSISLayoutData.publicView(adminMulti).groups.find(g=>g.code==='Renamed via older UI').levels"),['1','2']);assert.equal(run("GSISLayoutData.publicView(adminMulti).groups.find(g=>g.code==='Renamed via older UI').weeklyPeriods"),7.5);
+console.log('PASS multi-level TG storage: real dispatcher save/reload, assignment rate/export, optimistic conflicts, atomic rejection, old payload preservation, version copy and native Layout round trip');

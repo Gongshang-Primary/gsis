@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="referrer" content="same-origin"><title>GSiS Roster · System Health</title><link rel="stylesheet" href="edge-setup.css"><link rel="stylesheet" href="system-health.css"><script src="system-health.js" defer></script></head>
+<body>
+<a class="skip" href="#main">Skip to system health</a>
+<header><a href="/" class="brand">GSiS <span>Roster</span></a><span class="version">Administrator</span></header>
+<main id="main">
+<div class="section-heading"><div><p class="eyebrow">Operations</p><h1>System Health</h1></div><button id="op-refresh" class="primary" type="button">Refresh status</button></div>
+<p class="lead">Check allocation and notification processing, saved receipt review counts and recent failures.</p>
+<p>Use your signed-in school SMC or administrator session. <a href="/">Open Roster to sign in</a>.</p>
+<div id="status-message" class="notice" role="status" aria-live="polite">Checking school authority…</div>
+<p class="muted">Status updates only when you open this page, refresh it or request a review preview. Cloudflare’s Worker metrics and logs remain the source for CPU usage and execution limits.</p>
+<p id="timetable-preparation-link" hidden><a href="/timetable-preparation.html">Prepare timetable migration</a> · Administrator only; Google stays authoritative.</p>
+<div id="health-content" hidden>
+<p id="checked-at" class="muted"></p>
+<section aria-labelledby="jobs-title"><h2 id="jobs-title">Scheduled and background work</h2><p id="storage-status"></p><p class="muted">Successful notification processing does not confirm message delivery. The sent counter records provider acceptance; confirmed delivery must be checked in the existing delivery records.</p><p class="muted">Idle means there was no work due. Skipped means the task did not run. Neither counts as a successful completed job. Identical idle and skipped reports are recorded at most once every five minutes.</p><div class="table-scroll" tabindex="0" role="region" aria-label="Job health table"><table><thead><tr><th scope="col">Job</th><th scope="col">Latest outcome</th><th scope="col">Last successful processing</th><th scope="col">Diagnostic</th></tr></thead><tbody id="jobs-body"></tbody></table></div></section>
+<div class="health-columns">
+<section aria-labelledby="pending-title"><h2 id="pending-title">Pending work</h2><div id="backlog"></div><div data-private-health><h3>Background queue</h3><div id="background-summary"></div><div id="background-jobs"></div><p class="muted">Retry is available for parked background jobs. It preserves existing delivery safeguards and does not reset uncertain message deliveries.</p></div></section>
+<section aria-labelledby="cache-title"><h2 id="cache-title">Timetable cache</h2><div id="timetables"></div><p class="muted">Preparation times show when packages were built. Each read verifies the relevant source version and permissions before reuse.</p><h3>R2 cleanup</h3><div id="cleanup"></div></section>
+</div>
+<section id="peer-mail-section" aria-labelledby="peer-mail-title" hidden><div class="section-heading"><h2 id="peer-mail-title">Colleague email review</h2><button id="op-peer-review" type="button">Load current review preview</button></div><p class="muted">Admin only. Check with the recipient before marking an uncertain email reviewed. This records your review, preserves the original provider outcome and sends no email. Pending and blocked messages are separate work.</p><div id="peer-mail-review"></div><button id="op-peer-retry" type="button" hidden>Retry review confirmation</button></section>
+<section aria-labelledby="failures-title"><h2 id="failures-title">Recent failure history</h2><p class="muted">These are retained past processing outcomes, not cancellable queue items. A later successful run or administrator review does not erase this history. Check the latest outcome and current review counts to see what still needs attention.</p><p class="muted">Use the time, safe code and available trace reference to find the matching Cloudflare Worker log. The Worker trace identifies the matching Worker log. The backend reference is a separate diagnosticId; backendVersion, failureStage and operation identify the backend build and failed action when available. These safe references are retained with the processing outcome. The health summary contains no staff details or message contents.</p><div id="recent-failures"></div></section>
+<section aria-labelledby="recovery-title"><div class="section-heading"><h2 id="recovery-title">Recovery checkpoints</h2><button id="op-checkpoint" type="button" disabled>Record checkpoint</button></div><p id="recovery-status"></p><p id="checkpoint-help" class="muted"></p><div id="checkpoints"></div><p class="muted">A checkpoint records a native D1 Time Travel bookmark. Restoration remains an operator action following the recovery guide; it affects the shared database and does not restore R2 or reverse messages already sent.</p></section>
+</div>
+<footer>Administrator actions are verified again on the server. No credentials need to be pasted into this page.</footer>
+</main>
+<dialog id="confirmation" aria-labelledby="confirm-title" aria-describedby="confirm-description"><h2 id="confirm-title">Retry parked work?</h2><p id="confirm-description"></p><div class="actions"><button id="cancel-action" type="button" autofocus>Cancel</button><button id="confirm-action" class="primary" type="button">Retry job</button></div></dialog>
+</body></html>

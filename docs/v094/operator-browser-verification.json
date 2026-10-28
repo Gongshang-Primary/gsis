@@ -1,0 +1,29 @@
+{
+  "scope": "Synthetic browser routes only; no live mutation or credentials",
+  "results": [
+    {
+      "domain": "roster",
+      "width": 1365,
+      "height": 768,
+      "auth403": true,
+      "privateExport": true,
+      "cancelFirst": true,
+      "activation": true,
+      "overflow": false,
+      "focus": "",
+      "errors": []
+    },
+    {
+      "domain": "deploy",
+      "width": 390,
+      "height": 844,
+      "auth403": true,
+      "privateExport": true,
+      "cancelFirst": true,
+      "activation": true,
+      "overflow": false,
+      "focus": "",
+      "errors": []
+    }
+  ]
+}

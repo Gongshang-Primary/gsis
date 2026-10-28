@@ -1,0 +1,19 @@
+{
+  "environment": "Local headless Chromium; synthetic 200-teacher baseline, 31-day window; two tabs, 30 concurrent requests. Not a production or school-device latency measurement.",
+  "coldMs": {
+    "p50": 103.4,
+    "p95": 128.1
+  },
+  "warmMs": {
+    "p50": 0,
+    "p95": 0.1
+  },
+  "originRequestsCold": 2,
+  "originRequestsWarm": 0,
+  "compressedPayloadBytesCold": 50856,
+  "unchangedPayloadBytes": 0,
+  "baselineValidationsCold": 1,
+  "decodedContentWritesCold": 1,
+  "unchangedExtraDecodes": 0,
+  "unchangedExtraPayloadWrites": 0
+}

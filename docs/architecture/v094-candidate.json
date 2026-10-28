@@ -1,0 +1,282 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "GSiS v0.9.4 \u00b7 architecture and ownership",
+    "output": "docs/architecture/GSiS_v0.9.4_Architecture.html",
+    "locale": "en",
+    "quality_profile": "showcase",
+    "views": [
+      {
+        "id": "staff",
+        "label": "Staff path",
+        "focus": [
+          "staff",
+          "browser",
+          "pages",
+          "edge",
+          "d1"
+        ],
+        "note": "A captured command has a durable receipt; publication and delivery are separate."
+      },
+      {
+        "id": "owners",
+        "label": "Data owners",
+        "focus": [
+          "edge",
+          "d1",
+          "refs",
+          "googledata",
+          "r2"
+        ],
+        "note": "The cutover activates one operational owner. Google reference and resource services keep their own data."
+      },
+      {
+        "id": "delivery",
+        "label": "Background work",
+        "focus": [
+          "d1",
+          "notify",
+          "providers",
+          "r2"
+        ],
+        "note": "Provider acceptance is not delivery; uncertainty is retained for reconciliation."
+      }
+    ]
+  },
+  "components": [
+    {
+      "id": "staff",
+      "type": "external",
+      "label": "School staff",
+      "sublabel": "Teachers \u00b7 SMC \u00b7 room owners",
+      "pos": [
+        40,
+        40
+      ],
+      "size": [
+        180,
+        64
+      ]
+    },
+    {
+      "id": "browser",
+      "type": "frontend",
+      "label": "Nine browser apps",
+      "sublabel": "JavaScript \u00b7 local IndexedDB",
+      "pos": [
+        340,
+        40
+      ],
+      "size": [
+        190,
+        64
+      ]
+    },
+    {
+      "id": "pages",
+      "type": "security",
+      "label": "Pages gateways",
+      "sublabel": "App-specific access \u00b7 signed APIs",
+      "pos": [
+        660,
+        40
+      ],
+      "size": [
+        200,
+        64
+      ]
+    },
+    {
+      "id": "refs",
+      "type": "backend",
+      "label": "Google-owned services",
+      "sublabel": "Contacts \u00b7 Calendar \u00b7 LORD \u00b7 Venues",
+      "pos": [
+        340,
+        280
+      ],
+      "size": [
+        220,
+        76
+      ]
+    },
+    {
+      "id": "edge",
+      "type": "backend",
+      "label": "Roster + Deploy Workers",
+      "sublabel": "Activated operational commands",
+      "pos": [
+        660,
+        280
+      ],
+      "size": [
+        220,
+        76
+      ]
+    },
+    {
+      "id": "notify",
+      "type": "backend",
+      "label": "Notification Worker",
+      "sublabel": "Claims \u00b7 send results \u00b7 callbacks",
+      "pos": [
+        1020,
+        280
+      ],
+      "size": [
+        200,
+        76
+      ]
+    },
+    {
+      "id": "googledata",
+      "type": "database",
+      "label": "Private Google stores",
+      "sublabel": "Sheets \u00b7 Drive \u00b7 Calendar",
+      "pos": [
+        340,
+        540
+      ],
+      "size": [
+        220,
+        68
+      ]
+    },
+    {
+      "id": "d1",
+      "type": "database",
+      "label": "Shared D1 database",
+      "sublabel": "Records \u00b7 revisions \u00b7 receipts \u00b7 jobs",
+      "pos": [
+        660,
+        540
+      ],
+      "size": [
+        220,
+        68
+      ]
+    },
+    {
+      "id": "providers",
+      "type": "external",
+      "label": "Delivery providers",
+      "sublabel": "Meta WhatsApp \u00b7 Google email",
+      "pos": [
+        1020,
+        540
+      ],
+      "size": [
+        200,
+        68
+      ]
+    },
+    {
+      "id": "r2",
+      "type": "cloud",
+      "label": "Private R2",
+      "sublabel": "Immutable timetable parts \u00b7 media",
+      "pos": [
+        1020,
+        40
+      ],
+      "size": [
+        200,
+        64
+      ]
+    }
+  ],
+  "connections": [
+    {
+      "from": "staff",
+      "to": "browser",
+      "label": "Uses app",
+      "variant": "emphasis"
+    },
+    {
+      "from": "browser",
+      "to": "pages",
+      "label": "HTTPS",
+      "variant": "security"
+    },
+    {
+      "from": "pages",
+      "to": "edge",
+      "label": "Active owner",
+      "variant": "emphasis"
+    },
+    {
+      "from": "pages",
+      "to": "refs",
+      "label": "Other apps",
+      "variant": "security"
+    },
+    {
+      "from": "edge",
+      "to": "refs",
+      "label": "Signed adapters",
+      "variant": "security"
+    },
+    {
+      "from": "edge",
+      "to": "d1",
+      "label": "Guarded commit",
+      "variant": "emphasis"
+    },
+    {
+      "from": "refs",
+      "to": "googledata",
+      "label": "Own records"
+    },
+    {
+      "from": "edge",
+      "to": "r2",
+      "label": "Versioned parts"
+    },
+    {
+      "from": "notify",
+      "to": "d1",
+      "label": "Claim / result"
+    },
+    {
+      "from": "notify",
+      "to": "providers",
+      "label": "Background send",
+      "variant": "dashed"
+    },
+    {
+      "from": "notify",
+      "to": "r2",
+      "label": "Private media"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "Runtime and browser stack",
+      "items": [
+        "Nine vanilla HTML/CSS/JavaScript apps use app-specific Pages gateways.",
+        "Workers, D1 and private R2 own activated Roster/Deploy operations and immutable content.",
+        "Apps Script V8 retains Google services; Node/Python and pinned esbuild build the suite."
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "One writer per domain",
+      "items": [
+        "D1 commits changed records, receipt and included audit/job intent together.",
+        "The legacy Apps Script writer stays fenced after activation.",
+        "Contacts, Calendar, LORD and Venues retain separate Google-owned stores."
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "Evidence and deployment limits",
+      "items": [
+        "Local source receipt pins implementation commit 13ea5104fa2d and cited file hashes.",
+        "Archify design-mode rendering; native forge links are unavailable for the local history bundle.",
+        "Code and configured modes are shown; live cutover and provider delivery need separate acceptance."
+      ]
+    }
+  ]
+}

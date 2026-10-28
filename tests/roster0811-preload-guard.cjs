@@ -1,0 +1,21 @@
+'use strict';
+const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm'),path=require('node:path'),{createRequire}=require('node:module');
+const file='tests/roster089-cache.cjs',source=fs.readFileSync(file,'utf8'),box={require:createRequire(path.resolve(file)),console,setTimeout,Buffer,Blob,DecompressionStream,TextEncoder,TextDecoder,Uint8Array,atob};
+vm.runInNewContext(source.slice(0,source.indexOf('(async()=>'))+'\nthis.helpers={harness,memory,envelope,hash};',box);
+const {harness,memory,envelope,hash}=box.helpers,plain=x=>JSON.parse(JSON.stringify(x));
+const info=v=>v?{role:v.role,from:v.baseline.payload.from,baselineSourceKey:v.baseline.sourceKey,suspendedSourceKey:v.suspended?.sourceKey}:null;
+(async()=>{
+ const store=memory();await harness({store}).cache.start();const predecessor=info(store.value),promotions=[],checks=[];
+ store.getGenerationInfo=async()=>info(store.value);
+ store.commitGeneration=async(owner,value,expected)=>{promotions.push({expected:plain(expected??null),current:info(store.value)});return false;};
+ store.markChecked=async(owner,at,expected)=>checks.push(plain(expected??null));
+ const h=harness({store,reply:(p,from)=>{if(p.stage==='suspended')store.value={...store.value,suspended:{...store.value.suspended,sourceKey:hash('8')}};return envelope(p.stage,from,x=>x,hash(p.stage==='baseline'?'c':'9'));}});
+ await h.cache.start();const result=await h.cache.start({refresh:true});assert.equal(result.phase,'ready',result.error?.stack);
+ assert.deepEqual(promotions[0].expected,predecessor,'promotion carries the predecessor captured before network work');
+ assert.notDeepEqual(promotions[0].current,predecessor,'fixture installs another tab generation during the request');
+ assert.equal(checks.length,0,'rejected promotion never marks the newer generation checked');
+ const same=memory();await harness({store:same}).cache.start();const expected=info(same.value);same.getGenerationInfo=async()=>info(same.value);same.markChecked=async(owner,at,guard)=>checks.push(plain(guard??null));
+ const warm=harness({store:same,reply:(p,from)=>({schema:1,stage:p.stage,from,to:'2026-11-21',baselineKey:hash('b'),sourceKey:hash(p.stage==='baseline'?'c':'d'),unchanged:true})});
+ await warm.cache.start();await warm.cache.start({refresh:true});assert.deepEqual(checks[0],expected,'timestamp-only checks identify the content actually checked');
+ console.log('PASS preload captures predecessor before network and guards timestamp-only checks without promoting rejected content.');
+})().catch(error=>{console.error(error);process.exitCode=1;});

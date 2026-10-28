@@ -1,0 +1,9 @@
+# v0.8.7 verification evidence
+
+The combined offline gate ran 569 scripts: 566 passed and three failed. The three failures were the newly embedded manual's old anchor, an obsolete pending-approval expectation, and diagnostics that validated only the base template instead of its approved variant. All three were corrected and their full scripts rerun successfully. The approved-button and notification-maintenance scripts were added and passed separately. No failed script is ignored or presented as a pass before its successful rerun.
+
+Focused reruns additionally cover separate transport storage, exact Admin-email closure, legacy review receipt compatibility, 30 simultaneous stale-snapshot absence reports, protected stale edits, exact retry receipts, scoped acknowledgements, cache isolation, Statistics and typed Excel export. The release builder parses all 100 Apps Script files as ES2020. The full package test verifies exactly 12 members, source parity, component hashes, runtime assets and manual anchors. The offline manual passed a 390-pixel Chromium containment/JavaScript check. Archify validation, artifact checks and browser containment passed. These are host/browser simulations, not a production throughput benchmark.
+
+Latest queue-maintenance tests cover legacy/current receipt suppression, unchanged compressed timetable and domain state, private-link preservation, prepared uncertainty, repeat cleanup after a later explicit retry, lock/read-before-write, owner rejection, and safe recovery when the second transport-file write fails.
+
+Operational limitation: historical save outcome and uncertain provider deliveries remain unconfirmed. Google authorisation blocked live maintenance execution; only the helper source was saved in the project editor. No live queue mutation, message, email, acknowledgement, or full-suite deployment was performed.

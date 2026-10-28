@@ -1,0 +1,123 @@
+# GSiS v0.6.03 API contracts
+
+Relief remains response schema 3. Deploy write protocol remains 500. Use authenticated `GET /api/relief` or the existing server-signed Apps Script `relief` action. Current school identity and SMC/KP or Admin authority are checked for every request. Secrets remain server side. No new receiving app or cross-origin grant is configured.
+
+| Query | Meaning |
+| --- | --- |
+| `versionId` | Read a permitted editable version; omit for the frozen publication. |
+| `teacherId` | Filter a stable teacher ID; this is not an authorization grant. Omit for all teachers. |
+| `year` | 2000 to 2099; the selected version must have valid dates overlapping that year. |
+
+The success envelope remains `{ "ok": true, "data": ... }`. Schema 3 data includes `schemaVersion`, `calculationVersion`, `backendVersion`, `units:"periods/week"`, `version`, `reference`, `teachers`, `planningQuota:true`, `timetableAvailability:false` and `blockSource:"external"`.
+
+`version` contains `id`, `name`, `revision`, `commit`, `published`, `from` and `to`. Preserve these with imported results. A frozen publication can share a version ID with a later draft; its commit and store identity differ.
+
+| Field | Units and meaning |
+| --- | --- |
+| `calculationVersion` | `whole-week-v2` for every version, including older stored settings and publications. Independent of API and product versions. |
+| `reference.siuePercent` | Percentage, normally 150. Multiplier = 1 + this value / 100. |
+| `reference.T_avg` | Total actual teaching periods / eligible active full-time teacher count. |
+| `reference.teachingPeriodTotal` | Actual weekly teacher-periods, including FAJT and 4/5 teaching. |
+| `reference.fullTimeTeacherCount` | Active eligible full-time headcount; FAJT and 4/5 excluded. |
+| `reference.available`, `reason` | Whether this reference can be calculated and why it cannot. |
+| `teachers[].teacherId`, `name`, `active`, `eligible` | Identity and status in this version. |
+| `teachers[].R` | Estimated weekly capacity before external Blocks, with fractional precision. |
+| `teachers[].OF` | Composed nonemployment offload fraction, e.g. 0.3 for 30%, not 30. |
+| `teachers[].Ti` | Actual individual weekly teaching periods. |
+| `teachers[].available`, `reason` | Valid zero is available. Unavailable R is null, never spare capacity. |
+| `teachers[].breakdown` | Employment, FTT, PD, duties, weeklyBudget, timetableFactor, Wi, rawR, offloadAllowance, siuePeriods, offloadComponents, available and reason. |
+
+For `whole-week-v2`:
+
+```text
+offloadAllowance = OF * T_avg
+siuePeriods = (Ti + offloadAllowance) * siuePercent / 100
+Wi = FTT + PD + duties + (1 + siuePercent / 100) * (Ti + offloadAllowance)
+rawR = timetableFactor * (weeklyBudget - Wi)
+R = max(0, rawR)
+```
+
+Defaults: full-time budget 84; 4/5 budget 84 × 0.8 = 67.2; FAJT budget 65. The full-time and 4/5 timetable factor is 60/84; FAJT uses 1. OF composes applicable nonemployment percentages multiplicatively, retains explicit-role replacement and acting rules, and excludes 4/5 and FAJT employment reductions. Caps remain caps rather than invented percentages. Unresolved rules or demand give unavailable R. Lunch duty counts through the roster; personal lunch is not subtracted.
+
+For example, Ti=20, OF=0.3, T_avg=25, FTT=5, PD=2, duties=1 and SIUE=150% gives offloadAllowance=7.5, Wi=76.75 and full-time R=5.178571428571429 periods/week. The receiving app applies its own weekly Block value B once as `max(0, R - B)`, retaining unavailable status when R is null. R does not identify free timetable slots or assign lessons.
+
+Both Admin and SMC/KP receive the fields above. Only Admin also receives `admin` with normalized editable settings, formula and detailed rows. `admin.settings.blocks` is omitted from the API. Historical row Block values are compatibility information, never a deduction from exported R. Ordinary teachers remain denied even with a teacherId filter. A future teacher portal must enforce own-record access server side.
+
+Older settings remain readable without storage mutation. Schema 1/2 timetable/lunch budgets are replaced in memory by the PDF whole-week defaults; saved SIUE and Block values are preserved. Schema 3 whole-week budgets remain version-owned. Legacy mode expected is normalized to actual. New-model-only inputs are available for all valid versions. No legacy R or Expected R calculation remains. A publication retains its source data while being calculated by the common implementation.
+
+The reference also includes weeklyPeriods, fourFifthsFraction, fajtWeeklyPeriods and timetablePeriods so authorized viewers can render the current employment branches accurately.
+
+## Settings, snapshots and deltas
+
+Admin edits the common model through the existing `setReliefSettings` draft operation with expected-value checks:
+
+```json
+{
+  "schema": 3,
+  "calculationVersion": "whole-week-v2",
+  "mode": "actual",
+  "weeklyPeriods": 84,
+  "fourFifthsFraction": 0.8,
+  "fajtWeeklyPeriods": 65,
+  "timetablePeriods": 60,
+  "siuePercent": 150,
+  "blocks": {}
+}
+```
+
+Budgets are finite and positive; timetable periods cannot exceed full-time budget; the part-time fraction is in (0,1]; SIUE is finite and nonnegative. Unknown settings are rejected. Only mode actual is accepted for writes. Legacy/model-v1 settings remain stored until an explicit Admin save; their prior object is retained in reliefLegacy. New blank versions use the current schema 3 settings; duplicates preserve source inputs but calculate through the same implementation.
+
+`setPAL` accepts `{schema:1,auto:boolean}` and requires Admin, including mixed saves and retries. Auto reconciliation and FT changes share one commit. Manual preserves copied assignments, editable under ordinary assignment permissions.
+
+Snapshots carry `reliefResults` schema 3. SMC receives applied breakdowns; stored `relief`, `reliefLegacy`, Admin editing detail, audit and private rule values remain role-filtered. The calculation engine and its private catalogue are not embedded into public frontend code.
+
+A saved field delta can include `reliefProjection` with `versionId`, `revision`, `commit`, `calculationVersion`, `reliefResults` and optional Admin detail. Version and revision must match the delta. When inputs are unchanged from the client's immediately preceding revision, it instead has `unchanged:true`; retain the existing calculation and clear pending display status. Do not reuse this across versions, calculation versions or absent baselines. Old cursors, changed authority and unsupported paths still require a coherent reload.
+
+Pending edits hide authoritative R until save completes. A durable save remains confirmed if later display work fails; do not resubmit it as a new write. Current roles are checked before cached data is projected. Cache keys include workbook, version, store, commit, revision and model code. Missing, corrupt or evicted chunks rebuild from stored inputs. Caller-specific authorized responses are not cached.
+
+Pending commits and changing source markers return 503. Invalid parameters return 400; missing versions, teachers or years return 404; unauthorized roles return 403. Existing gateway authentication failures remain. Read-only relief requests do not recover or mutate pending commits.
+
+## Exclusion saves in v0.6.00
+
+For an exclusion-only draft save, the unchanged relief projection additionally includes `previousRevision`. It identifies the exact saved predecessor; `revision` must equal `previousRevision + 1`. The browser must have a nonpending, nonstale relief baseline for the same version at that predecessor before retaining it. Otherwise the write stays confirmed and the display requires refresh. The server does not read or calculate relief merely to issue this proof. A response delta is still supplied only when the caller's `since` matches the predecessor and authority matches.
+
+Exclusions are advisory and are not relief inputs. Mixed saves use the existing dependency-aware calculation path. A lost acknowledgement still uses the same receipt and delta recovery. Legacy projection layouts retain their complete dependency read fallback. This retained exclusion optimization does not change the relief consumer API.
+
+## Department TL validation
+
+setOrganisation and its patchPlanning form reject new department tls entries unless the selected version resolves that active eligible teacher to ST, LT or MTT. An existing invalid entry in the same department can remain or be removed. Newly added entries are checked again after all edits in a mixed save. Existing Head, Deputy and Member rules, permissions and duplicate checks remain.
+
+## Specialist indicator
+
+The Workload display derives actual assigned subject teacher-periods divided by distinct assigned specialist headcount. It is not used by the relief API and does not substitute for school T_avg or individual Ti.
+
+
+## v0.6.01 additions
+
+Contacts POST /api/kp, signed action setKP, accepts optional boolean grantAdmin. True explicitly adds Admin after a current Admin check; false/omission preserves Admin. Existing email, enabled (SMC/KP choice) and version fields remain required. A grant combined with removal of existing SMC returns 400. Non-Admin callers return 403 and stale target versions return 409. Explicit grants may reactivate an inactive Admin; ordinary SMC edits may not.
+
+UPSTREAM_RESPONSE errors may include responseInfo with fixed kind, format and numeric HTTP status. No raw upstream body or URL is returned. Layout adds UPSTREAM_SCHEMA for a nominal success that fails the public Layout schema. Existing authenticated routes and public data field allowlists remain.
+
+Required organisational membership is derived consistently from each record's role and appointment level. Acting status does not remove it. This does not grant application authority or change OF rates.
+
+## v0.6.03 TG levels and weekly periods
+
+The existing Admin TG add/update operations accept the following fields. The write protocol remains 500.
+
+| Field | Contract |
+| --- | --- |
+| `levels` | Nonempty array of distinct configured primary-level strings, saved in numeric order. |
+| `level` | Compatibility field containing the first selected level. It is not a multi-level workload rate. |
+| `weeklyPeriods` | Finite number from 0 to 100 in half-period increments, or null for the single-level Subject Load default. Required and non-null when several levels are selected. Zero is valid. |
+| `classRefs` | Version-owned class references from selected levels. Class-based scope requires at least one class at each selected level. |
+| `levelWide` | True includes all classes at the selected levels and requires empty `classRefs`. CCE EL requires this scope. |
+
+Modern add/update payloads must provide explicit class scope. Older edit payloads preserve omitted `levels` and `weeklyPeriods`. Invalid values and stale expected state fail before a durable write. Existing single-level records need no migration.
+
+For each assigned teacher, the ledger uses the entered TG total once, regardless of how many levels or classes it covers. If a legacy multi-level record lacks actual periods, calculation is incomplete; it must not fall back to its first level. Single-level records without an override continue using their configured Subject Load. The shared rule feeds workload, relief inputs, specialist demand and active deployment export.
+
+Layout publication carries `levels` and `weeklyPeriods`; its public gateway allowlist preserves them and checks array/string and finite number/null types. Native Layout rows show all selected levels together. Admin edits retain both fields. Expanding a published TG's levels retains its Layout ID and authoritative MTL teacher/pupil evidence. Public cache keys use the `tg-levels-v1` namespace to avoid returning older filtered projections.
+
+## Ledger derived values
+
+No new endpoint or persistence schema. Shared workload analysis adds fullTimeN, teachingReference, and per-row employment, nonTeachingActual, targetRetained and targetPending. quota is the new total-load target; status compares total with its inclusive outward-rounded band. RT returns null quota/band and internal No target, rendered as a dash. Existing capUsed, specialist references and relief response contracts remain unchanged.

@@ -1,0 +1,121 @@
+{
+  "schema": 1,
+  "mode": "working-source-snapshot",
+  "capturedAt": "2026-10-25T17:28:55.170806+00:00",
+  "baseCommit": "169f2e5d674507bcaec6bea43984718090f8fdf8",
+  "rendererMode": "Archify design-mode diagram plus independently inspected current source",
+  "status": "captured",
+  "limitations": "Hashes identify inspected working-source files at capture, before the release commit. This is not hosted source provenance or evidence of a production deployment. Diagram summarizes component responsibilities; file hashes alone do not prove its semantic claims.",
+  "sources": [
+    {
+      "path": "release-installation-manifest.json",
+      "sha256": "a3dcd377cf4bcbdf9ebc4266a55d038133560a93367e33de6a5aec64501dcca0",
+      "bytes": 2906
+    },
+    {
+      "path": "shared/edge-store.js",
+      "sha256": "8e7cbba890b6ea72201a2cf6c310ba4617d7aca7861ee1275435f8a22aa6ffb7",
+      "bytes": 26728
+    },
+    {
+      "path": "public/edge-deploy.js",
+      "sha256": "d90fbde8a5ac3da593dcaa4e0e181893fad589a7a57ca2624b1173a20b86dfe4",
+      "bytes": 28326
+    },
+    {
+      "path": "public/edge-deploy-runtime.js",
+      "sha256": "e98aef8e45254da2a66be4ca3a5c63fc8801f06ef879e90ad6c6dc2bd2bc5657",
+      "bytes": 11178
+    },
+    {
+      "path": "backend/DeployVenues.gs",
+      "sha256": "a16cb511e13ffc15ca4d999028e9521a3389b6f540050770d3bf493e89c034f7",
+      "bytes": 4303
+    },
+    {
+      "path": "backend/LordDeploy.gs",
+      "sha256": "52cf73f6520530910a041cb087ff74dce5166302359eb7dc8f439f1ec25223a9",
+      "bytes": 5242
+    },
+    {
+      "path": "backend/Code.gs",
+      "sha256": "dae9b606e1466ccd70ae2f3e8798c42981c031860f59e2009d68c0a2d4522ef5",
+      "bytes": 1394019
+    },
+    {
+      "path": "venues-backend/Sources.gs",
+      "sha256": "6ba9da4d2e728ad173ff02f4b993e57fe55beb1c294a753dae301abd4515fe1d",
+      "bytes": 28824
+    },
+    {
+      "path": "venues-backend/Code.gs",
+      "sha256": "f9557b078406c12096ef7d646d4f4bb81534b917c23ce24bd17adec1ef03ee12",
+      "bytes": 17884
+    },
+    {
+      "path": "venues-viewport/public/app.js",
+      "sha256": "343d5a7a92821446198de3c0175e13429b24f1d61004f7569dd8bd9d1f9662c3",
+      "bytes": 72482
+    },
+    {
+      "path": "lord-suite/Source/backend/Code.gs",
+      "sha256": "58a55c5620a447c6ae3b143ee93c0582463e7a7224be3e1509e0931ca204bbb8",
+      "bytes": 326165
+    },
+    {
+      "path": "lord-suite/Source/lord/_worker.js",
+      "sha256": "d71115336bb5fb026855f5b4d3f4a80e5c2a6bf404941f54840e61ea47e3bbfe",
+      "bytes": 22174
+    },
+    {
+      "path": "lord-suite/Source/overlord/assets/app.js",
+      "sha256": "9d5468302bc3c7a3b66ff5b04b97b3b0b1fa155e1d8093b030a988e1f8a537c2",
+      "bytes": 84704
+    },
+    {
+      "path": "README.md",
+      "sha256": "e50ec32c3f05b395f160050a82b8727175d495dd0042f7f16bb3d5ca79bb0f1b",
+      "bytes": 56107
+    },
+    {
+      "path": "backend/DeployEdge.gs",
+      "sha256": "604b05919659037979ac8f2e97928424d6ad4581a3989f6ab9fbfb4c1fc5fcda",
+      "bytes": 7446
+    },
+    {
+      "path": "layout-update/public/_worker.js",
+      "sha256": "c98fba0d85c7cd54d2120be4331e1698f9aa848901529493c6402fe580b1145c",
+      "bytes": 19469
+    },
+    {
+      "path": "roster-update/public/edge-roster.js",
+      "sha256": "43e94e8532b1ba1e9c119c6fcea56c23a4c39ff52b7c07c8e0d31cc34f08cf91",
+      "bytes": 82613
+    },
+    {
+      "path": "public/workload-ui.js",
+      "sha256": "124096053513bbaece3b11d4959bf4714cab0775c909d17591426ae8bed0016f",
+      "bytes": 24387
+    },
+    {
+      "path": "public/edge-setup.html",
+      "sha256": "353b001c1c7f5b7dca30d3efb3a1074c23e15a0029f931f6567a0d49f949f5a2",
+      "bytes": 4591
+    },
+    {
+      "path": "public/edge-setup.js",
+      "sha256": "edc5a43a23462b0aafcd5d7e9bfc15745dc986507f70b4892bd50714cc53f5c5",
+      "bytes": 8181
+    },
+    {
+      "path": "roster-update/public/edge-setup.html",
+      "sha256": "a810b5c0ef8b08536f0da15e61112b0ba30ad21cb2295311b857d79ea4d7c1d8",
+      "bytes": 4591
+    },
+    {
+      "path": "roster-update/public/edge-setup.js",
+      "sha256": "edc5a43a23462b0aafcd5d7e9bfc15745dc986507f70b4892bd50714cc53f5c5",
+      "bytes": 8181
+    }
+  ]
+}

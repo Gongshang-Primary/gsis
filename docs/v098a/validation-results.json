@@ -1,0 +1,86 @@
+{
+  "version": "0.9.8a",
+  "scope": "Focused regression checks for frontend queue selection and withdrawal",
+  "counts": {
+    "passed": 15
+  },
+  "tests": [
+    {
+      "test": "roster093b-absence-intake.cjs",
+      "status": "passed",
+      "seconds": 0.237
+    },
+    {
+      "test": "roster093b-absence-pipeline.cjs",
+      "status": "passed",
+      "seconds": 0.233
+    },
+    {
+      "test": "roster093b-worker-routes.mjs",
+      "status": "passed",
+      "seconds": 0.954
+    },
+    {
+      "test": "roster093b-intake-gateway.mjs",
+      "status": "passed",
+      "seconds": 0.53
+    },
+    {
+      "test": "roster098-backend-errors.cjs",
+      "status": "passed",
+      "seconds": 0.098
+    },
+    {
+      "test": "roster098-recovery-worker.mjs",
+      "status": "passed",
+      "seconds": 0.787
+    },
+    {
+      "test": "paid097-backend-gateway.mjs",
+      "status": "passed",
+      "seconds": 0.242
+    },
+    {
+      "test": "roster098a-intake-flush.cjs",
+      "status": "passed",
+      "seconds": 3.479
+    },
+    {
+      "test": "paid097-receipts.cjs",
+      "status": "passed",
+      "seconds": 2.702
+    },
+    {
+      "test": "paid097-receipts-browser.cjs",
+      "status": "passed",
+      "seconds": 0.926
+    },
+    {
+      "test": "roster093b-peer-ui.cjs",
+      "status": "passed",
+      "seconds": 2.896
+    },
+    {
+      "test": "roster089-receipt-refresh-browser.cjs",
+      "status": "passed",
+      "seconds": 2.894
+    },
+    {
+      "test": "roster098a-intake-flush-browser.cjs",
+      "status": "passed",
+      "seconds": 1.912
+    },
+    {
+      "test": "pages096-packaged-worker.cjs",
+      "status": "passed",
+      "evidence": "Executed against built 0.9.8a component archive."
+    },
+    {
+      "test": "paid097-bundles.cjs",
+      "status": "passed",
+      "evidence": "Executed against built 0.9.8a component archive."
+    }
+  ],
+  "fullSuiteRerun": false,
+  "liveReportsWithdrawn": false
+}

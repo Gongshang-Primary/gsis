@@ -1,0 +1,154 @@
+{
+  "version": "0.9.8i",
+  "baseline": "0.9.8h",
+  "baselineCommit": "69e0d74c569dfd7afb44f9e6bdd42968cc0382bf",
+  "scope": [
+    "confirmed suspended ordinary workload exemption with retained cumulative relief and preserved UT automatic cap",
+    "configured FORM=2 actual effective pairs and genuine solos without added coverage or SMC replacement",
+    "Show baseline comparison enabled by default with user off and independent plan authority",
+    "bounded daily plaintext Google allocation audit export through a dedicated audit-only cron",
+    "separate administrator rehearsal Worker with dedicated D1/private R2 and simulated notifications"
+  ],
+  "componentCount": 17,
+  "productionChangedComponents": [
+    "rosterFrontend",
+    "rosterBackend",
+    "notificationWorker"
+  ],
+  "versionHarmonisedComponents": [
+    "contactsFrontend",
+    "deployFrontend",
+    "layoutFrontend",
+    "calendarFrontend",
+    "lordFrontend",
+    "overlordFrontend",
+    "starlordFrontend",
+    "venuesFrontend",
+    "contactsBackend",
+    "deployBackend",
+    "calendarBackend",
+    "lordBackend",
+    "venuesBackend",
+    "operationsWorker"
+  ],
+  "timetableCacheChanged": false,
+  "migrationRequired": false,
+  "newInfrastructureRequired": false,
+  "productionDeployed": false,
+  "liveRecordsChanged": false,
+  "messagesSent": false,
+  "productionAuthority": "Google",
+  "productionAuditCron": {
+    "add": "2-57/5 * * * *",
+    "retain": [
+      "* * * * *",
+      "15 18 * * *"
+    ],
+    "timezone": "UTC",
+    "maximumPendingDaysPerInvocation": 1
+  },
+  "separateRehearsal": {
+    "archive": "GSiS_v0.9.8i_Rehearsal.zip",
+    "productionInstallation": false,
+    "newInfrastructureRequired": true,
+    "dedicatedResources": [
+      "Worker",
+      "D1",
+      "private R2"
+    ],
+    "authentication": "verified school Google identity and explicit server-side administrator allowlist",
+    "notificationDelivery": "simulated",
+    "productionActivationAvailable": false,
+    "liveScheduler": false,
+    "googleWriteCapability": false,
+    "deployed": false,
+    "liveCloudflareStorageVerified": false,
+    "blocker": "Cloudflare authentication unavailable",
+    "guide": "docs/v098i/REHEARSAL_SETUP.md"
+  },
+  "liveStaplerRecovery": {
+    "previewReported": "ready in H",
+    "restoreConfirmed": true,
+    "confirmationSource": "User confirmed 28\u201330 October restored after H release",
+    "newLiveVerificationPerformed": false
+  },
+  "verification": {
+    "status": "verified-with-inherited-limits",
+    "focusedPrograms": {
+      "revisionINamed": 9,
+      "passed": 9
+    },
+    "lordPrograms": {
+      "total": 38,
+      "passed": 38,
+      "failed": 0,
+      "sourceHashesMatch": true
+    },
+    "nodeAggregate": {
+      "total": 818,
+      "passed": 811,
+      "failed": 7,
+      "singleRun": false,
+      "postGateFixtureReruns": 1
+    },
+    "inheritedHFailurePrograms": [
+      "release084-absence-browser.cjs",
+      "roster717-inbox-performance.cjs",
+      "roster718-absence-performance-browser.cjs",
+      "stapler718a-relief-import.cjs",
+      "roster-draft-cell-save-speed.cjs",
+      "roster080-batch-backend.cjs",
+      "roster719-performance.cjs"
+    ],
+    "singleGreenFullSuiteClaimed": false,
+    "productionValidationPerformed": false,
+    "committedProvenance": {
+      "expectedTag": "v0.9.8i",
+      "sourceCommit": null,
+      "manifest": "PATCH.json in the production deployment archive",
+      "postCommitRecord": "RELEASE_VERIFICATION.json in the complete release archive"
+    },
+    "freshRecoveryClone": {
+      "required": true,
+      "history": "Full reachable release history, including recovered H baseline, without inventing unavailable older objects",
+      "postCommitRecord": "RELEASE_VERIFICATION.json in the complete release archive"
+    },
+    "nodeFinalFullRun": {
+      "total": 818,
+      "passed": 810,
+      "failed": 8,
+      "runtimeFrozen": true,
+      "fixtureRerunRequired": "release098h-suite-routing.cjs"
+    },
+    "appsScriptSyntax": {
+      "files": 218,
+      "ecmaVersion": 2020,
+      "passed": true
+    },
+    "runtimeFingerprints": {
+      "files": 454,
+      "unchanged": true
+    },
+    "independentReviews": {
+      "completed": 4,
+      "openMaterialFindings": 0
+    },
+    "rehearsalLocalTests": {
+      "sourceAndSetup": {
+        "passed": 10,
+        "failed": 0
+      },
+      "bundled": {
+        "passed": 9,
+        "failed": 0
+      },
+      "realLocalSQLite": true,
+      "liveR2": false
+    }
+  },
+  "timetableCacheNote": "Production Google routing, cache flags and migration remain unchanged. Rehearsal resources bind only to a separate Worker.",
+  "sharedHelperParityComponents": [
+    "deployBackend",
+    "operationsWorker"
+  ]
+}

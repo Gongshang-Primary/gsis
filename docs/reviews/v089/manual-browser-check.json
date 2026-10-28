@@ -1,0 +1,35 @@
+{
+  "version": "0.8.9",
+  "checkedAt": "2026-10-22T19:26:59.301Z",
+  "manualBytes": 71349,
+  "checks": [
+    "no embedded architecture runtime",
+    "search hides irrelevant sections",
+    "clear search restores sections",
+    "relative architecture link",
+    "unique IDs",
+    "valid in-page links",
+    "reduced motion",
+    "no runtime errors"
+  ],
+  "viewports": [
+    {
+      "width": 1440,
+      "height": 1000,
+      "browserZoomEquivalent": 1,
+      "overflow": false
+    },
+    {
+      "width": 390,
+      "height": 844,
+      "browserZoomEquivalent": 1,
+      "overflow": false
+    },
+    {
+      "width": 720,
+      "height": 1000,
+      "browserZoomEquivalent": 2,
+      "overflow": false
+    }
+  ]
+}

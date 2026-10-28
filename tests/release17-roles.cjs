@@ -1,0 +1,11 @@
+const assert=require('assert/strict'),rules=require('../shared/teaching-rules.js'),make=require('./dom-helper.cjs');
+const catalogue=[{role:'P',level:'SL',groups:['SL']},{role:'VP(EO)',level:'SL',groups:['SL']},{role:'HOD EL',level:'HOD',groups:['SC','SMC','KP']},{role:'YH',level:'HOD',groups:['SC']},{role:'Science assistant',level:'',groups:['Support']},{role:'Teacher',level:'',groups:[]}];
+for(const role of ['P','VP(EO)','SENO','Support','OSO','SAT','Dentist','DE','Librarian','Library','Recep','MK'])assert.equal(rules.eligible(rules.resolve({id:'x'},catalogue,{profile:{Role:role,Active:'Y'}})),false,role);
+assert.equal(rules.eligible(rules.resolve({id:'x'},catalogue,{profile:{Role:'HOD EL',Active:'Y'}})),true,'SC membership must not exclude teachers');
+const {w,run}=make();w.catalogue=catalogue;
+run(`roleCatalogue=window.catalogue;staffCatalog=new Map([['p',{id:'p',profile:{Role:'P',Active:'Y','Basic Name':'Leader'}}],['h',{id:'h',profile:{Role:'HOD EL',Active:'Y','Basic Name':'Head'}}]]);v().teachers=[{id:'p',name:'Leader',active:true},{id:'h',name:'Head',active:true}];tab='Teachers';render()`);
+assert.doesNotMatch(w.document.querySelector('#content table').textContent,/Leader/);assert.match(w.document.querySelector('#content table').textContent,/Head/);assert.match(w.document.querySelector('#content table').textContent,/HOD/);
+run(`tab='Ledger';render()`);assert.doesNotMatch(w.document.querySelector('#content .workload-ledger').textContent,/Leader/);assert.match(w.document.querySelector('#content .workload-ledger').textContent,/Head/);
+run(`v().teacherDrafts={h:{Role:'YH','Basic Name':'Planned name',Active:'Y'}}`);assert.equal(run(`plannerProfile(v().teachers[1])['Basic Name']`),'Planned name');assert.equal(run(`plannerProfile(v().teachers[1])['EO Appt Level']`),'HOD');
+run("tab='Teachers';render()");const tabs=[...w.document.querySelectorAll('#settingsSubnav button')].map(x=>x.textContent);assert.deepEqual(tabs,['Span of Control','Teachers','Exclusions','Membership','Offload','HR Terms']);w.document.querySelector('[data-section="Program Settings"]').click();assert.ok([...w.document.querySelectorAll('#settingsSubnav button')].some(b=>b.textContent==='Subject Load'));w.close();
+console.log('PASS catalogue-derived legacy profiles, SC membership distinction, Teachers/Summary exclusion, planned values and tab order');

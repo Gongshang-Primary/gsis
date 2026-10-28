@@ -1,0 +1,396 @@
+{
+  "schema_version": 1,
+  "diagram_type": "erd",
+  "meta": {
+    "title": "GSiS Calendar: configuration schema",
+    "locale": "en",
+    "quality_profile": "standard",
+    "output": "docs/GSiS-Schema-Calendar-Config-v0.7.10.html"
+  },
+  "layout": {
+    "mode": "grid",
+    "gapX": 70,
+    "gapY": 42,
+    "entityW": 270
+  },
+  "entities": [
+    {
+      "id": "e0",
+      "label": "Settings",
+      "tag": "Access and settings",
+      "row": 0,
+      "col": 0,
+      "attributes": [
+        {
+          "name": "Key",
+          "type": "cell"
+        },
+        {
+          "name": "Value",
+          "type": "cell"
+        },
+        {
+          "name": "Description",
+          "type": "cell"
+        }
+      ]
+    },
+    {
+      "id": "e1",
+      "label": "Users",
+      "tag": "Access and settings",
+      "row": 1,
+      "col": 0,
+      "attributes": [
+        {
+          "name": "UserAlias",
+          "type": "cell"
+        },
+        {
+          "name": "DisplayName",
+          "type": "cell"
+        },
+        {
+          "name": "IsAdmin",
+          "type": "cell"
+        },
+        {
+          "name": "IsParentPublisher",
+          "type": "cell"
+        },
+        {
+          "name": "Active",
+          "type": "cell"
+        },
+        {
+          "name": "AddedAt",
+          "type": "cell"
+        },
+        {
+          "name": "AddedBy",
+          "type": "cell"
+        },
+        {
+          "name": "Notes",
+          "type": "cell"
+        }
+      ]
+    },
+    {
+      "id": "e2",
+      "label": "Lanes",
+      "tag": "Lane rules",
+      "row": 0,
+      "col": 1,
+      "attributes": [
+        {
+          "name": "LaneID",
+          "type": "cell"
+        },
+        {
+          "name": "Header",
+          "type": "cell"
+        },
+        {
+          "name": "SortOrder",
+          "type": "cell"
+        },
+        {
+          "name": "Active",
+          "type": "cell"
+        },
+        {
+          "name": "SupportsShift",
+          "type": "cell"
+        },
+        {
+          "name": "ShiftALabel",
+          "type": "cell"
+        },
+        {
+          "name": "ShiftBLabel",
+          "type": "cell"
+        },
+        {
+          "name": "DefaultWeekday",
+          "type": "cell"
+        },
+        {
+          "name": "DefaultEventType",
+          "type": "cell"
+        },
+        {
+          "name": "DefaultStartTime",
+          "type": "cell"
+        },
+        {
+          "name": "DefaultEndTime",
+          "type": "cell"
+        },
+        {
+          "name": "ShiftADefaultStartTime",
+          "type": "cell"
+        },
+        {
+          "name": "ShiftADefaultEndTime",
+          "type": "cell"
+        },
+        {
+          "name": "ShiftBDefaultStartTime",
+          "type": "cell"
+        },
+        {
+          "name": "ShiftBDefaultEndTime",
+          "type": "cell"
+        },
+        {
+          "name": "SyncToStaffCalendar",
+          "type": "cell"
+        },
+        {
+          "name": "Notes",
+          "type": "cell"
+        }
+      ]
+    },
+    {
+      "id": "e3",
+      "label": "LaneSchedule",
+      "tag": "Lane rules",
+      "row": 1,
+      "col": 1,
+      "attributes": [
+        {
+          "name": "LaneID",
+          "type": "cell"
+        },
+        {
+          "name": "Weekday",
+          "type": "cell"
+        },
+        {
+          "name": "Enabled",
+          "type": "cell"
+        },
+        {
+          "name": "DefaultStartTime",
+          "type": "cell"
+        },
+        {
+          "name": "DefaultEndTime",
+          "type": "cell"
+        },
+        {
+          "name": "ShiftADefaultStartTime",
+          "type": "cell"
+        },
+        {
+          "name": "ShiftADefaultEndTime",
+          "type": "cell"
+        },
+        {
+          "name": "ShiftBDefaultStartTime",
+          "type": "cell"
+        },
+        {
+          "name": "ShiftBDefaultEndTime",
+          "type": "cell"
+        }
+      ]
+    },
+    {
+      "id": "e4",
+      "label": "Tags",
+      "tag": "Access and settings",
+      "row": 2,
+      "col": 0,
+      "attributes": [
+        {
+          "name": "Tag",
+          "type": "cell"
+        },
+        {
+          "name": "Meaning",
+          "type": "cell"
+        },
+        {
+          "name": "Active",
+          "type": "cell"
+        },
+        {
+          "name": "SortOrder",
+          "type": "cell"
+        },
+        {
+          "name": "CreatedAt",
+          "type": "cell"
+        },
+        {
+          "name": "CreatedBy",
+          "type": "cell"
+        },
+        {
+          "name": "UpdatedAt",
+          "type": "cell"
+        },
+        {
+          "name": "UpdatedBy",
+          "type": "cell"
+        }
+      ]
+    },
+    {
+      "id": "e5",
+      "label": "ColourRules",
+      "tag": "Import and colour",
+      "row": 0,
+      "col": 2,
+      "attributes": [
+        {
+          "name": "RuleID",
+          "type": "cell"
+        },
+        {
+          "name": "Priority",
+          "type": "cell"
+        },
+        {
+          "name": "RuleType",
+          "type": "cell"
+        },
+        {
+          "name": "Field",
+          "type": "cell"
+        },
+        {
+          "name": "Operator",
+          "type": "cell"
+        },
+        {
+          "name": "Value",
+          "type": "cell"
+        },
+        {
+          "name": "FillColour",
+          "type": "cell"
+        },
+        {
+          "name": "TextColour",
+          "type": "cell"
+        },
+        {
+          "name": "BorderColour",
+          "type": "cell"
+        },
+        {
+          "name": "Active",
+          "type": "cell"
+        },
+        {
+          "name": "Locked",
+          "type": "cell"
+        },
+        {
+          "name": "Notes",
+          "type": "cell"
+        }
+      ]
+    },
+    {
+      "id": "e6",
+      "label": "MigrationReview",
+      "tag": "Import and colour",
+      "row": 1,
+      "col": 2,
+      "attributes": [
+        {
+          "name": "MigrationID",
+          "type": "cell"
+        },
+        {
+          "name": "SourceYear",
+          "type": "cell"
+        },
+        {
+          "name": "SourceRow",
+          "type": "cell"
+        },
+        {
+          "name": "SourceDate",
+          "type": "cell"
+        },
+        {
+          "name": "SourceColumn",
+          "type": "cell"
+        },
+        {
+          "name": "RawText",
+          "type": "cell"
+        },
+        {
+          "name": "SuggestedTitle",
+          "type": "cell"
+        },
+        {
+          "name": "SuggestedLaneID",
+          "type": "cell"
+        },
+        {
+          "name": "SuggestedShiftSpan",
+          "type": "cell"
+        },
+        {
+          "name": "SuggestedOwnerTag",
+          "type": "cell"
+        },
+        {
+          "name": "Confidence",
+          "type": "cell"
+        },
+        {
+          "name": "Status",
+          "type": "cell"
+        },
+        {
+          "name": "ResolvedEventID",
+          "type": "cell"
+        },
+        {
+          "name": "Notes",
+          "type": "cell"
+        },
+        {
+          "name": "CreatedAt",
+          "type": "cell"
+        },
+        {
+          "name": "ResolvedAt",
+          "type": "cell"
+        },
+        {
+          "name": "ResolvedBy",
+          "type": "cell"
+        }
+      ]
+    }
+  ],
+  "relationships": [],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "Physical columns",
+      "items": [
+        "Each listed table shows every code-defined physical column. Values are Sheet cells, not invented SQL types.",
+        "Source snapshot: see GSiS-Schema-Reference-v0.7.10.md for owning functions and journal details."
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "Maintenance",
+      "items": [
+        "Keep exact header spelling and stable identities. Do not sort or delete journal rows.",
+        "Application references are validated in code. These stores do not enforce SQL foreign keys."
+      ]
+    }
+  ]
+}

@@ -1,0 +1,333 @@
+{
+  "release": "1.8 UAT",
+  "sendingEnabledByDefault": false,
+  "requiresHostReplacement": true,
+  "notes": [
+    "W1\u2013W5 wording approved by user. W6/W7 await wording acceptance.",
+    "Utility classification and inline wa.me acceptance are subject to Meta review.",
+    "URL buttons open authenticated LORD pages and never change a record on open.",
+    "Admin templates have no URL button. All teacher templates target the booked-for teacher."
+  ],
+  "templates": [
+    {
+      "code": "W1",
+      "kind": "overdue",
+      "reviewStatus": "Approved",
+      "providerStatus": "Not submitted",
+      "template": {
+        "name": "lord_cart_overdue_v18",
+        "language": "en",
+        "category": "UTILITY",
+        "components": [
+          {
+            "type": "BODY",
+            "text": "LORD equipment overdue\n\nCart: {{1}}\nBooked by: {{2}}\nCollected by: {{3}}\nClass/group: {{4}}\nSubject: {{5}}\nBooking time: {{6}}\nCollected at: {{7}}\nDevices out: {{8}}\n\nThe booking has passed the 30 minute return grace period. Please check the equipment status in OVERLORD. Contact the teacher here: {{9}}.",
+            "example": {
+              "body_text": [
+                [
+                  "Cart A",
+                  "Ms Tan",
+                  "Mr Lee",
+                  "5A",
+                  "Science",
+                  "08:30 to 10:00",
+                  "08:35",
+                  "28",
+                  "https://wa.me/6591234567"
+                ]
+              ]
+            }
+          }
+        ]
+      },
+      "parameterExample": [
+        "Cart A",
+        "Ms Tan",
+        "Mr Lee",
+        "5A",
+        "Science",
+        "08:30 to 10:00",
+        "08:35",
+        "28",
+        "https://wa.me/6591234567"
+      ]
+    },
+    {
+      "code": "W2",
+      "kind": "forceClose",
+      "reviewStatus": "Approved",
+      "providerStatus": "Not submitted",
+      "template": {
+        "name": "lord_force_close_v18",
+        "language": "en",
+        "category": "UTILITY",
+        "components": [
+          {
+            "type": "BODY",
+            "text": "LORD administrative close\n\nOpen cart sessions closed: {{1}}\nClosed at: {{2}}\nCart / collector summary: {{3}}\n\nThese are administrative closes only. Physical returns, return photos and return declarations have not been confirmed. Check OVERLORD for the full list and follow up on the equipment.",
+            "example": {
+              "body_text": [
+                [
+                  "2",
+                  "18 Oct 2026 18:00",
+                  "Cart A / Mr Lee; Cart B / Ms Tan"
+                ]
+              ]
+            }
+          }
+        ]
+      },
+      "parameterExample": [
+        "2",
+        "18 Oct 2026 18:00",
+        "Cart A / Mr Lee; Cart B / Ms Tan"
+      ]
+    },
+    {
+      "code": "W3",
+      "kind": "collectReminder",
+      "reviewStatus": "Approved",
+      "providerStatus": "Not submitted",
+      "template": {
+        "name": "lord_collect_reminder_v18",
+        "language": "en",
+        "category": "UTILITY",
+        "components": [
+          {
+            "type": "BODY",
+            "text": "Device collection reminder\n\nHi {{1}}, your booking for {{2}} with {{3}} devices for {{4}} meant for {{5}} starts at {{6}} today.\n\nPlease send 4 students to the ICT workroom next to the library on Level 3 to collect the devices. When the devices reach your classroom, log the photos:",
+            "example": {
+              "body_text": [
+                [
+                  "Ms Tan",
+                  "Cart A",
+                  "28",
+                  "5A",
+                  "Science",
+                  "08:30"
+                ]
+              ]
+            }
+          },
+          {
+            "type": "BUTTONS",
+            "buttons": [
+              {
+                "type": "URL",
+                "text": "Collect devices",
+                "url": "https://REPLACE_LORD_HOST/?{{1}}",
+                "example": [
+                  "https://REPLACE_LORD_HOST/?bookingId=DEMO&flow=collect"
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "parameterExample": [
+        "Ms Tan",
+        "Cart A",
+        "28",
+        "5A",
+        "Science",
+        "08:30"
+      ]
+    },
+    {
+      "code": "W4",
+      "kind": "returnReminder",
+      "reviewStatus": "Approved",
+      "providerStatus": "Not submitted",
+      "template": {
+        "name": "lord_return_reminder_v18",
+        "language": "en",
+        "category": "UTILITY",
+        "components": [
+          {
+            "type": "BODY",
+            "text": "Device return reminder\n\nHi {{1}}, your booking for {{2}} with {{3}} devices for {{4}} meant for {{5}} is ending soon.\n\nPlease log the device return photos before having students send the devices back. Do so here:",
+            "example": {
+              "body_text": [
+                [
+                  "Ms Tan",
+                  "Cart A",
+                  "28",
+                  "5A",
+                  "Science"
+                ]
+              ]
+            }
+          },
+          {
+            "type": "BUTTONS",
+            "buttons": [
+              {
+                "type": "URL",
+                "text": "Return devices",
+                "url": "https://REPLACE_LORD_HOST/?{{1}}",
+                "example": [
+                  "https://REPLACE_LORD_HOST/?bookingId=DEMO&flow=return"
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "parameterExample": [
+        "Ms Tan",
+        "Cart A",
+        "28",
+        "5A",
+        "Science"
+      ]
+    },
+    {
+      "code": "W5",
+      "kind": "bookingSuccess",
+      "reviewStatus": "Approved",
+      "providerStatus": "Not submitted",
+      "template": {
+        "name": "lord_booking_success_v18",
+        "language": "en",
+        "category": "UTILITY",
+        "components": [
+          {
+            "type": "BODY",
+            "text": "Device booking\n\n{{1}} booked {{2}} comprising {{3}} devices:\nDate: {{4}}\nTime: {{5}} to {{6}}\nClass/group: {{7}}\n\nBooking has been successfully recorded.\n\nDo remember to \"collect\" when the devices reach your classroom, by logging photos.",
+            "example": {
+              "body_text": [
+                [
+                  "Ms Tan",
+                  "Cart A",
+                  "28",
+                  "19 Oct 2026",
+                  "08:30",
+                  "10:00",
+                  "5A"
+                ]
+              ]
+            }
+          },
+          {
+            "type": "BUTTONS",
+            "buttons": [
+              {
+                "type": "URL",
+                "text": "View booking",
+                "url": "https://REPLACE_LORD_HOST/?{{1}}",
+                "example": [
+                  "https://REPLACE_LORD_HOST/?bookingId=DEMO&flow=view"
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "parameterExample": [
+        "Ms Tan",
+        "Cart A",
+        "28",
+        "19 Oct 2026",
+        "08:30",
+        "10:00",
+        "5A"
+      ]
+    },
+    {
+      "code": "W6",
+      "kind": "collectionFollowup",
+      "reviewStatus": "Draft for UAT review",
+      "providerStatus": "Not submitted",
+      "template": {
+        "name": "lord_collection_followup_v18",
+        "language": "en",
+        "category": "UTILITY",
+        "components": [
+          {
+            "type": "BODY",
+            "text": "Device collection check\n\nHi {{1}}, your booking for {{2}} with {{3}} devices for {{4}} meant for {{5}} started over 30 minutes ago, but collection has not been logged.\n\nIf you no longer need the devices, cancel the booking so another teacher can use them. If they are already collected and in use, record that here; a missing-photo incident will be logged. You may also indicate that you will collect later within your booking time.",
+            "example": {
+              "body_text": [
+                [
+                  "Ms Tan",
+                  "Cart A",
+                  "28",
+                  "5A",
+                  "Science"
+                ]
+              ]
+            }
+          },
+          {
+            "type": "BUTTONS",
+            "buttons": [
+              {
+                "type": "URL",
+                "text": "Update booking",
+                "url": "https://REPLACE_LORD_HOST/?{{1}}",
+                "example": [
+                  "https://REPLACE_LORD_HOST/?bookingId=DEMO&flow=collection-response"
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "parameterExample": [
+        "Ms Tan",
+        "Cart A",
+        "28",
+        "5A",
+        "Science"
+      ]
+    },
+    {
+      "code": "W7",
+      "kind": "returnFollowup",
+      "reviewStatus": "Draft for UAT review",
+      "providerStatus": "Not submitted",
+      "template": {
+        "name": "lord_return_followup_v18",
+        "language": "en",
+        "category": "UTILITY",
+        "components": [
+          {
+            "type": "BODY",
+            "text": "Device return check\n\nHi {{1}}, your booking for {{2}} with {{3}} devices for {{4}} meant for {{5}} ended over 30 minutes ago, but the loan is still open.\n\nPlease be mindful that other teachers may need the devices next. Log the return with photos. If all devices were already returned and you forgot the photos, declare this here. Your loan will close immediately and a missing-photo incident will remain in the log.",
+            "example": {
+              "body_text": [
+                [
+                  "Ms Tan",
+                  "Cart A",
+                  "28",
+                  "5A",
+                  "Science"
+                ]
+              ]
+            }
+          },
+          {
+            "type": "BUTTONS",
+            "buttons": [
+              {
+                "type": "URL",
+                "text": "Update return",
+                "url": "https://REPLACE_LORD_HOST/?{{1}}",
+                "example": [
+                  "https://REPLACE_LORD_HOST/?bookingId=DEMO&flow=return-response"
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "parameterExample": [
+        "Ms Tan",
+        "Cart A",
+        "28",
+        "5A",
+        "Science"
+      ]
+    }
+  ]
+}

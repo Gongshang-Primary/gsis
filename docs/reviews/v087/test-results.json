@@ -1,0 +1,2861 @@
+{
+  "verifiedScripts": 571,
+  "basis": "Combined full gate plus focused successful correction and new-feature reruns; not a claim of a separate final all-scripts run.",
+  "results": [
+    {
+      "test": "082-domain-attendance-notify.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "082-domain-confirmed-preview.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "082-domain-link-audit.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "082-domain-manual-authority.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "082-domain-stapler-merge.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "082-domain-teacher-daily-update.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "ability-teacher-save.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "absence080a-save-shortcut.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "absence718d-flow.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "apps-script-syntax.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "arrival-stair.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "audit-loading.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "audit-read-path.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "backend-role-fixture.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "backend.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "baseline710-backend.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "baseline710-browser.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "cache-backend.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "cache-frontend.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "calendar085-write-cache.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "calendar087-statistics.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "calendar605.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "calendar606-gateway.mjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "calendar606-inherited.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "calendar606.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "calendar608-publication-ui.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "calendar608-publish.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "calendar609-api.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "calendar708-concurrency.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "calendar708-metadata-concurrency.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "calendar708-metadata-ui.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "campus-controls-b2.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "campus-version-ui.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "campus-window.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "cap708-ui.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "cap708.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "class-checklist.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "class-editor.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "class-validation.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "classes-sort.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "classes.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "combined-backend.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "compact-planning-ui.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "contacts-data-loading.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "contacts-data.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "contacts-login.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "contacts-management-ui.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "contacts-management.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "contacts083-vcard-browser.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "contacts083-vcard.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "contacts084-asset-recovery-ui.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "contacts084-http-browser.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "contacts407.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "contacts409.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "contacts410-backup.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "contacts410-save-ui.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "contacts410-transport.mjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "contacts411-recovery-ui.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "contacts411-recovery.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "contacts414-api.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "contacts418-diy-ui.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "contacts418-loading.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "contacts502-save.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "contacts502-ui.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "contacts503-commit.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "contacts503-save.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "contacts503-ui.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "contacts503-view.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "contacts707-modifier.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "contacts710-fasttrack.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "contacts718-roster-performance.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "deploy085-tg-duplicates.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "deploy085-tg-recovery.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "deploy085-tg-review-browser.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "deploy418-info.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "deploy418-projection.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "exclusion-cells.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "exclusion-ui.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "exclusions.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "explicit-save.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "first-load-contacts.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "first-load-deploy.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "frontend-recovery.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "garden605.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "gateway.mjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "hr-terms.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "imp-nonteaching-api.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "imp-nonteaching-ui.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "imp-nonteaching.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "import707.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "import708-browser.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "import708.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "inplace-select.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "ip-anchor413.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "landmark-alias.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "landmark-api.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "layout-courtyard-draft.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "layout-sync.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "layout-tg-compact.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "layout413.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "layout609-export-bold.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "layout713-geometry.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "layout714-geometry.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "live-hub.mjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "load-editor.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "loading.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "model-k.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "model404.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "model419.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "multilevel-tg-storage.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "multilevel-tg-ui.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "multilevel-tg.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "name-sets-backend.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "name-sets-ui.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "notices415-ui.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "notices415.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "package.cjs",
+      "status": "passed",
+      "evidence": "087-focused-gate-repairs.json"
+    },
+    {
+      "test": "planning.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "public-campus.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "public-gateway.mjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "public-layout.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "queue-recovery.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "queued-saves.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "read-transport.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "recovery411-deploy.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "recovery411-gateway.mjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "release04-planning.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "release04-ui.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "release0401-ui.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "release082-conflict-envelope.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "release082-latest-conflict-ui.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "release082-local-draft-tabs.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "release082-local-workflow-ui.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "release082-notify-ack-dashboard-browser.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "release082-notify-ack-dashboard-ui.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "release082-orphan-manual-ui.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "release082-stapler-local.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "release082-stapler-readonly-ui.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "release082-teacher-daily-browser.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "release082-teacher-daily-ui.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "release082-timetable-stacked-browser.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "release083-class-field-arrows.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "release083-confirmed-suspensions-browser.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "release083-confirmed-suspensions.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "release083-own-arrangements.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "release084-absence-browser.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "release084-backend-role.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "release084-confirmed-dates-browser.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "release084-confirmed-dates.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "release084-deploy-source-evidence.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "release084-instruction-concurrency.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "release084-ip-focus-browser.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "release084-own-arrangements.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "release084-report-backend.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "release084-report-instructions.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "release084-report-transport-browser.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "release084-report-transport.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "release086-deploy-cap-ui.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "release086-deploy-version-browser.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "release086-deploy-version-loading.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "release086-ut-cap.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "release087-composition.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "release14-contacts.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "release14-geometry.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "release14-ui.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "release14.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "release15-backend.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "release15-geometry.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "release15-rules.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "release15-ui.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "release17-backend.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "release17-contacts.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "release17-corridor.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "release17-roles.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "release17-table.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "release18-geometry.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "release18-loading.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "release18-summary.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "release402-catalogue.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "release402-filters.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "release402-storage.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "release403-notes.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "release403-ui.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "release404-contacts.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "release404-storage.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "release404-upgrade.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "release405-storage.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "release405-transport.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "release407-storage.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "release408-storage.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "release409-storage.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "release409.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "release410-protocol.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "release419-backend.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "release419-summary.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "release500-excel.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "release500-saves.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "release501-contacts.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "release501-layout.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "release504-contacts.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "release504-rules.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "release504-storage.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "release504-transport.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "release504-ui.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "release505-catalogue-ui.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "release505-catalogue.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "release505-gateway.mjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "release505-layout-cache.mjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "release505-layout-poll.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "release505-performance.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "release505-projection.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "release505-receipt.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "release505-relief-api.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "release505-relief-ui.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "release505-relief.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "release505-storage-contacts.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "release505-storage-relief.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "release505-storage.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "release505-tg-storage.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "release505-tg-ui.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "release505-tg.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "release505-timing.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "release505-transport.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "release506-groups-storage.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "release506-groups-ui.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "release506-groups.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "release506-hr-ui.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "release506-info.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "release506-layout-names.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "release506-performance.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "release506-storage.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "release506-tg-storage.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "release506-tg-ui.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "release506-workload-ui.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "release507-layout.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "release507-relief-refresh.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "release507-security.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "release508-atomic.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "release508-contacts.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "release508-relief.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "release508-storage.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "release508-ui.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "release509-exclusions.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "release509-ui.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "release600-rules.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "release600-storage.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "release600-ui.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "release601-admin.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "release601-diagnostics.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "release601-gateway.mjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "release601-membership.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "release601-ui.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "release603-ledger.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "release604-contacts.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "release604-pal.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "release604-ui.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "release605-workload.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "release607-workload.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "release608-teachers.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "release708-ui-browser.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "release710-resource-properties.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "release711-quota-accounting.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "review04-background-contacts.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "review04-cache.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "review04-geometry.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "review04-ui.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster-draft-absence-instructions-browser.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster-draft-auto-retry-browser.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster-draft-baseline-cache-browser.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster-draft-cell-save-browser.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster-draft-cell-save-speed.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster-draft-health-chart-browser.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster-draft-inbox-backend.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster-draft-inbox-domain.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster-inbox-browser.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster-speed-authority.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster-subject-catalogue.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster-subject-family-policy.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster080-batch-backend.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster080-batch-browser.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster080-batch-ui.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster080-batch.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster080-timetable-day.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster080-timetable-gateway.mjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster080-timetable-privacy.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster080-timetable-ui.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster081-api-roundtrips.mjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster081-compact-summary.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster081-conflict-envelope.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster081-day-ownership-browser.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster081-day-transactions.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster081-notification-lanes.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster082-advance-notify-worker.mjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster082-advance-notify.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster082-audit-worker-lane.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster082-backend-audit.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster082-backend-confirmed-storage.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster082-backend-merge.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster082-backend-private.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster082-backend-teacher-reads.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster082-email-settings-backend.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster082-email-settings-gateway.mjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster082-email-settings-recovery-browser.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster082-inbox-images-browser.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster082-inbox-images-domain.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster082-inbox-images-worker.mjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster082-notify-performance-browser.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster082-notify-service.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster082-notify-ui-browser.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster082-private-actions-browser.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster082-private-buttons-dispatch.mjs",
+      "status": "passed",
+      "evidence": "087-focused-gate-repairs.json"
+    },
+    {
+      "test": "roster082-private-capabilities.mjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster083-external-ack-gateway.mjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster083-inbox-diagnostics.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster083-no-relief-ui-browser.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster083-notify-ack-browser.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster083-provider-diagnostics.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster083-subject-settings-browser.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster083-template-dispatch.mjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster083-template-transport.mjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster083-timetable-ack.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster084-consecutive-performance.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster084-consecutive-settings-browser.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster084-consecutive-settings-dom.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster084-consecutive-subjects.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster084-manual-dispatch.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster084-notify-status-browser.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster084-private-link-reuse-browser.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster084-recipient-policy.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster084-stapler-unchanged.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster084a-relief-pool.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster085-inbox-lock-scope.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster085a-consecutive-backend.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster085a-consecutive-catalogue.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster085a-consecutive-picker-dom.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster085b-custom-backend.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster085b-custom-gateway.mjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster085b-custom-rules.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster085b-custom-toggle-browser.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster085b-custom-toggle-dom.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster085c-assign-default-date-dom.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster085c-next-school-day-gateway.mjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster086-counting-logging.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster086-current-duty-gateway.mjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster086-current-duty.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster086-delivery-review-worker.mjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster086-delivery-review.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster086-home-duty-browser.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster086-report-loading-browser.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster086-retired-route-dom.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster086-ui-dom.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster086a-confirmation-ui-browser.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster086a-confirmed-rename.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster086a-review-receipt.cjs",
+      "status": "passed",
+      "evidence": "087-maintenance-gates.json"
+    },
+    {
+      "test": "roster087-acknowledgement-ui.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster087-cache-storage-browser.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster087-delivery-review-close.cjs",
+      "status": "passed",
+      "evidence": "087-maintenance-gates.json"
+    },
+    {
+      "test": "roster087-manual-policy.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster087-notification-store.cjs",
+      "status": "passed",
+      "evidence": "087-maintenance-gates.json"
+    },
+    {
+      "test": "roster087-notification-worker.mjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster087-operations-ui.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster087-scoped-ack.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster087-shell-routing-browser.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster087-statistics-ui.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster087-statistics.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster096-absence-adapter.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster096-absence-coverage-browser.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster096-absence-coverage.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster097-batch-backend.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster097-batch-client.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster097-batch-errors.mjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster097-batch-gateway.mjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster097-batch-lifecycle-browser.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster097-batch-shell.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster097-confirmed-view.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster097-stapler-preload.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster605-authority.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster605-gateway.mjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster605-ui.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster605.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster607-diagnostics.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster608-access.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster608-diagnostic-detail.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster608-shared-drive.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster609-domain.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster609-exports.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster609-gateway.mjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster609-ui.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster700-contacts.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster700-model-cache.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster700-timetable.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster701-assets.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster701-backend-speed.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster701-delivery-lease.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster701-gateway-integration.mjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster701-integrity-review.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster701-r01.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster701-r05.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster701-r10.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster701-r11-gateway.mjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster701-r11.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster701-r12.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster701-r13.mjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster701-r15.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster701-r17-core.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster701-r17-integration.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster701-r17-service.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster701-r17-solver.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster701-r18-performance.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster701-r18.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster701-r19-performance.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster701-r19.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster701-r20-export.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster701-r20-notifications.mjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster701-r20-performance.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster701-r20-service.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster701-r20.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster701-r21.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster701-speed-gateway.mjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster701-speed-ui.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster701-whatsapp-contracts.mjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster701-whatsapp-domain.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster702-absence-remarks.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster702-backend.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster702-calendar-batch.mjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster702-memory-ui.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster702-mutual-candidates.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster702-notification-setup.mjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster702-operations-ui.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster702-shell-recovery.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster702-transport-reliability.mjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster704-entry-read.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster704-notification-readiness.mjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster704-report-load.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster704-save-candidates.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster705-auto-allocate.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster705-quota.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster706-backend-speed.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster706-domain.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster706-gateway.mjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster707-backend-domain.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster707-storage.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster707-timing.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster707-ui.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster709-date-publication.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster709-publish-ui.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster709-whatsapp-contracts.mjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster710-absence-policy-ui.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster710-adhoc-ui.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster710-allocation-preferences.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster710-context.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster710-mail.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster710-operations.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster710-settings-ui.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster710-worker-reports.mjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster711-backend-authority.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster711-backend.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster711-inbox-worker.mjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster711-reconcile-speed.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster711-settings-dom.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster711-worker-diagnostics.mjs",
+      "status": "passed",
+      "evidence": "087-focused-gate-repairs.json"
+    },
+    {
+      "test": "roster711-workspace-browser.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster711-workspace-ui.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster712-absence-concurrency.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster712-absence-eligibility-browser.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster712-duty-browser.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster712-duty-lists.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster712-shared-subject-browser.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster712-shared-subject.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster712-whatsapp-menu.mjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster713-manual-ranking.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster713-settings-browser.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster713-settings.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster713-smc-summary-browser.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster713-smc-summary.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster713-smc-template.mjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster714-allocation-policy.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster714-export-ui.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster714-settings-persistence.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster714-teacher-export.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster716-absence-fast-browser.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster716-allocator.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster716-calculations-browser.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster716-calculations-gateway.mjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster716-calculations.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster716-home-browser.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster716-inbox-activation.mjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster716-settings-browser.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster717-calculations.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster717-failure-diagnostics.mjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster717-inbox-performance.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster718-absence-performance-browser.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster718-bootstrap-cache.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster718-concurrency.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster718-gateway.mjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster718a-relief-readability-browser.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster718b-signature.mjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster719-class-pov.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster719-performance.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster719-relief-tools-browser.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster719-suspended-report-load.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "selected-campus-version.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "sessions.mjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "sheets414.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "showcase416.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "signature415.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "spinner.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "stair-mirror.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "stapler-draft-excel-export-browser.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "stapler-draft-excel-export-model.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "stapler-draft-level-recess-browser.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "stapler-draft-level-recess-model.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "stapler080-contact-origin.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "stapler080-date-retention.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "stapler080-dates-contacts.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "stapler080-pending-request-retry.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "stapler707-integration-review.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "stapler707-model.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "stapler710-browser.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "stapler711-model.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "stapler711-ui.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "stapler712-leases.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "stapler712-lock-browser.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "stapler714-import-browser.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "stapler714-import-ui.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "stapler714-import.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "stapler714a-operations.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "stapler715-loading-browser.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "stapler715-loading.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "stapler715-persistence.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "stapler716-browser.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "stapler716-canonical.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "stapler716-performance.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "stapler717-reopen-ui.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "stapler717-reopen.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "stapler718-lifecycle-persistence.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "stapler718-lifecycle-ui.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "stapler718-lifecycle.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "stapler718a-relief-import.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "stapler718b-envelope.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "stapler718b-save-recovery-browser.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "stapler718c-import-policy.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "stapler718c-persistence.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "stapler718c-warning-ui.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "stapler719-contacts-import-ui.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "stapler719-contacts-import.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "storage.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "subject704-backend.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "subject704-model.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "subject704-ui.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "suite703-calendar-reliability.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "suite703-local-interactions.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "suite703-roster-diagnostics.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "suite703-roster-memory.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "suite708-signing-keys.mjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "table-controls.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "tables412.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "teacher-lifecycle-ui.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "teacher-notes.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "teacher-publish-contacts.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "teachers-publish.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "teachers-ui.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "ui-structure.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "version-copy.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "workload408.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "workload412-ui.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "workload414-ui.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "workload415-ui.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "workload415.cjs",
+      "status": "passed",
+      "evidence": "full gate before final integration corrections"
+    },
+    {
+      "test": "roster087-approved-buttons.mjs",
+      "status": "passed",
+      "evidence": "087-focused-gate-repairs.json"
+    },
+    {
+      "test": "roster087-notification-maintenance.cjs",
+      "status": "passed",
+      "evidence": "087-maintenance-gates.json"
+    }
+  ]
+}

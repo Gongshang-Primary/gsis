@@ -1,0 +1,16 @@
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+import vm from 'node:vm';
+import {dispatchNotifications} from '../roster-update/public/_worker.js';
+import {safeHealthError} from '../shared/edge-health.js';
+const contract=JSON.parse(readFileSync('notification-worker/template-contracts.json')).templates.stapler_timetable;
+const env={WHATSAPP_ENABLED:'true',WHATSAPP_PHONE_NUMBER_ID:'123456789',WHATSAPP_ACCOUNT_ID:'223456789',WHATSAPP_TEMPLATE_ACCOUNT_ID:'323456789',WHATSAPP_API_VERSION:'v23.0',WHATSAPP_ACCESS_TOKEN:'synthetic-access-'.repeat(4),WHATSAPP_APP_SECRET:'synthetic-app-'.repeat(4),WHATSAPP_VERIFY_TOKEN:'synthetic-verify-'.repeat(4),ROSTER_SERVICE_SECRET:'synthetic-service-'.repeat(4),EXTERNAL_LINK_SECRET:'synthetic-link-'.repeat(4),ROSTER_PUBLIC_ORIGIN:'https://roster.example.test',CONTACTS_PUBLIC_URL:'https://contacts.example.test/',APPS_SCRIPT_URL:'https://script.google.com/macros/s/test/exec',WHATSAPP_TEMPLATES_JSON:JSON.stringify({stapler_timetable:{...contract,enabled:true}})};
+const previous=globalThis.fetch,diagnosticId=crypto.randomUUID();let calls=0;
+globalThis.fetch=async(url,init)=>{if(String(url).includes('message_templates'))return Response.json({data:[{...contract,status:'APPROVED',components:[{type:'BODY',text:contract.body}]}]});assert(!String(url).endsWith('/messages'),'failed claim must never submit a provider message');const req=JSON.parse(JSON.parse(init.body).payload);assert.equal(req.input.operation,'claimNotifications');calls++;return Response.json({ok:false,status:503,code:'CONTACTS_RECOVERY_REQUIRED',failureStage:'contacts-fetch',diagnosticId,backendVersion:'0.9.8c',error:'PRIVATE STAFF'});};
+try{
+ const result=await dispatchNotifications(env);assert.equal(calls,1);assert.equal(result.prepareFailures,1);assert.equal(result.failure.diagnosticId,diagnosticId);assert.equal(result.failure.operation,'claimNotifications');assert.equal(result.failure.code,'CONTACTS_RECOVERY_REQUIRED');assert(!JSON.stringify(result).includes('PRIVATE'));
+ const records=[],logs=[],scope=vm.createContext({crypto,Date,safeHealthError,assertRecoveryWritable(){},recordJobHealth:async(_,row)=>records.push(row),console:{info:value=>logs.push(JSON.parse(value)),error:value=>logs.push(JSON.parse(value))}}),source=readFileSync('notification-worker/index.js','utf8');vm.runInContext(source.slice(source.indexOf('function writable'),source.indexOf('function settleMessages')),scope);
+ await scope.stage({GSIS_JOBS:{prepare(){}}},'notifications','roster-notification-dispatch',()=>result);assert.equal(records[0].status,'failure');assert.equal(records[0].code,'CONTACTS_RECOVERY_REQUIRED');assert.equal(records[0].diagnosticId,diagnosticId);assert.equal(records[0].operation,'claimNotifications');assert.equal(records[0].failureStage,'contacts-fetch');assert.equal(logs[0].diagnosticId,diagnosticId);
+ await scope.stage({GSIS_JOBS:{prepare(){}}},'peer-mail',null,()=>({sent:0,pending:0,uncertain:0,reviewedUncertain:7}));assert.equal(records.at(-1).status,'idle','reviewed history is not successful processing');
+ console.log('PASS notification claim failure retains backend evidence without sending; reviewed history stays idle');
+}finally{globalThis.fetch=previous;}

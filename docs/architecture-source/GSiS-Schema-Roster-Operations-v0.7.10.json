@@ -1,0 +1,251 @@
+{
+  "schema_version": 1,
+  "diagram_type": "erd",
+  "meta": {
+    "title": "GSiS Roster: operational JSON root",
+    "locale": "en",
+    "quality_profile": "standard",
+    "output": "docs/GSiS-Schema-Roster-Operations-v0.7.10.html"
+  },
+  "layout": {
+    "mode": "grid",
+    "gapX": 50,
+    "gapY": 42,
+    "entityW": 245
+  },
+  "entities": [
+    {
+      "id": "op0",
+      "label": "Core records",
+      "tag": "Core records",
+      "row": 0,
+      "col": 0,
+      "attributes": [
+        {
+          "name": "schema",
+          "type": "JSON"
+        },
+        {
+          "name": "typeDetailsVersion",
+          "type": "JSON"
+        },
+        {
+          "name": "revision",
+          "type": "JSON"
+        },
+        {
+          "name": "types[]",
+          "type": "JSON"
+        },
+        {
+          "name": "absences[]",
+          "type": "JSON"
+        },
+        {
+          "name": "adhoc[]",
+          "type": "JSON"
+        },
+        {
+          "name": "assignments[]",
+          "type": "JSON"
+        },
+        {
+          "name": "requests[]",
+          "type": "JSON"
+        },
+        {
+          "name": "audit[]",
+          "type": "JSON"
+        },
+        {
+          "name": "receipts[]",
+          "type": "JSON"
+        }
+      ]
+    },
+    {
+      "id": "op1",
+      "label": "Accounting",
+      "tag": "Accounting",
+      "row": 0,
+      "col": 1,
+      "attributes": [
+        {
+          "name": "entitlements[]",
+          "type": "JSON"
+        },
+        {
+          "name": "reliefCorrections[]",
+          "type": "JSON"
+        },
+        {
+          "name": "importedRelief[]",
+          "type": "JSON"
+        },
+        {
+          "name": "rotationEvents[]",
+          "type": "JSON"
+        },
+        {
+          "name": "optimisationRuns[]",
+          "type": "JSON"
+        },
+        {
+          "name": "accountingProfiles{}",
+          "type": "JSON"
+        },
+        {
+          "name": "accountingYears{}",
+          "type": "JSON"
+        },
+        {
+          "name": "dayRevisions{}",
+          "type": "JSON"
+        },
+        {
+          "name": "healthWarningState{}",
+          "type": "JSON"
+        }
+      ]
+    },
+    {
+      "id": "op2",
+      "label": "Publication and messages",
+      "tag": "Publication and messages",
+      "row": 0,
+      "col": 2,
+      "attributes": [
+        {
+          "name": "outbox[]",
+          "type": "JSON"
+        },
+        {
+          "name": "deliveryEvents[]",
+          "type": "JSON"
+        },
+        {
+          "name": "publicationSnapshots[]",
+          "type": "JSON"
+        },
+        {
+          "name": "acknowledgements[]",
+          "type": "JSON"
+        },
+        {
+          "name": "customInstructions[]",
+          "type": "JSON"
+        },
+        {
+          "name": "smcDutyRoster[]",
+          "type": "JSON"
+        },
+        {
+          "name": "smcAlerts[]",
+          "type": "JSON"
+        },
+        {
+          "name": "scheduleReceipts{}",
+          "type": "JSON"
+        },
+        {
+          "name": "notificationWatermarks{}",
+          "type": "JSON"
+        },
+        {
+          "name": "inboundEvents[]",
+          "type": "JSON"
+        },
+        {
+          "name": "inboundSessions{}",
+          "type": "JSON"
+        },
+        {
+          "name": "manualAuditBaselines{}",
+          "type": "JSON"
+        },
+        {
+          "name": "massPublications{}",
+          "type": "JSON"
+        }
+      ],
+      "width": 260
+    },
+    {
+      "id": "op3",
+      "label": "Plans and policy",
+      "tag": "Plans and policy",
+      "row": 0,
+      "col": 3,
+      "attributes": [
+        {
+          "name": "recessActivations[]",
+          "type": "JSON"
+        },
+        {
+          "name": "recessSettings{}",
+          "type": "JSON"
+        },
+        {
+          "name": "staplerPlans[]",
+          "type": "JSON"
+        },
+        {
+          "name": "staplerRequests[]",
+          "type": "JSON"
+        },
+        {
+          "name": "staplerArchives[]",
+          "type": "JSON"
+        },
+        {
+          "name": "systemConfig{}",
+          "type": "JSON"
+        },
+        {
+          "name": "dailyEmploymentSettings{}",
+          "type": "JSON"
+        },
+        {
+          "name": "dailyEmploymentSnapshots[]",
+          "type": "JSON"
+        },
+        {
+          "name": "dailyEmploymentMail[]",
+          "type": "JSON"
+        },
+        {
+          "name": "dailyEmploymentAutomatic{}",
+          "type": "JSON"
+        }
+      ],
+      "width": 270
+    }
+  ],
+  "relationships": [],
+  "cards": [
+    {
+      "dot": "violet",
+      "title": "One physical document",
+      "items": [
+        "These four panels are logical groups inside Roster operations.json, not four stores or SQL tables.",
+        "The backend writes revision, domain changes, audit and intent together under its script lock."
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "Outside that commit",
+      "items": [
+        "MailApp sends and Meta sends are separate side effects with recorded outcomes.",
+        "Never remove receipts or pending sends to make a retry appear new."
+      ]
+    },
+    {
+      "dot": "cyan",
+      "title": "Source",
+      "items": [
+        "shared/roster-operations.js: initial, operationalSettings; shared/roster-allocation.js: ensure.",
+        "Nested record references and exact baseline shape are in GSiS-Schema-Reference-v0.7.10.md."
+      ]
+    }
+  ]
+}

@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "ok": true,
+  "command": "finalize",
+  "status": "pass",
+  "type": "architecture",
+  "quality": "showcase",
+  "specification": {
+    "path": "/workspace/scratch/2c52ae6e6b97/gsis-087/.archify/architecture-gsis-20261022/candidate.json",
+    "sha256": "a65713d1cc352179f6082c3cfe7e6b4241c668f3ba313d7e62d9ca05c1e62a45",
+    "bytes": 6539
+  },
+  "artifact": {
+    "path": "/workspace/scratch/2c52ae6e6b97/gsis-087/.archify/architecture-gsis-20261022/gsis.html",
+    "sha256": "714580e57a2fdf0ca4748e1e01a3ac779905cfdc98c7603344b16a15e3b0c990",
+    "bytes": 822916
+  },
+  "gates": {
+    "validate": "pass",
+    "deliver": "pass",
+    "check": "pass",
+    "browser-check": "pass"
+  },
+  "diagnostics": [],
+  "diagnosticSummary": {
+    "total": 0,
+    "shown": 0,
+    "truncated": false
+  },
+  "evidence": {
+    "receipt": "/workspace/scratch/2c52ae6e6b97/gsis-087/.archify/architecture-gsis-20261022/review-2/gsis.finalize.json",
+    "summaryReceipt": "/workspace/scratch/2c52ae6e6b97/gsis-087/.archify/architecture-gsis-20261022/review-2/gsis.finalize-summary.json",
+    "browserCheckReceipt": "/workspace/scratch/2c52ae6e6b97/gsis-087/.archify/architecture-gsis-20261022/review-2/gsis.browser-check.json"
+  },
+  "visualReview": "not-requested",
+  "durationMs": 3318
+}

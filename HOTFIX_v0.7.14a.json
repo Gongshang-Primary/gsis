@@ -1,0 +1,18 @@
+{
+  "version": "0.7.14a",
+  "packageType": "changed-deployment-items",
+  "baseline": "0.7.14",
+  "baselineCommit": "7ae2cbf6a0a4778ef8d843766501341d3a58304c",
+  "nextFullRelease": "0.7.15",
+  "components": {
+    "Roster frontend": "0.7.14a",
+    "Deploy backend (shared by Roster)": "0.7.14a",
+    "Deploy frontend": "0.7.14",
+    "Contacts frontend": "0.7.14",
+    "Contacts backend": "0.7.14",
+    "Calendar frontend": "0.7.14",
+    "Calendar backend": "0.7.14",
+    "Layout frontend": "0.7.14",
+    "Notification worker": "0.7.14"
+  }
+}

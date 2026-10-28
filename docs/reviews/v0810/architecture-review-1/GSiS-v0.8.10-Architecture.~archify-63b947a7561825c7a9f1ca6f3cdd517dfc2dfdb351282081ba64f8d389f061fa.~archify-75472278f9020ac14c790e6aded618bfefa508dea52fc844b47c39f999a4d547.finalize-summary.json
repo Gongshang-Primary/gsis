@@ -1,0 +1,58 @@
+{
+  "schemaVersion": 1,
+  "ok": false,
+  "command": "finalize",
+  "status": "fail",
+  "type": "architecture",
+  "quality": "showcase",
+  "specification": {
+    "path": "/workspace/scratch/2c52ae6e6b97/gsis-089a/docs/reviews/v0810/architecture-candidate.json",
+    "sha256": "0bb57d5240ea4511ac4fa073312f59ebdf0949d201da767cf8ae13c8f53559c5",
+    "bytes": 13132
+  },
+  "artifact": {
+    "path": "/workspace/scratch/2c52ae6e6b97/gsis-089a/docs/GSiS-v0.8.10-Architecture.html"
+  },
+  "gates": {
+    "validate": "fail",
+    "deliver": "not-run",
+    "check": "not-run",
+    "browser-check": "not-run"
+  },
+  "failedStage": "validate",
+  "diagnostics": [
+    {
+      "code": "repository-evidence/url-invalid",
+      "severity": "error",
+      "message": "/meta/repository/url must be a credential-free HTTP(S) or Git SSH repository address without query, fragment, or dot segments.",
+      "subject": {
+        "surface": "repository-evidence",
+        "path": "/meta/repository/url"
+      },
+      "evidence": {
+        "authoredValueLooksLike": "local filesystem path; the expected value is the remote origin address"
+      },
+      "supportedFixes": [
+        "run `git remote get-url origin` inside --repo-root and declare that credential-free address",
+        "use link_mode: local-only for internal repositories"
+      ]
+    }
+  ],
+  "diagnosticSummary": {
+    "total": 1,
+    "shown": 1,
+    "truncated": false
+  },
+  "evidence": {
+    "receipt": "/workspace/scratch/2c52ae6e6b97/gsis-089a/docs/reviews/v0810/architecture-review-1/GSiS-v0.8.10-Architecture.~archify-63b947a7561825c7a9f1ca6f3cdd517dfc2dfdb351282081ba64f8d389f061fa.~archify-75472278f9020ac14c790e6aded618bfefa508dea52fc844b47c39f999a4d547.finalize.json",
+    "summaryReceipt": "/workspace/scratch/2c52ae6e6b97/gsis-089a/docs/reviews/v0810/architecture-review-1/GSiS-v0.8.10-Architecture.~archify-63b947a7561825c7a9f1ca6f3cdd517dfc2dfdb351282081ba64f8d389f061fa.~archify-75472278f9020ac14c790e6aded618bfefa508dea52fc844b47c39f999a4d547.finalize-summary.json"
+  },
+  "visualReview": "not-requested",
+  "durationMs": 270,
+  "nextAction": {
+    "action": "edit-in-place",
+    "candidate": "/workspace/scratch/2c52ae6e6b97/gsis-089a/docs/reviews/v0810/architecture-candidate.json",
+    "constraint": "Preserve unaffected semantics and geometry; apply each diagnostic's supportedFixes, or the fix its message names, and do not replace the whole candidate.",
+    "then": "finalize-once"
+  }
+}

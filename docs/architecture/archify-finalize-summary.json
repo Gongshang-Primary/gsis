@@ -1,0 +1,65 @@
+{
+  "schemaVersion": 1,
+  "ok": true,
+  "command": "finalize",
+  "status": "pass",
+  "type": "architecture",
+  "quality": "showcase",
+  "specification": {
+    "path": "/workspace/scratch/2c52ae6e6b97/gsis-091/docs/architecture/architecture-candidate.json",
+    "sha256": "7e08a20650bc564585050d2e4f6269301079fbd549f12e31d00cfae4cd78927d",
+    "bytes": 8860
+  },
+  "artifact": {
+    "path": "/workspace/scratch/2c52ae6e6b97/gsis-091/docs/architecture/GSiS_v0.9.2_Architecture.html",
+    "sha256": "9ae4d3d673ba1d2b39ed10ebfaddbad2652e95ce23f1770d5468b55f7741dac7",
+    "bytes": 834287
+  },
+  "gates": {
+    "validate": "pass",
+    "deliver": "pass",
+    "check": "pass",
+    "browser-check": "pass"
+  },
+  "diagnostics": [],
+  "diagnosticSummary": {
+    "total": 0,
+    "shown": 0,
+    "truncated": false
+  },
+  "evidence": {
+    "receipt": "/workspace/scratch/2c52ae6e6b97/architecture-runtime-092/review-6/GSiS_v0.9.2_Architecture.~archify-048e2f4a078b08f20a985deb8f30c4d78223f3fb368747443674915a548ea3b7.~archify-c27f76ad7c0989d138c99de8bf0fdb64de20e39667ba82f3a20ac67aa2f18097.finalize.json",
+    "summaryReceipt": "/workspace/scratch/2c52ae6e6b97/architecture-runtime-092/review-6/GSiS_v0.9.2_Architecture.~archify-048e2f4a078b08f20a985deb8f30c4d78223f3fb368747443674915a548ea3b7.~archify-c27f76ad7c0989d138c99de8bf0fdb64de20e39667ba82f3a20ac67aa2f18097.finalize-summary.json",
+    "browserCheckReceipt": "/workspace/scratch/2c52ae6e6b97/architecture-runtime-092/review-6/GSiS_v0.9.2_Architecture.~archify-048e2f4a078b08f20a985deb8f30c4d78223f3fb368747443674915a548ea3b7.browser-check.json"
+  },
+  "visualReview": "not-requested",
+  "durationMs": 3926,
+  "visualReviewRecommendation": {
+    "action": "inspect-route-readability",
+    "signals": {
+      "routesOverSuggestedBends": 1
+    },
+    "reason": "Automated gates passed, but crossings or detours still need perceptual review before claiming visual quality.",
+    "affectedRoutes": {
+      "crossings": [],
+      "detours": [
+        {
+          "relationship": {
+            "from": "worker",
+            "to": "operations",
+            "label": "Claim / settle",
+            "collectionIndex": 8,
+            "artifactIndex": 9
+          },
+          "bends": 3,
+          "stretch": 1
+        }
+      ],
+      "truncated": false
+    },
+    "hints": [
+      "worker → operations needs 3 bends: move node worker or operations so they share a row or column with matching centers, or sit diagonally with a clear corner."
+    ],
+    "repair": "Trace these relationships at the desktop viewport. For Architecture, use references/architecture-layout-repair.md: reflow a blocked main path or tangled connected scene, and repair an isolated defect locally only when the surrounding composition is accepted. Preserve all semantic content and user-fixed geometry. Rerun finalize once after the edit."
+  }
+}

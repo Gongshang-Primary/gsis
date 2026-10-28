@@ -1,0 +1,75 @@
+# GSiS 0.9.8p: existing-school upgrade
+
+This is a full suite, not an infrastructure migration. Roster and Calendar receive functional fixes. Other production products are included with P labels. The separate timetable preparation Worker stays on its compatible O build; it needs no redeployment for the export fix.
+
+## Install the two fixes first
+
+1. Keep copies of the deployed Roster and Calendar code and version numbers. Preserve Script Properties and frontend variables/bindings. Save or record unsaved planning work before refreshing browser tabs.
+2. Open the existing **Roster Apps Script** project. Replace its combined backend code with `Roster_Backend_v0.9.8p.gs` from `Production`. Click **Save → Deploy → Manage deployments → pencil → New version → Deploy**. Keep the same `/exec` URL. Saving the editor alone does not deploy the web app.
+3. Open **Cloudflare → Workers & Pages → the existing Roster Pages project → Create deployment**. Upload `Roster_Frontend_v0.9.8p.zip` from `Production`. Upload this inner frontend ZIP, not the whole suite ZIP. Preserve settings. Refresh Roster and sign in normally.
+4. Repeat backend then frontend for Calendar with `Calendar_Backend_v0.9.8p.gs` and `Calendar_Frontend_v0.9.8p.zip`. Preserve Calendar API v3 and destination calendar IDs. This upgrade keeps native SpreadsheetApp; it does not re-enable Advanced Sheets storage.
+
+These fixes need no new Worker, D1 database, R2 bucket, Queue, secret or cron. Incoming absences continue through the normal Roster site and existing Pages Worker. Do not point its backend URL or bindings at `gsis-roster-rehearsal`. Received and successfully applied remain distinct report statuses; check the next genuine report's receipt rather than submitting a dummy absence.
+
+Keep the existing `GSIS_SECRET`, including a working 33-character key. Preserve independent Google OAuth, session, provider and booking credentials. Never put secrets in an export or review bundle.
+
+## Verify the timetable export
+
+1. Sign in to Roster as administrator.
+2. Open **System Health → Prepare timetable migration → Download timetable snapshot**.
+3. Import the downloaded JSON unchanged into the existing O preparation Worker. No removal of `timing` fields should be needed.
+4. Check stored status and read a dated baseline and a confirmed suspended copy. An unchanged import may keep the same revision and report `noChange`; this is expected.
+
+Native hashes, strict importer validation and request identities remain intact. The exported protocol identifies the compatible O preparation schema while installed production code identifies P. This is intentional. No teacher-facing reader switches to Cloudflare timetable authority in this release. See `Docs/TIMETABLE_HANDOVER_STATUS.md` for the remaining work. Keep timetable JSON private.
+
+## Verify Calendar sync
+
+1. Refresh Calendar, sign in and choose the intended year.
+2. Click **Sync Staff** once. An existing saved run can resume. Successful batches should progress without the old mandatory minute after each five records.
+3. Respect genuine source/provider cooldowns and their saved retry times. Permissions, exhausted quotas, unresolved year publication and uncertain outcomes still need their respective resolution.
+4. Check writes, remaining records, errors and blocked records separately. A completed processing pass is not necessarily a fully synced year.
+5. After the pass ends, another explicit **Sync Staff** can retry earlier failed records. Keep event/provider identities. Do not delete MutationLog rows or wipe Calendar to clear status.
+
+The missing `Events!AE1` VenueID header was repaired earlier. O's schema preflight and per-event blocker isolation remain. The two original uncertain save receipts still require separate reconciliation; this release does not declare them committed or delete them.
+
+Without configured background continuation, keep the Calendar tab open. Closing it preserves checkpoints but does not schedule further work. The optional Calendar job Worker can continue an existing authorized session when configured; it is separate from timetable preparation.
+
+## Full-suite inventory
+
+All following files are in `Production`.
+
+| Product | Frontend | Backend |
+| --- | --- | --- |
+| Contacts | `Contacts_Frontend_v0.9.8p.zip` | `Contacts_Backend_v0.9.8p.gs` |
+| Deploy | `Deploy_Frontend_v0.9.8p.zip` | `Deploy_Backend_v0.9.8p.gs` |
+| Layout | `Layout_Frontend_v0.9.8p.zip` | Shares Deploy backend |
+| Roster | `Roster_Frontend_v0.9.8p.zip` | `Roster_Backend_v0.9.8p.gs` |
+| Calendar | `Calendar_Frontend_v0.9.8p.zip` | `Calendar_Backend_v0.9.8p.gs` |
+| LORD | `LORD_Frontend_v0.9.8p.zip` | `LORD_Backend_v0.9.8p.gs` |
+| OVERLORD | `OVERLORD_Frontend_v0.9.8p.zip` | Shares LORD backend |
+| STARLORD | `STARLORD_Frontend_v0.9.8p.zip` | Shares LORD backend |
+| Venues | `Venues_Frontend_v0.9.8p.zip` | `Venues_Backend_v0.9.8p.gs` |
+
+For full harmonisation, install each matching backend/frontend pair to its existing app. Install Contacts and Deploy before their consumers. Update Layout with Deploy; update the three LORD viewports with their shared backend. Preserve services needed by other products: Calendar's native-storage correction does not remove other products' Google service dependencies.
+
+`Optional_Workers` contains Roster notification, private Operations and Calendar job modules. Update only corresponding existing Workers, preserving bindings and triggers. Do not create a second scheduled sender. Do not activate historical full-Roster D1 authority to connect the preparation store. Preserve Deploy's existing configured authority.
+
+`Timetable_Preparation` contains the separate O-compatible package. An operator who already deployed it keeps that existing version. Do not import its schema into a production Roster or Calendar database.
+
+## Optional Calendar background jobs
+
+This capability was packaged in J and is not enabled silently. Skip it if direct Calendar operation is sufficient.
+
+Use the guide, additive schema and example configuration under `Optional_Workers` (`Calendar_Jobs_Setup.md`, `Calendar_Jobs_schema.sql` and `Calendar_Jobs_wrangler.example.jsonc`). The service binding belongs to Calendar Pages. Start with `CALENDAR_SYNC_CONTINUE=false`, verify accepted jobs and saved-result recovery, then follow the guide's explicit continuation instructions. The original administrator, session identity, lease and cooldown remain enforced. Google remains the record destination.
+
+Do not run this schema against Roster/preparation D1. Do not upload a preparation Worker as a production Calendar Worker.
+
+## Rollback and independent review
+
+Restore the affected product's previous matched code pair at its existing deployment URL. Keep records, receipts, notification history and preparation objects. Code rollback does not undo accepted writes or recall messages. Review document size before reverting Roster to a pre-N build with its smaller storage guard.
+
+**Calendar exception:** finish an active P sync before restoring pre-P Calendar code. O cannot read P's chunked checkpoint format. If P cannot finish, keep its code and recovery state while a maintainer preserves and reconciles the checkpoint. Do not clear Script Properties or downgrade over an active run to force a restart.
+
+The separate review package contains current source, O-to-P diff, tests, validation limits and an included/omitted source inventory. Duplicate old manuals, release ZIPs and full-history Git bundles are excluded from this delivery; previous recovery packages remain separate. No live Google, D1 or R2 records are culled.
+
+Building this suite does not deploy it. Local tests do not certify school-scale production latency or provider delivery. Read the validation record before installation.

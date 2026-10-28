@@ -1,0 +1,16 @@
+'use strict';
+const assert=require('node:assert/strict'),adapter=require('./roster701-adapter.cjs');
+const h=adapter(),d='2026-10-15';h.ctx.days[d]=structuredClone(h.ctx.days[h.date]);h.ctx.now=Date.parse(h.date+'T20:00:00+08:00');h.ctx.minute=1200;h.ctx.iso=new Date(h.ctx.now).toISOString();h.scope.rosterIndex_=()=>({entries:[{id:'baseline',from:'2026-01-01',to:'2026-12-31'}]});
+const state=h.state();state.systemConfig.allowAdvancePublishing=true;
+h.O.apply(state,h.ctx,{operation:'saveAbsence',date:d,staffId:'alice',periods:[2,3],typeId:'mc'});
+h.O.apply(state,h.ctx,{operation:'assign',date:d,demandIds:[h.O.demand(h.ctx,state,d).find(row=>row.period===2).id],staffId:'bob'});
+h.O.apply(state,h.ctx,{operation:'publish',date:d,allocationRevision:state.dayRevisions[d],notifyMode:'none'});h.setState(state);
+h.call({operation:'notifyDaily',revision:state.revision,date:d,view:'dailyNotify',staffId:'bob',expectedPublicationRevision:1,requestId:crypto.randomUUID()});
+const service=(operation,extra={})=>h.scope.rosterServiceDispatch_({input:{operation,allowedTemplateKeys:['stapler_timetable'],...extra}});
+const legacy=h.state();delete legacy.outbox[0].data.communicationSnapshot;h.setState(legacy);
+const job=service('claimNotifications').notifications[0];assert.equal(job.date,d);assert.equal(service('prepareNotification',{id:job.id,claimId:job.claimId}).notification.id,job.id);
+const updated=h.state();
+h.O.apply(updated,h.ctx,{operation:'assign',date:d,demandIds:[h.O.demand(h.ctx,updated,d).find(row=>row.period===3).id],staffId:'bob'});
+h.O.apply(updated,h.ctx,{operation:'publish',date:d,allocationRevision:updated.dayRevisions[d],notifyMode:'none'});h.setState(updated);
+assert.equal(service('prepareNotification',{id:job.id,claimId:job.claimId}).notification,null,'changed publication cancels a legacy claimed future notification before send');assert.equal(h.state().outbox.find(row=>row.id===job.id).status,'cancelled');
+console.log('PASS authoritative future notify enqueue, claim, preparation and stale publication cancellation. No sends.');

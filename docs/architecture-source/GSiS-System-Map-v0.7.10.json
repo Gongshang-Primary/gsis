@@ -1,0 +1,260 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "GSiS: runtime and data ownership",
+    "locale": "en",
+    "quality_profile": "showcase",
+    "output": "docs/GSiS-System-Map-v0.7.10.html"
+  },
+  "components": [
+    {
+      "id": "browser",
+      "type": "frontend",
+      "label": "Five websites",
+      "sublabel": "Contacts, Deploy, Layout, Calendar, Roster",
+      "pos": [
+        390,
+        40
+      ],
+      "size": [
+        230,
+        70
+      ]
+    },
+    {
+      "id": "gate",
+      "type": "security",
+      "label": "Pages gateways",
+      "sublabel": "Identity, session and signed requests",
+      "pos": [
+        390,
+        230
+      ],
+      "size": [
+        230,
+        70
+      ]
+    },
+    {
+      "id": "google",
+      "type": "external",
+      "label": "Google sign-in",
+      "sublabel": "School identity token",
+      "pos": [
+        740,
+        40
+      ],
+      "size": [
+        230,
+        65
+      ]
+    },
+    {
+      "id": "contacts",
+      "type": "backend",
+      "label": "Contacts script",
+      "sublabel": "Staff identity and authority",
+      "pos": [
+        40,
+        430
+      ],
+      "size": [
+        230,
+        70
+      ]
+    },
+    {
+      "id": "deploy",
+      "type": "backend",
+      "label": "Deploy script",
+      "sublabel": "Deploy + Layout + Roster",
+      "pos": [
+        390,
+        430
+      ],
+      "size": [
+        230,
+        70
+      ]
+    },
+    {
+      "id": "calendar",
+      "type": "backend",
+      "label": "Calendar script",
+      "sublabel": "Verified school dates",
+      "pos": [
+        40,
+        230
+      ],
+      "size": [
+        230,
+        70
+      ]
+    },
+    {
+      "id": "staffstore",
+      "type": "database",
+      "label": "Contacts workbook",
+      "sublabel": "Staff, roles, access, journals",
+      "pos": [
+        40,
+        640
+      ],
+      "size": [
+        230,
+        70
+      ]
+    },
+    {
+      "id": "stores",
+      "type": "database",
+      "label": "Deploy + Roster stores",
+      "sublabel": "Sheet fields and Drive JSON",
+      "pos": [
+        390,
+        640
+      ],
+      "size": [
+        230,
+        70
+      ]
+    },
+    {
+      "id": "calstore",
+      "type": "database",
+      "label": "Calendar workbook",
+      "sublabel": "Dates, events and mutation log",
+      "pos": [
+        40,
+        40
+      ],
+      "size": [
+        230,
+        70
+      ]
+    },
+    {
+      "id": "timer",
+      "type": "messagebus",
+      "label": "Notification Worker",
+      "sublabel": "Minute timer; separate switches",
+      "pos": [
+        740,
+        430
+      ],
+      "size": [
+        230,
+        70
+      ]
+    },
+    {
+      "id": "meta",
+      "type": "external",
+      "label": "Meta WhatsApp",
+      "sublabel": "Approved route; correlated callback",
+      "pos": [
+        740,
+        230
+      ],
+      "size": [
+        230,
+        70
+      ]
+    }
+  ],
+  "connections": [
+    {
+      "id": "c0",
+      "to": "gate",
+      "label": "HTTPS",
+      "from": "browser"
+    },
+    {
+      "id": "c1",
+      "to": "google",
+      "label": "verify identity",
+      "from": "gate"
+    },
+    {
+      "id": "c2",
+      "to": "deploy",
+      "label": "signed request",
+      "from": "gate"
+    },
+    {
+      "id": "c3",
+      "to": "contacts",
+      "label": "fresh authority",
+      "from": "deploy"
+    },
+    {
+      "id": "c4",
+      "to": "staffstore",
+      "label": "read / write",
+      "from": "contacts"
+    },
+    {
+      "id": "c5",
+      "to": "stores",
+      "label": "read / commit",
+      "from": "deploy"
+    },
+    {
+      "id": "c6",
+      "to": "calendar",
+      "label": "date context",
+      "from": "gate"
+    },
+    {
+      "id": "c7",
+      "to": "calstore",
+      "label": "read / write",
+      "from": "calendar"
+    },
+    {
+      "id": "c8",
+      "to": "deploy",
+      "label": "signed service",
+      "from": "timer"
+    },
+    {
+      "id": "c9",
+      "to": "meta",
+      "label": "eligible sends",
+      "from": "timer"
+    },
+    {
+      "id": "c10",
+      "to": "gate",
+      "label": "signed callback",
+      "from": "meta"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "Three Apps Script projects",
+      "items": [
+        "Deploy owns the Roster and Layout backend. Do not create a fourth script for Roster.",
+        "Contacts Pages and Calendar Pages call their matching script directly; paths are grouped here for readability."
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "Separate side effects",
+      "items": [
+        "Publish is a deliberate same-day action. The timer cannot publish a draft.",
+        "Deploy uses MailApp for daily reports; Calendar sync targets the configured Google calendars. Neither is a Meta message."
+      ]
+    },
+    {
+      "dot": "violet",
+      "title": "Source snapshot",
+      "items": [
+        "Source: each public/_worker.js, backend/Code.gs, Contacts_Code.gs, calendar-backend/Code.gs and notification-worker/index.js.",
+        "This is inspected package topology, not live configuration or measured latency."
+      ]
+    }
+  ]
+}

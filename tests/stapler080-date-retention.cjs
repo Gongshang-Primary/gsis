@@ -1,0 +1,23 @@
+'use strict';
+const assert=require('node:assert/strict'),fs=require('node:fs'),{JSDOM}=require('jsdom');
+const dom=new JSDOM('<main></main>',{url:'https://roster.test/',runScripts:'outside-only'}),w=dom.window,doc=w.document;
+w.eval(fs.readFileSync('roster-update/public/roster-stapler-ui.js','utf8'));
+const q=s=>doc.querySelector(s),date='2026-10-22',wait=()=>new Promise(r=>setImmediate(r));
+let response,fail=false,calls=0;
+const data={revision:1,dates:[{date,name:'Retained plan',mayManage:true,mayEdit:true}],sponsors:[],sponsorships:[]};
+const ctx={container:q('main'),verifiedSession:1,profile:{user:{email:'owner@test',admin:true}},today:()=>date,status(){},api:async()=>{calls++;if(fail)throw Object.assign(Error('Offline'),{status:503});if(response)return response;return structuredClone(data);}};
+(async()=>{
+ await w.RosterStaplerUI.render(ctx);assert(q('[data-plan-action]'));w.RosterStaplerUI.unmount();
+ response=new Promise(()=>{});const refresh=w.RosterStaplerUI.render(ctx);await wait();
+ assert.match(q('main').textContent,/Retained plan/,'reopening retains the verified-owner list while refreshing');
+ assert.match(q('[data-stapler-message]').textContent,/Refreshing|Last checked/);
+ assert(q('[data-plan-action]').disabled,'cached mutation controls wait for a fresh response');assert(q('[data-date-entry] button').disabled);
+ w.RosterStaplerUI.unmount();response=null;fail=true;await w.RosterStaplerUI.render(ctx);
+ assert.match(q('main').textContent,/Retained plan/);assert(q('[data-plan-action]').disabled);assert.match(q('[data-stapler-message]').textContent,/Offline.*Refresh dates/);
+ fail=false;q('[data-refresh-dates]').click();await wait();assert.equal(q('[data-plan-action]').disabled,false,'fresh response enables management');
+ w.RosterStaplerUI.invalidateDates([date]);assert(q('[data-plan-action]').disabled,'external writes invalidate list authority');
+ let resolve;response=new Promise(r=>resolve=r);q('[data-refresh-dates]').click();await wait();w.RosterStaplerUI.invalidateDates([date]);resolve(structuredClone(data));await wait();assert(q('[data-plan-action]').disabled,'a response started before an edit cannot reauthorize the stale list');
+ w.RosterStaplerUI.invalidateDates();assert.doesNotMatch(q('main').textContent,/Retained plan/,'access invalidation clears retained rows immediately');
+ w.RosterStaplerUI.unmount();response=new Promise(()=>{});w.RosterStaplerUI.render({...ctx,verifiedSession:2});await wait();assert.doesNotMatch(q('main').textContent,/Retained plan/,'a new verified session never sees a retained list');
+ w.RosterStaplerUI.unmount();dom.window.close();console.log('PASS Stapler retained date list: session isolation, refresh/failure, stale controls, invalidation.');
+})().catch(e=>{console.error(e);w.RosterStaplerUI.unmount();dom.window.close();process.exitCode=1;});

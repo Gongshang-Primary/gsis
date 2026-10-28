@@ -1,0 +1,17 @@
+# GSiS v0.9.7 approved design
+
+The user approved a full suite release from corrected v0.9.6, then explicitly approved four additions individually: administrator System Health and safe diagnostics; bounded queue background work; recovery checkpoints and safe restoration; a private shared backend Worker connected by service bindings.
+
+Core requirements: Roster and Deploy operational reads and writes run through Worker/D1 after verified migration. Compressed private R2 timetable packages update on relevant changes. Pruning protects live manifests, immutable source timetables, saved plans, recovery and audit records. Preserve school schedules, sacred manual relief decisions, source authorization, durable receipts and uncertain-delivery protection. Venues gets only permitted occupancy including occupying staff names, never drafts or private staff fields. Preserve Google-owned Contacts/Calendar/email adapters.
+
+Use existing modules and authority fences. Existing Pages URLs stay. Add one private operations Worker, binding GSIS_BACKEND on Pages and notification Worker; reject unknown origin/domain and do not expose public worker routes. Preserve browser credentials, sessions and role verification at backend; service calls verify their existing service authorization. No broad automatic migration or dual writes.
+
+System Health is admin-only and on demand. Store compact bounded job summaries and safe codes/counts, never raw payloads, arbitrary error text or credentials. Expose pending work age, cache freshness and cleanup status. Distinguish skipped/idle jobs from successful actual work and failure. Native Cloudflare monitoring remains CPU truth.
+
+Queues extend existing notification wake support with bounded workers for notification dispatch, timetable preparation and audit export, plus capped attempts and parked failures. D1 stays authoritative; a queue message is only a wake. Save confirmation requires committed operational data. Cron retains scheduled allocation/timing and recovery of missed enqueues. Manual retries operate only on recoverable job intents and never reset uncertain provider delivery records.
+
+Recovery records checkpoint information and supplies operator instructions for native D1 Time Travel. D1 restore affects the whole shared database and does not restore R2. Pause all writers/dispatch/cleanup before restore, reconcile external delivery state before resume, rebuild derived caches. Keep credentials out of browser and source. Restoration is an operator action, never an automatic job. Use source object retention compatible with recovery; avoid recurrent full database exports.
+
+Receipt UI adds per-user dismissal of fully completed intake receipts, Clear completed, reopenable History and amber Needs attention. Refresh/sign-in must not reveal another user's dismissed state or hide newly pending/review work. Clearing presentation never deletes absences or audit history. Approval for full097 includes this previously requested improvement.
+
+Prudence: no unlimited fanout, scans or retries; indexed probes, bounded histories and pruning; safe example bindings/flags with explicit activation guide. No production actions, messages, restores or migrations performed while building. Deliver full nine frontend/six backend suite, notification and private backend Workers, committed source, tests and exact install/rollback instructions. Do not claim live measurements or unavailable historical test results.

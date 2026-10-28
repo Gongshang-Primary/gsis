@@ -1,0 +1,103 @@
+{
+  "schema": 1,
+  "frontends": {
+    "Contacts": "contacts-update/public",
+    "Deploy": "public",
+    "Layout": "layout-update/public",
+    "Roster": "roster-update/public",
+    "Calendar": "calendar-update/public",
+    "LORD": "lord-suite/Source/lord",
+    "OVERLORD": "lord-suite/Source/overlord",
+    "STARLORD": "lord-suite/Source/starlord",
+    "Venues": "venues-viewport/public"
+  },
+  "backends": [
+    "Contacts",
+    "Deploy",
+    "Roster",
+    "Calendar",
+    "LORD",
+    "Venues"
+  ],
+  "workers": {
+    "Roster_Notification_Worker_v{version}.txt": "notification-worker/dashboard-worker.txt",
+    "GSiS_Operations_Worker_v{version}.txt": "operations-worker/dashboard-worker.txt",
+    "GSiS_Calendar_Job_Worker_v{version}.txt": "calendar-job-worker/dashboard-worker.txt"
+  },
+  "documents": [
+    "README.md",
+    "docs/architecture/GSiS_v{version}_Architecture.html",
+    "docs/GSiS-v{version}-User-Manual.html",
+    "docs/asc-skill.md",
+    "docs/WHATSAPP_PARAMETERS.md",
+    "docs/v099/SETUP.html",
+    "docs/v099/SETUP.md",
+    "docs/v099/CHANGELOG.md",
+    "docs/v099/VALIDATION.md",
+    "docs/v099/TIMETABLE_HANDOVER_STATUS.md"
+  ],
+  "dependencies": {
+    "LORD": {
+      "backends": [
+        "Contacts",
+        "Deploy"
+      ],
+      "scriptProperties": [
+        "LORD_BRIDGE_SECRET",
+        "LORD_CONTACTS_APPS_SCRIPT_URL",
+        "LORD_DEPLOY_APPS_SCRIPT_URL",
+        "LORD_GSIS_SNAPSHOT_FOLDER_ID",
+        "LORD_SPREADSHEET_ID",
+        "LORD_REFERENCE_SPREADSHEET_ID",
+        "LORD_PHOTO_FOLDER_ID",
+        "LORD_REIGN_ARCHIVE_FOLDER_ID",
+        "LORD_PROXY_SECRET",
+        "LORD_BOOKING_TOKEN_PEPPER",
+        "LORD_BOOKING_CODE_PEPPER",
+        "LORD_TELEGRAM_BOT_TOKEN",
+        "LORD_TELEGRAM_CHAT_ID"
+      ],
+      "workerBindings": [
+        "GOOGLE_CLIENT_ID",
+        "LORD_SESSION_SECRET",
+        "LORD_BACKEND_URL",
+        "LORD_PROXY_SECRET"
+      ]
+    },
+    "Venues": {
+      "backends": [
+        "Contacts",
+        "Deploy",
+        "Calendar",
+        "Roster"
+      ],
+      "scriptProperties": [
+        "VENUES_SPREADSHEET_ID",
+        "VENUES_SNAPSHOT_FOLDER_ID",
+        "VENUES_PROXY_SECRET",
+        "VENUES_BRIDGE_SECRET",
+        "VENUES_ROSTER_APPS_SCRIPT_URL",
+        "VENUES_CONTACTS_APPS_SCRIPT_URL",
+        "VENUES_DEPLOY_APPS_SCRIPT_URL",
+        "VENUES_CALENDAR_APPS_SCRIPT_URL",
+        "VENUES_ADMIN_EMAILS",
+        "VENUES_PUBLIC_URL"
+      ],
+      "workerBindings": [
+        "VENUES_BACKEND_URL",
+        "VENUES_PROXY_SECRET",
+        "GOOGLE_CLIENT_ID"
+      ],
+      "advancedServices": [
+        "Sheets v4",
+        "Drive v3"
+      ],
+      "scheduledOwner": "Venues Apps Script",
+      "optionalWorkerBindings": [
+        "ACCESS_TEAM_DOMAIN",
+        "ACCESS_AUD"
+      ]
+    }
+  },
+  "migrations": []
+}

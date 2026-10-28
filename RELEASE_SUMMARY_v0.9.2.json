@@ -1,0 +1,51 @@
+{
+  "release": "0.9.2",
+  "npmVersion": "0.9.2",
+  "baselineCommit": "f1069a135d762ab4761fdb94172f96680ec4c849",
+  "runtimeIntegrationCommit": "44252bd83e8598806296640791ce6122fe001099",
+  "releaseDate": "2026-10-25",
+  "releaseTimeZone": "Asia/Singapore",
+  "releaseTag": "v0.9.2",
+  "productionDeployed": false,
+  "components": {
+    "frontends": [
+      "Contacts",
+      "Deploy",
+      "Layout",
+      "Roster",
+      "Calendar",
+      "LORD",
+      "OVERLORD",
+      "STARLORD",
+      "Venues"
+    ],
+    "backendOwners": [
+      "Contacts",
+      "Calendar",
+      "Deploy/Layout",
+      "Roster",
+      "LORD",
+      "Venues"
+    ],
+    "notificationWorker": true
+  },
+  "verification": {
+    "gsisPrograms": 666,
+    "initialPassed": 663,
+    "initialFailed": 3,
+    "targetedFollowupsPassed": 3,
+    "remainingFailures": 0,
+    "lordPrograms": 33,
+    "lordFailed": 0,
+    "appsScriptSources": 156,
+    "packageMembers": 23,
+    "browserChecks": true,
+    "sourceRangeChecks": 49,
+    "liveProviderDelivery": false,
+    "productionLatencyMeasured": false
+  },
+  "venueSheetSplitRequired": true,
+  "venuesBookingSystem": "Standalone Venues backend and responsive viewport included",
+  "configuration": "Runtime credentials belong in Script Properties and Cloudflare bindings; preserve existing IDs/secrets/peppers. Main README is authoritative.",
+  "sourceRecovery": "Complete current-source ZIP plus incremental bundle requiring the stated baseline; earlier history excluded."
+}

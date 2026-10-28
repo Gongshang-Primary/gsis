@@ -1,0 +1,30 @@
+{
+  "version": "0.9.8",
+  "baseline": "0.9.7",
+  "scope": "Roster critical operations recovery",
+  "recordAuthority": "Google Roster backend",
+  "components": [
+    "rosterFrontend",
+    "rosterBackend",
+    "notificationWorker"
+  ],
+  "validation": {
+    "nodeTestFiles": 748,
+    "passed": 744,
+    "blocked-historical-context": 4,
+    "componentArchive": "scope, hashes and source parity verified",
+    "browser": "28 rerun files passed; one historical comparison blocked",
+    "production": "not deployed or exercised"
+  },
+  "sourceState": "working-tree",
+  "liveDeploymentPerformed": false,
+  "liveNotificationSent": false,
+  "knownOperationalBlocker": "Two retained overlapping absence reports must be resolved after all intended attendance is recorded.",
+  "suspendedFeatures": [
+    "paid operational migration",
+    "auxiliary scheduled jobs",
+    "private System Health panel",
+    "Roster occupancy export to Venues",
+    "R2 deletion under legacy authority"
+  ]
+}

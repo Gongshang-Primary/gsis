@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "ok": true,
+  "command": "finalize",
+  "status": "pass",
+  "type": "erd",
+  "quality": "standard",
+  "specification": {
+    "path": "/workspace/scratch/c84f0276cce6/build710/source/docs/architecture-source/GSiS-Schema-Contacts-v0.7.10.json",
+    "sha256": "4f75cc8d62a7790ec030d72920531f11e4158dc924f33d38be9a7bf203d72326",
+    "bytes": 5278
+  },
+  "artifact": {
+    "path": "/workspace/scratch/c84f0276cce6/build710/source/docs/GSiS-Schema-Contacts-v0.7.10.html",
+    "sha256": "72f007fe5e7c8861f49bc1a3f40e5c478c40c2f17234a0e576c88165fefd4120",
+    "bytes": 830854
+  },
+  "gates": {
+    "validate": "pass",
+    "deliver": "pass",
+    "check": "pass",
+    "browser-check": "pass"
+  },
+  "diagnostics": [],
+  "diagnosticSummary": {
+    "total": 0,
+    "shown": 0,
+    "truncated": false
+  },
+  "evidence": {
+    "receipt": "/workspace/scratch/c84f0276cce6/build710/source/docs/GSiS-Schema-Contacts-v0.7.10.finalize.json",
+    "summaryReceipt": "/workspace/scratch/c84f0276cce6/build710/source/docs/GSiS-Schema-Contacts-v0.7.10.finalize-summary.json",
+    "browserCheckReceipt": "/workspace/scratch/c84f0276cce6/build710/source/docs/GSiS-Schema-Contacts-v0.7.10.browser-check.json"
+  },
+  "visualReview": "not-requested",
+  "durationMs": 3623
+}

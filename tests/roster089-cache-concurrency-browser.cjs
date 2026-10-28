@@ -1,0 +1,32 @@
+'use strict';
+const assert=require('node:assert/strict'),fs=require('node:fs'),{gzipSync}=require('node:zlib'),{chromium}=require('playwright'),R=require('../shared/roster.js');
+const from='2026-10-22',to='2026-11-21',key='a'.repeat(64),modelKey='b'.repeat(64),calls=[];
+let suspendedSource='d',holdNext=false,releaseResponse=null;
+const model=R.validate({layoutMode:'single-week',single:{days:['Monday','Tuesday','Wednesday','Thursday','Friday'],perDay:20,maxPeriod:19,blocks:Array.from({length:200},(_,i)=>({name:'Fixture Teacher '+i,cells:Array.from({length:100},(_,j)=>['Subject '+(j%8),'Class '+(i%36),'Room '+(j%40),'Group '+(i%70)])}))},timing:{startMinutes:420,periodMinutes:30,normalLastPeriod:19},recesses:[]});
+function response(p){const sourceKey=(p.stage==='baseline'?'c':suspendedSource).repeat(64);if(p.knownSourceKey===sourceKey)return {schema:1,stage:p.stage,from,to,baselineKey:key,sourceKey,unchanged:true};const payload={schema:1,stage:p.stage,from,to,baselineKey:key,...(p.stage==='baseline'?{registerRevision:4,modelKeys:{base:modelKey},entries:[{id:'base',from,to,priority:1}],models:[{id:'base',contentKey:modelKey,model}],dates:Array.from({length:31},(_,i)=>({date:new Date(Date.parse(from)+i*86400000).toISOString().slice(0,10),baselineId:'base'}))}:{registerRevision:4,operationsRevision:suspendedSource==='d'?9:10,plans:[],planKeys:{},datesView:{revision:9,dates:[]}})},text=JSON.stringify(payload);return {schema:1,stage:p.stage,from,to,baselineKey:key,sourceKey,key,encoding:'gzip-base64-v1',bytes:Buffer.byteLength(text),data:gzipSync(text).toString('base64')};}
+const percentile=(xs,q)=>+xs.slice().sort((a,b)=>a-b)[Math.min(xs.length-1,Math.ceil(xs.length*q)-1)].toFixed(2);
+(async()=>{
+ const browser=await chromium.launch({headless:true,executablePath:process.env.ROSTER_TEST_CHROMIUM||'/tmp/chromium',args:['--no-sandbox']});
+ try{
+  const context=await browser.newContext();await context.route('https://cache.test/**',r=>r.fulfill({contentType:'text/html',body:'<!doctype html><title>Concurrent timetable cache</title>'}));
+  await context.exposeBinding('testApi',(_,input)=>{const value=response(input);calls.push({stage:input.stage,unchanged:!!value.unchanged,payloadBytes:value.data?Buffer.byteLength(value.data):0});if(holdNext&&input.stage==='suspended'){holdNext=false;return new Promise(resolve=>releaseResponse=()=>resolve(value));}return value;});
+  const pages=await Promise.all([context.newPage(),context.newPage()]);
+  for(const page of pages){await page.goto('https://cache.test');await page.addScriptTag({content:fs.readFileSync('shared/roster.js','utf8')});await page.evaluate(()=>{window.metrics={validations:0,decodes:0,writes:0,callbacks:0};const validate=GSISRoster.validate;GSISRoster.validate=(...args)=>{metrics.validations++;return validate(...args);};const Original=DecompressionStream;window.DecompressionStream=function(...args){metrics.decodes++;return new Original(...args);};const put=IDBObjectStore.prototype.put;IDBObjectStore.prototype.put=function(...args){if(this.name==='contents')metrics.writes++;return put.apply(this,args);};});for(const file of ['roster-baseline-cache.js','roster-timetable-preload.js'])await page.addScriptTag({content:fs.readFileSync('roster-update/public/'+file,'utf8')});await page.evaluate(()=>{window.cache=RosterTimetablePreload.create({api:(_,input)=>testApi(input),scope:'school|teacher',today:'2026-10-22',onBaseline:()=>metrics.callbacks++,onSuspended:()=>metrics.callbacks++});});}
+  const cold=await Promise.all(pages.map(page=>page.evaluate(async()=>Promise.all(Array.from({length:15},async()=>{const begin=performance.now(),result=await cache.start();if(result.phase!=='ready')throw Error(result.error?.message||result.phase);return performance.now()-begin;})))));
+  assert.equal(calls.length,2,'30 simultaneous requests in two tabs share the staged origin work');const initialMetrics=await Promise.all(pages.map(p=>p.evaluate(()=>metrics)));assert.equal(initialMetrics.reduce((n,m)=>n+m.validations,0),1);assert.equal(initialMetrics.reduce((n,m)=>n+m.writes,0),1);
+  const warm=await pages[0].evaluate(async()=>{const times=[];for(let i=0;i<30;i++){const begin=performance.now();await cache.start();cache.getBaseline('2026-11-05');times.push(performance.now()-begin);}return times;});assert.equal(calls.length,2);
+  const before=await pages[0].evaluate(()=>({...metrics}));await pages[0].evaluate(()=>cache.start({refresh:true}));const after=await pages[0].evaluate(()=>metrics);assert.deepEqual(after,before,'unchanged check performs no decode, full validation, payload write or callback');assert(calls.slice(2).every(c=>c.unchanged&&c.payloadBytes===0));
+  const raceBefore=calls.length;holdNext=true;
+  await pages[0].evaluate(()=>{window.oldRefresh=cache.start({refresh:true});});
+  for(let i=0;i<100&&!releaseResponse;i++)await new Promise(resolve=>setTimeout(resolve,5));assert(releaseResponse,'first tab must capture an in-flight old response');
+  suspendedSource='e';
+  await pages[1].evaluate(()=>{cache.invalidate(['2026-10-22']);window.newRefresh=cache.start({refresh:true});});
+  releaseResponse();
+  await pages[0].evaluate(()=>oldRefresh);await pages[1].evaluate(()=>newRefresh);
+  assert.equal(calls.length-raceBefore,4,'an explicit refresh after a write must make its own check even when the older read finishes later');
+  assert.equal(await pages[1].evaluate(()=>cache.snapshot().operationsRevision),10);
+  console.log('PASS a delayed pre-write response cannot satisfy a later explicit refresh');
+  const report={environment:'Local headless Chromium; synthetic 200-teacher baseline, 31-day window; two tabs, 30 concurrent requests. Not a production or school-device latency measurement.',coldMs:{p50:percentile(cold.flat(),.5),p95:percentile(cold.flat(),.95)},warmMs:{p50:percentile(warm,.5),p95:percentile(warm,.95)},originRequestsCold:2,originRequestsWarm:0,compressedPayloadBytesCold:calls.slice(0,2).reduce((n,c)=>n+c.payloadBytes,0),unchangedPayloadBytes:0,baselineValidationsCold:1,decodedContentWritesCold:1,unchangedExtraDecodes:after.decodes-before.decodes,unchangedExtraPayloadWrites:after.writes-before.writes};
+  fs.mkdirSync('verification',{recursive:true});fs.writeFileSync('verification/roster089-cache-performance.json',JSON.stringify(report,null,2)+'\n');console.log(JSON.stringify(report));
+ }finally{await browser.close();}
+})().catch(e=>{console.error(e);process.exitCode=1;});

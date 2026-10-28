@@ -1,0 +1,10 @@
+const assert=require('node:assert/strict'),fixture=require('./roster701-fixture.cjs'),S=require('../shared/roster-stapler.js');
+const f=fixture(),O=f.O,base=S.create({...f.ctx.days[f.date],date:f.date}),local=S.apply(base,{type:'edit',tileId:base.tiles[0].id,patch:{venue:'Local room'}}),online=S.apply(base,{type:'edit',tileId:base.tiles[1].id,patch:{venue:'Online room'}});
+O.apply(f.state,f.ctx,{operation:'saveStapler',date:f.date,staplerRevision:0,plan:online});
+O.apply(f.state,f.ctx,{operation:'saveStapler',date:f.date,staplerRevision:0,basePlan:base,plan:local});
+let result=f.state.staplerPlans[0].draft;assert.equal(result.tiles[0].venue,'Local room');assert.equal(result.tiles[1].venue,'Online room');
+const conflict=S.apply(base,{type:'edit',tileId:base.tiles[0].id,patch:{venue:'Third room'}});assert.throws(()=>O.apply(f.state,f.ctx,{operation:'saveStapler',date:f.date,staplerRevision:0,basePlan:base,plan:conflict}),e=>e.code==='STAPLER_CONFLICT'&&e.conflicts[0].collection==='tiles'&&e.currentPlan.tiles[0].venue==='Local room');
+assert.equal(f.state.staplerPlans[0].revision,2,'rejected merge cannot partially save');
+const same=S.apply(base,{type:'edit',tileId:base.tiles[0].id,patch:{venue:'Local room'}});O.apply(f.state,f.ctx,{operation:'saveStapler',date:f.date,staplerRevision:0,basePlan:base,plan:same});assert.equal(f.state.staplerPlans[0].draft.tiles[1].venue,'Online room');
+const bad=structuredClone(base);bad.baselineId='another';assert.throws(()=>O.apply(f.state,f.ctx,{operation:'saveStapler',date:f.date,staplerRevision:0,basePlan:bad,plan:local}),/baseline|date/);
+console.log('082 domain Stapler three-way merge: passed');

@@ -1,0 +1,28 @@
+# Update the existing dedicated rehearsal Worker, retaining its eight bindings/variables.
+name = "gsis-roster-rehearsal"
+main = "worker.mjs"
+compatibility_date = "2026-10-01"
+workers_dev = true
+preview_urls = false
+
+[limits]
+cpu_ms = 10000
+
+[vars]
+REHEARSAL_MODE = "simulation-only"
+REHEARSAL_INSTANCE_ID = "REPLACE-WITH-EXISTING-INSTANCE"
+REHEARSAL_ORIGIN = "https://gsis-roster-rehearsal.REPLACE.workers.dev"
+REHEARSAL_GOOGLE_CLIENT_ID = "REPLACE.apps.googleusercontent.com"
+REHEARSAL_SCHOOL_DOMAIN = "gsps.edu.sg"
+REHEARSAL_ADMIN_EMAILS = "REPLACE@gsps.edu.sg"
+
+[[d1_databases]]
+binding = "REHEARSAL_LEDGER"
+database_name = "REPLACE-EXISTING-REHEARSAL-D1"
+database_id = "REPLACE-EXISTING-REHEARSAL-D1-ID"
+
+[[r2_buckets]]
+binding = "REHEARSAL_TIMETABLES"
+bucket_name = "REPLACE-EXISTING-PRIVATE-REHEARSAL-BUCKET"
+
+# No secrets, production bindings, cron, Queues, routes or bucket public access.

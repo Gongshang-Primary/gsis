@@ -1,0 +1,62 @@
+{
+  "date": "2026-10-24",
+  "sourceSha256": "ed64b59f3461142d35aeeb180cd7717a2e7f103c8cb43e58c905899314b8c760",
+  "scope": "Actual source in local VM; simulated Script Properties/Sheets/Drive. Counts, not production latency.",
+  "measurements": [
+    {
+      "rows": 30,
+      "directoryPeople": 100,
+      "before": {
+        "movement": {
+          "propertyReads": 31,
+          "emailAccesses": 6100
+        },
+        "overdue": {
+          "propertyReads": 34
+        }
+      },
+      "after": {
+        "movement": {
+          "rows": 30,
+          "propertyReads": 1,
+          "emailAccesses": 200
+        },
+        "overdue": {
+          "rows": 30,
+          "propertyReads": 4
+        }
+      }
+    },
+    {
+      "rows": 100,
+      "directoryPeople": 100,
+      "before": {
+        "movement": {
+          "propertyReads": 101,
+          "emailAccesses": 20100
+        },
+        "overdue": {
+          "propertyReads": 104
+        }
+      },
+      "after": {
+        "movement": {
+          "rows": 100,
+          "propertyReads": 1,
+          "emailAccesses": 200
+        },
+        "overdue": {
+          "rows": 100,
+          "propertyReads": 4
+        }
+      }
+    }
+  ],
+  "bookingBindingVisits": {
+    "bookings": 100,
+    "events": 100,
+    "before": 5050,
+    "after": 100
+  },
+  "providerFreshnessReads": 3
+}

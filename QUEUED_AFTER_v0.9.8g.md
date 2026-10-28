@@ -1,0 +1,11 @@
+# Queued after revision G
+
+On 27 October 2026 the user explicitly selected Next patch when asked whether this policy batch should join G. These items are recorded for the next patch and are not implemented in G.
+
+1. Make Publish / Let teachers see a weak visibility control for normal teachers. Business availability, workload and pending cover checks should not block visibility. Preserve server permission checks and protection against overwriting newer saved work.
+2. Make SMC WhatsApp notification independent of publication, readily available as a communication tool. Define the message and link content clearly when notifying about unpublished work, so a message does not imply a publication that has not occurred. Existing provider delivery evidence and duplicate protection remain necessary.
+3. Format notification timestamps as friendly Singapore date and time. The supplied screenshot shows 2026-10-26T22:52:22.993Z; the intended display is 27 Oct 2026, 6:52 am SGT. Remove raw ISO UTC timestamps from the user facing message body.
+4. Enforce the configured UT time cap as a hard limit in the automatic allocator, with an explicit SMC manual override. The existing UT weekly employment cap is 26 periods. During next patch design, confirm its accounting scope and the intended exception to the current confirmed suspended day workload exemption.
+5. Decouple Stapler suspended timetables from the currently selected baseline. A baseline can update independently without replacing or invalidating an existing confirmed suspended timetable. Recommended design for the next patch: keep the confirmed plan's own timing and timetable snapshot, with provenance, and make any rebase onto a new baseline an explicit SMC action. Preserve saved planning and manual decisions; review changed staff identities, periods and class mappings during an explicit rebase. This does not authorise a Cloudflare cache migration or activation in G.
+
+The next implementation must cover publication and notification independence, private link visibility, unchanged or empty messages, partial failures, duplicate notifications, UT cap boundaries and deliberate manual overrides with appropriate regression checks. No messages, publication changes, allocations or school records were changed while recording these requests.

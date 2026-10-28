@@ -1,0 +1,211 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>GSPS Shared Calendar</title><link rel="icon" href="/favicon.ico?v=0.9.9" sizes="16x16 32x32 48x48"><link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png?v=0.9.9"><link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png?v=0.9.9">
+  <link rel="stylesheet" href="/styles.css?v=0.9.9">
+  <link rel="preload" as="image" href="/gsps-calendar-logo.png">
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+</head>
+<body>
+  <section id="loginView">
+    <div class="login-card">
+      <img
+        class="login-brand-logo"
+        src="/gsps-calendar-logo.png"
+        alt=""
+        aria-hidden="true"
+      >
+      <h1>GSPS Shared Calendar</h1>
+      <p>School-wide calendar planning, publishing and synchronisation.</p>
+      <div id="bootStatus" class="boot-status">
+        <div class="boot-spinner"></div>
+        <span id="bootStatusText">Checking your session…</span>
+      </div>
+      <div id="signInPrompt" class="hidden">
+        <p>Sign in using your GSPS Google account.</p>
+        <div id="googleButton"></div>
+      </div>
+      <div id="loginError"></div>
+    </div>
+  </section>
+
+  <section id="appView" class="app-shell hidden">
+    <header class="topbar">
+      <div class="brand-lockup">
+        <img
+          class="topbar-brand-logo"
+          src="/gsps-calendar-logo.png"
+          alt=""
+          aria-hidden="true"
+        >
+        <div class="brand">GSPS Shared Calendar</div>
+      </div>
+      <select id="yearSelect" class="year-select" aria-label="Calendar year"></select>
+      <span id="dirtyPill" class="dirty-pill hidden"></span>
+      <div class="spacer"></div>
+      <span id="identity" class="identity"></span>
+      <div class="calendar-publish-actions">
+      <button id="publishVersionBtn" class="sync-button hidden">Publish version</button>
+      <button id="syncStaffBtn" class="sync-button hidden">Sync Staff</button>
+      <button id="syncParentBtn" class="sync-button hidden">Sync Parent</button>
+      <button id="logoutBtn" class="icon-button" title="Sign out" aria-label="Sign out">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M10 4H5.8A1.8 1.8 0 0 0 4 5.8v12.4A1.8 1.8 0 0 0 5.8 20H10M14.5 7.5 19 12l-4.5 4.5M8 12h11"/>
+        </svg>
+      </button>
+      </div>
+    </header>
+
+    <nav id="nav" class="navbar">
+      <button class="nav-button active" data-page="events">Events</button>
+      <button class="nav-button" data-page="weekly">Weekly View</button>
+      <button class="nav-button" data-page="stats">Stats</button>
+      <button class="nav-button privileged-parent hidden" data-page="parent">Parent Publishing</button>
+      <button class="nav-button admin-only hidden" data-page="yearSetup">Year Setup</button>
+      <button class="nav-button admin-only hidden" data-page="columns">Columns</button>
+      <button class="nav-button" data-page="glossary">Glossary</button>
+      <button class="nav-button admin-only hidden" data-page="formatting">Conditional Formatting</button>
+      <button class="nav-button" data-page="people">People & Roles</button>
+      <button class="nav-button admin-only hidden" data-page="urls">URL Setup</button>
+    </nav>
+    <div id="freshnessBar" class="freshness-bar" aria-live="polite">
+      <span class="release-label">v0.9.9</span><span id="freshnessStatus"></span>
+      <button id="refreshCalendarBtn" type="button" class="text-link">Refresh</button>
+    </div>
+
+    <main>
+      <section id="page-events" class="page active">
+        <div class="page-head compact-head events-head">
+          <h2 id="calendarTitle">Events</h2>
+          <div class="date-search-controls"><label for="dateSearch">Date</label>
+            <input id="dateSearch" type="text" inputmode="text" autocomplete="off" placeholder="DD/MM, MM/YYYY, DD/MM/YYYY" aria-describedby="dateSearchGuide">
+            <button id="clearDateSearch" type="button" class="secondary">Clear</button><span id="dateMatchCount" aria-live="polite"></span>
+          </div>
+        </div>
+        <div id="dateSearchGuide" class="date-search-guide" aria-live="polite"></div>
+        <div id="calendarMessage" class="notice compact-notice hidden" aria-live="polite"></div>
+        <div id="calendarHost"></div>
+      </section>
+
+      <section id="page-weekly" class="page">
+        <div class="page-head compact-head">
+          <div>
+            <h2 id="weeklyTitle">Weekly View</h2>
+            <p>Whole-year Monday–Sunday view, one row per week.</p>
+          </div>
+        </div>
+        <div id="weeklyHost"></div>
+      </section>
+
+      <section id="page-stats" class="page">
+        <div class="page-head compact-head">
+          <div>
+            <h2 id="statsTitle">Stats</h2>
+            <p>Selected-year event frequency, recurrence and first/last occurrence.</p>
+          </div>
+        </div>
+        <div id="statsHost"></div>
+      </section>
+
+      <section id="page-parent" class="page">
+        <div class="page-head compact-head">
+          <div>
+            <h2>Parent Publishing</h2>
+            <p>Parent-facing events are always synchronised as all-day events.</p>
+          </div>
+        </div>
+        <div id="parentHost"></div>
+      </section>
+
+      <section id="page-yearSetup" class="page">
+        <div class="page-head compact-head">
+          <div>
+            <h2>Year Setup</h2>
+            <p>Create a blank planning year, verify authoritative dates, and release the year when ready.</p>
+          </div>
+        </div>
+        <div id="yearSetupHost"></div>
+      </section>
+
+      <section id="page-columns" class="page">
+        <div class="page-head compact-head">
+          <div>
+            <h2>Columns</h2>
+            <p>Display lanes apply globally to current and future live years. Archived years remain frozen.</p>
+          </div>
+        </div>
+        <div id="columnsHost"></div>
+      </section>
+
+      <section id="page-glossary" class="page">
+        <div class="page-head compact-head">
+          <div>
+            <h2>Glossary</h2>
+            <p>Every staff-side event must have one compulsory glossary tag.</p>
+          </div>
+        </div>
+        <div id="glossaryHost"></div>
+      </section>
+
+      <section id="page-formatting" class="page admin-only hidden">
+        <div class="page-head compact-head">
+          <div>
+            <h2>Conditional Formatting</h2>
+            <p>System rules protect core calendar semantics. Add lower-priority custom rules for tags, lanes, titles or date ranges.</p>
+          </div>
+        </div>
+        <div id="formattingHost"></div>
+      </section>
+
+      <section id="page-people" class="page">
+        <div class="page-head compact-head">
+          <div>
+            <h2>People & Roles</h2>
+            <p>Visible to all teachers. Unlisted GSPS users are normal view-only Teachers.</p>
+          </div>
+        </div>
+        <div id="birthdayActions" class="birthday-actions hidden">
+          <button id="pullBirthdaysBtn" class="secondary hidden" aria-describedby="birthdayPullStatus">Update birthdays from Contacts</button>
+          <div id="birthdayPullStatus" class="birthday-pull-status hidden" role="status" aria-live="polite"></div>
+        </div>
+        <div id="peopleHost"></div>
+      </section>
+
+      <section id="page-urls" class="page admin-only hidden">
+        <div class="page-head compact-head">
+          <div>
+            <h2>URL Setup</h2>
+            <p>Admin-only Google Calendar destinations used by Sync.</p>
+          </div>
+        </div>
+        <div id="urlsHost"></div>
+      </section>
+    </main>
+  </section>
+
+  <div id="modalHost"></div>
+  <div id="toast" class="toast hidden"></div>
+
+  <div id="syncOverlay" class="sync-overlay hidden" aria-live="polite">
+    <div class="sync-panel">
+      <img
+        class="sync-brand-logo"
+        src="/gsps-calendar-logo.png"
+        alt=""
+        aria-hidden="true"
+      >
+      <div class="sync-spinner"></div>
+      <h3 id="workTitle">Synchronising</h3>
+      <div id="syncStage">Comparing changes…</div>
+      <div class="progress-track"><div id="syncProgress" class="progress-bar"></div></div>
+      <div id="syncDetail" class="sync-detail">Please keep this page open.</div>
+      <button id="stopSyncWaiting" type="button" class="text-link hidden">Stop waiting</button>
+    </div>
+  </div>
+
+  <script src="/calendar-core.js?v=0.9.9"></script>
+  <script src="/app.js?v=0.9.9"></script>
+</body>
+</html>

@@ -1,0 +1,12 @@
+const fs=require('fs'),assert=require('assert/strict'),{chromium}=require(process.env.CODEX_PRIMARY_RUNTIME_NODE_MODULES+'/playwright'),JSZip=require(process.env.CODEX_PRIMARY_RUNTIME_NODE_MODULES+'/jszip');
+(async()=>{const browser=await chromium.launch({executablePath:process.env.GSIS_CHROMIUM||chromium.executablePath(),headless:true,args:['--no-sandbox']});try{
+ const page=await browser.newPage(),errors=[],writes=[];page.on('pageerror',e=>errors.push(e.message));
+ const campus={schemaVersion:2,modelVersion:'1.1.0',deploymentVersionId:'PUBLIC-413',deploymentRevision:1,registryRevision:1,venues:[{unitNumber:'F1-16',geometryUnit:'F1-16',name:'Public room',allocations:[{kind:'homeroom',targetId:'1P',label:'1P'}]}],classes:[{id:'1P',name:'Example',level:'1',units:['F1-16']}],groups:[]};
+ await page.route('https://gsis.local/**',r=>{const p=new URL(r.request().url()).pathname;if(p==='/api/public/campus')return r.fulfill({contentType:'application/json',body:JSON.stringify({ok:true,data:campus})});if(p.startsWith('/api/')){if(r.request().method()!=='GET')writes.push(p);return r.fulfill({status:401,contentType:'application/json',body:JSON.stringify({ok:false})});}return r.fulfill({path:'.'+p});});
+ await page.goto('https://gsis.local/layout-update/public/index.html');await page.waitForFunction(()=>!document.querySelector('#excel').disabled);
+ const [dl]=await Promise.all([page.waitForEvent('download'),page.getByRole('button',{name:'Export Excel',exact:true}).click()]);await dl.saveAs('verification/413-Public-Layout.xlsx');
+ const zip=await JSZip.loadAsync(fs.readFileSync('verification/413-Public-Layout.xlsx')),xml=await zip.file('xl/worksheets/sheet1.xml').async('string');for(const t of ['PUBLIC-413','Public room','F1-16','1P'])assert.ok(xml.includes(t),t);
+ await page.evaluate(()=>setView('model'));assert.equal(await page.locator('#excel').isVisible(),false);await page.evaluate(()=>setView('layout'));assert.equal(await page.locator('#excel').isVisible(),true);
+ await page.evaluate(()=>{campus.deploymentVersionId='';renderMap()});assert.equal(await page.locator('#excel').isDisabled(),true);assert.deepEqual(writes,[]);assert.deepEqual(errors,[]);
+ fs.writeFileSync('verification/413-public.json',JSON.stringify({version:'PUBLIC-413',download:true,disabledWithoutActive:true,hiddenIn3D:true,writes,errors},null,2));console.log('PASS public layout Excel uses its active snapshot; disabled without active deployment; hidden in 3D; no writes/errors.');
+}finally{await browser.close()}})().catch(e=>{console.error(e);process.exitCode=1});

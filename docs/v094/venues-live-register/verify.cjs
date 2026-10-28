@@ -1,0 +1,25 @@
+'use strict';
+const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict'),crypto=require('node:crypto');
+const read=n=>fs.readFileSync(__dirname+'/'+n,'utf8');
+const source=read('Deploy-replacement.gs'),refresh=read('Venues-replacement.gs');
+new vm.Script(source);new vm.Script(refresh);assert(!source.includes('||='));
+const ref={versionId:'2026',revision:1,commit:'published',updatedAt:'2026-10-01T00:00:00Z',from:'2026-01-01',to:'2026-12-31'};
+let rooms=[{unitNumber:'D1-06B',name:'EAS Store'},{unitNumber:'D1-06C',name:'Pump Room'}],reads=0,changeDuringRead=false,fenced=false;
+const clone=x=>JSON.parse(JSON.stringify(x));
+const c=vm.createContext({gsisRequireBackendRole_:()=>{},venuesSourceReadInput_:x=>x,venuesSourceAuthenticate_:x=>x,deployEdgeFenced_:()=>fenced,book_:()=>({}),index_:()=>({}),venuesDeployPublications_:()=>[{reference:clone(ref)}],readLandmarkRegistry_:()=>{reads++;let result=clone(rooms);if(changeDuringRead&&reads%2===0)result[0].name='Concurrent change';return {venues:result};},venuesSourceHash_:x=>crypto.createHash('sha256').update(JSON.stringify(x)).digest('hex'),venuesSourceError_:(status,code,message)=>{throw Error(code+': '+message);},venuesSourceResult_:(_,key,input,value)=>({key,...value,unchanged:input.knownKey===key})});
+vm.runInContext(source,c);
+const manifest=()=>c.venuesDeploySource_({operation:'manifest'});
+const snap=key=>c.venuesDeploySource_({operation:'snapshot',versionId:'2026',commit:'published',expectedKey:key});
+let m=manifest(),r=snap(m.key);assert.deepEqual(Array.from(r.venues,x=>x.unit),['D1-06B','D1-06C']);assert.equal(r.venues[1].name,'Pump Room');assert.equal(r.venues[0].sourceId,'deploy:2026:D1-06B');assert.equal(manifest().key,m.key);
+rooms[1].name='Updated pump room';assert.notEqual(manifest().key,m.key);assert.throws(()=>snap(m.key),/SOURCE_CHANGED/);
+m=manifest();reads=0;changeDuringRead=true;assert.throws(()=>snap(m.key),/SOURCE_CHANGED/);changeDuringRead=false;
+rooms[1].unitNumber='D1-06B';m=manifest();assert.throws(()=>snap(m.key),/duplicate units/);
+rooms=[];assert.throws(manifest,/empty or unavailable/);fenced=true;assert.throws(manifest,/edge cutover/);
+// Validate the exact deployed cache-key expression, including legacy-cache miss.
+const expr=refresh.match(/var key=(venuesDigest_\(JSON.stringify\(\{publication:reference,deployKey:deploy.key\}\)\)),prior=cached\[key\]/);assert(expr);
+const k=key=>vm.runInNewContext(expr[1],{venuesDigest_:x=>x,reference:ref,deploy:{key}});
+assert.notEqual(k('before'),k('after'));assert.equal(k('same'),k('same'));assert.notEqual(k('same'),JSON.stringify(ref));
+const original=fs.readFileSync(__dirname+'/../../../venues-backend/Sources.gs','utf8');
+const originalFunction=original.slice(original.indexOf('function venuesRefreshSources_(force){'),original.indexOf('function venuesEnsureFreshSources_'));
+assert.equal(refresh.slice(refresh.indexOf('function venuesRefreshSources_')),originalFunction.replace('var key=venuesDigest_(JSON.stringify(reference)),prior=cached[key]','var key=venuesDigest_(JSON.stringify({publication:reference,deployKey:deploy.key})),prior=cached[key]'));
+console.log('PASS: authoritative live rooms, stable identities, source-key invalidation, stale and concurrent read rejection, duplicate/empty rejection, edge guard, exact cache-only Venues change.');

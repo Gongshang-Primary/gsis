@@ -1,0 +1,20 @@
+const {ctx}=require('./storage.cjs'),vm=require('vm');
+vm.runInContext(`
+const notesReq={operation:'saveDraft',versionId:planningId,requestId:Utilities.getUuid(),issuedAt:Date.now(),clientId:'copy',edits:[{operation:'setTeacherNote',teacher:'t1',expected:'',value:'Only in source'}]};call('change',notesReq);
+const src=call('sync',{versionId:planningId}).current,create={operation:'create',sourceVersionId:planningId,name:'Duplicate',duplicate:true,requestId:Utilities.getUuid()};
+const copied=call('change',create),twice=call('change',create);if(copied.versionId!==twice.versionId||!twice.duplicate)throw Error('Creation receipt lost');
+const dup=call('sync',{versionId:copied.versionId}).current;
+for(const key of ['venues','groups','classes','loads','teachers','teacherNotes','teacherDrafts','assignments','levelExclusions','classNameSets','hrTerms'])if(JSON.stringify(src[key])!==JSON.stringify(dup[key]))throw Error('Did not copy '+key);
+if(dup.audit.length!==1||dup.status!=='planning')throw Error('Copied history or activation');
+const future=call('change',{operation:'create',sourceVersionId:planningId,name:'Future',requestId:Utilities.getUuid()}).versionId,next=call('sync',{versionId:future}).current;
+for(const key of ['venues','groups','classes','loads','hrTerms'])if(JSON.stringify(src[key])!==JSON.stringify(next[key]))throw Error('Future lost '+key);
+if(next.assignments.length||Object.keys(next.teacherNotes).length)throw Error('New plan retained old teacher planning');
+call('change',{...notesReq,versionId:copied.versionId,requestId:Utilities.getUuid(),edits:[{operation:'setTeacherNote',teacher:'t1',expected:'Only in source',value:'Independent copy'}]});
+if(call('sync',{versionId:planningId}).current.teacherNotes.t1!=='Only in source')throw Error('Copy changed source');
+const renameLease=call('lease',{versionId:copied.versionId,key:'meta',clientId:'copy'});call('change',{...renameLease,versionId:copied.versionId,key:'meta',clientId:'copy',operation:'metadata',name:'Renamed copy',from:'',to:'',requestId:Utilities.getUuid()});
+if(call('sync',{versionId:copied.versionId}).current.name!=='Renamed copy')throw Error('Rename failed');
+const deleteLease=call('lease',{versionId:copied.versionId,key:'meta',clientId:'copy'});call('change',{...deleteLease,versionId:copied.versionId,key:'meta',clientId:'copy',operation:'delete',requestId:Utilities.getUuid()});
+if(index_(book_()).versions.some(x=>x.id===copied.versionId))throw Error('Delete failed');
+let e;try{apply_(model_(JSON.parse(JSON.stringify(src))),{operation:'delete',key:'meta'},c,{active:src.id})}catch(x){e=x}if(e?.status!==409)throw Error('Active delete not protected');
+console.log('PASS selected-source inheritance, full duplication, create retry identity, isolation, rename, planning deletion and active protection');
+`,ctx);

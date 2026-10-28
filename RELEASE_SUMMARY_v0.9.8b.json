@@ -1,0 +1,11 @@
+{
+  "version": "0.9.8b",
+  "baseline": "0.9.8a",
+  "components": [
+    "rosterFrontend",
+    "rosterBackend",
+    "notificationWorker"
+  ],
+  "sourceBase": "319337e5aa060932a91d3fa7930f3eb0a55b458c",
+  "liveDeploymentPerformed": false
+}

@@ -1,0 +1,22 @@
+const fs=require('fs'),path=require('path'),crypto=require('crypto'),assert=require('assert/strict'),{load}=require('./model403-helper.js');
+const baseline=JSON.parse(fs.readFileSync('verification/model402-baseline.json')),m=load('.');
+const changed=new Set(['J:1','J:4','J:4:ISH east covered metal Z stair','C:2:C hall-facing corridor L2']);
+for(const [key,hash] of Object.entries(baseline.geometry))if(!changed.has(key))assert.equal(m.hashes[key],hash,'Unchanged geometry: '+key);
+assert.equal(Object.keys(m.hashes).filter(k=>!baseline.geometry[k]).length,1,'One Hall addition group');
+const data=m.run(`(()=>{
+ const hit=(a,b)=>{const A=new THREE.Vector3(...a),B=new THREE.Vector3(...b),ray=new THREE.Raycaster(A,B.clone().sub(A).normalize(),0,A.distanceTo(B));return ray.intersectObjects(scene.children,true).length>0;};
+ const floor=(x,z,y)=>hit([x,y+.06,z],[x,y-.2,z]);
+ const walk=(points,y)=>({floor:points.slice(1).every((b,i)=>Array.from({length:41},(_,j)=>{const a=points[i],t=j/40;return floor(a[0]+(b[0]-a[0])*t,a[1]+(b[1]-a[1])*t,y)}).every(Boolean)),clear:!points.slice(1).some((b,i)=>hit([points[i][0],y+1.6,points[i][1]],[b[0],y+1.6,b[1]]))});
+ const stair=scene.getObjectByName('ISH east covered metal Z stair').userData.stair,[x,y,z]=stair.base,xr=x+stair.lane,zs=z+stair.run,ym=y+stair.rise,yt=ym+stair.rise,door=stair.door;
+ const steps=[0,1].flatMap(f=>Array.from({length:30},(_,i)=>{const yy=y+f*stair.rise+(i+1)*stair.rise/30,zz=z+(i+.5)*stair.run/30;return {floor:floor(x,zz,yy),headroom:!hit([x,yy+.15,zz],[x,yy+1.95,zz])};}));
+ const addition=scene.getObjectByName('Hall C stair mid-floor and metal rails').userData.addition;
+ const mid=pt(632,635,1.98),removedA=pt(610,657,4.3),removedB=pt(619,657,4.3),keptA=pt(610,678,4.3),keptB=pt(619,678,4.3);
+ return {stair,steps,mid:walk([[x,zs+.9],[xr,zs+.9],[xr,z-.9],[x,z-.9]],ym),top:walk([[x,zs+.9],[xr,zs+.9],[xr,door[2]],[door[0]-.15,door[2]]],yt),hallFloor:floor(mid.x,mid.z,mid.y),removedBlocked:hit(removedA.toArray(),removedB.toArray()),keptGuard:hit(keptA.toArray(),keptB.toArray()),addition};
+})()`);
+assert.equal(data.stair.flights,2);assert.equal(data.stair.clearWidth,1.8);assert.equal(data.stair.midpointAccess,false);assert.ok(data.stair.footprint[3]-data.stair.footprint[2]<13,'Compact depth');
+assert.ok(data.steps.every(s=>s.floor&&s.headroom),'All 60 treads retain floor and headroom');
+assert.ok(data.mid.floor&&data.mid.clear,'Continuous clear mid-level return');assert.ok(data.top.floor,'Existing upper platform retained');
+assert.ok(data.hallFloor,'New Hall mid-floor extension exists');assert.equal(data.removedBlocked,false,'Marked parapet segment removed');assert.ok(data.keptGuard,'Unmarked parapet retained');
+assert.ok(data.addition.stepsUnchanged);assert.match(fs.readFileSync('layout-update/public/index.html','utf8'),/landmark.html\?v=0\.4\.05/);
+fs.writeFileSync('verification/model403-results.json',JSON.stringify(data,null,2));m.dom.window.close();
+console.log('PASS Q39 continuous two-flight/return/door route and headroom; Q40 slab and parapet checks; exact baseline Hall stair and all unrelated geometry preserved.');

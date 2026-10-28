@@ -1,0 +1,46 @@
+{
+  "version": "0.8.5c",
+  "baseline": "0.8.5",
+  "baselineCommit": "e70af17c870595dc11a60e86ae46ae81ae8767b0",
+  "integratedRequests": [
+    "0.8.5a",
+    "0.8.5b",
+    "0.8.5c"
+  ],
+  "scope": [
+    "rosterBackend",
+    "rosterFrontend"
+  ],
+  "changelogItems": [
+    "100",
+    "101",
+    "102"
+  ],
+  "verification": {
+    "uniqueTargetedScriptsPassed": 43,
+    "initialRelatedRun": {
+      "scripts": 36,
+      "passed": 33,
+      "fixtureFailures": 3
+    },
+    "correctedFixtureRerun": {
+      "scripts": 3,
+      "passed": 3
+    },
+    "finalFocusedRun": {
+      "scripts": 21,
+      "passed": 21
+    },
+    "appsScriptFilesParsed": 87,
+    "browser": "Chromium mobile and desktop",
+    "fullSuiteRerun": false,
+    "finalDateRerun": {
+      "scripts": 3,
+      "passed": 3
+    },
+    "review": "Independent correctness and quality reviews passed; all material findings resolved"
+  },
+  "liveDeploymentPerformed": false,
+  "schoolDataMutationPerformed": false,
+  "staffMessagesSent": false
+}

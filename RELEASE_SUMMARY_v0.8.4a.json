@@ -1,0 +1,31 @@
+{
+  "version": "0.8.4a",
+  "baseline": "0.8.4",
+  "baselineCommit": "9753648d18dd9d114d78e677cdd4dea57839e66a",
+  "scope": [
+    "rosterBackend",
+    "rosterFrontend"
+  ],
+  "changelogItems": [
+    "095"
+  ],
+  "verification": {
+    "targetedRegression": "tests/roster084a-relief-pool.cjs",
+    "targetedChecksPassed": 14,
+    "finalReview": "Independent correctness and code-quality reviews passed; no unresolved material findings",
+    "fullGate": {
+      "scripts": 513,
+      "initialPassed": 507,
+      "initialFailed": 6,
+      "failedScriptsPassedOnRerun": 6
+    },
+    "focusedRerun": {
+      "scripts": 8,
+      "passed": 8
+    },
+    "syntax": "81 Apps Script files parse as ES2020; logical assignment regression rejected"
+  },
+  "liveDeploymentPerformed": false,
+  "schoolDataMutationPerformed": false,
+  "staffMessagesSent": false
+}

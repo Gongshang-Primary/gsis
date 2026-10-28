@@ -1,0 +1,259 @@
+{
+  "schemaVersion": 1,
+  "verificationMode": "independent-local-git-object-and-line-range-verification",
+  "commit": "13ea5104fa2da338aa0757033aab1b8825256d4f",
+  "origin": "/workspace/scratch/2c52ae6e6b97/comparison-recovery/GSiS_v0.9_Correction_Source_History.bundle",
+  "rendererMode": "Archify architecture design mode, showcase quality",
+  "rendererLimitation": "Archify 3.1.0 requires HTTP(S) or Git SSH repository identity even with local-only links. This repository origin is a local recovery bundle, so native repository evidence was not enabled. No remote URL was invented or changed.",
+  "status": "verified",
+  "sourceCount": 24,
+  "sources": [
+    {
+      "component": "staff",
+      "path": "README.md",
+      "line": 58,
+      "end_line": 68,
+      "gitBlob": "af06b7a3ea3ea4623b413a464f566b7b742d90eb",
+      "fileSha256": "f4c518c5f59b330443b7156a451edd8d9f714f14a84b203c328671c9ea4d129c",
+      "citedBytesSha256": "1c7ad42c3e0f2d1f887e7f255733d4417c327760f8e4b971814d5e84d34b6fda",
+      "fileLineCount": 460
+    },
+    {
+      "component": "browser",
+      "path": "release-installation-manifest.json",
+      "line": 3,
+      "end_line": 24,
+      "gitBlob": "5d2b334bf531d5c8a6b3d88d1560ad18775736be",
+      "fileSha256": "0873a49ea43ef37a61740db796450538c5802966ba6b9b79e7ec9c2e551f4bf7",
+      "citedBytesSha256": "69250a9092aa7789e1616b4cdc93823d3d353dc9bfa5da3f30984167d7ec35cf",
+      "fileLineCount": 105
+    },
+    {
+      "component": "browser",
+      "path": "roster-update/public/roster-baseline-cache.js",
+      "line": 7,
+      "end_line": 39,
+      "gitBlob": "97e84a3606520cc56ee7a469c3ce48363b0b3cc2",
+      "fileSha256": "8b623713628d1d63a30830b173c05c9bbcf370a8b2a61e826185e012bbbd862b",
+      "citedBytesSha256": "75f4fa5627df6a53d208af584ab7467058907cc7e57989c495bf39e47a15c6f2",
+      "fileLineCount": 151
+    },
+    {
+      "component": "pages",
+      "path": "public/_worker.js",
+      "line": 29,
+      "end_line": 56,
+      "gitBlob": "83801101689634ecbdbd78c456ab91a464ae4393",
+      "fileSha256": "9423333016797fe7c1173ae8c661a537496865579128b7f5913144cef5d987ff",
+      "citedBytesSha256": "50e4eccd3858525a89d288a059617a693c108180bcd365d180fb75b263659402",
+      "fileLineCount": 178
+    },
+    {
+      "component": "pages",
+      "path": "roster-update/public/_worker.js",
+      "line": 207,
+      "end_line": 229,
+      "gitBlob": "b7ace8fcebd95ce960d39c3838aea20138bcc15b",
+      "fileSha256": "22677322e91f5180f330e5846c414d781179a66a4d01fd5ddc5c06e824de604e",
+      "citedBytesSha256": "659ab64cefefbdd3ca8e9b7a0daed967fe6702e62fa887d321448f64b880f959",
+      "fileLineCount": 1489
+    },
+    {
+      "component": "refs",
+      "path": "README.md",
+      "line": 70,
+      "end_line": 81,
+      "gitBlob": "af06b7a3ea3ea4623b413a464f566b7b742d90eb",
+      "fileSha256": "f4c518c5f59b330443b7156a451edd8d9f714f14a84b203c328671c9ea4d129c",
+      "citedBytesSha256": "6f72a1bd5911816917462b13827f024f3f10e7f206e4da1b5e3e64d67cf7a46f",
+      "fileLineCount": 460
+    },
+    {
+      "component": "refs",
+      "path": "lord-suite/Source/backend/Code.gs",
+      "line": 502,
+      "end_line": 524,
+      "gitBlob": "04408f54025cdd5884ff2568ebfddeebd6105b6a",
+      "fileSha256": "e7198528a6e4444934ca0dd7e43600ac06de35d44f6415c90c9d4d18bdb8f8ae",
+      "citedBytesSha256": "651775fd5b7d39d187d00f18fa2bf203a5a8ae641f8c98a3a7faece808862eac",
+      "fileLineCount": 7133
+    },
+    {
+      "component": "refs",
+      "path": "venues-backend/Code.gs",
+      "line": 49,
+      "end_line": 77,
+      "gitBlob": "dda41b052f006bee2194f8135f917e82648a0268",
+      "fileSha256": "2291dd710fb94feebf823956762a02df3f516845227b13b905b5e4c3fd429249",
+      "citedBytesSha256": "d7cbfa80f6c612e6ea0a3ff1b77411c7a37d00dc22604ffdbaf51f472b002771",
+      "fileLineCount": 92
+    },
+    {
+      "component": "edge",
+      "path": "roster-update/public/edge-roster.js",
+      "line": 38,
+      "end_line": 44,
+      "gitBlob": "77a0888b1df9305db89b9c7b0f3cf7c4c19c2a2e",
+      "fileSha256": "a97894c4aa87bbbe054651ad539b7cf8194e4379bce2e5a5aa77f2c0a5bc3b3c",
+      "citedBytesSha256": "5830391a2a828e28d91434f3a5f099e8972491a7277a56277825174725584a3d",
+      "fileLineCount": 186
+    },
+    {
+      "component": "edge",
+      "path": "public/edge-deploy.js",
+      "line": 62,
+      "end_line": 95,
+      "gitBlob": "267f6771e1d94ca657230e4418d81bcdd638f582",
+      "fileSha256": "0944e1a5de574196ddf3d1a26d58d8929c8c406b1901a899609ce0fbf134c886",
+      "citedBytesSha256": "83e897933960abefe5e52b8794a9101dd59935c9d95f756c7476e21414b00325",
+      "fileLineCount": 210
+    },
+    {
+      "component": "edge",
+      "path": "roster-update/public/edge-roster.js",
+      "line": 141,
+      "end_line": 151,
+      "gitBlob": "77a0888b1df9305db89b9c7b0f3cf7c4c19c2a2e",
+      "fileSha256": "a97894c4aa87bbbe054651ad539b7cf8194e4379bce2e5a5aa77f2c0a5bc3b3c",
+      "citedBytesSha256": "9f06c13c850463cc4bb01dcb76d0d767f0852e30295b376f75fb22732099c7a7",
+      "fileLineCount": 186
+    },
+    {
+      "component": "notify",
+      "path": "notification-worker/index.js",
+      "line": 23,
+      "end_line": 44,
+      "gitBlob": "a71f32d017a52689d25ad9559138507147022baa",
+      "fileSha256": "2d1c4d11284fe7ffff669fc2525a10218ef137a92f34e9ccd77c26478f99f3c1",
+      "citedBytesSha256": "d5e0ef2421ce29f38ad378577c0b37e5781a317d5f94910f3604ef711f1ba1da",
+      "fileLineCount": 85
+    },
+    {
+      "component": "notify",
+      "path": "roster-update/public/edge-notifications.js",
+      "line": 11,
+      "end_line": 29,
+      "gitBlob": "22378fb173aace4fcfc558d1307563f0c567abdb",
+      "fileSha256": "efa5a4f05bcc12b5adb0117209e57c169e0dce2017c73bbd4e5db602a02db7aa",
+      "citedBytesSha256": "074cc0186723c223f841483149b9a9e276f9b5a8a4027a548f141681febc5192",
+      "fileLineCount": 124
+    },
+    {
+      "component": "notify",
+      "path": "roster-update/public/_worker.js",
+      "line": 657,
+      "end_line": 671,
+      "gitBlob": "b7ace8fcebd95ce960d39c3838aea20138bcc15b",
+      "fileSha256": "22677322e91f5180f330e5846c414d781179a66a4d01fd5ddc5c06e824de604e",
+      "citedBytesSha256": "4223d8ff1ba4af9dddebcd048ebdbaa6fdbb7ca07d3cd20a7f5dec8909c9252d",
+      "fileLineCount": 1489
+    },
+    {
+      "component": "googledata",
+      "path": "backend/Contacts_Lord.gs",
+      "line": 11,
+      "end_line": 26,
+      "gitBlob": "f24df59ea4576760bddb54bff2a83880350eaa2a",
+      "fileSha256": "995423f12de4a2a03659beb62a1566682d5922c72e19eb4774d3d355f30a8944",
+      "citedBytesSha256": "0b02f25f1658b4cf18e0a85b62f1c513778e007ed94db6945c86827d7bad66ce",
+      "fileLineCount": 27
+    },
+    {
+      "component": "googledata",
+      "path": "lord-suite/Source/backend/Code.gs",
+      "line": 2033,
+      "end_line": 2089,
+      "gitBlob": "04408f54025cdd5884ff2568ebfddeebd6105b6a",
+      "fileSha256": "e7198528a6e4444934ca0dd7e43600ac06de35d44f6415c90c9d4d18bdb8f8ae",
+      "citedBytesSha256": "69acc91fbcfc59a57708337dc6e0c15c968b4f0feefe3a88fd4ebf5c615627c2",
+      "fileLineCount": 7133
+    },
+    {
+      "component": "googledata",
+      "path": "calendar-backend/Code.gs",
+      "line": 7157,
+      "end_line": 7167,
+      "gitBlob": "2ef5d3d91b8d1c49737408deab64099305fef460",
+      "fileSha256": "41919f2b61b2ebc0680da1cd919eb48561d1c3b9f942c3deec4167d7c6ba1fa6",
+      "citedBytesSha256": "ea48f015f0df07eff3b5f2ee4d2beeabd05eb76e8802ef6db608af7b975d24d2",
+      "fileLineCount": 9799
+    },
+    {
+      "component": "d1",
+      "path": "shared/edge-store.js",
+      "line": 106,
+      "end_line": 129,
+      "gitBlob": "63181bdd9ccb17e01e93dc608270ea7e5e689b12",
+      "fileSha256": "8e7cbba890b6ea72201a2cf6c310ba4617d7aca7861ee1275435f8a22aa6ffb7",
+      "citedBytesSha256": "e77a48b71bb8662e621b2aaf3d0f961c3b32ea881b598a49e10b8202ebb02b35",
+      "fileLineCount": 159
+    },
+    {
+      "component": "d1",
+      "path": "migrations/0001-edge-operational-store.sql",
+      "line": 1,
+      "end_line": 39,
+      "gitBlob": "b7dfcc9d9a1604cbbfd3ca3fbf7ebc6691ad16fe",
+      "fileSha256": "529ceb07f74d4abed7a0bc6bcfbe187ce99b376f8ab087cd95f1d12a669b8511",
+      "citedBytesSha256": "0e020fe27dd5e2aa46b2e887d5f812ab4f2c9f30e7355645421e9194690eccbf",
+      "fileLineCount": 57
+    },
+    {
+      "component": "providers",
+      "path": "roster-update/public/_worker.js",
+      "line": 657,
+      "end_line": 671,
+      "gitBlob": "b7ace8fcebd95ce960d39c3838aea20138bcc15b",
+      "fileSha256": "22677322e91f5180f330e5846c414d781179a66a4d01fd5ddc5c06e824de604e",
+      "citedBytesSha256": "4223d8ff1ba4af9dddebcd048ebdbaa6fdbb7ca07d3cd20a7f5dec8909c9252d",
+      "fileLineCount": 1489
+    },
+    {
+      "component": "providers",
+      "path": "backend/RosterEdgeMail.gs",
+      "line": 1,
+      "end_line": 17,
+      "gitBlob": "102f7dbc0e95b38c6315c62c8fda5bf1d0839434",
+      "fileSha256": "7b14aa41a19a2fdd6b5007709e38ec71d91a4c0c57114cfe1b7137a2929250f6",
+      "citedBytesSha256": "7b14aa41a19a2fdd6b5007709e38ec71d91a4c0c57114cfe1b7137a2929250f6",
+      "fileLineCount": 17
+    },
+    {
+      "component": "providers",
+      "path": "roster-update/public/edge-notifications.js",
+      "line": 75,
+      "end_line": 102,
+      "gitBlob": "22378fb173aace4fcfc558d1307563f0c567abdb",
+      "fileSha256": "efa5a4f05bcc12b5adb0117209e57c169e0dce2017c73bbd4e5db602a02db7aa",
+      "citedBytesSha256": "3ea40bbfc3470fb7ae7f41b780560fcfe83e6b454d0c0b713dcd76ba838f5ab1",
+      "fileLineCount": 124
+    },
+    {
+      "component": "r2",
+      "path": "roster-update/public/edge-timetable-cache.js",
+      "line": 13,
+      "end_line": 27,
+      "gitBlob": "f3228dabe45b4ed1cd3bd9f5839687c3a1dc6ae7",
+      "fileSha256": "f39ecf0f98951e0e019f05575fad73a07db64bafbfa7896b4abe81cc1b9cdec9",
+      "citedBytesSha256": "465a05d051cdb333ecb6deb8bf37595ab09350fd19a5da937c4adbfbffd417ad",
+      "fileLineCount": 88
+    },
+    {
+      "component": "r2",
+      "path": "roster-update/public/_worker.js",
+      "line": 757,
+      "end_line": 773,
+      "gitBlob": "b7ace8fcebd95ce960d39c3838aea20138bcc15b",
+      "fileSha256": "22677322e91f5180f330e5846c414d781179a66a4d01fd5ddc5c06e824de604e",
+      "citedBytesSha256": "1e45f10b34b8c19a4df1fda9e171a922daf64d32f73473dd77848226b3eb1010",
+      "fileLineCount": 1489
+    }
+  ],
+  "scope": "Referenced bytes are read from the exact committed Git objects, not the working tree. The diagram is an implementation and deployment-mode map; this receipt does not establish production configuration or provider delivery.",
+  "diagram": {
+    "specificationPath": "docs/architecture/v094-candidate.json",
+    "specificationSha256": "00bcaaad4ed99eeaa3fa5eb30dcca6d45397af5b6758c4c8829cea3520b04e5a",
+    "artifactPath": "docs/architecture/GSiS_v0.9.4_Architecture.html",
+    "artifactSha256": "7d8198d80050e26eb7156fbda052b8c5ab9929fb83d840fd5d719f93ce7692b9"
+  }
+}

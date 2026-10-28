@@ -1,0 +1,19 @@
+/* Department leadership selection preserves teacher names at the table font size. */
+.group-role-picker{min-width:12ch;max-width:32ch;position:relative}
+.group-role-picker summary{cursor:pointer;min-height:26px;padding:3px 6px;white-space:normal}
+.group-role-name{display:block;white-space:nowrap;padding:1px 3px}
+.group-role-picker fieldset{min-width:18ch;max-height:280px;overflow:auto;margin:4px 0;padding:6px;border:1px solid #8aa0b2;background:#fff}
+.group-role-picker legend{font-size:12px;white-space:normal}
+.group-role-picker label{display:flex;align-items:center;gap:6px;white-space:nowrap;padding:3px 4px;text-align:left}
+.group-role-picker input[type=checkbox]{flex-shrink:0;min-height:18px;width:18px;height:18px}
+.group-member-blank{background:inherit}
+
+/* v0.6.01 department multiselect search stays outside the scrolling list. */
+.group-role-picker fieldset{max-height:none;overflow:visible}
+.group-role-search{display:flex;gap:.35rem;align-items:center;margin-bottom:.4rem}
+.group-role-search input{min-width:0;flex:1;width:10rem}
+.group-role-search button{flex:none}
+.group-role-options{max-height:16rem;overflow:auto;overscroll-behavior:contain}
+.group-role-options label[hidden]{display:none!important}
+.group-role-options small{display:block;white-space:normal}
+.group-role-picker [data-group-role-empty]{margin:.4rem 0}

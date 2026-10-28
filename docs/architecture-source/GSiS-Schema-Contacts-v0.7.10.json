@@ -1,0 +1,267 @@
+{
+  "schema_version": 1,
+  "diagram_type": "erd",
+  "meta": {
+    "title": "GSiS Contacts: physical Sheet schema",
+    "locale": "en",
+    "quality_profile": "standard",
+    "output": "docs/GSiS-Schema-Contacts-v0.7.10.html"
+  },
+  "layout": {
+    "mode": "grid",
+    "gapX": 70,
+    "gapY": 42,
+    "entityW": 270
+  },
+  "entities": [
+    {
+      "id": "e0",
+      "label": "contacts",
+      "tag": "Directory",
+      "row": 0,
+      "col": 0,
+      "attributes": [
+        {
+          "name": "TTb Name",
+          "type": "cell"
+        },
+        {
+          "name": "Basic Name",
+          "type": "cell"
+        },
+        {
+          "name": "Statutory Name",
+          "type": "cell"
+        },
+        {
+          "name": "iCON Alias (@moe.edu.sg)",
+          "type": "cell"
+        },
+        {
+          "name": "CES Alias (@schools.gov.sg)",
+          "type": "cell"
+        },
+        {
+          "name": "GSPS Alias (@gsps.edu.sg)",
+          "type": "cell"
+        },
+        {
+          "name": "Mobile No",
+          "type": "cell"
+        },
+        {
+          "name": "EXT",
+          "type": "cell"
+        },
+        {
+          "name": "Day of Birth",
+          "type": "cell"
+        },
+        {
+          "name": "Month of birth",
+          "type": "cell"
+        },
+        {
+          "name": "Role",
+          "type": "cell"
+        },
+        {
+          "name": "EO Appt Level",
+          "type": "cell"
+        },
+        {
+          "name": "Appointment Status",
+          "type": "cell"
+        },
+        {
+          "name": "Employment Modifier",
+          "type": "cell"
+        },
+        {
+          "name": "Subject Modifier",
+          "type": "cell"
+        },
+        {
+          "name": "Active",
+          "type": "cell"
+        },
+        {
+          "name": "MK Modifier",
+          "type": "cell"
+        },
+        {
+          "name": "Staff ID",
+          "type": "cell"
+        }
+      ]
+    },
+    {
+      "id": "e1",
+      "label": "roles",
+      "tag": "Directory",
+      "row": 1,
+      "col": 0,
+      "attributes": [
+        {
+          "name": "Role Shortform",
+          "type": "cell"
+        },
+        {
+          "name": "Formal Role Name",
+          "type": "cell"
+        },
+        {
+          "name": "EO Appt Level",
+          "type": "cell"
+        },
+        {
+          "name": "SL",
+          "type": "cell"
+        },
+        {
+          "name": "SC",
+          "type": "cell"
+        },
+        {
+          "name": "SMC",
+          "type": "cell"
+        },
+        {
+          "name": "KP",
+          "type": "cell"
+        },
+        {
+          "name": "TL",
+          "type": "cell"
+        },
+        {
+          "name": "SDT",
+          "type": "cell"
+        },
+        {
+          "name": "CMT",
+          "type": "cell"
+        },
+        {
+          "name": "SAT",
+          "type": "cell"
+        },
+        {
+          "name": "Support",
+          "type": "cell"
+        },
+        {
+          "name": "MK",
+          "type": "cell"
+        }
+      ]
+    },
+    {
+      "id": "e2",
+      "label": "admin_users",
+      "tag": "Access",
+      "row": 0,
+      "col": 1,
+      "attributes": [
+        {
+          "name": "Email",
+          "type": "cell"
+        },
+        {
+          "name": "Role",
+          "type": "cell"
+        },
+        {
+          "name": "Active",
+          "type": "cell"
+        },
+        {
+          "name": "Updated At",
+          "type": "cell"
+        },
+        {
+          "name": "Admin ID",
+          "type": "cell"
+        }
+      ]
+    },
+    {
+      "id": "e3",
+      "label": "sys_fields",
+      "tag": "Configuration",
+      "row": 0,
+      "col": 2,
+      "attributes": [
+        {
+          "name": "Field",
+          "type": "cell"
+        },
+        {
+          "name": "Value",
+          "type": "cell"
+        }
+      ]
+    },
+    {
+      "id": "e4",
+      "label": "offload",
+      "tag": "Configuration",
+      "row": 1,
+      "col": 2,
+      "attributes": [
+        {
+          "name": "Tags",
+          "type": "cell"
+        },
+        {
+          "name": "Offload Factor",
+          "type": "cell"
+        },
+        {
+          "name": "Notes",
+          "type": "cell"
+        }
+      ]
+    },
+    {
+      "id": "e5",
+      "label": "contact_identity_bindings",
+      "tag": "Access",
+      "row": 1,
+      "col": 1,
+      "attributes": [
+        {
+          "name": "Subject",
+          "type": "cell"
+        },
+        {
+          "name": "Staff ID",
+          "type": "cell"
+        },
+        {
+          "name": "Original email",
+          "type": "cell"
+        }
+      ]
+    }
+  ],
+  "relationships": [],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "Physical columns",
+      "items": [
+        "Each listed table shows every code-defined physical column. Values are Sheet cells, not invented SQL types.",
+        "Source snapshot: see GSiS-Schema-Reference-v0.7.10.md for owning functions and journal details."
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "Maintenance",
+      "items": [
+        "Keep exact header spelling and stable identities. Do not sort or delete journal rows.",
+        "Application references are validated in code. These stores do not enforce SQL foreign keys."
+      ]
+    }
+  ]
+}

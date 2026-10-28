@@ -1,0 +1,27 @@
+'use strict';
+const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
+const {ctx,sheets}=require('./storage.cjs'),run=s=>vm.runInContext(s,ctx);
+// Load the canonical source, independently of release-generated Code.gs.
+vm.runInContext(fs.readFileSync('backend/FieldStore.gs','utf8').replace(/^const settingsRoots_=.*$/m,''),ctx);
+run(`var vi=index_(book_());delete vi.venuePublications;fieldIndexWrite_(book_(),vi);var oldPublication=JSON.parse(JSON.stringify(publishedEntry_(vi)));var oldDocument=document_(book_(),oldPublication);var futureId=call('change',{operation:'create',name:'2027',requestId:Utilities.getUuid()}).versionId;var futureDoc=document_(book_(),index_(book_()).versions.find(e=>e.id===futureId));futureDoc.from='2027-01-01';futureDoc.to='2027-12-31';var futureIndex=index_(book_());futureIndex.publishNext=futureId;persist_(book_(),futureIndex,futureDoc,null);`);
+assert.equal(run('index_(book_()).venuePublications?.length'),2,'publishing the future retains the previous immutable publication');
+assert.equal(run('JSON.stringify(document_(book_(),index_(book_()).venuePublications.find(e=>e.id===oldPublication.id)))'),run('JSON.stringify(oldDocument)'));
+assert.equal(run("index_(book_()).venuePublications.find(e=>e.id===futureId).from"),'2027-01-01');
+run(`var newerIndex=index_(book_()),newerDoc=document_(book_(),newerIndex.versions.find(e=>e.id===futureId));newerDoc.name='2027 revised';newerIndex.publishNext=futureId;persist_(book_(),newerIndex,newerDoc,null);`);
+assert.equal(run('index_(book_()).venuePublications?.length'),2,'same-version republication supersedes its old reference without losing other years');
+assert.equal(run('index_(book_()).venuePublications.find(e=>e.id===futureId).commit'),run('index_(book_()).published.commit'));
+console.log('PASS retained immutable Deploy publications: first-publication migration, effective dates, old document reads and same-version replacement');
+run(`var legacyDoc=JSON.parse(JSON.stringify(oldDocument));legacyDoc.id='legacy-row-2026';legacyDoc.name='Legacy 2026';legacyDoc.from='2026-01-01';legacyDoc.to='2026-12-31';var legacyText=JSON.stringify(legacyDoc),legacySheet=book_().getSheetByName('deploy_documents'),legacyRow=legacySheet.getLastRow()+1,legacyRows=[];for(var at=0;at<legacyText.length;at+=10000)legacyRows.push([legacyDoc.id,'legacy-published-commit',legacyRows.length,legacyText.slice(at,at+10000)]);legacySheet.getRange(legacyRow,1,legacyRows.length,4).setValues(legacyRows);var obsoleteRow=legacyRow+legacyRows.length,draftRow=obsoleteRow+1;legacySheet.getRange(obsoleteRow,1,2,4).setValues([[legacyDoc.id,'legacy-obsolete',0,'old draft'],[legacyDoc.id,'legacy-draft-current',0,'current draft']]);var legacyHead={id:legacyDoc.id,commit:'legacy-published-commit',row:legacyRow,parts:legacyRows.length,revision:1,updatedAt:'2026-10-01T00:00:00Z',from:legacyDoc.from,to:legacyDoc.to};var legacyIndex=index_(book_());legacyIndex.published=legacyHead;fieldIndexWrite_(book_(),legacyIndex);var publishAfterLegacy=index_(book_());publishAfterLegacy.publishNext=futureId;persist_(book_(),publishAfterLegacy,document_(book_(),publishAfterLegacy.versions.find(e=>e.id===futureId)),null);cleanOld_(book_(),legacyDoc.id,'legacy-draft-current');`);
+assert.equal(run("legacySheet.getRange(legacyRow,1).getValue()"),'legacy-row-2026','purging an old version preserves its retained published row storage');
+assert.equal(run('JSON.stringify(document_(book_(),index_(book_()).venuePublications.find(e=>e.id===legacyDoc.id)))'),run('JSON.stringify(legacyDoc)'));
+assert.equal(run('legacySheet.getRange(obsoleteRow,1).getValue()'),'','obsolete unretained drafts are still removed');
+assert.equal(run('legacySheet.getRange(draftRow,1).getValue()'),'legacy-row-2026','purge keeps its explicit current draft');
+run('cleanOld_(book_(),legacyDoc.id,null)');
+assert.equal(run('legacySheet.getRange(draftRow,1).getValue()'),'','deleting a version can remove its unretained draft storage');
+assert.equal(run('JSON.stringify(document_(book_(),index_(book_()).venuePublications.find(e=>e.id===legacyDoc.id)))'),run('JSON.stringify(legacyDoc)'));
+console.log('PASS legacy publication storage survives future publication, purge and delete cleanup while obsolete drafts are cleared');
+run(`var boundedIndex=index_(book_());boundedIndex.venuePublications=Array.from({length:200},(_,i)=>({id:'retained-'+i,commit:'immutable-'+i}));boundedIndex.venuePublications[0]=boundedIndex.published;fieldIndexWrite_(book_(),boundedIndex);var boundedDoc=JSON.parse(JSON.stringify(legacyDoc));boundedDoc.id='next-published-version';var boundedPublish=index_(book_());boundedPublish.publishNext=boundedDoc.id;`);
+const beforeBound=JSON.stringify([...sheets].map(([name,sheet])=>[name,sheet.data]));
+assert.throws(()=>run('persist_(book_(),boundedPublish,boundedDoc,null)'),/200 retained published versions/,'the consumer publication bound must reject before a new save starts');
+assert.equal(JSON.stringify([...sheets].map(([name,sheet])=>[name,sheet.data])),beforeBound,'capacity rejection writes neither journal, fields nor publication index');
+console.log('PASS publication capacity preflight preserves every stored byte before exceeding the supported reference count');

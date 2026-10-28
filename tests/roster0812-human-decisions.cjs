@@ -1,0 +1,25 @@
+'use strict';
+const assert=require('node:assert/strict'),crypto=require('node:crypto'),fs=require('node:fs'),vm=require('node:vm'),adapter=require('./roster701-adapter.cjs');
+const h=adapter(),date=h.date,id='absence:2';Object.assign(h.ctx,{minute:360,now:Date.parse(date+'T06:00:00+08:00')});h.ctx.iso=new Date(h.ctx.now).toISOString();
+vm.runInContext(fs.readFileSync('backend/RosterAuditExport.gs','utf8'),h.scope);
+const state=h.state();state.systemConfig.verboseLogging=false;state.absences.push({id:'absence',date,staffId:'alice',name:'Alice',typeId:'mc',periods:[2,3],reliefRequired:true,instructions:{}});h.setState(state);
+const read=()=>h.call({operation:'read',date,view:'allocation'}),source=()=>Object.fromEntries(h.O.demand(h.ctx,h.state(),date).map(d=>[d.id,h.O.cellSourceKey(d)]));
+function command(operation,staffId,base=read(),extra={}){return {operation:'reliefBatch',date,view:'allocation',revision:base.revision,requestId:crypto.randomUUID(),expectedTimetableId:'baseline',expectedStaplerRevision:0,expectedParity:'even',expectedDemandSources:source(),baseCells:{[id]:base.cellStates[id]},baseCellTokens:{[id]:base.cellProvenance[id].token},commands:[{operation,demandIds:[id],...(staffId?{staffId}:{}),...(operation==='setNoRelief'?{noRelief:true}:{})}],...extra};}
+const bob={email:'bob@gsps.edu.sg',staffId:'bob'},dora={email:'dora@gsps.edu.sg',staffId:'dora'};
+h.call(command('assign','bob'),bob);const first=read(),stale=command('assign','dora',first),firstToken=first.cellProvenance[id].token;
+h.call(command('assign','charlie'),dora);h.call(command('assign','bob'),dora);
+const latest=read();assert.equal(latest.cellStates[id].staffId,first.cellStates[id].staffId);assert.notEqual(latest.cellProvenance[id].token,firstToken,'ABA at identical clock time changes the server decision token');assert.equal(latest.cellProvenance[id].version,3);assert.equal(latest.cellProvenance[id].actor,dora.email);assert.equal(latest.cellProvenance[id].at,first.cellProvenance[id].at,'token does not depend on timestamp uniqueness');
+assert.throws(()=>h.call(stale,bob),e=>e.code==='CELL_CONFLICT'&&e.conflicts[0].currentProvenance.actor===dora.email);
+const legacy={...stale,requestId:crypto.randomUUID()};delete legacy.baseCellTokens;assert.throws(()=>h.call(legacy,bob),e=>e.code==='DAY_CONFLICT','legacy value-only clients must refresh after same-value ABA');
+const mine={...stale,requestId:crypto.randomUUID(),cellResolutions:{[id]:{choice:'keepMine',expectedToken:latest.cellProvenance[id].token}}};
+const override=h.call(mine,bob);assert.equal(override.cellStates[id].staffId,'dora');assert.equal(override.changes[0].beforeProvenance.actor,dora.email);assert.equal(override.changes[0].actor,bob.email);assert.equal(override.changes[0].choice,'keepMine');
+assert(h.state().audit.some(row=>row.operation==='resolveAllocationConflict'&&row.choices[0].choice==='keepMine'&&row.essential===true&&!row.auditExportSuppressed),'explicit conflict choice survives disabled verbose logging');
+const text=h.scope.rosterAllocationAuditText_(h.state(),date,h.ctx.iso);assert.match(text,/Keep mine/);assert.match(text,/previous editor Dora/);assert(h.state().allocationAuditExports[date].pendingVersion>0);
+const beforeReplay=h.state();h.call(mine,bob);assert.deepEqual(h.state(),beforeReplay,'accepted override replays without duplicate audit');
+const previous=read(),online=command('assign','bob',previous,{cellResolutions:{[id]:{choice:'keepOnline',expectedToken:previous.cellProvenance[id].token}}});
+const kept=h.call(online,bob);assert.equal(kept.cellStates[id].staffId,'dora');assert.equal(kept.cellProvenance[id].token,previous.cellProvenance[id].token,'keeping online does not pretend another user edited the cell');assert.equal(kept.changes[0].outcome,'kept-online');assert(h.state().audit.some(row=>row.operation==='resolveAllocationConflict'&&row.requestId===online.requestId&&row.choices[0].choice==='keepOnline'));
+const pending=command('assign','bob',read(),{cellResolutions:{[id]:{choice:'keepMine',expectedToken:read().cellProvenance[id].token}}});h.call(command('assign','charlie'),dora);assert.throws(()=>h.call(pending,bob),e=>e.code==='CELL_CONFLICT','a later human change after comparison requires a fresh choice');
+const releaseBase=read();h.call(command('returnAutomatic'),bob);const released=read();assert(released.cellProvenance[id].version>releaseBase.cellProvenance[id].version);assert.notEqual(released.cellProvenance[id].token,releaseBase.cellProvenance[id].token,'release to automatic retains a decision tombstone');
+assert(h.state().audit.filter(row=>row.decisionChanges).every(row=>row.essential===true&&!row.auditExportSuppressed));
+assert.throws(()=>h.call(command('assign','bob',read(),{cellResolutions:{[id]:{choice:'keepMine',expectedToken:'forged'}}})),e=>e.code==='CELL_CONFLICT');
+console.log('PASS human decision provenance: same-clock ABA, fresh explicit override, keep-online receipt, stale review rejection, atomic audit/retry and release-to-auto tombstone with verbose logging disabled.');

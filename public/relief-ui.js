@@ -1,0 +1,47 @@
+/* Admin editor. Calculations and private defaults are supplied by the backend. */
+function reliefResultData(){
+ const doc=v(),rows=(doc?.reliefResults?.teachers||[]).map(r=>({id:r.teacherId,quota:doc.reliefResults.pending||doc.reliefResults.stale?null:r.R,reason:r.reason}));
+ return {rows,byTeacher:Object.fromEntries(rows.map(r=>[r.id,r]))};
+}
+function markReliefStale(){if(!v()?.reliefResults)return;v().reliefResults.stale=true;if(['Ledger','Stats','Relief Settings'].includes(tab))render(true);}
+function renderReliefSettings(root){renderReliefBreakdown(root);}
+function reliefFormulaHTML(settings){
+ const t=String.raw,math=(tex,text)=>wlMath(tex,text,true),n=x=>Number.isFinite(x)?String(Number(x.toFixed(6))):'?',s=settings||{};
+ const factor=Math.abs(s.timetablePeriods/s.weeklyPeriods-5/7)<1e-12?t`\frac{5}{7}`:t`\frac{${n(s.timetablePeriods)}}{${n(s.weeklyPeriods)}}`;
+ return '<div class="relief-formulas" aria-label="Relief calculation equations">'+
+ math(t`W_i=\mathrm{FTT}_i+\mathrm{PD}_i+\mathrm{Duties}_i+\mathrm{Other}_i+\left(1+\frac{\mathrm{SIUE}}{100}\right)\left(T_i+\mathrm{OF}_i T_{\mathrm{avg}}\right)`,'Wi = FTT + PD + Duties + Other non-teaching + (1 + SIUE / 100) × (Ti + OF × T_avg)')+
+ math(t`R_{\mathrm{normal},i}=\begin{cases}\left\lfloor\max\left(0,${factor}\left(${n(s.weeklyPeriods)}-W_i\right)\right)\right\rfloor,&\text{full time}\\[4pt]\left\lfloor\max\left(0,${factor}\left(${n(s.weeklyPeriods*s.fourFifthsFraction)}-W_i\right)\right)\right\rfloor,&\text{4/5 load}\\[4pt]\left\lfloor\max\left(0,${n(s.fajtWeeklyPeriods)}-W_i\right)\right\rfloor,&\text{FAJT}\end{cases}`,'Round each R down to an integer. Full time: R = max(0, '+n(s.timetablePeriods/s.weeklyPeriods)+' × ('+n(s.weeklyPeriods)+' − Wi)); 4/5: R = max(0, '+n(s.timetablePeriods/s.weeklyPeriods)+' × ('+n(s.weeklyPeriods*s.fourFifthsFraction)+' − Wi)); FAJT: R = max(0, '+n(s.fajtWeeklyPeriods)+' − Wi)')+math(t`R_i=\left\lfloor\max\left(0,\min\left(R_{\mathrm{normal},i},C_i-L_{\mathrm{cap},i}\right)\right)\right\rfloor`,'With a configured weekly period cap C: R is the lower of normal R and cap minus cap-counted periods, rounded down and never negative.')+'<p>Without a configured period cap, normal R applies. For UT, cap-counted periods include total actual workload: FTT, teaching, PD, duties and other countable non-teaching periods. Other weekly caps count FTT + teaching. Offload and preparation factors affect normal R; they are not added to cap-counted periods.</p></div>';
+}
+function renderReliefBreakdown(root){
+ const doc=v(),detail=doc.reliefAdmin,result=doc.reliefResults,settings=detail?.settings,reference=result?.reference;
+ if(!result){root.innerHTML='<p>Refresh to load relief calculations.</p>';return;}
+ const pending=result.pending||result.stale,editable=admin()&&!queueFlight&&!result.stale;
+ const n=x=>Number.isFinite(x)?Number(x.toFixed(3)).toLocaleString('en-GB',{maximumFractionDigits:3}):'Unavailable';
+ root.innerHTML='<h2>Relief calculations</h2><p>Deploy calculates the weekly R quota from every period it captures. Teaching uses the configured offload and SIUE factors. FTT, PD, duties and other non-teaching periods count once without those factors. Roster uses this quota to fill available timetable periods; blocked periods mark non-availability and do not reduce R again.</p>'+reliefFormulaHTML(settings||reference)+'<p>'+esc(reference?'School teaching demand: '+n(reference.teachingPeriodTotal)+' periods / '+reference.fullTimeTeacherCount+' full-time teachers = '+n(reference.T_avg)+'. SIUE: '+n(reference.siuePercent)+'%.':'Refresh to load the school teaching demand.')+'</p>';
+ if(admin()&&settings?.schema===3){
+  const form=document.createElement('form');form.dataset.reliefForm='true';
+  const labels={weeklyPeriods:'Full-time weekly budget (periods)',fourFifthsFraction:'4/5 budget fraction',fajtWeeklyPeriods:'FAJT weekly budget (periods)',timetablePeriods:'Weekly timetable window (periods)',siuePercent:'Preparation and marking: SIUE (%)'};
+  form.innerHTML='<div class="tools relief-controls">'+Object.entries(labels).map(([key,label])=>'<label>'+label+'<input data-relief-factor="'+key+'" type="number" min="0" step="any" value="'+esc(settings[key])+'" required '+(!editable?'disabled':'')+'></label>').join('')+'</div><p class="hint">The timetable factor is timetable periods divided by the full-time budget. FAJT uses factor 1. Personal lunch is excluded; rostered duties still count.</p><p data-relief-error role="alert"></p><p data-relief-status role="status">Apply settings, then Save changes. The table shows the last saved results.</p><button type="submit" '+(!editable?'disabled':'')+'>Apply settings</button> <button type="button" data-relief-reset>Reset fields</button>';
+  root.append(form);form.querySelector('[data-relief-error]').textContent=detail.settingsError||'';
+  function read(){
+   const value=clone(settings);value.mode='actual';
+   for(const input of form.querySelectorAll('[data-relief-factor]'))value[input.dataset.reliefFactor]=input.value.trim()===''?NaN:Number(input.value);
+   if(!Number.isFinite(value.weeklyPeriods)||value.weeklyPeriods<=0||!Number.isFinite(value.fajtWeeklyPeriods)||value.fajtWeeklyPeriods<=0||!Number.isFinite(value.timetablePeriods)||value.timetablePeriods<=0)throw Error('Weekly budgets and timetable periods must be greater than zero.');
+   if(value.timetablePeriods>value.weeklyPeriods)throw Error('Timetable periods must fit within the full-time weekly budget.');
+   if(!Number.isFinite(value.fourFifthsFraction)||value.fourFifthsFraction<=0||value.fourFifthsFraction>1)throw Error('The 4/5 budget fraction must be greater than zero and at most one.');
+   if(!Number.isFinite(value.siuePercent)||value.siuePercent<0)throw Error('SIUE must be a finite nonnegative percentage.');
+   return value;
+  }
+  form.oninput=()=>{if(!editable)return;try{const value=read();unsavedDraft=JSON.stringify(value)!==JSON.stringify(settings);form.querySelector('[data-relief-error]').textContent='';root.querySelector('.relief-formulas').outerHTML=reliefFormulaHTML(value);}catch(e){unsavedDraft=true;form.querySelector('[data-relief-error]').textContent=e.message;}};
+  form.onsubmit=e=>{e.preventDefault();if(!editable||!admin())return;try{const value=read();if(!form.reportValidity())return;unsavedDraft=false;queueCell({operation:'setReliefSettings',value,expected:clone(doc.relief||null)});render();}catch(e){unsavedDraft=true;form.querySelector('[data-relief-error]').textContent=e.message;}};
+  form.querySelector('[data-relief-reset]').onclick=()=>{unsavedDraft=false;render();};
+ }
+ const value=x=>pending?(result.stale?'Refresh to update':'Save to update'):n(x);
+ const headings=[['Teacher'],['OF_i','OF'],['T_i','Ti'],['W_i','Wi'],['FTT'],['PD'],['Duties'],['Other non-teaching'],['R_i','R'],['Details']];
+ const teachers=new Map((doc.teachers||[]).map(t=>[t.id,plannerTeacher(t)]));
+ const visible=result.teachers.filter(t=>{const teacher=teachers.get(t.teacherId);return teacher?.active&&GSISTeachingRules.eligible(teacher);});
+ root.insertAdjacentHTML('beforeend','<div class="table-wrap relief-table-wrap"><table class="relief-table gsis-compact" data-no-sort data-export-title="Relief calculations"><thead><tr>'+headings.map(([tex,label])=>'<th scope="col" data-export-value="'+esc(label||tex)+'">'+(label?wlMath(tex,tex==='R_i'?'R':label):tex)+'</th>').join('')+'</tr><tr class="column-filters" data-export-ignore>'+headings.map(([tex,label])=>'<th><input type="search" data-relief-filter aria-label="Filter '+esc(label||tex)+'" placeholder="Filter…"></th>').join('')+'</tr></thead><tbody>'+visible.map(t=>{const b=t.breakdown||{};return '<tr><th scope="row">'+esc(t.name)+'</th>'+[t.OF,t.Ti,b.Wi,b.FTT,b.PD,b.duties,b.otherNonTeaching,t.R].map((x,i)=>'<td'+(!pending&&Number.isFinite(x)?' class="relief-number"':'')+(i===7?' data-relief-value="quota"':'')+'>'+value(x)+'</td>').join('')+'<td>'+esc(pending?'Save or refresh for confirmed results.':t.reason||b.reason||[b.capConfigured||b.periodCap!==null&&b.periodCap!==undefined?'Normal R '+n(b.normalR)+'; weekly cap '+n(b.periodCap)+'; counted '+(b.capBasis==='total'?'total actual workload':'FTT + teaching')+' '+n(b.capWorkload)+'; cap headroom '+n(b.capHeadroom)+'; final R '+n(t.R)+(b.capWorkload>b.periodCap?' (existing workload exceeds cap)':''):'',(b.nonTeachingActivities||[]).map(a=>a.code+' ('+a.name+'): '+n(a.weeklyPeriods)+' periods/week').join('; '),(b.offloadComponents||[]).map(x=>x.label+(x.percent!==null?' '+n(x.percent)+'%':'')+(x.capPeriods!==null?' cap '+n(x.capPeriods):'')).join('; ')].filter(Boolean).join('; '))+'</td></tr>';}).join('')+'</tbody></table></div><p data-relief-empty role="status"'+(visible.length?' hidden':'')+'>No teachers match this view.</p>');
+ const table=root.querySelector('.relief-table'),filters=[...table.querySelectorAll('[data-relief-filter]')],rows=[...table.tBodies[0].rows];
+ const searchText=rows.map(row=>[...row.cells].map(cell=>cell.textContent.toLowerCase()));
+ table.tHead.addEventListener('input',()=>{const terms=filters.map(input=>input.value.trim().toLowerCase());rows.forEach((row,i)=>{row.hidden=!terms.every((term,j)=>!term||searchText[i][j].includes(term));});root.querySelector('[data-relief-empty]').hidden=rows.some(row=>!row.hidden);});
+}

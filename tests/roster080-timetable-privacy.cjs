@@ -1,0 +1,13 @@
+'use strict';
+const assert=require('node:assert/strict'),fixture=require('./roster701-fixture.cjs'),S=require('../shared/roster-stapler.js');
+const {O,state,ctx,date}=fixture(),day=ctx.days[date];ctx.baselineDays=ctx.days;ctx.minute=360;ctx.now=Date.parse(date+'T06:00:00+08:00');ctx.iso=new Date(ctx.now).toISOString();
+const card=(id,teacher,period,subject,className)=>({id,teacher,assignedPeriod:period,subject,className,venue:'Classroom',group:'G1',sheet:'Even Week',day:'Wednesday',location:'teacher'});
+const payload={app:'Stapler',version:'4.3',stateType:'relief',selectedDate:date,selectedDay:'Wednesday',selectedSheet:'Even Week',startTime:'07:00',periodMinutes:30,addedTeachers:['Alice','Bob'],tiles:[card('lesson','Alice',2,'EL','4A'),card('prose','Bob',4,'Discuss absent protagonists\nordinary teaching text','4B')],reliefAbsences:[{teacher:'Alice',periods:[0,2],reason:'Others',reasonOther:'Private medical\nPRIVATE_REASON',assignments:{}}]};
+const imported=S.importLegacy(S.create({...day,date}),payload,{people:ctx.people});
+assert.equal(S.effectiveDay(imported,day).teachers.find(t=>t.staffId==='alice').cells[2][0],'EL (absent — Private medical\nPRIVATE_REASON)');
+O.apply(state,ctx,{operation:'saveStapler',date,plan:imported,staplerRevision:0});O.apply(state,ctx,{operation:'confirmStapler',date,staplerRevision:1});
+O.apply(state,O.composeStaplerContext(state,ctx),{operation:'publish',date,allocationRevision:state.dayRevisions[date]||0,notifyMode:'none',requestId:'privacy-publication'});
+const privateBefore=JSON.stringify(state),publicContext={today:date,days:{[date]:{id:day.id,periods:day.periods,teachers:[]}}};
+const check=source=>{const result=O.timetableDay(source,publicContext,{date}),alice=result.teachers.find(t=>t.staffId==='alice');assert.equal(alice.cells[0][0],'Absent');assert.equal(alice.cells[2][0],'Absent');assert.deepEqual(alice.cells[2].slice(1),['4A','Classroom','G1']);assert.equal(result.teachers.find(t=>t.staffId==='bob').cells[4][0],'Discuss absent protagonists\nordinary teaching text');assert.doesNotMatch(JSON.stringify(result),/Private medical|PRIVATE_REASON/);};
+check(state);const legacy=structuredClone(state);legacy.dailyPublicationStates={};check(legacy);assert.equal(JSON.stringify(state),privateBefore,'public redaction leaves stored source intact');assert.match(state.staplerPlans[0].published.tiles.find(t=>t.teacherId==='alice'&&t.period===2).subject,/PRIVATE_REASON/);
+console.log('PASS timetable privacy: real multiline Offline import/save/confirm/publish projects neutral absence labels without modifying private source or ordinary multiline lesson text.');

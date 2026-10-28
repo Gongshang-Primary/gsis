@@ -1,0 +1,112 @@
+:root{font:16px/1.45 system-ui,sans-serif;color:#304a5c;background:#f2f5f9;--blue:#087af0;--border:#d5dfe7;--muted:#5f7484}
+*{box-sizing:border-box}body{margin:0}
+.site-footer{padding:0 26px 18px;font-size:14px}.site-footer a{color:#17548b}
+header{display:flex;align-items:center;gap:12px;background:var(--blue);color:white;padding:12px 26px;flex-wrap:wrap}
+header img{width:38px;height:38px;object-fit:contain}h1{font-size:23px;font-weight:600;margin:0}header span{font-size:13px}#account{margin-left:auto}
+button,input,select,#systemHealthLink{font:inherit;padding:9px 12px;border:1px solid #aebfc9;border-radius:5px}
+button,#systemHealthLink{min-height:42px;cursor:pointer;background:white;color:#294b65}button:hover{background:#f0f6fc}button:disabled{opacity:.5;cursor:default}
+header button,header #systemHealthLink{min-height:44px;background:transparent;border-color:#ffffff80;color:white}header button:hover,header #systemHealthLink:hover{background:#ffffff20}
+button.primary,nav button[aria-current]{background:#0873da;border-color:#0873da;color:white}
+nav{display:flex;gap:8px;flex-wrap:wrap}
+nav button{border-color:transparent;font-size:14px}
+.status-row{display:flex;align-items:center;justify-content:space-between;gap:8px 20px;padding:4px 26px;min-height:44px;background:white;border-bottom:1px solid var(--border)}.status-row nav{margin-left:auto;min-width:0;justify-content:flex-end}.status-row .breadcrumbs{justify-content:flex-end}#status{margin:0;min-width:0}#signin{margin:10px 26px}#status:empty,#signin:empty{display:none}#status{font-size:14px;color:var(--muted)}
+#status.error{padding:10px 14px;background:#fff;border:1px solid var(--border);border-left:3px solid #7b91a2;color:#304a5c;overflow-wrap:anywhere}.recovery p{overflow-wrap:anywhere}
+main{padding:10px 26px 30px}h2{font-size:25px;font-weight:600;margin:8px 0 12px}h3{font-size:19px;margin:12px 0 8px}h4{font-size:16px;margin:22px 0 10px}
+section,form,details{background:white;border:1px solid var(--border);border-radius:7px;padding:18px;margin:14px 0}summary{cursor:pointer;font-weight:500;min-height:30px}
+fieldset{border:0;padding:0;margin:0;min-width:0}input,select{max-width:100%;background:white;color:inherit}
+.fields,.tools{display:flex;gap:12px;flex-wrap:wrap;align-items:end}label{display:flex;flex-direction:column;gap:5px;font-size:14px}label input,label select{font-size:16px}
+label.check{display:inline-flex;flex-direction:row;align-items:center;min-height:40px;margin:4px 12px 4px 0}.wide{min-width:250px;flex:1}
+.hint{font-size:14px;color:var(--muted);margin:8px 0 12px}.banner{padding:10px 14px;background:#e9f2fb;border-radius:5px}
+.page-heading,.list-heading{display:flex;gap:12px;align-items:center;justify-content:space-between}.page-heading{justify-content:flex-start}.page-heading h2{margin:8px 0}
+.access-label{font-size:11px;letter-spacing:.06em;color:#657b8b;background:#f0f4f7;padding:3px 7px;border-radius:3px;width:max-content}
+.home{background:white;max-width:1420px;margin:0 auto;padding:24px 28px 40px;min-height:420px}
+.home h2{font-size:22px;margin-bottom:4px}.home-note{color:var(--muted);font-size:14px;margin:0 0 22px}
+.function-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
+.function-tile{position:relative;display:flex;flex-direction:column;align-items:flex-start;gap:12px;text-align:left;padding:24px 20px 28px;min-height:234px;border:1px solid transparent;border-radius:5px;background:white}
+.function-tile:hover{background:#f5faff;border-color:#cce2f8}.function-tile img{width:56px;height:56px;margin-bottom:20px}
+.function-title{font-size:21px;font-weight:400;overflow-wrap:anywhere}.function-description{font-size:16px;color:var(--muted);font-weight:350}.function-tile .access-label{position:absolute;top:22px;right:16px}
+.upload-source{background:#f6f9fc;border:1px solid var(--border);border-radius:5px;padding:16px}.upload-source>label{font-weight:600;font-size:16px;margin-bottom:10px}.upload-source input{width:min(640px,100%);background:white}.upload-source p:last-child{margin:6px 0 0;font-size:14px}
+#uploadGuide details{margin:10px 0 18px;padding:12px 16px}.save-row{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-top:20px}.save-row button{min-width:160px}.save-row p{flex:1;min-width:230px;margin:0}
+#importPreview{border-top:1px solid var(--border);margin-top:20px}.import-facts{display:flex;gap:28px;flex-wrap:wrap;margin:12px 0}.import-facts dt{font-size:13px;color:var(--muted)}.import-facts dd{font-size:18px;margin:4px 0 0}.preview-teacher{max-width:340px;margin-top:14px}
+.error{color:#9c3219}.pending-save{border-left:3px solid #477ea9}.recovery{max-width:680px;margin:30px auto}.empty-state{padding:18px;background:white;border:1px solid var(--border);color:var(--muted)}
+table{border-collapse:collapse;width:100%;background:white}th,td{border:1px solid #ccd7df;padding:6px 8px;text-align:left;vertical-align:top}th{background:#255f8c;color:white}td.number{text-align:center}.table-scroll{overflow-x:auto}
+.baseline-list input{width:100%;min-width:130px;font-size:14px;padding:7px}.baseline-list td:first-child{min-width:260px}.baseline-list .actions{min-width:255px}.actions button{font-size:13px;padding:6px 8px;min-height:34px;margin:0 0 4px}
+.timetable{min-width:850px;table-layout:fixed}.timetable th:first-child{width:95px}.timetable td{font-size:13px;white-space:pre-line;overflow-wrap:anywhere}.timetable td.blank{background:#f6f9fb}.timetable small{display:block;font-weight:normal}
+.guide-image{position:relative;width:min(503px,100%)}.guide-image img{width:100%;display:block}.guide-image svg{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+.teacher-options{max-width:100%;display:flex;flex-wrap:wrap}.teacher-options label{width:240px}
+button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,summary:focus-visible{outline:3px solid #c07c00;outline-offset:3px}h2:focus{outline:none}[hidden]{display:none!important}
+@media(max-width:850px){header,.status-row{padding-left:16px;padding-right:16px}main{padding:10px 16px 24px}#account{font-size:12px}#signin{margin-left:16px;margin-right:16px}.home{padding:20px 10px}.function-grid{gap:4px}.function-tile{padding:20px 12px;min-height:224px}.function-title{font-size:18px}.function-description{font-size:14px}}
+@media(max-width:620px){header{gap:8px}h1{font-size:20px}#account{order:2;width:100%;margin:0}.home{padding:16px 4px}.function-grid{grid-template-columns:1fr}.function-tile{display:grid;grid-template-columns:56px 1fr;column-gap:20px;min-height:120px;padding:20px 12px}.function-tile img{grid-row:1/3;margin:0}.function-title,.function-description{grid-column:2}.function-title{padding-right:34px}.function-tile .access-label{top:12px;right:8px}.fields>label{flex:1;min-width:140px}.fields>.wide{flex-basis:100%}.list-heading{align-items:flex-start;flex-direction:column;gap:0}.import-facts{gap:16px}.import-facts>div{min-width:42%}section,form{padding:14px}}
+@media print{@page{size:A4 landscape;margin:10mm}body{background:white}header,nav,#status,#signin,.tools,.banner,.hint,.teacher-options,button{display:none!important}main{padding:0}.week-sheet{break-after:page;border:0;padding:0;margin:0}.week-sheet:last-child{break-after:auto}.table-scroll{overflow:visible}.timetable{min-width:0;width:100%}.timetable td{font-size:8pt}.timetable th{font-size:9pt}th{color:black;background:#e9eef1}}
+
+.subnav{display:flex;gap:6px;flex-wrap:wrap;margin:12px 0 18px;border-bottom:1px solid var(--border);padding-bottom:8px}.subnav button[aria-current]{background:#0873da;border-color:#0873da;color:white}
+.selection-tools{margin:16px 0}.name-picker{position:relative;width:min(380px,100%)}.combo-input{display:flex;margin-top:5px}.combo-input input{width:100%;min-width:0;border-radius:5px 0 0 5px}.combo-input button{border-radius:0 5px 5px 0;border-left:0;min-width:42px}.name-options{position:absolute;top:100%;left:0;right:0;z-index:5;margin:4px 0 0;padding:4px;max-height:280px;overflow:auto;list-style:none;background:white;border:1px solid #aebfc9;border-radius:5px;box-shadow:0 5px 14px #203a4d26}.name-options [role=option]{padding:8px 10px;cursor:pointer}.name-options [role=option]:hover,.name-options .highlighted{background:#e9f2fb}.name-options [aria-selected=true]{font-weight:600}.name-options .no-match{padding:8px 10px;color:var(--muted)}
+.timetable-caption,.sheet-subtitle{color:var(--muted);font-size:14px}.sheet-subtitle{margin:0 0 10px}.timetable-grid td{white-space:pre-wrap}.timetable-print-title{display:none}.export-panel{max-width:850px}#rosterPrint{display:none}
+@media print{.subnav,.timetable-caption{display:none!important}body.printing-roster>*:not(#rosterPrint){display:none!important}body.printing-roster>#rosterPrint{display:block!important}.week-sheet{break-inside:avoid}.week-sheet>h3,.week-sheet>.sheet-subtitle{display:none}.sheet-subtitle{font-size:9pt}.timetable-grid thead{display:table-header-group}.timetable-grid td{font-size:7pt;line-height:1.15;padding:4px}.timetable-grid th{font-size:8pt;padding:4px}.timetable-grid th:first-child{width:65px}.timetable-print-title{display:table-row}.timetable-grid .timetable-print-title th{width:auto;font-size:11pt;text-align:left}.timetable-print-title small{font-size:8pt}}
+
+/* Roster 0.7.01: saved display fields, operational navigation and availability. */
+.personal-functions{grid-template-columns:repeat(3,minmax(0,1fr))}.function-divider{border:0;border-top:1px solid var(--border);margin:12px 0 20px}.absence-entry .function-title{color:#b82d3c}.absence-entry:hover{background:#fff5f5;border-color:#f0cbd0}
+.field-toggles{flex:1;min-width:240px}.field-toggles fieldset{display:flex;flex-wrap:wrap;gap:0 8px}.field-toggles legend{font-size:14px;padding:0}.field-toggles label.check{font-size:13px;min-height:32px;margin:0 4px 0 0}.field-toggles input{width:17px;height:17px}
+.availability-picker{position:relative;min-width:320px;max-width:100%}.availability-picker input[type=search]{width:100%}.availability-picker .teacher-options{position:absolute;z-index:6;top:100%;left:0;right:0;max-height:290px;overflow:auto;background:white;border:1px solid #aebfc9;box-shadow:0 5px 14px #203a4d26;border-radius:5px;padding:8px}.availability-picker .teacher-options label{width:100%;padding:3px 8px;margin:0}.teacher-chips{display:flex;gap:8px;flex-wrap:wrap;margin:14px 0}.teacher-chip{background:#e7f1fc;border-color:#b8d8f6;min-height:34px;padding:5px 10px;font-size:14px}.teacher-chip span{font-size:18px;margin-left:8px}.availability-table th:first-child{width:150px}.availability-table tbody th{background:#f0f5fa;color:#294b65}.availability-table small{display:block;font-weight:normal}.available-teacher{display:inline-block;padding:5px 9px;margin:3px 0;background:#1671c9;color:white;border-radius:4px;font-size:14px}.availability-table .common-free>*{background:#d8f2eb}.common-label{display:block;color:#146553;font-size:13px;margin:5px 0}.availability-table .common-free .available-teacher{background:#126b62}
+@media(max-width:620px){.personal-functions{grid-template-columns:1fr}.availability-picker{min-width:0;width:100%}.field-toggles{flex-basis:100%}.availability-table th:first-child{width:112px}}
+
+/* R02: two-column mobile home; native button navigation without a second route list. */
+.mobile-menu-button{display:none}
+@media(max-width:800px){
+ .mobile-menu-button{display:inline-flex;align-items:center;justify-content:center;min-width:44px;font-size:23px;padding:3px 10px}
+ #nav button{text-align:left;min-height:44px}
+ .function-grid,.personal-functions{grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
+ .function-tile{display:flex;flex-direction:column;align-items:flex-start;gap:8px;min-width:0;min-height:156px;padding:14px 10px}
+ .function-tile img{width:44px;height:44px;margin:0 0 4px}.function-title{padding:0;font-size:17px;overflow-wrap:anywhere}.function-description{font-size:13px;overflow-wrap:anywhere}
+ .function-tile .access-label{top:8px;right:6px;font-size:10px;padding:2px 4px}
+}
+
+/* R16: one searchable field; selected names stay inside it. */
+.availability-picker{position:relative;max-width:100%;width:min(42rem,100%);min-width:0}.teacher-multiselect{display:flex;flex-wrap:wrap;align-items:center;gap:4px;border:1px solid #a8b1ba;border-radius:6px;padding:4px;background:#fff;min-height:38px;max-width:100%}.teacher-multiselect:focus-within{outline:2px solid #126b81;outline-offset:1px}.teacher-multiselect .teacher-chips{display:contents}.teacher-multiselect .teacher-chip{margin:0;background:#e5e7eb;color:#1f2937;border:1px solid #d1d5db;padding:4px 7px;min-height:28px;max-width:100%;white-space:normal;text-align:left;line-height:1.3}.teacher-multiselect .teacher-chip span{color:#58616b}.teacher-multiselect .teacher-chip:hover span{color:#111827}.teacher-multiselect input[type=search]{flex:1 1 11rem;width:auto;min-width:5rem;border:0;box-shadow:none;outline:none;padding:4px;height:30px;max-width:100%}.teacher-options .highlighted{background:#e7f1f4}.availability-picker>.teacher-options{position:absolute;top:100%;left:0;right:0;z-index:25;max-height:16rem;overflow:auto;background:white;border:1px solid #a8b1ba}.teacher-multiselect .teacher-chip:focus-visible{outline:2px solid #126b81}@media(max-width:800px){.teacher-multiselect .teacher-chip{min-height:38px}.teacher-multiselect input[type=search]{height:36px}}
+
+.function-tile[data-page="Assign Relief"]:hover{background:#e5f3e9;border-color:#27834c}.function-tile[data-page="Assign Relief"] .function-title{color:#185d36}
+
+.import-clash-review .import-clash{display:flex;flex-wrap:wrap;gap:12px;margin:20px 0;padding:12px;border:1px solid var(--border);border-radius:5px}
+.import-clash-review legend{font-weight:600;overflow-wrap:anywhere}
+.import-clash-review .import-clash-option{display:flex;flex-direction:row;align-items:flex-start;gap:10px;flex:1 1 260px;min-width:0;padding:10px;border:1px solid var(--border);border-radius:5px;cursor:pointer;overflow-wrap:anywhere}
+.import-clash-option input[type=radio]{flex:0 0 18px;width:18px;height:18px;margin:3px 0}
+.import-clash-option>span{min-width:0}.import-clash-option>span>span{display:block}
+.import-clash-option:has(input:checked){border-color:var(--blue);background:#e9f2fb}
+
+/* Show only the current path; Home returns to the complete function grid. */
+.breadcrumbs{display:flex;align-items:center;flex-wrap:wrap;gap:4px 10px;list-style:none;margin:0;padding:0;font-size:14px}.breadcrumbs li{display:flex;align-items:center;gap:10px;min-height:36px}.breadcrumbs li+li:before{content:"›";color:var(--muted)}.breadcrumbs button{min-height:36px;padding:5px 0;color:#0873da}.breadcrumbs [aria-current]{font-weight:600;color:#304a5c}.breadcrumbs span{overflow-wrap:anywhere}
+
+/* Keep the expanded planner name readable in date, loading and editing views. */
+[data-stapler-app] .page-heading,[data-stapler-app] .planner-heading{flex-wrap:wrap}
+[data-stapler-app] .planner-heading>div:first-child{min-width:0;max-width:100%}
+[data-stapler-app] h2{overflow-wrap:anywhere}
+
+/* Background date checks keep the timetable readable and controls available. */
+.timetable-day-status{display:flex;align-items:center;gap:.6rem;flex-wrap:wrap}
+.timetable-day-spinner{display:inline-block;width:1em;height:1em;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;animation:timetable-day-spin .8s linear infinite;flex-shrink:0}
+@keyframes timetable-day-spin{to{transform:rotate(360deg)}}
+@media(prefers-reduced-motion:reduce){.timetable-day-spinner{animation:none}}
+
+.timetable-source{margin-top:20px;min-width:0}.timetable-source+.timetable-source{border-top:2px solid var(--border);padding-top:16px}.timetable-source>.tools{flex-wrap:wrap}
+
+/* Read and save feedback uses the same yellow pending surface across Roster. */
+:root{--status-pending-fill:#fff3bd;--status-pending-border:#d5af32;--status-pending-text:#5e480c}
+#status.ops-status-pending{padding:8px 12px;background:var(--status-pending-fill);color:var(--status-pending-text);border:1px solid var(--status-pending-border);border-radius:5px}
+
+.home-duty{margin:0 0 20px;line-height:1.6}.home-duty-loading{display:inline-flex;align-items:center;gap:6px}.home-duty .ops-spinner{width:14px;height:14px;flex:none}.home-duty [data-duty-retry]{min-height:44px;padding:4px 10px;margin:0 4px}@media(prefers-reduced-motion:reduce){.home-duty .ops-spinner{animation:none}}
+
+/* Elapsed read time is visual feedback, never a page blocker. */
+#loadCounter{flex:none;font-size:14px;font-variant-numeric:tabular-nums;white-space:nowrap}
+.status-row{flex-wrap:wrap}
+
+.home-timetable{color:inherit;margin:0 0 6px}
+
+.home-heading{display:flex;align-items:baseline;gap:16px;margin-bottom:4px}
+.home-heading h2{flex:none;margin:0}
+.home-heading .home-timetable{flex:1;min-width:0;margin:0}
+
+/* The suite title is a keyboard-accessible home target, preserving go() guards. */
+#rosterHome{font:inherit;font-weight:inherit;min-height:44px;padding:7px 10px;margin:-7px -10px;border:1px solid transparent;border-radius:6px;white-space:nowrap}
+#rosterHome:focus-visible{outline:3px solid #fff;outline-offset:3px}
+
+#systemHealthLink{display:inline-flex;align-items:center;justify-content:center;text-decoration:none;box-sizing:border-box}

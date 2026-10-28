@@ -1,0 +1,314 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "How GSiS works",
+    "locale": "en",
+    "quality_profile": "showcase",
+    "output": ".archify/architecture-gsis-20261022/gsis.html",
+    "repository": {
+      "url": "https://local.invalid/gsis-release-preparation.git",
+      "revision": "399032c954035d7f00566620da65ddae62e413b0",
+      "link_mode": "local-only"
+    }
+  },
+  "components": [
+    {
+      "id": "web",
+      "type": "frontend",
+      "label": "GSiS web apps",
+      "sublabel": "Five role-aware viewports",
+      "pos": [
+        40,
+        40
+      ],
+      "size": [
+        186,
+        72
+      ],
+      "sources": [
+        {
+          "path": "scripts/build-release.py",
+          "line": 130,
+          "end_line": 149
+        },
+        {
+          "path": "roster-update/public/roster.js",
+          "line": 46,
+          "end_line": 57
+        }
+      ]
+    },
+    {
+      "id": "roster",
+      "type": "backend",
+      "label": "Roster operations",
+      "sublabel": "Attendance and allocations",
+      "pos": [
+        360,
+        40
+      ],
+      "size": [
+        186,
+        72
+      ],
+      "sources": [
+        {
+          "path": "backend/RosterOperations.gs",
+          "line": 379,
+          "end_line": 416
+        }
+      ]
+    },
+    {
+      "id": "plans",
+      "type": "database",
+      "label": "Roster records",
+      "sublabel": "One atomic writer",
+      "pos": [
+        680,
+        40
+      ],
+      "size": [
+        186,
+        72
+      ],
+      "sources": [
+        {
+          "path": "backend/RosterOperations.gs",
+          "line": 28,
+          "end_line": 65
+        }
+      ]
+    },
+    {
+      "id": "school",
+      "type": "backend",
+      "label": "School services",
+      "sublabel": "Calendar / Contacts / Deploy",
+      "pos": [
+        360,
+        260
+      ],
+      "size": [
+        186,
+        72
+      ],
+      "sources": [
+        {
+          "path": "backend/BackendRole.gs",
+          "line": 8,
+          "end_line": 21
+        },
+        {
+          "path": "calendar-backend/Code.gs",
+          "line": 1,
+          "end_line": 18
+        },
+        {
+          "path": "Contacts_Code.gs",
+          "line": 80,
+          "end_line": 110
+        }
+      ]
+    },
+    {
+      "id": "sheets",
+      "type": "database",
+      "label": "School Sheets",
+      "sublabel": "Dates, people, deployment",
+      "pos": [
+        680,
+        260
+      ],
+      "size": [
+        186,
+        72
+      ],
+      "sources": [
+        {
+          "path": "backend/Code.gs",
+          "line": 528,
+          "end_line": 528
+        },
+        {
+          "path": "Contacts_Code.gs",
+          "line": 80,
+          "end_line": 110
+        }
+      ]
+    },
+    {
+      "id": "sender",
+      "type": "backend",
+      "label": "Notification Worker",
+      "sublabel": "Queue wake or scheduled run",
+      "pos": [
+        40,
+        480
+      ],
+      "size": [
+        186,
+        72
+      ],
+      "sources": [
+        {
+          "path": "notification-worker/index.js",
+          "line": 1,
+          "end_line": 53
+        }
+      ]
+    },
+    {
+      "id": "transport",
+      "type": "backend",
+      "label": "Delivery operations",
+      "sublabel": "Independent delivery lock",
+      "pos": [
+        360,
+        480
+      ],
+      "size": [
+        186,
+        72
+      ],
+      "sources": [
+        {
+          "path": "backend/RosterNotificationStore.gs",
+          "line": 1,
+          "end_line": 27
+        },
+        {
+          "path": "backend/RosterNotificationStore.gs",
+          "line": 159,
+          "end_line": 200
+        }
+      ]
+    },
+    {
+      "id": "delivery",
+      "type": "database",
+      "label": "Delivery records",
+      "sublabel": "Claims, outcomes, reviews",
+      "pos": [
+        680,
+        480
+      ],
+      "size": [
+        186,
+        72
+      ],
+      "sources": [
+        {
+          "path": "backend/RosterNotificationStore.gs",
+          "line": 14,
+          "end_line": 27
+        }
+      ]
+    },
+    {
+      "id": "meta",
+      "type": "external",
+      "label": "WhatsApp",
+      "sublabel": "Approved templates",
+      "pos": [
+        40,
+        680
+      ],
+      "size": [
+        186,
+        72
+      ],
+      "sources": [
+        {
+          "path": "roster-update/public/_worker.js",
+          "line": 757,
+          "end_line": 777
+        }
+      ]
+    }
+  ],
+  "connections": [
+    {
+      "from": "web",
+      "to": "roster",
+      "label": "Authorised save",
+      "variant": "security"
+    },
+    {
+      "from": "roster",
+      "to": "plans",
+      "label": "Check then commit",
+      "variant": "emphasis"
+    },
+    {
+      "from": "web",
+      "to": "school",
+      "label": "Authorised reads",
+      "variant": "security"
+    },
+    {
+      "from": "school",
+      "to": "sheets",
+      "label": "Owned records"
+    },
+    {
+      "from": "web",
+      "to": "sender",
+      "label": "Signed wake",
+      "variant": "dashed"
+    },
+    {
+      "from": "sender",
+      "to": "transport",
+      "label": "Claim and settle",
+      "variant": "dashed"
+    },
+    {
+      "from": "transport",
+      "to": "delivery",
+      "label": "Persist outcome"
+    },
+    {
+      "from": "sender",
+      "to": "meta",
+      "label": "Bounded sends"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "Five views",
+      "items": [
+        "Calendar sets school dates; Contacts supplies current authority.",
+        "Deploy plans staffing; Layout shows the campus; Roster manages absence and relief."
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "Concurrent absence reports",
+      "items": [
+        "Slow reference lookups run before the write lock.",
+        "Current attendance, overlap checks and relief consequences commit together.",
+        "An exact retry recovers one durable result."
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "Separate delivery work",
+      "items": [
+        "Roster and delivery methods share one Apps Script deployment but use independent stores and locks.",
+        "Queue wake is optional; cron remains the fallback.",
+        "Uncertain WhatsApp outcomes stay uncertain until reconciled."
+      ]
+    },
+    {
+      "dot": "slate",
+      "title": "Source scope",
+      "items": [
+        "Prepared v0.8.7 source snapshot, not a statement of live deployment.",
+        "Google authentication, private-link access and media storage are summarised in the maintainer guide."
+      ]
+    }
+  ]
+}

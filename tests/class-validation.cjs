@@ -1,0 +1,10 @@
+const fs=require('fs'),vm=require('vm'),crypto=require('crypto'),assert=require('assert/strict');const ctx={console,Utilities:{getUuid:crypto.randomUUID,computeDigest:(a,s)=>[...crypto.createHash('sha256').update(s).digest()],DigestAlgorithm:{SHA_256:'sha256'}}};vm.createContext(ctx);for(const f of ['Code.gs','Seed.gs'])vm.runInContext(fs.readFileSync(__dirname+'/../backend/'+f,'utf8'),ctx);
+vm.runInContext(`
+const admin={user:{roles:['Admin']}},idx={active:'v1'};function check(x,m){if(!x)throw Error(m)}
+for(const [name,shortName] of CLASS_NAME_PAIRS){const d=model_(JSON.parse(JSON.stringify(DEPLOY_SEED)));d.classes=[];apply_(d,{operation:'addClass',key:'meta',level:'1',name,shortName},admin,idx);check(d.classes[0].name===name&&d.classes[0].shortName===shortName,'pair accepted '+name);check(classKey_(d.classes[0])==='1'+shortName,'derived class label');}
+const old=model_(JSON.parse(JSON.stringify(DEPLOY_SEED)));old.classes=[{level:'1',name:'',shortName:'1P'},{level:'2',name:'Graciousness',shortName:'2Gc'}];old.assignments=[{target:'1P',level:'1',subject:'EL'}];model_(old);model_(old);check(old.classes[0].shortName==='P'&&old.classes[0].name==='','legacy P kept ambiguous');check(old.classes[1].shortName==='Gc','two-letter case preserved');check(old.assignments[0].target==='1P','assignment label preserved');
+let rejected=false;try{apply_(old,{operation:'updateClass',key:'meta',previous:'1P',level:'1',name:'Prudence',shortName:'Rp'},admin,idx)}catch(e){rejected=e.status===400}check(rejected,'mismatched selection rejected');
+apply_(old,{operation:'updateClass',key:'meta',previous:'1P',level:'1',name:'Prudence',shortName:'P'},admin,idx);check(old.classes[0].name==='Prudence','P explicitly resolved');
+console.log('PASS old/new pairs, ambiguous P selection, legacy normalization, matching validation, two-letter codes, assignment preservation');
+`,ctx);
+const front=fs.readFileSync(__dirname+'/../public/app.js','utf8').match(/const CLASS_NAME_PAIRS=(.*);/)[1],back=fs.readFileSync(__dirname+'/../backend/Code.gs','utf8').match(/const CLASS_NAME_PAIRS=(.*);/)[1];assert.equal(front,back,'frontend/backend catalogs agree');

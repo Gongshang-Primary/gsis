@@ -1,0 +1,97 @@
+html,body{max-width:100%;overflow-x:hidden}body{padding-bottom:22px;box-sizing:border-box}header,.topbar,.hero,.navbar,main,#app,#view{max-width:100%;min-width:0;box-sizing:border-box}.table-window{max-width:100%;min-width:0;overflow-x:auto;position:relative}.table-window table{min-width:0}.frozen-col{position:sticky!important;left:0;z-index:2;background:#edf3f7}.table-window thead .frozen-col{z-index:4}.viewport-scrollbar{position:fixed;bottom:0;height:22px;overflow-x:scroll;overflow-y:hidden;background:#e4ecf2;z-index:90;scrollbar-color:#687e90 #e4ecf2;scrollbar-width:auto}.viewport-scrollbar>div{height:1px}.viewport-scrollbar::-webkit-scrollbar{height:16px}.viewport-scrollbar::-webkit-scrollbar-thumb{background:#687e90;border:3px solid #e4ecf2;border-radius:8px}.viewport-scrollbar[hidden]{display:none}select,input{line-height:1.35;box-sizing:border-box;min-height:30px}select{padding-top:4px;padding-bottom:4px}.source-data{width:max-content!important;table-layout:auto!important}.source-data th,.source-data td{white-space:nowrap}.source-data input{width:auto;min-width:8ch}.source-data input.compact-ext{width:6ch;min-width:6ch}.source-data select{min-width:10ch;width:auto;max-width:none}.source-data input[aria-label="Mobile No"]{width:12ch;min-width:12ch}.source-data input[aria-label="TTb Name"]{min-width:22ch}.source-data input[readonly]{background:#edf3f7;color:#18364c}.publication-review fieldset{display:flex;gap:12px;flex-wrap:wrap}.publication-review label{display:flex;flex-direction:column;gap:4px}.table-window td{vertical-align:top}.teacher-cell{min-width:12ch}.venue select,.venue .search-picker{max-width:240px}th{white-space:nowrap}
+
+.table-window thead .frozen-col{background:#19485e;color:white}#contactHead .frozen-col,.source-data thead .frozen-col{background:#edf3f7;color:#17364c}
+
+.source-data input[aria-label="EXT"]{width:6ch;min-width:6ch}
+
+/* The real scroll owner must remain constrained, even against legacy ID rules. */
+html body .table-window,html body #dataGrid.table-window,html body .page>[id$="Grid"].table-window{overflow-x:auto!important;max-width:100%!important;width:100%;min-width:0;box-sizing:border-box}
+.frozen-col{left:var(--frozen-left,0px)!important}
+.table-window th.frozen-col{z-index:7}.table-window td.frozen-col{z-index:3}
+.viewport-scrollbar{z-index:80;background:#edf3f7;scrollbar-gutter:stable}
+
+/* A single scroll owner keeps sticky headers and frozen cells in alignment. */
+html body .table-window.freeze-header{overflow:auto!important;overscroll-behavior:contain}
+.freeze-header table{border-collapse:separate;border-spacing:0}
+.freeze-header thead th{position:sticky!important;z-index:6;background:#19485e;color:white}
+.freeze-header thead th.frozen-col{z-index:9}
+#dataGrid.freeze-header thead th,#membershipGrid.freeze-header thead th{background:#edf3f7;color:#17364c}
+html body input[type="checkbox"]{width:18px!important;height:18px!important;min-width:18px!important;min-height:18px!important;max-width:18px;vertical-align:middle;padding:0}
+#membershipGrid table{table-layout:fixed!important}
+#membershipGrid td input:not([type="checkbox"]),#membershipGrid td select{width:100%;min-width:0;max-width:100%;font:inherit}
+#membershipGrid th{padding-right:14px}
+.member-sort{border:0;background:transparent;color:inherit;font:inherit;font-weight:600;text-align:left;white-space:nowrap;padding:4px 0;cursor:pointer}
+.member-resize{position:absolute;right:0;top:0;width:10px;height:100%;cursor:col-resize;touch-action:none;border-right:1px solid #b6c7d2}
+.member-resize:focus{outline:2px solid #0086c9}
+
+/* v0.4.15: native table scrollbars are the sole owners in Edit Info / Summary. */
+html:has(body.single-table-page),body.single-table-page{height:100%;overflow-y:hidden!important}
+body.single-table-page{padding-bottom:0}
+html body .single-scroll-owner{overflow:auto!important;overscroll-behavior:contain;scrollbar-gutter:stable}
+body.single-table-page .viewport-scrollbar{display:none!important}
+@media print{html:has(body.single-table-page),body.single-table-page{height:auto;overflow:visible!important}.single-scroll-owner{max-height:none!important;overflow:visible!important}}
+
+/* v0.4.15: one native scroll owner per table or explicitly independent pane. */
+html body .table-window{overflow:auto!important;max-width:100%!important;min-width:0;overscroll-behavior:contain}
+.viewport-scrollbar{display:none!important}
+html body.single-table-page #content{min-height:0;max-height:calc(100dvh - 155px);overflow:hidden}
+body.single-table-page main{min-width:0}
+#content[data-view="Duty"]{overflow:hidden!important}
+#content[data-view="Duty"] .duty-scroll{overflow:auto!important}
+#content[data-view="Duty"] .duty-descriptions{padding-bottom:20px}
+.freeze-header tbody th.frozen-col{position:sticky;left:0;background:#edf3f7;color:#17364c;z-index:3}
+@media print{html body .table-window{overflow:visible!important;max-height:none!important}html body.single-table-page #content{max-height:none;overflow:visible}}
+
+/* v0.4.15 row tracking and sticky intersections. Semantic cell fills retain priority. */
+.table-window table tbody tr:nth-child(odd){--row-band:#ffffff}
+.table-window table tbody tr:nth-child(even){--row-band:#e8f0f5}
+.table-window table tbody tr{background:var(--row-band)}
+.table-window table tbody .frozen-col{background:var(--row-band)}
+.table-window table th,.table-window table td{border-right:1px solid #8c9da9;border-bottom:1px solid #8c9da9}
+html body .table-window table thead{position:static!important;z-index:auto!important}
+html body .table-window table thead th{position:sticky!important;z-index:6}
+html body .table-window table thead th.frozen-col{z-index:10}
+html body .table-window table tbody .frozen-col{z-index:3}
+html body .table-window table tr.inactive{--row-band:#e0e3e6}
+html body .table-window table tr.inactive>td,html body .table-window table tr.inactive>th,
+html body .table-window table tr.inactive a{background:#e0e3e6;color:#47545f!important}
+html body .table-window table tr.inactive input:not(.dirty),html body .table-window table tr.inactive select:not(.dirty),html body .table-window table tr.inactive textarea:not(.dirty){background:#e0e3e6;color:#47545f}
+html body.single-table-page #content[data-view="Offload"]{max-height:calc(100dvh - 155px);overflow:auto!important;padding-bottom:28px}
+#content[data-view="Offload"] .table-window{max-height:55dvh!important}
+
+.legacy-offload{margin:14px 0;padding:12px;border:1px solid #8c9da9;background:#f3f6f8}
+.legacy-offload summary{cursor:pointer;font-weight:600;padding:6px}
+.legacy-offload pre{white-space:pre-wrap;overflow-wrap:anywhere;max-height:40dvh;overflow:auto;min-width:18ch;max-width:80ch}
+
+.legacy-section{margin:8px 0}.legacy-values{display:grid;grid-template-columns:minmax(10ch,auto) 1fr;gap:6px 16px}.legacy-values dt{font-weight:600}.legacy-values dd{margin:0}.legacy-table th,.legacy-table td{white-space:normal!important;overflow-wrap:anywhere;min-width:10ch;max-width:40ch}.legacy-table{width:100%}.legacy-table-wrap{margin:8px 0}#content[data-view="Offload"] .legacy-offload .table-window{max-height:36dvh!important}
+
+/* Compact preserves font size, semantic colours and teacher line breaks. */
+.compact-toolbar{display:flex;justify-content:flex-end;margin:6px 0}
+.compact-button{margin-left:auto;flex-shrink:0;order:999}
+.gsis-table-tools{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:8px 0;position:relative;font:inherit}
+.gsis-table-caption{font-size:inherit}.gsis-table-tools button,.gsis-columns summary{font:inherit;padding:5px 9px;white-space:nowrap}
+.gsis-columns{position:relative}.gsis-columns summary{cursor:pointer;border:1px solid #94a3b8;border-radius:5px;background:#fff;color:#17364c}
+.gsis-column-menu{position:absolute;top:100%;left:0;z-index:60;min-width:220px;max-height:55vh;overflow:auto;background:#fff;color:#17364c;border:1px solid #94a3b8;box-shadow:0 4px 14px #0002;padding:8px}
+.gsis-column-menu label{display:flex;align-items:center;gap:8px;white-space:nowrap;font:inherit;padding:4px}
+.gsis-export-status,.gsis-table-tools small{color:#526676;font-size:12px}.gsis-table-tools small{margin-left:auto}
+@media print{.gsis-table-tools{display:none!important}}
+html body .table-window table.gsis-compact:not(.gsis-compact-manual),html body #membershipGrid table.gsis-compact:not(.gsis-compact-manual){width:max-content!important;min-width:0!important;table-layout:auto!important}
+html body table.gsis-compact:not(.gsis-compact-manual) th,html body table.gsis-compact:not(.gsis-compact-manual) td{padding:3px 6px!important;width:auto!important;height:auto!important;min-width:0!important;max-width:none!important;white-space:nowrap!important;overflow:visible;text-overflow:clip}
+html body table.gsis-compact input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]),html body table.gsis-compact select,html body table.gsis-compact textarea{width:var(--compact-control-width,auto)!important;min-width:0!important;max-width:none!important;min-height:26px;padding-top:2px;padding-bottom:2px}
+html body table.gsis-compact .chip{display:table;width:max-content;white-space:nowrap;margin:1px 0}
+html body table.gsis-compact .search-picker{width:max-content;min-width:0;max-width:none}
+html body table.gsis-compact button{white-space:nowrap;min-height:24px;padding-top:2px;padding-bottom:2px}
+html body table.gsis-compact textarea{resize:both}
+
+/* Audit grows with its details; the document owns vertical scrolling. */
+html body #content[data-view="Audit"]{max-height:none;overflow:visible;padding-bottom:28px}
+html body #content[data-view="Audit"] .table-window{max-height:none!important;overflow-x:auto!important;overflow-y:auto!important;overscroll-behavior:auto}
+#content[data-view="Audit"] [data-audit-id] pre{white-space:pre-wrap;overflow-wrap:anywhere;max-height:none;overflow:visible;min-width:18ch;max-width:80ch}
+
+/* Versions and its publication review use the document, not a clipped table pane. */
+html body #content[data-view="Versions"],html body #content:has(>.publication-review){max-height:none;overflow:visible;padding-bottom:28px}
+html body #content[data-view="Versions"] .table-window,html body #content:has(>.publication-review) .table-window{max-height:none!important;overscroll-behavior:auto}
+
+.inline-editor .gsis-column-menu label{flex-direction:row;font:inherit;margin:3px 0}.inline-editor .gsis-column-menu input{margin:0}
+
+html body table.gsis-compact.gsis-compact-manual th,html body table.gsis-compact.gsis-compact-manual td{padding:3px 6px!important;height:auto!important}

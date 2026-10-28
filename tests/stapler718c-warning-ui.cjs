@@ -1,0 +1,36 @@
+'use strict';
+const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto'),{JSDOM}=require('jsdom');
+const S=require('../shared/roster-stapler.js'),{harness}=require('./stapler715-persistence.cjs'),root=path.resolve(__dirname,'..'),date='2026-10-21';
+const periods=Array.from({length:17},(_,period)=>({period,startMinutes:420+period*30,endMinutes:450+period*30}));
+const names=['Unknown <img src=x>','Over cap','Online only'],teachers=names.map((name,i)=>({staffId:'staff-'+i,name,timetableName:name,cells:periods.map(()=>['','','','']),R:9,periodCap:1,capConfigured:true,capVerified:i!==0,capWorkload:i===0?null:0,capVerificationReason:i===0?'Unclassified activity: X <img src=x>.':null}));
+teachers[2].cells[5]=['EL','5A','',''];
+const people=teachers.map(t=>({id:t.staffId,name:t.name,active:true})),day={date,id:'baseline',parity:'even',verified:true,schoolDay:true,periods,teachers,formClasses:[],recesses:[]};
+const payload={app:'Stapler',version:'4.3',stateType:'plan',selectedDate:date,selectedDay:'Wednesday',selectedSheet:'Even Week',startTime:'07:00',periodMinutes:30,addedTeachers:names.slice(0,2),tiles:names.slice(0,2).flatMap((teacher,i)=>[1,2].map(p=>({id:i+':'+p,teacher,subject:'EL',className:'Exam '+i,venue:'Hall',group:'',assignedPeriod:p,sheet:'Even Week',day:'Wednesday',location:'teacher'})))};
+const h=harness(day,people),leaseSessionId=crypto.randomUUID(),dom=new JSDOM('<main id="content"></main>',{url:'https://roster.test/',runScripts:'dangerously',pretendToBeVisual:true}),w=dom.window,q=s=>w.document.querySelector(s),flush=()=>new Promise(resolve=>setImmediate(resolve));
+const call=input=>{const r=h.call(input).result;if(!r.ok)throw Object.assign(Error(r.error),{status:r.status});return r.data;};
+async function until(predicate){for(let i=0;i<30;i++){if(predicate())return;await flush();}throw Error('UI did not settle: '+q('#content').textContent.slice(0,600));}
+(async()=>{try{
+ call({operation:'acquireStaplerLock',date,leaseSessionId,leaseFence:0,staplerRevision:0,requestId:crypto.randomUUID()});
+ call({operation:'saveStapler',view:'stapler',date,leaseSessionId,leaseFence:1,revision:0,staplerRevision:0,requestId:crypto.randomUUID(),plan:S.importLegacy(S.create(day),payload,{people})});
+ call({operation:'releaseStaplerLock',date,leaseSessionId,leaseFence:1});
+ w.Date.now=()=>Date.parse(date+'T06:00:00+08:00');w.confirm=()=>true;
+ for(const file of ['shared/roster-stapler.js','roster-update/public/roster-stapler-ui.js'])w.eval(fs.readFileSync(path.join(root,file),'utf8'));
+ const ctx={container:q('#content'),initialDate:date,today:()=>date,profile:{user:{email:'admin@gsps.edu.sg',smc:true,admin:true}},status(){},api:async(_,input)=>call(input)};
+ await w.RosterStaplerUI.render(ctx);
+ assert.equal(q('[data-confirm]').disabled,false);
+ q('[data-confirm]').click();await until(()=>q('[data-plan-meta]')?.textContent.startsWith('Confirmed'));
+ const notes=q('[data-plan-warnings]');assert(notes.querySelector('details'),'generic imported planning notes remain available');
+ assert.doesNotMatch(notes.textContent,/Weekly workload|Configured cap|against a cap/);assert.equal(q('[data-workload-warning]'),null,'obsolete workload banner is absent');
+ assert.match(notes.textContent,/Offline venue text retained for review/);assert.equal(q('#content').querySelector('img'),null,'teacher names remain escaped');assert(q('[data-target=class]'),'class timetable remains accessible');
+ w.RosterStaplerUI.unmount();await w.RosterStaplerUI.render(ctx);
+ assert.doesNotMatch(q('[data-plan-warnings]').textContent,/Weekly workload|Configured cap/,'obsolete warning stays absent after a fresh server read');assert.match(q('[data-plan-warnings]').textContent,/Offline venue text retained for review/);
+ await until(()=>q('[data-save]')&&!q('[data-save]').disabled);
+ q('[data-edit-tile]').click();q('dialog [name=venue]').value='Updated room';q('dialog button.primary').click();
+ assert.equal(q('[data-workload-warning]'),null,'ordinary card edits do not reintroduce workload warnings');
+ q('[data-save]').click();await until(()=>q('[data-stapler-message]')?.textContent.includes('Changes saved'));
+ assert.doesNotMatch(q('[data-plan-warnings]').textContent,/Weekly workload|against a cap/);assert.equal(q('[data-workload-warning]'),null);
+ assert.equal(q('[data-confirm]').disabled,false);
+ q('[data-confirm]').click();await until(()=>q('[data-stapler-message]')?.textContent.includes('Plan confirmed'));
+ assert.doesNotMatch(q('[data-plan-warnings]').textContent,/Weekly workload|Configured cap/);
+ console.log('PASS 718c UI: obsolete workload warnings stay absent, generic planning notes and escaped teacher names remain; class view, Confirm, reopen, edit, Save and reconfirm stay available.');
+}finally{w.RosterStaplerUI?.unmount();dom.window.close();h.close();}})().catch(e=>{console.error(e);process.exitCode=1;});

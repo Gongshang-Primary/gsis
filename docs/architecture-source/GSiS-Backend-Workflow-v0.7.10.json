@@ -1,0 +1,272 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "GSiS: reads, saves and scheduled work",
+    "locale": "en",
+    "quality_profile": "showcase",
+    "output": "docs/GSiS-Backend-Workflow-v0.7.10.html"
+  },
+  "lanes": [
+    {
+      "id": "ui",
+      "label": "Browser"
+    },
+    {
+      "id": "read",
+      "label": "Authoritative read"
+    },
+    {
+      "id": "write",
+      "label": "Save and publication"
+    },
+    {
+      "id": "async",
+      "label": "Scheduled side effects"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "read",
+      "lane": "ui",
+      "col": 0,
+      "type": "frontend",
+      "label": "Open / filter",
+      "sublabel": "Reuse loaded baseline"
+    },
+    {
+      "id": "local",
+      "lane": "ui",
+      "col": 1,
+      "type": "frontend",
+      "label": "Local view",
+      "sublabel": "Names and highlights"
+    },
+    {
+      "id": "gateway",
+      "lane": "read",
+      "col": 1,
+      "type": "security",
+      "label": "Gateway",
+      "sublabel": "Verify identity"
+    },
+    {
+      "id": "authority",
+      "lane": "read",
+      "col": 2,
+      "type": "backend",
+      "label": "Current context",
+      "sublabel": "Contacts + Calendar"
+    },
+    {
+      "id": "fetch",
+      "lane": "read",
+      "col": 3,
+      "type": "database",
+      "label": "Scoped reads",
+      "sublabel": "Model / current state"
+    },
+    {
+      "id": "show",
+      "lane": "ui",
+      "col": 4,
+      "type": "frontend",
+      "label": "Render data",
+      "sublabel": "Revision retained"
+    },
+    {
+      "id": "save",
+      "lane": "write",
+      "col": 0,
+      "type": "frontend",
+      "label": "Save or publish",
+      "sublabel": "Stable request ID"
+    },
+    {
+      "id": "lock",
+      "lane": "write",
+      "col": 1,
+      "type": "security",
+      "label": "Acquire lock",
+      "sublabel": "Recheck role + revision"
+    },
+    {
+      "id": "rules",
+      "lane": "write",
+      "col": 2,
+      "type": "backend",
+      "label": "Validate change",
+      "sublabel": "Clashes, date, eligibility"
+    },
+    {
+      "id": "commit",
+      "lane": "write",
+      "col": 3,
+      "type": "database",
+      "label": "Commit + receipt",
+      "sublabel": "Journal or Roster JSON"
+    },
+    {
+      "id": "ack",
+      "lane": "write",
+      "col": 4,
+      "type": "frontend",
+      "label": "Confirm saved",
+      "sublabel": "Keep draft if uncertain"
+    },
+    {
+      "id": "cron",
+      "lane": "async",
+      "col": 0,
+      "type": "messagebus",
+      "label": "Minute tick",
+      "sublabel": "Diagnostics or service"
+    },
+    {
+      "id": "gates",
+      "lane": "async",
+      "col": 1,
+      "type": "security",
+      "label": "Check switches",
+      "sublabel": "Due time + current state"
+    },
+    {
+      "id": "intent",
+      "lane": "async",
+      "col": 2,
+      "type": "database",
+      "label": "Claim intent",
+      "sublabel": "Revalidate recipient"
+    },
+    {
+      "id": "send",
+      "lane": "async",
+      "col": 3,
+      "type": "external",
+      "label": "Send / report",
+      "sublabel": "Meta or MailApp"
+    },
+    {
+      "id": "delivery",
+      "lane": "async",
+      "col": 4,
+      "type": "backend",
+      "label": "Record outcome",
+      "sublabel": "Callback or uncertain"
+    }
+  ],
+  "edges": [
+    {
+      "id": "e0",
+      "from": "read",
+      "to": "local",
+      "label": "warm model"
+    },
+    {
+      "id": "e1",
+      "from": "read",
+      "to": "gateway",
+      "label": "needs read"
+    },
+    {
+      "id": "e2",
+      "from": "gateway",
+      "to": "authority",
+      "label": "signed"
+    },
+    {
+      "id": "e3",
+      "from": "authority",
+      "to": "fetch",
+      "label": "authorised"
+    },
+    {
+      "id": "e4",
+      "from": "fetch",
+      "to": "show",
+      "label": "validated"
+    },
+    {
+      "id": "e5",
+      "from": "save",
+      "to": "lock",
+      "label": "request"
+    },
+    {
+      "id": "e6",
+      "from": "lock",
+      "to": "rules",
+      "label": "fresh state"
+    },
+    {
+      "id": "e7",
+      "from": "rules",
+      "to": "commit",
+      "label": "valid"
+    },
+    {
+      "id": "e8",
+      "from": "commit",
+      "to": "ack",
+      "label": "receipt"
+    },
+    {
+      "id": "e9",
+      "from": "cron",
+      "to": "gates",
+      "label": "service"
+    },
+    {
+      "id": "e10",
+      "from": "gates",
+      "to": "intent",
+      "label": "eligible"
+    },
+    {
+      "id": "e11",
+      "from": "intent",
+      "to": "send",
+      "label": "prepared"
+    },
+    {
+      "id": "e12",
+      "from": "send",
+      "to": "delivery",
+      "label": "result"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "Read",
+      "items": [
+        "Warm names, timetable filters and highlighting run locally. Fresh operational state still comes from the backend.",
+        "Immutable model cache is not authority to assign a teacher."
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "Write",
+      "items": [
+        "Deploy field saves use durable journals and a final index marker. Roster operational changes use one locked JSON commit.",
+        "Conflicts and uncertain results retain drafts. Retry the same request; do not assume a timeout means no write."
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "Scheduled work",
+      "items": [
+        "Automatic allocation is a draft operation with its own saved switch. WhatsApp, the menu and diagnostics have separate platform gates.",
+        "Publication remains deliberate and current Singapore schoolday only. Mail and Meta are separate side effects; no global transaction."
+      ]
+    },
+    {
+      "dot": "violet",
+      "title": "Evidence",
+      "items": [
+        "Source: backend/FieldStore.gs, backend/RosterOperations.gs, shared/roster-operations.js and notification-worker/index.js.",
+        "This diagram shows ordering and boundaries, not measured duration or a guarantee of provider delivery."
+      ]
+    }
+  ]
+}

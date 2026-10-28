@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "ok": true,
+  "command": "finalize",
+  "status": "pass",
+  "type": "architecture",
+  "quality": "showcase",
+  "specification": {
+    "path": "/workspace/scratch/c84f0276cce6/build710/source/docs/architecture-source/GSiS-System-Map-v0.7.10.json",
+    "sha256": "1abedae489107830d6d5f1c94e5b62a78b718125d3e822e22408965e6c8d3d63",
+    "bytes": 5123
+  },
+  "artifact": {
+    "path": "/workspace/scratch/c84f0276cce6/build710/source/docs/GSiS-System-Map-v0.7.10.html",
+    "sha256": "92dab3bb9d8916ce3d0bf18dd259af69442c4273de499599b51138b2a2b0e373",
+    "bytes": 828419
+  },
+  "gates": {
+    "validate": "pass",
+    "deliver": "pass",
+    "check": "pass",
+    "browser-check": "pass"
+  },
+  "diagnostics": [],
+  "diagnosticSummary": {
+    "total": 0,
+    "shown": 0,
+    "truncated": false
+  },
+  "evidence": {
+    "receipt": "/workspace/scratch/c84f0276cce6/build710/archify-work/system-review-3/GSiS-System-Map-v0.7.10.~archify-3fe3e24dadc60487929791f86170d58a0f5a2633da3bf5916ab26e98241b441a.~archify-f255b69c25568978821047ceda764c24d305db30121b378f3470373e71ef21e6.finalize.json",
+    "summaryReceipt": "/workspace/scratch/c84f0276cce6/build710/archify-work/system-review-3/GSiS-System-Map-v0.7.10.~archify-3fe3e24dadc60487929791f86170d58a0f5a2633da3bf5916ab26e98241b441a.~archify-f255b69c25568978821047ceda764c24d305db30121b378f3470373e71ef21e6.finalize-summary.json",
+    "browserCheckReceipt": "/workspace/scratch/c84f0276cce6/build710/archify-work/system-review-3/GSiS-System-Map-v0.7.10.~archify-3fe3e24dadc60487929791f86170d58a0f5a2633da3bf5916ab26e98241b441a.browser-check.json"
+  },
+  "visualReview": "not-requested",
+  "durationMs": 3809
+}

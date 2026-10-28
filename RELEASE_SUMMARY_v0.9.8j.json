@@ -1,0 +1,124 @@
+{
+  "version": "0.9.8j",
+  "baseline": "0.9.8i",
+  "baselineCommit": "f512ac6f584c26a027c1cf2aefb3b19d01fd6838",
+  "sourceFoundation": "703d3975e05d64acc512511ae2d09b0942cc900c",
+  "scope": [
+    "compact receipt-first saved-work publication and separate durable publish/notify-all stages",
+    "safe three-section allocation learning with exact prompt and staff-classification exclusions",
+    "final Excel row fitting without DRAFT markers",
+    "native Calendar sync reads with controlled retained-I comparison",
+    "optional durable four-event-command Calendar queue with Google destination",
+    "in-place glossary edits and stable venue catalogue identity with append-only header upgrade"
+  ],
+  "componentCount": 18,
+  "productionChangedComponents": [
+    "rosterFrontend",
+    "rosterBackend",
+    "calendarFrontend",
+    "calendarBackend",
+    "venuesBackend",
+    "calendarJobWorker"
+  ],
+  "versionHarmonisedComponents": [
+    "contactsFrontend",
+    "deployFrontend",
+    "layoutFrontend",
+    "lordFrontend",
+    "overlordFrontend",
+    "starlordFrontend",
+    "venuesFrontend",
+    "contactsBackend",
+    "deployBackend",
+    "lordBackend",
+    "notificationWorker",
+    "operationsWorker"
+  ],
+  "sharedHelperParityComponents": [
+    "deployBackend",
+    "notificationWorker",
+    "operationsWorker"
+  ],
+  "productionAuthority": "Google",
+  "authorityCutoverPerformed": false,
+  "migrationRequired": false,
+  "calendarAppendOnlyHeaderUpgradeRequired": true,
+  "timetableCacheChanged": false,
+  "newInfrastructureRequired": false,
+  "optionalCalendarJobs": {
+    "component": "calendarJobWorker",
+    "productionInstallation": true,
+    "required": false,
+    "newInfrastructureRequired": true,
+    "dedicatedResources": [
+      "Worker",
+      "D1"
+    ],
+    "d1Binding": "CALENDAR_JOBS_DB",
+    "pagesServiceBinding": "CALENDAR_JOBS",
+    "cron": "* * * * *",
+    "timezone": "UTC",
+    "recordDestination": "Google",
+    "secret": "existing canonical GSIS_SECRET with purpose separation",
+    "directModeWithoutBinding": true,
+    "deployed": false,
+    "liveCloudflareStorageVerified": false,
+    "syncContinuation": {
+      "setting": "CALENDAR_SYNC_CONTINUE",
+      "default": false,
+      "enabledOnlyBy": "true",
+      "maximumExistingBatchesPerCronInvocation": 1,
+      "startsNewSync": false,
+      "replacesExistingScheduler": false,
+      "guards": [
+        "original initiating Admin current authority",
+        "D1 maintenance lease",
+        "backend provider lease",
+        "persisted pause/cooldown/retry deadlines"
+      ]
+    }
+  },
+  "separateRehearsal": {
+    "archive": "GSiS_v0.9.8i_Rehearsal.zip",
+    "release": "0.9.8i",
+    "unchangedFromICompleteRelease": true,
+    "sourceCommit": "f512ac6f584c26a027c1cf2aefb3b19d01fd6838",
+    "sha256": "f3ee66bc4bb8171a6440b7e0b25ca1e8032f54a0cf38a8f41af28bdb83ce5522",
+    "productionInstallation": false,
+    "productionActivationAvailable": false,
+    "liveCloudflareStorageVerified": false,
+    "guide": "docs/v098i/REHEARSAL_SETUP.md"
+  },
+  "productionDeployed": false,
+  "liveRecordsChanged": false,
+  "messagesSent": false,
+  "verification": {
+    "status": "local-verified-with-inherited-test-limits",
+    "baselineFocusedProgramsPassed": 5,
+    "baselineFailureProgramsReproduced": 7,
+    "singleGreenFullSuiteClaimed": false,
+    "productionValidationPerformed": false,
+    "committedProvenance": {
+      "expectedTag": "v0.9.8j",
+      "sourceCommit": null,
+      "manifest": "PATCH.json in production deployment archive",
+      "postCommitRecord": "RELEASE_VERIFICATION.json in complete release archive"
+    },
+    "freshRecoveryClone": {
+      "required": true,
+      "status": "post-commit-external-record-required",
+      "history": "full reachable release history; unavailable older objects are not invented"
+    },
+    "selectedNodePrograms": 829,
+    "selectedNodeAggregate": {
+      "passed": 822,
+      "failed": 7
+    },
+    "nodeRunEvidence": "791-program interrupted attempt, exact remaining 38, and 12 scoped corrections retained separately",
+    "allNewJProgramsPassed": true,
+    "lordProgramsPassed": 38,
+    "independentReviewsCompleted": 5,
+    "openMaterialReviewFindings": 0,
+    "runtimeUnchangedAcrossRuns": true
+  }
+}

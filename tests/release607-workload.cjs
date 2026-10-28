@@ -1,0 +1,16 @@
+const assert=require('node:assert/strict'),W=require('../shared/workload'),R=require('../shared/teaching-rules'),make=require('./dom-helper.cjs');
+const d={teachers:[['a','Full time'],['b','Full time'],['j','FAJT'],['p','4/5'],['r','RT']].map(([id,employment])=>({id,name:id,active:true,employment})),loads:{1:{Assembly:1,FTGP:2,FTT:2,EL:10,Art:3,Music:2,CL:9,TL:8,FMA:4,LSP:3,'CCE EL':1}},classes:[{ref:'ca',level:'1',shortName:'A'},{ref:'cb',level:'1',shortName:'B'}],groups:[['cl','CL',9,false],['fma','FMA',4,true],['music','Music',3,false],['art','Art',3,true],['lsp','LSP',3,true],['cce','CCE EL',1,false]].map(([id,subject,weeklyPeriods,levelWide])=>({id,name:id,subject,weeklyPeriods,levelWide,level:'1',classRefs:['ca','cb']})),assignments:[['a','1A','FT'],['b','1A','FT'],['a','1A','EL'],['j','1A','EL'],['a','cl','CL'],['p','cl','CL'],['p','cl','CL']].map(([teacher,target,subject])=>({teacher,target,subject})),organisations:{plt:[{id:'empty',name:'Empty PLT',slots:[]},{id:'pd',name:'PLT',slots:['a','a','j']}]},duties:[{id:'duty',days:['Mon','Tue','Wed','Wed'],teachers:{Mon:'r'}}]};
+const analyse=()=>W.analyse(d,t=>R.calculate(t,d.offload));let w=analyse();
+// 15 FT + 30 EL + 9 Art + 7 Music + 18 CL + 4 FMA + 3 LSP + 1 CCE + 6 PD + 3 duties.
+assert.equal(w.demand.total,96);assert.equal(w.fullTimeN,2);assert.equal(w.D,48);assert.equal(w.totals.total,53);assert.deepEqual(w.demand.issues,[]);
+assert.equal(w.demand.entries.filter(e=>e.kind==='group').length,6);assert.equal(w.demand.entries.some(e=>e.kind==='class'&&['CL','TL','FMA','LSP','CCE EL'].includes(e.subject)),false);
+assert.equal(w.demand.entries.filter(e=>e.subject==='Music').length,3,'TG links do not cancel either form class');assert.equal(w.demand.entries.filter(e=>e.subject==='Art').length,3,'Art remains offered per class');
+assert.equal(w.rows.find(r=>r.teacher.id==='r').quota,null);assert.equal(w.rows.find(r=>r.teacher.id==='j').quota,(48-2)*65/84+2);
+for(const g of d.groups)g.demandMode='replacement';assert.equal(analyse().demand.total,96,'Obsolete stored classifications do not change demand');
+d.assignments.push({teacher:'r',target:'cl',subject:'CL'});assert.equal(analyse().demand.total,105,'A third distinct supplemental teacher adds one CL load');d.assignments.pop();
+const ui=make();try{
+ ui.run(`Object.assign(v(),${JSON.stringify(d)});tab='Workload';render();`);assert.equal(ui.w.document.querySelector('.workload-issues'),null);
+ assert.equal(ui.run("cellSubjects({level:'1'},'MTL').length"),0);assert.equal(ui.run("cellSubjects({level:'1'},'LSP').length"),0);assert.equal(ui.run("cellSubjects({level:'1'},'Music').join()"),'Music');assert.equal(ui.run("cellSubjects({level:'1'},'Art').join()"),'Art');
+ ui.run("v().groups[0].weeklyPeriods=.2;render()");const notice=ui.w.document.querySelector('.workload-issues');assert.ok(notice);assert.equal(notice.open,false);assert.match(notice.querySelector('summary').textContent,/Setup needs review/);assert.equal(ui.run('workloadData().D'),null,'Genuinely incomplete loads still withhold benchmarks');
+}finally{ui.w.close();}
+console.log('PASS 607 demand: independent TGs, IP matrix provision parity, distinct staff demand, empty duties/PLTs, employment rules and compact genuine-error notices');

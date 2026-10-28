@@ -1,0 +1,14 @@
+import {toWorkerModuleURL} from './helpers/worker-module.cjs';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+const gateway=await import(toWorkerModuleURL('data:text/javascript;base64,'+Buffer.from(fs.readFileSync('roster-update/public/_worker.js','utf8')).toString('base64')));
+const env={APPS_SCRIPT_URL:'https://script.google.com/macros/s/report-test/exec',ROSTER_SERVICE_SECRET:'s'.repeat(40)};
+let calls=0,result={reported:1,date:'2026-10-23',fileId:'file-1'};
+globalThis.fetch=async()=>{calls++;return Response.json({ok:true,data:result});};
+const at=Date.parse('2026-10-23T00:00:00Z');
+assert.equal((await gateway.dispatchDeliveryReviewReports(env,at-1)).deferred,'before-0800');assert.equal(calls,0,'do not check Meta or backend before scheduled report time');
+assert.equal((await gateway.dispatchDeliveryReviewReports(env,at)).reported,1);assert.equal(calls,1);
+assert.equal((await gateway.dispatchDeliveryReviewReports(env,at+60000)).alreadyReported,true);assert.equal(calls,1,'warm Worker remembers durable completion without repeated backend reads');
+result={pending:1};await gateway.dispatchDeliveryReviewReports(env,at+86400000);assert.equal(calls,2,'next Singapore date requires durable check');await gateway.dispatchDeliveryReviewReports(env,at+86460000);assert.equal(calls,3,'pending reports still retry');
+result={alreadyReported:true,date:'2026-10-24'};await gateway.dispatchDeliveryReviewReports(env,at+86520000);assert.equal(calls,4);await gateway.dispatchDeliveryReviewReports(env,at+86580000);assert.equal(calls,4);
+console.log('PASS 08:00 Singapore Worker gate, catch-up, durable-completion cache and pending retries');

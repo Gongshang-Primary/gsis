@@ -1,0 +1,80 @@
+{
+  "version": "0.9.8h",
+  "baseline": "0.9.8g",
+  "baselineCommit": "cb7a44ec1f42ecda6262e781de988330f465f62c",
+  "scope": [
+    "independent authoritative Stapler plans and native/reset archive recovery",
+    "publication independent of SMC WhatsApp communication with recipient snapshot privacy",
+    "Singapore notification dates and UT automatic hard cap with audited manual override",
+    "shared secret 32-or-more character compatibility and startup diagnostics",
+    "administrator OVERLORD Background work management"
+  ],
+  "componentCount": 17,
+  "timetableCacheChanged": false,
+  "migrationRequired": false,
+  "newInfrastructureRequired": false,
+  "productionDeployed": false,
+  "liveRecordsChanged": false,
+  "messagesSent": false,
+  "liveStaplerRecovery": {
+    "previewReported": "ready",
+    "restoreConfirmed": false
+  },
+  "verification": {
+    "status": "offline-verified-with-inherited-limits",
+    "focusedPrograms": 19,
+    "lordPrograms": 38,
+    "nodeAggregate": {
+      "total": 809,
+      "passed": 802,
+      "failed": 7,
+      "source": "verification/98h-node-aggregate-results.json",
+      "singleRun": false
+    },
+    "inheritedGFailurePrograms": [
+      "release084-absence-browser.cjs",
+      "roster717-inbox-performance.cjs",
+      "roster718-absence-performance-browser.cjs",
+      "stapler718a-relief-import.cjs",
+      "roster-draft-cell-save-speed.cjs",
+      "roster080-batch-backend.cjs",
+      "roster719-performance.cjs"
+    ],
+    "singleGreenFullSuiteClaimed": false,
+    "productionValidationPerformed": false,
+    "committedProvenance": {
+      "expectedTag": "v0.9.8h",
+      "manifest": "PATCH.json in the deployment archive",
+      "postCommitRecord": "RELEASE_VERIFICATION.json in the complete release archive"
+    },
+    "freshRecoveryClone": {
+      "required": true,
+      "history": "Complete reachable release history, including reconstructed baseline",
+      "postCommitRecord": "RELEASE_VERIFICATION.json in the complete release archive"
+    },
+    "nodeFullRuns": [
+      {
+        "total": 808,
+        "passed": 750,
+        "failed": 58,
+        "stage": "initial integration"
+      },
+      {
+        "total": 809,
+        "passed": 801,
+        "failed": 8,
+        "stage": "frozen generated runtime"
+      }
+    ],
+    "postGateReruns": [
+      {
+        "program": "stapler717-reopen.cjs",
+        "status": "passed",
+        "change": "Test-only historical quota-context fixture and authorised Save/Confirm quota-independence expectations",
+        "runtimeChanged": false
+      }
+    ],
+    "runtimeFingerprintFiles": 474
+  },
+  "timetableCacheNote": "No infrastructure or cache activation change; source-stability and projection fixes use existing readers."
+}

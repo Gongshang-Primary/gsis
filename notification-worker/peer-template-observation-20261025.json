@@ -1,0 +1,18 @@
+{
+  "observedDate": "2026-10-25",
+  "source": "WhatsApp Business MCP template detail read",
+  "templateId": "1860613241950793",
+  "name": "gsis_relief_request_v2",
+  "language": "en_GB",
+  "category": "UTILITY",
+  "status": "PENDING",
+  "bodySha256": "8d1496eda9cb385716226219d725c2e1d43b62c23dcccdcd9b8b0ad3a2232244",
+  "bodyParameterCount": 4,
+  "urlButtons": [
+    {
+      "text": "Review request",
+      "url": "https://roster.gsps.edu.sg/external.html#{{1}}"
+    }
+  ],
+  "activation": "Retain approved v1 until a live catalogue read verifies exact APPROVED v2 components."
+}

@@ -1,0 +1,95 @@
+{
+  "release": "0.9",
+  "checkedOn": "2026-10-24",
+  "basis": "current local source only; no live configuration or delivery verification",
+  "rosterSettings": [
+    "WHATSAPP_ACCESS_TOKEN",
+    "WHATSAPP_ACCOUNT_ID",
+    "WHATSAPP_API_VERSION",
+    "WHATSAPP_APP_SECRET",
+    "WHATSAPP_CURRENT_RELIEF_URL",
+    "WHATSAPP_DIAGNOSTICS_ENABLED",
+    "WHATSAPP_DURABLE_INGRESS",
+    "WHATSAPP_ENABLED",
+    "WHATSAPP_INBOX_ALERTS_ENABLED",
+    "WHATSAPP_INBOX_MEDIA",
+    "WHATSAPP_LAYOUT_URL",
+    "WHATSAPP_LORD_URL",
+    "WHATSAPP_MENU_ENABLED",
+    "WHATSAPP_PHONE_NUMBER_ID",
+    "WHATSAPP_SENDS_PER_SECOND",
+    "WHATSAPP_SEND_CONCURRENCY",
+    "WHATSAPP_TEMPLATES_JSON",
+    "WHATSAPP_TEMPLATE_ACCOUNT_ID",
+    "WHATSAPP_VERIFY_TOKEN"
+  ],
+  "lordScriptProperties": [
+    "LORD_WA_ACCESS_TOKEN",
+    "LORD_WA_API_VERSION",
+    "LORD_WA_BOOKINGSUCCESS_TEMPLATE",
+    "LORD_WA_COLLECTIONFOLLOWUP_TEMPLATE",
+    "LORD_WA_COLLECTREMINDER_TEMPLATE",
+    "LORD_WA_ENABLED",
+    "LORD_WA_FOLLOWUPS_APPROVED",
+    "LORD_WA_FORCE_CLOSE_TEMPLATE",
+    "LORD_WA_LANGUAGE",
+    "LORD_WA_LORD_BASE_URL",
+    "LORD_WA_OVERDUE_TEMPLATE",
+    "LORD_WA_PHONE_NUMBER_ID",
+    "LORD_WA_RETURNFOLLOWUP_TEMPLATE",
+    "LORD_WA_RETURNREMINDER_TEMPLATE",
+    "LORD_WA_SCHOOL_AGREEMENT",
+    "LORD_WA_TEACHER_ENABLED"
+  ],
+  "literalAndDynamicSettingsCovered": 35,
+  "canonicalRouteCount": 21,
+  "canonicalBodyFieldOrdersMatched": true,
+  "activationJsonMatchesCanonical": true,
+  "omissions": [],
+  "reviewedDependencies": [
+    "APPS_SCRIPT_URL",
+    "BRIDGE_SECRET",
+    "GOOGLE_CLIENT_ID",
+    "CALENDAR_APPS_SCRIPT_URL",
+    "CALENDAR_PROXY_SECRET",
+    "ROSTER_SERVICE_SECRET",
+    "ROSTER_PUBLIC_ORIGIN",
+    "CONTACTS_PUBLIC_URL",
+    "CONTACTS_API_URL",
+    "ROSTER_NOTIFICATION_ADMIN_IDS",
+    "EXTERNAL_LINK_SECRET",
+    "EXTERNAL_LINK_PREVIOUS_SECRET",
+    "GENERAL_OFFICE_PHONE",
+    "GSIS_JOBS",
+    "NOTIFICATION_DISPATCH_URL",
+    "NOTIFICATION_QUEUE",
+    "CALENDAR_BACKGROUND_SYNC",
+    "CALENDAR_SERVICE_SECRET",
+    "CALENDAR_GATEWAY",
+    "CALENDAR_GATEWAY_URL"
+  ],
+  "notes": [
+    "Worker also needs ingress settings and private media binding when it drains durable incoming jobs.",
+    "LORD property names are dynamically uppercased without underscores between words.",
+    "Meta template versions and schema identifiers are preserved.",
+    "Source-recorded historical approval observations are not a fresh provider check."
+  ],
+  "verificationCommands": [
+    {
+      "command": "node tests/roster712-whatsapp-menu.mjs",
+      "exitCode": 0
+    },
+    {
+      "command": "node tests/roster702-notification-setup.mjs",
+      "exitCode": 0
+    },
+    {
+      "command": "node tests/roster709-whatsapp-contracts.mjs",
+      "exitCode": 0
+    },
+    {
+      "command": "git diff --check",
+      "exitCode": 0
+    }
+  ]
+}

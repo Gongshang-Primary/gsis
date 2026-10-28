@@ -1,0 +1,219 @@
+{
+  "release": "0.8.1c",
+  "baseline": "0.8.1b",
+  "baselineCommit": "9816ba42a1ba68f7ec19dfc0639da928fabe201a",
+  "state": "committed-deployment-ready-package",
+  "releaseDate": "2026-10-21",
+  "releaseTimeZone": "Asia/Singapore",
+  "writeProtocol": 500,
+  "requirements": [
+    "058",
+    "059"
+  ],
+  "changedComponents": [
+    "deployBackend",
+    "rosterFrontend"
+  ],
+  "unchangedNotificationWorker": "0.8.1b",
+  "productionDeployed": false,
+  "productionDataChanged": false,
+  "staffMessagesSent": false,
+  "automaticMorningTeacherBatchCreated": false,
+  "verification": {
+    "fullNpm": {
+      "total": 455,
+      "passed": 446,
+      "failed": 9,
+      "failedTests": [
+        "package.cjs",
+        "release407-storage.cjs",
+        "roster081-day-ownership-browser.cjs",
+        "roster081-day-transactions.cjs",
+        "roster082-notify-service.cjs",
+        "roster083-template-transport.mjs",
+        "roster607-diagnostics.cjs",
+        "roster608-diagnostic-detail.cjs",
+        "roster711-backend.cjs"
+      ],
+      "log": "verification/81c-npm-test.log"
+    },
+    "capturedSnapshot": {
+      "operationsRevision": 204,
+      "date": "2026-10-21",
+      "storedTeacherRows": 58,
+      "substantiveRecipients": 38,
+      "reportedUnchangedTeacherExcluded": true,
+      "sourceUnmodified": true
+    },
+    "finalTargeted": {
+      "total": 29,
+      "passed": 29,
+      "results": [
+        {
+          "file": "package.cjs",
+          "passed": true,
+          "status": 0
+        },
+        {
+          "file": "release407-storage.cjs",
+          "passed": true,
+          "status": 0
+        },
+        {
+          "file": "roster081-day-ownership-browser.cjs",
+          "passed": true,
+          "status": 0
+        },
+        {
+          "file": "roster081-day-transactions.cjs",
+          "passed": true,
+          "status": 0
+        },
+        {
+          "file": "roster082-notify-service.cjs",
+          "passed": true,
+          "status": 0
+        },
+        {
+          "file": "roster083-template-transport.mjs",
+          "passed": true,
+          "status": 0
+        },
+        {
+          "file": "roster607-diagnostics.cjs",
+          "passed": true,
+          "status": 0
+        },
+        {
+          "file": "roster608-diagnostic-detail.cjs",
+          "passed": true,
+          "status": 0
+        },
+        {
+          "file": "roster711-backend.cjs",
+          "passed": true,
+          "status": 0
+        },
+        {
+          "file": "roster084-recipient-policy.cjs",
+          "passed": true,
+          "status": 0
+        },
+        {
+          "file": "roster084-manual-dispatch.cjs",
+          "passed": true,
+          "status": 0
+        },
+        {
+          "file": "roster084-notify-status-browser.cjs",
+          "passed": true,
+          "status": 0
+        },
+        {
+          "file": "roster084-stapler-unchanged.cjs",
+          "passed": true,
+          "status": 0
+        },
+        {
+          "file": "roster083-timetable-ack.cjs",
+          "passed": true,
+          "status": 0
+        },
+        {
+          "file": "roster709-date-publication.cjs",
+          "passed": true,
+          "status": 0
+        },
+        {
+          "file": "stapler-draft-excel-export-model.cjs",
+          "passed": true,
+          "status": 0
+        },
+        {
+          "file": "stapler707-model.cjs",
+          "passed": true,
+          "status": 0
+        },
+        {
+          "file": "stapler718c-import-policy.cjs",
+          "passed": true,
+          "status": 0
+        },
+        {
+          "file": "roster701-delivery-lease.cjs",
+          "passed": true,
+          "status": 0
+        },
+        {
+          "file": "roster701-r17-integration.cjs",
+          "passed": true,
+          "status": 0
+        },
+        {
+          "file": "roster083-provider-diagnostics.cjs",
+          "passed": true,
+          "status": 0
+        },
+        {
+          "file": "roster083-external-ack-gateway.mjs",
+          "passed": true,
+          "status": 0
+        },
+        {
+          "file": "roster083-notify-ack-browser.cjs",
+          "passed": true,
+          "status": 0
+        },
+        {
+          "file": "roster713-smc-summary.cjs",
+          "passed": true,
+          "status": 0
+        },
+        {
+          "file": "roster082-notify-performance-browser.cjs",
+          "passed": true,
+          "status": 0
+        },
+        {
+          "file": "roster719-performance.cjs",
+          "passed": true,
+          "status": 0
+        },
+        {
+          "file": "stapler716-performance.cjs",
+          "passed": true,
+          "status": 0
+        },
+        {
+          "file": "combined-backend.cjs",
+          "passed": true,
+          "status": 0
+        },
+        {
+          "file": "apps-script-syntax.cjs",
+          "passed": true,
+          "status": 0
+        }
+      ]
+    },
+    "currentScriptsVerifiedAcrossRuns": 455,
+    "unresolvedTestFailures": 0,
+    "appsScriptSourceFiles": 68,
+    "componentArchive": "exact scope, source parity and hashes passed"
+  },
+  "skills": [
+    "Ponytail",
+    "Pstack",
+    "Thermonuclear",
+    "Vercel",
+    "Superpowers"
+  ],
+  "queuedRequirements": [
+    "060"
+  ],
+  "reviews": {
+    "correctness": "closed",
+    "structuralQuality": "closed",
+    "unresolvedMaterialFindings": 0
+  }
+}

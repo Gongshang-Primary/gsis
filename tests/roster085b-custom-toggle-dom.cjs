@@ -1,0 +1,16 @@
+'use strict';
+const assert=require('node:assert/strict'),fs=require('node:fs'),{JSDOM}=require('jsdom');
+(async()=>{
+ const dom=new JSDOM('<main id="content"></main>',{url:'https://roster.test',runScripts:'outside-only',pretendToBeVisual:true}),w=dom.window;
+ w.structuredClone=v=>JSON.parse(JSON.stringify(v));w.HTMLElement.prototype.scrollIntoView=()=>{};
+ for(const file of ['shared/roster-stapler.js','shared/roster-allocation.js','shared/roster-operations.js','tests/roster701-fixture.js','roster-update/public/roster-operations-ui.js'])w.eval(fs.readFileSync(file,'utf8'));
+ const f=w.__fixture,invalidations=[];f.state.customInstructions=[{id:'rule1',date:'2026-10-01',levels:[1],periods:[2],classNames:[],groupIds:[],text:'Use the foyer.',version:1}];
+ const ctx={profile:f.profile,today:()=>f.ctx.today,container:w.document.getElementById('content'),status(){},invalidateOperations:dates=>invalidations.push(dates),api:async(route,p)=>{const response=await w.fetch('/'+route,{body:JSON.stringify(p)}),result=await response.json();if(!response.ok)throw Object.assign(Error(result.error),{status:response.status});return result.data;}};
+ const q=s=>w.document.querySelector(s),tick=()=>new Promise(r=>setTimeout(r,0));
+ await w.RosterOpsUI.render('Custom Notifications',ctx);assert.equal(q('[data-ops-date]'),null);assert.match(q('[data-ops-body]').textContent,/every.*day/i);assert.equal(q('[data-custom-toggle]').checked,true);assert.equal(q('[data-custom-toggle]').getAttribute('role'),'switch');
+ q('[data-custom-edit]').click();q('[name=text]').value='Unsaved local edit';q('[name=text]').dispatchEvent(new w.Event('input',{bubbles:true}));const before=JSON.stringify(f.state.customInstructions[0]);
+ q('[data-custom-toggle]').click();await tick();assert.equal(f.state.customInstructions[0].enabled,false);assert.equal(f.state.customInstructions[0].text,'Use the foyer.');assert.equal(q('[name=text]').value,'Unsaved local edit');assert.equal(w.RosterOpsUI.isDirty(),true);assert.equal(invalidations.at(-1),undefined,'global rule invalidates all cached days');
+ q('[data-custom-clear]').click();f.fail='after-save';q('[data-custom-toggle]').click();await tick();const pending=f.calls.at(-1).p;assert.equal(pending.operation,'setCustomInstructionEnabled');assert.equal(f.state.customInstructions[0].enabled,true);assert(q('[data-retry-save]'));q('[data-retry-save]').click();await tick();assert.equal(f.calls.at(-1).p.requestId,pending.requestId);assert.equal(f.state.customInstructions[0].version,3);assert.equal(q('[data-custom-toggle]').checked,true);
+ q('[data-custom-toggle]').click();await tick();q('[data-custom-edit]').click();q('[name=text]').value='Updated while paused';q('[name=text]').dispatchEvent(new w.Event('input',{bubbles:true}));q('[data-custom-form]').dispatchEvent(new w.Event('submit',{cancelable:true}));await tick();assert.equal(f.state.customInstructions[0].enabled,false);assert.equal(f.state.customInstructions[0].text,'Updated while paused');assert.equal(q('[data-custom-toggle]').checked,false);assert.equal(q('[name=text]').value,'');
+ w.RosterOpsUI.unmount();dom.window.close();console.log('PASS ongoing custom rules: no day picker, accessible toggle, local draft retention, global cache invalidation, exact retry, paused edits stay paused');
+})().catch(e=>{console.error(e);process.exitCode=1;});

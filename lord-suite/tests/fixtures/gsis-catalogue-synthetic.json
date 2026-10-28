@@ -1,0 +1,725 @@
+{
+  "synthetic": true,
+  "purpose": "Offline contract fixture; invented classes and local activities, no production snapshot",
+  "indexRevision": 7,
+  "published": {
+    "id": "synthetic-published",
+    "name": "Synthetic 2026 Published",
+    "revision": 1,
+    "commit": "synthetic-published-commit",
+    "from": "2026-01-01",
+    "to": "2026-12-31",
+    "classes": [
+      {
+        "level": "1",
+        "name": "Synthetic Published Class 1",
+        "shortName": "P",
+        "ref": "00000000-0000-4000-8000-000000001000"
+      },
+      {
+        "level": "1",
+        "name": "Synthetic Published Class 2",
+        "shortName": "A",
+        "ref": "00000000-0000-4000-8000-000000001001"
+      },
+      {
+        "level": "1",
+        "name": "Synthetic Published Class 3",
+        "shortName": "B",
+        "ref": "00000000-0000-4000-8000-000000001002"
+      },
+      {
+        "level": "1",
+        "name": "Synthetic Published Class 4",
+        "shortName": "C",
+        "ref": "00000000-0000-4000-8000-000000001003"
+      },
+      {
+        "level": "1",
+        "name": "Synthetic Published Class 5",
+        "shortName": "D",
+        "ref": "00000000-0000-4000-8000-000000001004"
+      },
+      {
+        "level": "1",
+        "name": "Synthetic Published Class 6",
+        "shortName": "E",
+        "ref": "00000000-0000-4000-8000-000000001005"
+      },
+      {
+        "level": "1",
+        "name": "Synthetic Published Class 7",
+        "shortName": "F",
+        "ref": "00000000-0000-4000-8000-000000001006"
+      },
+      {
+        "level": "1",
+        "name": "Synthetic Published Class 8",
+        "shortName": "G",
+        "ref": "00000000-0000-4000-8000-000000001007"
+      },
+      {
+        "level": "1",
+        "name": "Synthetic Published Class 9",
+        "shortName": "H",
+        "ref": "00000000-0000-4000-8000-000000001008"
+      },
+      {
+        "level": "1",
+        "name": "Synthetic Published Class 10",
+        "shortName": "I",
+        "ref": "00000000-0000-4000-8000-000000001009"
+      },
+      {
+        "level": "2",
+        "name": "Synthetic Published Class 11",
+        "shortName": "P",
+        "ref": "00000000-0000-4000-8000-000000001010"
+      },
+      {
+        "level": "2",
+        "name": "Synthetic Published Class 12",
+        "shortName": "A",
+        "ref": "00000000-0000-4000-8000-000000001011"
+      },
+      {
+        "level": "2",
+        "name": "Synthetic Published Class 13",
+        "shortName": "B",
+        "ref": "00000000-0000-4000-8000-000000001012"
+      },
+      {
+        "level": "2",
+        "name": "Synthetic Published Class 14",
+        "shortName": "C",
+        "ref": "00000000-0000-4000-8000-000000001013"
+      },
+      {
+        "level": "2",
+        "name": "Synthetic Published Class 15",
+        "shortName": "D",
+        "ref": "00000000-0000-4000-8000-000000001014"
+      },
+      {
+        "level": "2",
+        "name": "Synthetic Published Class 16",
+        "shortName": "E",
+        "ref": "00000000-0000-4000-8000-000000001015"
+      },
+      {
+        "level": "2",
+        "name": "Synthetic Published Class 17",
+        "shortName": "F",
+        "ref": "00000000-0000-4000-8000-000000001016"
+      },
+      {
+        "level": "2",
+        "name": "Synthetic Published Class 18",
+        "shortName": "G",
+        "ref": "00000000-0000-4000-8000-000000001017"
+      },
+      {
+        "level": "2",
+        "name": "Synthetic Published Class 19",
+        "shortName": "H",
+        "ref": "00000000-0000-4000-8000-000000001018"
+      },
+      {
+        "level": "2",
+        "name": "Synthetic Published Class 20",
+        "shortName": "I",
+        "ref": "00000000-0000-4000-8000-000000001019"
+      },
+      {
+        "level": "3",
+        "name": "Synthetic Published Class 21",
+        "shortName": "P",
+        "ref": "00000000-0000-4000-8000-000000001020"
+      },
+      {
+        "level": "3",
+        "name": "Synthetic Published Class 22",
+        "shortName": "A",
+        "ref": "00000000-0000-4000-8000-000000001021"
+      },
+      {
+        "level": "3",
+        "name": "Synthetic Published Class 23",
+        "shortName": "B",
+        "ref": "00000000-0000-4000-8000-000000001022"
+      },
+      {
+        "level": "3",
+        "name": "Synthetic Published Class 24",
+        "shortName": "C",
+        "ref": "00000000-0000-4000-8000-000000001023"
+      },
+      {
+        "level": "3",
+        "name": "Synthetic Published Class 25",
+        "shortName": "D",
+        "ref": "00000000-0000-4000-8000-000000001024"
+      },
+      {
+        "level": "3",
+        "name": "Synthetic Published Class 26",
+        "shortName": "E",
+        "ref": "00000000-0000-4000-8000-000000001025"
+      },
+      {
+        "level": "3",
+        "name": "Synthetic Published Class 27",
+        "shortName": "F",
+        "ref": "00000000-0000-4000-8000-000000001026"
+      },
+      {
+        "level": "3",
+        "name": "Synthetic Published Class 28",
+        "shortName": "G",
+        "ref": "00000000-0000-4000-8000-000000001027"
+      },
+      {
+        "level": "3",
+        "name": "Synthetic Published Class 29",
+        "shortName": "H",
+        "ref": "00000000-0000-4000-8000-000000001028"
+      },
+      {
+        "level": "3",
+        "name": "Synthetic Published Class 30",
+        "shortName": "I",
+        "ref": "00000000-0000-4000-8000-000000001029"
+      },
+      {
+        "level": "4",
+        "name": "Synthetic Published Class 31",
+        "shortName": "P",
+        "ref": "00000000-0000-4000-8000-000000001030"
+      },
+      {
+        "level": "4",
+        "name": "Synthetic Published Class 32",
+        "shortName": "A",
+        "ref": "00000000-0000-4000-8000-000000001031"
+      },
+      {
+        "level": "4",
+        "name": "Synthetic Published Class 33",
+        "shortName": "B",
+        "ref": "00000000-0000-4000-8000-000000001032"
+      },
+      {
+        "level": "4",
+        "name": "Synthetic Published Class 34",
+        "shortName": "C",
+        "ref": "00000000-0000-4000-8000-000000001033"
+      },
+      {
+        "level": "4",
+        "name": "Synthetic Published Class 35",
+        "shortName": "D",
+        "ref": "00000000-0000-4000-8000-000000001034"
+      },
+      {
+        "level": "4",
+        "name": "Synthetic Published Class 36",
+        "shortName": "E",
+        "ref": "00000000-0000-4000-8000-000000001035"
+      },
+      {
+        "level": "4",
+        "name": "Synthetic Published Class 37",
+        "shortName": "F",
+        "ref": "00000000-0000-4000-8000-000000001036"
+      },
+      {
+        "level": "4",
+        "name": "Synthetic Published Class 38",
+        "shortName": "G",
+        "ref": "00000000-0000-4000-8000-000000001037"
+      },
+      {
+        "level": "4",
+        "name": "Synthetic Published Class 39",
+        "shortName": "H",
+        "ref": "00000000-0000-4000-8000-000000001038"
+      },
+      {
+        "level": "4",
+        "name": "Synthetic Published Class 40",
+        "shortName": "I",
+        "ref": "00000000-0000-4000-8000-000000001039"
+      }
+    ]
+  },
+  "draft": {
+    "id": "synthetic-draft",
+    "name": "Synthetic 2027 Draft",
+    "revision": 1,
+    "commit": "synthetic-draft-commit",
+    "from": "2027-01-01",
+    "to": "2027-12-31",
+    "classes": [
+      {
+        "level": "1",
+        "name": "Synthetic Draft Class 1",
+        "shortName": "P",
+        "ref": "00000000-0000-4000-8000-000000002000"
+      },
+      {
+        "level": "1",
+        "name": "Synthetic Draft Class 2",
+        "shortName": "A",
+        "ref": "00000000-0000-4000-8000-000000002001"
+      },
+      {
+        "level": "1",
+        "name": "Synthetic Draft Class 3",
+        "shortName": "B",
+        "ref": "00000000-0000-4000-8000-000000002002"
+      },
+      {
+        "level": "1",
+        "name": "Synthetic Draft Class 4",
+        "shortName": "C",
+        "ref": "00000000-0000-4000-8000-000000002003"
+      },
+      {
+        "level": "1",
+        "name": "Synthetic Draft Class 5",
+        "shortName": "D",
+        "ref": "00000000-0000-4000-8000-000000002004"
+      },
+      {
+        "level": "1",
+        "name": "Synthetic Draft Class 6",
+        "shortName": "E",
+        "ref": "00000000-0000-4000-8000-000000002005"
+      },
+      {
+        "level": "1",
+        "name": "Synthetic Draft Class 7",
+        "shortName": "F",
+        "ref": "00000000-0000-4000-8000-000000002006"
+      },
+      {
+        "level": "1",
+        "name": "Synthetic Draft Class 8",
+        "shortName": "G",
+        "ref": "00000000-0000-4000-8000-000000002007"
+      },
+      {
+        "level": "1",
+        "name": "Synthetic Draft Class 9",
+        "shortName": "H",
+        "ref": "00000000-0000-4000-8000-000000002008"
+      },
+      {
+        "level": "1",
+        "name": "Synthetic Draft Class 10",
+        "shortName": "I",
+        "ref": "00000000-0000-4000-8000-000000002009"
+      },
+      {
+        "level": "2",
+        "name": "Synthetic Draft Class 11",
+        "shortName": "P",
+        "ref": "00000000-0000-4000-8000-000000002010"
+      },
+      {
+        "level": "2",
+        "name": "Synthetic Draft Class 12",
+        "shortName": "A",
+        "ref": "00000000-0000-4000-8000-000000002011"
+      },
+      {
+        "level": "2",
+        "name": "Synthetic Draft Class 13",
+        "shortName": "B",
+        "ref": "00000000-0000-4000-8000-000000002012"
+      },
+      {
+        "level": "2",
+        "name": "Synthetic Draft Class 14",
+        "shortName": "C",
+        "ref": "00000000-0000-4000-8000-000000002013"
+      },
+      {
+        "level": "2",
+        "name": "Synthetic Draft Class 15",
+        "shortName": "D",
+        "ref": "00000000-0000-4000-8000-000000002014"
+      },
+      {
+        "level": "2",
+        "name": "Synthetic Draft Class 16",
+        "shortName": "E",
+        "ref": "00000000-0000-4000-8000-000000002015"
+      },
+      {
+        "level": "2",
+        "name": "Synthetic Draft Class 17",
+        "shortName": "F",
+        "ref": "00000000-0000-4000-8000-000000002016"
+      },
+      {
+        "level": "2",
+        "name": "Synthetic Draft Class 18",
+        "shortName": "G",
+        "ref": "00000000-0000-4000-8000-000000002017"
+      },
+      {
+        "level": "2",
+        "name": "Synthetic Draft Class 19",
+        "shortName": "H",
+        "ref": "00000000-0000-4000-8000-000000002018"
+      },
+      {
+        "level": "2",
+        "name": "Synthetic Draft Class 20",
+        "shortName": "I",
+        "ref": "00000000-0000-4000-8000-000000002019"
+      },
+      {
+        "level": "3",
+        "name": "Synthetic Draft Class 21",
+        "shortName": "P",
+        "ref": "00000000-0000-4000-8000-000000002020"
+      },
+      {
+        "level": "3",
+        "name": "Synthetic Draft Class 22",
+        "shortName": "A",
+        "ref": "00000000-0000-4000-8000-000000002021"
+      },
+      {
+        "level": "3",
+        "name": "Synthetic Draft Class 23",
+        "shortName": "B",
+        "ref": "00000000-0000-4000-8000-000000002022"
+      },
+      {
+        "level": "3",
+        "name": "Synthetic Draft Class 24",
+        "shortName": "C",
+        "ref": "00000000-0000-4000-8000-000000002023"
+      },
+      {
+        "level": "3",
+        "name": "Synthetic Draft Class 25",
+        "shortName": "D",
+        "ref": "00000000-0000-4000-8000-000000002024"
+      },
+      {
+        "level": "3",
+        "name": "Synthetic Draft Class 26",
+        "shortName": "E",
+        "ref": "00000000-0000-4000-8000-000000002025"
+      },
+      {
+        "level": "3",
+        "name": "Synthetic Draft Class 27",
+        "shortName": "F",
+        "ref": "00000000-0000-4000-8000-000000002026"
+      },
+      {
+        "level": "3",
+        "name": "Synthetic Draft Class 28",
+        "shortName": "G",
+        "ref": "00000000-0000-4000-8000-000000002027"
+      },
+      {
+        "level": "3",
+        "name": "Synthetic Draft Class 29",
+        "shortName": "H",
+        "ref": "00000000-0000-4000-8000-000000002028"
+      },
+      {
+        "level": "3",
+        "name": "Synthetic Draft Class 30",
+        "shortName": "I",
+        "ref": "00000000-0000-4000-8000-000000002029"
+      },
+      {
+        "level": "4",
+        "name": "Synthetic Draft Class 31",
+        "shortName": "P",
+        "ref": "00000000-0000-4000-8000-000000002030"
+      },
+      {
+        "level": "4",
+        "name": "Synthetic Draft Class 32",
+        "shortName": "A",
+        "ref": "00000000-0000-4000-8000-000000002031"
+      },
+      {
+        "level": "4",
+        "name": "Synthetic Draft Class 33",
+        "shortName": "B",
+        "ref": "00000000-0000-4000-8000-000000002032"
+      },
+      {
+        "level": "4",
+        "name": "Synthetic Draft Class 34",
+        "shortName": "C",
+        "ref": "00000000-0000-4000-8000-000000002033"
+      },
+      {
+        "level": "4",
+        "name": "Synthetic Draft Class 35",
+        "shortName": "D",
+        "ref": "00000000-0000-4000-8000-000000002034"
+      },
+      {
+        "level": "4",
+        "name": "Synthetic Draft Class 36",
+        "shortName": "E",
+        "ref": "00000000-0000-4000-8000-000000002035"
+      },
+      {
+        "level": "4",
+        "name": "Synthetic Draft Class 37",
+        "shortName": "F",
+        "ref": "00000000-0000-4000-8000-000000002036"
+      },
+      {
+        "level": "4",
+        "name": "Synthetic Draft Class 38",
+        "shortName": "G",
+        "ref": "00000000-0000-4000-8000-000000002037"
+      },
+      {
+        "level": "4",
+        "name": "Synthetic Draft Class 39",
+        "shortName": "H",
+        "ref": "00000000-0000-4000-8000-000000002038"
+      },
+      {
+        "level": "4",
+        "name": "Synthetic Draft Class 40",
+        "shortName": "I",
+        "ref": "00000000-0000-4000-8000-000000002039"
+      },
+      {
+        "level": "5",
+        "name": "Synthetic Draft Class 41",
+        "shortName": "P",
+        "ref": "00000000-0000-4000-8000-000000002040"
+      },
+      {
+        "level": "5",
+        "name": "Synthetic Draft Class 42",
+        "shortName": "A",
+        "ref": "00000000-0000-4000-8000-000000002041"
+      },
+      {
+        "level": "5",
+        "name": "Synthetic Draft Class 43",
+        "shortName": "B",
+        "ref": "00000000-0000-4000-8000-000000002042"
+      },
+      {
+        "level": "5",
+        "name": "Synthetic Draft Class 44",
+        "shortName": "C",
+        "ref": "00000000-0000-4000-8000-000000002043"
+      },
+      {
+        "level": "5",
+        "name": "Synthetic Draft Class 45",
+        "shortName": "D",
+        "ref": "00000000-0000-4000-8000-000000002044"
+      },
+      {
+        "level": "5",
+        "name": "Synthetic Draft Class 46",
+        "shortName": "E",
+        "ref": "00000000-0000-4000-8000-000000002045"
+      },
+      {
+        "level": "5",
+        "name": "Synthetic Draft Class 47",
+        "shortName": "F",
+        "ref": "00000000-0000-4000-8000-000000002046"
+      },
+      {
+        "level": "5",
+        "name": "Synthetic Draft Class 48",
+        "shortName": "G",
+        "ref": "00000000-0000-4000-8000-000000002047"
+      },
+      {
+        "level": "5",
+        "name": "Synthetic Draft Class 49",
+        "shortName": "H",
+        "ref": "00000000-0000-4000-8000-000000002048"
+      },
+      {
+        "level": "5",
+        "name": "Synthetic Draft Class 50",
+        "shortName": "I",
+        "ref": "00000000-0000-4000-8000-000000002049"
+      },
+      {
+        "level": "6",
+        "name": "Synthetic Draft Class 51",
+        "shortName": "P",
+        "ref": "00000000-0000-4000-8000-000000002050"
+      },
+      {
+        "level": "6",
+        "name": "Synthetic Draft Class 52",
+        "shortName": "A",
+        "ref": "00000000-0000-4000-8000-000000002051"
+      },
+      {
+        "level": "6",
+        "name": "Synthetic Draft Class 53",
+        "shortName": "B",
+        "ref": "00000000-0000-4000-8000-000000002052"
+      },
+      {
+        "level": "6",
+        "name": "Synthetic Draft Class 54",
+        "shortName": "C",
+        "ref": "00000000-0000-4000-8000-000000002053"
+      },
+      {
+        "level": "6",
+        "name": "Synthetic Draft Class 55",
+        "shortName": "D",
+        "ref": "00000000-0000-4000-8000-000000002054"
+      },
+      {
+        "level": "6",
+        "name": "Synthetic Draft Class 56",
+        "shortName": "E",
+        "ref": "00000000-0000-4000-8000-000000002055"
+      },
+      {
+        "level": "6",
+        "name": "Synthetic Draft Class 57",
+        "shortName": "F",
+        "ref": "00000000-0000-4000-8000-000000002056"
+      },
+      {
+        "level": "6",
+        "name": "Synthetic Draft Class 58",
+        "shortName": "G",
+        "ref": "00000000-0000-4000-8000-000000002057"
+      },
+      {
+        "level": "6",
+        "name": "Synthetic Draft Class 59",
+        "shortName": "H",
+        "ref": "00000000-0000-4000-8000-000000002058"
+      }
+    ]
+  },
+  "lordReference": {
+    "labels": [
+      "1 Synthetic Published Class 1",
+      "1 Synthetic Published Class 2",
+      "1 Synthetic Published Class 3",
+      "1 Synthetic Published Class 4",
+      "1 Synthetic Published Class 5",
+      "1 Synthetic Published Class 6",
+      "1 Synthetic Published Class 7",
+      "1 Synthetic Published Class 8",
+      "1 Synthetic Published Class 9",
+      "1 Synthetic Published Class 10",
+      "2 Synthetic Published Class 11",
+      "2 Synthetic Published Class 12",
+      "2 Synthetic Published Class 13",
+      "2 Synthetic Published Class 14",
+      "2 Synthetic Published Class 15",
+      "2 Synthetic Published Class 16",
+      "2 Synthetic Published Class 17",
+      "2 Synthetic Published Class 18",
+      "2 Synthetic Published Class 19",
+      "2 Synthetic Published Class 20",
+      "3 Synthetic Published Class 21",
+      "3 Synthetic Published Class 22",
+      "3 Synthetic Published Class 23",
+      "3 Synthetic Published Class 24",
+      "3 Synthetic Published Class 25",
+      "3 Synthetic Published Class 26",
+      "3 Synthetic Published Class 27",
+      "3 Synthetic Published Class 28",
+      "3 Synthetic Published Class 29",
+      "3 Synthetic Published Class 30",
+      "4 Synthetic Published Class 31",
+      "4 Synthetic Published Class 32",
+      "4 Synthetic Published Class 33",
+      "4 Synthetic Published Class 34",
+      "4 Synthetic Published Class 35",
+      "4 Synthetic Published Class 36",
+      "4 Synthetic Published Class 37",
+      "4 Synthetic Published Class 38",
+      "4 Synthetic Published Class 39",
+      "4 Synthetic Published Class 40",
+      "Synthetic Activity 1",
+      "Synthetic Activity 2",
+      "Synthetic Activity 3",
+      "Synthetic Activity 4",
+      "Synthetic Activity 5",
+      "Synthetic Activity 6",
+      "Synthetic Activity 7",
+      "Synthetic Activity 8",
+      "Synthetic Activity 9",
+      "Synthetic Activity 10",
+      "Synthetic Activity 11",
+      "Synthetic Activity 12",
+      "Synthetic Activity 13",
+      "Synthetic Activity 14",
+      "Synthetic Activity 15",
+      "Synthetic Activity 16",
+      "Synthetic Activity 17",
+      "Synthetic Activity 18",
+      "Synthetic Activity 19",
+      "Synthetic Activity 20",
+      "Synthetic Activity 21",
+      "Synthetic Activity 22",
+      "Synthetic Activity 23",
+      "Synthetic Activity 24",
+      "Synthetic Activity 25",
+      "Synthetic Activity 26",
+      "Synthetic Activity 27",
+      "Synthetic Activity 28",
+      "Synthetic Activity 29",
+      "Synthetic Activity 30",
+      "Synthetic Activity 31",
+      "Synthetic Activity 32",
+      "Synthetic Activity 33",
+      "Synthetic Activity 34",
+      "Synthetic Activity 35",
+      "Synthetic Activity 36",
+      "Synthetic Activity 37",
+      "Synthetic Activity 38",
+      "Synthetic Activity 39",
+      "Synthetic Activity 40",
+      "Synthetic Activity 41",
+      "Synthetic Activity 42",
+      "Synthetic Activity 43",
+      "Synthetic Activity 44",
+      "Synthetic Activity 45",
+      "Synthetic Activity 46",
+      "Synthetic Activity 47",
+      "Synthetic Activity 48",
+      "Synthetic Activity 49",
+      "Synthetic Activity 50",
+      "Synthetic Activity 51",
+      "Synthetic Activity 52",
+      "Synthetic Activity 53",
+      "Synthetic Activity 54",
+      "Synthetic Activity 55",
+      "Synthetic Activity 56",
+      "Synthetic Activity 57",
+      "Synthetic Activity 58",
+      "Synthetic Activity 59",
+      "Synthetic Activity 60",
+      "Synthetic Activity 61",
+      "Synthetic Activity 62"
+    ]
+  }
+}

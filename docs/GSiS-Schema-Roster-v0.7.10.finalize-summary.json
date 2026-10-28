@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "ok": true,
+  "command": "finalize",
+  "status": "pass",
+  "type": "erd",
+  "quality": "standard",
+  "specification": {
+    "path": "/workspace/scratch/c84f0276cce6/build710/source/docs/architecture-source/GSiS-Schema-Roster-v0.7.10.json",
+    "sha256": "94c91a7a2768027c6e107d60ba0c3eaef8c804da91c355b5a256f0af9c6fb567",
+    "bytes": 5166
+  },
+  "artifact": {
+    "path": "/workspace/scratch/c84f0276cce6/build710/source/docs/GSiS-Schema-Roster-v0.7.10.html",
+    "sha256": "47c45939c7572220e45635c162b6e3c7e02b1230955125ce057902a2f79556fb",
+    "bytes": 829952
+  },
+  "gates": {
+    "validate": "pass",
+    "deliver": "pass",
+    "check": "pass",
+    "browser-check": "pass"
+  },
+  "diagnostics": [],
+  "diagnosticSummary": {
+    "total": 0,
+    "shown": 0,
+    "truncated": false
+  },
+  "evidence": {
+    "receipt": "/workspace/scratch/c84f0276cce6/build710/source/docs/GSiS-Schema-Roster-v0.7.10.finalize.json",
+    "summaryReceipt": "/workspace/scratch/c84f0276cce6/build710/source/docs/GSiS-Schema-Roster-v0.7.10.finalize-summary.json",
+    "browserCheckReceipt": "/workspace/scratch/c84f0276cce6/build710/source/docs/GSiS-Schema-Roster-v0.7.10.browser-check.json"
+  },
+  "visualReview": "not-requested",
+  "durationMs": 3698
+}

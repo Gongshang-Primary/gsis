@@ -1,0 +1,22 @@
+/* Program settings use the displayed value, including editable controls. */
+#content [data-value-align="text"],#content [data-value-align="text"] :is(input,select,textarea,.sort-button,summary){text-align:left!important}
+#content [data-value-align="number"],#content [data-value-align="number"] :is(input,select,textarea,.sort-button,summary){text-align:center!important}
+
+/* One scroll owner for all six primary levels; native tables retain their own tools. */
+html body #content[data-view="Classes & TGs"]{min-width:0;overflow:visible!important;max-height:none!important}
+#content .class-groups-scroll{overflow:auto;max-width:100%;height:calc(100dvh - 240px);min-height:12rem;overscroll-behavior:contain;position:relative;border:1px solid #b8c8d2}
+.class-group-levels{display:flex;align-items:stretch;gap:12px;width:max-content;min-width:100%}
+.class-group-level{flex:0 0 auto;min-width:0;position:relative}
+.class-group-level h3{position:sticky;top:0;z-index:4;height:2rem;box-sizing:border-box;display:flex;align-items:center;margin:0;padding:0 6px;background:#edf3f7;color:#17364c;font-size:inherit}
+.class-group-level .gsis-table-tools{flex-wrap:nowrap;white-space:nowrap;padding:0 4px;margin:4px 0}
+.class-group-level .gsis-table-caption{display:none}
+.class-group-level table{width:max-content!important;min-width:0;table-layout:auto;border-collapse:separate;border-spacing:0}
+.class-group-level table thead{position:sticky;top:2rem;z-index:3;background:#19485e;color:white}
+.class-group-level table th,.class-group-level table td{white-space:nowrap;text-align:left;padding:3px 6px;max-width:none;box-sizing:border-box}
+.class-group-level table tbody tr{height:3rem}
+.class-group-level table .context{display:block;white-space:nowrap}
+.class-group-level .class-group-spacer td{border-bottom-color:transparent}
+@media print{#content .class-groups-scroll{height:auto;overflow:visible;max-height:none}.class-group-level h3,.class-group-level table thead{position:static}}
+
+/* Subject placement choices share the existing local draft and save controls. */
+#content[data-view="Subject Type"] .scroll{width:100%;max-width:950px;overflow-x:auto}.subject-types-table{width:100%;min-width:620px;max-width:950px}.subject-types-table th:first-child{text-align:left}.subject-types-table th small{display:block;font-weight:400}#content .subject-types-table th:nth-child(2),#content .subject-types-table th:nth-child(3),#content .subject-types-table th:nth-child(4),#content .subject-types-table td:nth-child(2),#content .subject-types-table td:nth-child(3),#content .subject-types-table td:nth-child(4){text-align:center;width:100px}.subject-types-table input[type=radio]{width:20px;height:20px;cursor:pointer}.subject-types-table input:disabled{cursor:default}.subject-types-table [data-subject-type-note]{white-space:normal;font-size:13px;color:#805a13}

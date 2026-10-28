@@ -1,0 +1,49 @@
+name = "gsis-roster-notifications"
+main = "index.js"
+compatibility_date = "2026-10-01"
+workers_dev = false
+
+[observability]
+enabled = true
+
+[triggers]
+crons = ["* * * * *", "15 18 * * *", "2-57/5 * * * *"]
+
+[vars]
+WHATSAPP_ENABLED = "false"
+ROSTER_AUTOMATION_ENABLED = "false"
+WHATSAPP_MENU_ENABLED = "false"
+WHATSAPP_INBOX_ALERTS_ENABLED = "false"
+WHATSAPP_DIAGNOSTICS_ENABLED = "false"
+WHATSAPP_TEMPLATES_JSON = "{}"
+GSIS_RECOVERY_MODE = "false"
+WHATSAPP_SEND_CONCURRENCY = "4"
+WHATSAPP_SENDS_PER_SECOND = "4"
+# Set the approved API version and real account/number IDs during setup.
+# Configure values and secrets using ../docs/WHATSAPP_ACTIVATION_v0.9.1.md on both
+# this Worker and Roster Pages. After activation, keep these vars in sync with
+# the intended live values before a future Wrangler deployment (which applies them).
+# Ordinary ingress captures media on Roster Pages. With WHATSAPP_DURABLE_INGRESS=true,
+# also bind the same private WHATSAPP_INBOX_MEDIA bucket and GSIS_JOBS D1 database
+# here; mirror enabled menu settings because this Worker drains incoming jobs.
+# This Worker sends durable replies; private browser media is served by Pages.
+
+# v0.9.8 uses the existing notification queue only. Keep the existing live
+# NOTIFICATION_QUEUE producer and its consumer; no new queue or binding is needed.
+# The recovery profile ignores leftover GSIS_BACKEND, GSIS_BACKEND_REQUIRED,
+# ROSTER_EDGE_AUTHORITY, DEPLOY_EDGE_AUTHORITY and GSIS_BACKGROUND_JOBS values.
+# Detach the gsis-background-jobs consumer from this Worker if still attached.
+# Unsupported background wakes are retried, never acknowledged as completed.
+# Do not delete the old background queue or its D1 intents during recovery.
+# Existing GSIS_RECOVERY_MODE, WHATSAPP_ENABLED, ROSTER_AUTOMATION_ENABLED and
+# WHATSAPP_DIAGNOSTICS_ENABLED are honored. Deployment does not enable them.
+# [[queues.producers]]
+# binding = "NOTIFICATION_QUEUE"
+# queue = "gsis-roster-notifications"
+# [[queues.consumers]]
+# queue = "gsis-roster-notifications"
+# max_batch_size = 1
+# max_batch_timeout = 5
+# max_concurrency = 1
+# max_retries = 3
+# retry_delay = 60

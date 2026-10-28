@@ -1,0 +1,463 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "How GSiS v0.8.9 works",
+    "locale": "en",
+    "quality_profile": "showcase",
+    "output": "docs/GSiS-v0.8.9-Architecture.html",
+    "repository": {
+      "url": "https://local.invalid/gsis-release-preparation.git",
+      "revision": "982e247d40418e9b60098056f7df0e766caac3c7",
+      "link_mode": "local-only"
+    },
+    "views": [
+      {
+        "id": "viewing",
+        "label": "Read timetables",
+        "focus": [
+          "web",
+          "local",
+          "edge",
+          "workerstore",
+          "apps"
+        ],
+        "note": "Baseline first, then permitted suspensions. Matching tags keep decoded data on the device."
+      },
+      {
+        "id": "saving",
+        "label": "Save and publish",
+        "focus": [
+          "web",
+          "edge",
+          "apps",
+          "records"
+        ],
+        "note": "Each owner validates a save and keeps its receipt. Publish releases a checked snapshot."
+      },
+      {
+        "id": "school",
+        "label": "Five viewports",
+        "focus": [
+          "web",
+          "apps",
+          "records",
+          "gcal"
+        ],
+        "note": "Calendar, Layout, Roster, Deploy and Contacts share contracts, not one writable document."
+      },
+      {
+        "id": "delivery",
+        "label": "Deliver and receive",
+        "focus": [
+          "meta",
+          "edge",
+          "workerstore",
+          "worker",
+          "apps"
+        ],
+        "note": "Verified callbacks can be stored before processing. Queued, accepted and delivered are different states."
+      },
+      {
+        "id": "recovery",
+        "label": "Recover safely",
+        "focus": [
+          "local",
+          "workerstore",
+          "worker",
+          "apps",
+          "records"
+        ],
+        "note": "Retry the original request. Preserve drafts, durable jobs, provider uncertainty and authoritative records."
+      }
+    ]
+  },
+  "components": [
+    {
+      "id": "web",
+      "type": "frontend",
+      "label": "Five web viewports",
+      "sublabel": "Role-based school tasks",
+      "pos": [
+        40,
+        40
+      ],
+      "size": [
+        190,
+        72
+      ],
+      "sources": [
+        {
+          "path": "scripts/build-release.py",
+          "line": 137,
+          "end_line": 145
+        },
+        {
+          "path": "roster-update/public/roster.js",
+          "line": 46,
+          "end_line": 61
+        }
+      ]
+    },
+    {
+      "id": "edge",
+      "type": "security",
+      "label": "Pages gateways",
+      "sublabel": "Check identity and route",
+      "pos": [
+        350,
+        40
+      ],
+      "size": [
+        190,
+        72
+      ],
+      "sources": [
+        {
+          "path": "roster-update/public/_worker.js",
+          "line": 25,
+          "end_line": 43
+        },
+        {
+          "path": "roster-update/public/_worker.js",
+          "line": 155,
+          "end_line": 217
+        },
+        {
+          "path": "calendar-update/public/_worker.js",
+          "line": 1,
+          "end_line": 50
+        }
+      ]
+    },
+    {
+      "id": "apps",
+      "type": "backend",
+      "label": "Four Apps Script owners",
+      "sublabel": "Current checks and receipts",
+      "pos": [
+        680,
+        40
+      ],
+      "size": [
+        190,
+        72
+      ],
+      "sources": [
+        {
+          "path": "backend/BackendRole.gs",
+          "line": 1,
+          "end_line": 21
+        },
+        {
+          "path": "Contacts_Code.gs",
+          "line": 80,
+          "end_line": 100
+        },
+        {
+          "path": "calendar-backend/Code.gs",
+          "line": 7418,
+          "end_line": 7488
+        }
+      ]
+    },
+    {
+      "id": "records",
+      "type": "database",
+      "label": "School records",
+      "sublabel": "Owned Sheets and Drive data",
+      "pos": [
+        1010,
+        40
+      ],
+      "size": [
+        190,
+        72
+      ],
+      "sources": [
+        {
+          "path": "backend/RosterOperations.gs",
+          "line": 31,
+          "end_line": 48
+        },
+        {
+          "path": "backend/Code.gs",
+          "line": 349,
+          "end_line": 375
+        },
+        {
+          "path": "calendar-backend/Code.gs",
+          "line": 7488,
+          "end_line": 7531
+        }
+      ]
+    },
+    {
+      "id": "local",
+      "type": "database",
+      "label": "Device timetable cache",
+      "sublabel": "Decoded IndexedDB content",
+      "pos": [
+        40,
+        255
+      ],
+      "size": [
+        190,
+        72
+      ],
+      "sources": [
+        {
+          "path": "roster-update/public/roster-baseline-cache.js",
+          "line": 1,
+          "end_line": 40
+        },
+        {
+          "path": "roster-update/public/roster-timetable-preload.js",
+          "line": 1,
+          "end_line": 28
+        }
+      ]
+    },
+    {
+      "id": "workerstore",
+      "type": "database",
+      "label": "Private Worker stores",
+      "sublabel": "D1 jobs / R2 copies and media",
+      "pos": [
+        350,
+        255
+      ],
+      "size": [
+        190,
+        72
+      ],
+      "sources": [
+        {
+          "path": "roster-update/public/_worker.js",
+          "line": 46,
+          "end_line": 100
+        },
+        {
+          "path": "roster-update/public/_worker.js",
+          "line": 948,
+          "end_line": 1008
+        },
+        {
+          "path": "roster-update/public/_worker.js",
+          "line": 564,
+          "end_line": 585
+        }
+      ]
+    },
+    {
+      "id": "gcal",
+      "type": "external",
+      "label": "Google calendars",
+      "sublabel": "Explicit staff / parent sync",
+      "pos": [
+        1010,
+        255
+      ],
+      "size": [
+        190,
+        72
+      ],
+      "sources": [
+        {
+          "path": "calendar-backend/Code.gs",
+          "line": 7418,
+          "end_line": 7531
+        },
+        {
+          "path": "calendar-backend/Code.gs",
+          "line": 7728,
+          "end_line": 7787
+        }
+      ]
+    },
+    {
+      "id": "worker",
+      "type": "backend",
+      "label": "Minute Worker",
+      "sublabel": "Independent bounded tasks",
+      "pos": [
+        680,
+        470
+      ],
+      "size": [
+        190,
+        72
+      ],
+      "sources": [
+        {
+          "path": "notification-worker/index.js",
+          "line": 1,
+          "end_line": 45
+        },
+        {
+          "path": "backend/RosterNotificationStore.gs",
+          "line": 1,
+          "end_line": 27
+        },
+        {
+          "path": "roster-update/public/_worker.js",
+          "line": 984,
+          "end_line": 1008
+        }
+      ]
+    },
+    {
+      "id": "meta",
+      "type": "external",
+      "label": "WhatsApp",
+      "sublabel": "Approved routes and callbacks",
+      "pos": [
+        40,
+        470
+      ],
+      "size": [
+        190,
+        72
+      ],
+      "sources": [
+        {
+          "path": "roster-update/public/_worker.js",
+          "line": 938,
+          "end_line": 945
+        },
+        {
+          "path": "roster-update/public/_worker.js",
+          "line": 1010,
+          "end_line": 1065
+        }
+      ]
+    }
+  ],
+  "connections": [
+    {
+      "id": "web-edge",
+      "from": "web",
+      "to": "edge",
+      "label": "HTTPS",
+      "variant": "security"
+    },
+    {
+      "id": "web-local",
+      "from": "web",
+      "to": "local",
+      "label": "Reuse locally",
+      "variant": "default"
+    },
+    {
+      "id": "edge-apps",
+      "from": "edge",
+      "to": "apps",
+      "label": "Signed request",
+      "variant": "security"
+    },
+    {
+      "id": "apps-records",
+      "from": "apps",
+      "to": "records",
+      "label": "Owned commits",
+      "variant": "emphasis"
+    },
+    {
+      "id": "edge-store",
+      "from": "edge",
+      "to": "workerstore",
+      "label": "Copies and jobs",
+      "variant": "default"
+    },
+    {
+      "id": "apps-gcal",
+      "from": "apps",
+      "to": "gcal",
+      "label": "Sync after claim",
+      "variant": "default"
+    },
+    {
+      "id": "worker-apps",
+      "from": "worker",
+      "to": "apps",
+      "label": "Claim and settle",
+      "variant": "dashed"
+    },
+    {
+      "id": "worker-store",
+      "from": "worker",
+      "to": "workerstore",
+      "label": "Drain D1 jobs",
+      "variant": "dashed"
+    },
+    {
+      "id": "worker-meta",
+      "from": "worker",
+      "to": "meta",
+      "label": "Paced sends",
+      "variant": "dashed"
+    },
+    {
+      "id": "meta-edge",
+      "from": "meta",
+      "to": "edge",
+      "label": "Verified callback",
+      "variant": "security"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "Choose the viewport",
+      "items": [
+        "Calendar: school dates and events. Layout: campus and venue views.",
+        "Roster: absence, relief, timetables and notices. Deploy: staff and venue plans. Contacts: people and access."
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "Read once; use locally",
+      "items": [
+        "Load the usable Roster shell first. Transfer baseline content, then permitted suspended content for today plus 30 days.",
+        "Keep decoded immutable content in IndexedDB. Check tags on the first Singapore-day load, hourly at :20, and once after a missed check.",
+        "Matching tags need no timetable payload or decode. A cache does not grant access or confirm a save."
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "Save, publish, send",
+      "items": [
+        "Save to online commits the shared plan. Let teachers see releases its dated snapshot. Send WhatsApp creates eligible notification work.",
+        "Each mutable store has its own authoritative owner. Independent projects do not share an Apps Script lock.",
+        "Stable request IDs and durable receipts make a lost-response retry safe. SMC-touched allocations stay protected."
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "Separate background work",
+      "items": [
+        "Notification, Inbox ingestion, planning, reports and optional Calendar continuation run as bounded tasks.",
+        "D1 holds webhook jobs and read-build claims only. R2 holds private derived copies and media. Google retains school record authority.",
+        "A signed webhook is accepted after durable receipt storage when enabled. Duplicate events reuse IDs; uncertain sends stay uncertain."
+      ]
+    },
+    {
+      "dot": "slate",
+      "title": "Limits and recovery",
+      "items": [
+        "Roster still replaces its operational Drive JSON at commit. Logical changed fields are not SQL row isolation. Inbox still shares Roster ScriptLock.",
+        "Calendar releases its lock for Google calls. Settlement checks the claim and source; a newer edit remains pending.",
+        "Keep the original request, draft and reference after a timeout. A sent email closes a matching alert, not the underlying failed WhatsApp outcome."
+      ]
+    },
+    {
+      "dot": "cyan",
+      "title": "Install and verify",
+      "items": [
+        "Use five Pages ZIPs, four gCodes and one complete notification Worker text file. Follow the separate maintainer guide for dashboard steps.",
+        "D1 ingestion, R2 snapshots and Calendar continuation need their documented bindings and flags. Core paths remain available when optional features are off.",
+        "This map describes release source, not a live configuration or measured delivery guarantee. No new Durable Object or Workflow is required."
+      ]
+    }
+  ]
+}

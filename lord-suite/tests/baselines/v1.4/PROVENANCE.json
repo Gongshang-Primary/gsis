@@ -1,0 +1,10 @@
+{
+  "package": "LORD_V1.4_LTS_FULL_PACKAGE.zip",
+  "packageSha256": "c213818873403dcaee9faa36295ce59b4bde64d5df2b1add3969696e668b30e6",
+  "files": {
+    "Source/backend/Code.gs": "69dd46a05718d0dea49e0861354c9f92c3b617fb27a0f88da01828e535032dc6",
+    "Source/backend/appsscript.services.fragment.json": "56deaf698fb680786f219784ff54040b60f0dd0cd6d3e47dfd0c094353789a67",
+    "Source/starlord/_worker.js": "536daf402ee7ba369a438ca1c7433c2d06f47cbfb9c8416c3395569e93b37eea"
+  },
+  "configurationSanitisedForGSiSSuite": true
+}

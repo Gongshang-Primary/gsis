@@ -1,0 +1,72 @@
+{
+  "version": "0.9.1c",
+  "baseline": "0.9.1b",
+  "baselineCommit": "f8cbb01d85d50de18939ddcb4f12eb560e5b6942",
+  "tag": "v0.9.1c",
+  "sourceCommitRecordedIn": "PATCH.json",
+  "components": [
+    "rosterBackend",
+    "rosterFrontend",
+    "notificationWorker"
+  ],
+  "componentVersions": {
+    "calendarFrontend": "0.9.1",
+    "calendarBackend": "0.9.1",
+    "contactsFrontend": "0.9.1",
+    "contactsBackend": "0.9.1",
+    "deployFrontend": "0.9.1",
+    "layoutFrontend": "0.9.1",
+    "deployBackend": "0.9.1",
+    "rosterFrontend": "0.9.1c",
+    "notificationWorker": "0.9.1c",
+    "rosterBackend": "0.9.1c",
+    "lordFrontend": "0.9.1b",
+    "overlordFrontend": "0.9.1b",
+    "starlordFrontend": "0.9.1b",
+    "lordBackend": "0.9.1b"
+  },
+  "changes": [
+    "Full-school-year Report Absence range",
+    "Atomic long multi-teacher absence saves and compact range feedback",
+    "Venues design: room search, preparation notes, multi-room dashboard and owner policies"
+  ],
+  "verification": {
+    "status": "passed",
+    "rosterRelatedProgramsPassed": 363,
+    "rosterRelatedProgramsFailed": 0,
+    "appsScriptSourcesParsed": 141,
+    "independentReviews": [
+      "Absence range, Calendar authority and transport",
+      "Prepared instruction concurrency and replay",
+      "Notification eligibility",
+      "Year-long Chromium report and edit flow",
+      "Venues design builder check"
+    ],
+    "liveServicesUsed": false,
+    "leapYearFixture": {
+      "teachers": 2,
+      "dates": 366,
+      "absenceRecords": 732,
+      "operationsDocumentCommits": 1,
+      "calendarBatches": 6,
+      "calendarYearChecks": 6,
+      "backendCommands": 1,
+      "distinctTimetableModels": 2,
+      "timetableModelReads": 2,
+      "quotaCalls": 0
+    }
+  },
+  "newSettingsRequired": false,
+  "schemaMigrationRequired": false,
+  "liveDeploymentPerformed": false,
+  "liveSettingsChanged": false,
+  "providerMessagesSent": false,
+  "remotePushPerformed": false,
+  "venuesRuntimeIncluded": false,
+  "venuesDesignIncluded": true,
+  "productBacklogIncluded": false,
+  "newAppsScriptServicesRequired": [],
+  "newWorksheetsRequired": false,
+  "newScriptPropertiesRequired": false,
+  "newCloudflareBindingsRequired": false
+}

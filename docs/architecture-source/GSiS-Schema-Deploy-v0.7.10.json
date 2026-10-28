@@ -1,0 +1,234 @@
+{
+  "schema_version": 1,
+  "diagram_type": "erd",
+  "meta": {
+    "title": "GSiS Deploy: field storage schema",
+    "locale": "en",
+    "quality_profile": "standard",
+    "output": "docs/GSiS-Schema-Deploy-v0.7.10.html"
+  },
+  "layout": {
+    "mode": "grid",
+    "gapX": 70,
+    "gapY": 42,
+    "entityW": 270
+  },
+  "entities": [
+    {
+      "id": "e0",
+      "label": "deploy_index",
+      "tag": "Canonical",
+      "row": 0,
+      "col": 0,
+      "attributes": [
+        {
+          "name": "Key",
+          "type": "cell"
+        },
+        {
+          "name": "JSON",
+          "type": "cell"
+        }
+      ]
+    },
+    {
+      "id": "e1",
+      "label": "deploy_documents",
+      "tag": "Canonical",
+      "row": 1,
+      "col": 0,
+      "attributes": [
+        {
+          "name": "Version ID",
+          "type": "cell"
+        },
+        {
+          "name": "Commit ID",
+          "type": "cell"
+        },
+        {
+          "name": "Part",
+          "type": "cell"
+        },
+        {
+          "name": "JSON",
+          "type": "cell"
+        }
+      ]
+    },
+    {
+      "id": "e2",
+      "label": "fields_<version hash>",
+      "tag": "Canonical",
+      "row": 2,
+      "col": 0,
+      "attributes": [
+        {
+          "name": "Field",
+          "type": "cell"
+        },
+        {
+          "name": "JSON",
+          "type": "cell"
+        }
+      ]
+    },
+    {
+      "id": "e3",
+      "label": "editidx_<version hash>",
+      "tag": "Read projections",
+      "row": 0,
+      "col": 1,
+      "attributes": [
+        {
+          "name": "Field",
+          "type": "cell"
+        },
+        {
+          "name": "Row",
+          "type": "cell"
+        }
+      ]
+    },
+    {
+      "id": "e4",
+      "label": "fastidx_<version hash>",
+      "tag": "Read projections",
+      "row": 1,
+      "col": 1,
+      "attributes": [
+        {
+          "name": "Field",
+          "type": "cell"
+        },
+        {
+          "name": "Row",
+          "type": "cell"
+        },
+        {
+          "name": "JSON",
+          "type": "cell"
+        }
+      ]
+    },
+    {
+      "id": "e5",
+      "label": "viewidx_<commit hash>",
+      "tag": "Read projections",
+      "row": 2,
+      "col": 1,
+      "attributes": [
+        {
+          "name": "Field",
+          "type": "cell"
+        },
+        {
+          "name": "JSON",
+          "type": "cell"
+        }
+      ]
+    },
+    {
+      "id": "e6",
+      "label": "auditidx_<version hash>",
+      "tag": "Read projections",
+      "row": 3,
+      "col": 1,
+      "attributes": [
+        {
+          "name": "ID",
+          "type": "cell"
+        },
+        {
+          "name": "At",
+          "type": "cell"
+        },
+        {
+          "name": "Actor",
+          "type": "cell"
+        },
+        {
+          "name": "Action",
+          "type": "cell"
+        },
+        {
+          "name": "First",
+          "type": "cell"
+        },
+        {
+          "name": "Last",
+          "type": "cell"
+        }
+      ]
+    },
+    {
+      "id": "e7",
+      "label": "deploy_field_journal",
+      "tag": "Recovery",
+      "row": 0,
+      "col": 2,
+      "attributes": [
+        {
+          "name": "Commit",
+          "type": "cell"
+        },
+        {
+          "name": "Part",
+          "type": "cell"
+        },
+        {
+          "name": "JSON",
+          "type": "cell"
+        }
+      ]
+    },
+    {
+      "id": "e8",
+      "label": "deploy_save_receipts",
+      "tag": "Recovery",
+      "row": 1,
+      "col": 2,
+      "attributes": [
+        {
+          "name": "Request ID",
+          "type": "cell"
+        },
+        {
+          "name": "Version ID",
+          "type": "cell"
+        },
+        {
+          "name": "Actor",
+          "type": "cell"
+        },
+        {
+          "name": "Parts",
+          "type": "cell"
+        },
+        {
+          "name": "JSON",
+          "type": "cell"
+        }
+      ]
+    }
+  ],
+  "relationships": [],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "Physical columns",
+      "items": [
+        "Each listed table shows every code-defined physical column. Values are Sheet cells, not invented SQL types.",
+        "Source snapshot: see GSiS-Schema-Reference-v0.7.10.md for owning functions and journal details."
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "Maintenance",
+      "items": [
+        "Keep exact header spelling and stable identities. Do not sort or delete journal rows.",
+        "Application references are validated in code. These stores do not enforce SQL foreign keys."
+      ]
+    }
+  ]
+}

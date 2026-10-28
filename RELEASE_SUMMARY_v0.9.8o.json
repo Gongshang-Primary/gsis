@@ -1,0 +1,79 @@
+{
+  "version": "0.9.8o",
+  "baseline": "0.9.8n",
+  "baselineCommit": "e340bff68ab985f2f6a3434dd06c8a01ea936a0a",
+  "scope": [
+    "Read-only administrator export of native baseline and confirmed intended Stapler timetables",
+    "Separate native timetable shadow import using existing rehearsal D1/private R2",
+    "Calendar source schema preflight and per-event unknown-save isolation"
+  ],
+  "componentCount": 4,
+  "productionChangedComponents": [
+    "rosterFrontend",
+    "rosterBackend",
+    "calendarFrontend",
+    "calendarBackend"
+  ],
+  "optionalProductionComponents": [
+    "calendarFrontend",
+    "calendarBackend"
+  ],
+  "productionAuthority": "Google",
+  "authorityCutoverPerformed": false,
+  "productionDeployed": false,
+  "productionTimetableDataChanged": false,
+  "reliefLedgerMigrated": false,
+  "messagesSent": false,
+  "scheduledCadenceChanged": false,
+  "existingProtectedChoicesRewritten": false,
+  "newInfrastructureRequired": false,
+  "existingRehearsalSchemaAdditionRequired": true,
+  "productionFlagsChanged": false,
+  "sourceWindow": {
+    "timeZone": "Asia/Singapore",
+    "daysInclusive": 31,
+    "from": "today",
+    "to": "today+30"
+  },
+  "limits": {
+    "nativePartBytes": 4194304,
+    "aggregateNativeBytes": 67108864,
+    "nativeParts": 62
+  },
+  "separatePreparation": {
+    "archive": "GSiS_v0.9.8o_Timetable_Preparation.zip",
+    "mode": "shadow-only",
+    "productionInstallation": false,
+    "reusesExistingRehearsalStorage": true,
+    "googleFreshnessIndependentlyVerified": false,
+    "calendarDatedParityVerified": false,
+    "pruningEnabled": false
+  },
+  "googleIdentityFix": {
+    "serverJwksRedirect": "manual",
+    "nonOkResponsesRejected": true,
+    "browserFetchRedirect": "error"
+  },
+  "liveCalendarRepair": {
+    "eventsHeaderAdded": "VenueID",
+    "eventRowsChanged": false,
+    "unknownSaveReceiptsChanged": false,
+    "providerSyncInvoked": false,
+    "fullLiveSyncVerified": false
+  },
+  "verification": {
+    "status": "targeted-local-verified",
+    "singleGreenFullSuiteClaimed": false,
+    "productionValidationPerformed": false,
+    "cloudflareRuntimeNativeScaleValidated": false,
+    "expectedTag": "v0.9.8o",
+    "openMaterialFindings": 0,
+    "retainedRosterStaplerCachePrograms": 16,
+    "nativeExporterCases": 14,
+    "preparationWorkerSourceCases": 11,
+    "preparationWorkerBundleCases": 11,
+    "independentNativeIntegrationCases": 5,
+    "calendarNewBackendCases": 9,
+    "appsScriptFilesParsedES2020": 236
+  }
+}

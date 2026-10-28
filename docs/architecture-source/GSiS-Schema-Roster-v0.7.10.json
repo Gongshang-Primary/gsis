@@ -1,0 +1,256 @@
+{
+  "schema_version": 1,
+  "diagram_type": "erd",
+  "meta": {
+    "title": "GSiS Roster: baseline JSON documents",
+    "locale": "en",
+    "quality_profile": "standard",
+    "output": "docs/GSiS-Schema-Roster-v0.7.10.html"
+  },
+  "layout": {
+    "mode": "grid",
+    "gapX": 80,
+    "gapY": 38,
+    "entityW": 290
+  },
+  "entities": [
+    {
+      "id": "r0",
+      "label": "Roster register.json",
+      "tag": "Register",
+      "row": 0,
+      "col": 0,
+      "attributes": [
+        {
+          "name": "schema",
+          "type": "JSON"
+        },
+        {
+          "name": "revision",
+          "type": "JSON"
+        },
+        {
+          "name": "entries[]",
+          "type": "JSON"
+        },
+        {
+          "name": "receipts[]",
+          "type": "JSON"
+        }
+      ]
+    },
+    {
+      "id": "r1",
+      "label": "Register entry",
+      "tag": "Register",
+      "row": 1,
+      "col": 0,
+      "attributes": [
+        {
+          "name": "id",
+          "type": "JSON"
+        },
+        {
+          "name": "name",
+          "type": "JSON"
+        },
+        {
+          "name": "from",
+          "type": "JSON"
+        },
+        {
+          "name": "to",
+          "type": "JSON"
+        },
+        {
+          "name": "modelFile",
+          "type": "JSON"
+        },
+        {
+          "name": "workbookFile",
+          "type": "JSON"
+        },
+        {
+          "name": "teacherCount",
+          "type": "JSON"
+        },
+        {
+          "name": "layoutMode",
+          "type": "JSON"
+        },
+        {
+          "name": "createdAt",
+          "type": "JSON"
+        },
+        {
+          "name": "createdBy",
+          "type": "JSON"
+        },
+        {
+          "name": "pruned",
+          "type": "JSON"
+        },
+        {
+          "name": "priority",
+          "type": "JSON"
+        }
+      ]
+    },
+    {
+      "id": "r2",
+      "label": "Baseline model JSON",
+      "tag": "Immutable model",
+      "row": 0,
+      "col": 1,
+      "attributes": [
+        {
+          "name": "layoutMode",
+          "type": "JSON"
+        },
+        {
+          "name": "sourceMode",
+          "type": "JSON"
+        },
+        {
+          "name": "single OR odd + even",
+          "type": "JSON"
+        },
+        {
+          "name": "timing",
+          "type": "JSON"
+        },
+        {
+          "name": "recesses[]",
+          "type": "JSON"
+        },
+        {
+          "name": "teacherCount",
+          "type": "JSON"
+        },
+        {
+          "name": "maxPeriod",
+          "type": "JSON"
+        }
+      ]
+    },
+    {
+      "id": "r3",
+      "label": "Week model",
+      "tag": "Immutable model",
+      "row": 1,
+      "col": 1,
+      "attributes": [
+        {
+          "name": "days[]",
+          "type": "JSON"
+        },
+        {
+          "name": "blocks[]",
+          "type": "JSON"
+        },
+        {
+          "name": "maxPeriod",
+          "type": "JSON"
+        },
+        {
+          "name": "perDay",
+          "type": "JSON"
+        }
+      ]
+    },
+    {
+      "id": "r4",
+      "label": "Teacher block",
+      "tag": "Immutable model",
+      "row": 2,
+      "col": 1,
+      "attributes": [
+        {
+          "name": "name",
+          "type": "JSON"
+        },
+        {
+          "name": "cells[][4]",
+          "type": "JSON"
+        }
+      ]
+    },
+    {
+      "id": "r5",
+      "label": "Period cell",
+      "tag": "Immutable model",
+      "row": 3,
+      "col": 1,
+      "attributes": [
+        {
+          "name": "0: Subject",
+          "type": "JSON"
+        },
+        {
+          "name": "1: Class",
+          "type": "JSON"
+        },
+        {
+          "name": "2: Venue",
+          "type": "JSON"
+        },
+        {
+          "name": "3: Group",
+          "type": "JSON"
+        }
+      ]
+    },
+    {
+      "id": "r6",
+      "label": "Timing / recess",
+      "tag": "Immutable model",
+      "row": 4,
+      "col": 1,
+      "attributes": [
+        {
+          "name": "startMinutes",
+          "type": "JSON"
+        },
+        {
+          "name": "periodMinutes",
+          "type": "JSON"
+        },
+        {
+          "name": "normalLastPeriod",
+          "type": "JSON"
+        },
+        {
+          "name": "endOfDayMinutes (optional)",
+          "type": "JSON"
+        },
+        {
+          "name": "recesses[].level",
+          "type": "JSON"
+        },
+        {
+          "name": "recesses[].period",
+          "type": "JSON"
+        }
+      ]
+    }
+  ],
+  "relationships": [],
+  "cards": [
+    {
+      "dot": "violet",
+      "title": "Operational state",
+      "items": [
+        "A separate Roster operations.json stores absence, relief, audit, receipts, publications, reports and outbox intent together.",
+        "Its complete root collections and key relationships are listed in GSiS-Schema-Reference-v0.7.10.md."
+      ]
+    },
+    {
+      "dot": "cyan",
+      "title": "Meaning",
+      "items": [
+        "These are JSON properties and nested shapes, not SQL tables. Repeated shapes are shown once.",
+        "Register points to immutable model and archived workbook file IDs. Browser caches model by identity; live writes revalidate state."
+      ]
+    }
+  ]
+}

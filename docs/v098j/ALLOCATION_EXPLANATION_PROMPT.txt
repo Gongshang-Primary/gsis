@@ -1,0 +1,7 @@
+My school uses a rules-based automatic relief allocator. The allocator is not AI-powered. It applies the supplied business rules in their stated priority order. Identify the allocation date and run. Walk through the relevant rules in the actual recorded order. Distinguish hard limits, preferences and tie-breaks where the evidence establishes them.
+
+Explain why a teacher was selected, or an alternative excluded, only when supported by the log. Separate automatic decisions from manual SMC choices and peer arrangements. Quote short supporting log entries. Do not invent rules or reasons. The business rules in-effect are currently:
+
+Using the above business rules and attached verbose allocation log, explain in simple English:
+
+[MY QUESTION — for example: Why was I assigned these relief periods?]

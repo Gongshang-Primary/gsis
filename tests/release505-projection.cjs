@@ -1,0 +1,24 @@
+const assert=require('assert/strict'),u=require('./dom-helper.cjs')();
+try{
+ u.run("var projectionClones=0,projectionJSON=JSON.stringify;JSON.stringify=function(value,...rest){if(draftBase&&value===draftBase)projectionClones++;return projectionJSON.call(this,value,...rest)};tab='IP Deploy';v().classes[0].ref='class-one';render();");
+ u.run("queueCell({operation:'addTeacher',subject:'EL',target:'1P',teacher:'t',expected:false});");
+ assert.equal(u.run('projectionClones'),1,'queueCell + immediate IP render performs one baseline projection clone');
+ assert.equal(u.run('v().assignments.length'),1);assert.match(u.w.document.getElementById('content').textContent,/Test Teacher/,'IP assignment is visible immediately');
+ u.run('render();render(true);applyPendingProjection();');assert.equal(u.run('projectionClones'),1,'unchanged renders reuse the already applied projection');assert.equal(u.run('draftBase.assignments.length'),0,'deep baseline remains untouched');
+ u.run("queueCell({operation:'setLoad',level:'1',subject:'EL',value:14,expected:15});");assert.equal(u.run('projectionClones'),2);assert.equal(u.run("v().loads['1'].EL"),14);assert.equal(u.run('v().assignments.length'),1,'every new edit includes the complete queue');
+ u.run("queueCell({operation:'setLoad',level:'1',subject:'EL',value:13,expected:14});");assert.equal(u.run('projectionClones'),3);assert.equal(u.run("v().loads['1'].EL"),13);assert.equal(u.run("cellQueue.find(x=>x.operation==='setLoad').expected"),15,'coalescing retains original comparison');
+ u.run("cellQueue.find(x=>x.operation==='setLoad').value=12;applyPendingProjection();");assert.equal(u.run('projectionClones'),4);assert.equal(u.run("v().loads['1'].EL"),12,'content signature sees mutation without viewEpoch increment');
+ u.run("queueFlight={requestId:'pending-save',edits:cellQueue.splice(0),running:false};render();");assert.equal(u.run('projectionClones'),4,'moving unchanged edits to uncertain flight keeps exact projection');assert.equal(u.w.document.getElementById('content').inert,true);u.run("queueCell({operation:'setLoad',level:'1',subject:'EL',value:11,expected:12})");assert.equal(u.run("v().loads['1'].EL"),12,'uncertain flight cannot accept another edit');
+ u.run("cellQueue=queueFlight.edits;queueFlight=null;draftBase.notes='Saved note';applyPendingProjection();");assert.equal(u.run('projectionClones'),5);assert.equal(u.run('v().notes'),'Saved note');
+ u.run('draftBase=clone(draftBase);applyPendingProjection();');assert.equal(u.run('projectionClones'),7,'cloning baseline for replacement and reprojecting new identity both occur');
+ u.run('sessionEpoch++;applyPendingProjection();');assert.equal(u.run('projectionClones'),8,'session invalidates memo');
+ u.run("roleCatalogue=[{role:'Teacher',level:'',groups:[]}];applyPendingProjection();");assert.equal(u.run('projectionClones'),9,'live catalogue replacement invalidates memo');
+ u.run("state.versions=state.versions.map(x=>x.id===current?clone(x):x);applyPendingProjection();");assert.equal(u.run('projectionClones'),10,'new saved/current object cannot reuse old projected object');
+ u.run("cellQueue=[];applyPendingProjection();");assert.equal(u.run('draftBase'),null);assert.equal(u.run('pendingProjection'),null);assert.equal(u.run('v().assignments.length'),0,'discarded edits restore saved base');
+ u.run("tab='Offload';v().offload=GSISTeachingRules.migrate(null);render();");const input=u.w.document.querySelector('[data-rule="role-hod-sm"][data-prop="percent"]'),count=u.run('projectionClones');
+ input.value='45';input.dispatchEvent(new u.w.Event('input'));assert.equal(u.run('projectionClones'),count,'Offload remains incremental per keystroke');assert.equal(u.w.document.querySelector('[data-rule="role-hod-sm"][data-prop="percent"]'),input,'Offload editor is not rerendered');assert.equal(u.run("v().offload.tags.find(r=>r.id==='role-hod-sm').percent"),'45');
+ u.run('render();render();');assert.equal(u.run('projectionClones'),count+1,'first subsequent full render projects once');
+ const beforeVersion=u.run('projectionClones');u.run("var nextVersion=clone(v());nextVersion.id='v2';state.versions.push(nextVersion);current='v2';draftBase=clone(nextVersion);cellQueue=[{operation:'setLoad',level:'1',subject:'EL',value:10,expected:15}];applyPendingProjection();");assert.equal(u.run('projectionClones'),beforeVersion+1);assert.equal(u.run("v().loads['1'].EL"),10);assert.equal(u.run('pendingProjection.version'),'v2');
+ u.run("draftBase=null;cellQueue=[];applyPendingProjection();");assert.equal(u.run('pendingProjection'),null,'confirmed save/new base clears retained projection');
+ console.log('PASS 505 projection: immediate IP assignment, one projection per queue change, no repeated render clones, full coalesced queue, uncertain-flight preservation, session/catalogue/base/note invalidation and incremental Offload editing');
+}finally{u.w.close();}

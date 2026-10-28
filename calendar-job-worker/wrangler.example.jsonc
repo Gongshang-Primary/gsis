@@ -1,0 +1,21 @@
+{
+  "name": "gsis-calendar-jobs",
+  "main": "worker.mjs",
+  "compatibility_date": "2026-10-27",
+  "workers_dev": false,
+  "preview_urls": false,
+  "triggers": { "crons": ["* * * * *"] },
+  "d1_databases": [
+    {
+      "binding": "CALENDAR_JOBS_DB",
+      "database_name": "gsis-calendar-jobs",
+      "database_id": "REPLACE_WITH_EXISTING_CALENDAR_D1_DATABASE_ID"
+    }
+  ],
+  "vars": {
+    "CALENDAR_APPS_SCRIPT_URL": "https://script.google.com/macros/s/REPLACE_WITH_CALENDAR_DEPLOYMENT/exec",
+    "CALENDAR_SYNC_CONTINUE": "false"
+  }
+  // Set GSIS_SECRET as a Cloudflare secret. Reuse the current operator-selected
+  // value already configured for Calendar. Never put it in this file.
+}

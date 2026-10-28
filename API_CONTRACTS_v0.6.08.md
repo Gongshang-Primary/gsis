@@ -1,0 +1,15 @@
+# API contracts v0.6.08
+
+Write protocol 500, relief schema 3 and whole-week-v3 integer R remain unchanged. Roster request shapes, request receipts, storage folders, revision checks and signed school identity are retained. Calendar's rosterDate contract remains as documented in API_CONTRACTS_v0.6.06.md. Its release version is 0.6.08 and its stored schema remains v2 RC1.9.
+
+Teacher changes use the existing saveDraft endpoint. Duplicate timetable names are invalid across the selected version's teacher records, including inactive and pending profiles. The server validates the resulting state before a write. The frontend applies the same check before it changes a local draft and before it saves.
+
+The removeTeacherProfile operation requires current Admin access. It carries the expected teacher record and expectedImpact from GSISPlanning.teacherImpact. A changed record or changed allocations requires a fresh deletion review. Deletion removes the teacher and its assignments, duties, organization roles, reporting links, relief blocks and individual settings from the selected version. Audit history and the existing removedTeachers recovery record remain. Deletion records survive publication. A successful explicit Contacts approval marks the record contactsReviewed so later publication does not repeat the same review. Contacts refresh and stale profile edits cannot recreate a deleted ID. Allocation review compares deployment details, excluding temporary assignment IDs; audits retain the original IDs.
+
+SMC/KP and Admin can use setTeacherField with Active=N or upsertTeacherProfile to make a teacher inactive. The same version mutation clears the deployment references above, including auto PAL allocations. It keeps the teacher profile, notes and individual rules. Reactivation does not restore allocations.
+
+These changes use the existing journal, revision checks and final index marker. No Contacts write occurs during a draft save. Other versions and frozen published snapshots remain unchanged. The existing explicit Admin publication review remains necessary for changes that affect shared Contacts.
+
+Roster requires a boolean user.rosterSMC capability from current Contacts. After verification, its profile response includes user.accessVerified=true. The frontend requires that marker and a boolean smc value before it enables either access role. A stale or malformed profile clears management controls and offers Retry. An absent capability is an authority failure, not false membership. An explicit false value gives teacher access only. A true value allows Baseline Timetable independently of whether a timetable is active. No role is granted from an email name, a frontend flag or successful login alone.
+
+Existing Roster failures retain a neutral message and diagnostic reference. Match the reference to backend logs and check installed versions. The old screenshot alone cannot identify the exact deployed response. Upload remains one parsed model and one XLSX workbook per pending request; retries reuse the original request ID.

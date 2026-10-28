@@ -1,0 +1,12 @@
+# GSiS v0.5.09
+
+Authorized by the user's commit instruction on 9 October 2026 at 13:32 Singapore time. Baseline: v0.5.08, commit `31940780958911a18c7fb3d661878ad53f4eca5c`. Scope: Q184 and Q185. The product commit and tag are recorded in the generated maintainer notes and repository bundle.
+
+- **Q184:** Workload Settings now has its own active page. Merely opening the editor does not mark it dirty. Leaving actual changes offers discard or stay. Cancel and Apply sit at the top of the form with a sticky action bar; both long tables use document scrolling. Escape first closes an open dropdown, then exits the form. Cancel preserves unrelated queued edits; Apply retains the explicit Save workflow. Version changes, refresh and background reads respect the open editor.
+- **Q185:** Exclusion-only saves find stable teacher/field addresses on the server and batch the touched profile, draft and exclusion values. Container headers, current membership rules and transaction metadata remain available for validation and safe merging. Unrelated values are preserved. Cold or evicted relief caches cause no relief source read/calculation on this path. The browser accepts unchanged R only for a valid exact predecessor revision. Mixed saves still calculate workload effects. Exclusion deltas update affected controls and warnings without rebuilding other rows. Toggling back removes the redundant draft change. Existing inactive or removed rules remain visible for clearing.
+
+The durable journal, current authority, writer lock, receipts, audit, conflict notices, final completion marker, native transport and recovery are retained. Server-side key-column searches are additional work, not free indexed lookups; old projections retain a broad-read fallback. No formula, PAL policy or permission changes are introduced.
+
+In the 159-teacher/1,500-assignment fixture, the warm-cache exclusion save reads 210 cells instead of 6,125. The cold-cache case reads 226 instead of 33,654 and performs zero rather than one relief calculation. Both retain two API write requests and one client request with no follow-up reload. These are local service-work measurements, not production duration claims. See PERFORMANCE_v0.5.09.md and VALIDATION.md for checks and limits.
+
+All 186 regression scripts are verified, including a targeted rerun after the full suite caught and corrected a version-switch issue. The 75-file Apps Script syntax gate passes. Validation details and browser/production limits are recorded in VALIDATION.md.

@@ -1,0 +1,15 @@
+const {JSDOM}=require(process.env.GSIS_TEST_JSDOM||'jsdom'),fs=require('fs'),vm=require('vm'),assert=require('assert/strict');
+const html=fs.readFileSync('layout-update/public/landmark.html','utf8'),scripts=[...html.matchAll(/<script[^>]*>([\s\S]*?)<\/script>/g)].map(m=>m[1]);
+const dom=new JSDOM(html,{runScripts:'outside-only',url:'https://example.com/landmark.html'}),w=dom.window,ctx=dom.getInternalVMContext();
+w.HTMLCanvasElement.prototype.getContext=()=>new Proxy({measureText:t=>({width:t.length*6})},{get:(o,k)=>o[k]||(()=>{})});w.ResizeObserver=class{observe(){}};
+vm.runInContext(scripts[0],ctx);vm.runInContext(scripts[1].replace(/try\{init\(\);\}catch\(error\)\{console.error\(error\);\$\('error'\).hidden=false;\}/,''),ctx);
+assert.ok(w.document.querySelector('#sidebar').classList.contains('open'));assert.equal(w.document.querySelector('#menu').getAttribute('aria-expanded'),'true');assert.equal(w.getComputedStyle(w.document.querySelector('#sidebar')).top,'8px');
+vm.runInContext(`const recordedRails=[];const originalRail=rail;rail=function(g,...args){recordedRails.push({key:g.userData.key,args});return originalRail(g,...args)};scene=new THREE.Scene();buildCampus();revision11Connections();liftStack('G',626,546,5);finishGlazing();finishBatches();scene.updateMatrixWorld(true);`,ctx);
+const data=JSON.parse(vm.runInContext(`JSON.stringify({rails:recordedRails,connection:groups.find(g=>g.userData.key==='B:2:B L2 rain cover and open corridor').userData.connection})`,ctx));
+const has=(key,args)=>data.rails.some(r=>r.key===key&&r.args.every((n,i)=>Math.abs(n-args[i])<1e-8));
+assert.ok(!has('B:2',[699,616,130,1,3.78]),'Hall / C connection stays open');assert.ok(!has('B:2',[927,616,129,1,3.78]));
+const approach='B:2:B L2 rain cover and open corridor';assert.ok(data.rails.some(r=>r.key===approach&&r.args[1]===644));
+assert.deepEqual(data.connection.rainCover,[854,617,202,27]);assert.equal(data.connection.rainCoverWalkable,false);assert.deepEqual(data.connection.blockBOpening,[1032,617,24,1]);assert.equal(data.connection.noPlaygroundStairAccess,true);assert.ok(vm.runInContext("groups.filter(g=>g.userData.lift&&g.userData.block==='G').length>0&&groups.filter(g=>g.userData.lift&&g.userData.block==='G').every(g=>g.userData.lift.solidWestWall)",ctx));
+vm.runInContext('resize=()=>{};updateView=()=>{};focusRoom=()=>{};bind();selectRoom(rooms[0]);',ctx);
+assert.ok(w.document.querySelector('#sidebar').classList.contains('open'));w.document.querySelector('#menu').click();assert.equal(w.document.querySelector('#menu').getAttribute('aria-expanded'),'false');assert.ok(!w.document.querySelector('#sidebar').classList.contains('open'));w.document.querySelector('#menu').click();assert.ok(w.document.querySelector('#sidebar').classList.contains('open'));
+assert.doesNotMatch(fs.readFileSync('public/landmark.html','utf8'),/function buildCampus/);w.close();console.log('PASS default-visible controls, room selection and hide/show; generated B2 guards and walkable corridor extension');

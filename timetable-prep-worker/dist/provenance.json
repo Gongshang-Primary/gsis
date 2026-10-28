@@ -1,0 +1,19 @@
+{
+  "release": "0.9.9",
+  "protocolRelease": "0.9.8o",
+  "mode": "shadow-only",
+  "productionInstallation": false,
+  "buildTool": "esbuild",
+  "buildToolVersion": "0.28.2",
+  "sourceSha256": "883256499b61419ab73d6665543dcf8772d425f5ffce3083a41d8015563f124a",
+  "bundleSha256": "6539b58e15f39895d821dfe6790f313d9bd795b550e0d3acb6b732f1729c5efc",
+  "inputs": {
+    "shared/roster-stapler.js": "fad055065ea21e0ed6e319f4f5a104dbea6129d7f5d6ae24cd1d0a62439fd8b0",
+    "shared/roster.js": "30e5445935e0f414f8fe7083ceccd427e23b6008662de806127ce0afc1fe86dd",
+    "timetable-prep-worker/auth.mjs": "d55aef8506b2df7418d39df7b295f56a18ece2039faff454f85df9c3c839c30d",
+    "timetable-prep-worker/domain.mjs": "75ded4fed67c5d0295d3f1c71453d0b76c346e90e36ac4c68687588cd5a74e21",
+    "timetable-prep-worker/index.mjs": "6aeed65aae5f5a3a5d6fe9e8c1a8d053ff05aed6345ca2396cd5cbd86bd16398",
+    "timetable-prep-worker/storage.mjs": "f9b4ca01b49d7b7a48bf7979732c32fd9705b2179e3a28f64bc8a242e8f517eb",
+    "timetable-prep-worker/ui.mjs": "4b7f5fe79bad4c83aba05e3fc2102b6123cb33bda0077690222c46e6e6a68b02"
+  }
+}

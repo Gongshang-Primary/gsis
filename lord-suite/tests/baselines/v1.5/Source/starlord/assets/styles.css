@@ -1,0 +1,345 @@
+/* STARLORD v1.3 formal suite label — visual CSS unchanged from v1 */
+:root {
+  --navy: #12285a;
+  --navy-deep: #0c1c42;
+  --ink: #16213a;
+  --subtle: #5c667a;
+  --border: #e4e8f0;
+  --grey-frame: #eef1f6;
+  --blue: #155eef;
+  --blue-soft: #e7efff;
+  --green: #067647;
+  --amber: #b45309;
+  --amber-soft: #fef3c7;
+  --red: #b42318;
+  --red-soft: #fee4e2;
+  --shadow: 0 4px 14px rgba(18, 40, 90, 0.07);
+  --pad-x: 20px;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: #ffffff;
+  color: var(--ink);
+  font-family: "Segoe UI", "Trebuchet MS", Arial, sans-serif;
+  font-weight: 400;
+  min-height: 100vh;
+  /* The board auto-fits the viewport, so the page never scrolls… */
+  overflow: hidden;
+}
+
+/* …except in the extreme case where even minimum zoom cannot fit
+   everything (app.js adds this class). */
+body.allow-scroll { overflow-y: auto; }
+
+img { display: block; max-width: 100%; }
+
+/* ── Header block: banner + past strip ────────────────────────── */
+.sticky-shell {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+}
+
+.top-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 8px var(--pad-x);
+  background: linear-gradient(90deg, var(--navy-deep), var(--navy));
+  color: #fff;
+}
+
+.brand-wrap {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+}
+
+.wordmark {
+  height: 42px;
+  width: auto;
+  object-fit: contain;
+}
+
+.brand-copy { line-height: 1.2; min-width: 0; }
+
+.product-name {
+  font-size: 1.3rem;
+  letter-spacing: 0.1em;
+}
+
+.product-subtitle {
+  font-size: 0.8rem;
+  color: #bcc8e6;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.clock-wrap {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.clock-day { font-size: 1.2rem; }
+
+.clock-datetime {
+  font-size: 1.05rem;
+  color: #dbe3f6;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Past strip ───────────────────────────────────────────────── */
+.past-strip-panel {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--grey-frame);
+  border-bottom: 1px solid var(--border);
+  padding: 6px var(--pad-x);
+}
+
+.strip-title {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--subtle);
+  flex-shrink: 0;
+}
+
+.past-strip {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  min-width: 0;
+}
+
+.past-strip::-webkit-scrollbar { display: none; }
+
+.empty-past {
+  font-size: 0.8rem;
+  color: var(--subtle);
+  padding: 4px 0;
+}
+
+.past-card {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 10px 4px 4px;
+  border: 1px solid #d6dce8;
+  border-radius: 10px;
+  background: #f7f8fb;
+  filter: grayscale(100%);
+  opacity: 0.85;
+  line-height: 1.25;
+}
+
+.past-card img {
+  width: 30px;
+  height: 30px;
+  object-fit: contain;
+}
+
+.past-card .mini-title {
+  font-size: 0.76rem;
+  white-space: nowrap;
+}
+
+.past-card .mini-meta {
+  font-size: 0.68rem;
+  color: #4a5568;
+  white-space: nowrap;
+}
+
+/* ── Board: zoomed by app.js to always fit the window ─────────── */
+.board-main {
+  padding: 14px var(--pad-x) 16px;
+}
+
+/* min(250px, 24%) guarantees at least 3 tiles per row at any width.
+   Under zoom the effective width grows, so columns increase as the
+   board shrinks — both dimensions work toward the fit. */
+.cards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(250px, 24%), 1fr));
+  gap: 14px;
+}
+
+.loading-card,
+.empty-card,
+.error-card {
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: var(--shadow);
+  padding: 20px;
+  color: var(--subtle);
+  font-size: 1rem;
+  grid-column: 1 / -1;
+}
+
+.error-card { color: #9b1c1c; }
+
+/* ── Tile ─────────────────────────────────────────────────────── */
+.tile {
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: var(--shadow);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.tile.now { border-color: #bfe3cf; }
+
+.tile-media {
+  position: relative;
+  height: 88px;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  background: linear-gradient(180deg, #ffffff 0%, #f4f7fd 100%);
+  border-bottom: 1px solid var(--border);
+}
+
+.tile.now .tile-media {
+  background: linear-gradient(180deg, #ffffff 0%, #eefaf3 100%);
+}
+
+.tile-media img {
+  max-height: 76px;
+  width: auto;
+  object-fit: contain;
+}
+
+.badge {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  border-radius: 999px;
+  padding: 3px 10px;
+  font-size: 0.74rem;
+  letter-spacing: 0.03em;
+}
+
+.badge.now { background: var(--green); color: #fff; }
+.badge.soon { background: var(--blue-soft); color: var(--blue); }
+
+.tile-body {
+  padding: 10px 12px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
+}
+
+.teacher {
+  font-size: 1.22rem;
+  line-height: 1.15;
+  color: var(--navy);
+}
+
+.pair-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px 12px;
+}
+
+.pair {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 5px;
+  font-size: 0.92rem;
+  line-height: 1.3;
+}
+
+.pair .k {
+  font-size: 0.64rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--subtle);
+}
+
+.cart-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.cart-chip {
+  background: var(--navy);
+  color: #ffd44d;
+  border-radius: 8px;
+  padding: 4px 11px;
+  font-size: 1rem;
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+}
+
+.device {
+  font-size: 0.88rem;
+  color: var(--ink);
+}
+
+/* Sits at the tile's bottom; tiles without it keep the space blank */
+.add-row {
+  margin-top: auto;
+  background: var(--amber-soft);
+  color: var(--amber);
+  border-radius: 7px;
+  padding: 4px 9px;
+  font-size: 0.82rem;
+}
+
+/* ── Responsive ───────────────────────────────────────────────── */
+@media (max-width: 700px) {
+  :root { --pad-x: 10px; }
+  .wordmark { height: 34px; }
+  .product-subtitle { display: none; }
+  .clock-day { font-size: 1rem; }
+  .clock-datetime { font-size: 0.85rem; }
+  .cards-grid { gap: 8px; }
+  .teacher { font-size: 1rem; }
+  .pair { font-size: 0.8rem; }
+  .cart-chip { font-size: 0.88rem; padding: 3px 8px; }
+}
+
+
+/* v1 movement-aware student states */
+.tile.collected { border-color: #f0b429; }
+.tile.collected .tile-media {
+  background: linear-gradient(180deg, #ffffff 0%, var(--amber-soft) 100%);
+}
+.badge.collected { background: var(--amber); color: #fff; }
+
+.tile.late {
+  border-color: var(--red);
+  box-shadow: 0 4px 18px rgba(180, 35, 24, 0.18);
+}
+.tile.late .tile-media {
+  background: linear-gradient(180deg, #ffffff 0%, var(--red-soft) 100%);
+}
+.badge.late { background: var(--red); color: #fff; }
+.tile.late .teacher { color: var(--red); }
+
+.feed-status{margin-left:auto;padding:0 18px;font-size:12px;color:#506079;white-space:nowrap}.feed-status.stale{color:#9a5a00;font-weight:700}@media(max-width:720px){.feed-status{padding-right:10px;font-size:11px}}
+.past-strip{flex:1 1 auto}.feed-status{flex:0 0 auto}
+
+/* v1.3 reload controls */
+.reload-data-button { padding:8px 12px; color:#fff; background:#ffffff18; border:1px solid #ffffff70; border-radius:8px; font:600 12px Arial,sans-serif; cursor:pointer; white-space:nowrap; }
+.reload-data-button:disabled { opacity:.6; cursor:wait; }
+.reload-data-button:focus-visible { outline:3px solid #ffcb66; outline-offset:3px; }
+@media (max-width:1200px) { .clock-wrap { flex-wrap:wrap; justify-content:flex-end; gap:6px 10px; max-width:330px; } }

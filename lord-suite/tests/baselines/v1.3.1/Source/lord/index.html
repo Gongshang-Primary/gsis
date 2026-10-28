@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en-SG">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#183153">
+  <title>LORD v1.3 LTS | Loan Out &amp; Return of Devices</title>
+  <link rel="stylesheet" href="/assets/styles.css?v=1.3">
+</head>
+<body>
+  <div id="app" class="app-shell">
+    <header class="app-header">
+      <div class="header-identity">
+        <img class="school-wordmark" src="/assets/gsps-wordmark.webp" alt="Gongshang Primary School">
+        <div class="product-lockup">
+          <h1>LORD</h1>
+          <p class="subtitle">Loan Out &amp; Return of Devices</p>
+        </div>
+      </div>
+      <div class="header-data-actions">
+        <button id="reloadDataBtn" class="reload-data-button" type="button" hidden>Reload from Sheets</button>
+        <button id="resetAppBtn" class="icon-button" type="button" aria-label="Start over" title="Start over">↻</button>
+      </div>
+    </header>
+    <div id="reloadDataStatus" class="reload-data-status" role="status" aria-live="polite" hidden></div>
+
+    <main id="main" class="main-content" aria-live="polite"></main>
+
+  </div>
+
+  <template id="loadingTemplate">
+    <section class="card center-card">
+      <div class="spinner" aria-hidden="true"></div>
+      <h2>Loading LORD</h2>
+      <p>Retrieving the latest reference data.</p>
+    </section>
+  </template>
+
+  <script src="/assets/app.js?v=1.3" defer></script>
+</body>
+</html>

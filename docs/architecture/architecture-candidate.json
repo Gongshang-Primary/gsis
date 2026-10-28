@@ -1,0 +1,324 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "GSiS v0.9.2 \u00b7 ownership and data flow",
+    "output": "docs/architecture/GSiS_v0.9.2_Architecture.html",
+    "locale": "en",
+    "quality_profile": "showcase",
+    "views": [
+      {
+        "id": "staffJourney",
+        "label": "Staff journey",
+        "focus": [
+          "staff",
+          "browser",
+          "pages",
+          "identity",
+          "operations"
+        ],
+        "note": "Browser interactions enter app-specific gateways; backend owners authorize changes."
+      },
+      {
+        "id": "sources",
+        "label": "Source ownership",
+        "focus": [
+          "references",
+          "referenceStores",
+          "operations",
+          "operationStores"
+        ],
+        "note": "Separate owners exchange signed minimal projections rather than sharing write access."
+      },
+      {
+        "id": "delivery",
+        "label": "Notification delivery",
+        "focus": [
+          "operations",
+          "worker",
+          "providers",
+          "extensions"
+        ],
+        "note": "Durable intents govern delivery; optional infrastructure does not become business authority."
+      }
+    ]
+  },
+  "components": [
+    {
+      "id": "staff",
+      "type": "external",
+      "label": "School staff",
+      "sublabel": "Teachers \u00b7 SMC \u00b7 owners",
+      "pos": [
+        35,
+        270
+      ],
+      "size": [
+        150,
+        62
+      ]
+    },
+    {
+      "id": "browser",
+      "type": "frontend",
+      "label": "Nine browser apps",
+      "sublabel": "UI + local read caches",
+      "pos": [
+        270,
+        270
+      ],
+      "size": [
+        160,
+        62
+      ]
+    },
+    {
+      "id": "pages",
+      "type": "cloud",
+      "label": "Pages gateways",
+      "sublabel": "Same-origin API + assets",
+      "pos": [
+        535,
+        270
+      ],
+      "size": [
+        170,
+        62
+      ]
+    },
+    {
+      "id": "identity",
+      "type": "security",
+      "label": "Staff identity",
+      "sublabel": "Google / optional Access",
+      "pos": [
+        535,
+        40
+      ],
+      "size": [
+        170,
+        62
+      ]
+    },
+    {
+      "id": "references",
+      "type": "backend",
+      "label": "Reference backends",
+      "sublabel": "Contacts \u00b7 Calendar \u00b7 Deploy",
+      "pos": [
+        850,
+        40
+      ],
+      "size": [
+        190,
+        62
+      ]
+    },
+    {
+      "id": "operations",
+      "type": "backend",
+      "label": "Operational backends",
+      "sublabel": "Roster \u00b7 Venues \u00b7 LORD",
+      "pos": [
+        850,
+        270
+      ],
+      "size": [
+        190,
+        62
+      ]
+    },
+    {
+      "id": "referenceStores",
+      "type": "database",
+      "label": "Reference workbooks",
+      "sublabel": "Separate owners + revisions",
+      "pos": [
+        1170,
+        40
+      ],
+      "size": [
+        190,
+        62
+      ]
+    },
+    {
+      "id": "operationStores",
+      "type": "database",
+      "label": "Private Sheets + Drive",
+      "sublabel": "Bookings \u00b7 plans \u00b7 receipts",
+      "pos": [
+        1170,
+        270
+      ],
+      "size": [
+        190,
+        62
+      ]
+    },
+    {
+      "id": "worker",
+      "type": "cloud",
+      "label": "Roster notification Worker",
+      "sublabel": "Minute cron / optional Queue",
+      "pos": [
+        535,
+        535
+      ],
+      "size": [
+        190,
+        62
+      ]
+    },
+    {
+      "id": "providers",
+      "type": "external",
+      "label": "Delivery providers",
+      "sublabel": "WhatsApp + Google mail",
+      "pos": [
+        850,
+        535
+      ],
+      "size": [
+        190,
+        62
+      ]
+    },
+    {
+      "id": "extensions",
+      "type": "database",
+      "label": "Optional Roster services",
+      "sublabel": "R2 \u00b7 D1 \u00b7 Queue",
+      "pos": [
+        270,
+        535
+      ],
+      "size": [
+        170,
+        62
+      ]
+    }
+  ],
+  "connections": [
+    {
+      "from": "staff",
+      "to": "browser",
+      "label": "Staff tasks",
+      "variant": "emphasis"
+    },
+    {
+      "from": "browser",
+      "to": "pages",
+      "label": "HTTPS",
+      "variant": "emphasis"
+    },
+    {
+      "from": "identity",
+      "to": "pages",
+      "label": "Private app requests",
+      "variant": "security"
+    },
+    {
+      "from": "pages",
+      "to": "operations",
+      "label": "Authenticated API",
+      "variant": "emphasis"
+    },
+    {
+      "from": "pages",
+      "to": "references",
+      "label": "Reference API"
+    },
+    {
+      "from": "references",
+      "to": "referenceStores",
+      "label": "Owner I/O"
+    },
+    {
+      "from": "operations",
+      "to": "operationStores",
+      "label": "Owner I/O",
+      "variant": "emphasis"
+    },
+    {
+      "from": "operations",
+      "to": "references",
+      "label": "Signed reads"
+    },
+    {
+      "from": "worker",
+      "to": "operations",
+      "label": "Claim / settle"
+    },
+    {
+      "from": "worker",
+      "to": "providers",
+      "label": "Roster sends",
+      "variant": "dashed"
+    },
+    {
+      "from": "operations",
+      "to": "providers",
+      "label": "LORD / Venues sends",
+      "variant": "dashed"
+    },
+    {
+      "from": "pages",
+      "to": "extensions",
+      "label": "Optional bindings"
+    },
+    {
+      "from": "worker",
+      "to": "extensions",
+      "label": "Drain / media"
+    },
+    {
+      "from": "operations",
+      "to": "referenceStores",
+      "label": "Roster published read"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "Nine apps \u00b7 six backend owners",
+      "items": [
+        "Contacts manages staff identities and application access. Calendar owns school dates, parity and events. Deploy owns planning/publication; Layout shares its backend and physical room register.",
+        "Roster owns baseline, suspended and relief timetable state. Venues owns room bookings and facilities permissions. LORD, OVERLORD and STARLORD share one booking/device backend."
+      ]
+    },
+    {
+      "dot": "violet",
+      "title": "Identity and source exchanges",
+      "items": [
+        "Private staff apps retain Google sign-in/session checks. STARLORD keeps its read-only display model and separate outer access policy. Venues also supports verified Access JWTs; its backend resolves active Contacts identity and facilities grants.",
+        "Roster reads Contacts authority over a signed bridge and published Deploy quota/catalogue through read-only workbook access; its gateway gets Calendar date context. LORD refreshes signed Contacts/Deploy manifests. Venues reads signed Contacts, Deploy/Layout, Calendar and Roster projections."
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "Venues admission and timetable precedence",
+      "items": [
+        "A signed Roster begin creates a durable Venues fence before occupancy-changing timetable writes. Unrelated absence and audit work can continue. Complete marks the source stale; sync activates only when captured revisions and fence tokens still match.",
+        "Server validation checks current permissions, date coverage, room rules, pending holds, closures and effective timetable occupancy. Booking/transfer effects, audit, receipt and notification intent commit together in the Venues workbook. No cross-service atomicity is claimed."
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "Stores, delivery and maintenance",
+      "items": [
+        "Each Apps Script project owns its mutable records and locking. Roster retains Drive JSON; Venues uses atomic Sheets batch updates and immutable Drive occupancy pieces. Browser caches accelerate reads but never authorize a write.",
+        "The Roster Worker claims durable intents; optional Queue messages only wake it. Optional R2/D1 serve documented Roster media, snapshots and webhook jobs. LORD and Venues dispatch their own notifications. Uncertain provider acceptance requires review.",
+        "This source map is a companion to README.md, the deployment authority. It describes repository contracts, not a live infrastructure audit. See the editable Draw.io pages and evidence JSON for exact source ownership."
+      ]
+    },
+    {
+      "dot": "slate",
+      "title": "Local source evidence",
+      "items": [
+        "Source identity: local GSiS_v0.9_Correction_Source_History.bundle. No hosted upstream is asserted. The pinned revision, source ranges and file hashes are retained in architecture-evidence.json and architecture-source.json; architecture-text.md is the text alternative.",
+        "Archify cannot verify local-bundle origins. Its passing gates cover the rendered artifact and browser behavior; repository provenance is checked separately against local Git objects. README.md remains the only deployment guide."
+      ]
+    }
+  ]
+}

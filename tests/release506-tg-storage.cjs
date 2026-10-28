@@ -1,0 +1,17 @@
+const assert=require('assert/strict'),vm=require('vm'),{ctx}=require('./storage.cjs'),run=s=>vm.runInContext(s,ctx);
+run(`var id506tg=call('change',{operation:'create',sourceVersionId:id,duplicate:true,name:'506 FMA fixture',requestId:Utilities.getUuid()}).versionId;
+var doc506tg=()=>document_(book_(),index_(book_()).versions.find(x=>x.id===id506tg));
+var save506tg=edits=>call('change',{operation:'saveDraft',versionId:id506tg,requestId:Utilities.getUuid(),issuedAt:Date.now(),clientId:'506-tg',edits});
+var refs506tg=doc506tg().classes.filter(c=>c.level==='1').slice(0,2).map(c=>c.ref);
+save506tg([{operation:'setLoad',level:'1',subject:'FMA',value:8,expected:doc506tg().loads['1'].FMA}]);
+save506tg([{operation:'addTG',localId:'tg-506-fma',name:'P1 LSP 1 FMA selection',subject:'FMA',level:'1',levelWide:false,classRefs:refs506tg,venue:'F1-16',expected:null}]);`);
+assert.equal(run("doc506tg().groups.find(g=>g.id==='tg-506-fma').subject"),'FMA');
+assert.equal(run("call('sync',{versionId:id506tg}).current.groups.find(g=>g.id==='tg-506-fma').subject"),'FMA','Reload from persisted fields retains the selected FMA');
+run(`save506tg([{operation:'addTeacher',localId:'teacher506',subject:'FMA',target:'tg-506-fma',teacher:'t1',expected:false}]);
+var edit506tg={operation:'updateTG',groupId:'tg-506-fma',name:'EL in the name cannot override FMA',subject:'FMA',levelWide:true,classRefs:[],venue:'B3-01'};edit506tg.expected=GSISVenueGroups.state(doc506tg(),edit506tg);save506tg([edit506tg]);`);
+assert.equal(run("doc506tg().groups.find(g=>g.id==='tg-506-fma').subject"),'FMA');assert.equal(run("doc506tg().groups.find(g=>g.id==='tg-506-fma').venue"),'B3-01');assert.equal(run("doc506tg().groups.find(g=>g.id==='tg-506-fma').levelWide"),true);
+assert.equal(run("doc506tg().assignments.find(a=>a.target==='tg-506-fma').subject"),'FMA');assert.equal(run("doc506tg().assignments.find(a=>a.target==='tg-506-fma').venue"),'B3-01');
+assert.equal(run("call('sync',{versionId:id506tg}).current.loads['1'].FMA"),8);
+run(`edit506tg={...edit506tg,subject:'EL',assignments:'retain',expected:GSISVenueGroups.state(doc506tg(),edit506tg)};save506tg([edit506tg]);edit506tg={...edit506tg,subject:'FMA',assignments:'retain',expected:GSISVenueGroups.state(doc506tg(),edit506tg)};save506tg([edit506tg]);`);
+assert.equal(run("call('sync',{versionId:id506tg}).current.groups.find(g=>g.id==='tg-506-fma').subject"),'FMA');assert.equal(run("doc506tg().assignments.find(a=>a.target==='tg-506-fma').subject"),'FMA');
+console.log('PASS 506 FMA storage: explicit Add, saved sync reload, scope/venue/name edits, retained assignment subject and FMA remap round trip');

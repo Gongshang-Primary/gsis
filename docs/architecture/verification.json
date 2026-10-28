@@ -1,0 +1,38 @@
+{
+  "schema": "gsis-architecture-verification-v1",
+  "htmlSha256": "9ae4d3d673ba1d2b39ed10ebfaddbad2652e95ce23f1770d5468b55f7741dac7",
+  "drawioSha256": "59f59ad3451df669ef5b22a410411c25a4ff460440df6239240866981bd7b620",
+  "archify": {
+    "renderer": "3.1.0 packaged renderer",
+    "validate": "pass",
+    "deliver": "pass",
+    "strictCheck": "pass",
+    "realBrowser": "pass",
+    "externalRequests": 0,
+    "perceptualReview": {
+      "status": "pass",
+      "inspected": [
+        "1440x900 dark",
+        "1280x800 light"
+      ],
+      "finding": "No clipped nodes, crossing connectors or unreadable navigation. Source cards use normal vertical page scrolling."
+    },
+    "remainingAdvisory": "One three-bend claim/settle connector; visually traced and clear."
+  },
+  "drawio": {
+    "structuralErrors": 0,
+    "structuralWarnings": 0,
+    "throughVertex": 0,
+    "crossings": 0,
+    "overlaps": 0,
+    "semanticPolicy": "pass",
+    "nativeEditorRender": "not-run: draw.io binary unavailable"
+  },
+  "sourceEvidence": {
+    "pinnedRevision": "44252bd83e8598806296640791ce6122fe001099",
+    "sourceRangeChecks": 49,
+    "scope": "Committed implementation and contract evidence for both overview and editable model, pinned to the integrated runtime revision; all source ranges verified against local Git objects.",
+    "archifyRepositoryGate": "unavailable for actual local-bundle origin; separate local Git-object verification passed."
+  },
+  "readmeAuthority": "../../README.md"
+}

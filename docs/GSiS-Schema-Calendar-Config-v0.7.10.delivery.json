@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "receiptId": "389fddce-4da1-429f-8e2e-72d2e418648b",
+  "status": "current",
+  "command": "deliver",
+  "type": "erd",
+  "input": "/workspace/scratch/c84f0276cce6/build710/source/docs/architecture-source/GSiS-Schema-Calendar-Config-v0.7.10.json",
+  "output": "/workspace/scratch/c84f0276cce6/build710/source/docs/GSiS-Schema-Calendar-Config-v0.7.10.html",
+  "specification": {
+    "sha256": "1d9d975de1aac2431df4759c29cefd890be272464a582d475d0c094e20c98f00",
+    "bytes": 7883
+  },
+  "artifact": {
+    "sha256": "819f02d41724f610269f9f1d19ef51e4a3b0bfa81bfc9caf75fc001ffc14b9dc",
+    "bytes": 845553
+  }
+}

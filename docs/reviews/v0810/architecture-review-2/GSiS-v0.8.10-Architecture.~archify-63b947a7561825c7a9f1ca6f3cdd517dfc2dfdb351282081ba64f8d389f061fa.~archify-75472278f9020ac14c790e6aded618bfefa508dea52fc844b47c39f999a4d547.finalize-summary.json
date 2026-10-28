@@ -1,0 +1,55 @@
+{
+  "schemaVersion": 1,
+  "ok": false,
+  "command": "finalize",
+  "status": "fail",
+  "type": "architecture",
+  "quality": "showcase",
+  "specification": {
+    "path": "/workspace/scratch/2c52ae6e6b97/gsis-089a/docs/reviews/v0810/architecture-candidate.json",
+    "sha256": "b2fa4462290ea9af63b50fc03f66b8a2abf62ebdfcbaa08317b2ec1d750839fd",
+    "bytes": 13249
+  },
+  "artifact": {
+    "path": "/workspace/scratch/2c52ae6e6b97/gsis-089a/docs/GSiS-v0.8.10-Architecture.html",
+    "sha256": "ad3fc0b47a13c8bdb1175d2e6a7fe05c888c0ba39896bf65412f28c2e170b7b8",
+    "bytes": 830509
+  },
+  "gates": {
+    "validate": "pass",
+    "deliver": "pass",
+    "check": "pass",
+    "browser-check": "fail"
+  },
+  "failedStage": "browser-check",
+  "diagnostics": [
+    {
+      "code": "delivery/provenance-failed",
+      "severity": "error",
+      "message": "A delivery attempt is unfinished or failed; complete a successful deliver before trusting this artifact.",
+      "subject": {
+        "artifact": "/workspace/scratch/2c52ae6e6b97/gsis-089a/docs/GSiS-v0.8.10-Architecture.html",
+        "provenance": "/workspace/scratch/2c52ae6e6b97/gsis-089a/docs/GSiS-v0.8.10-Architecture.delivery.json"
+      },
+      "evidence": {
+        "pendingJournal": "/workspace/scratch/2c52ae6e6b97/gsis-089a/docs/GSiS-v0.8.10-Architecture.delivery-pending.json",
+        "found": true
+      },
+      "supportedFixes": [
+        "finish any active delivery, then rerun deliver successfully; retain the pending journal until recovery succeeds"
+      ]
+    }
+  ],
+  "diagnosticSummary": {
+    "total": 1,
+    "shown": 1,
+    "truncated": false
+  },
+  "evidence": {
+    "receipt": "/workspace/scratch/2c52ae6e6b97/gsis-089a/docs/reviews/v0810/architecture-review-2/GSiS-v0.8.10-Architecture.~archify-63b947a7561825c7a9f1ca6f3cdd517dfc2dfdb351282081ba64f8d389f061fa.~archify-75472278f9020ac14c790e6aded618bfefa508dea52fc844b47c39f999a4d547.finalize.json",
+    "summaryReceipt": "/workspace/scratch/2c52ae6e6b97/gsis-089a/docs/reviews/v0810/architecture-review-2/GSiS-v0.8.10-Architecture.~archify-63b947a7561825c7a9f1ca6f3cdd517dfc2dfdb351282081ba64f8d389f061fa.~archify-75472278f9020ac14c790e6aded618bfefa508dea52fc844b47c39f999a4d547.finalize-summary.json",
+    "browserCheckReceipt": "/workspace/scratch/2c52ae6e6b97/gsis-089a/docs/reviews/v0810/architecture-review-2/GSiS-v0.8.10-Architecture.~archify-63b947a7561825c7a9f1ca6f3cdd517dfc2dfdb351282081ba64f8d389f061fa.browser-check.json"
+  },
+  "visualReview": "not-requested",
+  "durationMs": 2985
+}

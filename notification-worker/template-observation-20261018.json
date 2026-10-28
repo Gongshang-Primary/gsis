@@ -1,0 +1,282 @@
+{
+  "observedAt": "2026-10-18",
+  "businessName": "Gongshang Primary",
+  "businessId": "1367896852088548",
+  "messagingAccountId": "971916692625997",
+  "source": "WhatsApp Business MCP read-only list and detail checks; no messages sent",
+  "templates": [
+    {
+      "id": "1647877567013330",
+      "name": "gsis_timetable_sponsor_v1",
+      "language": "en_GB",
+      "status": "PENDING",
+      "category": "UTILITY",
+      "components": [
+        {
+          "type": "BODY",
+          "text": "*Request to plan Suspended Timetable*\n\nHi {{1}}, {{2}} has requested your approval to plan and publish a suspended timetable for {{3}}.\n\nPlease review the request and approve or reject it here:\n{{4}}\n\nThank you."
+        }
+      ]
+    },
+    {
+      "id": "1116798554168000",
+      "name": "gsis_timetable_updated_v1",
+      "language": "en_GB",
+      "status": "PENDING",
+      "category": "UTILITY",
+      "components": [
+        {
+          "type": "BODY",
+          "text": "*Your timetable for today has changed*\n\nHi {{1}}, your timetable for today, {{2}}, has updates.\n\nSpecifically, the changes are:\n{{3}}\n\nView your updated timetable alongside your usual timetable:\n{{4}}\n\nThank you.\nGSiS Roster"
+        }
+      ]
+    },
+    {
+      "id": "2516068742237019",
+      "name": "gsis_relief_instruction_v1",
+      "language": "en_GB",
+      "status": "PENDING",
+      "category": "UTILITY",
+      "components": [
+        {
+          "type": "BODY",
+          "text": "*Instructions for relief lesson*\n\nHi {{1}}, please note the following instructions for your assigned relief lesson at Gongshang Primary School.\n\nClass: {{2}}\nDate: {{3}}\nPeriod and time: {{4}}\n\nLesson instructions:\n{{5}}\n\nFor clarification, please contact {{6}}, the absent teacher:\n{{7}}\n\nThank you."
+        }
+      ]
+    },
+    {
+      "id": "1612531343710304",
+      "name": "gsis_relief_attention_v2",
+      "language": "en_GB",
+      "status": "APPROVED",
+      "category": "UTILITY",
+      "components": [
+        {
+          "type": "BODY",
+          "text": "*School Relief Allocation Requires Action*\n\nHi {{1}}, you are on SMC relief duty at Gongshang Primary School on {{2}}.\n\nThe following issue has been recorded in the teacher relief allocation for your duty date:\n\n{{3}}\n\nPlease review the affected lessons and confirm or correct their teacher coverage in Roster: {{4}}.\n\nThank you."
+        }
+      ]
+    },
+    {
+      "id": "1617835963217353",
+      "name": "gsis_urgent_forward_v1",
+      "language": "en_GB",
+      "status": "APPROVED",
+      "category": "UTILITY",
+      "components": [
+        {
+          "type": "BODY",
+          "text": "*Urgent Message to Relief Team*\n\nHi {{1}}, a staff member has sent this urgent message:\n\n{{2}}\n\nFrom: {{3}}\nContact: {{4}}\n\nPlease contact the sender directly. This message does not create an absence report or confirm relief cover."
+        }
+      ]
+    },
+    {
+      "id": "1417951669852452",
+      "name": "gsis_relief_capacity_warning_v1",
+      "language": "en_GB",
+      "status": "APPROVED",
+      "category": "UTILITY",
+      "components": [
+        {
+          "type": "BODY",
+          "text": "*Relief Capacity Warning*\n\nHi {{1}}, relief capacity for {{2}} needs your attention.\n\n{{3}}\n\nRelief Health: {{4}}\n\nReview the affected periods in Roster: {{5}}.\n\nPlease consider external ad hoc relief where needed. External staff are not activated automatically."
+        }
+      ]
+    },
+    {
+      "id": "2188657595398105",
+      "name": "gsis_relief_manual_review_v1",
+      "language": "en_GB",
+      "status": "APPROVED",
+      "category": "UTILITY",
+      "components": [
+        {
+          "type": "BODY",
+          "text": "*Relief Allocation Requires Review*\n\nHi {{1}}, please review the relief plan for {{2}}.\n\nThe final scheduled allocation run is complete.\n{{3}}\n\nPlease allocate the remaining cover and publish the relief plan here: {{4}}.\n\nThank you."
+        }
+      ]
+    },
+    {
+      "id": "934616792782108",
+      "name": "gsis_absence_update_v1",
+      "language": "en_GB",
+      "status": "APPROVED",
+      "category": "UTILITY",
+      "components": [
+        {
+          "type": "BODY",
+          "text": "*New Absence Update*\n\nHi {{1}}, {{2}} new absence(s) have been reported for {{3}} since the previous update.\n\n{{4}}\n\nReview the latest allocation and publication status here: {{5}}.\n\nThank you."
+        }
+      ]
+    },
+    {
+      "id": "1082281697770168",
+      "name": "gsis_relief_morning_v1",
+      "language": "en_GB",
+      "status": "APPROVED",
+      "category": "UTILITY",
+      "components": [
+        {
+          "type": "BODY",
+          "text": "*Morning Relief Summary*\n\nHi {{1}}, here is the relief summary for {{2}}.\n\n{{3}}\n\nRelief Health: {{4}}\n\nThese allocations are drafts pending publication.\n\nReview the plan here: {{5}}.\n\nThank you."
+        }
+      ]
+    },
+    {
+      "id": "1662539355443373",
+      "name": "gsis_relief_evening_v1",
+      "language": "en_GB",
+      "status": "APPROVED",
+      "category": "UTILITY",
+      "components": [
+        {
+          "type": "BODY",
+          "text": "*Relief Planning Update*\n\nHi {{1}}, here is the relief planning update for {{2}}.\n\n{{3}}\n\nThese allocations are drafts pending publication.\n\nReview the plan here: {{4}}.\n\nThank you."
+        }
+      ]
+    },
+    {
+      "id": "2373646553447066",
+      "name": "gsis_relief_urgent_v1",
+      "language": "en_GB",
+      "status": "APPROVED",
+      "category": "UTILITY",
+      "components": [
+        {
+          "type": "BODY",
+          "text": "*Urgent Relief Assignment*\n\nHi {{1}}, Relief Team has assigned you a relief duty on {{2}} that starts in {{3}} minutes.\n\n{{4}}\n\nPlease view the relief instructions and acknowledge your duty now: {{5}}.\n\nThank you."
+        }
+      ]
+    },
+    {
+      "id": "3993441010951993",
+      "name": "gsis_relief_unacknowledged_v1",
+      "language": "en_GB",
+      "status": "APPROVED",
+      "category": "UTILITY",
+      "components": [
+        {
+          "type": "BODY",
+          "text": "*Relief Duty Not Acknowledged*\n\nHi {{1}}, {{2}} has not acknowledged the relief duty on {{3}}.\n\n{{4}}\n\nThe lesson starts in 10 minutes. Please contact the teacher and confirm cover.\n\nView the current status here: {{5}}.\n\nThank you."
+        }
+      ]
+    },
+    {
+      "id": "2175089153046382",
+      "name": "gsis_relief_reminder_v1",
+      "language": "en_GB",
+      "status": "APPROVED",
+      "category": "UTILITY",
+      "components": [
+        {
+          "type": "BODY",
+          "text": "*Relief Duty Reminder*\n\nHi {{1}}, your relief duty on {{2}} starts in 20 minutes and has not been acknowledged in Roster.\n\n{{3}}\n\nView the relief instructions and acknowledge your duty here: {{4}}.\n\nThank you."
+        }
+      ]
+    },
+    {
+      "id": "1753999250059547",
+      "name": "gsis_relief_updated_v1",
+      "language": "en_GB",
+      "status": "APPROVED",
+      "category": "UTILITY",
+      "components": [
+        {
+          "type": "BODY",
+          "text": "*Relief Assignment Updated*\n\nHi {{1}}, Relief Team has changed your relief duties for {{2}}.\n\n{{3}}\n\nView your updated timetable and acknowledge the change here: {{4}}.\n\nThank you."
+        }
+      ]
+    },
+    {
+      "id": "2331306544355004",
+      "name": "gsis_relief_assignment_v1",
+      "language": "en_GB",
+      "status": "APPROVED",
+      "category": "UTILITY",
+      "components": [
+        {
+          "type": "BODY",
+          "text": "*Relief Assignment*\n\nHi {{1}}, Relief Team has assigned you relief duties on {{2}}.\n\n{{3}}\n\nView the relief instructions and acknowledge your duties here: {{4}}.\n\nThank you."
+        }
+      ]
+    },
+    {
+      "id": "1775720290362486",
+      "name": "gsis_relief_changed_v1",
+      "language": "en_GB",
+      "status": "APPROVED",
+      "category": "UTILITY",
+      "components": [
+        {
+          "type": "BODY",
+          "text": "*Peer Relief Arrangement Updated*\n\nHi {{1}}, Relief Team has changed the peer relief arrangement for {{2}}.\n\n{{3}}\n\nView the published arrangement here: {{4}}.\n\nThank you."
+        }
+      ]
+    },
+    {
+      "id": "2207471319799180",
+      "name": "gsis_timetable_access_v1",
+      "language": "en_GB",
+      "status": "PENDING",
+      "category": "UTILITY",
+      "components": [
+        {
+          "type": "BODY",
+          "text": "*Suspended timetable request outcome*\n\n{{1}} made a request to plan a suspended timetable for {{2}}.\n\nThe request has been reviewed and the outcome is:\n{{3}}\n\nView the request and decision here:\n{{4}}\n\nThank you."
+        }
+      ]
+    },
+    {
+      "id": "1465945335400661",
+      "name": "gsis_relief_final_v1",
+      "language": "en_GB",
+      "status": "APPROVED",
+      "category": "UTILITY",
+      "components": [
+        {
+          "type": "BODY",
+          "text": "*Final Draft Relief Allocation*\n\nHi {{1}}, the final scheduled relief allocation for {{2}} is complete.\n\n{{3}}\n\nRelief Health: {{4}}\n\nReview and publish the draft in Roster: {{5}}.\n\nThank you."
+        }
+      ]
+    },
+    {
+      "id": "4510849222577421",
+      "name": "gsis_relief_urgent_smc_v1",
+      "language": "en_GB",
+      "status": "APPROVED",
+      "category": "UTILITY",
+      "components": [
+        {
+          "type": "BODY",
+          "text": "*Urgent Relief Cover*\n\nHi {{1}}, {{2}} has been assigned relief on {{3}}. The lesson starts in {{4}} minutes.\n\n{{5}}\n\nThe duty has not yet been acknowledged. Please check that cover is confirmed.\n\nView the current status here: {{6}}.\n\nThank you."
+        }
+      ]
+    },
+    {
+      "id": "1777525793360691",
+      "name": "gsis_contact_review_v1",
+      "language": "en_GB",
+      "status": "APPROVED",
+      "category": "UTILITY",
+      "components": [
+        {
+          "type": "BODY",
+          "text": "*Contact Details for Ad Hoc External Relief*\n\nHi {{1}}.\n\nOn https://roster.gsps.edu.sg, contact details for an ad hoc external relief teacher were added or updated on {{2}}.\n\nPlease review these details as a Contacts Admin:\n\n{{3}}\n\nReview and confirm the details in Contacts: {{4}}.\n\nThank you."
+        }
+      ]
+    },
+    {
+      "id": "1406506811640852",
+      "name": "gsis_relief_request_v1",
+      "language": "en_GB",
+      "status": "APPROVED",
+      "category": "UTILITY",
+      "components": [
+        {
+          "type": "BODY",
+          "text": "*Peer Relief Arrangement*\n\nHi {{1}}, {{2}} has requested on https://roster.gsps.edu.sg that you cover his/her lesson(s) on {{3}}: {{4}}.\n\nAccept or reject using this link: {{5}}.\n\nThank you."
+        }
+      ]
+    }
+  ]
+}

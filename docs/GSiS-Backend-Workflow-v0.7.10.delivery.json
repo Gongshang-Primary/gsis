@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "receiptId": "0dfc4dab-fc58-44a0-b575-8994096ebcd0",
+  "status": "current",
+  "command": "deliver",
+  "type": "workflow",
+  "input": "/workspace/scratch/c84f0276cce6/build710/source/docs/architecture-source/GSiS-Backend-Workflow-v0.7.10.json",
+  "output": "/workspace/scratch/c84f0276cce6/build710/source/docs/GSiS-Backend-Workflow-v0.7.10.html",
+  "specification": {
+    "sha256": "f21bea7f3bcfd1c08e617016728530d84781db1ddfc0de97c47de7c922608942",
+    "bytes": 5974
+  },
+  "artifact": {
+    "sha256": "b0c0e904254c279f73af6fc9d45868ff1ede523f7372717cb11801463a5f7eb8",
+    "bytes": 833910
+  }
+}

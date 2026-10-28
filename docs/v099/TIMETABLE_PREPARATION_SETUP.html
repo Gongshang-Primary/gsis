@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>GSiS 0.9.9 — timetable preparation</title><style>body{font:16px/1.55 system-ui,sans-serif;max-width:960px;margin:40px auto;padding:0 20px;color:#17343b}h1,h2{line-height:1.2}code{background:#edf2f4;padding:2px 4px}table{border-collapse:collapse;width:100%}td,th{border:1px solid #bdcbd0;padding:10px;text-align:left}.notice{background:#fff2bc;padding:16px;border-radius:8px}li{margin:8px 0}</style></head><body>
+<h1>GSiS 0.9.9 timetable preparation</h1>
+<p class="notice"><strong>SHADOW ONLY — NO PRODUCTION CUTOVER.</strong> Google remains authoritative for Roster. This separate package updates the existing administrator-only preparation Worker; it does not route Roster users to it, accept live absences, allocate relief, send messages or activate D1 authority.</p>
+<h2>What changes</h2>
+<p>The Worker page, status and package identify runtime <code>0.9.9</code>. The native timetable wire contract remains <code>0.9.8o</code>, schema version 1, so existing O/P exports, stored objects, pointers and request receipts remain compatible. Do not edit the release field in an exported manifest. The original I synthetic rehearsal schema remains a test and recovery reference; this update does not replace the stored synthetic ledger.</p>
+<h2>Update the existing preparation service</h2>
+<ol>
+<li>Keep a recoverable copy of the current preparation Worker and its configuration. Confirm that its D1 and private R2 bindings belong to the existing dedicated rehearsal instance, not a production transport or notification database.</li>
+<li>Replace only that Worker's code with this package's <code>worker.mjs</code>. Keep its existing origin, Google client ID, school domain, administrator allowlist, instance ID and the <code>REHEARSAL_LEDGER</code>/<code>REHEARSAL_TIMETABLES</code> bindings. Preserve bucket privacy and the existing intended Worker access setting. Do not enable an R2 Public Development URL.</li>
+<li>If the O preparation tables are already installed, no schema step is needed. For an existing initialized I rehearsal lacking those tables, review and run only the top-level additive <code>schema.sql</code>. Never reinitialize the original rehearsal schema or create duplicate production resources.</li>
+<li>Open the existing preparation origin, sign in as an allowlisted school administrator, and confirm the page and stored status show runtime <code>0.9.9</code>, protocol <code>0.9.8o</code>, Google authority and unverified current Google freshness.</li>
+<li>From current Roster System Health → Prepare timetable migration, export a fresh timetable snapshot. Import it without editing its JSON; inspect the revision, verified native hashes and all 31 dated mappings. Read representative baseline and confirmed suspended dates. Exact retries retain the same request identity.</li>
+</ol>
+<p>Do not add production secrets, provider credentials, schedules, Queue consumers, service bindings from Roster, or authority flags to this Worker. Keep the installed Calendar job configuration separate, including <code>CALENDAR_SYNC_CONTINUE=false</code>.</p>
+<h2>Interpret results correctly</h2>
+<table><thead><tr><th>Evidence</th><th>Meaning</th></tr></thead><tbody>
+<tr><td>Import/readback succeeded</td><td>Private compressed objects and the D1 pointer match the supplied native snapshot. This does not establish present Google freshness.</td></tr>
+<tr><td>Baseline candidates stored</td><td>Weekday/odd/even candidates exist. Calendar school-day and parity selection still require a future verified adapter.</td></tr>
+<tr><td>Independent confirmed plan stored</td><td>The intended confirmed Stapler plan survives changed or missing baselines. Unconfirmed draft changes are excluded.</td></tr>
+<tr><td>Unchanged import or exact retry</td><td>Existing objects/revision or the durable receipt are reused. It is not a new authority transfer.</td></tr>
+</tbody></table>
+<h2>Operator checks still required</h2>
+<ul><li>Run a live two-tab stale-revision import test: exactly one changed import may win; refresh and review the loser.</li><li>Review separation of the rehearsal OAuth origin/client from the production Roster client; the carried operator report says it still shares the production client.</li><li>Verify unlisted-account denial, private bucket exposure, representative workload latency and storage errors in the real Cloudflare runtime.</li><li>Before any production reader, verify current Calendar date/parity, Contacts/Name Bridge staff mapping, current source revisions and role-specific access. Venue consumers require a separately restricted occupancy projection.</li></ul>
+<p>The operator's P report proves a prior unedited export/import with 31 dates and 15 projection hashes. Local 0.9.9 tests do not establish 0.9.9 deployment or satisfy these live gates. No pruning or delete route is supplied: current heads, receipts, recovery versions and any in-flight references must remain protected until a separately tested retention design exists.</p>
+<p>For the stable native format, read <code>TIMETABLE_EXPORT_CONTRACT.md</code>. For further development, read the full release's <code>docs/v099/ROSTER_WORKER_ROADMAP.md</code> and <code>docs/v099/HANDOVER.md</code>.</p>
+</body></html>

@@ -1,0 +1,46 @@
+name = "gsis-roster-notifications"
+main = "index.js"
+compatibility_date = "2026-10-01"
+workers_dev = false
+
+[observability]
+enabled = true
+
+[triggers]
+crons = ["* * * * *", "15 18 * * *"]
+
+[vars]
+WHATSAPP_ENABLED = "false"
+ROSTER_AUTOMATION_ENABLED = "false"
+WHATSAPP_MENU_ENABLED = "false"
+WHATSAPP_INBOX_ALERTS_ENABLED = "false"
+WHATSAPP_DIAGNOSTICS_ENABLED = "false"
+WHATSAPP_TEMPLATES_JSON = "{}"
+GSIS_BACKGROUND_JOBS = "false"
+GSIS_RECOVERY_MODE = "false"
+WHATSAPP_SEND_CONCURRENCY = "4"
+WHATSAPP_SENDS_PER_SECOND = "4"
+# Set the approved API version and real account/number IDs during setup.
+# Configure values and secrets using ../docs/WHATSAPP_ACTIVATION_v0.9.1.md on both
+# this Worker and Roster Pages. After activation, keep these vars in sync with
+# the intended live values before a future Wrangler deployment (which applies them).
+# Ordinary ingress captures media on Roster Pages. With WHATSAPP_DURABLE_INGRESS=true,
+# also bind the same private WHATSAPP_INBOX_MEDIA bucket and GSIS_JOBS D1 database
+# here; mirror enabled menu settings because this Worker drains incoming jobs.
+# This Worker sends durable replies; private browser media is served by Pages.
+
+# Paid v0.9.7 setup: see QUEUES.md. Create both queues and bind the same
+# GSIS_JOBS database and GSIS_BACKEND private service before enabling the flag.
+# Queue bindings are commented so installing this safe default cannot silently
+# attach a new consumer to production. Preserve existing live bindings/secrets.
+# [[queues.producers]]
+# binding = "GSIS_BACKGROUND_QUEUE"
+# queue = "gsis-background-jobs"
+# [[queues.consumers]]
+# queue = "gsis-background-jobs"
+# max_batch_size = 1
+# max_batch_timeout = 5
+# max_concurrency = 1
+# max_retries = 3
+# retry_delay = 60
+# dead_letter_queue = "gsis-background-jobs-dlq"

@@ -1,0 +1,16 @@
+'use strict';
+const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm'),crypto=require('node:crypto');
+const source=fs.readFileSync('backend/Code.gs','utf8'),start=source.indexOf('function doPost(e){'),end=source.indexOf('\nfunction auth_',start),copy=x=>JSON.parse(JSON.stringify(x));
+const sample={status:409,code:'STAPLER_CONFLICT',conflicts:[{collection:'tiles',id:'example',field:'venue',base:'A',current:'B',local:'C'}],currentPlan:{date:'2026-10-21',tiles:[]},staplerRevision:3};
+const secret='x'.repeat(32),properties=new Map([['GSIS_SECRET',secret]]),settings={getProperty:key=>properties.get(key)??null};
+const box={JSON,Date,GSIS_DEPLOY_VERSION:'0.8.2',GSISSheets:{resetStats(){}},console:{log(){}},deployTrace_:null,Utilities:{getUuid:()=> 'request-id',Charset:{UTF_8:'utf8'},computeHmacSha256Signature:(text,key)=>[...crypto.createHmac('sha256',key).update(text).digest()]},PropertiesService:{getScriptProperties:()=>settings},out_:x=>x,error_:(status,message)=>{throw Object.assign(Error(message),{status});},props_:()=>settings,rosterStage_(){},rosterDiagnostic_(){},rosterFailureDetail_:()=>({}),rosterDiagnosticError_:()=>'',rosterDiagnosticText_:()=>'',contacts_:()=>({user:{email:'smc@gsps.edu.sg',roles:['SMC']}}),rosterDispatch_:()=>{throw Object.assign(Error('Compare changes'),copy(sample));}};
+vm.createContext(box);require('./load-backend-role.cjs')(box,'roster');vm.runInContext(fs.readFileSync('backend/ApiSecret.gs','utf8'),box);
+require('./helpers/load-roster-diagnostic-build.cjs')(box);
+vm.runInContext(source.slice(source.indexOf('function signature_('),source.indexOf('\nfunction book_(')),box);vm.runInContext(source.slice(start,end),box);
+const envelope={action:'rosterOperations',identity:{email:'smc@gsps.edu.sg',subject:'teacher'},timestamp:Date.now(),nonce:'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee',input:{operation:'saveStapler'}};
+const payload=JSON.stringify(envelope),req={postData:{contents:JSON.stringify({payload,signature:crypto.createHmac('sha256',secret).update(payload).digest('hex')})}};
+const result=box.doPost(req);assert.equal(result.status,409);assert.equal(result.code,'STAPLER_CONFLICT');assert.deepEqual(copy(result.conflicts),sample.conflicts);assert.deepEqual(copy(result.currentPlan),sample.currentPlan);assert.equal(result.staplerRevision,3);
+sample.code='UNEXPECTED_ERROR';const hidden=box.doPost(req);assert.equal(hidden.conflicts,undefined);assert.equal(hidden.currentPlan,undefined);
+const invalid=box.doPost({postData:{contents:JSON.stringify({payload,signature:'0'.repeat(64)})}});assert.equal(invalid.status,401);assert.equal(invalid.conflicts,undefined,'unauthenticated requests cannot receive conflict details');
+properties.set('GSIS_SECRET','bad');assert.equal(box.doPost(req).status,503,'invalid shared configuration fails closed before the conflict operation');
+console.log('PASS authenticated conflict envelope retains only approved conflict fields and omits arbitrary exception details.');

@@ -1,0 +1,13 @@
+const assert=require('assert/strict'),fs=require('fs'),fixture=require('./contacts503-fixture.js');
+const view=fs.readFileSync('backend/Contacts_View.gs','utf8'),source=fs.readFileSync('Contacts_Code.gs','utf8').replace(/\/\* GSIS_CONTACTS_VIEW_BEGIN \*\/[\s\S]*?\/\* GSIS_CONTACTS_VIEW_END \*\//,()=> '/* GSIS_CONTACTS_VIEW_BEGIN */\n'+view+'\n/* GSIS_CONTACTS_VIEW_END */');
+function make(api=true){const f=fixture({source}),p=f.ctx.PropertiesService.getScriptProperties;let batches=0,singles=0,hook=()=>{};f.ctx.PropertiesService.getScriptProperties=()=>{const store=p();return {...store,getProperty(k){singles++;return store.getProperty(k)},getProperties(){batches++;hook(batches);return Object.fromEntries(f.props)}}};if(!api)delete f.ctx.Sheets;return {...f,counts:()=>({batches,singles}),onSnapshot:fn=>hook=fn};}
+for(const api of [false,true]){
+ const f=make(api);const data=f.post('bootstrap');assert.equal(data.ok,true);assert.equal(f.counts().batches,2,'fresh bulk properties before and after the directory read');assert.equal(f.stats.nativeWrites,0);assert.deepEqual(f.stats.writes,[]);assert.equal(f.stats.flush,0);
+ const authority=make(api);const result=authority.post('deploySnapshot',{authorityOnly:true});assert.equal(result.ok,true);assert.deepEqual(result.data.user.roles,['Admin']);assert.equal(authority.counts().batches,0,'authority-only must bypass directory markers');if(api)assert.deepEqual(authority.stats.reads.flat(),["'admin_users'!A1:E4"]);
+ authority.sheets.get('admin_users').data[1][2]='N';assert.deepEqual(authority.post('deploySnapshot',{authorityOnly:true}).data.user.roles,[],'revocation remains live');
+ const concurrent=make(api);concurrent.onSnapshot(n=>{if(n===2){concurrent.props.set('CONTACTS_DATA_EPOCH','changed-during-first-read');concurrent.sheets.get('contacts').data[2][5]='New confirmed name';}});const retried=concurrent.post('bootstrap');assert.equal(retried.ok,true);assert.equal(concurrent.counts().batches,4,'changed marker discards the first source and repeats both boundary reads');assert.ok(retried.data.people.find(p=>p.id==='staff-1').name.includes('New confirmed name'));assert.equal(concurrent.stats.nativeWrites,0);assert.deepEqual(concurrent.stats.writes,[]);
+}
+// PropertiesService compatibility shims without getProperties retain the same
+// marker semantics, while production uses one bulk call at each boundary.
+const legacy=fixture({source});assert.equal(legacy.post('bootstrap').ok,true);
+console.log('PASS 505 Contacts markers: 6 single marker calls -> 2 bulk calls per stable read; native/API outputs, concurrent changes, authority-only and immediate revocation retained (synthetic)');

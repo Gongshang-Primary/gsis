@@ -1,0 +1,5 @@
+const assert=require('assert/strict'),make=require('./dom-helper.cjs');const {dom,w,run}=make();
+run(`tab='Classes';v().loads=Object.fromEntries(['6','2','1','10'].map(l=>[l,{EL:15}]));render()`);
+assert.deepEqual([...w.document.querySelectorAll('thead th')].slice(2).map(x=>x.textContent.replace(/[↕▴▾]/g,'').trim()),['P1','P2','P3','P4','P5','P6']);assert.equal(w.document.querySelector('#levels').hidden,true);assert.equal(run('cellQueue.length'),0);
+run(`tab='Ledger';const root=el('content');root.innerHTML=table(['Level'],['<tr><td><select><option>P1</option><option selected>P6</option></select></td></tr>','<tr><td><select><option selected>P1</option><option>P6</option></select></td></tr>']);sorts[tab]={index:0,desc:false};sortedRows(root)`);
+assert.equal(w.document.querySelector('#content tbody select').selectedOptions[0].textContent,'P1');run("sorts[tab].desc=true;sortedRows(el('content'))");assert.equal(w.document.querySelector('#content tbody select').selectedOptions[0].textContent,'P6');dom.window.close();console.log('PASS numeric level picker order, local level navigation and retained selected-value sorting for other tables');

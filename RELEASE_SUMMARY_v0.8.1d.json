@@ -1,0 +1,65 @@
+{
+  "release": "0.8.1d",
+  "baseline": "0.8.1c",
+  "baselineCommit": "0d6be0090bc5dc0172042a17cf6bef0547753f75",
+  "state": "committed-deployment-ready-package",
+  "releaseDate": "2026-10-21",
+  "releaseTimeZone": "Asia/Singapore",
+  "writeProtocol": 500,
+  "requirements": [
+    "060"
+  ],
+  "changedComponents": [
+    "rosterFrontend"
+  ],
+  "unchangedDeployBackend": "0.8.1c",
+  "unchangedNotificationWorker": "0.8.1b",
+  "productionDeployed": false,
+  "productionDataChanged": false,
+  "staffMessagesSent": false,
+  "automaticMorningTeacherBatchCreated": false,
+  "verification": {
+    "fullNpm": {
+      "total": 456,
+      "passed": 455,
+      "failed": 1,
+      "failedTests": [
+        "release505-relief-api.cjs"
+      ],
+      "log": "verification/81d-npm-test.log"
+    },
+    "finalTargeted": {
+      "total": 1,
+      "passed": 1,
+      "results": [
+        {
+          "file": "release505-relief-api.cjs",
+          "passed": true,
+          "status": 0
+        }
+      ],
+      "log": "verification/81d-relief-api-followup.log"
+    },
+    "currentScriptsVerifiedAcrossRuns": 456,
+    "unresolvedTestFailures": 0,
+    "appsScriptSourceFiles": 68,
+    "componentArchive": "exact frontend-only scope, source parity and hashes passed",
+    "redGreen": "New private-link browser regression failed against old fragment-stripping page and passed after fix"
+  },
+  "skills": [
+    "Ponytail",
+    "Pstack",
+    "Thermonuclear",
+    "Vercel",
+    "Superpowers"
+  ],
+  "reviews": {
+    "correctness": "closed",
+    "structuralQuality": "closed",
+    "unresolvedMaterialFindings": 0
+  },
+  "queuedRequirements": [
+    "061",
+    "062"
+  ]
+}

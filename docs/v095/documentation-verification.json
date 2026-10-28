@@ -1,0 +1,94 @@
+{
+  "manual": [
+    {
+      "label": "desktop",
+      "width": 1365,
+      "height": 768,
+      "overflow": false,
+      "missingAnchors": [],
+      "title": "GSiS 0.9.5 \u00b7 Staff manual",
+      "sectionCount": 22,
+      "search": true,
+      "printVisible": true,
+      "errors": []
+    },
+    {
+      "label": "mobile",
+      "width": 390,
+      "height": 844,
+      "overflow": false,
+      "missingAnchors": [],
+      "title": "GSiS 0.9.5 \u00b7 Staff manual",
+      "sectionCount": 22,
+      "search": true,
+      "printVisible": true,
+      "errors": []
+    }
+  ],
+  "archify": {
+    "schemaVersion": 1,
+    "ok": true,
+    "command": "finalize",
+    "status": "pass",
+    "type": "architecture",
+    "quality": "showcase",
+    "specification": {
+      "path": "/workspace/scratch/2c52ae6e6b97/gsis-091/docs/architecture/v095-candidate.json",
+      "sha256": "bb7480a6b94fd6eb1c1caa9db663c6e491f7da4e6c1415ed3ce5b11f918a1eef",
+      "bytes": 6473
+    },
+    "artifact": {
+      "path": "/workspace/scratch/2c52ae6e6b97/gsis-091/docs/architecture/GSiS_v0.9.5_Architecture.html",
+      "sha256": "42eea43e05658885becd46cefe93618ae1c190ee3a24d2eaaeb57d1e20da1a67",
+      "bytes": 827579
+    },
+    "gates": {
+      "validate": "pass",
+      "deliver": "pass",
+      "check": "pass",
+      "browser-check": "pass"
+    },
+    "diagnostics": [],
+    "diagnosticSummary": {
+      "total": 0,
+      "shown": 0,
+      "truncated": false
+    },
+    "evidence": {
+      "receipt": "/workspace/scratch/2c52ae6e6b97/architecture-runtime-095/review-1/GSiS_v0.9.5_Architecture.~archify-3a46fa5a1e217aa3e2b0fe8ca5280be6c9e398536f066a882175fb6b6323f6ab.~archify-2edce14a7d7f1986063fa3a0361916ef496e8169651d3dd97f32b2a16f55f485.finalize.json",
+      "summaryReceipt": "/workspace/scratch/2c52ae6e6b97/architecture-runtime-095/review-1/GSiS_v0.9.5_Architecture.~archify-3a46fa5a1e217aa3e2b0fe8ca5280be6c9e398536f066a882175fb6b6323f6ab.~archify-2edce14a7d7f1986063fa3a0361916ef496e8169651d3dd97f32b2a16f55f485.finalize-summary.json",
+      "browserCheckReceipt": "/workspace/scratch/2c52ae6e6b97/architecture-runtime-095/review-1/GSiS_v0.9.5_Architecture.~archify-3a46fa5a1e217aa3e2b0fe8ca5280be6c9e398536f066a882175fb6b6323f6ab.browser-check.json"
+    },
+    "visualReview": "not-requested",
+    "durationMs": 5553,
+    "visualInspection": {
+      "status": "pass",
+      "viewports": [
+        "1440x900"
+      ],
+      "finding": "Inspected full-page screenshot: labels, connections, legend and four explanatory cards readable without overlap."
+    }
+  },
+  "drawio": {
+    "structuralValidation": "pass",
+    "errors": 0,
+    "warnings": 0,
+    "geometryScore": 0,
+    "nativeEditorRender": "not-run: native Draw.io binary unavailable",
+    "sha256": "358d48741587c3ff303cd10ebf75862ca79612cc844f008451563de1bf21087e"
+  },
+  "scope": "Local documentation artifacts and synthetic browser checks. No production configuration or provider test.",
+  "manualVisualInspection": {
+    "status": "pass",
+    "viewports": [
+      "390x844",
+      "390x844 Venues instructions"
+    ],
+    "finding": "Inspected mobile intro and updated Venues instructions: content fits width and controls and steps remain readable."
+  },
+  "sourceEvidence": "docs/architecture/v095-source-evidence.json",
+  "sourceEvidenceMode": "Current working source snapshot; no invented hosted origin or future commit",
+  "manualSha256": "b8a7c768a5ed26689d55fcd3d84fda2c3abf6c03c41346e30642d5e79e5252be",
+  "sourceEvidenceSha256": "ee1cc558b9c3b2ab510ac82f64a15fcfd0d76a4bb764136f90c3d00d3c5ac8c3",
+  "sourceEvidenceRefreshedAt": "2026-10-25T17:28:55.170806+00:00"
+}

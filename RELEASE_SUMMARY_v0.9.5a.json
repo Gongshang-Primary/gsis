@@ -1,0 +1,14 @@
+{
+  "version": "0.9.5a",
+  "baseline": "0.9.5",
+  "scope": "STAPLER Add teacher: all Contacts staff except MK, with partial text search and independent relief eligibility",
+  "components": [
+    "rosterFrontend",
+    "rosterBackend",
+    "notificationWorker"
+  ],
+  "productionDeployed": false,
+  "baselineArchive": "GSiS_v0.9.5_Suite.zip",
+  "baselineArchiveSha256": "34423004aac4d772c823aa88cb3e5f13df337e985bfbd2ef8f5856a5b3268e11",
+  "sourceNote": "Local Git baseline imports the supplied source archive for reproducible component packaging; it is not the upstream release commit."
+}

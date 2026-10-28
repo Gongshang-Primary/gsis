@@ -1,0 +1,17 @@
+{
+  "version": "0.9.8a",
+  "baseline": "0.9.8",
+  "components": [
+    "rosterFrontend"
+  ],
+  "scope": "Selective withdrawal of received reports awaiting review",
+  "validation": {
+    "focusedTestFilesPassed": 15,
+    "fullSuiteRerun": false,
+    "realBrowser": "390px and 1280px; required confirmation, selection, exact retry and partial results",
+    "package": "frontend-only scope, bundled source parity and hashes verified"
+  },
+  "sourceState": "working-tree",
+  "liveDeploymentPerformed": false,
+  "liveReportsWithdrawn": false
+}

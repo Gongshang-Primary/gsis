@@ -1,0 +1,43 @@
+# Roster v0.7.03 operations
+
+## Domain surface
+
+Retain the v0.7.00 operation names for existing clients. Add explicit operations for automatic accounting/optimisation, manual Undo, combinations, custom instructions, day export, publication acknowledgement/history and Recess Regression. Allowed operation sets and their payload validation are in `backend/RosterOperations.gs` and `shared/roster-operations.js`; tests provide executable payload examples. Do not invent parallel endpoints or bypass current Contacts authority.
+
+Recess Regression uses `saveRecess` and `deleteRecess`, level selections, two inclusive dates and validated per-level numbered periods. Stable activation/class/date/period identifiers prevent duplicates. Calendar and authoritative class catalogues determine school days/classes. Ordinary assignment/publication/withdrawal rules apply; existing recess duty may be repurposed for zero additional R, additional supervision costs one R per period.
+
+## Notification service
+
+Signed service operations: `scheduledRoster`, `claimNotifications`, `prepareNotification`, `notificationResult`, `notificationDelivery`, `inboundMessage`, `inboundReplyResult`, `externalDuties`, `externalRespond`, `externalAcknowledge`.
+
+A claim is a durable lease, not proof of sending. `prepareNotification` rechecks live recipient authority, publication version, current acknowledgement, quiet window, expiry and approved template routing immediately before dispatch. Unprepared expiry refunds the attempted claim; prepared expiry is uncertain and cannot be blindly resent.
+
+`notificationResult` and delivery callbacks correlate business notification, claim and provider message IDs. Confirmed failures have three attempts maximum. Positive delivery cannot be downgraded by stale callbacks. Pending/disabled contracts stay blocked without consuming send attempts. Backend failure to confirm a result is ambiguous, not a safe reason to send again.
+
+## Instruction semantics
+
+All matching custom rules are retained separately by stable rule/version and assignment period. OR applies within selected levels, AND across different filter types. Teaching groups use IDs. Published instruction snapshots never mutate in place. Rules removed or changed after publication produce a new publication revision when SMC publishes. Acknowledgement suppresses reminders, not an otherwise-due supplemental instruction. Reassignment invalidates outgoing queued instructions.
+
+## Storage and permissions
+
+The existing single-document store remains transactional under the script lock and revision checks, with a 12 MB guard. Read projections are scoped and indexed; storage writes replace the document. Preserve append-only factual corrections and historical publications. Custom urgent messages are accessible only to their eligible recipient set; ordinary allocation alerts use the day's duty-SMC list.
+
+## v0.7.02 read contracts
+
+Authenticated `directory` returns `{date,people:[{id,name}]}` for active Contacts plus nondeleted external activations on the selected date. It reads activation records without timetable, Calendar, quota, reconciliation or writes. Historical record-only reads retain their role requirements and skip timetable-register reconciliation. Current duty and all mutation paths retain fresh authority and cancellation handling.
+
+The signed service `connectionStatus` reads the Contacts service directory and returns only read-only connectivity metadata. It does not access operational state, claim the notification queue, allocate cover or send messages. Worker diagnostics are scheduled and disabled by default; there is no HTTP diagnostic endpoint.
+
+## v0.7.03 mutual candidates
+
+The read operation `candidates` accepts `{purpose:'mutual',byPeriod:true,date,demandIds}`. `demandIds` contains at most 100 unique current demand IDs, all for the selected date and permitted by current ownership or SMC authority. The response supplies `candidatesByPeriod`. Each candidate exposes only `{staffId,name,available,reasons,external}`. Activated external teachers remain eligible for display even without a baseline row.
+
+The browser keeps the verified projection for at most 60 seconds, keyed to actor/session, absence, date, revision and timetable. Reopening preserves its original verification time. A failed refresh disables stale choices. Period selection, target selection and name filtering use existing local rows. Selection never submits a request. The existing Submit requests and acceptance operations recheck current authority, availability and quota before writing.
+
+## v0.7.03 absence and recovery behavior
+
+New clients omit Remarks from forms and save payloads. An omitted field preserves historical stored remarks. Explicit updates or clears from older clients retain their existing meaning. `reliefRequired:false` produces no relief demand.
+
+Uncertain writes keep the exact request ID and payload for receipt confirmation. Read-only menus and filters remain available, while new mutations wait for confirmation. A confirmed receipt refreshes the current page/date. Definite revision conflicts retain editable drafts, refresh the revision and require explicit review before another submission. Failed resynchronisation blocks further writes. Old-session responses cannot replace or clear a later session. Same-account reauthentication retains an uncertain write, while unrelated unsaved forms clear at authentication teardown.
+
+`deleteAbsences` remains an authenticated owner/SMC operation with `confirm:true` and explicit IDs. It uses the existing lock, revision, receipt, audit and reconciliation protocol. It marks records deleted rather than erasing history. This release does not itself clear any live record.

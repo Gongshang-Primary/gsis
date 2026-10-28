@@ -1,0 +1,314 @@
+{
+  "schema": "drawio-skill/diagram-ir/v1",
+  "metadata": {
+    "title": "GSiS v0.9.4 \u00b7 architecture and ownership",
+    "scope": "Committed implementation and cutover modes; not live production evidence",
+    "revision": "13ea5104fa2da338aa0757033aab1b8825256d4f",
+    "sourceEvidence": "v094-source-evidence.json",
+    "readme": "../../README.md"
+  },
+  "nodes": [
+    {
+      "id": "staff",
+      "label": "School staff\nTeachers \u00b7 SMC \u00b7 room owners",
+      "kind": "external",
+      "width": 180,
+      "height": 64,
+      "style": "rounded=1;whiteSpace=wrap;html=1;fontFamily=Arial;fontSize=13;fontColor=#172432;fillColor=#f1f3f5;strokeColor=#727a85;",
+      "properties": {
+        "owner": "School staff",
+        "description": "Teachers \u00b7 SMC \u00b7 room owners",
+        "sourceReferences": "[{\"path\": \"README.md\", \"line\": 58, \"end_line\": 68, \"fileSha256\": \"f4c518c5f59b330443b7156a451edd8d9f714f14a84b203c328671c9ea4d129c\"}]"
+      },
+      "provenance": {
+        "path": "README.md",
+        "line": 58,
+        "end_line": 68,
+        "fileSha256": "f4c518c5f59b330443b7156a451edd8d9f714f14a84b203c328671c9ea4d129c"
+      }
+    },
+    {
+      "id": "browser",
+      "label": "Nine browser apps\nJavaScript \u00b7 local IndexedDB",
+      "kind": "application",
+      "width": 190,
+      "height": 64,
+      "style": "rounded=1;whiteSpace=wrap;html=1;fontFamily=Arial;fontSize=13;fontColor=#172432;fillColor=#e2f5f9;strokeColor=#3b8194;",
+      "properties": {
+        "owner": "School staff",
+        "description": "JavaScript \u00b7 local IndexedDB",
+        "sourceReferences": "[{\"path\": \"release-installation-manifest.json\", \"line\": 3, \"end_line\": 24, \"fileSha256\": \"0873a49ea43ef37a61740db796450538c5802966ba6b9b79e7ec9c2e551f4bf7\"}, {\"path\": \"roster-update/public/roster-baseline-cache.js\", \"line\": 7, \"end_line\": 39, \"fileSha256\": \"8b623713628d1d63a30830b173c05c9bbcf370a8b2a61e826185e012bbbd862b\"}]"
+      },
+      "provenance": {
+        "path": "release-installation-manifest.json",
+        "line": 3,
+        "end_line": 24,
+        "fileSha256": "0873a49ea43ef37a61740db796450538c5802966ba6b9b79e7ec9c2e551f4bf7"
+      }
+    },
+    {
+      "id": "pages",
+      "label": "Pages gateways\nApp-specific access \u00b7 signed APIs",
+      "kind": "security",
+      "width": 200,
+      "height": 64,
+      "style": "rounded=1;whiteSpace=wrap;html=1;fontFamily=Arial;fontSize=13;fontColor=#172432;fillColor=#fde8ed;strokeColor=#ac526b;",
+      "properties": {
+        "owner": "GSiS service owner",
+        "description": "App-specific access \u00b7 signed APIs",
+        "sourceReferences": "[{\"path\": \"public/_worker.js\", \"line\": 29, \"end_line\": 56, \"fileSha256\": \"9423333016797fe7c1173ae8c661a537496865579128b7f5913144cef5d987ff\"}, {\"path\": \"roster-update/public/_worker.js\", \"line\": 207, \"end_line\": 229, \"fileSha256\": \"22677322e91f5180f330e5846c414d781179a66a4d01fd5ddc5c06e824de604e\"}]"
+      },
+      "provenance": {
+        "path": "public/_worker.js",
+        "line": 29,
+        "end_line": 56,
+        "fileSha256": "9423333016797fe7c1173ae8c661a537496865579128b7f5913144cef5d987ff"
+      }
+    },
+    {
+      "id": "refs",
+      "label": "Google-owned services\nContacts \u00b7 Calendar \u00b7 LORD \u00b7 Venues",
+      "kind": "service",
+      "width": 220,
+      "height": 76,
+      "style": "rounded=1;whiteSpace=wrap;html=1;fontFamily=Arial;fontSize=13;fontColor=#172432;fillColor=#e7f3ec;strokeColor=#518a68;",
+      "properties": {
+        "owner": "GSiS service owner",
+        "description": "Contacts \u00b7 Calendar \u00b7 LORD \u00b7 Venues",
+        "sourceReferences": "[{\"path\": \"README.md\", \"line\": 70, \"end_line\": 81, \"fileSha256\": \"f4c518c5f59b330443b7156a451edd8d9f714f14a84b203c328671c9ea4d129c\"}, {\"path\": \"lord-suite/Source/backend/Code.gs\", \"line\": 502, \"end_line\": 524, \"fileSha256\": \"e7198528a6e4444934ca0dd7e43600ac06de35d44f6415c90c9d4d18bdb8f8ae\"}, {\"path\": \"venues-backend/Code.gs\", \"line\": 49, \"end_line\": 77, \"fileSha256\": \"2291dd710fb94feebf823956762a02df3f516845227b13b905b5e4c3fd429249\"}]"
+      },
+      "provenance": {
+        "path": "README.md",
+        "line": 70,
+        "end_line": 81,
+        "fileSha256": "f4c518c5f59b330443b7156a451edd8d9f714f14a84b203c328671c9ea4d129c"
+      }
+    },
+    {
+      "id": "edge",
+      "label": "Roster + Deploy Workers\nActivated operational commands",
+      "kind": "service",
+      "width": 220,
+      "height": 76,
+      "style": "rounded=1;whiteSpace=wrap;html=1;fontFamily=Arial;fontSize=13;fontColor=#172432;fillColor=#e7f3ec;strokeColor=#518a68;",
+      "properties": {
+        "owner": "GSiS service owner",
+        "description": "Activated operational commands",
+        "sourceReferences": "[{\"path\": \"roster-update/public/edge-roster.js\", \"line\": 38, \"end_line\": 44, \"fileSha256\": \"a97894c4aa87bbbe054651ad539b7cf8194e4379bce2e5a5aa77f2c0a5bc3b3c\"}, {\"path\": \"public/edge-deploy.js\", \"line\": 62, \"end_line\": 95, \"fileSha256\": \"0944e1a5de574196ddf3d1a26d58d8929c8c406b1901a899609ce0fbf134c886\"}, {\"path\": \"roster-update/public/edge-roster.js\", \"line\": 141, \"end_line\": 151, \"fileSha256\": \"a97894c4aa87bbbe054651ad539b7cf8194e4379bce2e5a5aa77f2c0a5bc3b3c\"}]"
+      },
+      "provenance": {
+        "path": "roster-update/public/edge-roster.js",
+        "line": 38,
+        "end_line": 44,
+        "fileSha256": "a97894c4aa87bbbe054651ad539b7cf8194e4379bce2e5a5aa77f2c0a5bc3b3c"
+      }
+    },
+    {
+      "id": "notify",
+      "label": "Notification Worker\nClaims \u00b7 send results \u00b7 callbacks",
+      "kind": "service",
+      "width": 200,
+      "height": 76,
+      "style": "rounded=1;whiteSpace=wrap;html=1;fontFamily=Arial;fontSize=13;fontColor=#172432;fillColor=#e7f3ec;strokeColor=#518a68;",
+      "properties": {
+        "owner": "GSiS service owner",
+        "description": "Claims \u00b7 send results \u00b7 callbacks",
+        "sourceReferences": "[{\"path\": \"notification-worker/index.js\", \"line\": 23, \"end_line\": 44, \"fileSha256\": \"2d1c4d11284fe7ffff669fc2525a10218ef137a92f34e9ccd77c26478f99f3c1\"}, {\"path\": \"roster-update/public/edge-notifications.js\", \"line\": 11, \"end_line\": 29, \"fileSha256\": \"efa5a4f05bcc12b5adb0117209e57c169e0dce2017c73bbd4e5db602a02db7aa\"}, {\"path\": \"roster-update/public/_worker.js\", \"line\": 657, \"end_line\": 671, \"fileSha256\": \"22677322e91f5180f330e5846c414d781179a66a4d01fd5ddc5c06e824de604e\"}]"
+      },
+      "provenance": {
+        "path": "notification-worker/index.js",
+        "line": 23,
+        "end_line": 44,
+        "fileSha256": "2d1c4d11284fe7ffff669fc2525a10218ef137a92f34e9ccd77c26478f99f3c1"
+      }
+    },
+    {
+      "id": "googledata",
+      "label": "Private Google stores\nSheets \u00b7 Drive \u00b7 Calendar",
+      "kind": "database",
+      "width": 220,
+      "height": 68,
+      "style": "rounded=1;whiteSpace=wrap;html=1;fontFamily=Arial;fontSize=13;fontColor=#172432;fillColor=#f0e8ff;strokeColor=#8460b3;",
+      "properties": {
+        "owner": "GSiS service owner",
+        "description": "Sheets \u00b7 Drive \u00b7 Calendar",
+        "sourceReferences": "[{\"path\": \"backend/Contacts_Lord.gs\", \"line\": 11, \"end_line\": 26, \"fileSha256\": \"995423f12de4a2a03659beb62a1566682d5922c72e19eb4774d3d355f30a8944\"}, {\"path\": \"lord-suite/Source/backend/Code.gs\", \"line\": 2033, \"end_line\": 2089, \"fileSha256\": \"e7198528a6e4444934ca0dd7e43600ac06de35d44f6415c90c9d4d18bdb8f8ae\"}, {\"path\": \"calendar-backend/Code.gs\", \"line\": 7157, \"end_line\": 7167, \"fileSha256\": \"41919f2b61b2ebc0680da1cd919eb48561d1c3b9f942c3deec4167d7c6ba1fa6\"}]"
+      },
+      "provenance": {
+        "path": "backend/Contacts_Lord.gs",
+        "line": 11,
+        "end_line": 26,
+        "fileSha256": "995423f12de4a2a03659beb62a1566682d5922c72e19eb4774d3d355f30a8944"
+      }
+    },
+    {
+      "id": "d1",
+      "label": "Shared D1 database\nRecords \u00b7 revisions \u00b7 receipts \u00b7 jobs",
+      "kind": "database",
+      "width": 220,
+      "height": 68,
+      "style": "rounded=1;whiteSpace=wrap;html=1;fontFamily=Arial;fontSize=13;fontColor=#172432;fillColor=#f0e8ff;strokeColor=#8460b3;",
+      "properties": {
+        "owner": "GSiS service owner",
+        "description": "Records \u00b7 revisions \u00b7 receipts \u00b7 jobs",
+        "sourceReferences": "[{\"path\": \"shared/edge-store.js\", \"line\": 106, \"end_line\": 129, \"fileSha256\": \"8e7cbba890b6ea72201a2cf6c310ba4617d7aca7861ee1275435f8a22aa6ffb7\"}, {\"path\": \"migrations/0001-edge-operational-store.sql\", \"line\": 1, \"end_line\": 39, \"fileSha256\": \"529ceb07f74d4abed7a0bc6bcfbe187ce99b376f8ab087cd95f1d12a669b8511\"}]"
+      },
+      "provenance": {
+        "path": "shared/edge-store.js",
+        "line": 106,
+        "end_line": 129,
+        "fileSha256": "8e7cbba890b6ea72201a2cf6c310ba4617d7aca7861ee1275435f8a22aa6ffb7"
+      }
+    },
+    {
+      "id": "providers",
+      "label": "Delivery providers\nMeta WhatsApp \u00b7 Google email",
+      "kind": "external",
+      "width": 200,
+      "height": 68,
+      "style": "rounded=1;whiteSpace=wrap;html=1;fontFamily=Arial;fontSize=13;fontColor=#172432;fillColor=#f1f3f5;strokeColor=#727a85;",
+      "properties": {
+        "owner": "GSiS service owner",
+        "description": "Meta WhatsApp \u00b7 Google email",
+        "sourceReferences": "[{\"path\": \"roster-update/public/_worker.js\", \"line\": 657, \"end_line\": 671, \"fileSha256\": \"22677322e91f5180f330e5846c414d781179a66a4d01fd5ddc5c06e824de604e\"}, {\"path\": \"backend/RosterEdgeMail.gs\", \"line\": 1, \"end_line\": 17, \"fileSha256\": \"7b14aa41a19a2fdd6b5007709e38ec71d91a4c0c57114cfe1b7137a2929250f6\"}, {\"path\": \"roster-update/public/edge-notifications.js\", \"line\": 75, \"end_line\": 102, \"fileSha256\": \"efa5a4f05bcc12b5adb0117209e57c169e0dce2017c73bbd4e5db602a02db7aa\"}]"
+      },
+      "provenance": {
+        "path": "roster-update/public/_worker.js",
+        "line": 657,
+        "end_line": 671,
+        "fileSha256": "22677322e91f5180f330e5846c414d781179a66a4d01fd5ddc5c06e824de604e"
+      }
+    },
+    {
+      "id": "r2",
+      "label": "Private R2\nImmutable timetable parts \u00b7 media",
+      "kind": "storage",
+      "width": 200,
+      "height": 64,
+      "style": "rounded=1;whiteSpace=wrap;html=1;fontFamily=Arial;fontSize=13;fontColor=#172432;fillColor=#fff0da;strokeColor=#b47d35;",
+      "properties": {
+        "owner": "GSiS service owner",
+        "description": "Immutable timetable parts \u00b7 media",
+        "sourceReferences": "[{\"path\": \"roster-update/public/edge-timetable-cache.js\", \"line\": 13, \"end_line\": 27, \"fileSha256\": \"f39ecf0f98951e0e019f05575fad73a07db64bafbfa7896b4abe81cc1b9cdec9\"}, {\"path\": \"roster-update/public/_worker.js\", \"line\": 757, \"end_line\": 773, \"fileSha256\": \"22677322e91f5180f330e5846c414d781179a66a4d01fd5ddc5c06e824de604e\"}]"
+      },
+      "provenance": {
+        "path": "roster-update/public/edge-timetable-cache.js",
+        "line": 13,
+        "end_line": 27,
+        "fileSha256": "f39ecf0f98951e0e019f05575fad73a07db64bafbfa7896b4abe81cc1b9cdec9"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "e0",
+      "source": "staff",
+      "target": "browser",
+      "label": "Uses app",
+      "kind": "sync",
+      "properties": {
+        "description": "Uses app"
+      }
+    },
+    {
+      "id": "e1",
+      "source": "browser",
+      "target": "pages",
+      "label": "HTTPS",
+      "kind": "sync",
+      "properties": {
+        "description": "HTTPS"
+      }
+    },
+    {
+      "id": "e2",
+      "source": "pages",
+      "target": "edge",
+      "label": "Active owner",
+      "kind": "sync",
+      "properties": {
+        "description": "Active owner"
+      }
+    },
+    {
+      "id": "e3",
+      "source": "pages",
+      "target": "refs",
+      "label": "Other apps",
+      "kind": "sync",
+      "properties": {
+        "description": "Other apps"
+      }
+    },
+    {
+      "id": "e4",
+      "source": "edge",
+      "target": "refs",
+      "label": "Signed adapters",
+      "kind": "sync",
+      "properties": {
+        "description": "Signed adapters"
+      }
+    },
+    {
+      "id": "e5",
+      "source": "edge",
+      "target": "d1",
+      "label": "Guarded commit",
+      "kind": "sync",
+      "properties": {
+        "description": "Guarded commit"
+      }
+    },
+    {
+      "id": "e6",
+      "source": "refs",
+      "target": "googledata",
+      "label": "Own records",
+      "kind": "sync",
+      "properties": {
+        "description": "Own records"
+      }
+    },
+    {
+      "id": "e7",
+      "source": "edge",
+      "target": "r2",
+      "label": "Versioned parts",
+      "kind": "sync",
+      "properties": {
+        "description": "Versioned parts"
+      }
+    },
+    {
+      "id": "e8",
+      "source": "notify",
+      "target": "d1",
+      "label": "Claim / result",
+      "kind": "sync",
+      "properties": {
+        "description": "Claim / result"
+      }
+    },
+    {
+      "id": "e9",
+      "source": "notify",
+      "target": "providers",
+      "label": "Background send",
+      "kind": "async",
+      "properties": {
+        "description": "Background send"
+      }
+    },
+    {
+      "id": "e10",
+      "source": "notify",
+      "target": "r2",
+      "label": "Private media",
+      "kind": "sync",
+      "properties": {
+        "description": "Private media"
+      }
+    }
+  ]
+}

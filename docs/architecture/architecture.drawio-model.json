@@ -1,0 +1,915 @@
+{
+  "schema": "drawio-skill/diagram-ir/v1",
+  "metadata": {
+    "title": "GSiS v0.9.2 architecture",
+    "scope": "Repository-backed deployment and logical transaction views; not a live-infrastructure assertion",
+    "repository": {
+      "url": "/workspace/scratch/2c52ae6e6b97/comparison-recovery/GSiS_v0.9_Correction_Source_History.bundle",
+      "revision": "44252bd83e8598806296640791ce6122fe001099",
+      "link_mode": "local-only"
+    },
+    "readme": "../../README.md",
+    "legend": {
+      "blue": "Application / process",
+      "orange": "Gateway",
+      "purple": "Identity",
+      "green": "Owned store",
+      "yellow": "Durable coordination / queue",
+      "grey": "Browser / external provider"
+    },
+    "provenanceScope": "Committed implementation and contract references; all ranges validated at the exact repository revision."
+  },
+  "nodes": [
+    {
+      "id": "browser",
+      "label": "Nine browser apps\nStaff interactions + local caches",
+      "kind": "external",
+      "width": 205,
+      "height": 82,
+      "style": "rounded=1;whiteSpace=wrap;html=1;fontFamily=Arial;fontSize=13;fontColor=#172432;fillColor=#f1f3f5;strokeColor=#727a85;",
+      "properties": {
+        "owner": "School staff",
+        "description": "",
+        "trust_boundary": "browser or external provider"
+      },
+      "provenance": {
+        "path": "release-installation-manifest.json",
+        "line": 3,
+        "end_line": 20
+      }
+    },
+    {
+      "id": "coreGateway",
+      "label": "Eight Pages gateways\nApp-specific access",
+      "kind": "gateway",
+      "width": 205,
+      "height": 82,
+      "style": "rounded=1;whiteSpace=wrap;html=1;fontFamily=Arial;fontSize=13;fontColor=#172432;fillColor=#fff0da;strokeColor=#b47d35;",
+      "properties": {
+        "owner": "Cloudflare administrator",
+        "description": "Private staff apps retain Google sign-in/session protocols. STARLORD is a read-only display with a separate deployment outer-access policy.",
+        "trust_boundary": "authenticated school services"
+      },
+      "provenance": {
+        "path": "public/_worker.js",
+        "line": 25,
+        "end_line": 51
+      }
+    },
+    {
+      "id": "accessGateway",
+      "label": "Venues Pages gateway\nGoogle session / optional Access",
+      "kind": "security",
+      "width": 205,
+      "height": 82,
+      "style": "rounded=1;whiteSpace=wrap;html=1;fontFamily=Arial;fontSize=13;fontColor=#172432;fillColor=#efe8ff;strokeColor=#8460b3;",
+      "properties": {
+        "owner": "Cloudflare administrator",
+        "description": "",
+        "trust_boundary": "authenticated school services"
+      },
+      "provenance": {
+        "path": "venues-viewport/public/_worker.js",
+        "line": 44,
+        "end_line": 75
+      }
+    },
+    {
+      "id": "contacts",
+      "label": "Contacts Apps Script\nStaff identities + app authority",
+      "kind": "service",
+      "width": 205,
+      "height": 82,
+      "style": "rounded=1;whiteSpace=wrap;html=1;fontFamily=Arial;fontSize=13;fontColor=#172432;fillColor=#e6f0ff;strokeColor=#5473a4;",
+      "properties": {
+        "owner": "Contacts",
+        "description": "Current active staff and access are authoritative; exported references are minimal.",
+        "trust_boundary": "authenticated school services"
+      },
+      "provenance": {
+        "path": "backend/Contacts_Lord.gs",
+        "line": 8,
+        "end_line": 27
+      }
+    },
+    {
+      "id": "calendar",
+      "label": "Calendar Apps Script\nDates, parity and events",
+      "kind": "service",
+      "width": 205,
+      "height": 82,
+      "style": "rounded=1;whiteSpace=wrap;html=1;fontFamily=Arial;fontSize=13;fontColor=#172432;fillColor=#e6f0ff;strokeColor=#5473a4;",
+      "properties": {
+        "owner": "Calendar",
+        "description": "Bound calendar workbook, authorised external calendars, explicit coverage.",
+        "trust_boundary": "authenticated school services"
+      },
+      "provenance": {
+        "path": "calendar-backend/Code.gs",
+        "line": 844,
+        "end_line": 875
+      }
+    },
+    {
+      "id": "deploy",
+      "label": "Deploy / Layout Apps Script\nPublished catalogue + physical rooms",
+      "kind": "service",
+      "width": 205,
+      "height": 82,
+      "style": "rounded=1;whiteSpace=wrap;html=1;fontFamily=Arial;fontSize=13;fontColor=#172432;fillColor=#e6f0ff;strokeColor=#5473a4;",
+      "properties": {
+        "owner": "Deploy / Layout",
+        "description": "Planning drafts differ from frozen published references; Layout owns physical room descriptions.",
+        "trust_boundary": "authenticated school services"
+      },
+      "provenance": {
+        "path": "backend/LordDeploy.gs",
+        "line": 1,
+        "end_line": 23
+      }
+    },
+    {
+      "id": "roster",
+      "label": "Roster Apps Script\nBaseline + confirmed ST + relief",
+      "kind": "service",
+      "width": 205,
+      "height": 82,
+      "style": "rounded=1;whiteSpace=wrap;html=1;fontFamily=Arial;fontSize=13;fontColor=#172432;fillColor=#e6f0ff;strokeColor=#5473a4;",
+      "properties": {
+        "owner": "Roster",
+        "description": "Separate writer project; effective occupancy derives from authoritative timetable sources.",
+        "trust_boundary": "authenticated school services"
+      },
+      "provenance": {
+        "path": "backend/RosterVenues.gs",
+        "line": 56,
+        "end_line": 105
+      }
+    },
+    {
+      "id": "venues",
+      "label": "Venues Apps Script\nBookings + separate facilities grants",
+      "kind": "service",
+      "width": 205,
+      "height": 82,
+      "style": "rounded=1;whiteSpace=wrap;html=1;fontFamily=Arial;fontSize=13;fontColor=#172432;fillColor=#e6f0ff;strokeColor=#5473a4;",
+      "properties": {
+        "owner": "Venues",
+        "description": "Owns booking, transfer, policy, grants, closures, audit, receipts, fence and outbox.",
+        "trust_boundary": "authenticated school services"
+      },
+      "provenance": {
+        "path": "venues-backend/Code.gs",
+        "line": 49,
+        "end_line": 73
+      }
+    },
+    {
+      "id": "lord",
+      "label": "LORD / OVERLORD / STARLORD\nOne Apps Script backend",
+      "kind": "service",
+      "width": 205,
+      "height": 82,
+      "style": "rounded=1;whiteSpace=wrap;html=1;fontFamily=Arial;fontSize=13;fontColor=#172432;fillColor=#e6f0ff;strokeColor=#5473a4;",
+      "properties": {
+        "owner": "LORD",
+        "description": "Bookings, equipment inventory, custody and private validated reference snapshots.",
+        "trust_boundary": "authenticated school services"
+      },
+      "provenance": {
+        "path": "lord-suite/Source/backend/Code.gs",
+        "line": 6921,
+        "end_line": 6934
+      }
+    },
+    {
+      "id": "contactsStore",
+      "label": "Contacts workbook",
+      "kind": "database",
+      "width": 205,
+      "height": 82,
+      "style": "shape=cylinder3;whiteSpace=wrap;html=1;fontFamily=Arial;fontSize=13;fontColor=#172432;fillColor=#e2f4e8;strokeColor=#4b8962;",
+      "properties": {
+        "owner": "Contacts",
+        "description": "",
+        "trust_boundary": "authenticated school services"
+      },
+      "provenance": {
+        "path": "backend/Contacts_Lord.gs",
+        "line": 11,
+        "end_line": 16
+      }
+    },
+    {
+      "id": "calendarStore",
+      "label": "Bound Calendar workbook",
+      "kind": "database",
+      "width": 205,
+      "height": 82,
+      "style": "shape=cylinder3;whiteSpace=wrap;html=1;fontFamily=Arial;fontSize=13;fontColor=#172432;fillColor=#e2f4e8;strokeColor=#4b8962;",
+      "properties": {
+        "owner": "Calendar",
+        "description": "",
+        "trust_boundary": "authenticated school services"
+      },
+      "provenance": {
+        "path": "calendar-backend/Code.gs",
+        "line": 1082,
+        "end_line": 1095
+      }
+    },
+    {
+      "id": "deployStore",
+      "label": "Deploy workbook +\nLayout repositories",
+      "kind": "database",
+      "width": 205,
+      "height": 82,
+      "style": "shape=cylinder3;whiteSpace=wrap;html=1;fontFamily=Arial;fontSize=13;fontColor=#172432;fillColor=#e2f4e8;strokeColor=#4b8962;",
+      "properties": {
+        "owner": "Deploy / Layout",
+        "description": "",
+        "trust_boundary": "authenticated school services"
+      },
+      "provenance": {
+        "path": "backend/Code.gs",
+        "line": 542
+      }
+    },
+    {
+      "id": "rosterStore",
+      "label": "Private Drive JSON\nRegister, plans, transport",
+      "kind": "database",
+      "width": 205,
+      "height": 82,
+      "style": "shape=cylinder3;whiteSpace=wrap;html=1;fontFamily=Arial;fontSize=13;fontColor=#172432;fillColor=#e2f4e8;strokeColor=#4b8962;",
+      "properties": {
+        "owner": "Roster",
+        "description": "",
+        "trust_boundary": "authenticated school services"
+      },
+      "provenance": {
+        "path": "backend/Roster.gs",
+        "line": 31,
+        "end_line": 75
+      }
+    },
+    {
+      "id": "venuesStore",
+      "label": "Venues workbook +\nimmutable Drive pieces",
+      "kind": "database",
+      "width": 205,
+      "height": 82,
+      "style": "shape=cylinder3;whiteSpace=wrap;html=1;fontFamily=Arial;fontSize=13;fontColor=#172432;fillColor=#e2f4e8;strokeColor=#4b8962;",
+      "properties": {
+        "owner": "Venues",
+        "description": "",
+        "trust_boundary": "authenticated school services"
+      },
+      "provenance": {
+        "path": "venues-backend/Code.gs",
+        "line": 10,
+        "end_line": 47
+      }
+    },
+    {
+      "id": "lordStore",
+      "label": "LORD workbooks +\nprivate photos / references",
+      "kind": "database",
+      "width": 205,
+      "height": 82,
+      "style": "shape=cylinder3;whiteSpace=wrap;html=1;fontFamily=Arial;fontSize=13;fontColor=#172432;fillColor=#e2f4e8;strokeColor=#4b8962;",
+      "properties": {
+        "owner": "LORD",
+        "description": "",
+        "trust_boundary": "authenticated school services"
+      },
+      "provenance": {
+        "path": "lord-suite/Source/backend/Code.gs",
+        "line": 201
+      }
+    },
+    {
+      "id": "worker",
+      "label": "Roster notification Worker\nMinute cron; optional wake Queue",
+      "kind": "service",
+      "width": 205,
+      "height": 82,
+      "style": "rounded=1;whiteSpace=wrap;html=1;fontFamily=Arial;fontSize=13;fontColor=#172432;fillColor=#e6f0ff;strokeColor=#5473a4;",
+      "properties": {
+        "owner": "Cloudflare administrator",
+        "description": "",
+        "trust_boundary": "authenticated school services"
+      },
+      "provenance": {
+        "path": "notification-worker/index.js",
+        "line": 20,
+        "end_line": 58
+      }
+    },
+    {
+      "id": "providers",
+      "label": "WhatsApp / mail providers\nAcceptance \u2260 delivery",
+      "kind": "external",
+      "width": 205,
+      "height": 82,
+      "style": "rounded=1;whiteSpace=wrap;html=1;fontFamily=Arial;fontSize=13;fontColor=#172432;fillColor=#f1f3f5;strokeColor=#727a85;",
+      "properties": {
+        "owner": "Provider administrator",
+        "description": "",
+        "trust_boundary": "browser or external provider"
+      },
+      "provenance": {
+        "path": "lord-suite/Source/backend/Code.gs",
+        "line": 5644,
+        "end_line": 5659
+      }
+    },
+    {
+      "id": "fence",
+      "label": "Durable source fence\nBegin \u2192 commit \u2192 complete",
+      "kind": "queue",
+      "width": 205,
+      "height": 82,
+      "style": "rounded=1;whiteSpace=wrap;html=1;fontFamily=Arial;fontSize=13;fontColor=#172432;fillColor=#fff5d1;strokeColor=#a88a23;",
+      "properties": {
+        "owner": "Venues + Roster",
+        "description": "",
+        "trust_boundary": "authenticated school services"
+      },
+      "provenance": {
+        "path": "backend/RosterVenues.gs",
+        "line": 22,
+        "end_line": 54
+      }
+    },
+    {
+      "id": "projection",
+      "label": "Pinned source projection\nRead remotely outside writer lock",
+      "kind": "service",
+      "width": 205,
+      "height": 82,
+      "style": "rounded=1;whiteSpace=wrap;html=1;fontFamily=Arial;fontSize=13;fontColor=#172432;fillColor=#e6f0ff;strokeColor=#5473a4;",
+      "properties": {
+        "owner": "Venues",
+        "description": "",
+        "trust_boundary": "authenticated school services"
+      },
+      "provenance": {
+        "path": "venues-backend/Sources.gs",
+        "line": 82,
+        "end_line": 104
+      }
+    },
+    {
+      "id": "admission",
+      "label": "Fresh server admission\nPermissions + source + conflicts",
+      "kind": "service",
+      "width": 205,
+      "height": 82,
+      "style": "rounded=1;whiteSpace=wrap;html=1;fontFamily=Arial;fontSize=13;fontColor=#172432;fillColor=#e6f0ff;strokeColor=#5473a4;",
+      "properties": {
+        "owner": "Venues",
+        "description": "",
+        "trust_boundary": "authenticated school services"
+      },
+      "provenance": {
+        "path": "venues-backend/Domain.gs",
+        "line": 16,
+        "end_line": 43
+      }
+    },
+    {
+      "id": "commit",
+      "label": "Single Venues batch commit\nEffects + audit + receipt + intent",
+      "kind": "service",
+      "width": 205,
+      "height": 82,
+      "style": "rounded=1;whiteSpace=wrap;html=1;fontFamily=Arial;fontSize=13;fontColor=#172432;fillColor=#e6f0ff;strokeColor=#5473a4;",
+      "properties": {
+        "owner": "Venues",
+        "description": "",
+        "trust_boundary": "authenticated school services"
+      },
+      "provenance": {
+        "path": "venues-backend/Code.gs",
+        "line": 20,
+        "end_line": 47
+      }
+    },
+    {
+      "id": "outbox",
+      "label": "Durable notification outbox\nQueued / failed / uncertain",
+      "kind": "queue",
+      "width": 205,
+      "height": 82,
+      "style": "rounded=1;whiteSpace=wrap;html=1;fontFamily=Arial;fontSize=13;fontColor=#172432;fillColor=#fff5d1;strokeColor=#a88a23;",
+      "properties": {
+        "owner": "Venues",
+        "description": "",
+        "trust_boundary": "authenticated school services"
+      },
+      "provenance": {
+        "path": "venues-backend/Notifications.gs",
+        "line": 27,
+        "end_line": 50
+      }
+    },
+    {
+      "id": "localCache",
+      "label": "Actor-scoped local occupancy\nDigest-verified immutable generation",
+      "kind": "database",
+      "width": 205,
+      "height": 82,
+      "style": "shape=cylinder3;whiteSpace=wrap;html=1;fontFamily=Arial;fontSize=13;fontColor=#172432;fillColor=#e2f4e8;strokeColor=#4b8962;",
+      "properties": {
+        "owner": "Staff browser",
+        "description": "",
+        "trust_boundary": "authenticated school services"
+      },
+      "provenance": {
+        "path": "venues-viewport/public/cache.js",
+        "line": 8,
+        "end_line": 37
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "browser-coreGateway-0",
+      "source": "browser",
+      "target": "coreGateway",
+      "label": "Same-origin API",
+      "kind": "sync",
+      "properties": {
+        "protocol": "HTTPS"
+      },
+      "style": "edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;endArrow=block;endSize=8;html=1;fontFamily=Arial;fontSize=11;"
+    },
+    {
+      "id": "browser-accessGateway-1",
+      "source": "browser",
+      "target": "accessGateway",
+      "label": "Same-origin API",
+      "kind": "sync",
+      "properties": {
+        "protocol": "HTTPS"
+      },
+      "style": "edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;endArrow=block;endSize=8;html=1;fontFamily=Arial;fontSize=11;"
+    },
+    {
+      "id": "coreGateway-contacts-2",
+      "source": "coreGateway",
+      "target": "contacts",
+      "label": "Authenticated proxy",
+      "kind": "sync",
+      "properties": {
+        "protocol": "HTTPS"
+      },
+      "style": "edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;endArrow=block;endSize=8;html=1;fontFamily=Arial;fontSize=11;"
+    },
+    {
+      "id": "coreGateway-calendar-3",
+      "source": "coreGateway",
+      "target": "calendar",
+      "label": "Authenticated proxy",
+      "kind": "sync",
+      "properties": {
+        "protocol": "HTTPS"
+      },
+      "style": "edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;endArrow=block;endSize=8;html=1;fontFamily=Arial;fontSize=11;"
+    },
+    {
+      "id": "coreGateway-deploy-4",
+      "source": "coreGateway",
+      "target": "deploy",
+      "label": "Authenticated proxy",
+      "kind": "sync",
+      "properties": {
+        "protocol": "HTTPS"
+      },
+      "style": "edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;endArrow=block;endSize=8;html=1;fontFamily=Arial;fontSize=11;"
+    },
+    {
+      "id": "coreGateway-roster-5",
+      "source": "coreGateway",
+      "target": "roster",
+      "label": "Authenticated proxy",
+      "kind": "sync",
+      "properties": {
+        "protocol": "HTTPS"
+      },
+      "style": "edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;endArrow=block;endSize=8;html=1;fontFamily=Arial;fontSize=11;"
+    },
+    {
+      "id": "coreGateway-lord-6",
+      "source": "coreGateway",
+      "target": "lord",
+      "label": "Authenticated proxy",
+      "kind": "sync",
+      "properties": {
+        "protocol": "HTTPS"
+      },
+      "style": "edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;endArrow=block;endSize=8;html=1;fontFamily=Arial;fontSize=11;"
+    },
+    {
+      "id": "accessGateway-venues-7",
+      "source": "accessGateway",
+      "target": "venues",
+      "label": "HMAC venues envelope",
+      "kind": "sync",
+      "properties": {
+        "protocol": "HTTPS"
+      },
+      "style": "edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;endArrow=block;endSize=8;html=1;fontFamily=Arial;fontSize=11;"
+    },
+    {
+      "id": "contacts-contactsStore-8",
+      "source": "contacts",
+      "target": "contactsStore",
+      "label": "Owner reads / writes",
+      "kind": "sync",
+      "properties": {
+        "protocol": "Google APIs"
+      },
+      "style": "edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;endArrow=block;endSize=8;html=1;fontFamily=Arial;fontSize=11;"
+    },
+    {
+      "id": "calendar-calendarStore-9",
+      "source": "calendar",
+      "target": "calendarStore",
+      "label": "Owner reads / writes",
+      "kind": "sync",
+      "properties": {
+        "protocol": "Google APIs"
+      },
+      "style": "edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;endArrow=block;endSize=8;html=1;fontFamily=Arial;fontSize=11;"
+    },
+    {
+      "id": "deploy-deployStore-10",
+      "source": "deploy",
+      "target": "deployStore",
+      "label": "Owner reads / writes",
+      "kind": "sync",
+      "properties": {
+        "protocol": "Google APIs"
+      },
+      "style": "edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;endArrow=block;endSize=8;html=1;fontFamily=Arial;fontSize=11;"
+    },
+    {
+      "id": "roster-rosterStore-11",
+      "source": "roster",
+      "target": "rosterStore",
+      "label": "Owner reads / writes",
+      "kind": "sync",
+      "properties": {
+        "protocol": "Google APIs"
+      },
+      "style": "edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;endArrow=block;endSize=8;html=1;fontFamily=Arial;fontSize=11;"
+    },
+    {
+      "id": "venues-venuesStore-12",
+      "source": "venues",
+      "target": "venuesStore",
+      "label": "Owner reads / writes",
+      "kind": "sync",
+      "properties": {
+        "protocol": "Google APIs"
+      },
+      "style": "edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;endArrow=block;endSize=8;html=1;fontFamily=Arial;fontSize=11;"
+    },
+    {
+      "id": "lord-lordStore-13",
+      "source": "lord",
+      "target": "lordStore",
+      "label": "Owner reads / writes",
+      "kind": "sync",
+      "properties": {
+        "protocol": "Google APIs"
+      },
+      "style": "edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;endArrow=block;endSize=8;html=1;fontFamily=Arial;fontSize=11;"
+    },
+    {
+      "id": "deploy-contacts-14",
+      "source": "deploy",
+      "target": "contacts",
+      "label": "Signed staff / access read",
+      "kind": "sync",
+      "properties": {
+        "protocol": "HTTPS"
+      },
+      "style": "edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;endArrow=block;endSize=8;html=1;fontFamily=Arial;fontSize=11;"
+    },
+    {
+      "id": "roster-contacts-15",
+      "source": "roster",
+      "target": "contacts",
+      "label": "Signed staff / SMC read",
+      "kind": "sync",
+      "properties": {
+        "protocol": "HTTPS"
+      },
+      "style": "edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;endArrow=block;endSize=8;html=1;fontFamily=Arial;fontSize=11;"
+    },
+    {
+      "id": "roster-deploy-16",
+      "source": "roster",
+      "target": "deployStore",
+      "label": "Published read-only quota / catalogue",
+      "kind": "sync",
+      "properties": {
+        "protocol": "Google Sheets API"
+      },
+      "style": "edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;endArrow=block;endSize=8;html=1;fontFamily=Arial;fontSize=11;"
+    },
+    {
+      "id": "coreGateway-calendar-17",
+      "source": "coreGateway",
+      "target": "calendar",
+      "label": "Roster date context",
+      "kind": "sync",
+      "properties": {
+        "protocol": "HTTPS"
+      },
+      "style": "edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;endArrow=block;endSize=8;html=1;fontFamily=Arial;fontSize=11;"
+    },
+    {
+      "id": "lord-contacts-18",
+      "source": "lord",
+      "target": "contacts",
+      "label": "lordService manifest",
+      "kind": "sync",
+      "properties": {
+        "protocol": "HTTPS"
+      },
+      "style": "edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;endArrow=block;endSize=8;html=1;fontFamily=Arial;fontSize=11;"
+    },
+    {
+      "id": "lord-deploy-19",
+      "source": "lord",
+      "target": "deploy",
+      "label": "lordService manifest",
+      "kind": "sync",
+      "properties": {
+        "protocol": "HTTPS"
+      },
+      "style": "edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;endArrow=block;endSize=8;html=1;fontFamily=Arial;fontSize=11;"
+    },
+    {
+      "id": "venues-contacts-20",
+      "source": "venues",
+      "target": "contacts",
+      "label": "venuesSource: manifest / snapshot",
+      "kind": "sync",
+      "properties": {
+        "protocol": "HTTPS"
+      },
+      "style": "edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;endArrow=block;endSize=8;html=1;fontFamily=Arial;fontSize=11;"
+    },
+    {
+      "id": "venues-calendar-21",
+      "source": "venues",
+      "target": "calendar",
+      "label": "venuesSource: dates",
+      "kind": "sync",
+      "properties": {
+        "protocol": "HTTPS"
+      },
+      "style": "edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;endArrow=block;endSize=8;html=1;fontFamily=Arial;fontSize=11;"
+    },
+    {
+      "id": "venues-deploy-22",
+      "source": "venues",
+      "target": "deploy",
+      "label": "venuesSource: manifest / snapshot",
+      "kind": "sync",
+      "properties": {
+        "protocol": "HTTPS"
+      },
+      "style": "edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;endArrow=block;endSize=8;html=1;fontFamily=Arial;fontSize=11;"
+    },
+    {
+      "id": "venues-roster-23",
+      "source": "venues",
+      "target": "roster",
+      "label": "venuesSource: manifest / snapshot",
+      "kind": "sync",
+      "properties": {
+        "protocol": "HTTPS"
+      },
+      "style": "edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;endArrow=block;endSize=8;html=1;fontFamily=Arial;fontSize=11;"
+    },
+    {
+      "id": "worker-roster-24",
+      "source": "worker",
+      "target": "roster",
+      "label": "Signed claim / prepare / settle",
+      "kind": "sync",
+      "properties": {
+        "protocol": "HTTPS"
+      },
+      "style": "edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;endArrow=block;endSize=8;html=1;fontFamily=Arial;fontSize=11;"
+    },
+    {
+      "id": "worker-providers-25",
+      "source": "worker",
+      "target": "providers",
+      "label": "Roster delivery",
+      "kind": "async",
+      "properties": {
+        "protocol": "HTTPS"
+      },
+      "style": "edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;endArrow=block;endSize=8;html=1;fontFamily=Arial;fontSize=11;dashed=1;"
+    },
+    {
+      "id": "lord-providers-26",
+      "source": "lord",
+      "target": "providers",
+      "label": "LORD delivery",
+      "kind": "async",
+      "properties": {
+        "protocol": "HTTPS"
+      },
+      "style": "edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;endArrow=block;endSize=8;html=1;fontFamily=Arial;fontSize=11;dashed=1;"
+    },
+    {
+      "id": "venues-providers-27",
+      "source": "venues",
+      "target": "providers",
+      "label": "Venues delivery",
+      "kind": "async",
+      "properties": {
+        "protocol": "HTTPS"
+      },
+      "style": "edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;endArrow=block;endSize=8;html=1;fontFamily=Arial;fontSize=11;dashed=1;"
+    },
+    {
+      "id": "roster-fence-28",
+      "source": "roster",
+      "target": "fence",
+      "label": "Occupancy change: begin / complete",
+      "kind": "sync",
+      "properties": {
+        "protocol": "HTTPS"
+      },
+      "style": "edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;endArrow=block;endSize=8;html=1;fontFamily=Arial;fontSize=11;"
+    },
+    {
+      "id": "fence-projection-29",
+      "source": "fence",
+      "target": "projection",
+      "label": "Block until stable",
+      "kind": "sync",
+      "properties": {
+        "protocol": "State check"
+      },
+      "style": "edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;endArrow=block;endSize=8;html=1;fontFamily=Arial;fontSize=11;"
+    },
+    {
+      "id": "projection-admission-30",
+      "source": "projection",
+      "target": "admission",
+      "label": "Activate validated generation",
+      "kind": "sync",
+      "properties": {
+        "protocol": "Writer lock"
+      },
+      "style": "edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;endArrow=block;endSize=8;html=1;fontFamily=Arial;fontSize=11;"
+    },
+    {
+      "id": "accessGateway-admission-31",
+      "source": "accessGateway",
+      "target": "admission",
+      "label": "Read / command + requestId",
+      "kind": "sync",
+      "properties": {
+        "protocol": "HTTPS"
+      },
+      "style": "edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;endArrow=block;endSize=8;html=1;fontFamily=Arial;fontSize=11;"
+    },
+    {
+      "id": "admission-commit-32",
+      "source": "admission",
+      "target": "commit",
+      "label": "All authoritative checks pass",
+      "kind": "sync",
+      "properties": {
+        "protocol": "Writer lock"
+      },
+      "style": "edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;endArrow=block;endSize=8;html=1;fontFamily=Arial;fontSize=11;"
+    },
+    {
+      "id": "commit-venuesStore-33",
+      "source": "commit",
+      "target": "venuesStore",
+      "label": "Atomic Sheets batchUpdate",
+      "kind": "sync",
+      "properties": {
+        "protocol": "Google Sheets API"
+      },
+      "style": "edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;endArrow=block;endSize=8;html=1;fontFamily=Arial;fontSize=11;"
+    },
+    {
+      "id": "commit-outbox-34",
+      "source": "commit",
+      "target": "outbox",
+      "label": "Intent in same transaction",
+      "kind": "sync",
+      "properties": {
+        "protocol": "Atomic batch"
+      },
+      "style": "edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;endArrow=block;endSize=8;html=1;fontFamily=Arial;fontSize=11;"
+    },
+    {
+      "id": "outbox-providers-35",
+      "source": "outbox",
+      "target": "providers",
+      "label": "Bounded provider dispatch",
+      "kind": "async",
+      "properties": {
+        "protocol": "HTTPS"
+      },
+      "style": "edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;endArrow=block;endSize=8;html=1;fontFamily=Arial;fontSize=11;dashed=1;"
+    },
+    {
+      "id": "venues-localCache-authenticatedPieces",
+      "source": "venues",
+      "target": "localCache",
+      "label": "Whitelisted pieces via Pages API",
+      "kind": "sync",
+      "properties": {
+        "protocol": "Authenticated API"
+      },
+      "style": "edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;endArrow=block;endSize=8;html=1;fontFamily=Arial;fontSize=11;"
+    },
+    {
+      "id": "localCache-browser-37",
+      "source": "localCache",
+      "target": "browser",
+      "label": "Local dates / filters / Now",
+      "kind": "sync",
+      "properties": {
+        "protocol": "Local memory"
+      },
+      "style": "edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;endArrow=block;endSize=8;html=1;fontFamily=Arial;fontSize=11;"
+    }
+  ],
+  "views": [
+    {
+      "id": "ownership",
+      "name": "1 \u00b7 Owners and deployment",
+      "direction": "LR",
+      "nodes": [
+        "browser",
+        "coreGateway",
+        "accessGateway",
+        "contacts",
+        "calendar",
+        "deploy",
+        "roster",
+        "venues",
+        "lord",
+        "contactsStore",
+        "calendarStore",
+        "deployStore",
+        "rosterStore",
+        "venuesStore",
+        "lordStore"
+      ]
+    },
+    {
+      "id": "exchanges",
+      "name": "2 \u00b7 Signed source and delivery APIs",
+      "direction": "LR",
+      "nodes": [
+        "contacts",
+        "calendar",
+        "deploy",
+        "roster",
+        "venues",
+        "lord",
+        "worker",
+        "providers",
+        "deployStore"
+      ]
+    },
+    {
+      "id": "admissionFlow",
+      "name": "3 \u00b7 Venues admission and source coordination",
+      "direction": "LR",
+      "nodes": [
+        "browser",
+        "accessGateway",
+        "roster",
+        "fence",
+        "projection",
+        "admission",
+        "commit",
+        "venuesStore",
+        "outbox",
+        "providers",
+        "localCache",
+        "venues"
+      ]
+    }
+  ]
+}

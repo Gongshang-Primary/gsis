@@ -1,0 +1,9 @@
+{
+  "stapler_timetable": {
+    "name": "gsis_timetable_updated_button_v2",
+    "language": "en_GB",
+    "bodySha256": "c045ccb418e1680e2f528de915ba3897511bd7514eb9941b67f83fab2917c5b0",
+    "enabled": true,
+    "summaryMaxCharacters": 1024
+  }
+}

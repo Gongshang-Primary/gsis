@@ -1,0 +1,20 @@
+{
+  "version": "0.9.3a",
+  "baseline": "0.9.3",
+  "kind": "component-patch",
+  "components": [
+    "rosterBackend",
+    "rosterFrontend"
+  ],
+  "liveDeploymentPerformed": false,
+  "newSettings": [],
+  "activeBacklog": false,
+  "validation": {
+    "currentRegressionPrograms": 694,
+    "packageVerifier": "passed separately",
+    "lordPrograms": 33,
+    "appsScriptFiles": 163,
+    "productionTimingMeasured": false,
+    "liveSchoolWrites": 0
+  }
+}

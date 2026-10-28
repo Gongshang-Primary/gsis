@@ -1,0 +1,18 @@
+'use strict';
+const assert=require('node:assert/strict'),fs=require('node:fs'),{JSDOM}=require('jsdom');
+const read=p=>fs.readFileSync(p,'utf8'),p=JSON.parse(read('package.json')),v='0.9.8p',lock=JSON.parse(read('package-lock.json'));
+assert.equal(p.gsisRelease,v);assert.equal(p.version,v);assert.equal(lock.version,v);assert.equal(lock.packages[''].version,v);
+assert.equal(p.gsisBaseline,'0.9.8o');assert.equal(p.gsisPatchSourceBase,'edcb6b4c4d43b2d2af7eaa4f2d4f220e2adb7cfc');assert.equal(p.gsisPackageKind,'full-suite');
+assert.equal(Object.keys(p.gsisComponentVersions).length,18);assert(Object.values(p.gsisComponentVersions).every(value=>value===v));
+assert.deepEqual(p.gsisProductionChangedComponents,['rosterFrontend','rosterBackend','calendarFrontend','calendarBackend']);
+assert.equal(p.gsisSeparatePackages.length,1);assert.equal(p.gsisSeparatePackages[0].name,'GSiS_v0.9.8o_Timetable_Preparation.zip');assert.equal(p.gsisSeparatePackages[0].productionInstallation,false);
+assert(read('backend/RosterTimetablePreparation.gs').includes("release:'0.9.8o'"));assert(read('timetable-prep-worker/domain.mjs').includes("RELEASE='0.9.8o'"));
+const spec=JSON.parse(read('release-installation-manifest.json'));assert.equal(Object.keys(spec.frontends).length,9);assert.equal(spec.backends.length,6);assert.equal(Object.keys(spec.workers).length,3);assert.deepEqual(spec.migrations,[]);
+for(const folder of Object.values(spec.frontends))assert(read(folder+'/index.html').includes('v'+v),folder+' visible version');
+assert(read('roster-update/public/_worker.js').includes("version:'"+v+"'"));assert(read('calendar-update/public/app.js').includes("FRONTEND_VERSION = '"+v+"'"));assert(read('calendar-backend/Code.gs').includes("RELEASE_VERSION: '"+v+"'"));
+const guide=new JSDOM(read('SETUP_v'+v+'.html')).window.document,markdown=read('SETUP_v'+v+'.md');assert.equal(guide.querySelectorAll('script,iframe,form').length,0);assert.equal(guide.querySelectorAll('h2').length,(markdown.match(/^## /gm)||[]).length);
+for(const phrase of ['Roster_Backend_v0.9.8p.gs','Calendar_Backend_v0.9.8p.gs','New version','GSIS_SECRET','33-character','Prepare timetable migration','Download timetable snapshot','existing O preparation Worker','no new Worker','Google','Deploy'])assert(guide.body.textContent.includes(phrase),phrase);
+const summary=JSON.parse(read('RELEASE_SUMMARY.json'));assert.equal(summary.version,v);assert.equal(summary.componentCount,18);assert.equal(summary.productionAuthorities.roster,'Google');assert.equal(summary.productionAuthorities.calendar,'Google');assert.equal(summary.productionAuthorities.deploy,'unchanged configured authority');
+for(const k of ['productionDeployed','authorityCutoverPerformed','messagesSent','liveRecordsChanged','newInfrastructureRequired','reliefLedgerMigrated'])assert.equal(summary[k],false,k);
+assert(!read('README.md').includes('## Historical v0.9.7 installation handbook'));assert(read('README.md').includes('docs/v098p/SETUP.html'));
+console.log('PASS P full-suite metadata:18 production components, separate compatible O preparation, current offline guides and unchanged authority.');

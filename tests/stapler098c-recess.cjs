@@ -1,0 +1,15 @@
+'use strict';
+const assert=require('node:assert/strict'),S=require('../shared/roster-stapler.js');
+const periods=Array.from({length:8},(_,period)=>({period,startMinutes:450+15*period,endMinutes:465+15*period}));
+const original=S.create({date:'2026-10-26',id:'base',periods,recesses:[{level:1,startMinutes:480,endMinutes:510}],formClasses:[{id:'a',name:'1A',level:1},{id:'b',name:'1B',level:1}],teachers:[{staffId:'t',name:'Teacher',cells:periods.map(p=>p.period===5?['Maths','1A','Room','']:['','','',''])}]});
+const recess=(p,id)=>p.tiles.find(t=>t.id==='recess:'+id);
+const pit=S.apply(original,{type:'pit',tileId:'recess:a'}),before=JSON.stringify(pit);
+const placed=S.apply(pit,{type:'recessMove',tileId:'recess:a',classId:'a',period:4});
+assert.equal(recess(placed,'a').location,'grid');assert.deepEqual(S.tilePeriods(placed,recess(placed,'a')),[4,5]);assert.equal(recess(placed,'a').durationMinutes,30);assert.deepEqual(recess(placed,'a').source,recess(original,'a').source);assert.equal(recess(placed,'b').period,2);
+assert.equal(placed.tiles.find(t=>t.kind==='lesson').location,'pit');assert.match(placed.warnings.at(-1),/Card Pit/);assert.equal(placed.tiles.length,original.tiles.length);assert.equal(JSON.stringify(pit),before);
+assert.throws(()=>S.apply(pit,{type:'recessMove',tileId:'recess:a',classId:'b',period:4}),/original class/);
+assert.throws(()=>S.apply(pit,{type:'recessMove',tileId:'recess:a',period:7}),/fit/);
+const moved=S.apply(original,{type:'recessMove',tileId:'recess:a',period:3});assert.equal(recess(moved,'a').period,3);assert.equal(recess(moved,'b').period,2);
+const group=S.apply(original,{type:'recessLevelMove',tileId:'recess:a',period:4});assert.deepEqual(group.tiles.filter(t=>t.kind==='recess').map(t=>t.period),[4,4]);
+S.validate(JSON.parse(JSON.stringify(placed)),{baseline:original.baseline,previous:original});
+console.log('PASS 098c recess: Pit placement, individual/cohort, immutable owner/duration, bounds, visible lesson displacement and saved validation.');

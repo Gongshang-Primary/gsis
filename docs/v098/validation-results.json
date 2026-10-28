@@ -1,0 +1,3755 @@
+{
+  "release": "0.9.8",
+  "baseline": "0.9.7",
+  "initialBroadRun": 748,
+  "browserRechecks": 29,
+  "focusedRechecks": 16,
+  "counts": {
+    "passed": 744,
+    "blocked-historical-context": 4
+  },
+  "tests": [
+    {
+      "test": "082-domain-attendance-notify.cjs",
+      "status": "passed",
+      "seconds": 0.236
+    },
+    {
+      "test": "082-domain-confirmed-preview.cjs",
+      "status": "passed",
+      "seconds": 0.121
+    },
+    {
+      "test": "082-domain-link-audit.cjs",
+      "status": "passed",
+      "seconds": 0.18
+    },
+    {
+      "test": "082-domain-manual-authority.cjs",
+      "status": "passed",
+      "seconds": 0.265
+    },
+    {
+      "test": "082-domain-stapler-merge.cjs",
+      "status": "passed",
+      "seconds": 0.125
+    },
+    {
+      "test": "082-domain-teacher-daily-update.cjs",
+      "status": "passed",
+      "seconds": 0.148
+    },
+    {
+      "test": "ability-teacher-save.cjs",
+      "status": "passed",
+      "seconds": 2.158
+    },
+    {
+      "test": "absence080a-save-shortcut.cjs",
+      "status": "passed",
+      "seconds": 3.933
+    },
+    {
+      "test": "absence718d-flow.cjs",
+      "status": "passed",
+      "seconds": 2.659
+    },
+    {
+      "test": "apps-script-syntax.cjs",
+      "status": "passed",
+      "seconds": 7.07
+    },
+    {
+      "test": "arrival-stair.cjs",
+      "status": "passed",
+      "seconds": 1.075
+    },
+    {
+      "test": "asc0810-browser.cjs",
+      "status": "passed",
+      "seconds": 3.557
+    },
+    {
+      "test": "asc0810-demand.cjs",
+      "status": "passed",
+      "seconds": 0.888
+    },
+    {
+      "test": "asc0810-export.cjs",
+      "status": "passed",
+      "seconds": 0.935
+    },
+    {
+      "test": "asc0810-settings.cjs",
+      "status": "passed",
+      "seconds": 2.062
+    },
+    {
+      "test": "asc0810-ui.cjs",
+      "status": "passed",
+      "seconds": 1.541
+    },
+    {
+      "test": "audit-loading.cjs",
+      "status": "passed",
+      "seconds": 0.834
+    },
+    {
+      "test": "audit-read-path.cjs",
+      "status": "passed",
+      "seconds": 1.95
+    },
+    {
+      "test": "backend-role-fixture.cjs",
+      "status": "passed",
+      "seconds": 0.079
+    },
+    {
+      "test": "backend.cjs",
+      "status": "passed",
+      "seconds": 0.15
+    },
+    {
+      "test": "baseline710-backend.cjs",
+      "status": "passed",
+      "seconds": 0.099
+    },
+    {
+      "test": "baseline710-browser.cjs",
+      "status": "passed",
+      "seconds": 3.103
+    },
+    {
+      "test": "cache-backend.cjs",
+      "status": "passed",
+      "seconds": 1.998
+    },
+    {
+      "test": "cache-frontend.cjs",
+      "status": "passed",
+      "seconds": 0.107
+    },
+    {
+      "test": "calendar0810-birthday-responsive.cjs",
+      "status": "passed",
+      "seconds": 1.531
+    },
+    {
+      "test": "calendar0810-birthday-ui.cjs",
+      "status": "passed",
+      "seconds": 0.996
+    },
+    {
+      "test": "calendar0810-birthdays.cjs",
+      "status": "passed",
+      "seconds": 0.724
+    },
+    {
+      "test": "calendar0811-cleanup.cjs",
+      "status": "passed",
+      "seconds": 0.149
+    },
+    {
+      "test": "calendar085-write-cache.cjs",
+      "status": "passed",
+      "seconds": 0.22
+    },
+    {
+      "test": "calendar087-statistics.cjs",
+      "status": "passed",
+      "seconds": 0.152
+    },
+    {
+      "test": "calendar089-background-gateway.mjs",
+      "status": "passed",
+      "seconds": 0.133
+    },
+    {
+      "test": "calendar089-sync-concurrency.cjs",
+      "status": "passed",
+      "seconds": 0.275
+    },
+    {
+      "test": "calendar093-cooldown-ui.cjs",
+      "status": "passed",
+      "seconds": 0.972
+    },
+    {
+      "test": "calendar093-provider-cooldown.cjs",
+      "status": "passed",
+      "seconds": 0.425
+    },
+    {
+      "test": "calendar093-roster-window.cjs",
+      "status": "passed",
+      "seconds": 0.144
+    },
+    {
+      "test": "calendar605.cjs",
+      "status": "passed",
+      "seconds": 0.067
+    },
+    {
+      "test": "calendar606-gateway.mjs",
+      "status": "passed",
+      "seconds": 0.492
+    },
+    {
+      "test": "calendar606-inherited.cjs",
+      "status": "passed",
+      "seconds": 1.034
+    },
+    {
+      "test": "calendar606.cjs",
+      "status": "passed",
+      "seconds": 0.153
+    },
+    {
+      "test": "calendar608-publication-ui.cjs",
+      "status": "passed",
+      "seconds": 1.084
+    },
+    {
+      "test": "calendar608-publish.cjs",
+      "status": "passed",
+      "seconds": 0.54
+    },
+    {
+      "test": "calendar609-api.cjs",
+      "status": "passed",
+      "seconds": 0.367
+    },
+    {
+      "test": "calendar708-concurrency.cjs",
+      "status": "passed",
+      "seconds": 0.157
+    },
+    {
+      "test": "calendar708-metadata-concurrency.cjs",
+      "status": "passed",
+      "seconds": 0.373
+    },
+    {
+      "test": "calendar708-metadata-ui.cjs",
+      "status": "passed",
+      "seconds": 2.18
+    },
+    {
+      "test": "campus-controls-b2.cjs",
+      "status": "passed",
+      "seconds": 1.975
+    },
+    {
+      "test": "campus-version-ui.cjs",
+      "status": "passed",
+      "seconds": 1.001
+    },
+    {
+      "test": "campus-window.cjs",
+      "status": "passed",
+      "seconds": 0.825
+    },
+    {
+      "test": "cap708-ui.cjs",
+      "status": "passed",
+      "seconds": 1.266
+    },
+    {
+      "test": "cap708.cjs",
+      "status": "passed",
+      "seconds": 0.398
+    },
+    {
+      "test": "class-checklist.cjs",
+      "status": "passed",
+      "seconds": 2.609
+    },
+    {
+      "test": "class-editor.cjs",
+      "status": "passed",
+      "seconds": 2.293
+    },
+    {
+      "test": "class-validation.cjs",
+      "status": "passed",
+      "seconds": 0.207
+    },
+    {
+      "test": "classes-sort.cjs",
+      "status": "passed",
+      "seconds": 1.345
+    },
+    {
+      "test": "classes.cjs",
+      "status": "passed",
+      "seconds": 0.151
+    },
+    {
+      "test": "combined-backend.cjs",
+      "status": "passed",
+      "seconds": 0.135
+    },
+    {
+      "test": "compact-planning-ui.cjs",
+      "status": "passed",
+      "seconds": 1.34
+    },
+    {
+      "test": "contacts-data-loading.cjs",
+      "status": "passed",
+      "seconds": 0.95
+    },
+    {
+      "test": "contacts-data.cjs",
+      "status": "passed",
+      "seconds": 0.088
+    },
+    {
+      "test": "contacts-login.cjs",
+      "status": "passed",
+      "seconds": 0.967
+    },
+    {
+      "test": "contacts-management-ui.cjs",
+      "status": "passed",
+      "seconds": 1.11
+    },
+    {
+      "test": "contacts-management.cjs",
+      "status": "passed",
+      "seconds": 0.116
+    },
+    {
+      "test": "contacts0810-birthdays.cjs",
+      "status": "passed",
+      "seconds": 0.201
+    },
+    {
+      "test": "contacts083-vcard-browser.cjs",
+      "status": "passed",
+      "seconds": 1.895
+    },
+    {
+      "test": "contacts083-vcard.cjs",
+      "status": "passed",
+      "seconds": 0.112
+    },
+    {
+      "test": "contacts084-asset-recovery-ui.cjs",
+      "status": "passed",
+      "seconds": 1.269
+    },
+    {
+      "test": "contacts084-http-browser.cjs",
+      "status": "passed",
+      "seconds": 2.606
+    },
+    {
+      "test": "contacts095-venues-errors.cjs",
+      "status": "passed",
+      "seconds": 0.121
+    },
+    {
+      "test": "contacts407.cjs",
+      "status": "passed",
+      "seconds": 0.128
+    },
+    {
+      "test": "contacts409.cjs",
+      "status": "passed",
+      "seconds": 0.143
+    },
+    {
+      "test": "contacts410-backup.cjs",
+      "status": "passed",
+      "seconds": 0.15
+    },
+    {
+      "test": "contacts410-save-ui.cjs",
+      "status": "passed",
+      "seconds": 1.2
+    },
+    {
+      "test": "contacts410-transport.mjs",
+      "status": "passed",
+      "seconds": 0.15
+    },
+    {
+      "test": "contacts411-recovery-ui.cjs",
+      "status": "passed",
+      "seconds": 1.054
+    },
+    {
+      "test": "contacts411-recovery.cjs",
+      "status": "passed",
+      "seconds": 0.166
+    },
+    {
+      "test": "contacts414-api.cjs",
+      "status": "passed",
+      "seconds": 0.135
+    },
+    {
+      "test": "contacts418-diy-ui.cjs",
+      "status": "passed",
+      "seconds": 0.999
+    },
+    {
+      "test": "contacts418-loading.cjs",
+      "status": "passed",
+      "seconds": 0.109
+    },
+    {
+      "test": "contacts502-save.cjs",
+      "status": "passed",
+      "seconds": 0.277
+    },
+    {
+      "test": "contacts502-ui.cjs",
+      "status": "passed",
+      "seconds": 1.414
+    },
+    {
+      "test": "contacts503-commit.cjs",
+      "status": "passed",
+      "seconds": 0.091
+    },
+    {
+      "test": "contacts503-save.cjs",
+      "status": "passed",
+      "seconds": 0.235
+    },
+    {
+      "test": "contacts503-ui.cjs",
+      "status": "passed",
+      "seconds": 1.764
+    },
+    {
+      "test": "contacts503-view.cjs",
+      "status": "passed",
+      "seconds": 0.667
+    },
+    {
+      "test": "contacts707-modifier.cjs",
+      "status": "passed",
+      "seconds": 0.223
+    },
+    {
+      "test": "contacts710-fasttrack.cjs",
+      "status": "passed",
+      "seconds": 0.312
+    },
+    {
+      "test": "contacts718-roster-performance.cjs",
+      "status": "passed",
+      "seconds": 0.595
+    },
+    {
+      "test": "deploy085-tg-duplicates.cjs",
+      "status": "passed",
+      "seconds": 1.812
+    },
+    {
+      "test": "deploy085-tg-recovery.cjs",
+      "status": "passed",
+      "seconds": 1.165
+    },
+    {
+      "test": "deploy085-tg-review-browser.cjs",
+      "status": "passed",
+      "seconds": 0.941
+    },
+    {
+      "test": "deploy094-edge.mjs",
+      "status": "passed",
+      "seconds": 5.525
+    },
+    {
+      "test": "deploy418-info.cjs",
+      "status": "passed",
+      "seconds": 0.982
+    },
+    {
+      "test": "deploy418-projection.cjs",
+      "status": "passed",
+      "seconds": 4.825
+    },
+    {
+      "test": "edge094-setup.cjs",
+      "status": "passed",
+      "seconds": 0.911
+    },
+    {
+      "test": "edge094-store.cjs",
+      "status": "passed",
+      "seconds": 0.408
+    },
+    {
+      "test": "exclusion-cells.cjs",
+      "status": "passed",
+      "seconds": 2.247
+    },
+    {
+      "test": "exclusion-ui.cjs",
+      "status": "passed",
+      "seconds": 0.956
+    },
+    {
+      "test": "exclusions.cjs",
+      "status": "passed",
+      "seconds": 0.165
+    },
+    {
+      "test": "explicit-save.cjs",
+      "status": "passed",
+      "seconds": 2.197
+    },
+    {
+      "test": "first-load-contacts.cjs",
+      "status": "passed",
+      "seconds": 0.14
+    },
+    {
+      "test": "first-load-deploy.cjs",
+      "status": "passed",
+      "seconds": 1.363
+    },
+    {
+      "test": "frontend-recovery.cjs",
+      "status": "passed",
+      "seconds": 0.141
+    },
+    {
+      "test": "garden605.cjs",
+      "status": "passed",
+      "seconds": 2.417
+    },
+    {
+      "test": "gateway.mjs",
+      "status": "passed",
+      "seconds": 0.438
+    },
+    {
+      "test": "hr-terms.cjs",
+      "status": "passed",
+      "seconds": 1.683
+    },
+    {
+      "test": "imp-nonteaching-api.cjs",
+      "status": "passed",
+      "seconds": 7.863
+    },
+    {
+      "test": "imp-nonteaching-ui.cjs",
+      "status": "passed",
+      "seconds": 1.323
+    },
+    {
+      "test": "imp-nonteaching.cjs",
+      "status": "passed",
+      "seconds": 0.158
+    },
+    {
+      "test": "import707.cjs",
+      "status": "passed",
+      "seconds": 1.415
+    },
+    {
+      "test": "import708-browser.cjs",
+      "status": "passed",
+      "seconds": 2.471
+    },
+    {
+      "test": "import708.cjs",
+      "status": "passed",
+      "seconds": 5.932
+    },
+    {
+      "test": "inplace-select.cjs",
+      "status": "passed",
+      "seconds": 1.405
+    },
+    {
+      "test": "ip-anchor413.cjs",
+      "status": "passed",
+      "seconds": 0.827
+    },
+    {
+      "test": "landmark-alias.cjs",
+      "status": "passed",
+      "seconds": 0.807
+    },
+    {
+      "test": "landmark-api.cjs",
+      "status": "passed",
+      "seconds": 1.391
+    },
+    {
+      "test": "layout-courtyard-draft.cjs",
+      "status": "passed",
+      "seconds": 1.587
+    },
+    {
+      "test": "layout-sync.cjs",
+      "status": "passed",
+      "seconds": 0.839
+    },
+    {
+      "test": "layout-tg-compact.cjs",
+      "status": "passed",
+      "seconds": 3.658
+    },
+    {
+      "test": "layout413.cjs",
+      "status": "passed",
+      "seconds": 1.836
+    },
+    {
+      "test": "layout609-export-bold.cjs",
+      "status": "passed",
+      "seconds": 1.967
+    },
+    {
+      "test": "layout713-geometry.cjs",
+      "status": "passed",
+      "seconds": 1.735
+    },
+    {
+      "test": "layout714-geometry.cjs",
+      "status": "passed",
+      "seconds": 1.804
+    },
+    {
+      "test": "live-hub.mjs",
+      "status": "passed",
+      "seconds": 0.106
+    },
+    {
+      "test": "load-editor.cjs",
+      "status": "passed",
+      "seconds": 0.956
+    },
+    {
+      "test": "loading.cjs",
+      "status": "passed",
+      "seconds": 0.132
+    },
+    {
+      "test": "lord-source-bridges.cjs",
+      "status": "passed",
+      "seconds": 1.826
+    },
+    {
+      "test": "lord091a-component-patch.cjs",
+      "status": "passed",
+      "seconds": 0.468
+    },
+    {
+      "test": "model-k.cjs",
+      "status": "passed",
+      "seconds": 1.401
+    },
+    {
+      "test": "model404.cjs",
+      "status": "passed",
+      "seconds": 1.563
+    },
+    {
+      "test": "model419.cjs",
+      "status": "passed",
+      "seconds": 2.274
+    },
+    {
+      "test": "multilevel-tg-storage.cjs",
+      "status": "passed",
+      "seconds": 2.384
+    },
+    {
+      "test": "multilevel-tg-ui.cjs",
+      "status": "passed",
+      "seconds": 1.981
+    },
+    {
+      "test": "multilevel-tg.cjs",
+      "status": "passed",
+      "seconds": 0.099
+    },
+    {
+      "test": "name-sets-backend.cjs",
+      "status": "passed",
+      "seconds": 2.224
+    },
+    {
+      "test": "name-sets-ui.cjs",
+      "status": "passed",
+      "seconds": 1.334
+    },
+    {
+      "test": "notices415-ui.cjs",
+      "status": "passed",
+      "seconds": 2.23
+    },
+    {
+      "test": "notices415.cjs",
+      "status": "passed",
+      "seconds": 1.442
+    },
+    {
+      "test": "package-suite-correction.cjs",
+      "status": "passed",
+      "seconds": 0.866
+    },
+    {
+      "test": "package092-inventory.cjs",
+      "status": "passed",
+      "seconds": 0.162
+    },
+    {
+      "test": "pages096-packaged-worker.cjs",
+      "status": "passed",
+      "seconds": 0.727
+    },
+    {
+      "test": "paid097-backend-gateway.mjs",
+      "status": "passed",
+      "seconds": 0.338
+    },
+    {
+      "test": "paid097-backend.mjs",
+      "status": "passed",
+      "seconds": 0.502
+    },
+    {
+      "test": "paid097-bundles.cjs",
+      "status": "passed",
+      "seconds": 0.865
+    },
+    {
+      "test": "paid097-cache.mjs",
+      "status": "passed",
+      "seconds": 0.23
+    },
+    {
+      "test": "paid097-health-ui.cjs",
+      "status": "passed",
+      "seconds": 0.946
+    },
+    {
+      "test": "paid097-health.mjs",
+      "status": "passed",
+      "seconds": 0.171
+    },
+    {
+      "test": "paid097-jobs-idle.mjs",
+      "status": "passed",
+      "seconds": 0.376
+    },
+    {
+      "test": "paid097-jobs-worker.cjs",
+      "status": "passed",
+      "seconds": 0.094
+    },
+    {
+      "test": "paid097-jobs.mjs",
+      "status": "passed",
+      "seconds": 0.082
+    },
+    {
+      "test": "paid097-receipts-browser.cjs",
+      "status": "passed",
+      "seconds": 1.028
+    },
+    {
+      "test": "paid097-receipts.cjs",
+      "status": "passed",
+      "seconds": 2.697
+    },
+    {
+      "test": "paid097-recovery.mjs",
+      "status": "passed",
+      "seconds": 0.126
+    },
+    {
+      "test": "paid097-venues-names.mjs",
+      "status": "passed",
+      "seconds": 0.152
+    },
+    {
+      "test": "planning.cjs",
+      "status": "passed",
+      "seconds": 0.114
+    },
+    {
+      "test": "public-campus.cjs",
+      "status": "passed",
+      "seconds": 1.595
+    },
+    {
+      "test": "public-gateway.mjs",
+      "status": "passed",
+      "seconds": 0.104
+    },
+    {
+      "test": "public-layout.cjs",
+      "status": "passed",
+      "seconds": 0.869
+    },
+    {
+      "test": "queue-recovery.cjs",
+      "status": "passed",
+      "seconds": 0.882
+    },
+    {
+      "test": "queued-saves.cjs",
+      "status": "passed",
+      "seconds": 4.316
+    },
+    {
+      "test": "read-transport.cjs",
+      "status": "passed",
+      "seconds": 0.08
+    },
+    {
+      "test": "recovery411-deploy.cjs",
+      "status": "passed",
+      "seconds": 1.203
+    },
+    {
+      "test": "recovery411-gateway.mjs",
+      "status": "passed",
+      "seconds": 0.405
+    },
+    {
+      "test": "release04-planning.cjs",
+      "status": "passed",
+      "seconds": 4.928
+    },
+    {
+      "test": "release04-ui.cjs",
+      "status": "passed",
+      "seconds": 3.678
+    },
+    {
+      "test": "release0401-ui.cjs",
+      "status": "passed",
+      "seconds": 2.672
+    },
+    {
+      "test": "release082-conflict-envelope.cjs",
+      "status": "passed",
+      "seconds": 0.086
+    },
+    {
+      "test": "release082-latest-conflict-ui.cjs",
+      "status": "passed",
+      "seconds": 1.835
+    },
+    {
+      "test": "release082-local-draft-tabs.cjs",
+      "status": "passed",
+      "seconds": 3.019
+    },
+    {
+      "test": "release082-local-workflow-ui.cjs",
+      "status": "passed",
+      "seconds": 3.52
+    },
+    {
+      "test": "release082-notify-ack-dashboard-browser.cjs",
+      "status": "passed",
+      "seconds": 1.017
+    },
+    {
+      "test": "release082-notify-ack-dashboard-ui.cjs",
+      "status": "passed",
+      "seconds": 1.077
+    },
+    {
+      "test": "release082-orphan-manual-ui.cjs",
+      "status": "passed",
+      "seconds": 1.621
+    },
+    {
+      "test": "release082-stapler-local.cjs",
+      "status": "passed",
+      "seconds": 1.06
+    },
+    {
+      "test": "release082-stapler-readonly-ui.cjs",
+      "status": "passed",
+      "seconds": 0.896
+    },
+    {
+      "test": "release082-teacher-daily-browser.cjs",
+      "status": "passed",
+      "seconds": 0.878
+    },
+    {
+      "test": "release082-teacher-daily-ui.cjs",
+      "status": "passed",
+      "seconds": 1.128
+    },
+    {
+      "test": "release082-timetable-stacked-browser.cjs",
+      "status": "passed",
+      "seconds": 2.54
+    },
+    {
+      "test": "release083-class-field-arrows.cjs",
+      "status": "passed",
+      "seconds": 1.373
+    },
+    {
+      "test": "release083-confirmed-suspensions-browser.cjs",
+      "status": "passed",
+      "seconds": 1.327
+    },
+    {
+      "test": "release083-confirmed-suspensions.cjs",
+      "status": "passed",
+      "seconds": 1.275
+    },
+    {
+      "test": "release083-own-arrangements.cjs",
+      "status": "passed",
+      "seconds": 3.219
+    },
+    {
+      "test": "release084-absence-browser.cjs",
+      "status": "blocked-historical-context",
+      "reason": "Missing historical Git tag v0.8.3."
+    },
+    {
+      "test": "release084-backend-role.cjs",
+      "status": "passed",
+      "seconds": 0.173
+    },
+    {
+      "test": "release084-confirmed-dates-browser.cjs",
+      "status": "passed",
+      "seconds": 0.917
+    },
+    {
+      "test": "release084-confirmed-dates.cjs",
+      "status": "passed",
+      "seconds": 1.0
+    },
+    {
+      "test": "release084-deploy-source-evidence.cjs",
+      "status": "passed",
+      "seconds": 0.153
+    },
+    {
+      "test": "release084-instruction-concurrency.cjs",
+      "status": "passed",
+      "seconds": 0.178
+    },
+    {
+      "test": "release084-ip-focus-browser.cjs",
+      "status": "passed",
+      "seconds": 4.701
+    },
+    {
+      "test": "release084-own-arrangements.cjs",
+      "status": "passed",
+      "seconds": 2.873
+    },
+    {
+      "test": "release084-report-backend.cjs",
+      "status": "passed",
+      "seconds": 0.165
+    },
+    {
+      "test": "release084-report-instructions.cjs",
+      "status": "passed",
+      "seconds": 0.16
+    },
+    {
+      "test": "release084-report-transport-browser.cjs",
+      "status": "passed",
+      "seconds": 2.867
+    },
+    {
+      "test": "release084-report-transport.cjs",
+      "status": "passed",
+      "seconds": 0.301
+    },
+    {
+      "test": "release086-deploy-cap-ui.cjs",
+      "status": "passed",
+      "seconds": 0.893
+    },
+    {
+      "test": "release086-deploy-version-browser.cjs",
+      "status": "passed",
+      "seconds": 1.532
+    },
+    {
+      "test": "release086-deploy-version-loading.cjs",
+      "status": "passed",
+      "seconds": 1.845
+    },
+    {
+      "test": "release086-ut-cap.cjs",
+      "status": "passed",
+      "seconds": 0.178
+    },
+    {
+      "test": "release087-composition.cjs",
+      "status": "passed",
+      "seconds": 0.22
+    },
+    {
+      "test": "release088-class-rename-ui.cjs",
+      "status": "passed",
+      "seconds": 1.404
+    },
+    {
+      "test": "release088-class-rename.cjs",
+      "status": "passed",
+      "seconds": 2.032
+    },
+    {
+      "test": "release089-clear-venues-ui.cjs",
+      "status": "passed",
+      "seconds": 1.18
+    },
+    {
+      "test": "release089-clear-venues.cjs",
+      "status": "passed",
+      "seconds": 3.99
+    },
+    {
+      "test": "release14-contacts.cjs",
+      "status": "passed",
+      "seconds": 0.129
+    },
+    {
+      "test": "release14-geometry.cjs",
+      "status": "passed",
+      "seconds": 1.488
+    },
+    {
+      "test": "release14-ui.cjs",
+      "status": "passed",
+      "seconds": 1.616
+    },
+    {
+      "test": "release14.cjs",
+      "status": "passed",
+      "seconds": 2.212
+    },
+    {
+      "test": "release15-backend.cjs",
+      "status": "passed",
+      "seconds": 1.462
+    },
+    {
+      "test": "release15-geometry.cjs",
+      "status": "passed",
+      "seconds": 1.617
+    },
+    {
+      "test": "release15-rules.cjs",
+      "status": "passed",
+      "seconds": 0.106
+    },
+    {
+      "test": "release15-ui.cjs",
+      "status": "passed",
+      "seconds": 1.865
+    },
+    {
+      "test": "release17-backend.cjs",
+      "status": "passed",
+      "seconds": 1.548
+    },
+    {
+      "test": "release17-contacts.cjs",
+      "status": "passed",
+      "seconds": 0.136
+    },
+    {
+      "test": "release17-corridor.cjs",
+      "status": "passed",
+      "seconds": 1.871
+    },
+    {
+      "test": "release17-roles.cjs",
+      "status": "passed",
+      "seconds": 1.416
+    },
+    {
+      "test": "release17-table.cjs",
+      "status": "passed",
+      "seconds": 1.442
+    },
+    {
+      "test": "release18-geometry.cjs",
+      "status": "passed",
+      "seconds": 2.179
+    },
+    {
+      "test": "release18-loading.cjs",
+      "status": "passed",
+      "seconds": 1.271
+    },
+    {
+      "test": "release18-summary.cjs",
+      "status": "passed",
+      "seconds": 1.34
+    },
+    {
+      "test": "release402-catalogue.cjs",
+      "status": "passed",
+      "seconds": 0.114
+    },
+    {
+      "test": "release402-filters.cjs",
+      "status": "passed",
+      "seconds": 1.019
+    },
+    {
+      "test": "release402-storage.cjs",
+      "status": "passed",
+      "seconds": 3.314
+    },
+    {
+      "test": "release403-notes.cjs",
+      "status": "passed",
+      "seconds": 1.592
+    },
+    {
+      "test": "release403-ui.cjs",
+      "status": "passed",
+      "seconds": 1.023
+    },
+    {
+      "test": "release404-contacts.cjs",
+      "status": "passed",
+      "seconds": 0.12
+    },
+    {
+      "test": "release404-storage.cjs",
+      "status": "passed",
+      "seconds": 2.533
+    },
+    {
+      "test": "release404-upgrade.cjs",
+      "status": "passed",
+      "seconds": 1.951
+    },
+    {
+      "test": "release405-storage.cjs",
+      "status": "passed",
+      "seconds": 2.551
+    },
+    {
+      "test": "release405-transport.cjs",
+      "status": "passed",
+      "seconds": 0.092
+    },
+    {
+      "test": "release407-storage.cjs",
+      "status": "passed",
+      "seconds": 2.747
+    },
+    {
+      "test": "release408-storage.cjs",
+      "status": "passed",
+      "seconds": 4.172
+    },
+    {
+      "test": "release409-storage.cjs",
+      "status": "passed",
+      "seconds": 2.026
+    },
+    {
+      "test": "release409.cjs",
+      "status": "passed",
+      "seconds": 0.119
+    },
+    {
+      "test": "release410-protocol.cjs",
+      "status": "passed",
+      "seconds": 0.973
+    },
+    {
+      "test": "release419-backend.cjs",
+      "status": "passed",
+      "seconds": 2.003
+    },
+    {
+      "test": "release419-summary.cjs",
+      "status": "passed",
+      "seconds": 1.177
+    },
+    {
+      "test": "release500-excel.cjs",
+      "status": "passed",
+      "seconds": 2.724
+    },
+    {
+      "test": "release500-saves.cjs",
+      "status": "passed",
+      "seconds": 2.535
+    },
+    {
+      "test": "release501-contacts.cjs",
+      "status": "passed",
+      "seconds": 1.207
+    },
+    {
+      "test": "release501-layout.cjs",
+      "status": "passed",
+      "seconds": 2.156
+    },
+    {
+      "test": "release504-contacts.cjs",
+      "status": "passed",
+      "seconds": 0.148
+    },
+    {
+      "test": "release504-rules.cjs",
+      "status": "passed",
+      "seconds": 0.079
+    },
+    {
+      "test": "release504-storage.cjs",
+      "status": "passed",
+      "seconds": 1.664
+    },
+    {
+      "test": "release504-transport.cjs",
+      "status": "passed",
+      "seconds": 0.087
+    },
+    {
+      "test": "release504-ui.cjs",
+      "status": "passed",
+      "seconds": 2.102
+    },
+    {
+      "test": "release505-catalogue-ui.cjs",
+      "status": "passed",
+      "seconds": 1.524
+    },
+    {
+      "test": "release505-catalogue.cjs",
+      "status": "passed",
+      "seconds": 1.571
+    },
+    {
+      "test": "release505-gateway.mjs",
+      "status": "passed",
+      "seconds": 0.372
+    },
+    {
+      "test": "release505-layout-cache.mjs",
+      "status": "passed",
+      "seconds": 0.256
+    },
+    {
+      "test": "release505-layout-poll.cjs",
+      "status": "passed",
+      "seconds": 0.104
+    },
+    {
+      "test": "release505-performance.cjs",
+      "status": "passed",
+      "seconds": 3.773
+    },
+    {
+      "test": "release505-projection.cjs",
+      "status": "passed",
+      "seconds": 1.764
+    },
+    {
+      "test": "release505-receipt.cjs",
+      "status": "passed",
+      "seconds": 0.141
+    },
+    {
+      "test": "release505-relief-api.cjs",
+      "status": "passed",
+      "seconds": 3.0
+    },
+    {
+      "test": "release505-relief-ui.cjs",
+      "status": "passed",
+      "seconds": 1.213
+    },
+    {
+      "test": "release505-relief.cjs",
+      "status": "passed",
+      "seconds": 0.102
+    },
+    {
+      "test": "release505-storage-contacts.cjs",
+      "status": "passed",
+      "seconds": 0.155
+    },
+    {
+      "test": "release505-storage-relief.cjs",
+      "status": "passed",
+      "seconds": 1.663
+    },
+    {
+      "test": "release505-storage.cjs",
+      "status": "passed",
+      "seconds": 1.747
+    },
+    {
+      "test": "release505-tg-storage.cjs",
+      "status": "passed",
+      "seconds": 1.949
+    },
+    {
+      "test": "release505-tg-ui.cjs",
+      "status": "passed",
+      "seconds": 1.229
+    },
+    {
+      "test": "release505-tg.cjs",
+      "status": "passed",
+      "seconds": 0.09
+    },
+    {
+      "test": "release505-timing.cjs",
+      "status": "passed",
+      "seconds": 1.207
+    },
+    {
+      "test": "release505-transport.cjs",
+      "status": "passed",
+      "seconds": 0.092
+    },
+    {
+      "test": "release506-groups-storage.cjs",
+      "status": "passed",
+      "seconds": 3.417
+    },
+    {
+      "test": "release506-groups-ui.cjs",
+      "status": "passed",
+      "seconds": 2.644
+    },
+    {
+      "test": "release506-groups.cjs",
+      "status": "passed",
+      "seconds": 0.086
+    },
+    {
+      "test": "release506-hr-ui.cjs",
+      "status": "passed",
+      "seconds": 2.367
+    },
+    {
+      "test": "release506-info.cjs",
+      "status": "passed",
+      "seconds": 2.495
+    },
+    {
+      "test": "release506-layout-names.cjs",
+      "status": "passed",
+      "seconds": 2.042
+    },
+    {
+      "test": "release506-performance.cjs",
+      "status": "passed",
+      "seconds": 6.203
+    },
+    {
+      "test": "release506-storage.cjs",
+      "status": "passed",
+      "seconds": 2.483
+    },
+    {
+      "test": "release506-tg-storage.cjs",
+      "status": "passed",
+      "seconds": 2.213
+    },
+    {
+      "test": "release506-tg-ui.cjs",
+      "status": "passed",
+      "seconds": 1.911
+    },
+    {
+      "test": "release506-workload-ui.cjs",
+      "status": "passed",
+      "seconds": 3.717
+    },
+    {
+      "test": "release507-layout.cjs",
+      "status": "passed",
+      "seconds": 8.247
+    },
+    {
+      "test": "release507-relief-refresh.cjs",
+      "status": "passed",
+      "seconds": 1.192
+    },
+    {
+      "test": "release507-security.cjs",
+      "status": "passed",
+      "seconds": 2.723
+    },
+    {
+      "test": "release508-atomic.cjs",
+      "status": "passed",
+      "seconds": 1.198
+    },
+    {
+      "test": "release508-contacts.cjs",
+      "status": "passed",
+      "seconds": 0.312
+    },
+    {
+      "test": "release508-relief.cjs",
+      "status": "passed",
+      "seconds": 0.107
+    },
+    {
+      "test": "release508-storage.cjs",
+      "status": "passed",
+      "seconds": 2.887
+    },
+    {
+      "test": "release508-ui.cjs",
+      "status": "passed",
+      "seconds": 1.327
+    },
+    {
+      "test": "release509-exclusions.cjs",
+      "status": "passed",
+      "seconds": 3.422
+    },
+    {
+      "test": "release509-ui.cjs",
+      "status": "passed",
+      "seconds": 2.899
+    },
+    {
+      "test": "release600-rules.cjs",
+      "status": "passed",
+      "seconds": 0.098
+    },
+    {
+      "test": "release600-storage.cjs",
+      "status": "passed",
+      "seconds": 2.696
+    },
+    {
+      "test": "release600-ui.cjs",
+      "status": "passed",
+      "seconds": 1.444
+    },
+    {
+      "test": "release601-admin.cjs",
+      "status": "passed",
+      "seconds": 0.121
+    },
+    {
+      "test": "release601-diagnostics.cjs",
+      "status": "passed",
+      "seconds": 0.159
+    },
+    {
+      "test": "release601-gateway.mjs",
+      "status": "passed",
+      "seconds": 0.108
+    },
+    {
+      "test": "release601-membership.cjs",
+      "status": "passed",
+      "seconds": 0.118
+    },
+    {
+      "test": "release601-ui.cjs",
+      "status": "passed",
+      "seconds": 0.854
+    },
+    {
+      "test": "release603-ledger.cjs",
+      "status": "passed",
+      "seconds": 1.415
+    },
+    {
+      "test": "release604-contacts.cjs",
+      "status": "passed",
+      "seconds": 0.127
+    },
+    {
+      "test": "release604-pal.cjs",
+      "status": "passed",
+      "seconds": 2.273
+    },
+    {
+      "test": "release604-ui.cjs",
+      "status": "passed",
+      "seconds": 1.926
+    },
+    {
+      "test": "release605-workload.cjs",
+      "status": "passed",
+      "seconds": 1.301
+    },
+    {
+      "test": "release607-workload.cjs",
+      "status": "passed",
+      "seconds": 1.092
+    },
+    {
+      "test": "release608-teachers.cjs",
+      "status": "passed",
+      "seconds": 4.03
+    },
+    {
+      "test": "release708-ui-browser.cjs",
+      "status": "passed",
+      "seconds": 1.968
+    },
+    {
+      "test": "release710-resource-properties.cjs",
+      "status": "passed",
+      "seconds": 0.089
+    },
+    {
+      "test": "release711-quota-accounting.cjs",
+      "status": "passed",
+      "seconds": 0.167
+    },
+    {
+      "test": "review04-background-contacts.cjs",
+      "status": "passed",
+      "seconds": 0.937
+    },
+    {
+      "test": "review04-cache.cjs",
+      "status": "passed",
+      "seconds": 0.112
+    },
+    {
+      "test": "review04-geometry.cjs",
+      "status": "passed",
+      "seconds": 1.614
+    },
+    {
+      "test": "review04-ui.cjs",
+      "status": "passed",
+      "seconds": 2.882
+    },
+    {
+      "test": "roster-absence-year-browser.cjs",
+      "status": "passed",
+      "seconds": 2.322
+    },
+    {
+      "test": "roster-absence-year-worker.mjs",
+      "status": "passed",
+      "seconds": 0.716
+    },
+    {
+      "test": "roster-absence-year.cjs",
+      "status": "passed",
+      "seconds": 4.061
+    },
+    {
+      "test": "roster-draft-absence-instructions-browser.cjs",
+      "status": "passed",
+      "seconds": 2.987
+    },
+    {
+      "test": "roster-draft-auto-retry-browser.cjs",
+      "status": "passed",
+      "seconds": 1.149
+    },
+    {
+      "test": "roster-draft-baseline-cache-browser.cjs",
+      "status": "passed",
+      "seconds": 6.414
+    },
+    {
+      "test": "roster-draft-cell-save-browser.cjs",
+      "status": "passed",
+      "seconds": 6.619
+    },
+    {
+      "test": "roster-draft-cell-save-speed.cjs",
+      "status": "passed",
+      "seconds": 1.432
+    },
+    {
+      "test": "roster-draft-health-chart-browser.cjs",
+      "status": "passed",
+      "seconds": 1.056
+    },
+    {
+      "test": "roster-draft-inbox-backend.cjs",
+      "status": "passed",
+      "seconds": 0.118
+    },
+    {
+      "test": "roster-draft-inbox-domain.cjs",
+      "status": "passed",
+      "seconds": 0.097
+    },
+    {
+      "test": "roster-external-prominent-ack-browser.cjs",
+      "status": "passed",
+      "seconds": 3.705
+    },
+    {
+      "test": "roster-inbox-browser.cjs",
+      "status": "passed",
+      "seconds": 18.638
+    },
+    {
+      "test": "roster-lord-component-patch.cjs",
+      "status": "passed",
+      "seconds": 4.118
+    },
+    {
+      "test": "roster-next-window-source.cjs",
+      "status": "passed",
+      "seconds": 0.425
+    },
+    {
+      "test": "roster-prepared-parts-browser.cjs",
+      "status": "passed",
+      "seconds": 1.178
+    },
+    {
+      "test": "roster-prepared-parts.cjs",
+      "status": "passed",
+      "seconds": 0.807
+    },
+    {
+      "test": "roster-report-picker-browser.cjs",
+      "status": "passed",
+      "seconds": 4.567
+    },
+    {
+      "test": "roster-speed-authority.cjs",
+      "status": "passed",
+      "seconds": 0.13
+    },
+    {
+      "test": "roster-subject-catalogue.cjs",
+      "status": "passed",
+      "seconds": 0.119
+    },
+    {
+      "test": "roster-subject-family-policy.cjs",
+      "status": "passed",
+      "seconds": 0.127
+    },
+    {
+      "test": "roster080-batch-backend.cjs",
+      "status": "passed",
+      "seconds": 1.839
+    },
+    {
+      "test": "roster080-batch-browser.cjs",
+      "status": "passed",
+      "seconds": 2.318
+    },
+    {
+      "test": "roster080-batch-ui.cjs",
+      "status": "passed",
+      "seconds": 12.949
+    },
+    {
+      "test": "roster080-batch.cjs",
+      "status": "passed",
+      "seconds": 0.187
+    },
+    {
+      "test": "roster080-timetable-day.cjs",
+      "status": "passed",
+      "seconds": 0.123
+    },
+    {
+      "test": "roster080-timetable-gateway.mjs",
+      "status": "passed",
+      "seconds": 0.475
+    },
+    {
+      "test": "roster080-timetable-privacy.cjs",
+      "status": "passed",
+      "seconds": 0.139
+    },
+    {
+      "test": "roster080-timetable-ui.cjs",
+      "status": "passed",
+      "seconds": 1.08
+    },
+    {
+      "test": "roster081-api-roundtrips.mjs",
+      "status": "passed",
+      "seconds": 0.405
+    },
+    {
+      "test": "roster081-compact-summary.cjs",
+      "status": "passed",
+      "seconds": 0.241
+    },
+    {
+      "test": "roster081-conflict-envelope.cjs",
+      "status": "passed",
+      "seconds": 0.078
+    },
+    {
+      "test": "roster081-day-ownership-browser.cjs",
+      "status": "passed",
+      "seconds": 6.096
+    },
+    {
+      "test": "roster081-day-transactions.cjs",
+      "status": "passed",
+      "seconds": 1.023
+    },
+    {
+      "test": "roster081-notification-lanes.cjs",
+      "status": "passed",
+      "seconds": 0.094
+    },
+    {
+      "test": "roster0810-allocation-index.cjs",
+      "status": "passed",
+      "seconds": 0.208
+    },
+    {
+      "test": "roster0810-delivery-drive.cjs",
+      "status": "passed",
+      "seconds": 0.106
+    },
+    {
+      "test": "roster0810-delivery-report-worker.mjs",
+      "status": "passed",
+      "seconds": 0.446
+    },
+    {
+      "test": "roster0810-entry-cache.cjs",
+      "status": "passed",
+      "seconds": 0.924
+    },
+    {
+      "test": "roster0810-identity-index.cjs",
+      "status": "passed",
+      "seconds": 0.099
+    },
+    {
+      "test": "roster0810-scoped-absence.cjs",
+      "status": "passed",
+      "seconds": 0.237
+    },
+    {
+      "test": "roster0810-timetable-projection.cjs",
+      "status": "passed",
+      "seconds": 2.463
+    },
+    {
+      "test": "roster0811-cache-storage-browser.cjs",
+      "status": "passed",
+      "seconds": 0.578
+    },
+    {
+      "test": "roster0811-cell-index.cjs",
+      "status": "passed",
+      "seconds": 0.171
+    },
+    {
+      "test": "roster0811-conflict-save.cjs",
+      "status": "passed",
+      "seconds": 2.363
+    },
+    {
+      "test": "roster0811-notice-copy.cjs",
+      "status": "passed",
+      "seconds": 0.119
+    },
+    {
+      "test": "roster0811-preload-guard.cjs",
+      "status": "passed",
+      "seconds": 0.111
+    },
+    {
+      "test": "roster0811-range-gateway.mjs",
+      "status": "passed",
+      "seconds": 0.373
+    },
+    {
+      "test": "roster0811-school-absences-browser.cjs",
+      "status": "passed",
+      "seconds": 0.94
+    },
+    {
+      "test": "roster0811-school-absences-ui.cjs",
+      "status": "passed",
+      "seconds": 1.565
+    },
+    {
+      "test": "roster0811-school-absences.cjs",
+      "status": "passed",
+      "seconds": 0.207
+    },
+    {
+      "test": "roster0811-timetable-redraw-browser.cjs",
+      "status": "passed",
+      "seconds": 1.063
+    },
+    {
+      "test": "roster0811-urgent-forward.cjs",
+      "status": "passed",
+      "seconds": 0.163
+    },
+    {
+      "test": "roster0812-allocation-monitor-browser.cjs",
+      "status": "passed",
+      "seconds": 1.703
+    },
+    {
+      "test": "roster0812-allocation-run.cjs",
+      "status": "passed",
+      "seconds": 0.451
+    },
+    {
+      "test": "roster0812-human-decisions.cjs",
+      "status": "passed",
+      "seconds": 0.346
+    },
+    {
+      "test": "roster082-advance-notify-worker.mjs",
+      "status": "passed",
+      "seconds": 0.466
+    },
+    {
+      "test": "roster082-advance-notify.cjs",
+      "status": "passed",
+      "seconds": 0.183
+    },
+    {
+      "test": "roster082-audit-worker-lane.cjs",
+      "status": "passed",
+      "seconds": 0.111
+    },
+    {
+      "test": "roster082-backend-audit.cjs",
+      "status": "passed",
+      "seconds": 0.13
+    },
+    {
+      "test": "roster082-backend-confirmed-storage.cjs",
+      "status": "passed",
+      "seconds": 1.235
+    },
+    {
+      "test": "roster082-backend-merge.cjs",
+      "status": "passed",
+      "seconds": 0.387
+    },
+    {
+      "test": "roster082-backend-private.cjs",
+      "status": "passed",
+      "seconds": 0.208
+    },
+    {
+      "test": "roster082-backend-teacher-reads.cjs",
+      "status": "passed",
+      "seconds": 0.134
+    },
+    {
+      "test": "roster082-email-settings-backend.cjs",
+      "status": "passed",
+      "seconds": 0.152
+    },
+    {
+      "test": "roster082-email-settings-gateway.mjs",
+      "status": "passed",
+      "seconds": 0.481
+    },
+    {
+      "test": "roster082-email-settings-recovery-browser.cjs",
+      "status": "passed",
+      "seconds": 2.295
+    },
+    {
+      "test": "roster082-inbox-images-browser.cjs",
+      "status": "passed",
+      "seconds": 0.913
+    },
+    {
+      "test": "roster082-inbox-images-domain.cjs",
+      "status": "passed",
+      "seconds": 0.109
+    },
+    {
+      "test": "roster082-inbox-images-worker.mjs",
+      "status": "passed",
+      "seconds": 0.501
+    },
+    {
+      "test": "roster082-notify-performance-browser.cjs",
+      "status": "passed",
+      "seconds": 1.191
+    },
+    {
+      "test": "roster082-notify-service.cjs",
+      "status": "passed",
+      "seconds": 0.175
+    },
+    {
+      "test": "roster082-notify-ui-browser.cjs",
+      "status": "passed",
+      "seconds": 1.778
+    },
+    {
+      "test": "roster082-private-actions-browser.cjs",
+      "status": "passed",
+      "seconds": 0.973
+    },
+    {
+      "test": "roster082-private-buttons-dispatch.mjs",
+      "status": "passed",
+      "seconds": 0.519
+    },
+    {
+      "test": "roster082-private-capabilities.mjs",
+      "status": "passed",
+      "seconds": 0.484
+    },
+    {
+      "test": "roster083-external-ack-gateway.mjs",
+      "status": "passed",
+      "seconds": 0.453
+    },
+    {
+      "test": "roster083-inbox-diagnostics.cjs",
+      "status": "passed",
+      "seconds": 0.172
+    },
+    {
+      "test": "roster083-no-relief-ui-browser.cjs",
+      "status": "passed",
+      "seconds": 0.932
+    },
+    {
+      "test": "roster083-notify-ack-browser.cjs",
+      "status": "passed",
+      "seconds": 1.508
+    },
+    {
+      "test": "roster083-provider-diagnostics.cjs",
+      "status": "passed",
+      "seconds": 0.17
+    },
+    {
+      "test": "roster083-subject-settings-browser.cjs",
+      "status": "passed",
+      "seconds": 1.383
+    },
+    {
+      "test": "roster083-template-dispatch.mjs",
+      "status": "passed",
+      "seconds": 0.633
+    },
+    {
+      "test": "roster083-template-transport.mjs",
+      "status": "passed",
+      "seconds": 0.54
+    },
+    {
+      "test": "roster083-timetable-ack.cjs",
+      "status": "passed",
+      "seconds": 0.323
+    },
+    {
+      "test": "roster084-consecutive-performance.cjs",
+      "status": "passed",
+      "seconds": 3.167
+    },
+    {
+      "test": "roster084-consecutive-settings-browser.cjs",
+      "status": "passed",
+      "seconds": 1.295
+    },
+    {
+      "test": "roster084-consecutive-settings-dom.cjs",
+      "status": "passed",
+      "seconds": 1.499
+    },
+    {
+      "test": "roster084-consecutive-subjects.cjs",
+      "status": "passed",
+      "seconds": 0.658
+    },
+    {
+      "test": "roster084-manual-dispatch.cjs",
+      "status": "passed",
+      "seconds": 0.412
+    },
+    {
+      "test": "roster084-notify-status-browser.cjs",
+      "status": "passed",
+      "seconds": 1.466
+    },
+    {
+      "test": "roster084-private-link-reuse-browser.cjs",
+      "status": "passed",
+      "seconds": 2.015
+    },
+    {
+      "test": "roster084-recipient-policy.cjs",
+      "status": "passed",
+      "seconds": 0.384
+    },
+    {
+      "test": "roster084-stapler-unchanged.cjs",
+      "status": "passed",
+      "seconds": 0.149
+    },
+    {
+      "test": "roster084a-relief-pool.cjs",
+      "status": "passed",
+      "seconds": 0.169
+    },
+    {
+      "test": "roster085-inbox-lock-scope.cjs",
+      "status": "passed",
+      "seconds": 0.103
+    },
+    {
+      "test": "roster085a-consecutive-backend.cjs",
+      "status": "passed",
+      "seconds": 0.16
+    },
+    {
+      "test": "roster085a-consecutive-catalogue.cjs",
+      "status": "passed",
+      "seconds": 0.145
+    },
+    {
+      "test": "roster085a-consecutive-picker-dom.cjs",
+      "status": "passed",
+      "seconds": 1.295
+    },
+    {
+      "test": "roster085b-custom-backend.cjs",
+      "status": "passed",
+      "seconds": 0.122
+    },
+    {
+      "test": "roster085b-custom-gateway.mjs",
+      "status": "passed",
+      "seconds": 0.453
+    },
+    {
+      "test": "roster085b-custom-rules.cjs",
+      "status": "passed",
+      "seconds": 0.17
+    },
+    {
+      "test": "roster085b-custom-toggle-browser.cjs",
+      "status": "passed",
+      "seconds": 1.695
+    },
+    {
+      "test": "roster085b-custom-toggle-dom.cjs",
+      "status": "passed",
+      "seconds": 1.05
+    },
+    {
+      "test": "roster085c-assign-default-date-dom.cjs",
+      "status": "passed",
+      "seconds": 2.108
+    },
+    {
+      "test": "roster085c-next-school-day-gateway.mjs",
+      "status": "passed",
+      "seconds": 0.459
+    },
+    {
+      "test": "roster086-counting-logging.cjs",
+      "status": "passed",
+      "seconds": 0.153
+    },
+    {
+      "test": "roster086-current-duty-gateway.mjs",
+      "status": "passed",
+      "seconds": 0.412
+    },
+    {
+      "test": "roster086-current-duty.cjs",
+      "status": "passed",
+      "seconds": 0.121
+    },
+    {
+      "test": "roster086-delivery-review-worker.mjs",
+      "status": "passed",
+      "seconds": 0.498
+    },
+    {
+      "test": "roster086-delivery-review.cjs",
+      "status": "passed",
+      "seconds": 0.137
+    },
+    {
+      "test": "roster086-home-duty-browser.cjs",
+      "status": "passed",
+      "seconds": 1.715
+    },
+    {
+      "test": "roster086-report-loading-browser.cjs",
+      "status": "passed",
+      "seconds": 1.845
+    },
+    {
+      "test": "roster086-retired-route-dom.cjs",
+      "status": "passed",
+      "seconds": 0.998
+    },
+    {
+      "test": "roster086-ui-dom.cjs",
+      "status": "passed",
+      "seconds": 0.843
+    },
+    {
+      "test": "roster086a-confirmation-ui-browser.cjs",
+      "status": "passed",
+      "seconds": 1.03
+    },
+    {
+      "test": "roster086a-confirmed-rename.cjs",
+      "status": "passed",
+      "seconds": 0.153
+    },
+    {
+      "test": "roster086a-review-receipt.cjs",
+      "status": "passed",
+      "seconds": 0.113
+    },
+    {
+      "test": "roster087-acknowledgement-ui.cjs",
+      "status": "passed",
+      "seconds": 1.035
+    },
+    {
+      "test": "roster087-approved-buttons.mjs",
+      "status": "passed",
+      "seconds": 0.477
+    },
+    {
+      "test": "roster087-cache-storage-browser.cjs",
+      "status": "passed",
+      "seconds": 0.793
+    },
+    {
+      "test": "roster087-delivery-review-close.cjs",
+      "status": "passed",
+      "seconds": 0.082
+    },
+    {
+      "test": "roster087-manual-policy.cjs",
+      "status": "passed",
+      "seconds": 0.123
+    },
+    {
+      "test": "roster087-notification-maintenance.cjs",
+      "status": "passed",
+      "seconds": 0.09
+    },
+    {
+      "test": "roster087-notification-store.cjs",
+      "status": "passed",
+      "seconds": 0.32
+    },
+    {
+      "test": "roster087-notification-worker.mjs",
+      "status": "passed",
+      "seconds": 1.443
+    },
+    {
+      "test": "roster087-operations-ui.cjs",
+      "status": "passed",
+      "seconds": 1.366
+    },
+    {
+      "test": "roster087-scoped-ack.cjs",
+      "status": "passed",
+      "seconds": 0.275
+    },
+    {
+      "test": "roster087-shell-routing-browser.cjs",
+      "status": "passed",
+      "seconds": 1.273
+    },
+    {
+      "test": "roster087-statistics-ui.cjs",
+      "status": "passed",
+      "seconds": 2.443
+    },
+    {
+      "test": "roster087-statistics.cjs",
+      "status": "passed",
+      "seconds": 0.106
+    },
+    {
+      "test": "roster088-audit-priority.cjs",
+      "status": "passed",
+      "seconds": 0.122
+    },
+    {
+      "test": "roster088-delivery-controls.cjs",
+      "status": "passed",
+      "seconds": 0.104
+    },
+    {
+      "test": "roster088-delivery-review-remount.cjs",
+      "status": "passed",
+      "seconds": 0.989
+    },
+    {
+      "test": "roster088-delivery-review-ui.cjs",
+      "status": "passed",
+      "seconds": 0.889
+    },
+    {
+      "test": "roster088-inbox-responsive.cjs",
+      "status": "passed",
+      "seconds": 1.087
+    },
+    {
+      "test": "roster088-load-counter.cjs",
+      "status": "passed",
+      "seconds": 0.084
+    },
+    {
+      "test": "roster088-maintenance-intent-race.cjs",
+      "status": "passed",
+      "seconds": 0.088
+    },
+    {
+      "test": "roster088-notification-batch.cjs",
+      "status": "passed",
+      "seconds": 0.232
+    },
+    {
+      "test": "roster088-notification-worker.mjs",
+      "status": "passed",
+      "seconds": 6.354
+    },
+    {
+      "test": "roster088-notify-refresh-browser.cjs",
+      "status": "passed",
+      "seconds": 1.52
+    },
+    {
+      "test": "roster088-ops-responsiveness.cjs",
+      "status": "passed",
+      "seconds": 2.084
+    },
+    {
+      "test": "roster088-statistics-contrast.cjs",
+      "status": "passed",
+      "seconds": 1.014
+    },
+    {
+      "test": "roster089-cache-concurrency-browser.cjs",
+      "status": "passed",
+      "seconds": 0.793
+    },
+    {
+      "test": "roster089-cache-storage-browser.cjs",
+      "status": "passed",
+      "seconds": 0.609
+    },
+    {
+      "test": "roster089-cache.cjs",
+      "status": "passed",
+      "seconds": 0.132
+    },
+    {
+      "test": "roster089-receipt-refresh-browser.cjs",
+      "status": "passed",
+      "seconds": 3.637
+    },
+    {
+      "test": "roster089-source-read.cjs",
+      "status": "passed",
+      "seconds": 0.76
+    },
+    {
+      "test": "roster089-worker-calendar-lane.mjs",
+      "status": "passed",
+      "seconds": 0.097
+    },
+    {
+      "test": "roster089-worker-durability.mjs",
+      "status": "passed",
+      "seconds": 6.126
+    },
+    {
+      "test": "roster089a-home-timetable-browser.cjs",
+      "status": "passed",
+      "seconds": 1.027
+    },
+    {
+      "test": "roster09-absence-selector-browser.cjs",
+      "status": "passed",
+      "seconds": 2.475
+    },
+    {
+      "test": "roster09-batch-absence-browser.cjs",
+      "status": "passed",
+      "seconds": 2.092
+    },
+    {
+      "test": "roster09-report-outcome-browser.cjs",
+      "status": "passed",
+      "seconds": 1.746
+    },
+    {
+      "test": "roster090-absence-save-cost.cjs",
+      "status": "passed",
+      "seconds": 0.153
+    },
+    {
+      "test": "roster090-multiple-absence.cjs",
+      "status": "passed",
+      "seconds": 0.57
+    },
+    {
+      "test": "roster090-mutual-grid-browser.cjs",
+      "status": "passed",
+      "seconds": 3.312
+    },
+    {
+      "test": "roster090-mutual-timetable.cjs",
+      "status": "passed",
+      "seconds": 0.222
+    },
+    {
+      "test": "roster090-report-selection-cache.cjs",
+      "status": "passed",
+      "seconds": 0.135
+    },
+    {
+      "test": "roster090-school-absence-pagination.cjs",
+      "status": "passed",
+      "seconds": 4.931
+    },
+    {
+      "test": "roster093-allocation-cache-browser.cjs",
+      "status": "passed",
+      "seconds": 1.423
+    },
+    {
+      "test": "roster093-allocation-cache-ui.cjs",
+      "status": "passed",
+      "seconds": 4.346
+    },
+    {
+      "test": "roster093-allocation-reference.cjs",
+      "status": "passed",
+      "seconds": 0.442
+    },
+    {
+      "test": "roster093-background-loading.cjs",
+      "status": "passed",
+      "seconds": 0.093
+    },
+    {
+      "test": "roster093-calendar-cache-ui.cjs",
+      "status": "passed",
+      "seconds": 0.07
+    },
+    {
+      "test": "roster093-calendar-proof.mjs",
+      "status": "passed",
+      "seconds": 0.423
+    },
+    {
+      "test": "roster093-emergency-absence.cjs",
+      "status": "passed",
+      "seconds": 0.255
+    },
+    {
+      "test": "roster093-publication-preview-ui.cjs",
+      "status": "passed",
+      "seconds": 1.445
+    },
+    {
+      "test": "roster093-targeted-publication.cjs",
+      "status": "passed",
+      "seconds": 0.641
+    },
+    {
+      "test": "roster093a-absence-arrangements.cjs",
+      "status": "passed",
+      "seconds": 0.247
+    },
+    {
+      "test": "roster093a-arrangements-draft.cjs",
+      "status": "passed",
+      "seconds": 2.391
+    },
+    {
+      "test": "roster093a-client-cache.cjs",
+      "status": "passed",
+      "seconds": 0.124
+    },
+    {
+      "test": "roster093a-fast-report-browser.cjs",
+      "status": "passed",
+      "seconds": 1.249
+    },
+    {
+      "test": "roster093a-home-report-warm.cjs",
+      "status": "passed",
+      "seconds": 0.118
+    },
+    {
+      "test": "roster093a-instruction-review.cjs",
+      "status": "passed",
+      "seconds": 1.291
+    },
+    {
+      "test": "roster093a-local-report-browser.cjs",
+      "status": "passed",
+      "seconds": 1.206
+    },
+    {
+      "test": "roster093a-pending-own-arrangements.cjs",
+      "status": "passed",
+      "seconds": 2.431
+    },
+    {
+      "test": "roster093a-preload-local.cjs",
+      "status": "passed",
+      "seconds": 0.148
+    },
+    {
+      "test": "roster093a-report-form.cjs",
+      "status": "passed",
+      "seconds": 0.171
+    },
+    {
+      "test": "roster093a-report-gateway.mjs",
+      "status": "passed",
+      "seconds": 0.431
+    },
+    {
+      "test": "roster093a-report-projection.cjs",
+      "status": "passed",
+      "seconds": 0.114
+    },
+    {
+      "test": "roster093a-report-shell.cjs",
+      "status": "passed",
+      "seconds": 0.93
+    },
+    {
+      "test": "roster093b-absence-intake.cjs",
+      "status": "passed",
+      "seconds": 0.206
+    },
+    {
+      "test": "roster093b-absence-pipeline.cjs",
+      "status": "passed",
+      "seconds": 0.187
+    },
+    {
+      "test": "roster093b-intake-gateway.mjs",
+      "status": "passed",
+      "seconds": 0.447
+    },
+    {
+      "test": "roster093b-notification-lanes.cjs",
+      "status": "passed",
+      "seconds": 0.104
+    },
+    {
+      "test": "roster093b-peer-delivery.cjs",
+      "status": "passed",
+      "seconds": 0.283
+    },
+    {
+      "test": "roster093b-peer-source.cjs",
+      "status": "passed",
+      "seconds": 0.162
+    },
+    {
+      "test": "roster093b-peer-ui.cjs",
+      "status": "passed",
+      "seconds": 3.686
+    },
+    {
+      "test": "roster093b-peer-workflow.cjs",
+      "status": "passed",
+      "seconds": 0.319
+    },
+    {
+      "test": "roster093b-worker-capture.mjs",
+      "status": "passed",
+      "seconds": 0.3
+    },
+    {
+      "test": "roster093b-worker-routes.mjs",
+      "status": "passed",
+      "seconds": 0.823
+    },
+    {
+      "test": "roster094-delivery-review.mjs",
+      "status": "passed",
+      "seconds": 0.092
+    },
+    {
+      "test": "roster094-edge-notifications.cjs",
+      "status": "passed",
+      "seconds": 0.286
+    },
+    {
+      "test": "roster094-edge-roster.mjs",
+      "status": "passed",
+      "seconds": 1.423
+    },
+    {
+      "test": "roster094-edge-timetable.mjs",
+      "status": "passed",
+      "seconds": 0.2
+    },
+    {
+      "test": "roster094-email-sink.cjs",
+      "status": "passed",
+      "seconds": 0.091
+    },
+    {
+      "test": "roster094-external-peer-scope.mjs",
+      "status": "passed",
+      "seconds": 0.176
+    },
+    {
+      "test": "roster094-notification-adapter.mjs",
+      "status": "passed",
+      "seconds": 0.106
+    },
+    {
+      "test": "roster094-peer-processing-ui.cjs",
+      "status": "passed",
+      "seconds": 1.452
+    },
+    {
+      "test": "roster094-peer-template.mjs",
+      "status": "passed",
+      "seconds": 0.113
+    },
+    {
+      "test": "roster094-sender-pacing.mjs",
+      "status": "passed",
+      "seconds": 0.099
+    },
+    {
+      "test": "roster095-manage-periods.cjs",
+      "status": "passed",
+      "seconds": 2.131
+    },
+    {
+      "test": "roster096-absence-adapter.cjs",
+      "status": "passed",
+      "seconds": 0.916
+    },
+    {
+      "test": "roster096-absence-coverage-browser.cjs",
+      "status": "passed",
+      "seconds": 1.488
+    },
+    {
+      "test": "roster096-absence-coverage.cjs",
+      "status": "passed",
+      "seconds": 0.226
+    },
+    {
+      "test": "roster096-cleanup-lane.cjs",
+      "status": "passed",
+      "seconds": 0.135
+    },
+    {
+      "test": "roster096-cron-idle.mjs",
+      "status": "passed",
+      "seconds": 0.285
+    },
+    {
+      "test": "roster096-deploy-idle.mjs",
+      "status": "passed",
+      "seconds": 0.426
+    },
+    {
+      "test": "roster096-dispatch-idle.mjs",
+      "status": "passed",
+      "seconds": 3.18
+    },
+    {
+      "test": "roster096-probe-plans.mjs",
+      "status": "passed",
+      "seconds": 0.23
+    },
+    {
+      "test": "roster096-r2-cleanup.mjs",
+      "status": "passed",
+      "seconds": 0.137
+    },
+    {
+      "test": "roster096-scheduled-idle.mjs",
+      "status": "passed",
+      "seconds": 0.327
+    },
+    {
+      "test": "roster096-timetable-idle.mjs",
+      "status": "passed",
+      "seconds": 0.335
+    },
+    {
+      "test": "roster097-batch-backend.cjs",
+      "status": "passed",
+      "seconds": 0.457
+    },
+    {
+      "test": "roster097-batch-client.cjs",
+      "status": "passed",
+      "seconds": 0.23
+    },
+    {
+      "test": "roster097-batch-errors.mjs",
+      "status": "passed",
+      "seconds": 0.615
+    },
+    {
+      "test": "roster097-batch-gateway.mjs",
+      "status": "passed",
+      "seconds": 0.454
+    },
+    {
+      "test": "roster097-batch-lifecycle-browser.cjs",
+      "status": "passed",
+      "seconds": 3.133
+    },
+    {
+      "test": "roster097-batch-shell.cjs",
+      "status": "passed",
+      "seconds": 1.33
+    },
+    {
+      "test": "roster097-confirmed-view.cjs",
+      "status": "passed",
+      "seconds": 0.135
+    },
+    {
+      "test": "roster097-stapler-preload.cjs",
+      "status": "passed",
+      "seconds": 1.611
+    },
+    {
+      "test": "roster098-backend-errors.cjs",
+      "status": "passed",
+      "seconds": 0.091
+    },
+    {
+      "test": "roster098-recovery-worker.mjs",
+      "status": "passed",
+      "seconds": 0.817
+    },
+    {
+      "test": "roster605-authority.cjs",
+      "status": "passed",
+      "seconds": 0.124
+    },
+    {
+      "test": "roster605-gateway.mjs",
+      "status": "passed",
+      "seconds": 0.463
+    },
+    {
+      "test": "roster605-ui.cjs",
+      "status": "passed",
+      "seconds": 1.463
+    },
+    {
+      "test": "roster605.cjs",
+      "status": "passed",
+      "seconds": 0.971
+    },
+    {
+      "test": "roster607-diagnostics.cjs",
+      "status": "passed",
+      "seconds": 0.093
+    },
+    {
+      "test": "roster608-access.cjs",
+      "status": "passed",
+      "seconds": 1.087
+    },
+    {
+      "test": "roster608-diagnostic-detail.cjs",
+      "status": "passed",
+      "seconds": 0.314
+    },
+    {
+      "test": "roster608-shared-drive.cjs",
+      "status": "passed",
+      "seconds": 2.687
+    },
+    {
+      "test": "roster609-domain.cjs",
+      "status": "passed",
+      "seconds": 0.111
+    },
+    {
+      "test": "roster609-exports.cjs",
+      "status": "passed",
+      "seconds": 1.379
+    },
+    {
+      "test": "roster609-gateway.mjs",
+      "status": "passed",
+      "seconds": 0.47
+    },
+    {
+      "test": "roster609-ui.cjs",
+      "status": "passed",
+      "seconds": 2.002
+    },
+    {
+      "test": "roster700-contacts.cjs",
+      "status": "passed",
+      "seconds": 0.425
+    },
+    {
+      "test": "roster700-model-cache.cjs",
+      "status": "passed",
+      "seconds": 0.136
+    },
+    {
+      "test": "roster700-timetable.cjs",
+      "status": "passed",
+      "seconds": 1.427
+    },
+    {
+      "test": "roster701-assets.cjs",
+      "status": "passed",
+      "seconds": 0.158
+    },
+    {
+      "test": "roster701-backend-speed.cjs",
+      "status": "passed",
+      "seconds": 0.332
+    },
+    {
+      "test": "roster701-delivery-lease.cjs",
+      "status": "passed",
+      "seconds": 0.178
+    },
+    {
+      "test": "roster701-gateway-integration.mjs",
+      "status": "passed",
+      "seconds": 0.56
+    },
+    {
+      "test": "roster701-integrity-review.cjs",
+      "status": "passed",
+      "seconds": 0.701
+    },
+    {
+      "test": "roster701-r01.cjs",
+      "status": "passed",
+      "seconds": 0.11
+    },
+    {
+      "test": "roster701-r05.cjs",
+      "status": "passed",
+      "seconds": 0.112
+    },
+    {
+      "test": "roster701-r10.cjs",
+      "status": "passed",
+      "seconds": 0.141
+    },
+    {
+      "test": "roster701-r11-gateway.mjs",
+      "status": "passed",
+      "seconds": 0.478
+    },
+    {
+      "test": "roster701-r11.cjs",
+      "status": "passed",
+      "seconds": 0.133
+    },
+    {
+      "test": "roster701-r12.cjs",
+      "status": "passed",
+      "seconds": 0.14
+    },
+    {
+      "test": "roster701-r13.mjs",
+      "status": "passed",
+      "seconds": 0.484
+    },
+    {
+      "test": "roster701-r15.cjs",
+      "status": "passed",
+      "seconds": 0.125
+    },
+    {
+      "test": "roster701-r17-core.cjs",
+      "status": "passed",
+      "seconds": 0.142
+    },
+    {
+      "test": "roster701-r17-integration.cjs",
+      "status": "passed",
+      "seconds": 0.253
+    },
+    {
+      "test": "roster701-r17-service.cjs",
+      "status": "passed",
+      "seconds": 0.149
+    },
+    {
+      "test": "roster701-r17-solver.cjs",
+      "status": "passed",
+      "seconds": 1.853
+    },
+    {
+      "test": "roster701-r18-performance.cjs",
+      "status": "passed",
+      "seconds": 0.563
+    },
+    {
+      "test": "roster701-r18.cjs",
+      "status": "passed",
+      "seconds": 0.27
+    },
+    {
+      "test": "roster701-r19-performance.cjs",
+      "status": "passed",
+      "seconds": 0.137
+    },
+    {
+      "test": "roster701-r19.cjs",
+      "status": "passed",
+      "seconds": 0.198
+    },
+    {
+      "test": "roster701-r20-export.cjs",
+      "status": "passed",
+      "seconds": 0.175
+    },
+    {
+      "test": "roster701-r20-notifications.mjs",
+      "status": "passed",
+      "seconds": 0.482
+    },
+    {
+      "test": "roster701-r20-performance.cjs",
+      "status": "passed",
+      "seconds": 0.212
+    },
+    {
+      "test": "roster701-r20-service.cjs",
+      "status": "passed",
+      "seconds": 0.174
+    },
+    {
+      "test": "roster701-r20.cjs",
+      "status": "passed",
+      "seconds": 0.231
+    },
+    {
+      "test": "roster701-r21.cjs",
+      "status": "passed",
+      "seconds": 0.26
+    },
+    {
+      "test": "roster701-speed-gateway.mjs",
+      "status": "passed",
+      "seconds": 0.629
+    },
+    {
+      "test": "roster701-speed-ui.cjs",
+      "status": "passed",
+      "seconds": 1.335
+    },
+    {
+      "test": "roster701-whatsapp-contracts.mjs",
+      "status": "passed",
+      "seconds": 0.592
+    },
+    {
+      "test": "roster701-whatsapp-domain.cjs",
+      "status": "passed",
+      "seconds": 0.232
+    },
+    {
+      "test": "roster702-absence-remarks.cjs",
+      "status": "passed",
+      "seconds": 1.565
+    },
+    {
+      "test": "roster702-backend.cjs",
+      "status": "passed",
+      "seconds": 0.233
+    },
+    {
+      "test": "roster702-calendar-batch.mjs",
+      "status": "passed",
+      "seconds": 0.618
+    },
+    {
+      "test": "roster702-memory-ui.cjs",
+      "status": "passed",
+      "seconds": 1.554
+    },
+    {
+      "test": "roster702-mutual-candidates.cjs",
+      "status": "passed",
+      "seconds": 0.179
+    },
+    {
+      "test": "roster702-notification-setup.mjs",
+      "status": "passed",
+      "seconds": 1.018
+    },
+    {
+      "test": "roster702-operations-ui.cjs",
+      "status": "passed",
+      "seconds": 3.218
+    },
+    {
+      "test": "roster702-shell-recovery.cjs",
+      "status": "passed",
+      "seconds": 1.974
+    },
+    {
+      "test": "roster702-transport-reliability.mjs",
+      "status": "passed",
+      "seconds": 0.645
+    },
+    {
+      "test": "roster704-entry-read.cjs",
+      "status": "passed",
+      "seconds": 4.421
+    },
+    {
+      "test": "roster704-notification-readiness.mjs",
+      "status": "passed",
+      "seconds": 1.165
+    },
+    {
+      "test": "roster704-report-load.cjs",
+      "status": "passed",
+      "seconds": 2.386
+    },
+    {
+      "test": "roster704-save-candidates.cjs",
+      "status": "passed",
+      "seconds": 0.186
+    },
+    {
+      "test": "roster705-auto-allocate.cjs",
+      "status": "passed",
+      "seconds": 0.268
+    },
+    {
+      "test": "roster705-quota.cjs",
+      "status": "passed",
+      "seconds": 0.166
+    },
+    {
+      "test": "roster706-backend-speed.cjs",
+      "status": "passed",
+      "seconds": 0.192
+    },
+    {
+      "test": "roster706-domain.cjs",
+      "status": "passed",
+      "seconds": 0.222
+    },
+    {
+      "test": "roster706-gateway.mjs",
+      "status": "passed",
+      "seconds": 0.496
+    },
+    {
+      "test": "roster707-backend-domain.cjs",
+      "status": "passed",
+      "seconds": 0.338
+    },
+    {
+      "test": "roster707-storage.cjs",
+      "status": "passed",
+      "seconds": 2.955
+    },
+    {
+      "test": "roster707-timing.cjs",
+      "status": "passed",
+      "seconds": 0.06
+    },
+    {
+      "test": "roster707-ui.cjs",
+      "status": "passed",
+      "seconds": 1.749
+    },
+    {
+      "test": "roster709-date-publication.cjs",
+      "status": "passed",
+      "seconds": 0.422
+    },
+    {
+      "test": "roster709-publish-ui.cjs",
+      "status": "passed",
+      "seconds": 1.517
+    },
+    {
+      "test": "roster709-whatsapp-contracts.mjs",
+      "status": "passed",
+      "seconds": 0.499
+    },
+    {
+      "test": "roster710-absence-policy-ui.cjs",
+      "status": "passed",
+      "seconds": 2.099
+    },
+    {
+      "test": "roster710-adhoc-ui.cjs",
+      "status": "passed",
+      "seconds": 1.697
+    },
+    {
+      "test": "roster710-allocation-preferences.cjs",
+      "status": "passed",
+      "seconds": 1.127
+    },
+    {
+      "test": "roster710-context.cjs",
+      "status": "passed",
+      "seconds": 0.121
+    },
+    {
+      "test": "roster710-mail.cjs",
+      "status": "passed",
+      "seconds": 0.151
+    },
+    {
+      "test": "roster710-operations.cjs",
+      "status": "passed",
+      "seconds": 0.187
+    },
+    {
+      "test": "roster710-settings-ui.cjs",
+      "status": "passed",
+      "seconds": 2.6
+    },
+    {
+      "test": "roster710-worker-reports.mjs",
+      "status": "passed",
+      "seconds": 0.565
+    },
+    {
+      "test": "roster711-backend-authority.cjs",
+      "status": "passed",
+      "seconds": 0.175
+    },
+    {
+      "test": "roster711-backend.cjs",
+      "status": "passed",
+      "seconds": 0.269
+    },
+    {
+      "test": "roster711-inbox-worker.mjs",
+      "status": "passed",
+      "seconds": 0.558
+    },
+    {
+      "test": "roster711-reconcile-speed.cjs",
+      "status": "passed",
+      "seconds": 0.239
+    },
+    {
+      "test": "roster711-settings-dom.cjs",
+      "status": "passed",
+      "seconds": 1.974
+    },
+    {
+      "test": "roster711-worker-diagnostics.mjs",
+      "status": "passed",
+      "seconds": 0.705
+    },
+    {
+      "test": "roster711-workspace-browser.cjs",
+      "status": "passed",
+      "seconds": 2.458
+    },
+    {
+      "test": "roster711-workspace-ui.cjs",
+      "status": "passed",
+      "seconds": 2.172
+    },
+    {
+      "test": "roster712-absence-concurrency.cjs",
+      "status": "passed",
+      "seconds": 1.157
+    },
+    {
+      "test": "roster712-absence-eligibility-browser.cjs",
+      "status": "passed",
+      "seconds": 1.295
+    },
+    {
+      "test": "roster712-duty-browser.cjs",
+      "status": "passed",
+      "seconds": 2.971
+    },
+    {
+      "test": "roster712-duty-lists.cjs",
+      "status": "passed",
+      "seconds": 0.126
+    },
+    {
+      "test": "roster712-shared-subject-browser.cjs",
+      "status": "passed",
+      "seconds": 2.04
+    },
+    {
+      "test": "roster712-shared-subject.cjs",
+      "status": "passed",
+      "seconds": 0.524
+    },
+    {
+      "test": "roster712-whatsapp-menu.mjs",
+      "status": "passed",
+      "seconds": 0.5
+    },
+    {
+      "test": "roster713-manual-ranking.cjs",
+      "status": "passed",
+      "seconds": 1.288
+    },
+    {
+      "test": "roster713-settings-browser.cjs",
+      "status": "passed",
+      "seconds": 2.279
+    },
+    {
+      "test": "roster713-settings.cjs",
+      "status": "passed",
+      "seconds": 0.251
+    },
+    {
+      "test": "roster713-smc-summary-browser.cjs",
+      "status": "passed",
+      "seconds": 1.867
+    },
+    {
+      "test": "roster713-smc-summary.cjs",
+      "status": "passed",
+      "seconds": 0.242
+    },
+    {
+      "test": "roster713-smc-template.mjs",
+      "status": "passed",
+      "seconds": 0.505
+    },
+    {
+      "test": "roster714-allocation-policy.cjs",
+      "status": "passed",
+      "seconds": 0.345
+    },
+    {
+      "test": "roster714-export-ui.cjs",
+      "status": "passed",
+      "seconds": 1.482
+    },
+    {
+      "test": "roster714-settings-persistence.cjs",
+      "status": "passed",
+      "seconds": 0.12
+    },
+    {
+      "test": "roster714-teacher-export.cjs",
+      "status": "passed",
+      "seconds": 3.149
+    },
+    {
+      "test": "roster716-absence-fast-browser.cjs",
+      "status": "passed",
+      "seconds": 2.795
+    },
+    {
+      "test": "roster716-allocator.cjs",
+      "status": "passed",
+      "seconds": 0.343
+    },
+    {
+      "test": "roster716-calculations-browser.cjs",
+      "status": "passed",
+      "seconds": 2.654
+    },
+    {
+      "test": "roster716-calculations-gateway.mjs",
+      "status": "passed",
+      "seconds": 0.451
+    },
+    {
+      "test": "roster716-calculations.cjs",
+      "status": "passed",
+      "seconds": 0.16
+    },
+    {
+      "test": "roster716-home-browser.cjs",
+      "status": "passed",
+      "seconds": 2.184
+    },
+    {
+      "test": "roster716-inbox-activation.mjs",
+      "status": "passed",
+      "seconds": 0.523
+    },
+    {
+      "test": "roster716-settings-browser.cjs",
+      "status": "passed",
+      "seconds": 1.712
+    },
+    {
+      "test": "roster717-calculations.cjs",
+      "status": "passed",
+      "seconds": 0.299
+    },
+    {
+      "test": "roster717-failure-diagnostics.mjs",
+      "status": "passed",
+      "seconds": 0.414
+    },
+    {
+      "test": "roster717-inbox-performance.cjs",
+      "status": "blocked-historical-context",
+      "reason": "Missing historical Git tag v0.7.16."
+    },
+    {
+      "test": "roster718-absence-performance-browser.cjs",
+      "status": "blocked-historical-context",
+      "reason": "Missing historical Git tag v0.7.17."
+    },
+    {
+      "test": "roster718-bootstrap-cache.cjs",
+      "status": "passed",
+      "seconds": 0.202
+    },
+    {
+      "test": "roster718-concurrency.cjs",
+      "status": "passed",
+      "seconds": 0.828
+    },
+    {
+      "test": "roster718-gateway.mjs",
+      "status": "passed",
+      "seconds": 0.658
+    },
+    {
+      "test": "roster718a-relief-readability-browser.cjs",
+      "status": "passed",
+      "seconds": 1.66
+    },
+    {
+      "test": "roster718b-signature.mjs",
+      "status": "passed",
+      "seconds": 0.652
+    },
+    {
+      "test": "roster719-class-pov.cjs",
+      "status": "passed",
+      "seconds": 1.001
+    },
+    {
+      "test": "roster719-performance.cjs",
+      "status": "passed",
+      "seconds": 2.148
+    },
+    {
+      "test": "roster719-relief-tools-browser.cjs",
+      "status": "passed",
+      "seconds": 1.787
+    },
+    {
+      "test": "roster719-suspended-report-load.cjs",
+      "status": "passed",
+      "seconds": 1.814
+    },
+    {
+      "test": "selected-campus-version.cjs",
+      "status": "passed",
+      "seconds": 1.651
+    },
+    {
+      "test": "sessions.mjs",
+      "status": "passed",
+      "seconds": 0.436
+    },
+    {
+      "test": "sheets414.cjs",
+      "status": "passed",
+      "seconds": 1.497
+    },
+    {
+      "test": "showcase416.cjs",
+      "status": "passed",
+      "seconds": 1.73
+    },
+    {
+      "test": "signature415.cjs",
+      "status": "passed",
+      "seconds": 0.095
+    },
+    {
+      "test": "spinner.cjs",
+      "status": "passed",
+      "seconds": 0.775
+    },
+    {
+      "test": "stair-mirror.cjs",
+      "status": "passed",
+      "seconds": 1.355
+    },
+    {
+      "test": "stapler-draft-excel-export-browser.cjs",
+      "status": "passed",
+      "seconds": 2.638
+    },
+    {
+      "test": "stapler-draft-excel-export-model.cjs",
+      "status": "passed",
+      "seconds": 1.375
+    },
+    {
+      "test": "stapler-draft-level-recess-browser.cjs",
+      "status": "passed",
+      "seconds": 2.566
+    },
+    {
+      "test": "stapler-draft-level-recess-model.cjs",
+      "status": "passed",
+      "seconds": 0.115
+    },
+    {
+      "test": "stapler080-contact-origin.cjs",
+      "status": "passed",
+      "seconds": 1.074
+    },
+    {
+      "test": "stapler080-date-retention.cjs",
+      "status": "passed",
+      "seconds": 0.821
+    },
+    {
+      "test": "stapler080-dates-contacts.cjs",
+      "status": "passed",
+      "seconds": 0.674
+    },
+    {
+      "test": "stapler080-pending-request-retry.cjs",
+      "status": "passed",
+      "seconds": 1.031
+    },
+    {
+      "test": "stapler0810-planner-browser.cjs",
+      "status": "passed",
+      "seconds": 1.841
+    },
+    {
+      "test": "stapler0810-planner-ui.cjs",
+      "status": "passed",
+      "seconds": 1.115
+    },
+    {
+      "test": "stapler0810-relief-tiles.cjs",
+      "status": "passed",
+      "seconds": 0.143
+    },
+    {
+      "test": "stapler0812-backend-recovery.cjs",
+      "status": "passed",
+      "seconds": 4.891
+    },
+    {
+      "test": "stapler0812-draft-recovery-browser.cjs",
+      "status": "passed",
+      "seconds": 8.048
+    },
+    {
+      "test": "stapler092-cap-reasons.cjs",
+      "status": "passed",
+      "seconds": 0.158
+    },
+    {
+      "test": "stapler092-indexeddb-recovery-browser.cjs",
+      "status": "passed",
+      "seconds": 24.772
+    },
+    {
+      "test": "stapler093-confirmed-parts.cjs",
+      "status": "passed",
+      "seconds": 0.799
+    },
+    {
+      "test": "stapler093-save-cost.cjs",
+      "status": "passed",
+      "seconds": 6.148
+    },
+    {
+      "test": "stapler095a-add-teacher-ui.cjs",
+      "status": "passed",
+      "seconds": 1.366
+    },
+    {
+      "test": "stapler095a-staff-eligibility.cjs",
+      "status": "passed",
+      "seconds": 0.162
+    },
+    {
+      "test": "stapler707-integration-review.cjs",
+      "status": "passed",
+      "seconds": 0.121
+    },
+    {
+      "test": "stapler707-model.cjs",
+      "status": "passed",
+      "seconds": 0.167
+    },
+    {
+      "test": "stapler710-browser.cjs",
+      "status": "passed",
+      "seconds": 2.221
+    },
+    {
+      "test": "stapler711-model.cjs",
+      "status": "passed",
+      "seconds": 0.093
+    },
+    {
+      "test": "stapler711-ui.cjs",
+      "status": "passed",
+      "seconds": 1.325
+    },
+    {
+      "test": "stapler712-leases.cjs",
+      "status": "passed",
+      "seconds": 0.183
+    },
+    {
+      "test": "stapler712-lock-browser.cjs",
+      "status": "passed",
+      "seconds": 3.228
+    },
+    {
+      "test": "stapler714-import-browser.cjs",
+      "status": "passed",
+      "seconds": 1.838
+    },
+    {
+      "test": "stapler714-import-ui.cjs",
+      "status": "passed",
+      "seconds": 1.293
+    },
+    {
+      "test": "stapler714-import.cjs",
+      "status": "passed",
+      "seconds": 0.149
+    },
+    {
+      "test": "stapler714a-operations.cjs",
+      "status": "passed",
+      "seconds": 0.178
+    },
+    {
+      "test": "stapler715-loading-browser.cjs",
+      "status": "passed",
+      "seconds": 3.941
+    },
+    {
+      "test": "stapler715-loading.cjs",
+      "status": "passed",
+      "seconds": 1.408
+    },
+    {
+      "test": "stapler715-persistence.cjs",
+      "status": "passed",
+      "seconds": 3.569
+    },
+    {
+      "test": "stapler716-browser.cjs",
+      "status": "passed",
+      "seconds": 15.694
+    },
+    {
+      "test": "stapler716-canonical.cjs",
+      "status": "passed",
+      "seconds": 4.472
+    },
+    {
+      "test": "stapler716-performance.cjs",
+      "status": "passed",
+      "seconds": 2.553
+    },
+    {
+      "test": "stapler717-reopen-ui.cjs",
+      "status": "passed",
+      "seconds": 0.943
+    },
+    {
+      "test": "stapler717-reopen.cjs",
+      "status": "passed",
+      "seconds": 2.73
+    },
+    {
+      "test": "stapler718-lifecycle-persistence.cjs",
+      "status": "passed",
+      "seconds": 4.775
+    },
+    {
+      "test": "stapler718-lifecycle-ui.cjs",
+      "status": "passed",
+      "seconds": 1.214
+    },
+    {
+      "test": "stapler718-lifecycle.cjs",
+      "status": "passed",
+      "seconds": 2.499
+    },
+    {
+      "test": "stapler718a-relief-import.cjs",
+      "status": "blocked-historical-context",
+      "reason": "Imported historical snapshot lacks shared/roster-stapler.js."
+    },
+    {
+      "test": "stapler718b-envelope.cjs",
+      "status": "passed",
+      "seconds": 1.084
+    },
+    {
+      "test": "stapler718b-save-recovery-browser.cjs",
+      "status": "passed",
+      "seconds": 3.399
+    },
+    {
+      "test": "stapler718c-import-policy.cjs",
+      "status": "passed",
+      "seconds": 0.242
+    },
+    {
+      "test": "stapler718c-persistence.cjs",
+      "status": "passed",
+      "seconds": 0.384
+    },
+    {
+      "test": "stapler718c-warning-ui.cjs",
+      "status": "passed",
+      "seconds": 1.795
+    },
+    {
+      "test": "stapler719-contacts-import-ui.cjs",
+      "status": "passed",
+      "seconds": 1.386
+    },
+    {
+      "test": "stapler719-contacts-import.cjs",
+      "status": "passed",
+      "seconds": 0.127
+    },
+    {
+      "test": "storage.cjs",
+      "status": "passed",
+      "seconds": 1.348
+    },
+    {
+      "test": "subject704-backend.cjs",
+      "status": "passed",
+      "seconds": 5.991
+    },
+    {
+      "test": "subject704-model.cjs",
+      "status": "passed",
+      "seconds": 0.111
+    },
+    {
+      "test": "subject704-ui.cjs",
+      "status": "passed",
+      "seconds": 1.445
+    },
+    {
+      "test": "suite703-calendar-reliability.cjs",
+      "status": "passed",
+      "seconds": 1.185
+    },
+    {
+      "test": "suite703-local-interactions.cjs",
+      "status": "passed",
+      "seconds": 1.969
+    },
+    {
+      "test": "suite703-roster-diagnostics.cjs",
+      "status": "passed",
+      "seconds": 0.103
+    },
+    {
+      "test": "suite703-roster-memory.cjs",
+      "status": "passed",
+      "seconds": 1.098
+    },
+    {
+      "test": "suite708-signing-keys.mjs",
+      "status": "passed",
+      "seconds": 1.444
+    },
+    {
+      "test": "table-controls.cjs",
+      "status": "passed",
+      "seconds": 1.315
+    },
+    {
+      "test": "tables412.cjs",
+      "status": "passed",
+      "seconds": 1.468
+    },
+    {
+      "test": "teacher-lifecycle-ui.cjs",
+      "status": "passed",
+      "seconds": 2.596
+    },
+    {
+      "test": "teacher-notes.cjs",
+      "status": "passed",
+      "seconds": 3.169
+    },
+    {
+      "test": "teacher-publish-contacts.cjs",
+      "status": "passed",
+      "seconds": 0.199
+    },
+    {
+      "test": "teachers-publish.cjs",
+      "status": "passed",
+      "seconds": 2.127
+    },
+    {
+      "test": "teachers-ui.cjs",
+      "status": "passed",
+      "seconds": 1.272
+    },
+    {
+      "test": "ui-structure.cjs",
+      "status": "passed",
+      "seconds": 1.047
+    },
+    {
+      "test": "venues-backend.cjs",
+      "status": "passed",
+      "seconds": 0.22
+    },
+    {
+      "test": "venues-browser.cjs",
+      "status": "passed",
+      "seconds": 4.317
+    },
+    {
+      "test": "venues-domain.cjs",
+      "status": "passed",
+      "seconds": 0.149
+    },
+    {
+      "test": "venues-jobs.cjs",
+      "status": "passed",
+      "seconds": 0.631
+    },
+    {
+      "test": "venues-links.cjs",
+      "status": "passed",
+      "seconds": 2.097
+    },
+    {
+      "test": "venues-publications.cjs",
+      "status": "passed",
+      "seconds": 2.459
+    },
+    {
+      "test": "venues-sources.cjs",
+      "status": "passed",
+      "seconds": 0.178
+    },
+    {
+      "test": "venues-worker.mjs",
+      "status": "passed",
+      "seconds": 0.245
+    },
+    {
+      "test": "venues093-roster-source.cjs",
+      "status": "passed",
+      "seconds": 0.155
+    },
+    {
+      "test": "venues094-refresh.cjs",
+      "status": "passed",
+      "seconds": 0.177
+    },
+    {
+      "test": "venues095-admin.cjs",
+      "status": "passed",
+      "seconds": 0.242
+    },
+    {
+      "test": "venues095-authority.cjs",
+      "status": "passed",
+      "seconds": 1.587
+    },
+    {
+      "test": "version-copy.cjs",
+      "status": "passed",
+      "seconds": 1.846
+    },
+    {
+      "test": "worker089-gateway-coalescing.mjs",
+      "status": "passed",
+      "seconds": 0.404
+    },
+    {
+      "test": "worker089-read-coalescing.cjs",
+      "status": "passed",
+      "seconds": 0.087
+    },
+    {
+      "test": "workload408.cjs",
+      "status": "passed",
+      "seconds": 0.102
+    },
+    {
+      "test": "workload412-ui.cjs",
+      "status": "passed",
+      "seconds": 1.352
+    },
+    {
+      "test": "workload414-ui.cjs",
+      "status": "passed",
+      "seconds": 1.353
+    },
+    {
+      "test": "workload415-ui.cjs",
+      "status": "passed",
+      "seconds": 1.058
+    },
+    {
+      "test": "workload415.cjs",
+      "status": "passed",
+      "seconds": 0.101
+    }
+  ],
+  "liveDeploymentPerformed": false,
+  "liveNotificationSent": false
+}

@@ -1,0 +1,23 @@
+'use strict';
+const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict'),{JSDOM}=require('jsdom');
+const dom=new JSDOM(fs.readFileSync('public/index.html','utf8'),{url:'https://deploy.test',runScripts:'outside-only',pretendToBeVisual:true}),w=dom.window,run=s=>vm.runInContext(s,dom.getInternalVMContext());
+w.alert=m=>{throw Error(m)};w.confirm=()=>true;let network=0;w.fetch=()=>{network++;throw Error('Unexpected network call')};w.scrollTo=()=>{};w.HTMLCanvasElement.prototype.getContext=()=>({font:'',measureText:s=>({width:s.length*7})});
+(async()=>{try{
+let app=fs.readFileSync('public/app.js','utf8').replace(/controls\(\);startSignIn\(\);\s*$/,'');app=app.replace(/\/\* GSIS_VENUE_GROUPS_BEGIN \*\/[\s\S]*?\/\* GSIS_VENUE_GROUPS_END \*\//,()=> '/* GSIS_VENUE_GROUPS_BEGIN */\n'+fs.readFileSync('shared/venue-groups.js','utf8')+'\n/* GSIS_VENUE_GROUPS_END */');run(app);
+run(`state={versions:[{id:'v1',status:'planning',publication:'Unpublished',publishedRevision:null,name:'Planning fixture',cceELScope:true,pal:{schema:1,auto:false},classNameSets:[],classes:[{ref:'a',level:'1',name:'Alpha',shortName:'A'}],loads:{'1':{EL:15,FT:2}},venues:[{id:'room1',form:'1A',forms:['1A']},{id:'room2',form:''}],groups:[{id:'tg',name:'TG',subject:'EL',level:'1',form:'1A',sources:['1A'],classRefs:['a'],venue:'room1'}],teachers:[{id:'t',name:'Teacher',active:true}],assignments:[{id:'as',teacher:'t',target:'1A',subject:'EL',level:'1',venue:'room1'}],levelExclusions:[],teacherNotes:{},audit:[]}]};current='v1';role='Admin+KP';token='fixture';tab='Venues';connectLive=()=>{};render();queueCell({operation:'setTeacherNote',teacher:'t',value:'Keep draft',expected:''});`);
+assert.ok(w.document.querySelector('#settingsSubnav [data-tab="Venues"]'),'Venues is a Program Settings tab');
+assert.match(w.document.querySelector('#saveQueue').textContent,/Save to online/);
+const clickClear=()=>{const b=w.document.querySelector('[data-clear-venues]');assert.equal(b.disabled,false);b.focus();b.click();return w.document.querySelector('.inline-editor');};
+let editor=clickClear();assert.match(editor.textContent,/1 room\/class links, 1 teaching groups, 1 teacher deployment rows/);assert.match(editor.textContent,/Planning fixture/);assert.equal(editor.querySelector('#ok').textContent,'Add clear to draft');
+assert.equal(run('cellQueue.length'),1,'Preview does not stage or save');editor.querySelector('[data-cancel]').click();assert.equal(run('cellQueue.length'),1,'Cancel retains unrelated local edits');
+editor=clickClear();await editor.querySelector('form').onsubmit({preventDefault(){}});
+assert.equal(run('cellQueue.length'),2);assert.equal(run("cellQueue.filter(x=>x.operation==='clearVenueAssignments').length"),1,'One command, not one per venue');
+assert.equal(run("v().teacherNotes.t"),'Keep draft');assert.equal(run("v().venues[0].form"),'');assert.equal(run("v().groups[0].venue"),'');assert.equal(run("v().assignments[0].venue"),'');assert.equal(run("v().assignments[0].teacher"),'t');assert.equal(run("draftBase.venues[0].form"),'1A','Saved base remains intact');assert.equal(network,0,'Preview and staging have no network dependency');
+assert.equal(w.document.querySelector('[data-clear-venues]').disabled,true,'Cannot queue a duplicate clear');
+const remove=[...w.document.querySelectorAll('button')].find(b=>b.textContent==='Remove clear from draft');assert.ok(remove);remove.click();
+assert.equal(run('cellQueue.length'),1);assert.equal(run("v().teacherNotes.t"),'Keep draft');assert.equal(run("v().venues[0].form"),'1A');assert.equal(run("v().groups[0].venue"),'room1');assert.equal(run("v().assignments[0].venue"),'room1','Only local clear is removed');
+run(`cellQueue=[];draftBase=null;v().status='active';v().publication='Unpublished';v().publishedRevision=5;render();`);assert.equal(w.document.querySelector('[data-clear-venues]').disabled,true,'Current published version with pending edits is protected');
+run(`role='KP';v().status='planning';v().publishedRevision=null;tab='Venues';render();`);assert.equal(w.document.querySelector('#settingsSubnav [data-tab="Venues"]'),null);assert.equal(w.document.querySelector('[data-clear-venues]'),null,'KP has no clear control');
+assert.throws(()=>run(`queueCell({operation:'clearVenueAssignments',expected:GSISVenueGroups.clearState(v())})`),/Only Admin/,'Frontend direct guard');
+console.log('PASS 089 venue-clear UI: Admin-only page, counts and version preview, explicit draft confirmation, no network, one command, published target protected, unrelated draft and local-only removal preserved.');
+}finally{w.close();}})().catch(e=>{console.error(e);process.exitCode=1});

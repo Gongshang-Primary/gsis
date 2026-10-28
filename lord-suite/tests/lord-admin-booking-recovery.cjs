@@ -1,0 +1,21 @@
+const assert=require('node:assert/strict'),fs=require('node:fs');
+const {worker,response}=require('./frontend_harness.cjs');
+const {harness,adminRequest,request}=require('./backend_harness.cjs');
+const email='admin@gsps.edu.sg',session={identityType:'GSPS',email,sub:'admin-sub',ttbName:'Admin',isAdmin:false};
+(async()=>{
+ const h=worker('lord',async()=>response({ok:true,identity:{found:true,email,ttbName:'Admin',isAdmin:true}}),session);
+ let res=await h.ctx.worker.fetch(new Request('https://test.invalid/api/auth/identity',{method:'POST'}),{...h.env,LORD_SESSION_SECRET:'test-secret'});
+ assert.equal(res.status,200);assert.equal((await res.json()).session.isAdmin,true);assert.match(res.headers.get('Set-Cookie'),/HttpOnly/);
+ assert.equal(h.requests[0].url.searchParams.get('email'),email);assert.equal(h.requests[0].url.searchParams.get('sub'),'admin-sub');
+ const denied=worker('lord',async()=>{throw Error('upstream unavailable');},session);
+ const fallback=await denied.ctx.cachedIdentity(email,session.sub,denied.env);assert.equal(fallback.isAdmin,false);assert.equal(fallback.identityPending,true);assert.equal(denied.cache.size,0,'failure must not poison the identity cache');
+ res=await denied.ctx.worker.fetch(new Request('https://test.invalid/api/auth/identity',{method:'POST'}),{...denied.env,LORD_SESSION_SECRET:'test-secret'});
+ assert.equal((await res.json()).ok,false);assert.equal(res.headers.get('Set-Cookie'),null,'failed verification cannot mint an elevated cookie');
+ const relief=worker('lord',async()=>{throw Error('must not call');},{...session,identityType:'RELIEF'});assert.equal((await relief.call('/api/auth/identity','POST')).status,401);assert.equal(relief.requests.length,0);
+ const unauth=worker('lord',async()=>{throw Error('must not call');},null);assert.equal((await unauth.call('/api/auth/identity','POST')).status,401);
+ const scoped=worker('lord',async()=>response({ok:true,identity:{found:true,email,isAdmin:true}}),session);await scoped.ctx.cachedIdentity(email,'one',scoped.env);await scoped.ctx.cachedIdentity(email,'two',scoped.env);assert.equal(scoped.requests.length,2,'cached role bound to verified Google subject');
+ const b=harness();b.contacts.data[2][5]='98765432';const booked=b.post(adminRequest({bookingForTtbName:'Staff'}));assert(booked.ok,JSON.stringify(booked));const row=b.sheets.Bookings.data[1];assert.equal(row[2],'Staff');assert.equal(row[25],'staff@gsps.edu.sg');assert.equal(row[28],'admin@gsps.edu.sg');assert.equal(row[29],'Admin');assert.equal(row[24]||'','','recipient must not receive administrator subject');
+ const deniedAdmin=harness();assert.equal(deniedAdmin.ctx.isAuthenticatedAdmin_(request({authIsAdmin:true})),false);
+ assert(!fs.readFileSync(require('path').join(__dirname,'../Source/lord/assets/app.js'),'utf8').includes('notificationPreferencesBtn'));
+ console.log('PASS: verified role recovery, failed lookup never cached/elevated, school identity required, subject-scoped cache, recipient/actor separation, removed home link.');
+})().catch(e=>{console.error(e);process.exitCode=1;});

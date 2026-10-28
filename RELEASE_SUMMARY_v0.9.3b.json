@@ -1,0 +1,44 @@
+{
+  "version": "0.9.3b",
+  "baseline": "0.9.3",
+  "kind": "component-patch",
+  "components": [
+    "rosterBackend",
+    "rosterFrontend",
+    "notificationWorker"
+  ],
+  "liveDeploymentPerformed": false,
+  "newSettings": [],
+  "managedSettings": [
+    "ROSTER_ABSENCE_INTAKE_FILE"
+  ],
+  "existingBindingChecks": [
+    "APPS_SCRIPT_URL",
+    "ROSTER_PUBLIC_ORIGIN",
+    "ROSTER_SERVICE_SECRET",
+    "BRIDGE_SECRET",
+    "CALENDAR_APPS_SCRIPT_URL",
+    "CALENDAR_PROXY_SECRET",
+    "WHATSAPP_DIAGNOSTICS_ENABLED=false or unset for production processing"
+  ],
+  "optionalExistingBindings": {
+    "GSIS_JOBS": "Same D1 database on Roster Pages and notification Worker"
+  },
+  "activeBacklog": false,
+  "validation": {
+    "status": "passed",
+    "currentRegressionPrograms": 704,
+    "packageVerifier": "passed",
+    "lordPrograms": 33,
+    "appsScriptFiles": 167,
+    "productionTimingMeasured": false,
+    "liveSchoolWrites": 0,
+    "targetedFixtureReruns": 1
+  },
+  "newRequiredBindingChecks": {
+    "notificationWorker": [
+      "Existing Roster BRIDGE_SECRET when GSIS_JOBS D1 capture is enabled",
+      "Calendar URL/proxy secret and ROSTER_SERVICE_SECRET for report processing even when allocation is disabled"
+    ]
+  }
+}

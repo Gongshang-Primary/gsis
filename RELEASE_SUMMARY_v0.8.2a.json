@@ -1,0 +1,46 @@
+{
+  "release": "0.8.2a",
+  "baseline": "0.8.2",
+  "baselineCommit": "4cd0fbe5f33175ac2be5c28b33e2c55d9a8a05b6",
+  "state": "committed-deployment-ready-package",
+  "releaseDate": "2026-10-21",
+  "releaseTimeZone": "Asia/Singapore",
+  "requirements": [
+    "083"
+  ],
+  "changedComponents": [
+    "contactsFrontend"
+  ],
+  "productionDeployed": false,
+  "productionDataChanged": false,
+  "personalContactsWritten": false,
+  "staffMessagesSent": false,
+  "verification": {
+    "fullNpm": {
+      "command": "npm test",
+      "total": 491,
+      "passed": 491,
+      "failed": 0,
+      "log": "verification/82a-npm-test.log",
+      "logSha256": "d23badf1268b2ee4cc3ee6bb64fcb977836ca4c7e484106c185c4ba2ed458bbb"
+    },
+    "focused": [
+      "contacts083-vcard.cjs",
+      "contacts083-vcard-browser.cjs",
+      "contacts410-transport.mjs"
+    ],
+    "independentReviews": [
+      "Thermonuclear correctness",
+      "Thermonuclear structural quality",
+      "Vercel and five UI skills"
+    ],
+    "fixedReviewFinding": "Normalize bare Singapore country code 65 as +65",
+    "unresolvedMaterialFindings": 0,
+    "nativeDeviceImportVerified": false,
+    "premiumWholeRepositoryHeuristicFlags": 615
+  },
+  "liveChecks": [
+    "Android native contact import",
+    "iPhone native contact import"
+  ]
+}

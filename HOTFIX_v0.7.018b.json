@@ -1,0 +1,12 @@
+{
+  "version": "0.7.018b",
+  "packageType": "changed-deployment-items",
+  "baseline": "0.7.018a",
+  "baselineCommit": "7ef1b2b69fef8d6853afcd5fb7511d8eafc680e2",
+  "nextFullRelease": "0.7.19",
+  "components": {
+    "Roster frontend": "0.7.018b",
+    "Deploy backend (shared by Roster)": "0.7.018b"
+  },
+  "unchangedComponents": "All other components retain their installed versions. The two deployment items include the v0.7.018a changes."
+}

@@ -1,0 +1,7 @@
+{
+  "rules": [
+    "no-orphans",
+    "every-service-has-owner",
+    "trust-boundaries-use-protocol"
+  ]
+}

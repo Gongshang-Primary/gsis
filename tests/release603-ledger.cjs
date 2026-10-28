@@ -1,0 +1,29 @@
+const assert=require('assert/strict'),fs=require('fs'),vm=require('vm');
+const W=require('../shared/workload'),R=require('../shared/teaching-rules');
+const d={teachers:[['f',''],['g',''],['j','FAJT'],['p','4/5'],['r','RT']].map(([id,employment])=>({id,name:id,active:true,employment})),classes:[{level:'1',shortName:'A'}],groups:[],loads:Object.fromEntries([1,2,3,4,5,6].map(l=>[l,{EL:20,Assembly:1,FTGP:2,FTT:2,Admin:3}])),assignments:['f','g','j','p','r'].map(teacher=>({teacher,target:'1A',subject:'EL'})),organisations:{plt:[{id:'pd',slots:['f']}]},duties:[{days:['Mon'],teachers:{Mon:'f'}}],workload:{categories:{Admin:'Non-teaching'}}};
+d.assignments.push({teacher:'f',target:'1A',subject:'FT'},{teacher:'f',target:'1A',subject:'Admin'});
+const calc=()=>W.analyse(d,t=>R.calculate(t,d.offload));
+const before=JSON.stringify(d);let w=calc();assert.equal(JSON.stringify(d),before,'read-only calculation');
+assert.equal(w.fullTimeN,2);assert.equal(w.totals.Teaching,100);assert.equal(w.teachingReference,50);
+const row=id=>w.rows.find(r=>r.teacher.id===id);
+assert.equal(row('f').nonTeachingActual,11,'FTT 5 + PD 2 + Duty 1 + countable Admin 3');assert.equal(row('f').total,31);assert.equal(row('f').quota,55.5);assert.deepEqual(row('f').band,{lower:49,upper:62});
+assert.equal(row('f').capUsed,25,'weekly-cap scope unchanged');
+assert.equal(row('j').quota,55.5*65/84);assert.ok(Math.abs(row('p').quota-44.4)<1e-9);
+assert.equal(row('r').quota,null);assert.equal(row('r').band,null);assert.equal(row('r').status,'No target');assert.equal(row('r').total,20);
+d.teachers[2].role='HOD ICT';w=calc();assert.equal(row('j').quota,55.5*65/84,'FAJT never stacks appointment offload');
+d.teachers[3].role='LH EL';w=calc();assert.ok(Math.abs(row('p').quota-35.52)<1e-9,'4/5 retains configured appointment stacking');
+d.workload.noFTT=['f'];assert.equal(calc().rows[0].quota,55.5,'actual FTT is counted once regardless of no-FTT flag');
+d.loads[1].Admin=null;assert.equal(calc().rows[0].quota,null,'missing non-teaching load cannot produce a target');d.loads[1].Admin=3;
+d.teachers[0].active=false;d.teachers[1].active=false;w=calc();assert.equal(w.fullTimeN,0);assert.equal(w.teachingReference,null);assert.equal(row('j').quota,null);assert.equal(row('r').status,'No target');
+const make=require('./dom-helper.cjs'),{dom,w:win,run}=make();
+try{
+ vm.runInContext(fs.readFileSync('public/vendor/katex/katex.min.js','utf8'),dom.getInternalVMContext());
+ run(`Object.assign(v(),${before});tab='Ledger';render();`);
+ const table=win.document.querySelector('.workload-ledger'),headers=[...table.tHead.rows[0].cells].map(c=>c.textContent.replace(/[↕▴▾]/g,'').trim());
+ assert.equal(headers[headers.indexOf('Actual total')+1],'Target');assert.equal(headers[headers.indexOf('Target')+1],'At-load range');
+ assert.ok(win.document.querySelector('.ledger-formula .katex'));assert.ok(win.document.querySelector('.ledger-formula math'));assert.equal(win.document.querySelectorAll('.katex-error').length,0);
+ const rt=[...table.tBodies[0].rows].find(r=>r.cells[0].textContent==='r');assert.equal(rt.cells[1].textContent,'—');assert.equal(rt.cells[headers.indexOf('Target')].textContent,'—');
+ run(fs.readFileSync('shared/table-tools.js','utf8'));const exported=win.GSISTableTools.snapshot(table);assert.ok(exported.headers.includes('Target'));
+ run('window.katex=undefined;render()');assert.match(win.document.querySelector('.ledger-formula').textContent,/A = actual FTT/);
+}finally{dom.window.close();}
+console.log('PASS 603 Ledger full-time denominator, non-teaching actuals, FAJT, RT, part-time stacking, unavailable inputs, unchanged cap, rendered LaTeX, adjacent values and export.');

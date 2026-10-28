@@ -1,0 +1,17 @@
+{
+  "codeCommit": "982e247d40418e9b60098056f7df0e766caac3c7",
+  "sourcePrograms": 597,
+  "passedSourcePrograms": 597,
+  "packagePrograms": 1,
+  "passedPackagePrograms": 1,
+  "historicalSuperseded": [
+    "model403.cjs",
+    "model405.cjs",
+    "roster700-gateway.mjs",
+    "roster700-operations.cjs",
+    "roster700-review.cjs",
+    "roster700-ui.cjs",
+    "workload407.cjs"
+  ],
+  "productionMeasured": false
+}

@@ -1,0 +1,389 @@
+{
+  "schemaVersion": 1,
+  "ok": false,
+  "command": "finalize",
+  "status": "fail",
+  "type": "architecture",
+  "quality": "showcase",
+  "startedAt": "2026-10-23T00:47:30.142Z",
+  "specification": {
+    "path": "/workspace/scratch/2c52ae6e6b97/gsis-089a/docs/reviews/v0810/architecture-candidate.json",
+    "sha256": "b2fa4462290ea9af63b50fc03f66b8a2abf62ebdfcbaa08317b2ec1d750839fd",
+    "bytes": 13249
+  },
+  "artifact": {
+    "path": "/workspace/scratch/2c52ae6e6b97/gsis-089a/docs/GSiS-v0.8.10-Architecture.html",
+    "sha256": "ad3fc0b47a13c8bdb1175d2e6a7fe05c888c0ba39896bf65412f28c2e170b7b8",
+    "bytes": 830509
+  },
+  "stages": {
+    "validate": {
+      "status": "pass",
+      "exitCode": 0,
+      "durationMs": null,
+      "execution": "embedded-in-deliver",
+      "command": [
+        "/opt/codex/runtimes/codex-primary-runtime/dependencies/node/bin/node",
+        "/root/.codex/plugins/cache/created-by-me-remote/archify/0.1.0/skills/archify/bin/archify.mjs",
+        "deliver",
+        "architecture",
+        "/workspace/scratch/2c52ae6e6b97/gsis-089a/docs/reviews/v0810/architecture-candidate.json",
+        "/workspace/scratch/2c52ae6e6b97/gsis-089a/docs/GSiS-v0.8.10-Architecture.html",
+        "--quality",
+        "showcase",
+        "--repo-root",
+        "/workspace/scratch/2c52ae6e6b97/archify-v0810-source",
+        "--json"
+      ],
+      "receipt": {
+        "schemaVersion": 1,
+        "ok": true,
+        "command": "validate",
+        "specification": {
+          "sha256": "b2fa4462290ea9af63b50fc03f66b8a2abf62ebdfcbaa08317b2ec1d750839fd",
+          "bytes": 13249
+        },
+        "validation": {
+          "checksPassed": 9,
+          "checkCount": 9,
+          "compositionProfile": "showcase",
+          "compositionStatus": "pass",
+          "errors": 0,
+          "warnings": 0
+        }
+      }
+    },
+    "deliver": {
+      "status": "pass",
+      "exitCode": 0,
+      "durationMs": 491,
+      "command": [
+        "/opt/codex/runtimes/codex-primary-runtime/dependencies/node/bin/node",
+        "/root/.codex/plugins/cache/created-by-me-remote/archify/0.1.0/skills/archify/bin/archify.mjs",
+        "deliver",
+        "architecture",
+        "/workspace/scratch/2c52ae6e6b97/gsis-089a/docs/reviews/v0810/architecture-candidate.json",
+        "/workspace/scratch/2c52ae6e6b97/gsis-089a/docs/GSiS-v0.8.10-Architecture.html",
+        "--quality",
+        "showcase",
+        "--repo-root",
+        "/workspace/scratch/2c52ae6e6b97/archify-v0810-source",
+        "--json"
+      ],
+      "receipt": {
+        "schemaVersion": 1,
+        "receiptId": "8c741cab-5b81-4afd-991e-cbfd8102d6ee",
+        "ok": true,
+        "command": "deliver",
+        "type": "architecture",
+        "input": "/workspace/scratch/2c52ae6e6b97/gsis-089a/docs/reviews/v0810/architecture-candidate.json",
+        "output": "/workspace/scratch/2c52ae6e6b97/gsis-089a/docs/GSiS-v0.8.10-Architecture.html",
+        "specification": {
+          "sha256": "b2fa4462290ea9af63b50fc03f66b8a2abf62ebdfcbaa08317b2ec1d750839fd",
+          "bytes": 13249
+        },
+        "artifact": {
+          "sha256": "ad3fc0b47a13c8bdb1175d2e6a7fe05c888c0ba39896bf65412f28c2e170b7b8",
+          "bytes": 830509
+        },
+        "validation": {
+          "checksPassed": 9,
+          "checkCount": 9,
+          "compositionProfile": "showcase",
+          "compositionStatus": "pass",
+          "errors": 0,
+          "warnings": 0
+        },
+        "evidence": {
+          "verified": true,
+          "repository": "https://local.invalid/gsis-release-snapshot.git",
+          "revision": "80ca4711a5d0ada5fab0dc3ffcb7a9b541a5582e",
+          "references": 26,
+          "linkMode": "local-only"
+        },
+        "update": {
+          "status": "unavailable",
+          "installedVersion": null,
+          "availableVersion": null,
+          "releaseNotes": null,
+          "checkedAt": null,
+          "source": null,
+          "noticeRequired": false,
+          "noticeText": null,
+          "reason": "disabled"
+        }
+      }
+    },
+    "check": {
+      "status": "pass",
+      "exitCode": 0,
+      "durationMs": 180,
+      "command": [
+        "/opt/codex/runtimes/codex-primary-runtime/dependencies/node/bin/node",
+        "/root/.codex/plugins/cache/created-by-me-remote/archify/0.1.0/skills/archify/bin/archify.mjs",
+        "check",
+        "/workspace/scratch/2c52ae6e6b97/gsis-089a/docs/GSiS-v0.8.10-Architecture.html",
+        "--require-provenance"
+      ],
+      "receipt": {
+        "ok": true,
+        "file": "/workspace/scratch/2c52ae6e6b97/gsis-089a/docs/GSiS-v0.8.10-Architecture.html",
+        "artifact": {
+          "sha256": "ad3fc0b47a13c8bdb1175d2e6a7fe05c888c0ba39896bf65412f28c2e170b7b8",
+          "bytes": 830509
+        },
+        "checks": [
+          {
+            "name": "single_svg",
+            "ok": true,
+            "details": [
+              "found 1 <svg> block(s)"
+            ]
+          },
+          {
+            "name": "finite_svg",
+            "ok": true,
+            "details": []
+          },
+          {
+            "name": "orthogonal_arrows",
+            "ok": true,
+            "details": []
+          },
+          {
+            "name": "label_route_clearance",
+            "ok": true,
+            "details": []
+          },
+          {
+            "name": "relationship_crossings",
+            "ok": true,
+            "details": []
+          },
+          {
+            "name": "relationship_corridors",
+            "ok": true,
+            "details": []
+          },
+          {
+            "name": "container_border_runs",
+            "ok": true,
+            "details": []
+          },
+          {
+            "name": "route_rhythm",
+            "ok": true,
+            "details": []
+          },
+          {
+            "name": "legend_clearance",
+            "ok": true,
+            "details": []
+          }
+        ],
+        "composition": {
+          "schemaVersion": 1,
+          "profile": "showcase",
+          "status": "pass",
+          "summary": {
+            "errors": 0,
+            "warnings": 0
+          },
+          "metrics": {
+            "properCrossings": 0,
+            "resolvedCrossovers": 0,
+            "ambiguousCorridors": 0,
+            "arrowheadCollisions": 0,
+            "containerBorderRuns": 0,
+            "labelRouteClearanceIssues": 0,
+            "labelCanvasOverflowIssues": 0,
+            "minLabelRouteClearance": 20,
+            "desktopReadabilityIssues": 0,
+            "viewportHeightIssues": 0,
+            "minProjectedNodeTextPx": 7.5,
+            "maxBends": 2,
+            "routesOverSuggestedBends": 0,
+            "maxStretch": 1,
+            "routesOverSuggestedStretch": 0,
+            "minSegmentPx": 60,
+            "minInteriorSegmentPx": 409,
+            "shortSegmentCount": 0,
+            "shortEndpointSegmentCount": 0,
+            "shortInteriorSegmentCount": 0,
+            "microSegmentCount": 0
+          },
+          "suggestedLimits": {
+            "bendsPerRelationship": 2,
+            "stretch": 1.35,
+            "segmentPx": 16,
+            "microSegmentPx": 8
+          },
+          "routeReview": {
+            "crossings": [],
+            "detours": []
+          },
+          "leadingSpace": {
+            "measured": true,
+            "emptyTopPx": 40,
+            "emptyTopRatio": 0.066,
+            "occupiedTop": 40,
+            "viewBoxTop": 0,
+            "canvasHeight": 610,
+            "typicalNodeHeight": 72,
+            "reviewSuggested": false
+          },
+          "desktopReadability": {
+            "budgetBasis": "recognized-declared-wide",
+            "readerContract": "declared-wide-v1",
+            "availableDiagramWidth": 1162.5,
+            "actualBudgetPx": 1162.5,
+            "actualReaderWidth": 1192.5,
+            "desiredReaderWidth": 1192.5,
+            "viewportCap": 1376,
+            "limit": "source-size",
+            "requestedTargetPx": 7.5,
+            "requestedTargetMet": true,
+            "hardFloorPx": 6,
+            "hardFloorMet": true,
+            "minimumOwner": {
+              "kind": "edge",
+              "id": "web-edge",
+              "from": "web",
+              "to": "edge"
+            },
+            "minimumSourceTextPx": 8,
+            "minimumProjectedTextPx": 7.5,
+            "semanticTextCount": 28
+          },
+          "issues": []
+        },
+        "provenance": "current",
+        "deliveryReceiptId": "8c741cab-5b81-4afd-991e-cbfd8102d6ee"
+      }
+    },
+    "browser-check": {
+      "status": "fail",
+      "exitCode": 1,
+      "durationMs": 2209,
+      "command": [
+        "/opt/codex/runtimes/codex-primary-runtime/dependencies/node/bin/node",
+        "/root/.codex/plugins/cache/created-by-me-remote/archify/0.1.0/skills/archify/bin/archify.mjs",
+        "browser-check",
+        "/workspace/scratch/2c52ae6e6b97/gsis-089a/docs/GSiS-v0.8.10-Architecture.html",
+        "--json",
+        "--require-provenance",
+        "--out-dir",
+        "/workspace/scratch/2c52ae6e6b97/gsis-089a/docs/reviews/v0810/architecture-review-2"
+      ],
+      "execution": "in-process",
+      "receipt": {
+        "schemaVersion": 1,
+        "ok": false,
+        "command": "browser-check",
+        "evidenceKind": "automated-browser",
+        "status": "fail",
+        "visualReview": "not-requested",
+        "provenance": "failed",
+        "deliveryReceiptId": "8c741cab-5b81-4afd-991e-cbfd8102d6ee",
+        "artifact": {
+          "path": "/workspace/scratch/2c52ae6e6b97/gsis-089a/docs/GSiS-v0.8.10-Architecture.html",
+          "sha256": "ad3fc0b47a13c8bdb1175d2e6a7fe05c888c0ba39896bf65412f28c2e170b7b8",
+          "bytes": 830509
+        },
+        "state": {
+          "detail": "read",
+          "motion": "still"
+        },
+        "chrome": {
+          "status": "available",
+          "executable": "/workspace/scratch/2c52ae6e6b97/browser-runtime-v089/bin/chromium"
+        },
+        "diagnostics": [
+          {
+            "code": "delivery/provenance-failed",
+            "severity": "error",
+            "message": "A delivery attempt is unfinished or failed; complete a successful deliver before trusting this artifact.",
+            "subject": {
+              "artifact": "/workspace/scratch/2c52ae6e6b97/gsis-089a/docs/GSiS-v0.8.10-Architecture.html",
+              "provenance": "/workspace/scratch/2c52ae6e6b97/gsis-089a/docs/GSiS-v0.8.10-Architecture.delivery.json"
+            },
+            "evidence": {
+              "pendingJournal": "/workspace/scratch/2c52ae6e6b97/gsis-089a/docs/GSiS-v0.8.10-Architecture.delivery-pending.json",
+              "found": true
+            },
+            "supportedFixes": [
+              "finish any active delivery, then rerun deliver successfully; retain the pending journal until recovery succeeds"
+            ]
+          }
+        ],
+        "containment": {
+          "status": "fail",
+          "policy": "fit-or-reader-declared-readable-vertical-scroll",
+          "viewports": []
+        },
+        "themeStates": {
+          "status": "fail",
+          "viewports": []
+        },
+        "readability": {
+          "status": "fail",
+          "minimumProjectedNodeTextPx": 6,
+          "viewports": []
+        },
+        "viewerChrome": {
+          "status": "fail",
+          "viewports": []
+        },
+        "captures": {
+          "status": "not-requested",
+          "screenshots": [],
+          "contactSheet": null
+        },
+        "sidecars": {
+          "directory": "/workspace/scratch/2c52ae6e6b97/gsis-089a/docs/reviews/v0810/architecture-review-2",
+          "receipt": "GSiS-v0.8.10-Architecture.~archify-63b947a7561825c7a9f1ca6f3cdd517dfc2dfdb351282081ba64f8d389f061fa.browser-check.json",
+          "files": []
+        },
+        "error": "A delivery attempt is unfinished or failed; complete a successful deliver before trusting this artifact."
+      }
+    }
+  },
+  "diagnostics": [
+    {
+      "code": "delivery/provenance-failed",
+      "severity": "error",
+      "message": "A delivery attempt is unfinished or failed; complete a successful deliver before trusting this artifact.",
+      "subject": {
+        "artifact": "/workspace/scratch/2c52ae6e6b97/gsis-089a/docs/GSiS-v0.8.10-Architecture.html",
+        "provenance": "/workspace/scratch/2c52ae6e6b97/gsis-089a/docs/GSiS-v0.8.10-Architecture.delivery.json"
+      },
+      "evidence": {
+        "pendingJournal": "/workspace/scratch/2c52ae6e6b97/gsis-089a/docs/GSiS-v0.8.10-Architecture.delivery-pending.json",
+        "found": true
+      },
+      "supportedFixes": [
+        "finish any active delivery, then rerun deliver successfully; retain the pending journal until recovery succeeds"
+      ]
+    }
+  ],
+  "evidence": {
+    "receipt": "/workspace/scratch/2c52ae6e6b97/gsis-089a/docs/reviews/v0810/architecture-review-2/GSiS-v0.8.10-Architecture.~archify-63b947a7561825c7a9f1ca6f3cdd517dfc2dfdb351282081ba64f8d389f061fa.~archify-75472278f9020ac14c790e6aded618bfefa508dea52fc844b47c39f999a4d547.finalize.json",
+    "summaryReceipt": "/workspace/scratch/2c52ae6e6b97/gsis-089a/docs/reviews/v0810/architecture-review-2/GSiS-v0.8.10-Architecture.~archify-63b947a7561825c7a9f1ca6f3cdd517dfc2dfdb351282081ba64f8d389f061fa.~archify-75472278f9020ac14c790e6aded618bfefa508dea52fc844b47c39f999a4d547.finalize-summary.json",
+    "browserCheckReceipt": "/workspace/scratch/2c52ae6e6b97/gsis-089a/docs/reviews/v0810/architecture-review-2/GSiS-v0.8.10-Architecture.~archify-63b947a7561825c7a9f1ca6f3cdd517dfc2dfdb351282081ba64f8d389f061fa.browser-check.json"
+  },
+  "visualReview": "not-requested",
+  "failedStage": "browser-check",
+  "finishedAt": "2026-10-23T00:47:33.128Z",
+  "durationMs": 2985,
+  "update": {
+    "status": "unavailable",
+    "installedVersion": null,
+    "availableVersion": null,
+    "releaseNotes": null,
+    "checkedAt": null,
+    "source": null,
+    "noticeRequired": false,
+    "noticeText": null,
+    "reason": "cache-valid"
+  }
+}

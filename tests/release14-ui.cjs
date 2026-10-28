@@ -1,0 +1,10 @@
+const make=require('./dom-helper.cjs'),fs=require('fs'),assert=require('assert/strict');const {dom,w,run}=make();
+(async()=>{
+run("v().venues.push({id:'F1-17',form:'',name:'Spare room'});tab='IP Deploy';render()");assert.ok(![...w.document.querySelectorAll('button')].some(b=>b.textContent==='Assign venues'));
+const venue=w.document.querySelector('[data-venue-target="1P"]');assert.ok(venue._searchPicker);venue.value='F1-17';venue.dispatchEvent(new w.Event('change'));assert.equal(run("queuedEdits()[0].operation"),'moveVenueGroup');assert.equal(run("v().venues.find(v=>v.form==='1P').id"),'F1-17');
+run("cellQueue=[];draftBase=null;v().teachers.push({id:'support',name:'Support example',active:true,role:'SENO'});tab='Teachers';render()");assert.ok(!w.document.querySelector('table').textContent.includes('Support example'));
+const table=w.document.querySelector('table'),wrap=table.parentElement;table.getClientRects=()=>[{}];Object.defineProperty(table,'scrollWidth',{value:1500});Object.defineProperty(wrap,'scrollWidth',{value:1500});Object.defineProperty(wrap,'clientWidth',{value:600});wrap.getBoundingClientRect=()=>({left:0,top:200,bottom:1200,width:600});
+run(fs.readFileSync('shared/table-viewport.js','utf8'));w.dispatchEvent(new w.Event('resize'));await new Promise(r=>setTimeout(r,30));assert.equal(w.document.querySelector('.viewport-scrollbar'),null);assert.ok(table.querySelector('thead th').classList.contains('frozen-col'));wrap.scrollLeft=300;wrap.dispatchEvent(new w.Event('scroll'));assert.equal(wrap.scrollLeft,300);
+const checks=w.document.querySelectorAll('.column-picker input');checks[0].checked=false;checks[0].dispatchEvent(new w.Event('change'));w.dispatchEvent(new w.Event('resize'));await new Promise(r=>setTimeout(r,30));assert.ok(table.querySelectorAll('thead th')[1].classList.contains('frozen-col'));
+await new Promise(r=>setTimeout(r,100));w.GSISTableDispose();dom.window.close();console.log('PASS immediate in-cell venue draft, teacher exclusions, first-visible frozen column and single native scroll owner');
+})().catch(e=>{dom.window.close();console.error(e);process.exitCode=1});

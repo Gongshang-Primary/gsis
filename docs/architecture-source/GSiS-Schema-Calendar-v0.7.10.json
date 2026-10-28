@@ -1,0 +1,565 @@
+{
+  "schema_version": 1,
+  "diagram_type": "erd",
+  "meta": {
+    "title": "GSiS Calendar: records and history",
+    "locale": "en",
+    "quality_profile": "standard",
+    "output": "docs/GSiS-Schema-Calendar-v0.7.10.html"
+  },
+  "layout": {
+    "mode": "grid",
+    "gapX": 70,
+    "gapY": 42,
+    "entityW": 270
+  },
+  "entities": [
+    {
+      "id": "e0",
+      "label": "Years",
+      "tag": "School dates",
+      "row": 0,
+      "col": 0,
+      "attributes": [
+        {
+          "name": "Year",
+          "type": "cell"
+        },
+        {
+          "name": "Status",
+          "type": "cell"
+        },
+        {
+          "name": "ReleasedToTeachers",
+          "type": "cell"
+        },
+        {
+          "name": "RamadanStart",
+          "type": "cell"
+        },
+        {
+          "name": "RamadanEnd",
+          "type": "cell"
+        },
+        {
+          "name": "MOEPressReleaseURL",
+          "type": "cell"
+        },
+        {
+          "name": "MOECalendarURL",
+          "type": "cell"
+        },
+        {
+          "name": "MUISCalendarURL",
+          "type": "cell"
+        },
+        {
+          "name": "CreatedAt",
+          "type": "cell"
+        },
+        {
+          "name": "CreatedBy",
+          "type": "cell"
+        },
+        {
+          "name": "UpdatedAt",
+          "type": "cell"
+        },
+        {
+          "name": "UpdatedBy",
+          "type": "cell"
+        },
+        {
+          "name": "ArchivedAt",
+          "type": "cell"
+        },
+        {
+          "name": "ArchiveSpreadsheetFileId",
+          "type": "cell"
+        },
+        {
+          "name": "ArchivePdfFileId",
+          "type": "cell"
+        },
+        {
+          "name": "ArchiveStatsFileId",
+          "type": "cell"
+        }
+      ]
+    },
+    {
+      "id": "e1",
+      "label": "YearStructure",
+      "tag": "School dates",
+      "row": 1,
+      "col": 0,
+      "attributes": [
+        {
+          "name": "StructureID",
+          "type": "cell"
+        },
+        {
+          "name": "Year",
+          "type": "cell"
+        },
+        {
+          "name": "Kind",
+          "type": "cell"
+        },
+        {
+          "name": "Label",
+          "type": "cell"
+        },
+        {
+          "name": "Term",
+          "type": "cell"
+        },
+        {
+          "name": "Week",
+          "type": "cell"
+        },
+        {
+          "name": "StartDate",
+          "type": "cell"
+        },
+        {
+          "name": "EndDate",
+          "type": "cell"
+        },
+        {
+          "name": "SyncToStaffCalendar",
+          "type": "cell"
+        },
+        {
+          "name": "SourceURL",
+          "type": "cell"
+        },
+        {
+          "name": "Notes",
+          "type": "cell"
+        },
+        {
+          "name": "CreatedAt",
+          "type": "cell"
+        },
+        {
+          "name": "CreatedBy",
+          "type": "cell"
+        },
+        {
+          "name": "UpdatedAt",
+          "type": "cell"
+        },
+        {
+          "name": "UpdatedBy",
+          "type": "cell"
+        },
+        {
+          "name": "DeletedAt",
+          "type": "cell"
+        }
+      ]
+    },
+    {
+      "id": "e2",
+      "label": "Events",
+      "tag": "Events",
+      "row": 0,
+      "col": 1,
+      "attributes": [
+        {
+          "name": "EventID",
+          "type": "cell"
+        },
+        {
+          "name": "Year",
+          "type": "cell"
+        },
+        {
+          "name": "Status",
+          "type": "cell"
+        },
+        {
+          "name": "LaneID",
+          "type": "cell"
+        },
+        {
+          "name": "ShiftSpan",
+          "type": "cell"
+        },
+        {
+          "name": "OwnerTag",
+          "type": "cell"
+        },
+        {
+          "name": "StaffTitle",
+          "type": "cell"
+        },
+        {
+          "name": "StaffDescription",
+          "type": "cell"
+        },
+        {
+          "name": "Location",
+          "type": "cell"
+        },
+        {
+          "name": "EventType",
+          "type": "cell"
+        },
+        {
+          "name": "StartDate",
+          "type": "cell"
+        },
+        {
+          "name": "EndDate",
+          "type": "cell"
+        },
+        {
+          "name": "StartTime",
+          "type": "cell"
+        },
+        {
+          "name": "EndTime",
+          "type": "cell"
+        },
+        {
+          "name": "ParentEnabled",
+          "type": "cell"
+        },
+        {
+          "name": "ParentTitle",
+          "type": "cell"
+        },
+        {
+          "name": "ParentDescription",
+          "type": "cell"
+        },
+        {
+          "name": "StaffCalendarEventId",
+          "type": "cell"
+        },
+        {
+          "name": "StaffSyncHash",
+          "type": "cell"
+        },
+        {
+          "name": "StaffSyncState",
+          "type": "cell"
+        },
+        {
+          "name": "ParentCalendarEventId",
+          "type": "cell"
+        },
+        {
+          "name": "ParentSyncHash",
+          "type": "cell"
+        },
+        {
+          "name": "ParentSyncState",
+          "type": "cell"
+        },
+        {
+          "name": "LastSyncedAt",
+          "type": "cell"
+        },
+        {
+          "name": "CreatedAt",
+          "type": "cell"
+        },
+        {
+          "name": "CreatedBy",
+          "type": "cell"
+        },
+        {
+          "name": "UpdatedAt",
+          "type": "cell"
+        },
+        {
+          "name": "UpdatedBy",
+          "type": "cell"
+        },
+        {
+          "name": "DeletedAt",
+          "type": "cell"
+        },
+        {
+          "name": "LastMutationID",
+          "type": "cell"
+        }
+      ]
+    },
+    {
+      "id": "e3",
+      "label": "DayNotes",
+      "tag": "School dates",
+      "row": 2,
+      "col": 0,
+      "attributes": [
+        {
+          "name": "NoteID",
+          "type": "cell"
+        },
+        {
+          "name": "Year",
+          "type": "cell"
+        },
+        {
+          "name": "Date",
+          "type": "cell"
+        },
+        {
+          "name": "Text",
+          "type": "cell"
+        },
+        {
+          "name": "CreatedAt",
+          "type": "cell"
+        },
+        {
+          "name": "CreatedBy",
+          "type": "cell"
+        },
+        {
+          "name": "UpdatedAt",
+          "type": "cell"
+        },
+        {
+          "name": "UpdatedBy",
+          "type": "cell"
+        }
+      ]
+    },
+    {
+      "id": "e4",
+      "label": "MutationLog",
+      "tag": "Events",
+      "row": 1,
+      "col": 1,
+      "attributes": [
+        {
+          "name": "OperationID",
+          "type": "cell"
+        },
+        {
+          "name": "UserAlias",
+          "type": "cell"
+        },
+        {
+          "name": "Action",
+          "type": "cell"
+        },
+        {
+          "name": "PayloadHash",
+          "type": "cell"
+        },
+        {
+          "name": "State",
+          "type": "cell"
+        },
+        {
+          "name": "EventID",
+          "type": "cell"
+        },
+        {
+          "name": "ResultJSON",
+          "type": "cell"
+        },
+        {
+          "name": "ErrorJSON",
+          "type": "cell"
+        },
+        {
+          "name": "CreatedAt",
+          "type": "cell"
+        },
+        {
+          "name": "UpdatedAt",
+          "type": "cell"
+        }
+      ]
+    },
+    {
+      "id": "e5",
+      "label": "AuditLog",
+      "tag": "Events",
+      "row": 2,
+      "col": 1,
+      "attributes": [
+        {
+          "name": "AuditID",
+          "type": "cell"
+        },
+        {
+          "name": "Timestamp",
+          "type": "cell"
+        },
+        {
+          "name": "UserAlias",
+          "type": "cell"
+        },
+        {
+          "name": "Action",
+          "type": "cell"
+        },
+        {
+          "name": "EntityType",
+          "type": "cell"
+        },
+        {
+          "name": "EntityID",
+          "type": "cell"
+        },
+        {
+          "name": "BeforeJSON",
+          "type": "cell"
+        },
+        {
+          "name": "AfterJSON",
+          "type": "cell"
+        },
+        {
+          "name": "RequestID",
+          "type": "cell"
+        }
+      ]
+    },
+    {
+      "id": "e6",
+      "label": "SyncLog",
+      "tag": "Outputs",
+      "row": 0,
+      "col": 2,
+      "attributes": [
+        {
+          "name": "SyncRunID",
+          "type": "cell"
+        },
+        {
+          "name": "Timestamp",
+          "type": "cell"
+        },
+        {
+          "name": "Year",
+          "type": "cell"
+        },
+        {
+          "name": "UserAlias",
+          "type": "cell"
+        },
+        {
+          "name": "StaffCreates",
+          "type": "cell"
+        },
+        {
+          "name": "StaffUpdates",
+          "type": "cell"
+        },
+        {
+          "name": "StaffDeletes",
+          "type": "cell"
+        },
+        {
+          "name": "ParentCreates",
+          "type": "cell"
+        },
+        {
+          "name": "ParentUpdates",
+          "type": "cell"
+        },
+        {
+          "name": "ParentDeletes",
+          "type": "cell"
+        },
+        {
+          "name": "Errors",
+          "type": "cell"
+        },
+        {
+          "name": "DurationMs",
+          "type": "cell"
+        },
+        {
+          "name": "PdfFileId",
+          "type": "cell"
+        },
+        {
+          "name": "PdfDownloadURL",
+          "type": "cell"
+        },
+        {
+          "name": "DetailsJSON",
+          "type": "cell"
+        }
+      ]
+    },
+    {
+      "id": "e7",
+      "label": "PDFLog",
+      "tag": "Outputs",
+      "row": 1,
+      "col": 2,
+      "attributes": [
+        {
+          "name": "PDFID",
+          "type": "cell"
+        },
+        {
+          "name": "Year",
+          "type": "cell"
+        },
+        {
+          "name": "GeneratedAt",
+          "type": "cell"
+        },
+        {
+          "name": "GeneratedBy",
+          "type": "cell"
+        },
+        {
+          "name": "FileName",
+          "type": "cell"
+        },
+        {
+          "name": "FileId",
+          "type": "cell"
+        },
+        {
+          "name": "DirectDownloadURL",
+          "type": "cell"
+        },
+        {
+          "name": "DomainShared",
+          "type": "cell"
+        },
+        {
+          "name": "SyncRunID",
+          "type": "cell"
+        },
+        {
+          "name": "Notes",
+          "type": "cell"
+        }
+      ]
+    }
+  ],
+  "relationships": [],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "Physical columns",
+      "items": [
+        "Each listed table shows every code-defined physical column. Values are Sheet cells, not invented SQL types.",
+        "Source snapshot: see GSiS-Schema-Reference-v0.7.10.md for owning functions and journal details."
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "Maintenance",
+      "items": [
+        "Keep exact header spelling and stable identities. Do not sort or delete journal rows.",
+        "Application references are validated in code. These stores do not enforce SQL foreign keys."
+      ]
+    }
+  ]
+}

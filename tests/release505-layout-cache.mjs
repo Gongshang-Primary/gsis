@@ -1,0 +1,57 @@
+import {toWorkerModuleURL} from './helpers/worker-module.cjs';
+import assert from 'node:assert/strict';
+import {readFile} from 'node:fs/promises';
+import {createRequire} from 'node:module';
+const require=createRequire(import.meta.url),{publicView}=require('../shared/layout-data.js');
+const source=await readFile('layout-update/public/_worker.js','utf8'),{default:worker,sign}=await import(toWorkerModuleURL('data:text/javascript;base64,'+Buffer.from(source).toString('base64')));
+const seed=JSON.parse(await readFile('data/layout-2026.json','utf8'));
+const publicData=publicView(seed);publicData.groups[0].levels=['1','2'];publicData.groups[0].weeklyPeriods=6.5;publicData.handoff={status:'complete',year:2026,versionId:'version',revision:3,commit:'committed',layoutRevision:publicData.cursor};
+const env={APPS_SCRIPT_URL:'https://script.google.com/macros/s/layout-505/exec',BRIDGE_SECRET:'k'.repeat(64),GOOGLE_CLIENT_ID:'test'};
+const origin='https://layout.example',stored=new Map();let calls=[],matches=0,puts=0,clock=Date.now();
+const realNow=Date.now,oldFetch=globalThis.fetch,oldCaches=globalThis.caches,oldError=console.error;Date.now=()=>clock;console.error=()=>{};
+globalThis.caches={default:{async match(req){matches++;return stored.get(req.url)?.clone();},async put(req,response){puts++;stored.set(req.url,response.clone());}}};
+const request=(query='',trace='')=>new Request(origin+'/api/public/campus'+query,{headers:trace?{'X-GSiS-Trace-ID':trace}:{}});
+let reply=async body=>Response.json({ok:true,data:{...structuredClone(publicData),layoutYear:Number(body.input.year||2026)}});
+globalThis.fetch=async(url,options)=>{const body=JSON.parse(JSON.parse(options.body).payload);calls.push({url:String(url),body});return reply(body);};
+function reset(){stored.clear();calls=[];matches=0;puts=0;}
+try{
+ let release;const gate=new Promise(resolve=>release=resolve);reply=async body=>{await gate;return Response.json({ok:true,data:structuredClone(publicData),timing:{email:'private'},diagnosticId:'upstream-only',user:{email:'private'}});};
+ const clientTraces=Array.from({length:30},()=>crypto.randomUUID());const pending=clientTraces.map((trace,i)=>worker.fetch(request('?year=2026'+(i===0?'&since='+publicData.cursor:''),trace),env));
+ for(let tries=0;!calls.length&&tries<100;tries++)await new Promise(resolve=>setTimeout(resolve,10));assert.equal(calls.length,1,'30 same-isolate concurrent clients share one backend request');release();
+ const responses=await Promise.all(pending),bodies=await Promise.all(responses.map(r=>r.json()));
+ assert.equal(calls[0].body.action,'publicLayout');assert.equal(calls[0].body.identity,null);assert.deepEqual(calls[0].body.input,{year:'2026'},'Backend always gets the full publication, never client since or injected action');
+ assert.match(calls[0].body.nonce,/^[0-9a-f-]{36}$/);assert.ok(clientTraces.includes(calls[0].body.traceId));
+ assert.equal(bodies[0].data.unchanged,true);assert.deepEqual(bodies[1].data,publicData,'First client cursor cannot poison other coalesced results');
+ bodies.forEach((body,i)=>{assert.equal(body.gatewayTiming.traceId,clientTraces[i]);assert.equal(body.gatewayTiming.diagnosticId,body.gatewayTiming.traceId);assert.equal(body.gatewayTiming.upstreamTraceId,calls[0].body.traceId);assert.equal(body.gatewayTiming.upstreamRequestId,calls[0].body.nonce);assert.equal(typeof body.gatewayTiming.totalMs,'number');assert.equal(body.gatewayTiming.elapsedMs,undefined);assert.equal(body.user,undefined);assert.equal(body.timing,undefined);});
+ responses.forEach(r=>{assert.equal(r.headers.get('Access-Control-Allow-Origin'),'*');assert.equal(r.headers.get('Cache-Control'),'no-store');});
+ assert.equal(puts,1);const savedResponse=[...stored.values()][0],saved=await savedResponse.clone().json();assert.equal(savedResponse.headers.get('Cache-Control'),'public, max-age=45');assert.deepEqual(saved,{ok:true,data:publicData});assert.doesNotMatch(JSON.stringify(saved),/gatewayTiming|private|upstream-only|client-/);
+ const hitTrace=crypto.randomUUID(),hit=await (await worker.fetch(request('?year=2026&action=bootstrap&versionId=planning',hitTrace),env)).json();assert.equal(calls.length,1);assert.equal(hit.gatewayTiming.cache,'hit');assert.equal(hit.gatewayTiming.traceId,hitTrace);assert.equal(hit.gatewayTiming.upstreamRequestId,undefined);assert.equal(hit.gatewayTiming.upstreamTraceId,undefined);assert.deepEqual(hit.data,publicData);
+ console.log('PASS 30 concurrent public reads use one canonical request; per-client cursors, trace IDs and cache metadata remain separate');
+ reply=async body=>Response.json({ok:true,data:{...structuredClone(publicData),layoutYear:Number(body.input.year||2026)}});
+ const nextYear=await (await worker.fetch(request('?year=2027'),env)).json();assert.equal(nextYear.data.layoutYear,2027);assert.equal(calls.length,2);
+ await worker.fetch(request('?year=2026'),{...env,APPS_SCRIPT_URL:'https://script.google.com/macros/s/other-layout/exec'});assert.equal(calls.length,3,'Another configured backend uses a separate namespace');
+ await worker.fetch(request(),{...env,LAYOUT_YEAR:'2027'});assert.equal(calls.length,3,'Configured year and explicitly selected same year share a canonical record');
+ clock+=45001;await worker.fetch(request('?year=2026'),env);assert.equal(calls.length,4,'Expired publication is fetched fresh');
+ console.log('PASS year and backend isolation, configured year and bounded 45-second expiry');
+ reset();reply=async()=>Response.json({ok:false,status:503,error:'Synthetic unavailable',diagnosticId:'upstream-error'});
+ let failed=await (await worker.fetch(request('?year=2026','11111111-1111-4111-8111-111111111111'),env)).json();assert.equal(failed.ok,false);assert.equal(puts,0);assert.equal(stored.size,0);
+ reply=async()=>Response.json({ok:true,data:structuredClone(publicData)});assert.equal((await worker.fetch(request('?year=2026'),env)).status,200);assert.equal(calls.length,2,'A failed read does not poison later retry');
+ reset();reply=async()=>{throw Object.assign(Error('Timeout'),{name:'TimeoutError'});};const timed=await worker.fetch(request('?year=2026','22222222-2222-4222-8222-222222222222'),env);failed=await timed.json();assert.equal(timed.status,503);assert.equal(failed.code,'UPSTREAM_TIMEOUT');assert.equal(failed.diagnosticId,'22222222-2222-4222-8222-222222222222');assert.equal(failed.gatewayTiming.traceId,calls[0].body.traceId);assert.equal(failed.gatewayTiming.upstreamTraceId,'22222222-2222-4222-8222-222222222222');assert.equal(failed.gatewayTiming.upstreamRequestId,calls[0].body.nonce);assert.equal(typeof failed.gatewayTiming.totalMs,'number');assert.equal(puts,0);
+ reset();reply=async()=>Response.json({ok:true,data:{venues:[]}});await worker.fetch(request(),env);await worker.fetch(request(),env);assert.equal(calls.length,2);assert.equal(puts,0,'Incomplete legacy successful envelope is returned but never cached');
+ reset();reply=async()=>Response.json({ok:true,data:{...structuredClone(publicData),layoutYear:2027}});await worker.fetch(request('?year=2026'),env);assert.equal(puts,0,'Wrong-year upstream data cannot enter selected-year cache');
+ const invalidTrace=await (await worker.fetch(request('?year=2026','invalid-short-trace'),env)).json();assert.match(invalidTrace.gatewayTiming.traceId,/^[\w-]{36}$/);assert.notEqual(invalidTrace.gatewayTiming.traceId,'invalid-short-trace');assert.equal(invalidTrace.gatewayTiming.traceId,calls.at(-1).body.traceId);
+ console.log('PASS semantic errors, timeouts, incomplete responses and wrong-year data cannot enter cache; invalid traces receive a consistent UUID');
+ reset();const injected=structuredClone(publicData);injected.user={email:'secret'};injected.timing={requestId:'secret'};injected.venues[0].identity={email:'secret'};injected.groups[0].publication={id:'version',name:'Public name',year:2026,revision:1,commit:'commit',email:'secret'};injected.groups[0].breakdown.identity={email:'secret'};injected.sources[0].requestId='secret';injected.handoff.identity='secret';
+ reply=async()=>Response.json({ok:true,data:injected,authority:{email:'secret'}});const sanitized=await (await worker.fetch(request('?year=2026'),env)).json();assert.doesNotMatch(JSON.stringify(sanitized),/secret|"authority"|"identity"|"user"/);const sanitizedStored=await [...stored.values()][0].clone().json();assert.doesNotMatch(JSON.stringify(sanitizedStored),/secret|gatewayTiming|traceId/);assert.equal(sanitized.data.groups[0].teacherLabels,publicData.groups[0].teacherLabels,'Existing public teacher display labels remain intact');
+ const cacheKey=[...stored.keys()][0];stored.set(cacheKey,Response.json({ok:true,data:{...publicData,layoutYear:2027}},{headers:{'X-GSiS-Expires':String(clock+45000)}}));await worker.fetch(request('?year=2026'),env);assert.equal(calls.length,2,'Cached response is validated again, including selected year');
+ console.log('PASS nested public allowlist excludes identity/request metadata and validates cache on read');
+ reset();reply=async()=>Response.json({ok:true,data:{user:{email:'authenticated@gsps.edu.sg',roles:['Admin']}}});
+ assert.equal((await worker.fetch(new Request(origin+'/api/profile',{method:'POST',headers:{Origin:origin},body:'{}'}),env)).status,401);
+ assert.equal((await worker.fetch(new Request(origin+'/api/bootstrap'),env)).status,404);
+ assert.equal((await worker.fetch(new Request(origin+'/api/unit/rename',{method:'POST',headers:{Origin:origin},body:'{}'}),env)).status,410);
+ const session={purpose:'gsis-session-v1',origin,email:'authenticated@gsps.edu.sg',subject:'auth-subject',issued:clock,expires:clock+60000},signed=await sign(session,env.BRIDGE_SECRET+'|gsis-browser-session-v1|'+origin),cookie='__Host-gsis_session='+Buffer.from(signed.payload).toString('base64url')+'.'+signed.signature;
+ const profile=trace=>new Request(origin+'/api/profile',{method:'POST',headers:{Origin:origin,Cookie:cookie,'X-GSiS-Trace-ID':trace},body:'{}'});
+ for(const trace of [crypto.randomUUID(),crypto.randomUUID()]){const response=await (await worker.fetch(profile(trace),env)).json();assert.equal(response.data.user.email,session.email);assert.equal(response.gatewayTiming.traceId,trace);}
+ assert.equal(calls.length,2);assert.equal(matches,0);assert.equal(puts,0);assert.equal(calls[0].body.action,'campusProfile');assert.equal(calls[0].body.identity.email,session.email);assert.notEqual(calls[0].body.nonce,calls[1].body.nonce);
+ console.log('PASS authenticated profile stays uncached and auth checks, retired mutation and route restrictions remain enforced');
+}finally{Date.now=realNow;globalThis.fetch=oldFetch;globalThis.caches=oldCaches;console.error=oldError;}

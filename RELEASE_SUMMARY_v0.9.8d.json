@@ -1,0 +1,37 @@
+{
+  "release": "0.9.8d",
+  "baseline": "0.9.8c",
+  "scope": "component-patch",
+  "migration": false,
+  "liveDeploymentPerformed": false,
+  "components": [
+    "rosterFrontend",
+    "rosterBackend",
+    "notificationWorker",
+    "lordBackend"
+  ],
+  "validation": {
+    "mainInitial": {
+      "passed": 760,
+      "total": 775,
+      "failed": 15
+    },
+    "resolvedByRerunOrFix": 8,
+    "mainConsolidated": {
+      "passed": 768,
+      "total": 775,
+      "knownRemaining": 7
+    },
+    "targeted": {
+      "passed": 16,
+      "total": 16
+    },
+    "lord": {
+      "passed": 35,
+      "total": 35
+    },
+    "productionVerified": false,
+    "fullSuiteGreen": false
+  },
+  "sourceBase": "703d3975e05d64acc512511ae2d09b0942cc900c"
+}

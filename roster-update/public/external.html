@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+ <meta charset="utf-8">
+ <meta name="viewport" content="width=device-width, initial-scale=1">
+ <meta name="referrer" content="no-referrer">
+ <title>My timetable | GSiS</title><link rel="icon" href="/favicon.ico?v=0.7.08" sizes="16x16 32x32 48x48"><link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png?v=0.7.08"><link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png?v=0.7.08">
+ <link rel="stylesheet" href="external.css?v=0.9.9">
+ <script src="external.js?v=0.9.9" async fetchpriority="high"></script>
+</head>
+<body>
+ <header><span>GSiS · Gongshang Primary School</span><h1>My timetable</h1><p id="date"></p></header>
+ <main>
+  <p id="status" role="status" aria-live="polite">Loading your private relief record…</p>
+  <section id="private-actions" aria-label="Timetable acknowledgement" aria-busy="true"><p>Checking your timetable…</p><button type="button" class="private-ack-button" aria-label="Acknowledge timetable and instructions" disabled data-unavailable="true">Acknowledge timetable</button></section>
+  <section id="request" hidden>
+   <h2>Colleague relief request</h2>
+   <p id="request-description"></p>
+   <div id="request-lessons"></div>
+   <form id="decision-form" hidden>
+    <label for="reason">Reason if you reject this request</label>
+    <textarea id="reason" maxlength="1000" rows="3" placeholder="Enter a reason for rejection."></textarea>
+    <div class="actions"><button type="submit" value="approve">Approve</button><button type="submit" value="reject" class="reject">Reject</button></div>
+   </form>
+  </section>
+  <section id="duties" hidden><h2>Relief duties</h2><div id="duty-list"></div></section>
+  <section id="arrangements" hidden><h2>Cover for my lessons</h2><div id="arrangement-list"></div></section>
+  <section id="changes" hidden><h2>Changed or cancelled duties</h2><div id="change-list"></div></section>
+  <button id="refresh" type="button">Refresh</button>
+  <p class="private-note">This private link is for you only. Do not forward it. If it has expired, ask SMC for a new link.</p>
+  <p id="private-expiry" class="private-note"></p>
+  <p class="private-note"><a href="/privacy.html">Privacy policy</a></p>
+ </main>
+</body>
+</html>

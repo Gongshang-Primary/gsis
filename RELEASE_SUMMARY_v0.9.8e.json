@@ -1,0 +1,20 @@
+{
+  "release": "0.9.8e",
+  "baseline": "0.9.8d",
+  "migration": false,
+  "liveDeploymentPerformed": false,
+  "components": [
+    "rosterFrontend",
+    "rosterBackend"
+  ],
+  "validation": {
+    "targeted": {
+      "passed": 19,
+      "total": 19
+    },
+    "broadSuiteComplete": false,
+    "broadPartialPrograms": 250,
+    "productionVerified": false,
+    "fullSuiteGreen": false
+  }
+}

@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>STARLORD v0.9.9 · Students Taking and Returning LOaned/Retrieved Devices</title>
+  <link rel="preload" href="assets/gsps-wordmark.webp" as="image" />
+  <link rel="stylesheet" href="assets/styles.css?v=0.9.9" />
+</head>
+<body>
+  <div class="sticky-shell">
+    <header class="top-banner">
+      <div class="brand-wrap">
+        <img class="wordmark" src="assets/gsps-wordmark.webp" alt="Gongshang Primary School" />
+        <div class="brand-copy">
+          <div class="product-name">STARLORD</div>
+          <div class="product-subtitle">Students Taking and Returning LOaned/Retrieved Devices</div>
+        </div>
+      </div>
+      <div class="clock-wrap">
+        <span id="currentDayLabel" class="clock-day">Monday</span>
+        <span id="currentDateTime" class="clock-datetime">26 Jul 2026, 12:00</span>
+      </div>
+    </header>
+
+    <section class="past-strip-panel">
+      <span class="strip-title">Past</span>
+      <div id="pastStrip" class="past-strip">
+        <div class="empty-past">No past bookings yet.</div>
+      </div>
+      <span id="feedStatus" class="feed-status" role="status" aria-live="polite">Connecting…</span>
+    </section>
+  </div>
+
+  <main class="board-main" id="boardMain">
+    <section id="activeGrid" class="cards-grid">
+      <article class="loading-card">Loading bookings…</article>
+    </section>
+  </main>
+
+  <script src="assets/app.js?v=0.9.9"></script>
+</body>
+</html>

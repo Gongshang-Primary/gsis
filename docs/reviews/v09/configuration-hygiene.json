@@ -1,0 +1,12 @@
+{
+  "status": "passed",
+  "originalValuesChecked": 10,
+  "secretValuesExcluded": 5,
+  "runtimePlaceholdersChecked": true,
+  "nonSecretEvidenceReferences": [
+    {
+      "path": "docs/reviews/optimization-20261024/lord-deploy-live-catalogue-evidence.json",
+      "key": "REFERENCE_SPREADSHEET_ID"
+    }
+  ]
+}

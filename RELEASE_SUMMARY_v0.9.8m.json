@@ -1,0 +1,78 @@
+{
+  "version": "0.9.8m",
+  "baseline": "0.9.8l",
+  "baselineCommit": "b029e0972ec1b88fad17d30829861b1e7a3b36ec",
+  "sourceFoundation": "703d3975e05d64acc512511ae2d09b0942cc900c",
+  "scope": [
+    "Allow both manual Roster allocation controls at any time on eligible current/future dates",
+    "Reoptimise only unstarted unpublished automatic work while preserving elapsed and human/publication decisions",
+    "Retain scheduled optimisation cadence, cutoff, accounting and all enabled business rules"
+  ],
+  "componentCount": 4,
+  "productionChangedComponents": [
+    "rosterFrontend",
+    "rosterBackend"
+  ],
+  "sharedHelperParityComponents": [
+    "notificationWorker",
+    "operationsWorker"
+  ],
+  "optionalProductionComponents": [
+    "notificationWorker",
+    "operationsWorker"
+  ],
+  "otherComponentVersions": {
+    "calendarFrontend": "0.9.8l",
+    "calendarBackend": "0.9.8l",
+    "contactsFrontend": "0.9.8j",
+    "contactsBackend": "0.9.8j",
+    "deployFrontend": "0.9.8l",
+    "layoutFrontend": "0.9.8j",
+    "deployBackend": "0.9.8l",
+    "lordFrontend": "0.9.8j",
+    "overlordFrontend": "0.9.8j",
+    "starlordFrontend": "0.9.8j",
+    "lordBackend": "0.9.8j",
+    "venuesFrontend": "0.9.8j",
+    "venuesBackend": "0.9.8j",
+    "calendarJobWorker": "0.9.8j"
+  },
+  "productionAuthority": "Google",
+  "authorityCutoverPerformed": false,
+  "migrationRequired": false,
+  "timetableCacheChanged": false,
+  "newInfrastructureRequired": false,
+  "productionDeployed": false,
+  "liveRecordsChanged": false,
+  "messagesSent": false,
+  "automaticRunInvokedByPreparation": false,
+  "existingProtectedChoicesRewritten": false,
+  "scheduledCadenceChanged": false,
+  "manualAllocationAnyTime": true,
+  "elapsedSlotsProtected": true,
+  "manualOptimisationCutoffSingapore": null,
+  "scheduledOptimisationCutoffSingapore": "06:29",
+  "autoAllocateMode": "reoptimise-unstarted-unpublished-automatic",
+  "autoFillBlanksMode": "fill-only",
+  "separateRehearsal": {
+    "archive": "GSiS_v0.9.8i_Rehearsal.zip",
+    "sourceCommit": "f512ac6f584c26a027c1cf2aefb3b19d01fd6838",
+    "unchanged": true,
+    "productionInstallation": false
+  },
+  "verification": {
+    "status": "targeted-local-verified",
+    "singleGreenFullSuiteClaimed": false,
+    "productionValidationPerformed": false,
+    "expectedTag": "v0.9.8m",
+    "sourceCommit": null,
+    "manifest": "PATCH.json",
+    "recovery": "Post-commit external recovery verification record",
+    "targetedPrograms": 78,
+    "targetedPassed": 78,
+    "newDomainCases": 11,
+    "newUiCases": 3,
+    "appsScriptSyntaxFiles": 232,
+    "openMaterialFindings": 0
+  }
+}

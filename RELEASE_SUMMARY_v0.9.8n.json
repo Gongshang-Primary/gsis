@@ -1,0 +1,87 @@
+{
+  "version": "0.9.8n",
+  "baseline": "0.9.8m",
+  "baselineCommit": "c4978418fec42eb5563893e767cc9ed6ecd50688",
+  "sourceFoundation": "703d3975e05d64acc512511ae2d09b0942cc900c",
+  "scope": [
+    "Restore absence intake saves at the existing Google operations document ceiling without deleting records",
+    "Use later same-actor future shorter reports by default while retaining explicit choices and protected shortening review",
+    "Preserve lazy immutable Stapler plans during absence resubmission and keep storage failures actionable"
+  ],
+  "componentCount": 4,
+  "productionChangedComponents": [
+    "rosterFrontend",
+    "rosterBackend"
+  ],
+  "sharedHelperParityComponents": [
+    "notificationWorker",
+    "operationsWorker"
+  ],
+  "optionalProductionComponents": [
+    "notificationWorker",
+    "operationsWorker"
+  ],
+  "otherComponentVersions": {
+    "calendarFrontend": "0.9.8l",
+    "calendarBackend": "0.9.8l",
+    "contactsFrontend": "0.9.8j",
+    "contactsBackend": "0.9.8j",
+    "deployFrontend": "0.9.8l",
+    "layoutFrontend": "0.9.8j",
+    "deployBackend": "0.9.8l",
+    "lordFrontend": "0.9.8j",
+    "overlordFrontend": "0.9.8j",
+    "starlordFrontend": "0.9.8j",
+    "lordBackend": "0.9.8j",
+    "venuesFrontend": "0.9.8j",
+    "venuesBackend": "0.9.8j",
+    "calendarJobWorker": "0.9.8j"
+  },
+  "productionAuthority": "Google",
+  "authorityCutoverPerformed": false,
+  "migrationRequired": false,
+  "timetableCacheChanged": false,
+  "newInfrastructureRequired": false,
+  "productionDeployed": false,
+  "liveRecordsChanged": false,
+  "messagesSent": false,
+  "automaticRunInvokedByPreparation": false,
+  "existingProtectedChoicesRewritten": false,
+  "scheduledCadenceChanged": false,
+  "manualAllocationAnyTime": true,
+  "elapsedSlotsProtected": true,
+  "manualOptimisationCutoffSingapore": null,
+  "scheduledOptimisationCutoffSingapore": "06:29",
+  "autoAllocateMode": "reoptimise-unstarted-unpublished-automatic",
+  "autoFillBlanksMode": "fill-only",
+  "separateRehearsal": {
+    "archive": "GSiS_v0.9.8i_Rehearsal.zip",
+    "sourceCommit": "f512ac6f584c26a027c1cf2aefb3b19d01fd6838",
+    "unchanged": true,
+    "productionInstallation": false
+  },
+  "verification": {
+    "status": "targeted-local-verified",
+    "singleGreenFullSuiteClaimed": false,
+    "productionValidationPerformed": false,
+    "expectedTag": "v0.9.8n",
+    "sourceCommit": null,
+    "manifest": "PATCH.json",
+    "recovery": "Post-commit external recovery verification record",
+    "targetedPrograms": 96,
+    "targetedPassed": 96,
+    "openMaterialFindings": 0,
+    "attempts": "94 initial passes plus two package smoke checks rerun after the required ZIP was generated; raw attempts retained",
+    "independentChecks": {
+      "combined": 32,
+      "manualAndScheduler": 16,
+      "parity": 14
+    }
+  },
+  "operationsStorageLimitCharacters": 16000000,
+  "previousOperationsStorageLimitCharacters": 12000000,
+  "storageFormatChanged": false,
+  "sameActorLaterShorterDefault": true,
+  "protectedShorteningReviewRetained": true,
+  "receivedReportRecovery": "one-time reprocessing of retained shorter-review receipts; normal authority and protected-cover checks remain"
+}

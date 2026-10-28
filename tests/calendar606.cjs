@@ -1,0 +1,13 @@
+const assert=require('node:assert/strict'),{makeHarness}=require('./calendar/backend_harness.cjs');
+const release=require('../package.json'),version=release.gsisComponentVersions?.calendarBackend||release.gsisRelease;
+const h=makeHarness(),week={StructureID:'W1',Year:2026,Kind:'TERM_WEEK',Term:'4',Week:'1',StartDate:'2026-09-14',EndDate:'2026-09-20'},get=date=>h.call('rosterDate',{date},'teacher');
+h.seed('YearStructure',[week]);let x=get('2026-09-14');assert.equal(x.parity,'odd');assert.equal(x.schoolDay,true);assert.equal(x.version,version);assert.equal(x.events,undefined);assert.equal(h.audit.writes,0);
+assert.throws(()=>get('2027-01-04'),e=>e.code==='YEAR_UNAVAILABLE');assert.throws(()=>get('2026-02-30'),e=>e.code==='INVALID_DATE');assert.equal(get('2026-09-20').schoolDay,false);
+h.seed('YearStructure',[{...week,Week:'T4W2'}]);assert.equal(get('2026-09-14').parity,'even');
+h.seed('Events',[{...h.base,EventID:'H',OwnerTag:'hol',EventType:'ALL_DAY',StaffTitle:'School holiday'}]);x=get('2026-09-14');assert.equal(x.schoolDay,false);assert.equal(x.reason,'School holiday');assert.equal(x.parity,'even');
+h.seed('Events',[{...h.base,OwnerTag:'hol',EventType:'ALL_DAY',Status:'HIDDEN'}]);assert.equal(get('2026-09-14').schoolDay,true);
+h.seed('YearStructure',[week,{...week,StructureID:'V',Kind:'VACATION',Label:'School vacation'}]);assert.equal(get('2026-09-14').schoolDay,false);
+h.seed('YearStructure',[week,{...week,StructureID:'W2',Week:'2'}]);assert.equal(get('2026-09-14').parity,null);assert.match(get('2026-09-14').warning,/Conflicting/);
+h.seed('YearStructure',[{...week,Week:'T1W0'}]);assert.equal(get('2026-09-14').schoolDay,null);h.seed('YearStructure',[]);assert.equal(get('2026-09-14').parity,null);
+const body={action:'rosterDate',payload:{date:'2026-09-14'},proxySecret:'bad',actor:h.actor('teacher')};assert.equal(JSON.parse(h.sandbox.doPost({postData:{contents:JSON.stringify(body)}}).text).ok,false);body.proxySecret='synthetic-secret';body.actor.email='teacher@outside.test';assert.equal(JSON.parse(h.sandbox.doPost({postData:{contents:JSON.stringify(body)}}).text).ok,false);body.actor=h.actor('teacher');assert.equal(JSON.parse(h.sandbox.doPost({postData:{contents:JSON.stringify(body)}}).text).ok,true);
+assert.equal(h.audit.writes,0);assert.equal(h.audit.calendarCalls.length,0);console.log('PASS Calendar date API: authentication, released years, odd/even, week zero, holidays, vacations, weekends, overlap, missing structure and zero writes');

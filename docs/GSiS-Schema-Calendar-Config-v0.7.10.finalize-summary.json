@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "ok": true,
+  "command": "finalize",
+  "status": "pass",
+  "type": "erd",
+  "quality": "standard",
+  "specification": {
+    "path": "/workspace/scratch/c84f0276cce6/build710/source/docs/architecture-source/GSiS-Schema-Calendar-Config-v0.7.10.json",
+    "sha256": "1d9d975de1aac2431df4759c29cefd890be272464a582d475d0c094e20c98f00",
+    "bytes": 7883
+  },
+  "artifact": {
+    "path": "/workspace/scratch/c84f0276cce6/build710/source/docs/GSiS-Schema-Calendar-Config-v0.7.10.html",
+    "sha256": "819f02d41724f610269f9f1d19ef51e4a3b0bfa81bfc9caf75fc001ffc14b9dc",
+    "bytes": 845553
+  },
+  "gates": {
+    "validate": "pass",
+    "deliver": "pass",
+    "check": "pass",
+    "browser-check": "pass"
+  },
+  "diagnostics": [],
+  "diagnosticSummary": {
+    "total": 0,
+    "shown": 0,
+    "truncated": false
+  },
+  "evidence": {
+    "receipt": "/workspace/scratch/c84f0276cce6/build710/source/docs/GSiS-Schema-Calendar-Config-v0.7.10.finalize.json",
+    "summaryReceipt": "/workspace/scratch/c84f0276cce6/build710/source/docs/GSiS-Schema-Calendar-Config-v0.7.10.finalize-summary.json",
+    "browserCheckReceipt": "/workspace/scratch/c84f0276cce6/build710/source/docs/GSiS-Schema-Calendar-Config-v0.7.10.browser-check.json"
+  },
+  "visualReview": "not-requested",
+  "durationMs": 3586
+}

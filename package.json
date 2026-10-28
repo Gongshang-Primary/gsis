@@ -1,0 +1,113 @@
+{
+  "name": "gsis-unified",
+  "version": "0.9.9",
+  "private": true,
+  "scripts": {
+    "test": "node tests/run.cjs && python3 lord-suite/tests/run_all_checks.py",
+    "build": "python3 scripts/package-099-suite.py --build-only",
+    "test:release": "python3 scripts/verify-099-suite.py ../deliverables/GSiS_v0.9.9_Full_Suite.zip ../deliverables/GSiS_v0.9.9_Review_Source.zip",
+    "test:lord": "python3 lord-suite/tests/run_all_checks.py",
+    "package:suite": "python3 scripts/package-099-suite.py --evidence-dir verification/v099",
+    "test:packaging": "python3 tests/release098p-packaging.py && python3 tests/release098q-packaging.py && python3 tests/release099-packaging.py",
+    "test:recovery": "python3 scripts/check-099-recovery.py --help"
+  },
+  "devDependencies": {
+    "acorn": "8.15.0",
+    "esbuild": "0.28.2",
+    "jsdom": "30.1.1",
+    "jszip": "3.10.1",
+    "playwright": "1.62.1"
+  },
+  "gsisRelease": "0.9.9",
+  "releaseScope": "Full production suite: stable Calendar views, revision hints, recovery diagnostics and harmonised release labels; Google-first Roster and Calendar; separately versioned shadow timetable preparation",
+  "gsisWriteProtocol": 500,
+  "gsisBaseline": "0.9.8q",
+  "gsisAssetsIncluded": true,
+  "gsisDraft": false,
+  "gsisPackageState": "locally-verified-not-deployed",
+  "gsisPackageKind": "full-suite",
+  "gsisComponentVersions": {
+    "calendarFrontend": "0.9.9",
+    "calendarBackend": "0.9.9",
+    "contactsFrontend": "0.9.9",
+    "contactsBackend": "0.9.9",
+    "deployFrontend": "0.9.9",
+    "layoutFrontend": "0.9.9",
+    "deployBackend": "0.9.9",
+    "rosterFrontend": "0.9.9",
+    "notificationWorker": "0.9.9",
+    "rosterBackend": "0.9.9",
+    "lordFrontend": "0.9.9",
+    "overlordFrontend": "0.9.9",
+    "starlordFrontend": "0.9.9",
+    "lordBackend": "0.9.9",
+    "venuesFrontend": "0.9.9",
+    "venuesBackend": "0.9.9",
+    "operationsWorker": "0.9.9",
+    "calendarJobWorker": "0.9.9"
+  },
+  "gsisSourceBase": "50c977d79c9756dfdbee91f2922f0cd89ab6e903",
+  "engines": {
+    "node": "^22.22.2 || ^24.15.0 || >=26.0.0"
+  },
+  "gsisPatchBaseline": "0.9.8q",
+  "gsisPatchComponents": [
+    "calendarFrontend",
+    "calendarBackend",
+    "contactsFrontend",
+    "contactsBackend",
+    "deployFrontend",
+    "layoutFrontend",
+    "deployBackend",
+    "rosterFrontend",
+    "notificationWorker",
+    "rosterBackend",
+    "lordFrontend",
+    "overlordFrontend",
+    "starlordFrontend",
+    "lordBackend",
+    "venuesFrontend",
+    "venuesBackend",
+    "operationsWorker",
+    "calendarJobWorker"
+  ],
+  "gsisPatchSourceBase": "50c977d79c9756dfdbee91f2922f0cd89ab6e903",
+  "gsisPatchSetupGuide": true,
+  "gsisSourceRecoveryKind": "current-source-with-parent-diff",
+  "gsisProductionChangedComponents": [
+    "calendarFrontend",
+    "calendarBackend",
+    "calendarJobWorker"
+  ],
+  "gsisVersionHarmonisedComponents": [
+    "contactsFrontend",
+    "contactsBackend",
+    "deployFrontend",
+    "layoutFrontend",
+    "deployBackend",
+    "rosterFrontend",
+    "notificationWorker",
+    "rosterBackend",
+    "lordFrontend",
+    "overlordFrontend",
+    "starlordFrontend",
+    "lordBackend",
+    "venuesFrontend",
+    "venuesBackend",
+    "operationsWorker"
+  ],
+  "gsisSeparatePackages": [
+    {
+      "name": "GSiS_v0.9.9_Timetable_Preparation.zip",
+      "purpose": "Separately versioned admin-only timetable shadow preparation; preserve existing rehearsal D1/R2 setup and Google production authority",
+      "productionInstallation": false
+    }
+  ],
+  "gsisSharedHelperParityComponents": [],
+  "gsisOptionalProductionComponents": [
+    "operationsWorker",
+    "calendarJobWorker"
+  ],
+  "gsisRehearsalSourceBase": "f512ac6f584c26a027c1cf2aefb3b19d01fd6838",
+  "gsisPatchDocuments": {}
+}

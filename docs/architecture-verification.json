@@ -1,0 +1,135 @@
+{
+  "version": "0.7.10",
+  "reviewDate": "2026-10-18",
+  "provenance": "Inspected source archive; not a claimed Git commit or live deployment observation.",
+  "artifacts": [
+    {
+      "artifact": "GSiS-Backend-Workflow-v0.7.10.html",
+      "specification": "architecture-source/GSiS-Backend-Workflow-v0.7.10.json",
+      "type": "workflow",
+      "quality": "showcase",
+      "sha256": "b0c0e904254c279f73af6fc9d45868ff1ede523f7372717cb11801463a5f7eb8",
+      "inputSha256": "f21bea7f3bcfd1c08e617016728530d84781db1ddfc0de97c47de7c922608942",
+      "gates": {
+        "validate": "pass",
+        "deliver": "pass",
+        "check": "pass",
+        "browser-check": "pass"
+      },
+      "receipt": "GSiS-Backend-Workflow-v0.7.10.finalize-summary.json",
+      "visualReview": "light capture inspected at 1440x900"
+    },
+    {
+      "artifact": "GSiS-Schema-Calendar-Config-v0.7.10.html",
+      "specification": "architecture-source/GSiS-Schema-Calendar-Config-v0.7.10.json",
+      "type": "erd",
+      "quality": "standard",
+      "sha256": "819f02d41724f610269f9f1d19ef51e4a3b0bfa81bfc9caf75fc001ffc14b9dc",
+      "inputSha256": "1d9d975de1aac2431df4759c29cefd890be272464a582d475d0c094e20c98f00",
+      "gates": {
+        "validate": "pass",
+        "deliver": "pass",
+        "check": "pass",
+        "browser-check": "pass"
+      },
+      "receipt": "GSiS-Schema-Calendar-Config-v0.7.10.finalize-summary.json",
+      "visualReview": "automated browser checks only"
+    },
+    {
+      "artifact": "GSiS-Schema-Calendar-v0.7.10.html",
+      "specification": "architecture-source/GSiS-Schema-Calendar-v0.7.10.json",
+      "type": "erd",
+      "quality": "standard",
+      "sha256": "5c6dce781af292af8ede110165e6c75cf896366677b2fc27427aea42fe822c90",
+      "inputSha256": "d3c377528ebcb949e06cb71b409b0c2e709199702eb44b10617e957e3ad7988d",
+      "gates": {
+        "validate": "pass",
+        "deliver": "pass",
+        "check": "pass",
+        "browser-check": "pass"
+      },
+      "receipt": "GSiS-Schema-Calendar-v0.7.10.finalize-summary.json",
+      "visualReview": "automated browser checks only"
+    },
+    {
+      "artifact": "GSiS-Schema-Contacts-v0.7.10.html",
+      "specification": "architecture-source/GSiS-Schema-Contacts-v0.7.10.json",
+      "type": "erd",
+      "quality": "standard",
+      "sha256": "72f007fe5e7c8861f49bc1a3f40e5c478c40c2f17234a0e576c88165fefd4120",
+      "inputSha256": "4f75cc8d62a7790ec030d72920531f11e4158dc924f33d38be9a7bf203d72326",
+      "gates": {
+        "validate": "pass",
+        "deliver": "pass",
+        "check": "pass",
+        "browser-check": "pass"
+      },
+      "receipt": "GSiS-Schema-Contacts-v0.7.10.finalize-summary.json",
+      "visualReview": "automated browser checks only"
+    },
+    {
+      "artifact": "GSiS-Schema-Deploy-v0.7.10.html",
+      "specification": "architecture-source/GSiS-Schema-Deploy-v0.7.10.json",
+      "type": "erd",
+      "quality": "standard",
+      "sha256": "4e08d280a458ed7b7351e7d214b5e7868425f67fbe31da18ead322fcb6af5022",
+      "inputSha256": "9bc05079351780741f7dee23a7f0555ee53c7bef2d8a5d61de32906134869994",
+      "gates": {
+        "validate": "pass",
+        "deliver": "pass",
+        "check": "pass",
+        "browser-check": "pass"
+      },
+      "receipt": "GSiS-Schema-Deploy-v0.7.10.finalize-summary.json",
+      "visualReview": "automated browser checks only"
+    },
+    {
+      "artifact": "GSiS-Schema-Roster-Operations-v0.7.10.html",
+      "specification": "architecture-source/GSiS-Schema-Roster-Operations-v0.7.10.json",
+      "type": "erd",
+      "quality": "standard",
+      "sha256": "c38bf6bbc9bdd7423e62365d5a759a4d397db0285f8bb012fabe513576473c5c",
+      "inputSha256": "4712c6d32cebcd02177f98144248a9547c414e77c35a1e2f210ef0c0cba6d862",
+      "gates": {
+        "validate": "pass",
+        "deliver": "pass",
+        "check": "pass",
+        "browser-check": "pass"
+      },
+      "receipt": "GSiS-Schema-Roster-Operations-v0.7.10.finalize-summary.json",
+      "visualReview": "automated browser checks only"
+    },
+    {
+      "artifact": "GSiS-Schema-Roster-v0.7.10.html",
+      "specification": "architecture-source/GSiS-Schema-Roster-v0.7.10.json",
+      "type": "erd",
+      "quality": "standard",
+      "sha256": "47c45939c7572220e45635c162b6e3c7e02b1230955125ce057902a2f79556fb",
+      "inputSha256": "94c91a7a2768027c6e107d60ba0c3eaef8c804da91c355b5a256f0af9c6fb567",
+      "gates": {
+        "validate": "pass",
+        "deliver": "pass",
+        "check": "pass",
+        "browser-check": "pass"
+      },
+      "receipt": "GSiS-Schema-Roster-v0.7.10.finalize-summary.json",
+      "visualReview": "automated browser checks only"
+    },
+    {
+      "artifact": "GSiS-System-Map-v0.7.10.html",
+      "specification": "architecture-source/GSiS-System-Map-v0.7.10.json",
+      "type": "architecture",
+      "quality": "showcase",
+      "sha256": "92dab3bb9d8916ce3d0bf18dd259af69442c4273de499599b51138b2a2b0e373",
+      "inputSha256": "1abedae489107830d6d5f1c94e5b62a78b718125d3e822e22408965e6c8d3d63",
+      "gates": {
+        "validate": "pass",
+        "deliver": "pass",
+        "check": "pass",
+        "browser-check": "pass"
+      },
+      "receipt": "GSiS-System-Map-v0.7.10.finalize-summary.json",
+      "visualReview": "light capture inspected at 1440x900"
+    }
+  ]
+}

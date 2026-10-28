@@ -1,0 +1,48 @@
+"use strict";
+const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),{chromium}=require('playwright');
+const root=path.resolve(__dirname,'..'),S=require('../shared/roster-stapler.js');
+(async()=>{
+ const browser=await chromium.launch({headless:true,executablePath:process.env.ROSTER_TEST_CHROMIUM||'/tmp/chromium',args:['--no-sandbox']});
+ try{
+  const page=await browser.newPage({viewport:{width:1440,height:900}});await page.route('**/*',r=>r.fulfill({contentType:'text/html',body:'<!doctype html><main></main>'}));await page.goto('https://roster.test/');await page.evaluate(()=>Object.defineProperty(window,'indexedDB',{value:undefined,configurable:true}));
+  for(const name of ['roster.css','roster-operations.css','roster-stapler.css'])await page.addStyleTag({path:path.join(root,'roster-update/public',name)});
+  await page.addScriptTag({path:path.join(root,'shared/roster-stapler.js')});
+  const source=fs.readFileSync(path.join(root,'roster-update/public/roster-stapler-ui.js'),'utf8').replace('window.RosterStaplerUI={','window.testUI={state:()=>current,pending:()=>pending,clearPending:()=>pending=null,mark,mutate,persistDraft};window.RosterStaplerUI={');await page.addScriptTag({content:source});
+  const date='2026-10-28',periods=Array.from({length:17},(_,period)=>({period,startMinutes:420+30*period,endMinutes:450+30*period}));
+  const teachers=Array.from({length:100},(_,i)=>({staffId:'staff-'+i,name:'Teacher '+i,cells:periods.map((_,p)=>p>0&&p<11?['EL','Class '+i,'Room '+i,'']:['','','',''])})),people=teachers.map(t=>({id:t.staffId,name:t.name,active:true})),plan=S.create({date,id:'baseline',verified:true,schoolDay:true,periods,teachers,formClasses:[],recesses:[]});
+  await page.evaluate(({date,people,plan})=>{const clone=x=>JSON.parse(JSON.stringify(x));window.saved=clone(plan);window.rev=1;window.fail=false;window.calls=[];window.ctx={initialDate:date,today:()=>date,container:document.querySelector('main'),profile:{user:{admin:true,smc:true,email:'admin@school.test'}},status(){},api:async(_,input)=>{calls.push(clone(input));if(input.operation==='saveStapler'){saved=clone(input.plan);rev++;if(fail)throw Object.assign(Error('Response lost'),{status:503});}if(input.operation==='confirmStapler')saved.status='confirmed';const compact=input.operation==='confirmStapler'&&input.knownPlanContentTag==='fixture-tag';return {date,plan:compact?null:clone(saved),planContentTag:'fixture-tag',planUnchanged:compact,planStatus:saved.status,planRevision:saved.revision,revision:rev,staplerRevision:rev,confirmed:saved.status==='confirmed'?{revision:rev}:null,planningAllowed:true,canEdit:true,canConfirm:true,people,accessRequests:[],currentAbsences:{date,records:[],revision:0,checkedAt:'2026-10-24T00:00:00Z'}};}};}, {date,people,plan});
+  await page.evaluate(()=>RosterStaplerUI.render(ctx));
+  await page.evaluate(async()=>{const s=testUI.state(),next=JSON.parse(JSON.stringify(s.plan));next.tiles.find(t=>t.kind==='lesson').venue='Changed';testUI.mark(s,next);await testUI.persistDraft(s);window.baseKey=Object.keys(localStorage).find(k=>k.startsWith('gsis-stapler-local'));window.dirtyRaw=localStorage.getItem(baseKey);});
+  // Fill storage while preserving enough room for compact pending metadata, not two duplicate plans.
+  await page.evaluate(()=>{let pad='x'.repeat(32*1024);for(let i=0;i<200;i++){try{localStorage.setItem('fixture-fill-'+i,pad);}catch{break;}}for(let i=199;i>=0;i--)if(localStorage.getItem('fixture-fill-'+i)){localStorage.removeItem('fixture-fill-'+i);break;}fail=true;});
+  await page.evaluate(()=>testUI.mutate(testUI.state(),'saveStapler',{plan:testUI.state().plan}));
+  const failed=await page.evaluate(()=>({stored:JSON.parse(localStorage.getItem(baseKey)),request:calls.find(c=>c.operation==='saveStapler'),dirtyBytes:dirtyRaw.length,storedBytes:localStorage.getItem(baseKey).length}));
+  assert.ok(failed.request,'compact pending fits and is sent');assert.ok(failed.stored.pending,'pending identity is durable before dispatch');assert.ok(failed.storedBytes<failed.dirtyBytes+5000,'pending metadata must not duplicate either plan');
+  await page.evaluate(async()=>{RosterStaplerUI.unmount();testUI.clearPending();await RosterStaplerUI.render(ctx);});
+  const restored=await page.evaluate(()=>testUI.pending().input);assert.deepEqual(restored,failed.request,'reload reconstructs identical request, including request ID and both snapshots');
+  await page.evaluate(()=>{fail=false;Object.keys(localStorage).filter(k=>k.startsWith('fixture-fill')).forEach(k=>localStorage.removeItem(k));});
+  await page.evaluate(()=>testUI.mutate(testUI.state(),'saveStapler',{plan:testUI.state().plan}));
+  // Unchanged content acknowledgement must not lose table scroll or replace table nodes.
+  await page.evaluate(()=>{document.querySelector('[data-scroll="teacher"]').scrollTop=1500;document.querySelector('[data-scroll="class"]').scrollTop=600;window.tableBefore=document.querySelector('[data-scroll="teacher"] table');window.scrollBefore=document.querySelector('[data-scroll="teacher"]').scrollTop;});
+  await page.evaluate(()=>testUI.mutate(testUI.state(),'confirmStapler'));
+  const retained=await page.evaluate(()=>({before:scrollBefore,after:document.querySelector('[data-scroll="teacher"]').scrollTop,same:tableBefore===document.querySelector('[data-scroll="teacher"] table')}));
+  assert.ok(retained.before>0);assert.equal(retained.after,retained.before,'Confirm keeps teacher viewport');assert.equal(retained.same,true,'unchanged Confirm keeps table DOM');assert.equal(await page.evaluate(()=>calls.find(c=>c.operation==='confirmStapler').knownPlanContentTag),'fixture-tag','Confirm sends the last server tag');
+  // Lost compact Confirm acknowledgement survives a reload with its exact original command.
+  await page.evaluate(()=>{window.confirmApi=ctx.api;window.loseConfirm=true;ctx.api=async(name,input)=>{const data=await confirmApi(name,input);if(input.operation==='confirmStapler'&&loseConfirm){loseConfirm=false;window.lostConfirm=JSON.parse(JSON.stringify(input));throw Object.assign(Error('lost confirmation response'),{status:503});}return data;};});
+  await page.evaluate(()=>testUI.mutate(testUI.state(),'confirmStapler'));await page.evaluate(async()=>{RosterStaplerUI.unmount();testUI.clearPending();await RosterStaplerUI.render(ctx);});
+  assert.deepEqual(await page.evaluate(()=>testUI.pending().input),await page.evaluate(()=>lostConfirm));assert.equal(await page.evaluate(()=>testUI.state().dirty),false);
+  await page.evaluate(()=>testUI.mutate(testUI.state(),'confirmStapler'));assert.equal(await page.evaluate(()=>testUI.pending()),null);await page.evaluate(()=>ctx.api=confirmApi);
+  // Accepted old confirmation can replay against a restored draft; status must describe current state.
+  await page.evaluate(()=>{window.originalApi=ctx.api;ctx.api=async(name,input)=>{const data=await originalApi(name,input);if(input.operation==='confirmStapler'){data.planStatus='draft';data.confirmed=null;data.replayed=true;data.acceptedResult={confirmed:true};}return data;};});
+  await page.evaluate(()=>testUI.mutate(testUI.state(),'confirmStapler'));assert.match(await page.locator('[data-stapler-message]').innerText(),/current online plan is a draft/);assert.equal(await page.evaluate(()=>testUI.state().plan.status),'draft');await page.evaluate(()=>ctx.api=originalApi);
+  // A concurrent server change must replace the visible content, retaining viewport position.
+  await page.evaluate(()=>{document.querySelector('[data-scroll="teacher"]').scrollTop=1500;window.tableBefore=document.querySelector('[data-scroll="teacher"] table');window.previousApi=ctx.api;ctx.api=async(name,input)=>{const data=await previousApi(name,input);if(input.operation==='saveStapler'){data.plan.tiles.find(t=>t.kind==='lesson').venue='Server merged change';data.planContentTag='merged-tag';}return data;};});
+  await page.evaluate(()=>testUI.mutate(testUI.state(),'saveStapler',{plan:testUI.state().plan}));
+  const changed=await page.evaluate(()=>({same:tableBefore===document.querySelector('[data-scroll="teacher"] table'),scroll:document.querySelector('[data-scroll="teacher"]').scrollTop,visible:document.querySelector('[data-scroll="teacher"]').textContent.includes('Server merged change')}));assert.equal(changed.same,false);assert.equal(changed.visible,true);assert.equal(changed.scroll,1500);
+  // A full browser must not dispatch a new mutation whose recovery identity cannot be saved.
+  await page.evaluate(()=>{const s=testUI.state(),next=JSON.parse(JSON.stringify(s.plan));next.tiles.find(t=>t.kind==='lesson').venue='Next change';testUI.mark(s,next);window.callCount=calls.length;const native=Storage.prototype.setItem;window.restoreStorage=()=>Storage.prototype.setItem=native;Storage.prototype.setItem=function(k,v){if(this===localStorage)throw new DOMException('full','QuotaExceededError');return native.call(this,k,v);};});
+  await page.evaluate(()=>testUI.mutate(testUI.state(),'saveStapler',{plan:testUI.state().plan}));
+  const blocked=await page.evaluate(()=>({newCalls:calls.length-callCount,pending:testUI.pending(),message:document.querySelector('[data-stapler-message]').textContent,dirty:testUI.state().dirty}));assert.equal(blocked.newCalls,0);assert.equal(blocked.pending,null);assert.equal(blocked.dirty,true);assert.match(blocked.message,/not sent/i);
+  console.log('PASS compact pending snapshots, exact lost-response recovery, quota blocks first send, unchanged Confirm keeps DOM and scroll. '+JSON.stringify({dirtyBytes:failed.dirtyBytes,pendingBytes:failed.storedBytes,scroll:retained.after}));
+ }finally{await browser.close();}
+})().catch(e=>{console.error(e);process.exitCode=1;});

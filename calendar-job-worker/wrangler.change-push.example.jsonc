@@ -1,0 +1,24 @@
+// OPTIONAL PREPARATION ONLY. The new namespace/class needs explicit approval
+// before deployment. Reuse the existing Worker and dedicated Calendar D1.
+{
+  "name": "gsis-calendar-jobs",
+  "main": "worker.mjs",
+  "compatibility_date": "2026-10-27",
+  "workers_dev": false,
+  "preview_urls": false,
+  "triggers": { "crons": ["* * * * *"] },
+  "d1_databases": [{
+    "binding": "CALENDAR_JOBS_DB",
+    "database_name": "gsis-calendar-jobs",
+    "database_id": "REPLACE_WITH_EXISTING_CALENDAR_D1_DATABASE_ID"
+  }],
+  "durable_objects": {"bindings": [{"name": "CALENDAR_CHANGE_HUB", "class_name": "CalendarChangeHub"}]},
+  "migrations": [{"tag": "calendar-change-v1", "new_sqlite_classes": ["CalendarChangeHub"]}],
+  "vars": {
+    "CALENDAR_APPS_SCRIPT_URL": "https://script.google.com/macros/s/REPLACE_WITH_CALENDAR_DEPLOYMENT/exec",
+    "CALENDAR_SYNC_CONTINUE": "false",
+    "CALENDAR_CHANGE_PUSH": "false"
+  }
+  // Keep the existing GSIS_SECRET. After approved deployment + additive D1
+  // migration, set CALENDAR_CHANGE_PUSH=true here AND on Calendar Pages.
+}

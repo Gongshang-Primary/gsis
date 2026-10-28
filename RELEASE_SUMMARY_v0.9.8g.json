@@ -1,0 +1,20 @@
+{
+  "version": "0.9.8g",
+  "baseline": "0.9.8f",
+  "scope": ["Deploy recoverable class rename drafts", "GSIS_SECRET first party transport configuration", "setup and storage preparation guide", "Roster period timing export headers and Stapler workbook tabs", "teacher Stapler confirmed dates and own timetable navigation"],
+  "timetableCacheChanged": false,
+  "migrationRequired": false,
+  "productionDeployed": false,
+  "liveRecordsChanged": false,
+  "messagesSent": false,
+  "verification": {
+    "focusedPrograms": {"passed": 49, "failed": 0},
+    "lordPrograms": {"passed": 36, "failed": 0},
+    "nodeAggregate": {"passed": 783, "remainingInheritedFailures": 7, "total": 790, "method": "complete parallel run plus 32 fresh corrected fixture reruns; package parity separate"},
+    "singleGreenFullSuiteClaimed": false,
+    "appsScriptFilesParsed": 206,
+    "independentMaterialFindingsFixed": 3,
+    "productionValidationPerformed": false
+  },
+  "queuedForNextPatch": ["publish visibility policy", "independent SMC WhatsApp communication", "friendly Singapore notification timestamps", "UT auto cap with SMC override", "independent baseline and suspended timetable updates"]
+}

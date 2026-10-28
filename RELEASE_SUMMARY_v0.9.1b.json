@@ -1,0 +1,60 @@
+{
+  "version": "0.9.1b",
+  "baseline": "0.9.1a",
+  "baselineCommit": "306be4b2cfd76dbb6a4555b07703707f5ac0b1da",
+  "tag": "v0.9.1b",
+  "sourceCommitRecordedIn": "PATCH.json",
+  "components": [
+    "lordBackend",
+    "lordFrontend",
+    "overlordFrontend",
+    "starlordFrontend",
+    "rosterBackend",
+    "rosterFrontend",
+    "notificationWorker"
+  ],
+  "otherComponentVersion": "0.9.1",
+  "changes": [
+    "LORD Remarks and return controls",
+    "Combined booking read and bounded queue admission snapshot reuse",
+    "Actionable persistent OVERLORD task diagnostics",
+    "STARLORD complete-response deadline and recovery",
+    "Prepared immutable Roster timetable pieces",
+    "LORD photo upload identity, verified retry and durable evidence manifests",
+    "Report Absence picker responsiveness and local timetable hydration",
+    "Prominent timetable acknowledgement with confirmed success colour and faster initial loading"
+  ],
+  "verification": {
+    "lordProgramsPassed": 33,
+    "gsisProgramsPassed": 652,
+    "appsScriptSourcesParsed": 140,
+    "independentReviews": [
+      "LORD correctness",
+      "LORD queue/cache safety",
+      "OVERLORD warning retention",
+      "STARLORD timeout recovery",
+      "Roster source/privacy and browser review",
+      "LORD photo evidence and Drive v3 readiness",
+      "Report Absence cache authority and UI races",
+      "Private timetable acknowledgement and early-load errors",
+      "LORD component setup-file packaging"
+    ],
+    "gsisRun": "Initial full 650-program run: 648 passed; an unchanged performance test passed in isolation after its subprocess timeout, and notification parity passed after derived Worker regeneration. After final UI integration, all 158 related programs passed, including 2 new programs (652 distinct programs overall).",
+    "finalRelatedProgramsPassed": 158,
+    "finalRelatedProgramsFailed": 0
+  },
+  "newSettingsRequired": true,
+  "schemaMigrationRequired": false,
+  "liveDeploymentPerformed": false,
+  "liveSettingsChanged": false,
+  "providerMessagesSent": false,
+  "remotePushPerformed": false,
+  "venuesRuntimeIncluded": false,
+  "productBacklogIncluded": false,
+  "newAppsScriptServicesRequired": [
+    "Drive API v3"
+  ],
+  "newWorksheetsRequired": false,
+  "newScriptPropertiesRequired": false,
+  "newCloudflareBindingsRequired": false
+}

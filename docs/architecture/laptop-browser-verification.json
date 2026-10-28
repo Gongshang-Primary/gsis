@@ -1,0 +1,25 @@
+{
+  "ok": true,
+  "artifact": "GSiS_v0.9.2_Architecture.html",
+  "artifactSha256": "9ae4d3d673ba1d2b39ed10ebfaddbad2652e95ce23f1770d5468b55f7741dac7",
+  "measurements": [
+    {
+      "width": 1280,
+      "height": 800,
+      "scrollWidth": 1280,
+      "scrollHeight": 1842,
+      "svg": true,
+      "focusableNodes": 11
+    },
+    {
+      "width": 1366,
+      "height": 768,
+      "scrollWidth": 1366,
+      "scrollHeight": 1589,
+      "svg": true,
+      "focusableNodes": 11
+    }
+  ],
+  "externalRequests": [],
+  "notes": "Page-level vertical scrolling retains readable source cards; the diagram has no horizontal document overflow."
+}

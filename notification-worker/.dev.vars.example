@@ -1,0 +1,5 @@
+# Copy to platform configuration; never commit real secrets.
+WHATSAPP_ENABLED=false
+WHATSAPP_MENU_ENABLED=false
+ROSTER_AUTOMATION_ENABLED=false
+# Set verified values described in WHATSAPP_SETUP.md. No API version or school-action URL is guessed.

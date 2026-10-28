@@ -1,0 +1,33 @@
+'use strict';
+const assert=require('node:assert/strict'),fs=require('node:fs'),{JSDOM}=require('jsdom'),JSZip=require('jszip');
+(async()=>{
+ const dom=new JSDOM('<main id="content"></main>',{url:'https://roster.test',runScripts:'outside-only',pretendToBeVisual:true}),w=dom.window,downloads=[],objects=new Map(),errors=[];
+ w.JSZip=JSZip;w.Blob=Blob;w.structuredClone=structuredClone;w.HTMLElement.prototype.scrollIntoView=function(){};w.addEventListener('error',event=>errors.push(event.error));
+ w.URL.createObjectURL=blob=>{const url='blob:export-'+objects.size;objects.set(url,blob);return url;};w.URL.revokeObjectURL=url=>objects.delete(url);
+ w.HTMLAnchorElement.prototype.click=function(){downloads.push({filename:this.download,blob:objects.get(this.href)});};
+ const wait=async predicate=>{for(let n=0;n<200;n++){if(predicate())return;await new Promise(resolve=>setTimeout(resolve,10));}throw Error('Export did not finish: '+w.document.body.textContent);};
+ try{
+  for(const file of ['shared/roster-allocation.js','shared/roster-stapler.js','shared/roster-operations.js','tests/roster701-fixture.js','roster-update/public/converter.js','roster-update/public/roster-export.js','roster-update/public/roster-stapler-export.js','roster-update/public/roster-operations-ui.js'])w.eval(fs.readFileSync(file,'utf8'));
+  const f=w.__fixture,day=f.day;f.setClock(f.ctx.today+'T06:00:00+08:00');
+  f.state.absences.push({id:'absent',staffId:'alice',name:'Alice Teacher',date:f.ctx.today,typeLabel:'MC',typeId:'mc',periods:[2],reliefRequired:true,instructions:{},instructionsNA:true});
+  const week={days:['Monday','Tuesday','Wednesday','Thursday','Friday'],perDay:17,maxPeriod:16,blocks:day.teachers.map(t=>({name:t.name,cells:Array.from({length:5},()=>structuredClone(t.cells)).flat()}))};
+  const baseline={modelId:'baseline',model:{layoutMode:'odd-even',odd:structuredClone(week),even:structuredClone(week),maxPeriod:16,teacherCount:4,timing:{startMinutes:420,periodMinutes:30,normalLastPeriod:12,endOfDayMinutes:810},recesses:[]}};
+  const calls=[],ctx={profile:f.profile,today:()=>f.ctx.today,container:w.document.querySelector('#content'),status(){},localTimetable:async()=>baseline,api:async(route,p)=>{
+   calls.push(structuredClone(p));const response=await w.fetch('/'+route,{body:JSON.stringify(p)}),result=await response.json();if(!response.ok)throw Error(result.error);if(p.operation==='read'&&p.view==='allocation')result.data.exportContext=w.GSISRosterOperations.dailyExport(f.state,f.ctx,{date:p.date,fullTeachers:true});return result.data;
+  }};
+  await w.RosterOpsUI.render('Assign Relief',ctx);
+  await new Promise(r=>setTimeout(r,0));
+  const initialCalls=calls.length;let networkBlocked=true;const originalApi=ctx.api;ctx.api=async(...args)=>{if(networkBlocked)throw Error('Offline');return originalApi(...args);};
+  w.document.querySelector('[data-manual-select="dora"]').click();
+  const full=w.document.querySelector('[data-daily-excel]'),relief=w.document.querySelector('[data-relief-excel]');
+  assert.equal(full.textContent,'Export Excel');assert.equal(relief.textContent,'Export relief excel');assert.equal(full.parentElement,relief.parentElement);
+  full.click();await wait(()=>downloads.length===1);assert.equal(full.disabled,false);assert.equal(full.textContent,'Export Excel');assert.equal(calls.length,initialCalls,'full export makes no network call');
+  relief.click();await wait(()=>downloads.length===2);assert.equal(relief.disabled,false);assert.equal(calls.length,initialCalls,'relief export makes no network call');
+  w.document.querySelector('[data-class-excel]').click();await wait(()=>downloads.length===3);assert.equal(calls.length,initialCalls,'class export makes no network call');
+  const fullZip=await JSZip.loadAsync(await downloads[0].blob.arrayBuffer()),fullXml=await fullZip.file('xl/worksheets/sheet2.xml').async('string'),reliefZip=await JSZip.loadAsync(await downloads[1].blob.arrayBuffer()),reliefXml=await reliefZip.file('xl/worksheets/sheet1.xml').async('string');
+  for(const name of ['Alice Teacher','Bob Colleague','Charlie Busy','Dora Free'])assert(fullXml.includes(name),name+' included with no filter');
+  assert.match(fullXml,/Dora Free/);assert.match(fullXml,/Local snapshot/);assert.match(fullXml,/not saved/);assert.doesNotMatch(reliefXml,/Bob Colleague|Charlie Busy/);assert.match(reliefXml,/Alice Teacher/);assert.match(reliefXml,/Dora Free/);assert.match(reliefXml,/not saved/);
+  assert.match(downloads[0].filename,/Relief local snapshot/);assert.equal(downloads[1].filename,'GSiS Relief 2026-10-14.xlsx');assert.deepEqual(errors,[]);
+  console.log('PASS v0.8.2 all three offline exports create real XLSX from the unsaved local projection with snapshot labels and no network calls.');
+ }finally{dom.window.close();}
+})().catch(error=>{console.error(error);process.exitCode=1;});

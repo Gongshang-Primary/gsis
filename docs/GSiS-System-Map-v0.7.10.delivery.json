@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "receiptId": "86c8f326-e3e8-4d88-aa87-ad5f3949a40f",
+  "status": "current",
+  "command": "deliver",
+  "type": "architecture",
+  "input": "/workspace/scratch/c84f0276cce6/build710/source/docs/architecture-source/GSiS-System-Map-v0.7.10.json",
+  "output": "/workspace/scratch/c84f0276cce6/build710/source/docs/GSiS-System-Map-v0.7.10.html",
+  "specification": {
+    "sha256": "1abedae489107830d6d5f1c94e5b62a78b718125d3e822e22408965e6c8d3d63",
+    "bytes": 5123
+  },
+  "artifact": {
+    "sha256": "92dab3bb9d8916ce3d0bf18dd259af69442c4273de499599b51138b2a2b0e373",
+    "bytes": 828419
+  }
+}

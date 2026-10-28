@@ -1,0 +1,3904 @@
+{
+  "version": "0.5.04",
+  "kind": "Static current-source I/O and call-site inventory; dynamic measurements are separate",
+  "files": [
+    {
+      "file": "backend/Code.gs",
+      "sha256": "0d1075b1bdab593f972fe63ef07ca367b5d8e32dcdac824ae17085ef36345c20",
+      "functionCount": 408
+    },
+    {
+      "file": "Contacts_Code.gs",
+      "sha256": "d28f7da4be1b8ff3c5933f5b1fdbe02012156de4eff2a94fa0759806abbb5db9",
+      "functionCount": 281
+    },
+    {
+      "file": "backend/Contacts_Catalogue.gs",
+      "sha256": "cbb7da26f10f37c660c02ceb47f08da649866170256d3de5f74b98cfc158ba0f",
+      "functionCount": 20
+    },
+    {
+      "file": "backend/Contacts_Commit.gs",
+      "sha256": "415c4e2b91f4505760c800beba8f42600d070c9b4099374572d8a880870b290c",
+      "functionCount": 10
+    },
+    {
+      "file": "backend/Contacts_Current.gs",
+      "sha256": "6a3ef1ec111d46d4a6c1ccfbfb2e663fd9558e31f0ba292d207057804c92de6b",
+      "functionCount": 14
+    },
+    {
+      "file": "backend/Contacts_Diagnostics.gs",
+      "sha256": "74280e053382e4fc00054ab2846fb19add526102f557ccfcf004db2eb7277480",
+      "functionCount": 10
+    },
+    {
+      "file": "backend/Contacts_View.gs",
+      "sha256": "627f22da10f92c63dbb78b6fa460f8ce337f85a295df359525d7a23449a9f07a",
+      "functionCount": 35
+    },
+    {
+      "file": "backend/FieldStore.gs",
+      "sha256": "3d1d60077a848f842be7eacedd4fe1c7d210defa5294dfd7c7ad47662df1d2e2",
+      "functionCount": 148
+    },
+    {
+      "file": "backend/LayoutRepository.gs",
+      "sha256": "f11e79f36bd2f743f68b3aea6c642cd1044bb587dfe83ade5ceadd4e2806b9a2",
+      "functionCount": 50
+    },
+    {
+      "file": "backend/NoticeAcknowledgement.gs",
+      "sha256": "0d05faed09cbabf9f8f2a1792859b13ccddd38e20671c1ea0c5becffa4d25b74",
+      "functionCount": 13
+    },
+    {
+      "file": "backend/Planning.gs",
+      "sha256": "b52dc0045b353f46c74d76452ea611c94daa421027f92b717fd8cc2700954e51",
+      "functionCount": 20
+    },
+    {
+      "file": "backend/PlanningPatch.gs",
+      "sha256": "ec855193afa440c67c7e67e0d41c8126be2e10ead0bdf01ed2cd518f3356f2d1",
+      "functionCount": 4
+    },
+    {
+      "file": "backend/SheetsIO.gs",
+      "sha256": "2318cae8e1482bd236d98750beda62725ed1e6feb37b49fcd1d6aacb3c32f5f3",
+      "functionCount": 27
+    },
+    {
+      "file": "backend/VersionNotes.gs",
+      "sha256": "9b0fc3a0c504600d6c8302559d6afab465b2c18356c3d38cbd18d09e965ee58e",
+      "functionCount": 2
+    },
+    {
+      "file": "public/app.js",
+      "sha256": "cc4831d050cd208a9a56756ad147d0af334a12f2bdb4cd0fa083e6a0a64b99af",
+      "functionCount": 671
+    },
+    {
+      "file": "public/planning-ui.js",
+      "sha256": "1ef17005ea62159ee58a9fb955e93e58f046a2701b03d310689a3d1581c42333",
+      "functionCount": 202
+    },
+    {
+      "file": "contacts-update/public/app.js",
+      "sha256": "f01fa1685d55b6e8f79fd18fc97d1e9bf869fad3066d7edbd30178a19431ac1c",
+      "functionCount": 249
+    },
+    {
+      "file": "layout-update/public/app.js",
+      "sha256": "34a43969e8ec0599438dfe34f153d803e3ff6cfb28783d3273042a4cc578c311",
+      "functionCount": 104
+    },
+    {
+      "file": "shared/transport.js",
+      "sha256": "6901edb28ea529ba9fb6e5ca6ebe310d19bca7d7f81d2a7871fb3f511a77a7be",
+      "functionCount": 5
+    },
+    {
+      "file": "public/_worker.js",
+      "sha256": "be0ab92918a62fe88859fc630a5d75bceb3593bfa443bb7d96e1cf3ca1f074a9",
+      "functionCount": 23
+    },
+    {
+      "file": "contacts-update/public/_worker.js",
+      "sha256": "1db48285bdccbeaed963e61f8da17a5912488dc05e817bd30d53878736f7c537",
+      "functionCount": 17
+    },
+    {
+      "file": "layout-update/public/_worker.js",
+      "sha256": "16036b1827d4dd9f5d21ce16fde1042f7d043395e20a744b486b961cb77d68f7",
+      "functionCount": 18
+    }
+  ],
+  "routes": [
+    {
+      "file": "public/_worker.js",
+      "path": "/api/acknowledgeNotices",
+      "action": "acknowledgeNotices"
+    },
+    {
+      "file": "public/_worker.js",
+      "path": "/api/auditPage",
+      "action": "auditPage"
+    },
+    {
+      "file": "public/_worker.js",
+      "path": "/api/versionNote",
+      "action": "versionNote"
+    },
+    {
+      "file": "public/_worker.js",
+      "path": "/api/delta",
+      "action": "delta"
+    },
+    {
+      "file": "public/_worker.js",
+      "path": "/api/receipt",
+      "action": "receipt"
+    },
+    {
+      "file": "public/_worker.js",
+      "path": "/api/roleTruthTable",
+      "action": "roleTruthTable"
+    },
+    {
+      "file": "public/_worker.js",
+      "path": "/api/saveRoleTruthTable",
+      "action": "saveRoleTruthTable"
+    },
+    {
+      "file": "public/_worker.js",
+      "path": "/api/landmark/catalog",
+      "action": "publicCampus"
+    },
+    {
+      "file": "public/_worker.js",
+      "path": "/api/landmark/unit",
+      "action": "landmarkUnit"
+    },
+    {
+      "file": "public/_worker.js",
+      "path": "/api/landmark/search",
+      "action": "landmarkSearch"
+    },
+    {
+      "file": "public/_worker.js",
+      "path": "/api/publishReview",
+      "action": "publishReview"
+    },
+    {
+      "file": "public/_worker.js",
+      "path": "/api/bootstrap",
+      "action": "bootstrap"
+    },
+    {
+      "file": "public/_worker.js",
+      "path": "/api/sync",
+      "action": "sync"
+    },
+    {
+      "file": "public/_worker.js",
+      "path": "/api/lease",
+      "action": "lease"
+    },
+    {
+      "file": "public/_worker.js",
+      "path": "/api/change",
+      "action": "change"
+    },
+    {
+      "file": "public/_worker.js",
+      "path": "/api/active",
+      "action": "active"
+    },
+    {
+      "file": "public/_worker.js",
+      "path": "/api/live-ticket",
+      "action": "live-ticket"
+    },
+    {
+      "file": "public/_worker.js",
+      "path": "/api/layout-reference",
+      "action": "layout-reference"
+    },
+    {
+      "file": "public/_worker.js",
+      "path": "/api/campus-map",
+      "action": "campus-map"
+    },
+    {
+      "file": "contacts-update/public/_worker.js",
+      "path": "/api/save-signature-settings",
+      "action": "saveSignatureSettings"
+    },
+    {
+      "file": "contacts-update/public/_worker.js",
+      "path": "/api/recovery-status",
+      "action": "recoveryStatus"
+    },
+    {
+      "file": "contacts-update/public/_worker.js",
+      "path": "/api/recover-save",
+      "action": "recoverSave"
+    },
+    {
+      "file": "contacts-update/public/_worker.js",
+      "path": "/api/bootstrap",
+      "action": "bootstrap"
+    },
+    {
+      "file": "contacts-update/public/_worker.js",
+      "path": "/api/deployment",
+      "action": "deployment"
+    },
+    {
+      "file": "contacts-update/public/_worker.js",
+      "path": "/api/kp",
+      "action": "setKP"
+    },
+    {
+      "file": "contacts-update/public/_worker.js",
+      "path": "/api/data",
+      "action": "data"
+    },
+    {
+      "file": "contacts-update/public/_worker.js",
+      "path": "/api/save-receipt",
+      "action": "saveReceipt"
+    },
+    {
+      "file": "contacts-update/public/_worker.js",
+      "path": "/api/save-data",
+      "action": "saveData"
+    },
+    {
+      "file": "contacts-update/public/_worker.js",
+      "path": "/api/recalculate-data",
+      "action": "recalculateData"
+    },
+    {
+      "file": "contacts-update/public/_worker.js",
+      "path": "/api/sysFields",
+      "action": "sysFields"
+    },
+    {
+      "file": "contacts-update/public/_worker.js",
+      "path": "/api/membership",
+      "action": "membership"
+    },
+    {
+      "file": "contacts-update/public/_worker.js",
+      "path": "/api/offload",
+      "action": "offload"
+    },
+    {
+      "file": "contacts-update/public/_worker.js",
+      "path": "/api/diy",
+      "action": "diy"
+    },
+    {
+      "file": "contacts-update/public/_worker.js",
+      "path": "/api/save-admin-table",
+      "action": "saveAdminTable"
+    },
+    {
+      "file": "contacts-update/public/_worker.js",
+      "path": "/api/save-diy",
+      "action": "saveDIY"
+    },
+    {
+      "file": "layout-update/public/_worker.js",
+      "path": "/api/profile",
+      "action": "campusProfile"
+    }
+  ],
+  "functions": [
+    {
+      "file": "backend/Code.gs",
+      "function": "validateClassNameSet_",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "error_",
+        "text_"
+      ]
+    },
+    {
+      "file": "backend/Code.gs",
+      "function": "validateClassNameSet_",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "error_",
+        "text_"
+      ]
+    },
+    {
+      "file": "backend/Code.gs",
+      "function": "out_",
+      "serviceCallSites": [
+        "GSISSheets.stats"
+      ],
+      "delegatedCalls": []
+    },
+    {
+      "file": "backend/Code.gs",
+      "function": "props_",
+      "serviceCallSites": [
+        "PropertiesService.getScriptProperties"
+      ],
+      "delegatedCalls": []
+    },
+    {
+      "file": "backend/Code.gs",
+      "function": "book_",
+      "serviceCallSites": [
+        "SpreadsheetApp.openById"
+      ],
+      "delegatedCalls": []
+    },
+    {
+      "file": "backend/Code.gs",
+      "function": "setupDeploy",
+      "serviceCallSites": [
+        "props_().getProperty",
+        "props_().setProperty",
+        "s.getRange",
+        "s.getRange().getValue",
+        "s.getRange().setValues"
+      ],
+      "delegatedCalls": [
+        "book_",
+        "props_"
+      ]
+    },
+    {
+      "file": "backend/Code.gs",
+      "function": "setupDeploy",
+      "serviceCallSites": [
+        "s.getLastRow",
+        "s.getRange",
+        "s.getRange().getValues"
+      ],
+      "delegatedCalls": []
+    },
+    {
+      "file": "backend/Code.gs",
+      "function": "index_",
+      "serviceCallSites": [
+        "b.getSheetByName().getRange",
+        "b.getSheetByName().getRange().getValue"
+      ],
+      "delegatedCalls": [
+        "error_"
+      ]
+    },
+    {
+      "file": "backend/Code.gs",
+      "function": "document_",
+      "serviceCallSites": [
+        "b.getSheetByName().getRange",
+        "b.getSheetByName().getRange().getValues"
+      ],
+      "delegatedCalls": [
+        "error_",
+        "fieldRead_",
+        "model_"
+      ]
+    },
+    {
+      "file": "backend/Code.gs",
+      "function": "persist_",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "fieldPersist_"
+      ]
+    },
+    {
+      "file": "backend/Code.gs",
+      "function": "cleanOld_",
+      "serviceCallSites": [
+        "GSISSheets.read",
+        "s.getLastRow",
+        "s.getRange",
+        "s.getRange().clearContent"
+      ],
+      "delegatedCalls": [
+        "index_",
+        "publishedEntry_"
+      ]
+    },
+    {
+      "file": "backend/Code.gs",
+      "function": "contacts_",
+      "serviceCallSites": [
+        "UrlFetchApp.fetch",
+        "p.getProperty"
+      ],
+      "delegatedCalls": [
+        "error_",
+        "props_",
+        "signature_"
+      ]
+    },
+    {
+      "file": "backend/Code.gs",
+      "function": "doGet",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "out_"
+      ]
+    },
+    {
+      "file": "backend/Code.gs",
+      "function": "doPost",
+      "serviceCallSites": [
+        "GSISSheets.resetStats",
+        "props_().getProperty"
+      ],
+      "delegatedCalls": [
+        "campusProfile_",
+        "contacts_",
+        "dispatch_",
+        "error_",
+        "out_",
+        "props_",
+        "publicCampus_",
+        "publicLayout_",
+        "renameCampusUnit_",
+        "same_",
+        "signature_"
+      ]
+    },
+    {
+      "file": "backend/Code.gs",
+      "function": "auth_",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "error_"
+      ]
+    },
+    {
+      "file": "backend/Code.gs",
+      "function": "resolveTeachers_",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "membershipCatalogue_"
+      ]
+    },
+    {
+      "file": "backend/Code.gs",
+      "function": "publication_",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "publishedEntry_"
+      ]
+    },
+    {
+      "file": "backend/Code.gs",
+      "function": "versionRow_",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "publication_"
+      ]
+    },
+    {
+      "file": "backend/Code.gs",
+      "function": "view_",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "pendingNotices_",
+        "publication_",
+        "resolveTeachers_"
+      ]
+    },
+    {
+      "file": "backend/Code.gs",
+      "function": "visible_",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "error_"
+      ]
+    },
+    {
+      "file": "backend/Code.gs",
+      "function": "leases_",
+      "serviceCallSites": [
+        "props_().getProperty"
+      ],
+      "delegatedCalls": [
+        "props_"
+      ]
+    },
+    {
+      "file": "backend/Code.gs",
+      "function": "model_",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "defaultClassNameSets_",
+        "retireUnusedLegacy_"
+      ]
+    },
+    {
+      "file": "backend/Code.gs",
+      "function": "model_",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "hash_"
+      ]
+    },
+    {
+      "file": "backend/Code.gs",
+      "function": "resource_",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "classKey_"
+      ]
+    },
+    {
+      "file": "backend/Code.gs",
+      "function": "snapshot_",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "auth_",
+        "document_",
+        "hash_",
+        "hrTerms_",
+        "leases_",
+        "noticeAckEpoch_",
+        "planningContext_",
+        "publishedEntry_"
+      ]
+    },
+    {
+      "file": "backend/Code.gs",
+      "function": "snapshot_",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "versionRow_"
+      ]
+    },
+    {
+      "file": "backend/Code.gs",
+      "function": "snapshot_",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "view_"
+      ]
+    },
+    {
+      "file": "backend/Code.gs",
+      "function": "dispatch_",
+      "serviceCallSites": [
+        "LockService.getScriptLock",
+        "b.getSheetByName().getRange",
+        "b.getSheetByName().getRange().setValue",
+        "props_().setProperty"
+      ],
+      "delegatedCalls": [
+        "acknowledgeNotices_",
+        "activeExport_",
+        "apply_",
+        "approveTeacherPublish_",
+        "auditPage_",
+        "auth_",
+        "batchCells_",
+        "book_",
+        "cleanOld_",
+        "committedDelta_",
+        "contacts_",
+        "copyVersion_",
+        "deployFlush_",
+        "deployLock_",
+        "diff_",
+        "document_",
+        "draftReadScope_",
+        "duplicateDraft_",
+        "error_",
+        "fieldDelta_",
+        "fieldReceipt_",
+        "fieldRecover_",
+        "hash_",
+        "hrTerms_",
+        "index_",
+        "landmarkRead_",
+        "leases_",
+        "log_",
+        "model_",
+        "persist_",
+        "planningContext_",
+        "props_",
+        "publishReview_",
+        "publishedEntry_",
+        "resolveTeachers_",
+        "resource_",
+        "saveDraft_",
+        "saveExclusionCell_",
+        "saveVersionNote_",
+        "snapshot_",
+        "syncLayoutPublication_",
+        "syncPublishedCatalogues_",
+        "visible_"
+      ]
+    },
+    {
+      "file": "backend/Code.gs",
+      "function": "dispatch_",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "versionRow_"
+      ]
+    },
+    {
+      "file": "backend/Code.gs",
+      "function": "text_",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "error_"
+      ]
+    },
+    {
+      "file": "backend/Code.gs",
+      "function": "apply_",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "assertTeacherNames_",
+        "auth_",
+        "classKey_",
+        "deployEligible_",
+        "error_",
+        "model_",
+        "periods_",
+        "readLandmarkRegistry_",
+        "retireUnusedLegacy_",
+        "saveTeacherProfile_",
+        "teacherContactChanges_",
+        "text_",
+        "validateClassNameSet_"
+      ]
+    },
+    {
+      "file": "backend/Code.gs",
+      "function": "apply_",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "classKey_"
+      ]
+    },
+    {
+      "file": "backend/Code.gs",
+      "function": "apply_",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "classKey_"
+      ]
+    },
+    {
+      "file": "backend/Code.gs",
+      "function": "apply_",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "classKey_"
+      ]
+    },
+    {
+      "file": "backend/Code.gs",
+      "function": "apply_",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "classKey_"
+      ]
+    },
+    {
+      "file": "backend/Code.gs",
+      "function": "apply_",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "classKey_"
+      ]
+    },
+    {
+      "file": "backend/Code.gs",
+      "function": "apply_",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "classKey_"
+      ]
+    },
+    {
+      "file": "backend/Code.gs",
+      "function": "apply_",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "classKey_"
+      ]
+    },
+    {
+      "file": "backend/Code.gs",
+      "function": "apply_",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "periods_"
+      ]
+    },
+    {
+      "file": "backend/Code.gs",
+      "function": "apply_",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "classKey_"
+      ]
+    },
+    {
+      "file": "backend/Code.gs",
+      "function": "apply_",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "classKey_"
+      ]
+    },
+    {
+      "file": "backend/Code.gs",
+      "function": "apply_",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "classKey_"
+      ]
+    },
+    {
+      "file": "backend/Code.gs",
+      "function": "apply_",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "classKey_"
+      ]
+    },
+    {
+      "file": "backend/Code.gs",
+      "function": "apply_",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "classKey_"
+      ]
+    },
+    {
+      "file": "backend/Code.gs",
+      "function": "apply_",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "classKey_"
+      ]
+    },
+    {
+      "file": "backend/Code.gs",
+      "function": "sameStaff_",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "hash_"
+      ]
+    },
+    {
+      "file": "backend/Code.gs",
+      "function": "activeExport_",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "periods_"
+      ]
+    },
+    {
+      "file": "backend/Code.gs",
+      "function": "activeExport_",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "classKey_"
+      ]
+    },
+    {
+      "file": "backend/Code.gs",
+      "function": "saveExclusionCell_",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "auth_",
+        "error_",
+        "log_",
+        "persist_"
+      ]
+    },
+    {
+      "file": "backend/Code.gs",
+      "function": "batchCells_",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "apply_",
+        "auth_",
+        "cellState_",
+        "error_",
+        "leases_",
+        "log_",
+        "persist_"
+      ]
+    },
+    {
+      "file": "backend/Code.gs",
+      "function": "setupLandmarkDeploy",
+      "serviceCallSites": [
+        "props_().setProperty"
+      ],
+      "delegatedCalls": [
+        "props_",
+        "readLandmarkRegistry_"
+      ]
+    },
+    {
+      "file": "backend/Code.gs",
+      "function": "readLandmarkRegistry_",
+      "serviceCallSites": [
+        "SpreadsheetApp.openById",
+        "SpreadsheetApp.openById().getSheetByName",
+        "props_().getProperty",
+        "range.getFormulas",
+        "range.getValues",
+        "sheet.getDataRange"
+      ],
+      "delegatedCalls": [
+        "error_",
+        "hash_",
+        "props_"
+      ]
+    },
+    {
+      "file": "backend/Code.gs",
+      "function": "readLandmarkRegistry_",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "error_"
+      ]
+    },
+    {
+      "file": "backend/Code.gs",
+      "function": "landmarkRegistry_",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "hash_"
+      ]
+    },
+    {
+      "file": "backend/Code.gs",
+      "function": "landmarkAllocations_",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "error_"
+      ]
+    },
+    {
+      "file": "backend/Code.gs",
+      "function": "landmarkRead_",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "document_",
+        "error_",
+        "landmarkAllocations_",
+        "landmarkRegistry_",
+        "publishedEntry_",
+        "text_",
+        "visible_"
+      ]
+    },
+    {
+      "file": "backend/Code.gs",
+      "function": "landmarkRead_",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "classKey_"
+      ]
+    },
+    {
+      "file": "backend/Code.gs",
+      "function": "publicCampus_",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "book_",
+        "document_",
+        "error_",
+        "fieldJournalRead_",
+        "index_",
+        "publicCampusDocument_",
+        "publishedEntry_"
+      ]
+    },
+    {
+      "file": "backend/Code.gs",
+      "function": "publicCampusDocument_",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "error_",
+        "landmarkRegistry_"
+      ]
+    },
+    {
+      "file": "backend/Code.gs",
+      "function": "publicCampusDocument_",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "error_",
+        "landmarkAllocations_"
+      ]
+    },
+    {
+      "file": "backend/Code.gs",
+      "function": "publicCampusDocument_",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "classKey_"
+      ]
+    },
+    {
+      "file": "backend/Code.gs",
+      "function": "publicCampusDocument_",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "classKey_"
+      ]
+    },
+    {
+      "file": "backend/Code.gs",
+      "function": "campusProfile_",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "book_",
+        "document_",
+        "index_"
+      ]
+    },
+    {
+      "file": "backend/Code.gs",
+      "function": "renameCampusUnit_",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "auth_",
+        "error_"
+      ]
+    },
+    {
+      "file": "backend/Code.gs",
+      "function": "resumeLegacyCampusUnit501_",
+      "serviceCallSites": [
+        "LockService.getScriptLock",
+        "SpreadsheetApp.openById",
+        "SpreadsheetApp.openById().getSheetByName",
+        "props_().getProperty",
+        "props_().setProperty",
+        "range.getFormulas",
+        "range.getValues",
+        "sheet.getDataRange",
+        "sourceRange.getFormulas",
+        "sourceRange.getValues"
+      ],
+      "delegatedCalls": [
+        "auth_",
+        "book_",
+        "deployFlush_",
+        "deployLock_",
+        "document_",
+        "error_",
+        "hash_",
+        "index_",
+        "landmarkAllocations_",
+        "landmarkRegistry_",
+        "log_",
+        "persist_",
+        "props_",
+        "publishedEntry_",
+        "readLandmarkRegistry_",
+        "text_"
+      ]
+    },
+    {
+      "file": "backend/Code.gs",
+      "function": "resumeLegacyCampusUnit501_",
+      "serviceCallSites": [
+        "sheet.getRange",
+        "sheet.getRange().setValue"
+      ],
+      "delegatedCalls": []
+    },
+    {
+      "file": "backend/Code.gs",
+      "function": "draftKey_",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "isPlanningOp_"
+      ]
+    },
+    {
+      "file": "backend/Code.gs",
+      "function": "draftValue_",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "cellState_",
+        "isPlanningOp_",
+        "planningPatchValue_",
+        "planningValue_"
+      ]
+    },
+    {
+      "file": "backend/Code.gs",
+      "function": "duplicateDraft_",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "error_",
+        "hash_",
+        "storedReceipt_"
+      ]
+    },
+    {
+      "file": "backend/Code.gs",
+      "function": "saveDraft_",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "applyPlanningPatch_",
+        "applyPlanning_",
+        "apply_",
+        "auth_",
+        "classKey_",
+        "committedDelta_",
+        "draftKey_",
+        "draftLocation_",
+        "draftValue_",
+        "error_",
+        "hash_",
+        "isPlanningOp_",
+        "leases_",
+        "log_",
+        "persist_",
+        "saveHRTerms_",
+        "saveTeacherProfile_",
+        "storedReceipt_",
+        "teacherProfile_",
+        "validateOffload_"
+      ]
+    },
+    {
+      "file": "backend/Code.gs",
+      "function": "saveDraft_",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "classKey_",
+        "error_"
+      ]
+    },
+    {
+      "file": "backend/Code.gs",
+      "function": "draftLocation_",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "classKey_",
+        "isPlanningOp_"
+      ]
+    },
+    {
+      "file": "backend/Code.gs",
+      "function": "teacherContactChanges_",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "error_",
+        "teacherProfile_"
+      ]
+    },
+    {
+      "file": "backend/Code.gs",
+      "function": "teacherContactChanges_",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "teacherProfile_"
+      ]
+    },
+    {
+      "file": "backend/Code.gs",
+      "function": "teacherContactChanges_",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "teacherProfile_"
+      ]
+    },
+    {
+      "file": "backend/Code.gs",
+      "function": "saveTeacherProfile_",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "contacts_",
+        "error_",
+        "hrTerms_",
+        "membershipCatalogue_",
+        "normaliseEO_"
+      ]
+    },
+    {
+      "file": "backend/Code.gs",
+      "function": "publishReview_",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "auth_",
+        "contacts_",
+        "document_",
+        "planningContext_",
+        "resolveTeachers_",
+        "teacherContactChanges_",
+        "visible_"
+      ]
+    },
+    {
+      "file": "backend/Code.gs",
+      "function": "approveTeacherPublish_",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "assertTeacherNames_",
+        "auth_",
+        "contacts_",
+        "error_",
+        "resolveTeachers_",
+        "teacherContactChanges_",
+        "teacherProfile_"
+      ]
+    },
+    {
+      "file": "backend/Code.gs",
+      "function": "approveTeacherPublish_",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "profileName_"
+      ]
+    },
+    {
+      "file": "backend/Code.gs",
+      "function": "assertTeacherNames_",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "error_",
+        "profileName_",
+        "teacherProfile_"
+      ]
+    },
+    {
+      "file": "backend/Code.gs",
+      "function": "validateOffload_",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "error_"
+      ]
+    },
+    {
+      "file": "backend/Code.gs",
+      "function": "saveHRTerms_",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "auth_",
+        "error_",
+        "hrTerms_"
+      ]
+    },
+    {
+      "file": "backend/Code.gs",
+      "function": "copyVersion_",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "hrTerms_",
+        "text_"
+      ]
+    },
+    {
+      "file": "backend/Code.gs",
+      "function": "copyVersion_",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "deployEligible_"
+      ]
+    },
+    {
+      "file": "backend/Code.gs",
+      "function": "deployFlush_",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "deployPhase_"
+      ]
+    },
+    {
+      "file": "backend/Code.gs",
+      "function": "deployFlush_",
+      "serviceCallSites": [
+        "SpreadsheetApp.flush"
+      ],
+      "delegatedCalls": []
+    },
+    {
+      "file": "backend/Code.gs",
+      "function": "deployLock_",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "deployPhase_"
+      ]
+    },
+    {
+      "file": "backend/Code.gs",
+      "function": "deployLock_",
+      "serviceCallSites": [
+        "lock.tryLock"
+      ],
+      "delegatedCalls": []
+    },
+    {
+      "file": "backend/Code.gs",
+      "function": "anonymous",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "deployPhase_"
+      ]
+    },
+    {
+      "file": "backend/Code.gs",
+      "function": "anonymous",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "deployPhase_"
+      ]
+    },
+    {
+      "file": "backend/Code.gs",
+      "function": "anonymous",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "deployPhase_"
+      ]
+    },
+    {
+      "file": "backend/Code.gs",
+      "function": "anonymous",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "deployPhase_"
+      ]
+    },
+    {
+      "file": "backend/Code.gs",
+      "function": "anonymous",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "deployPhase_"
+      ]
+    },
+    {
+      "file": "backend/Code.gs",
+      "function": "anonymous",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "deployPhase_"
+      ]
+    },
+    {
+      "file": "backend/Code.gs",
+      "function": "anonymous",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "deployPhase_"
+      ]
+    },
+    {
+      "file": "backend/Code.gs",
+      "function": "anonymous",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "deployPhase_"
+      ]
+    },
+    {
+      "file": "backend/Code.gs",
+      "function": "anonymous",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "deployPhase_"
+      ]
+    },
+    {
+      "file": "backend/Code.gs",
+      "function": "anonymous",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "deployPhase_"
+      ]
+    },
+    {
+      "file": "backend/Code.gs",
+      "function": "anonymous",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "deployPhase_"
+      ]
+    },
+    {
+      "file": "backend/Code.gs",
+      "function": "anonymous",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "deployPhase_"
+      ]
+    },
+    {
+      "file": "backend/Code.gs",
+      "function": "anonymous",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "deployPhase_"
+      ]
+    },
+    {
+      "file": "backend/Code.gs",
+      "function": "prepareSheetsAPI414",
+      "serviceCallSites": [
+        "GSISSheets.check"
+      ],
+      "delegatedCalls": [
+        "book_"
+      ]
+    },
+    {
+      "file": "Contacts_Code.gs",
+      "function": "setupGSiS",
+      "serviceCallSites": [
+        "PropertiesService.getScriptProperties",
+        "SpreadsheetApp.openById",
+        "properties.getProperty",
+        "properties.setProperty"
+      ],
+      "delegatedCalls": [
+        "access_",
+        "required_",
+        "table_"
+      ]
+    },
+    {
+      "file": "Contacts_Code.gs",
+      "function": "setupGSiS",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "roles_"
+      ]
+    },
+    {
+      "file": "Contacts_Code.gs",
+      "function": "doGet",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "reply_"
+      ]
+    },
+    {
+      "file": "Contacts_Code.gs",
+      "function": "doPost",
+      "serviceCallSites": [
+        "GSISSheets.resetStats",
+        "PropertiesService.getScriptProperties",
+        "PropertiesService.getScriptProperties().getProperty"
+      ],
+      "delegatedCalls": [
+        "adminTable_",
+        "applyDeployCatalogues_",
+        "approveDeployTeachers_",
+        "bootstrapWithDeploy_",
+        "contactAuthority_",
+        "contactData_",
+        "contactFailure_",
+        "contactPhase_",
+        "contactPrefetchDirectory_",
+        "contactRecoveryStatus_",
+        "contactSaveReceipt_",
+        "contactViewRead_",
+        "contactViewReset_",
+        "deployPublishReview_",
+        "deploySnapshot_",
+        "deploymentData_",
+        "ensureContactsReady_",
+        "equal_",
+        "fault_",
+        "invalidateDeployReadCache_",
+        "recalculateContactData_",
+        "recoverContactSave_",
+        "reply_",
+        "saveAdminTable_",
+        "saveContactData_",
+        "saveSignatureSettings_",
+        "setKP_"
+      ]
+    },
+    {
+      "file": "Contacts_Code.gs",
+      "function": "doPost",
+      "serviceCallSites": [
+        "SpreadsheetApp.openById"
+      ],
+      "delegatedCalls": []
+    },
+    {
+      "file": "Contacts_Code.gs",
+      "function": "doPost",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "adminTable_",
+        "bootstrapWithDeploy_",
+        "contactData_",
+        "contactPrefetchDirectory_",
+        "deploySnapshot_"
+      ]
+    },
+    {
+      "file": "Contacts_Code.gs",
+      "function": "contactEpoch_",
+      "serviceCallSites": [
+        "PropertiesService.getScriptProperties",
+        "PropertiesService.getScriptProperties().setProperty"
+      ],
+      "delegatedCalls": []
+    },
+    {
+      "file": "Contacts_Code.gs",
+      "function": "reply_",
+      "serviceCallSites": [
+        "GSISSheets.stats",
+        "PropertiesService.getScriptProperties",
+        "PropertiesService.getScriptProperties().getProperty"
+      ],
+      "delegatedCalls": [
+        "fault_"
+      ]
+    },
+    {
+      "file": "Contacts_Code.gs",
+      "function": "table_",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "contactViewTable_",
+        "readContactTable_"
+      ]
+    },
+    {
+      "file": "Contacts_Code.gs",
+      "function": "readContactTable_",
+      "serviceCallSites": [
+        "GSISSheets.readAcross",
+        "sheet.getLastColumn",
+        "sheet.getLastRow"
+      ],
+      "delegatedCalls": [
+        "fault_"
+      ]
+    },
+    {
+      "file": "Contacts_Code.gs",
+      "function": "contactPrefetchDirectory_",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "contactPhase_"
+      ]
+    },
+    {
+      "file": "Contacts_Code.gs",
+      "function": "contactPrefetchDirectory_",
+      "serviceCallSites": [
+        "sheet.getLastColumn",
+        "sheet.getLastRow"
+      ],
+      "delegatedCalls": [
+        "fault_"
+      ]
+    },
+    {
+      "file": "Contacts_Code.gs",
+      "function": "contactPrefetchDirectory_",
+      "serviceCallSites": [
+        "GSISSheets.readAcross"
+      ],
+      "delegatedCalls": []
+    },
+    {
+      "file": "Contacts_Code.gs",
+      "function": "required_",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "fault_"
+      ]
+    },
+    {
+      "file": "Contacts_Code.gs",
+      "function": "access_",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "required_",
+        "table_"
+      ]
+    },
+    {
+      "file": "Contacts_Code.gs",
+      "function": "access_",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "fault_"
+      ]
+    },
+    {
+      "file": "Contacts_Code.gs",
+      "function": "contactAuthority_",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "access_",
+        "roles_"
+      ]
+    },
+    {
+      "file": "Contacts_Code.gs",
+      "function": "bootstrap_",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "access_",
+        "contactDirectoryRead_",
+        "roles_",
+        "signatureSettings_"
+      ]
+    },
+    {
+      "file": "Contacts_Code.gs",
+      "function": "bootstrap_",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "roles_",
+        "version_"
+      ]
+    },
+    {
+      "file": "Contacts_Code.gs",
+      "function": "contactDirectoryRead_",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "contactCachedRead_"
+      ]
+    },
+    {
+      "file": "Contacts_Code.gs",
+      "function": "contactDirectoryRead_",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "access_",
+        "contactPrefetchDirectory_",
+        "deriveContacts_",
+        "required_",
+        "table_"
+      ]
+    },
+    {
+      "file": "Contacts_Code.gs",
+      "function": "contactDirectoryRead_",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "email_"
+      ]
+    },
+    {
+      "file": "Contacts_Code.gs",
+      "function": "setKP_",
+      "serviceCallSites": [
+        "LockService.getScriptLock",
+        "t.sheet.getLastRow",
+        "t.sheet.getMaxRows",
+        "t.sheet.insertRowsAfter"
+      ],
+      "delegatedCalls": [
+        "access_",
+        "contactFlush_",
+        "contactLock_",
+        "contactWriterReady_",
+        "fault_",
+        "roles_",
+        "version_",
+        "writeContactDirtyRow_"
+      ]
+    },
+    {
+      "file": "Contacts_Code.gs",
+      "function": "deployReadCacheKey_",
+      "serviceCallSites": [
+        "PropertiesService.getScriptProperties",
+        "p.getProperty"
+      ],
+      "delegatedCalls": []
+    },
+    {
+      "file": "Contacts_Code.gs",
+      "function": "contactCachedRead_",
+      "serviceCallSites": [
+        "CacheService.getScriptCache",
+        "cache.getAll",
+        "cache.putAll"
+      ],
+      "delegatedCalls": [
+        "deployReadCacheKey_"
+      ]
+    },
+    {
+      "file": "Contacts_Code.gs",
+      "function": "invalidateDeployReadCache_",
+      "serviceCallSites": [
+        "CacheService.getScriptCache",
+        "PropertiesService.getScriptProperties",
+        "PropertiesService.getScriptProperties().setProperty"
+      ],
+      "delegatedCalls": [
+        "deployReadCacheKey_"
+      ]
+    },
+    {
+      "file": "Contacts_Code.gs",
+      "function": "deploySnapshot_",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "contactAuthority_",
+        "contactCachedRead_"
+      ]
+    },
+    {
+      "file": "Contacts_Code.gs",
+      "function": "deploySnapshot_",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "deriveContacts_",
+        "legacyOffload_",
+        "required_",
+        "sysFields_",
+        "table_"
+      ]
+    },
+    {
+      "file": "Contacts_Code.gs",
+      "function": "deploySnapshot_",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "fault_"
+      ]
+    },
+    {
+      "file": "Contacts_Code.gs",
+      "function": "deploySnapshot_",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "normaliseEO_",
+        "requiredSubject_"
+      ]
+    },
+    {
+      "file": "Contacts_Code.gs",
+      "function": "bootstrapWithDeploy_",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "bootstrap_"
+      ]
+    },
+    {
+      "file": "Contacts_Code.gs",
+      "function": "deploymentData_",
+      "serviceCallSites": [
+        "PropertiesService.getScriptProperties",
+        "SpreadsheetApp.openById",
+        "UrlFetchApp.fetch",
+        "p.getProperty"
+      ],
+      "delegatedCalls": [
+        "currentContactsDeployment_"
+      ]
+    },
+    {
+      "file": "Contacts_Code.gs",
+      "function": "requireDataAdmin_",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "access_",
+        "fault_",
+        "roles_"
+      ]
+    },
+    {
+      "file": "Contacts_Code.gs",
+      "function": "requireStaffView_",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "access_",
+        "fault_",
+        "roles_"
+      ]
+    },
+    {
+      "file": "Contacts_Code.gs",
+      "function": "contactData_",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "deriveContacts_",
+        "requireStaffView_",
+        "required_",
+        "sysFields_",
+        "table_"
+      ]
+    },
+    {
+      "file": "Contacts_Code.gs",
+      "function": "contactData_",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "normaliseEO_",
+        "requiredSubject_"
+      ]
+    },
+    {
+      "file": "Contacts_Code.gs",
+      "function": "contactData_",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "fault_"
+      ]
+    },
+    {
+      "file": "Contacts_Code.gs",
+      "function": "saveContactData_",
+      "serviceCallSites": [
+        "LockService.getScriptLock"
+      ],
+      "delegatedCalls": [
+        "contactBusyFault_",
+        "contactLock_",
+        "saveContactDataLocked_"
+      ]
+    },
+    {
+      "file": "Contacts_Code.gs",
+      "function": "saveContactDataLocked_",
+      "serviceCallSites": [
+        "GSISSheets.enabled"
+      ],
+      "delegatedCalls": [
+        "calculatedContacts_",
+        "contactPhase_",
+        "contactPrefetchDirectory_",
+        "contactPrepareValues_",
+        "contactViewCapture_",
+        "contactWritePlan_",
+        "contactWriterReady_",
+        "deriveContacts_",
+        "fault_",
+        "ownStaff_",
+        "requireContactsBackup_",
+        "requireDataAdmin_",
+        "required_",
+        "saveJournal_",
+        "sysFields_",
+        "table_",
+        "validateContactCell_",
+        "validateDirectory_"
+      ]
+    },
+    {
+      "file": "Contacts_Code.gs",
+      "function": "saveContactDataLocked_",
+      "serviceCallSites": [
+        "identity.flush"
+      ],
+      "delegatedCalls": []
+    },
+    {
+      "file": "Contacts_Code.gs",
+      "function": "contactWritePlan_",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "reserveContactRow_",
+        "writeContactDirtyRow_"
+      ]
+    },
+    {
+      "file": "Contacts_Code.gs",
+      "function": "contactWritePlan_",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "safeCell_"
+      ]
+    },
+    {
+      "file": "Contacts_Code.gs",
+      "function": "contactWritePlan_",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "safeCell_"
+      ]
+    },
+    {
+      "file": "Contacts_Code.gs",
+      "function": "reserveContactRow_",
+      "serviceCallSites": [
+        "t.sheet.getLastRow",
+        "t.sheet.getMaxRows",
+        "t.sheet.insertRowsAfter"
+      ],
+      "delegatedCalls": [
+        "contactFlush_",
+        "contactValues_"
+      ]
+    },
+    {
+      "file": "Contacts_Code.gs",
+      "function": "deriveContacts_",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "required_",
+        "table_"
+      ]
+    },
+    {
+      "file": "Contacts_Code.gs",
+      "function": "deriveContacts_",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "fault_"
+      ]
+    },
+    {
+      "file": "Contacts_Code.gs",
+      "function": "deriveContacts_",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "normaliseEO_",
+        "requiredSubject_"
+      ]
+    },
+    {
+      "file": "Contacts_Code.gs",
+      "function": "calculatedContacts_",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "deriveContacts_",
+        "table_"
+      ]
+    },
+    {
+      "file": "Contacts_Code.gs",
+      "function": "backupContactsOnce_",
+      "serviceCallSites": [
+        "PropertiesService.getScriptProperties",
+        "props.getProperty",
+        "props.setProperty"
+      ],
+      "delegatedCalls": []
+    },
+    {
+      "file": "Contacts_Code.gs",
+      "function": "requireContactsBackup_",
+      "serviceCallSites": [
+        "PropertiesService.getScriptProperties",
+        "PropertiesService.getScriptProperties().getProperty"
+      ],
+      "delegatedCalls": [
+        "fault_"
+      ]
+    },
+    {
+      "file": "Contacts_Code.gs",
+      "function": "prepareContactsPerformance410",
+      "serviceCallSites": [
+        "LockService.getScriptLock",
+        "SpreadsheetApp.openById"
+      ],
+      "delegatedCalls": [
+        "backupContactsOnce_",
+        "contactLock_",
+        "contactWriterReady_",
+        "ensureContactsReady_",
+        "fault_",
+        "requireContactsBackup_",
+        "table_"
+      ]
+    },
+    {
+      "file": "Contacts_Code.gs",
+      "function": "persistContactCalculations_",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "calculatedContacts_",
+        "table_",
+        "writeContactDirtyRow_"
+      ]
+    },
+    {
+      "file": "Contacts_Code.gs",
+      "function": "persistContactCalculations_",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "safeCell_"
+      ]
+    },
+    {
+      "file": "Contacts_Code.gs",
+      "function": "persistContactCalculations_",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "safeCell_"
+      ]
+    },
+    {
+      "file": "Contacts_Code.gs",
+      "function": "recalculateContactData_",
+      "serviceCallSites": [
+        "LockService.getScriptLock"
+      ],
+      "delegatedCalls": [
+        "backupContactsOnce_",
+        "calculatedContacts_",
+        "contactData_",
+        "contactFlush_",
+        "contactLock_",
+        "contactWriterReady_",
+        "ensureAppointmentOverride_",
+        "fault_",
+        "persistContactCalculations_",
+        "removeWorkbookFormulas_",
+        "requireDataAdmin_"
+      ]
+    },
+    {
+      "file": "Contacts_Code.gs",
+      "function": "deployPublishReview_",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "calculatedContacts_",
+        "fault_",
+        "requireDataAdmin_",
+        "required_"
+      ]
+    },
+    {
+      "file": "Contacts_Code.gs",
+      "function": "deployPublishReview_",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "deriveContacts_"
+      ]
+    },
+    {
+      "file": "Contacts_Code.gs",
+      "function": "approveDeployTeachers_",
+      "serviceCallSites": [
+        "LockService.getScriptLock",
+        "journal.getLastRow",
+        "journal.getMaxRows",
+        "journal.getRange",
+        "journal.getRange().setValue",
+        "journal.insertRowsAfter",
+        "start.flush",
+        "t.sheet.getLastRow",
+        "t.sheet.getMaxRows",
+        "t.sheet.getRange",
+        "t.sheet.getRange().setValue",
+        "t.sheet.insertRowsAfter"
+      ],
+      "delegatedCalls": [
+        "backupContactsOnce_",
+        "calculatedContacts_",
+        "contactEpoch_",
+        "contactFlush_",
+        "contactJournalRow_",
+        "contactLock_",
+        "contactPending_",
+        "contactPrepareValues_",
+        "contactViewCapture_",
+        "contactViewJournalWrites_",
+        "contactWriterReady_",
+        "deriveContacts_",
+        "ensureAppointmentOverride_",
+        "fault_",
+        "requireDataAdmin_",
+        "required_",
+        "table_",
+        "validateContactAlias_",
+        "validateDirectory_",
+        "writeContactDirtyRow_"
+      ]
+    },
+    {
+      "file": "Contacts_Code.gs",
+      "function": "approveDeployTeachers_",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "safeCell_"
+      ]
+    },
+    {
+      "file": "Contacts_Code.gs",
+      "function": "ensureAppointmentOverride_",
+      "serviceCallSites": [
+        "sheet.getLastColumn",
+        "sheet.getRange",
+        "sheet.getRange().getValues",
+        "sheet.getRange().setValue"
+      ],
+      "delegatedCalls": []
+    },
+    {
+      "file": "Contacts_Code.gs",
+      "function": "sysFields_",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "table_"
+      ]
+    },
+    {
+      "file": "Contacts_Code.gs",
+      "function": "validateContactAlias_",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "fault_"
+      ]
+    },
+    {
+      "file": "Contacts_Code.gs",
+      "function": "validateContactCell_",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "fault_",
+        "validateContactAlias_"
+      ]
+    },
+    {
+      "file": "Contacts_Code.gs",
+      "function": "validateDirectory_",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "fault_"
+      ]
+    },
+    {
+      "file": "Contacts_Code.gs",
+      "function": "ownStaff_",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "calculatedContacts_",
+        "contactFlush_",
+        "fault_",
+        "table_"
+      ]
+    },
+    {
+      "file": "Contacts_Code.gs",
+      "function": "ownStaff_",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "email_"
+      ]
+    },
+    {
+      "file": "Contacts_Code.gs",
+      "function": "adminTable_",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "digestData_",
+        "fault_",
+        "ownStaff_",
+        "requireStaffView_",
+        "required_",
+        "sysFields_",
+        "table_"
+      ]
+    },
+    {
+      "file": "Contacts_Code.gs",
+      "function": "adminTable_",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "normaliseEO_"
+      ]
+    },
+    {
+      "file": "Contacts_Code.gs",
+      "function": "adminTable_",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "normaliseEO_",
+        "requiredSubject_"
+      ]
+    },
+    {
+      "file": "Contacts_Code.gs",
+      "function": "contactJournalRow_",
+      "serviceCallSites": [
+        "PropertiesService.getScriptProperties",
+        "PropertiesService.getScriptProperties().getProperty",
+        "sheet.getLastRow",
+        "sheet.getRange",
+        "sheet.getRange().createTextFinder",
+        "sheet.getRange().createTextFinder().matchEntireCell",
+        "sheet.getRange().createTextFinder().matchEntireCell().matchCase",
+        "sheet.getRange().createTextFinder().matchEntireCell().matchCase().useRegularExpression",
+        "sheet.getRange().createTextFinder().matchEntireCell().matchCase().useRegularExpression().findNext"
+      ],
+      "delegatedCalls": [
+        "contactJournalValues_"
+      ]
+    },
+    {
+      "file": "Contacts_Code.gs",
+      "function": "contactJournalValues_",
+      "serviceCallSites": [
+        "GSISSheets.readAcross"
+      ],
+      "delegatedCalls": []
+    },
+    {
+      "file": "Contacts_Code.gs",
+      "function": "contactValues_",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "contactPhase_"
+      ]
+    },
+    {
+      "file": "Contacts_Code.gs",
+      "function": "contactValues_",
+      "serviceCallSites": [
+        "GSISSheets.enabled",
+        "GSISSheets.write"
+      ],
+      "delegatedCalls": [
+        "contactFlush_"
+      ]
+    },
+    {
+      "file": "Contacts_Code.gs",
+      "function": "contactPending_",
+      "serviceCallSites": [
+        "PropertiesService.getScriptProperties",
+        "props.getProperty",
+        "props.setProperty"
+      ],
+      "delegatedCalls": []
+    },
+    {
+      "file": "Contacts_Code.gs",
+      "function": "saveJournal_",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "contactFlush_",
+        "contactJournalRow_",
+        "digestData_",
+        "fault_",
+        "savedContactPayload_"
+      ]
+    },
+    {
+      "file": "Contacts_Code.gs",
+      "function": "saveJournal_",
+      "serviceCallSites": [
+        "sheet.getLastRow",
+        "sheet.getMaxRows",
+        "sheet.insertRowsAfter"
+      ],
+      "delegatedCalls": [
+        "contactFlush_",
+        "contactPrepareValues_",
+        "contactViewJournalWrites_",
+        "fault_"
+      ]
+    },
+    {
+      "file": "Contacts_Code.gs",
+      "function": "saveJournal_",
+      "serviceCallSites": [
+        "start.flush"
+      ],
+      "delegatedCalls": [
+        "contactEpoch_",
+        "contactPending_"
+      ]
+    },
+    {
+      "file": "Contacts_Code.gs",
+      "function": "saveJournal_",
+      "serviceCallSites": [
+        "finish.flush"
+      ],
+      "delegatedCalls": [
+        "contactEpoch_",
+        "contactPending_",
+        "contactPrepareValues_"
+      ]
+    },
+    {
+      "file": "Contacts_Code.gs",
+      "function": "saveAdminTable_",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "fault_"
+      ]
+    },
+    {
+      "file": "Contacts_Code.gs",
+      "function": "removeWorkbookFormulas_",
+      "serviceCallSites": [
+        "range.getFormulas",
+        "range.getValues",
+        "sheet.getLastColumn",
+        "sheet.getLastRow",
+        "sheet.getRange",
+        "sheet.getRange().getValues"
+      ],
+      "delegatedCalls": []
+    },
+    {
+      "file": "Contacts_Code.gs",
+      "function": "removeWorkbookFormulas_",
+      "serviceCallSites": [
+        "sheet.getRange",
+        "sheet.getRange().setValues"
+      ],
+      "delegatedCalls": []
+    },
+    {
+      "file": "Contacts_Code.gs",
+      "function": "legacyOffload_",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "table_"
+      ]
+    },
+    {
+      "file": "Contacts_Code.gs",
+      "function": "writeContactDirtyRow_",
+      "serviceCallSites": [
+        "GSISSheets.write"
+      ],
+      "delegatedCalls": []
+    },
+    {
+      "file": "Contacts_Code.gs",
+      "function": "contactSaveReceipt_",
+      "serviceCallSites": [
+        "LockService.getScriptLock",
+        "lock.tryLock"
+      ],
+      "delegatedCalls": [
+        "contactPhase_",
+        "fault_",
+        "requireDataAdmin_",
+        "savedContactPayload_"
+      ]
+    },
+    {
+      "file": "Contacts_Code.gs",
+      "function": "contactSaveReceipt_",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "contactJournalRow_"
+      ]
+    },
+    {
+      "file": "Contacts_Code.gs",
+      "function": "contactRecoveryFault_",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "fault_"
+      ]
+    },
+    {
+      "file": "Contacts_Code.gs",
+      "function": "contactBusyFault_",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "fault_"
+      ]
+    },
+    {
+      "file": "Contacts_Code.gs",
+      "function": "savedContactPayload_",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "digestData_",
+        "fault_"
+      ]
+    },
+    {
+      "file": "Contacts_Code.gs",
+      "function": "contactRecoveryPointers_",
+      "serviceCallSites": [
+        "PropertiesService.getScriptProperties",
+        "PropertiesService.getScriptProperties().getProperty",
+        "sh.getLastRow",
+        "sh.getRange",
+        "sh.getRange().getValues",
+        "sh.getRange().getValues().forEach"
+      ],
+      "delegatedCalls": []
+    },
+    {
+      "file": "Contacts_Code.gs",
+      "function": "contactRecoveryStatus_",
+      "serviceCallSites": [
+        "PropertiesService.getScriptProperties",
+        "PropertiesService.getScriptProperties().getProperty"
+      ],
+      "delegatedCalls": [
+        "contactAuthority_",
+        "contactJournalValues_",
+        "contactRecoveryPointers_",
+        "fault_",
+        "savedContactPayload_",
+        "table_"
+      ]
+    },
+    {
+      "file": "Contacts_Code.gs",
+      "function": "recoverContactSave_",
+      "serviceCallSites": [
+        "LockService.getScriptLock",
+        "PropertiesService.getScriptProperties",
+        "PropertiesService.getScriptProperties().getProperty",
+        "PropertiesService.getScriptProperties().setProperty",
+        "sh.getRange",
+        "sh.getRange().getValues"
+      ],
+      "delegatedCalls": [
+        "contactBusyFault_",
+        "contactEpoch_",
+        "contactJournalRow_",
+        "contactLock_",
+        "contactPending_",
+        "contactRecoveryPointers_",
+        "contactWriterReady_",
+        "fault_",
+        "requireDataAdmin_",
+        "saveContactDataLocked_",
+        "savedContactPayload_"
+      ]
+    },
+    {
+      "file": "Contacts_Code.gs",
+      "function": "ensureContactsReady_",
+      "serviceCallSites": [
+        "LockService.getScriptLock",
+        "PropertiesService.getScriptProperties",
+        "props.getProperty",
+        "props.setProperty",
+        "sh.getLastRow",
+        "sh.getRange",
+        "sh.getRange().getValues"
+      ],
+      "delegatedCalls": [
+        "contactLock_",
+        "contactPending_",
+        "contactRecoveryFault_",
+        "fault_",
+        "recoverCatalogue_"
+      ]
+    },
+    {
+      "file": "Contacts_Code.gs",
+      "function": "contactWriterReady_",
+      "serviceCallSites": [
+        "PropertiesService.getScriptProperties",
+        "p.getProperty"
+      ],
+      "delegatedCalls": [
+        "contactRecoveryFault_",
+        "fault_"
+      ]
+    },
+    {
+      "file": "Contacts_Code.gs",
+      "function": "contactFailure_",
+      "serviceCallSites": [
+        "GSISSheets.enabled"
+      ],
+      "delegatedCalls": [
+        "contactErrorCategory_"
+      ]
+    },
+    {
+      "file": "Contacts_Code.gs",
+      "function": "contactFlush_",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "contactPhase_"
+      ]
+    },
+    {
+      "file": "Contacts_Code.gs",
+      "function": "contactFlush_",
+      "serviceCallSites": [
+        "SpreadsheetApp.flush"
+      ],
+      "delegatedCalls": []
+    },
+    {
+      "file": "Contacts_Code.gs",
+      "function": "contactLock_",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "contactPhase_"
+      ]
+    },
+    {
+      "file": "Contacts_Code.gs",
+      "function": "contactLock_",
+      "serviceCallSites": [
+        "lock.tryLock"
+      ],
+      "delegatedCalls": []
+    },
+    {
+      "file": "Contacts_Code.gs",
+      "function": "anonymous",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "contactPhase_"
+      ]
+    },
+    {
+      "file": "Contacts_Code.gs",
+      "function": "anonymous",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "contactPhase_"
+      ]
+    },
+    {
+      "file": "Contacts_Code.gs",
+      "function": "anonymous",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "contactPhase_"
+      ]
+    },
+    {
+      "file": "Contacts_Code.gs",
+      "function": "anonymous",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "contactPhase_"
+      ]
+    },
+    {
+      "file": "Contacts_Code.gs",
+      "function": "anonymous",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "contactPhase_"
+      ]
+    },
+    {
+      "file": "Contacts_Code.gs",
+      "function": "anonymous",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "contactPhase_"
+      ]
+    },
+    {
+      "file": "Contacts_Code.gs",
+      "function": "prepareContactsPerformance404",
+      "serviceCallSites": [
+        "SpreadsheetApp.openById"
+      ],
+      "delegatedCalls": [
+        "ensureContactsReady_"
+      ]
+    },
+    {
+      "file": "Contacts_Code.gs",
+      "function": "prepareSheetsAPI414",
+      "serviceCallSites": [
+        "GSISSheets.check",
+        "SpreadsheetApp.openById",
+        "SpreadsheetApp.openById().getSheetByName"
+      ],
+      "delegatedCalls": []
+    },
+    {
+      "file": "Contacts_Code.gs",
+      "function": "prepareContactsPerformance502",
+      "serviceCallSites": [
+        "GSISSheets.enabled",
+        "GSISSheets.readAcross",
+        "SpreadsheetApp.openById",
+        "sheet.getLastColumn"
+      ],
+      "delegatedCalls": [
+        "contactRecoveryPointers_"
+      ]
+    },
+    {
+      "file": "Contacts_Code.gs",
+      "function": "recoverContactsSave502",
+      "serviceCallSites": [
+        "SpreadsheetApp.openById"
+      ],
+      "delegatedCalls": [
+        "contactRecoveryStatus_",
+        "fault_",
+        "recoverContactSave_",
+        "requireDataAdmin_"
+      ]
+    },
+    {
+      "file": "Contacts_Code.gs",
+      "function": "signatureSettings_",
+      "serviceCallSites": [
+        "PropertiesService.getScriptProperties",
+        "PropertiesService.getScriptProperties().getProperty"
+      ],
+      "delegatedCalls": []
+    },
+    {
+      "file": "Contacts_Code.gs",
+      "function": "saveSignatureSettings_",
+      "serviceCallSites": [
+        "LockService.getScriptLock",
+        "PropertiesService.getScriptProperties",
+        "PropertiesService.getScriptProperties().setProperty"
+      ],
+      "delegatedCalls": [
+        "contactLock_",
+        "contactWriterReady_",
+        "fault_",
+        "requireDataAdmin_",
+        "signatureSettings_"
+      ]
+    },
+    {
+      "file": "backend/Contacts_Catalogue.gs",
+      "function": "applyCatalogueTransaction_",
+      "serviceCallSites": [
+        "GSISSheets.write",
+        "PropertiesService.getScriptProperties",
+        "props.setProperty",
+        "s.getMaxRows",
+        "s.insertRowsAfter"
+      ],
+      "delegatedCalls": [
+        "contactEpoch_",
+        "contactFlush_"
+      ]
+    },
+    {
+      "file": "backend/Contacts_Catalogue.gs",
+      "function": "recoverCatalogue_",
+      "serviceCallSites": [
+        "PropertiesService.getScriptProperties",
+        "catalogueJournal_().getRange",
+        "catalogueJournal_().getRange().getValues",
+        "props.getProperty"
+      ],
+      "delegatedCalls": [
+        "applyCatalogueTransaction_",
+        "catalogueJournal_",
+        "fault_"
+      ]
+    },
+    {
+      "file": "backend/Contacts_Catalogue.gs",
+      "function": "catalogueBlock_",
+      "serviceCallSites": [
+        "s.getLastColumn",
+        "s.getLastRow",
+        "s.getRange",
+        "s.getRange().getValues"
+      ],
+      "delegatedCalls": [
+        "fault_"
+      ]
+    },
+    {
+      "file": "backend/Contacts_Catalogue.gs",
+      "function": "catalogueBlock_",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "fault_"
+      ]
+    },
+    {
+      "file": "backend/Contacts_Catalogue.gs",
+      "function": "applyDeployCatalogues_",
+      "serviceCallSites": [
+        "LockService.getScriptLock",
+        "PropertiesService.getScriptProperties",
+        "props.getProperty",
+        "props.setProperty",
+        "s.getLastRow",
+        "s.getMaxRows",
+        "s.getRange",
+        "s.getRange().setValues",
+        "s.insertRowsAfter"
+      ],
+      "delegatedCalls": [
+        "applyCatalogueTransaction_",
+        "catalogueBlock_",
+        "catalogueJournal_",
+        "contactEpoch_",
+        "contactFlush_",
+        "contactLock_",
+        "contactViewCapture_",
+        "contactViewPack_",
+        "contactWriterReady_",
+        "deriveContacts_",
+        "digestData_",
+        "fault_",
+        "recoverCatalogue_",
+        "requireDataAdmin_",
+        "table_",
+        "validateDirectory_"
+      ]
+    },
+    {
+      "file": "backend/Contacts_Commit.gs",
+      "function": "contactPrepareValues_",
+      "serviceCallSites": [
+        "entry.sheet.getRange"
+      ],
+      "delegatedCalls": []
+    },
+    {
+      "file": "backend/Contacts_Commit.gs",
+      "function": "contactPrepareValues_",
+      "serviceCallSites": [
+        "SpreadsheetApp.flush",
+        "entry.range.setValues"
+      ],
+      "delegatedCalls": []
+    },
+    {
+      "file": "backend/Contacts_Current.gs",
+      "function": "currentContactsDeployment_",
+      "serviceCallSites": [
+        "GSISSheets.readAcross",
+        "sheet.getMaxRows"
+      ],
+      "delegatedCalls": []
+    },
+    {
+      "file": "backend/Contacts_Current.gs",
+      "function": "verifyCurrentContactsDeployment",
+      "serviceCallSites": [
+        "SpreadsheetApp.openById"
+      ],
+      "delegatedCalls": [
+        "currentContactsDeployment_"
+      ]
+    },
+    {
+      "file": "backend/Contacts_Diagnostics.gs",
+      "function": "inspectContactsWriteAccess504",
+      "serviceCallSites": [
+        "GSISSheets.enabled",
+        "SpreadsheetApp.openById"
+      ],
+      "delegatedCalls": [
+        "calculatedContacts_",
+        "contactAuthority_",
+        "contactJournalRow_",
+        "contactRecoveryPointers_",
+        "contactWritePlan_",
+        "deriveContacts_",
+        "fault_",
+        "savedContactPayload_",
+        "table_"
+      ]
+    },
+    {
+      "file": "backend/Contacts_Diagnostics.gs",
+      "function": "inspect",
+      "serviceCallSites": [
+        "range.canEdit",
+        "sheet.getMaxRows",
+        "sheet.getRange"
+      ],
+      "delegatedCalls": [
+        "contactErrorCategory_",
+        "contactRangeLabel_"
+      ]
+    },
+    {
+      "file": "backend/Contacts_View.gs",
+      "function": "contactViewCapture_",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "table_"
+      ]
+    },
+    {
+      "file": "backend/Contacts_View.gs",
+      "function": "contactViewPack_",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "digestData_",
+        "fault_"
+      ]
+    },
+    {
+      "file": "backend/Contacts_View.gs",
+      "function": "contactViewUnpack_",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "digestData_"
+      ]
+    },
+    {
+      "file": "backend/Contacts_View.gs",
+      "function": "contactViewJournalWrites_",
+      "serviceCallSites": [
+        "sheet.getRange",
+        "sheet.getRange().getValues"
+      ],
+      "delegatedCalls": [
+        "contactFlush_",
+        "contactViewPack_",
+        "fault_"
+      ]
+    },
+    {
+      "file": "backend/Contacts_View.gs",
+      "function": "contactViewRowSnapshot_",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "contactViewUnpack_"
+      ]
+    },
+    {
+      "file": "backend/Contacts_View.gs",
+      "function": "contactViewMarker_",
+      "serviceCallSites": [
+        "PropertiesService.getScriptProperties",
+        "p.getProperty"
+      ],
+      "delegatedCalls": []
+    },
+    {
+      "file": "backend/Contacts_View.gs",
+      "function": "contactViewHistorical_",
+      "serviceCallSites": [
+        "GSISSheets.readAcross",
+        "sheet.getLastColumn",
+        "sheet.getLastRow"
+      ],
+      "delegatedCalls": [
+        "contactViewUnpack_"
+      ]
+    },
+    {
+      "file": "backend/Contacts_View.gs",
+      "function": "contactViewSafeFallback_",
+      "serviceCallSites": [
+        "PropertiesService.getScriptProperties",
+        "PropertiesService.getScriptProperties().getProperty"
+      ],
+      "delegatedCalls": [
+        "contactViewHistorical_",
+        "contactViewInstall_",
+        "readContactTable_"
+      ]
+    },
+    {
+      "file": "backend/Contacts_View.gs",
+      "function": "contactViewPrepare_",
+      "serviceCallSites": [
+        "GSISSheets.readAcross",
+        "PropertiesService.getScriptProperties",
+        "PropertiesService.getScriptProperties().getProperty",
+        "sh.getLastColumn",
+        "sh.getLastRow"
+      ],
+      "delegatedCalls": [
+        "contactJournalValues_",
+        "contactRecoveryPointers_",
+        "contactViewInstall_",
+        "contactViewReset_",
+        "contactViewRowSnapshot_",
+        "contactViewSafeFallback_",
+        "contactViewUnpack_",
+        "savedContactPayload_"
+      ]
+    },
+    {
+      "file": "backend/Contacts_View.gs",
+      "function": "contactPrepareViewSafely_",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "contactPhase_",
+        "contactViewReset_",
+        "contactViewSafeFallback_"
+      ]
+    },
+    {
+      "file": "backend/Contacts_View.gs",
+      "function": "contactPrepareViewSafely_",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "contactViewPrepare_"
+      ]
+    },
+    {
+      "file": "backend/Contacts_View.gs",
+      "function": "contactViewRead_",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "contactPrepareViewSafely_",
+        "contactViewMarker_",
+        "contactViewPinned_",
+        "contactViewResult_",
+        "contactViewSafeFallback_"
+      ]
+    },
+    {
+      "file": "backend/FieldStore.gs",
+      "function": "fieldCapacity_",
+      "serviceCallSites": [
+        "s.getMaxRows",
+        "s.insertRowsAfter"
+      ],
+      "delegatedCalls": []
+    },
+    {
+      "file": "backend/FieldStore.gs",
+      "function": "fieldName_",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "hash_"
+      ]
+    },
+    {
+      "file": "backend/FieldStore.gs",
+      "function": "fieldIndexWrite_",
+      "serviceCallSites": [
+        "b.getSheetByName().getRange",
+        "b.getSheetByName().getRange().setValue"
+      ],
+      "delegatedCalls": [
+        "deployFlush_"
+      ]
+    },
+    {
+      "file": "backend/FieldStore.gs",
+      "function": "fieldJournal_",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "fieldSheet_"
+      ]
+    },
+    {
+      "file": "backend/FieldStore.gs",
+      "function": "fieldJournalWrite_",
+      "serviceCallSites": [
+        "s.getLastRow",
+        "s.getRange",
+        "s.getRange().setValues"
+      ],
+      "delegatedCalls": [
+        "deployFlush_",
+        "fieldCapacity_",
+        "fieldJournal_"
+      ]
+    },
+    {
+      "file": "backend/FieldStore.gs",
+      "function": "fieldJournalRead_",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "error_",
+        "fieldJournal_",
+        "fieldReadValues_"
+      ]
+    },
+    {
+      "file": "backend/FieldStore.gs",
+      "function": "fieldApplyRows_",
+      "serviceCallSites": [
+        "GSISSheets.enabled",
+        "GSISSheets.write"
+      ],
+      "delegatedCalls": [
+        "deployFlush_",
+        "fieldIndexWrite_"
+      ]
+    },
+    {
+      "file": "backend/FieldStore.gs",
+      "function": "fieldApplyRows_",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "fieldCapacity_",
+        "fieldSheet_"
+      ]
+    },
+    {
+      "file": "backend/FieldStore.gs",
+      "function": "fieldRecover_",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "fieldApplyRows_",
+        "fieldJournalRead_",
+        "index_"
+      ]
+    },
+    {
+      "file": "backend/FieldStore.gs",
+      "function": "recoverFieldCommit",
+      "serviceCallSites": [
+        "LockService.getScriptLock"
+      ],
+      "delegatedCalls": [
+        "book_",
+        "deployLock_",
+        "error_",
+        "fieldRecover_"
+      ]
+    },
+    {
+      "file": "backend/FieldStore.gs",
+      "function": "fastFieldKey_",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "editFieldKey_"
+      ]
+    },
+    {
+      "file": "backend/FieldStore.gs",
+      "function": "projectionRead_",
+      "serviceCallSites": [
+        "sheet.getLastRow"
+      ],
+      "delegatedCalls": [
+        "error_",
+        "fieldReadMany_",
+        "fieldReadValues_",
+        "fieldRead_",
+        "index_",
+        "model_"
+      ]
+    },
+    {
+      "file": "backend/FieldStore.gs",
+      "function": "rootProjectionRanges_",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "fieldRuns_"
+      ]
+    },
+    {
+      "file": "backend/FieldStore.gs",
+      "function": "projectionRanges_",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "fieldRuns_",
+        "settingsFieldKey_"
+      ]
+    },
+    {
+      "file": "backend/FieldStore.gs",
+      "function": "rangedProjectionRows_",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "fieldReadMany_"
+      ]
+    },
+    {
+      "file": "backend/FieldStore.gs",
+      "function": "fieldRead_",
+      "serviceCallSites": [
+        "s.getLastRow",
+        "sh.getLastRow"
+      ],
+      "delegatedCalls": [
+        "error_",
+        "fieldReadMany_",
+        "fieldReadValues_",
+        "fieldRuns_",
+        "index_",
+        "model_",
+        "projectionRead_",
+        "rangedProjectionRows_",
+        "scopedFieldKey_",
+        "scopedRanges_"
+      ]
+    },
+    {
+      "file": "backend/FieldStore.gs",
+      "function": "fieldRead_",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "fastFieldKey_"
+      ]
+    },
+    {
+      "file": "backend/FieldStore.gs",
+      "function": "receiptSheet_",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "fieldSheet_"
+      ]
+    },
+    {
+      "file": "backend/FieldStore.gs",
+      "function": "findExactRow_",
+      "serviceCallSites": [
+        "s.getLastRow",
+        "s.getRange",
+        "s.getRange().createTextFinder",
+        "s.getRange().createTextFinder().matchEntireCell",
+        "s.getRange().createTextFinder().matchEntireCell().matchCase",
+        "s.getRange().createTextFinder().matchEntireCell().matchCase().useRegularExpression",
+        "s.getRange().createTextFinder().matchEntireCell().matchCase().useRegularExpression().findNext"
+      ],
+      "delegatedCalls": []
+    },
+    {
+      "file": "backend/FieldStore.gs",
+      "function": "storedReceipt_",
+      "serviceCallSites": [
+        "sh.getRange",
+        "sh.getRange().getValues",
+        "sh.getRange().getValues().map",
+        "sh.getRange().getValues().map().join"
+      ],
+      "delegatedCalls": [
+        "document_",
+        "error_",
+        "findExactRow_"
+      ]
+    },
+    {
+      "file": "backend/FieldStore.gs",
+      "function": "fieldPersist_",
+      "serviceCallSites": [
+        "auditSheet.getLastRow",
+        "editSheet.getLastRow",
+        "fastSheet.getLastRow",
+        "fieldJournal_().getLastRow",
+        "rs.getLastRow",
+        "s.getLastRow",
+        "viewSheet.getLastRow"
+      ],
+      "delegatedCalls": [
+        "auditRows_",
+        "document_",
+        "error_",
+        "fieldApplyRows_",
+        "fieldIndexWrite_",
+        "fieldJournalWrite_",
+        "fieldJournal_",
+        "fieldName_",
+        "fieldReadValues_",
+        "fieldRuns_",
+        "fieldSheet_",
+        "hash_",
+        "layoutPublicationIntent_",
+        "projectionMatrix_",
+        "projectionRanges_",
+        "publicCampusDocument_",
+        "publishedEntry_",
+        "rangedProjectionRows_",
+        "receiptSheet_",
+        "rootProjectionRanges_",
+        "scopedRanges_"
+      ]
+    },
+    {
+      "file": "backend/FieldStore.gs",
+      "function": "fieldPersist_",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "editFieldKey_"
+      ]
+    },
+    {
+      "file": "backend/FieldStore.gs",
+      "function": "fieldPersist_",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "editFieldKey_"
+      ]
+    },
+    {
+      "file": "backend/FieldStore.gs",
+      "function": "fieldPersist_",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "fastFieldKey_"
+      ]
+    },
+    {
+      "file": "backend/FieldStore.gs",
+      "function": "fieldPersist_",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "noteFieldKey_"
+      ]
+    },
+    {
+      "file": "backend/FieldStore.gs",
+      "function": "fieldPersist_",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "fastFieldKey_"
+      ]
+    },
+    {
+      "file": "backend/FieldStore.gs",
+      "function": "fieldPersist_",
+      "serviceCallSites": [
+        "fastSheet.getLastRow"
+      ],
+      "delegatedCalls": [
+        "noteFieldKey_"
+      ]
+    },
+    {
+      "file": "backend/FieldStore.gs",
+      "function": "fieldPersist_",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "viewFieldKey_"
+      ]
+    },
+    {
+      "file": "backend/FieldStore.gs",
+      "function": "fieldPersist_",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "receiptRows_"
+      ]
+    },
+    {
+      "file": "backend/FieldStore.gs",
+      "function": "fieldDelta_",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "fieldJournalRead_",
+        "publicFieldDelta_",
+        "publishedEntry_",
+        "visible_"
+      ]
+    },
+    {
+      "file": "backend/FieldStore.gs",
+      "function": "committedDelta_",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "publicFieldDelta_"
+      ]
+    },
+    {
+      "file": "backend/FieldStore.gs",
+      "function": "committedDelta_",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "versionRow_"
+      ]
+    },
+    {
+      "file": "backend/FieldStore.gs",
+      "function": "fieldReceipt_",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "error_",
+        "storedReceipt_",
+        "visible_"
+      ]
+    },
+    {
+      "file": "backend/FieldStore.gs",
+      "function": "auditPage_",
+      "serviceCallSites": [
+        "sh.getRange",
+        "sh.getRange().getValues"
+      ],
+      "delegatedCalls": [
+        "auth_",
+        "document_",
+        "error_",
+        "fieldReadValues_",
+        "index_",
+        "visible_"
+      ]
+    },
+    {
+      "file": "backend/FieldStore.gs",
+      "function": "preflightFieldStore",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "book_",
+        "error_",
+        "index_"
+      ]
+    },
+    {
+      "file": "backend/FieldStore.gs",
+      "function": "preflightFieldStore",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "document_",
+        "error_"
+      ]
+    },
+    {
+      "file": "backend/FieldStore.gs",
+      "function": "migrateFieldStore",
+      "serviceCallSites": [
+        "LockService.getScriptLock"
+      ],
+      "delegatedCalls": [
+        "book_",
+        "deployLock_",
+        "document_",
+        "error_",
+        "index_",
+        "persist_"
+      ]
+    },
+    {
+      "file": "backend/FieldStore.gs",
+      "function": "prepareLegacyRollback",
+      "serviceCallSites": [
+        "LockService.getScriptLock"
+      ],
+      "delegatedCalls": [
+        "book_",
+        "deployFlush_",
+        "deployLock_",
+        "error_",
+        "fieldIndexWrite_",
+        "fieldRecover_"
+      ]
+    },
+    {
+      "file": "backend/FieldStore.gs",
+      "function": "snapshot",
+      "serviceCallSites": [
+        "sheet.getLastRow",
+        "sheet.getRange",
+        "sheet.getRange().setValues"
+      ],
+      "delegatedCalls": [
+        "document_",
+        "exportVersionReceipts_",
+        "fieldCapacity_"
+      ]
+    },
+    {
+      "file": "backend/FieldStore.gs",
+      "function": "preparePerformance404",
+      "serviceCallSites": [
+        "LockService.getScriptLock"
+      ],
+      "delegatedCalls": [
+        "book_",
+        "deployLock_",
+        "document_",
+        "error_",
+        "fieldRecover_",
+        "persist_"
+      ]
+    },
+    {
+      "file": "backend/FieldStore.gs",
+      "function": "exportVersionReceipts_",
+      "serviceCallSites": [
+        "sh.getLastRow",
+        "sh.getRange",
+        "sh.getRange().getValues"
+      ],
+      "delegatedCalls": []
+    },
+    {
+      "file": "backend/FieldStore.gs",
+      "function": "preparePerformance418",
+      "serviceCallSites": [
+        "LockService.getScriptLock"
+      ],
+      "delegatedCalls": [
+        "auditRows_",
+        "book_",
+        "deployLock_",
+        "document_",
+        "error_",
+        "fieldApplyRows_",
+        "fieldIndexWrite_",
+        "fieldJournalWrite_",
+        "fieldRecover_",
+        "hash_",
+        "projectionMatrix_"
+      ]
+    },
+    {
+      "file": "backend/FieldStore.gs",
+      "function": "fieldReadValues_",
+      "serviceCallSites": [
+        "GSISSheets.read"
+      ],
+      "delegatedCalls": []
+    },
+    {
+      "file": "backend/FieldStore.gs",
+      "function": "fieldReadMany_",
+      "serviceCallSites": [
+        "GSISSheets.readMany"
+      ],
+      "delegatedCalls": []
+    },
+    {
+      "file": "backend/LayoutRepository.gs",
+      "function": "layoutRepositoryId_",
+      "serviceCallSites": [
+        "SpreadsheetApp.create",
+        "props_().getProperty",
+        "props_().setProperty"
+      ],
+      "delegatedCalls": [
+        "error_",
+        "props_"
+      ]
+    },
+    {
+      "file": "backend/LayoutRepository.gs",
+      "function": "layoutSheet_",
+      "serviceCallSites": [
+        "GSISSheets.read",
+        "s.getRange",
+        "s.getRange().setValues"
+      ],
+      "delegatedCalls": [
+        "error_"
+      ]
+    },
+    {
+      "file": "backend/LayoutRepository.gs",
+      "function": "layoutHead_",
+      "serviceCallSites": [
+        "GSISSheets.read",
+        "GSISSheets.read().find",
+        "meta.getLastRow",
+        "s.getLastRow",
+        "s.getRange",
+        "s.getRange().setValues"
+      ],
+      "delegatedCalls": [
+        "error_",
+        "layoutSheet_"
+      ]
+    },
+    {
+      "file": "backend/LayoutRepository.gs",
+      "function": "layoutRead_",
+      "serviceCallSites": [
+        "GSISSheets.read"
+      ],
+      "delegatedCalls": [
+        "error_",
+        "hash_",
+        "layoutHead_"
+      ]
+    },
+    {
+      "file": "backend/LayoutRepository.gs",
+      "function": "layoutRead_",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "error_"
+      ]
+    },
+    {
+      "file": "backend/LayoutRepository.gs",
+      "function": "layoutMirror_",
+      "serviceCallSites": [
+        "GSISSheets.enabled",
+        "GSISSheets.read",
+        "GSISSheets.readAcross",
+        "GSISSheets.write",
+        "meta.getLastRow",
+        "sheet.getLastRow",
+        "sheet.getMaxRows",
+        "sheet.getRange",
+        "sheet.getRange().setValues",
+        "sheet.insertRowsAfter"
+      ],
+      "delegatedCalls": [
+        "deployFlush_",
+        "layoutRows_",
+        "layoutSheet_"
+      ]
+    },
+    {
+      "file": "backend/LayoutRepository.gs",
+      "function": "layoutMirror_",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "error_"
+      ]
+    },
+    {
+      "file": "backend/LayoutRepository.gs",
+      "function": "layoutMirror_",
+      "serviceCallSites": [
+        "GSISSheets.enabled"
+      ],
+      "delegatedCalls": []
+    },
+    {
+      "file": "backend/LayoutRepository.gs",
+      "function": "layoutStore_",
+      "serviceCallSites": [
+        "GSISSheets.read",
+        "GSISSheets.write",
+        "index.sheet.getRange",
+        "index.sheet.getRange().setValue",
+        "sheet.getLastRow",
+        "sheet.getMaxRows",
+        "sheet.insertRowsAfter",
+        "staging.getLastRow",
+        "staging.getRange",
+        "staging.getRange().setValues"
+      ],
+      "delegatedCalls": [
+        "deployFlush_",
+        "error_",
+        "hash_",
+        "layoutHead_",
+        "layoutMirror_",
+        "layoutRead_",
+        "layoutSheet_"
+      ]
+    },
+    {
+      "file": "backend/LayoutRepository.gs",
+      "function": "layoutAdminTables_",
+      "serviceCallSites": [
+        "GSISSheets.read",
+        "sheet.getLastRow"
+      ],
+      "delegatedCalls": [
+        "error_",
+        "layoutRows_",
+        "layoutSheet_"
+      ]
+    },
+    {
+      "file": "backend/LayoutRepository.gs",
+      "function": "prepareLayoutRepository501",
+      "serviceCallSites": [
+        "LockService.getScriptLock",
+        "SpreadsheetApp.openById"
+      ],
+      "delegatedCalls": [
+        "deployLock_",
+        "error_",
+        "layoutAdminTables_",
+        "layoutCounts_",
+        "layoutHead_",
+        "layoutRead_",
+        "layoutRepositoryId_",
+        "layoutStore_"
+      ]
+    },
+    {
+      "file": "backend/LayoutRepository.gs",
+      "function": "saveLayoutAdmin501",
+      "serviceCallSites": [
+        "LockService.getScriptLock",
+        "SpreadsheetApp.openById",
+        "props_().getProperty"
+      ],
+      "delegatedCalls": [
+        "deployLock_",
+        "error_",
+        "hash_",
+        "layoutAdminTables_",
+        "layoutCounts_",
+        "layoutRead_",
+        "layoutRepositoryId_",
+        "layoutStore_",
+        "props_"
+      ]
+    },
+    {
+      "file": "backend/LayoutRepository.gs",
+      "function": "repairLayoutTables501",
+      "serviceCallSites": [
+        "LockService.getScriptLock",
+        "SpreadsheetApp.openById",
+        "props_().getProperty"
+      ],
+      "delegatedCalls": [
+        "deployLock_",
+        "error_",
+        "layoutMirror_",
+        "layoutRead_",
+        "layoutRepositoryId_",
+        "props_"
+      ]
+    },
+    {
+      "file": "backend/LayoutRepository.gs",
+      "function": "publicLayout_",
+      "serviceCallSites": [
+        "SpreadsheetApp.openById",
+        "props_().getProperty"
+      ],
+      "delegatedCalls": [
+        "error_",
+        "layoutHead_",
+        "layoutRead_",
+        "layoutRepositoryId_",
+        "props_"
+      ]
+    },
+    {
+      "file": "backend/LayoutRepository.gs",
+      "function": "syncLayoutPublication_",
+      "serviceCallSites": [
+        "SpreadsheetApp.openById",
+        "pointer.sheet.getRange",
+        "pointer.sheet.getRange().setValue"
+      ],
+      "delegatedCalls": [
+        "deployFlush_",
+        "document_",
+        "error_",
+        "fieldIndexWrite_",
+        "layoutHead_",
+        "layoutRead_",
+        "layoutRepositoryId_",
+        "layoutStore_",
+        "publishedEntry_"
+      ]
+    },
+    {
+      "file": "backend/LayoutRepository.gs",
+      "function": "syncLayoutPublication_",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "hash_"
+      ]
+    },
+    {
+      "file": "backend/LayoutRepository.gs",
+      "function": "retryLayoutPublication501",
+      "serviceCallSites": [
+        "LockService.getScriptLock"
+      ],
+      "delegatedCalls": [
+        "book_",
+        "deployLock_",
+        "error_",
+        "fieldRecover_",
+        "syncLayoutPublication_"
+      ]
+    },
+    {
+      "file": "backend/NoticeAcknowledgement.gs",
+      "function": "noticeAckKey_",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "hash_"
+      ]
+    },
+    {
+      "file": "backend/NoticeAcknowledgement.gs",
+      "function": "noticeAckEpoch_",
+      "serviceCallSites": [
+        "props_().getProperty"
+      ],
+      "delegatedCalls": [
+        "hash_",
+        "props_"
+      ]
+    },
+    {
+      "file": "backend/NoticeAcknowledgement.gs",
+      "function": "pendingNotices_",
+      "serviceCallSites": [
+        "props_().getProperty"
+      ],
+      "delegatedCalls": [
+        "noticeAckKey_",
+        "props_"
+      ]
+    },
+    {
+      "file": "backend/NoticeAcknowledgement.gs",
+      "function": "acknowledgeNotices_",
+      "serviceCallSites": [
+        "LockService.getScriptLock",
+        "props.setProperty"
+      ],
+      "delegatedCalls": [
+        "auth_",
+        "deployLock_",
+        "document_",
+        "error_",
+        "hash_",
+        "index_",
+        "noticeAckKey_",
+        "props_",
+        "visible_"
+      ]
+    },
+    {
+      "file": "backend/Planning.gs",
+      "function": "planningContext_",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "hrTerms_",
+        "membershipCatalogue_",
+        "seedMembership_"
+      ]
+    },
+    {
+      "file": "backend/Planning.gs",
+      "function": "applyPlanning_",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "auth_",
+        "error_",
+        "membershipCatalogue_",
+        "planningValue_",
+        "resolveTeachers_"
+      ]
+    },
+    {
+      "file": "backend/Planning.gs",
+      "function": "syncPublishedCatalogues_",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "contacts_",
+        "document_",
+        "publishedEntry_"
+      ]
+    },
+    {
+      "file": "backend/PlanningPatch.gs",
+      "function": "planningPatchValue_",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "planningPatchTarget_"
+      ]
+    },
+    {
+      "file": "backend/PlanningPatch.gs",
+      "function": "applyPlanningPatch_",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "applyPlanning_",
+        "error_",
+        "planningPatchTarget_"
+      ]
+    },
+    {
+      "file": "backend/SheetsIO.gs",
+      "function": "readAcross",
+      "serviceCallSites": [
+        "SpreadsheetApp.flush"
+      ],
+      "delegatedCalls": []
+    },
+    {
+      "file": "backend/SheetsIO.gs",
+      "function": "readAcross",
+      "serviceCallSites": [
+        "r.sheet.getRange"
+      ],
+      "delegatedCalls": []
+    },
+    {
+      "file": "backend/SheetsIO.gs",
+      "function": "readAcross",
+      "serviceCallSites": [
+        "g.getDisplayValues",
+        "g.getValues"
+      ],
+      "delegatedCalls": []
+    },
+    {
+      "file": "backend/SheetsIO.gs",
+      "function": "readAcross",
+      "serviceCallSites": [
+        "Sheets.Spreadsheets.Values.batchGet"
+      ],
+      "delegatedCalls": []
+    },
+    {
+      "file": "backend/SheetsIO.gs",
+      "function": "readMany",
+      "serviceCallSites": [
+        "readAcross"
+      ],
+      "delegatedCalls": []
+    },
+    {
+      "file": "backend/SheetsIO.gs",
+      "function": "read",
+      "serviceCallSites": [
+        "readMany"
+      ],
+      "delegatedCalls": []
+    },
+    {
+      "file": "backend/SheetsIO.gs",
+      "function": "write",
+      "serviceCallSites": [
+        "SpreadsheetApp.flush"
+      ],
+      "delegatedCalls": []
+    },
+    {
+      "file": "backend/SheetsIO.gs",
+      "function": "write",
+      "serviceCallSites": [
+        "e.sheet.getRange",
+        "e.sheet.getRange().setValues"
+      ],
+      "delegatedCalls": []
+    },
+    {
+      "file": "backend/SheetsIO.gs",
+      "function": "write",
+      "serviceCallSites": [
+        "Sheets.Spreadsheets.Values.batchUpdate"
+      ],
+      "delegatedCalls": []
+    },
+    {
+      "file": "backend/VersionNotes.gs",
+      "function": "saveVersionNote_",
+      "serviceCallSites": [],
+      "delegatedCalls": [
+        "auth_",
+        "document_",
+        "error_",
+        "hash_",
+        "leases_",
+        "log_",
+        "persist_",
+        "publication_",
+        "storedReceipt_",
+        "visible_"
+      ]
+    },
+    {
+      "file": "public/app.js",
+      "function": "layout",
+      "serviceCallSites": [
+        "fetch"
+      ],
+      "delegatedCalls": []
+    },
+    {
+      "file": "public/app.js",
+      "function": "downloadCampusReference",
+      "serviceCallSites": [
+        "fetch"
+      ],
+      "delegatedCalls": []
+    },
+    {
+      "file": "public/planning-ui.js",
+      "function": "dutyPage",
+      "serviceCallSites": [
+        "roster.style.setProperty"
+      ],
+      "delegatedCalls": []
+    },
+    {
+      "file": "contacts-update/public/app.js",
+      "function": "signout",
+      "serviceCallSites": [
+        "fetch"
+      ],
+      "delegatedCalls": []
+    },
+    {
+      "file": "layout-update/public/app.js",
+      "function": "renderSelected",
+      "serviceCallSites": [
+        "canEdit"
+      ],
+      "delegatedCalls": []
+    },
+    {
+      "file": "layout-update/public/app.js",
+      "function": "startLogin",
+      "serviceCallSites": [
+        "canEdit",
+        "fetch"
+      ],
+      "delegatedCalls": []
+    },
+    {
+      "file": "shared/transport.js",
+      "function": "anonymous",
+      "serviceCallSites": [
+        "fetch"
+      ],
+      "delegatedCalls": []
+    },
+    {
+      "file": "public/_worker.js",
+      "function": "identity",
+      "serviceCallSites": [
+        "fetch"
+      ],
+      "delegatedCalls": []
+    },
+    {
+      "file": "public/_worker.js",
+      "function": "backend",
+      "serviceCallSites": [
+        "fetch"
+      ],
+      "delegatedCalls": []
+    },
+    {
+      "file": "public/_worker.js",
+      "function": "anonymous",
+      "serviceCallSites": [
+        "env.ASSETS.fetch",
+        "hub().fetch"
+      ],
+      "delegatedCalls": []
+    },
+    {
+      "file": "public/_worker.js",
+      "function": "anonymous",
+      "serviceCallSites": [
+        "hub().fetch"
+      ],
+      "delegatedCalls": []
+    },
+    {
+      "file": "contacts-update/public/_worker.js",
+      "function": "identity",
+      "serviceCallSites": [
+        "fetch"
+      ],
+      "delegatedCalls": []
+    },
+    {
+      "file": "contacts-update/public/_worker.js",
+      "function": "anonymous",
+      "serviceCallSites": [
+        "env.ASSETS.fetch",
+        "fetch"
+      ],
+      "delegatedCalls": []
+    },
+    {
+      "file": "layout-update/public/_worker.js",
+      "function": "identity",
+      "serviceCallSites": [
+        "fetch"
+      ],
+      "delegatedCalls": []
+    },
+    {
+      "file": "layout-update/public/_worker.js",
+      "function": "backend",
+      "serviceCallSites": [
+        "fetch"
+      ],
+      "delegatedCalls": []
+    },
+    {
+      "file": "layout-update/public/_worker.js",
+      "function": "anonymous",
+      "serviceCallSites": [
+        "env.ASSETS.fetch"
+      ],
+      "delegatedCalls": []
+    }
+  ]
+}

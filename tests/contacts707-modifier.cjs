@@ -1,0 +1,15 @@
+const assert=require('node:assert/strict'),crypto=require('node:crypto'),fixture=require('./contacts503-fixture');
+const f=fixture(),contacts=f.sheets.get('contacts'),roles=f.sheets.get('roles');
+contacts.data[2][3]='smc';contacts.data[2][10]='SH';
+roles.data.push(roles.data[0].map(k=>k==='Role Shortform'?'SH':k==='SMC'?'1':''));
+const create=p=>f.post('rosterContactCreate',{requestId:crypto.randomUUID(),name:'Visiting Teacher',mobile:'91234567',...p},'smc@gsps.edu.sg');
+const original=JSON.stringify(contacts.data);
+for(const modifier of ['x,y','(x)','x\n<script>', 'x'.repeat(33)])assert.equal(create({modifier}).status,400);
+assert.equal(JSON.stringify(contacts.data),original,'Invalid modifiers leave Contacts untouched');
+const first=create({modifier:'Morning A'});assert.equal(first.ok,true,JSON.stringify(first));assert.equal(first.data.person.name,'Visiting Teacher (Morning A)');assert.equal(first.data.person.active,false);
+assert.equal(create({modifier:'Morning A',confirmDistinct:true}).data.blocked,true,'Exact TTb cannot be bypassed by distinct confirmation');
+const distinct=create({modifier:'Afternoon B',mobile:'92345678',confirmDistinct:true});assert.equal(distinct.data.saved,true);assert.equal(distinct.data.person.name,'Visiting Teacher (Afternoon B)');
+const p={requestId:crypto.randomUUID(),name:'Another Visitor',mobile:'93456789',modifier:'Custom 7'};
+assert.equal(create(p).data.saved,true);f.reset();assert.equal(create(p).data.duplicate,true);assert.equal(f.stats.writes.length,0,'Retry uses durable receipt');
+assert.equal(create({...p,modifier:'Changed'}).status,409);
+console.log('PASS v707 Contacts: custom TTb modifier, inactive-only identity, exact-name block, atomic rejection and retry receipt.');

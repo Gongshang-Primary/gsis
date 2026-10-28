@@ -1,0 +1,16 @@
+const assert=require('node:assert/strict'),vm=require('node:vm'),{ctx}=require('./storage.cjs'),run=s=>vm.runInContext(s,ctx),json=s=>JSON.parse(JSON.stringify(run(s)));
+run(`var tg085Id=call('change',{operation:'create',sourceVersionId:id,duplicate:true,name:'2027 TG recovery',requestId:Utilities.getUuid()}).versionId;
+var tg085Doc=()=>document_(book_(),index_(book_()).versions.find(x=>x.id===tg085Id));
+var tg085Save=(edits,requestId=Utilities.getUuid())=>call('change',{operation:'saveDraft',versionId:tg085Id,requestId,issuedAt:Date.now(),clientId:'tg085',edits});
+var tg085Add={operation:'addTG',localId:'tg085-new',name:'Recovery HCL group',subject:'TL',level:'1',levelWide:true,classRefs:[],venue:'',expected:null};
+var tg085Teacher={operation:'addTeacher',localId:'tg085-teacher',teacher:'t1',target:'tg085-new',subject:'TL',expected:false};
+var tg085Request=Utilities.getUuid();tg085Save([tg085Add,tg085Teacher],tg085Request);`);
+const saved=json('tg085Doc()');
+assert.throws(()=>run(`tg085Save([{...tg085Add,localId:'tg085-other',name:'  recovery hcl GROUP  '}])`),e=>e.status===400&&/recovery hcl GROUP.*already exists/i.test(e.message),'Saved duplicate must be named in the error');
+assert.deepEqual(json('tg085Doc()'),saved,'Rejected duplicate cannot modify the document');
+assert.throws(()=>run(`tg085Save([{...tg085Add,localId:'tg085-a',name:'Draft duplicate'},{...tg085Add,localId:'tg085-b',name:'draft DUPLICATE'},{...tg085Teacher,target:'tg085-b'}])`),e=>e.status===400&&/draft DUPLICATE.*already exists/i.test(e.message),'Same-batch duplicate must produce a useful named error');
+assert.deepEqual(json('tg085Doc()'),saved,'The first TG and teacher must not leak out of an invalid batch');
+run(`var tg085Corrected=[{...tg085Add,localId:'tg085-a',name:'Draft first'},{...tg085Add,localId:'tg085-b',name:'Draft corrected'},{...tg085Teacher,target:'tg085-b'}];var tg085CorrectedRequest=Utilities.getUuid();tg085Save(tg085Corrected,tg085CorrectedRequest);tg085Save(tg085Corrected,tg085CorrectedRequest);`);
+assert.equal(run(`tg085Doc().groups.filter(g=>g.id==='tg085-b').length`),1);assert.equal(run(`tg085Doc().assignments.filter(a=>a.target==='tg085-b'&&a.teacher==='t1').length`),1);
+assert.throws(()=>run(`tg085Save([{...tg085Add,localId:'tg085-legacy',classRefs:undefined,name:'Draft corrected'}])`),e=>e.status===400&&/Draft corrected.*already exists/i.test(e.message),'Older clients receive the same named duplicate error');
+console.log('PASS real Deploy dispatcher: named saved/same-batch/legacy TG duplicate, atomic rejection, corrected TG with teacher and idempotent receipt replay');

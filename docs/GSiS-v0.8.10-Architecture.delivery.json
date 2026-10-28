@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "receiptId": "d3e8911e-9dfa-4e1d-83cb-0e3db2463995",
+  "status": "current",
+  "command": "deliver",
+  "type": "architecture",
+  "input": "/workspace/scratch/2c52ae6e6b97/gsis-089a/docs/reviews/v0810/architecture-candidate.json",
+  "output": "/workspace/scratch/2c52ae6e6b97/gsis-089a/docs/GSiS-v0.8.10-Architecture.html",
+  "specification": {
+    "sha256": "b2fa4462290ea9af63b50fc03f66b8a2abf62ebdfcbaa08317b2ec1d750839fd",
+    "bytes": 13249
+  },
+  "artifact": {
+    "sha256": "ad3fc0b47a13c8bdb1175d2e6a7fe05c888c0ba39896bf65412f28c2e170b7b8",
+    "bytes": 830509
+  }
+}

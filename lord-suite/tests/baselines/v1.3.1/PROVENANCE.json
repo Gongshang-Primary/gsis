@@ -1,0 +1,30 @@
+{
+  "package": "LORD_V1.3.1_LTS_FULL_PACKAGE.zip",
+  "packageSha256": "840a549d57030771aca767e4c9b0579a2b716bc22b88be25c8354b9cd9b4ee22",
+  "files": {
+    "Source/backend/Code.gs": "03046829a9ceb126c993c5092240c58bf67b44592afbf22a30541994cbe95a56",
+    "Source/backend/appsscript.services.fragment.json": "56deaf698fb680786f219784ff54040b60f0dd0cd6d3e47dfd0c094353789a67",
+    "Source/lord/_worker.js": "14af100f946c2213b09ca79a9a98998721fa912c055c84b129a9f867fd559b5e",
+    "Source/lord/assets/app.js": "84cf357bae401da22016ecae4fbfcfeb6fa8c5b7faf7831e1c81ccdda9733ebd",
+    "Source/lord/assets/gsps-wordmark.webp": "d74fabf5cecc7bb497dc5f16bbc94881f92147200103ec002281536736481d58",
+    "Source/lord/assets/styles.css": "5eadcccd2da41a2a0df36bcb54bcf2c4ef1db873f55e702575fe4aa77030069f",
+    "Source/lord/assets/trolley-photo-example.webp": "fba8bd8110e15c7c47ff1eda6a4752a19b5632e01b0c51fd9fe216e4b3339e24",
+    "Source/lord/index.html": "4d7dd249bd7f638dd9491fb893e16b43d23705af417785f7f6663dd104824a58",
+    "Source/overlord/_worker.js": "3b75ad0ad956796f463e723f073421c2fd3c13de16f0d6f21a931307c086d6c0",
+    "Source/overlord/assets/app.js": "b973fd2c5540b9e558282b392ca29cb31998cd331a306433c5cef1d081b453db",
+    "Source/overlord/assets/gsps-wordmark.webp": "d74fabf5cecc7bb497dc5f16bbc94881f92147200103ec002281536736481d58",
+    "Source/overlord/assets/styles.css": "7425a6f8f69882680488699ca4fb4ff83ab4e5276c7bde4dd24ceaeeaf72563a",
+    "Source/overlord/index.html": "63082ce4a8b06b454c9a8755bb6fe2b71d22965975cc8c95d8ae9807cb2de0dc",
+    "Source/starlord/_headers": "3f29ea335e5ec0655c3123031d75424175d998e680f98622127c99c860609e5f",
+    "Source/starlord/_worker.js": "4268c1cd25c34af28f2b2bd3b1d6d4e9d8141da9477ed9b9b5a89197a7d31e0e",
+    "Source/starlord/assets/app.js": "5bba6cf80ed4af29f7dbfc84951501d0b8b389c32844777ec4f896bb13c01325",
+    "Source/starlord/assets/device-android.webp": "af2467ac8a84d6f02a6d2d6a35f717e1fb4ca3d8b39992304f5dc5b67c17e28c",
+    "Source/starlord/assets/device-ipad.webp": "b6d318c68222230feec1e7dd33b0dbcb8409b1a75897078cba5e0e1d59e285a0",
+    "Source/starlord/assets/device-laptop.jpg": "bb0c1914b97dd02c88516991488c71d56fd253802953151db44a7e5aac1bd25c",
+    "Source/starlord/assets/device-mbn.webp": "5f7a2ddcb08249a568a08553f00f6417683e608817e65857dc503e83fa72409a",
+    "Source/starlord/assets/gsps-wordmark.webp": "d74fabf5cecc7bb497dc5f16bbc94881f92147200103ec002281536736481d58",
+    "Source/starlord/assets/styles.css": "c582a9ddc74c478c9eb7885f5a7c2041a5ae3182bac0d268ff4e4f56ccccde37",
+    "Source/starlord/index.html": "561ecda9562195beea2360ae48d2a99080e313f78ad6c419be1c0a12d82b40aa"
+  },
+  "configurationSanitisedForGSiSSuite": true
+}

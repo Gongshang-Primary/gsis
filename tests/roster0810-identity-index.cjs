@@ -1,0 +1,13 @@
+'use strict';
+const assert=require('node:assert/strict'),O=require('../shared/roster-operations.js');
+const state=O.initial();state.nameBridgesSeeded=true;let bridgeReads=0;
+const people=Array.from({length:220},(_,i)=>({id:'staff'+i,name:'Statutory '+i})),blocks=people.map((p,i)=>({name:'TTb '+i}));
+state.nameBridges=people.map((p,i)=>({get timetableName(){bridgeReads++;return 'TTb '+i;},staffId:p.id}));
+const matched=O.matchTimetableNames(state,people,blocks);assert.deepEqual(matched.map(row=>row.person.id),people.map(p=>p.id));
+console.log(JSON.stringify({teachers:people.length,bridges:state.nameBridges.length,bridgeNameReads:bridgeReads}));
+assert(bridgeReads<=state.nameBridges.length*2,'identity join must normalise each saved bridge once');
+const ambiguous=O.initial();ambiguous.nameBridgesSeeded=true;ambiguous.nameBridges=[{timetableName:'Duplicate',staffId:'one'},{timetableName:'Duplicate',staffId:'two'},{timetableName:'Alias',staffId:'one'},{timetableName:'Missing',staffId:'missing'}];
+const names=[{id:'one',name:'Ada'},{id:'two',name:'Bob'},{id:'three',name:'Repeated'},{id:'four',name:'Repeated'}];
+assert.deepEqual(O.matchTimetableNames(ambiguous,names,[{name:'Duplicate'},{name:'Repeated'},{name:'Missing'},{name:'Alias'}]).map(row=>row.person.id),['one']);
+assert.deepEqual(O.matchTimetableNames(ambiguous,names,[{name:'Ada'},{name:'Alias'}]),[],'two timetable blocks must not resolve to the same identity');
+console.log('PASS indexed identity join preserves missing, duplicate, alias and one-to-one identity checks.');

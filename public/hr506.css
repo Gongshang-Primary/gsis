@@ -1,0 +1,19 @@
+/* HR rows stay compact until a note is being read or edited. */
+#content[data-view="Teachers"] tbody td{padding:3px 6px;vertical-align:middle}
+#content[data-view="Teachers"] .teacher-cell{min-height:28px;padding:3px 4px;line-height:1.25}
+#content[data-view="Teachers"] table textarea.full-cell-note{min-height:28px!important;height:28px!important;padding:3px 5px!important;line-height:1.25!important;resize:vertical;overflow:auto}
+#content[data-view="Teachers"] table textarea.full-cell-note:focus{height:84px!important;min-height:84px!important}
+#content[data-view="Teachers"] .contact-pool-note{display:block;color:#526676;font-size:11px;line-height:1.15}
+
+/* Use the reporting content's natural width, and scroll only when it exceeds
+   the viewport. Individual boxes no longer expand to fill spare space. */
+#content .reporting-content-fit{width:max-content;max-width:100%;box-sizing:border-box;grid-template-columns:minmax(0,max-content) 205px;align-items:start}
+.reporting-content-fit .reporting-main{width:max-content;max-width:100%;height:100%;min-width:0;box-sizing:border-box}
+.reporting-content-fit .reporting-unassigned{height:100%;box-sizing:border-box}
+.reporting-content-fit .ro-layer{width:max-content;max-width:100%;min-width:0;box-sizing:border-box}
+.reporting-content-fit .ro-layer-scroll{width:max-content;max-width:100%;box-sizing:border-box;overflow-x:auto!important}
+.reporting-content-fit .ro-box{flex:0 0 auto;width:max-content;min-width:185px;max-width:320px;overflow-wrap:anywhere}
+.reporting-content-fit .reporting-directory{width:max-content;min-width:0}
+.reporting-content-fit .reporting-directory>section{width:max-content;box-sizing:border-box}
+.reporting-content-fit .ro-review{width:max-content;max-width:100%;box-sizing:border-box}
+@media(max-width:700px){#content .reporting-content-fit{grid-template-columns:minmax(0,max-content) 175px}}

@@ -1,0 +1,25 @@
+'use strict';
+const assert=require('node:assert/strict'),fixture=require('./roster701-fixture.cjs'),A=require('../shared/roster-allocation.js');
+const f=fixture();f.ctx.minute=360;f.ctx.now=Date.parse(f.date+'T06:00:00+08:00');f.ctx.iso=new Date(f.ctx.now).toISOString();
+f.state.systemConfig.allocationPreferences=['subjectMatch','levelMatch','weeklyRemaining','annualUtilisation','alternatives','rotation'];
+f.state.systemConfig.allocationRuleEnabled={annualUtilisation:false,alternatives:false,rotation:false};
+for(const t of f.teachers){t.R=20;t.teachingProfile={subjects:t.staffId==='charlie'?['ML']:['CL'],levels:t.staffId==='dora'?[4]:[3]};}
+f.ctx.days[f.date].teachingGroups=[{id:'cl',name:'4CL1',subject:'CL',level:4}];
+A.captureWeek(f.state,f.ctx,f.date);const m=A.manualModel(f.state,f.ctx,f.date),dem={id:'d1',period:2,staffId:'alice',subject:'MTL',groupIds:['cl'],groupName:'4CL1',className:'4A'};
+const names=model=>A.manualRanks(model,dem).filter(r=>r.available).map(r=>r.id);
+assert.deepEqual(names(m),['dora','bob','charlie'],'precise TG family and level match follow configured order');
+m.policy.allocationRuleEnabled.subjectMatch=false;m.policy.allocationRuleEnabled.levelMatch=false;m.teachers.find(t=>t.id==='charlie').balance.remaining=25;
+assert.equal(names(m)[0],'charlie','disabled subject/level rules do not affect selection');
+const heavy=m.teachers.find(t=>t.id==='charlie');heavy.base=[0,1,4,5,8,9,12,13];heavy.workloadBase=heavy.base.slice();heavy.consecutiveBase=heavy.base.slice();heavy.consecutiveWorkloadBase=heavy.base.slice();
+let r=A.manualRanks(m,dem);assert.equal(r.find(x=>x.id==='charlie').load,8);assert.equal(r.find(x=>x.id==='charlie').available,true);assert.equal(names(m).at(-1),'charlie','eight work periods softly demoted, still eligible');
+heavy.absent=[13];assert.equal(A.manualRanks(m,dem).find(x=>x.id==='charlie').load,7,'absent baseline periods do not count as work performed');heavy.absent=[];
+heavy.workloadBase=[0,1,4,5,8,9,12];heavy.consecutiveWorkloadBase=heavy.workloadBase.slice();assert.equal(names(m)[0],'charlie','BLK/recess occupancy is excluded from work load');
+const combined=[{id:'a',demandId:'a',staffId:'charlie',period:12,rCost:0,combination:true},{id:'b',demandId:'b',staffId:'charlie',period:12,rCost:0,combination:true}];
+const c=A.withManualAssignments(m,combined);assert.equal(A.manualRanks(c,dem).find(x=>x.id==='charlie').load,7,'combined period counted once with baseline');
+const add=[...combined,{id:'c',demandId:'c',staffId:'charlie',period:14,rCost:1}];const before=structuredClone(m),draft=A.withManualAssignments(c,add);
+assert.equal(draft.teachers.find(t=>t.id==='charlie').balance.remaining,24);assert.equal(A.manualRanks(draft,dem).find(x=>x.id==='charlie').load,8);assert.equal(names(draft).at(-1),'charlie');
+assert.deepEqual(A.withManualAssignments(draft,add),draft,'reprojection does not double count');assert.deepEqual(m,before,'projection does not mutate server snapshot');
+const cleared=A.withManualAssignments(draft,[]);assert.equal(cleared.teachers.find(t=>t.id==='charlie').balance.remaining,25,'unassignment restores weekly allowance');
+const override=structuredClone(draft);override.teachers.find(t=>t.id==='bob').balance.remaining=0;const ranks=A.manualRanks(override,dem).filter(x=>x.available);assert(ranks.findIndex(x=>x.id==='charlie')<ranks.findIndex(x=>x.id==='bob'),'load demotion never crosses eligibility/override categories');
+const replacement=A.manualRanks(draft,{...dem,id:'c',period:14}).find(x=>x.id==='charlie');assert.equal(replacement.remainingWithReplacement,25,'replacement restores the selected assignment cost');
+console.log('PASS v087 manual policy: TG families, levels, toggles, eight-period soft demotion, combine/BLK counts, eligibility groups, local weekly R and replacement');

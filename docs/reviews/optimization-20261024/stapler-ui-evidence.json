@@ -1,0 +1,26 @@
+{
+  "fixture": "2026 Oct 28 P3 LTP supplied Offline JSON",
+  "teachers": 100,
+  "planCharacters": 782666,
+  "baseCharacters": 468591,
+  "domNodes": 21103,
+  "pendingRecovery": {
+    "historicalDuplicatedCharacters": 2502924,
+    "compactCharacters": 1251696,
+    "totalCharactersWithThreeRetainedDates": 5006091,
+    "pendingPersisted": true,
+    "pendingRestored": true,
+    "requestIdPreserved": true
+  },
+  "save": {
+    "scrollBefore": 1500,
+    "scrollAfter": 1500,
+    "drawTablesCalls": 0
+  },
+  "confirm": {
+    "scrollBefore": 1500,
+    "scrollAfter": 1500,
+    "drawTablesCalls": 0
+  },
+  "timingOmitted": "Other concurrent work may affect browser wall time. No production latency claim."
+}

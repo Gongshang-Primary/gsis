@@ -1,0 +1,29 @@
+# Copy only into a NEW rehearsal deployment directory. setup-rehearsal.py generates real values.
+name = "gsis-roster-rehearsal"
+main = "worker.mjs"
+compatibility_date = "2026-10-01"
+workers_dev = true
+preview_urls = false
+
+[limits]
+cpu_ms = 1000
+
+[vars]
+REHEARSAL_MODE = "simulation-only"
+REHEARSAL_INSTANCE_ID = "REPLACE-WITH-NEW-LOWERCASE-INSTANCE-ID"
+REHEARSAL_ORIGIN = "https://gsis-roster-rehearsal.REPLACE.workers.dev"
+REHEARSAL_GOOGLE_CLIENT_ID = "REPLACE.apps.googleusercontent.com"
+REHEARSAL_SCHOOL_DOMAIN = "REPLACE.edu.sg"
+REHEARSAL_ADMIN_EMAILS = "REPLACE@REPLACE.edu.sg"
+
+[[d1_databases]]
+binding = "REHEARSAL_LEDGER"
+database_name = "gsis-roster-rehearsal-ledger-REPLACE"
+database_id = "REPLACE-NEW-DATABASE-UUID"
+
+[[r2_buckets]]
+binding = "REHEARSAL_TIMETABLES"
+bucket_name = "gsis-roster-rehearsal-timetables-REPLACE"
+
+# Intentionally no services, Queues, cron, routes, production bindings or secrets.
+# Keep R2 private: never enable a public r2.dev endpoint or a custom bucket domain.

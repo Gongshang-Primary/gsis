@@ -1,0 +1,13 @@
+const fs=require('fs'),vm=require('vm'),assert=require('assert/strict'),{JSDOM}=require(process.env.GSIS_TEST_JSDOM||'jsdom');
+const html=fs.readFileSync('layout-update/public/landmark.html','utf8'),scripts=[...html.matchAll(/<script[^>]*>([\s\S]*?)<\/script>/g)].map(m=>m[1]),dom=new JSDOM(html,{runScripts:'outside-only'}),ctx=dom.getInternalVMContext();
+dom.window.HTMLCanvasElement.prototype.getContext=()=>new Proxy({measureText:t=>({width:t.length*6})},{get:(o,k)=>o[k]||(()=>{})});
+vm.runInContext(scripts[0],ctx);vm.runInContext(scripts[1].replace(/try\{init\(\);\}catch\(error\)\{console.error\(error\);\$\('error'\).hidden=false;\}/,''),ctx);
+vm.runInContext('scene=new THREE.Scene();buildCampus();facadeAccents();photoArchitecture();campusPhotoRevision();finishGlazing();finishBatches();scene.updateMatrixWorld(true);',ctx);
+const actual=JSON.parse(vm.runInContext(`JSON.stringify((()=>{
+ const hit=(a,b)=>{const A=pt(...a),B=pt(...b),ray=new THREE.Raycaster(A,B.clone().sub(A).normalize(),0,A.distanceTo(B));return ray.intersectObjects(scene.children,true).length>0;};
+ return {greenTop:hit([922,632.75,4.88],[932,632.75,4.88]),greenGap:hit([922,632.75,4.2],[932,632.75,4.2]),magentaTop:hit([978,612,4.88],[978,622,4.88]),magentaGap:hit([978,612,4.2],[978,622,4.2]),cyan:hit([1050,630,4.2],[1062,630,4.2]),yellow:hit([980,650,4.2],[980,637,4.2]),orange:hit([1120,612,4.2],[1120,622,4.2]),orangeTop:hit([1120,612,4.88],[1120,622,4.88]),cover:hit([980,630,3.9],[980,630,3.45]),floor:hit([1120,617.25,4],[1120,617.25,3.55]),adjacentGuard:hit([1120,650,4.2],[1120,637,4.2]),fe:[2,3,4].map(l=>({level:l,blocked:hit([200,800,(l-1)*3.6+1.28],[200,819,(l-1)*3.6+1.28]),floor:hit([200,809,(l-1)*3.6+.5],[200,809,(l-1)*3.6-.2]),outerRail:hit([240,802,(l-1)*3.6+1.28],[240,815,(l-1)*3.6+1.28])}))};
+})())`,ctx));
+assert.equal(actual.greenTop,false,'19 Oct crossed transverse rail removed for the continuous rain shelter');assert.equal(actual.greenGap,false);assert.equal(actual.magentaTop,true,'26 Sep cyan edge has metal railing');assert.equal(actual.magentaGap,false);assert.equal(actual.cyan,false,'Internal cross-wall removed for the B doorway');assert.equal(actual.yellow,false);assert.equal(actual.cover,true,'Rain-cover slab retained');assert.equal(actual.floor,true,'Corridor floor retained');
+
+for(const f of actual.fe){assert.equal(f.blocked,false,'F–E passage L'+f.level);assert.equal(f.floor,true);assert.equal(f.outerRail,true,'Keep courtyard rail L'+f.level)}
+dom.window.close();console.log('PASS actual-mesh ray checks: crossed-out walls/rails removed, retained slabs, rain cover, F–E L2–L4 passages and outer guards');

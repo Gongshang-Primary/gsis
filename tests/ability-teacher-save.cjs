@@ -1,0 +1,22 @@
+const {ctx}=require('./storage.cjs'),vm=require('vm');
+vm.runInContext(`{
+const check=(x,m)=>{if(!x)throw Error(m)};
+c.sysFields={'Role':['Teacher','HOD'],'EO Appt Level':['Teaching','Middle management'],'Appointment Status':['Permanent','Contract'],'Employment Modifier':[],'Subject Modifier':['MTL'],'Active':['Y','N']};
+c.people[0].profile={'Basic Name':'One',Role:'Teacher','EO Appt Level':'Teaching','Appointment Status':'Permanent','Employment Modifier':'','Subject Modifier':'',Active:'Y'};
+const vid=call('change',{operation:'create',name:'Ability field test',requestId:Utilities.getUuid()}).versionId;
+const doc=()=>call('sync',{versionId:vid}).current;
+const save=(edits,email='one@gsps.edu.sg')=>call('change',{operation:'saveDraft',versionId:vid,requestId:Utilities.getUuid(),clientId:email,issuedAt:Date.now(),edits},{email,subject:email});
+save(['Role','Appointment Status','Subject Modifier'].map(field=>({operation:'setHRTerms',field,values:c.sysFields[field],expected:doc().hrTerms[field]})));
+const ref=doc().classes[0].ref;
+save([{operation:'setClassAbility',ref,expected:'',value:'HA'}]);
+const conflict=save([{operation:'setClassAbility',ref,expected:'',value:'MA'}],'two@gsps.edu.sg');
+check(doc().classes[0].ability==='MA','Latest ability wins');check(conflict.conflicts[0].overwrittenBy==='one@gsps.edu.sg'&&conflict.conflicts[0].overwrittenValue==='HA','Ability conflict records overwritten user/value');
+save([{operation:'setTeacherField',teacher:'t1',field:'Appointment Status',expected:'Permanent',value:'Contract'}]);
+save([{operation:'setTeacherField',teacher:'t1',field:'Subject Modifier',expected:'',value:'MTL'}],'two@gsps.edu.sg');
+check(doc().teacherDrafts.t1['Appointment Status']==='Contract'&&doc().teacherDrafts.t1['Subject Modifier']==='MTL','Separate teacher fields merge');
+let invalid=false;try{save([{operation:'setClassAbility',ref,expected:'MA',value:'XX'}])}catch(e){invalid=e.status===400}check(invalid&&doc().classes[0].ability==='MA','Invalid ability cannot alter saved data');
+let term=false;try{save([{operation:'setTeacherField',teacher:'t1',field:'Role',expected:'Teacher',value:'Unlisted'}])}catch(e){term=e.status===400}check(term,'Version choices validate teacher fields');
+const copy=call('change',{operation:'create',duplicate:true,sourceVersionId:vid,name:'Ability copy',requestId:Utilities.getUuid()}).versionId;
+save([{operation:'setClassAbility',ref,expected:'MA',value:'LA'}]);check(call('sync',{versionId:copy}).current.classes[0].ability==='MA','Copied ability independent');
+console.log('PASS ability validation/version isolation/conflict receipts and independent master-validated teacher cell saves');
+}`,ctx);

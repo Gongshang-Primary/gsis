@@ -1,0 +1,11 @@
+'use strict';
+const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm'),fixture=require('./roster701-fixture.cjs'),A=require('../shared/roster-allocation.js');
+const f=fixture(),source={service:'deploy',versionId:'published-v1',revision:7,commit:'immutable-commit-7',calculationVersion:'model-v1',from:'2026-01-01',to:'2026-12-31',checkedAt:'variable-read-time'};f.ctx.days[f.date].quotaSource=source;f.ctx.baselineDays=f.ctx.days;
+A.initialiseHistory(f.state,f.ctx,f.date);f.state.accountingYears['2026'].verified=true;A.captureWeek(f.state,f.ctx,f.date);
+const expected={...source};delete expected.checkedAt;
+const event=A.addAudit(f.state,f.ctx,'manual-review',{date:f.date});assert.deepEqual(event.deploySource,expected);
+f.O.apply(f.state,f.ctx,{operation:'saveAbsence',date:f.date,staffId:'alice',typeId:'mc',periods:[2]});assert.deepEqual(f.state.audit.filter(a=>a.operation==='saveAbsence').at(-1).deploySource,expected,'actual domain operation records its verified source');
+const first=A.optimise(f.state,f.ctx,f.date,[],{maxNodes:256});assert.deepEqual(first.decisionEvidence.inputs.deploySource,expected);
+source.revision=8;source.commit='immutable-commit-8';const second=A.optimise(f.state,f.ctx,f.date,[],{maxNodes:256});assert.equal(first.decisionEvidence.inputs.deploySource.commit,'immutable-commit-7');assert.equal(second.decisionEvidence.inputs.deploySource.commit,'immutable-commit-8','next decision records its own newly verified source');
+const scope=vm.createContext({GSISRosterAllocation:A});vm.runInContext(fs.readFileSync('backend/RosterAuditExport.gs','utf8'),scope);f.state.audit=[{...event,auditExportCaptured:true}];f.state.optimisationRuns=[{id:'run',date:f.date,at:f.ctx.iso,status:'complete',decisionEvidence:second.decisionEvidence}];const text=scope.rosterAllocationAuditText_(f.state,f.date,f.ctx.iso);assert.match(text,/Published Deploy version: published-v1/);assert.match(text,/Commit: immutable-commit-7/);assert.match(text,/Commit: immutable-commit-8/);
+console.log('PASS v0.8.4 allocation and operation audit bind the verified Deploy version/revision/commit and human-readable trail retains both source snapshots.');

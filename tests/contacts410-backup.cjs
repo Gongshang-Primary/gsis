@@ -1,0 +1,10 @@
+const {run,sheets,props}=require('./contacts-data.cjs'),assert=require('assert/strict');
+const sheet=sheets.get('contacts'),backup=props.get('CONTACT_VALUE_MIGRATION_BACKUP'),originalCopy=sheet.copyTo.bind(sheet);let copies=0;
+sheet.copyTo=(...a)=>{copies++;return originalCopy(...a)};
+assert.equal(run('prepareContactsPerformance410().ready'),true);assert.equal(copies,0,'existing backup reused');
+props.delete('CONTACT_VALUE_MIGRATION_BACKUP');const before=JSON.stringify(sheet.data);
+run("var request410={identity:actor,input:{requestId:Utilities.getUuid(),changes:[{id:'s1',field:'Basic Name',expected:'New Name',value:'Prepared Name'}]}};");
+assert.throws(()=>run('saveContactData_(book,request410)'),e=>e.status===409&&/preparation/.test(e.message));assert.equal(copies,0);assert.equal(JSON.stringify(sheet.data),before,'unprepared save must not mutate contacts');
+props.set('CONTACT_VALUE_MIGRATION_BACKUP',backup);assert.equal(run('saveContactData_(book,request410).saved'),true);assert.equal(copies,0,'ordinary save cannot copy a sheet');
+assert.equal(run('saveContactData_(book,request410).duplicate'),true);assert.equal(copies,0);
+console.log('PASS backup preparation is explicit/idempotent; unprepared edit rejects before contact mutation; ordinary and duplicate saves perform no sheet copy.');

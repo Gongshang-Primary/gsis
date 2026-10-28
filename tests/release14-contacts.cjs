@@ -1,0 +1,11 @@
+const {ctx,book,sheets,run,Sheet,headers}=require('./contacts-data.cjs'),assert=require('assert/strict');
+const contacts=sheets.get('contacts');
+const row=Object.fromEntries(headers.map(h=>[h,'']));Object.assign(row,{'Staff ID':'s2','Basic Name':'New Name',Role:'Teacher','Employment Modifier':'4/5, BT','Subject Modifier':'MTL',Active:'N'});contacts.data.push(headers.map(h=>row[h]||''));
+assert.throws(()=>run('validateDirectory_(calculatedContacts_(book).rows)'),e=>e.status===409);
+contacts.data[2][headers.indexOf('Subject Modifier')]='PE';assert.doesNotThrow(()=>run('validateDirectory_(calculatedContacts_(book).rows)'));
+sheets.get('roles').data.push(['PE','Teaching']);run("var derived=calculatedContacts_(book);derived.rows[1].Role='PE';derived.rows[1]['Subject Modifier']='';deriveContacts_(book,derived)");assert.equal(run("derived.rows[1]['Subject Modifier']"),'PE');assert.match(run("derived.rows[1]['TTb Name']"),/\(PE\)$/);
+assert.equal(run("contactData_(book,actor).fields[0]"),'TTb Name');assert.equal(run("contactData_(book,actor).rows[0].computed[0]"),true);assert.ok(run("sysFields_(book)['EO Appt Level'].includes('SL')"));
+for(const [old,value] of [['SSD','HOD'],['YH','HOD'],['AYH','Jnr KP'],['LH','Jnr KP']])assert.equal(run(`normaliseEO_('${old}')`),value);
+assert.throws(()=>run("saveContactData_(book,{identity:actor,input:{requestId:Utilities.getUuid(),changes:[{id:'s1',field:'EO Appt Level',value:'SH',expected:'HOD'}]}})"),e=>e.status===400);
+assert.throws(()=>run("validateContactCell_('Mobile No','1234567',{},'')"),e=>e.status===400);
+console.log('PASS unique TTb across inactive staff, repeat Basic Names with distinct modifiers, required subject, derived-field guards and EO normalisation');

@@ -1,0 +1,4 @@
+'use strict';
+const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
+const source=fs.readFileSync('roster-update/public/roster-operations-ui.js','utf8'),context=vm.createContext({});vm.runInContext(source.slice(source.indexOf('function intakeSummary('),source.indexOf('function intakeDetails(')),context);
+test('retained capacity failures explain administrator action without claiming automatic progress',()=>{const entry={intakeState:'needsReview',absenceApplied:false,failureCode:'ROSTER_STORAGE_CAPACITY',reasonCode:'STORAGE_CAPACITY_REQUIRED'};assert.match(context.intakeSummary(entry),/storage capacity.*administrator/i);const text=context.intakeReason(entry.reasonCode,entry.failureCode);assert.match(text,/retained/i);assert.match(text,/retry this same report/i);assert.doesNotMatch(text,/retry automatically/i);entry.absenceApplied=true;assert.match(context.intakeSummary(entry),/^Absence saved/);});

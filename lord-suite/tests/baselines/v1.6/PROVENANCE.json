@@ -1,0 +1,32 @@
+{
+  "package": "LORD_V1.6_LTS_FULL_PACKAGE.zip",
+  "packageSha256": "f47faad836473810e0b8767a8f49f30c93fd2d55df289fb17cca6e760bc00959",
+  "files": {
+    "Source/starlord/_headers": "3f29ea335e5ec0655c3123031d75424175d998e680f98622127c99c860609e5f",
+    "Source/starlord/index.html": "dba7cb472a1550616413925eefec73e85b7d90ddf57eeccd56d81c77225aecee",
+    "Source/starlord/_worker.js": "5fdb6259f85c15675ddc6c860f5a27abf063e15f73079d53f588b46c33b65056",
+    "Source/backend/Code.gs": "c909df55f9d1cdbdb17d430bc636090aabe85fb1c9d8e3944f4615ad20501068",
+    "Source/backend/appsscript.services.fragment.json": "56deaf698fb680786f219784ff54040b60f0dd0cd6d3e47dfd0c094353789a67",
+    "Source/lord/index.html": "4e2bb9d2110fb15136369a5d1be9ba3b1da9828ac633e109c48ce71f8072924d",
+    "Source/lord/_worker.js": "8bb003df96b0375868ef545c8a6e221450fc8defb39fe5f7ca6e925e99f4dba2",
+    "Source/overlord/index.html": "266ea7237ff0a77941ab0cf08d419f0c0fa94d6dea31292c86e0608188756621",
+    "Source/overlord/_worker.js": "bd560e4e4db7e34d7caff49175e04112bc65b06b9abdcc5260b7020bdd3b4147",
+    "Source/starlord/assets/device-android.webp": "af2467ac8a84d6f02a6d2d6a35f717e1fb4ca3d8b39992304f5dc5b67c17e28c",
+    "Source/starlord/assets/gsps-wordmark.webp": "d74fabf5cecc7bb497dc5f16bbc94881f92147200103ec002281536736481d58",
+    "Source/starlord/assets/device-ipad.webp": "b6d318c68222230feec1e7dd33b0dbcb8409b1a75897078cba5e0e1d59e285a0",
+    "Source/starlord/assets/device-mbn.webp": "5f7a2ddcb08249a568a08553f00f6417683e608817e65857dc503e83fa72409a",
+    "Source/starlord/assets/styles.css": "c582a9ddc74c478c9eb7885f5a7c2041a5ae3182bac0d268ff4e4f56ccccde37",
+    "Source/starlord/assets/app.js": "6b3e61697a326e888de91331ebf523a42292e628987dda9868e59e74311ceebf",
+    "Source/starlord/assets/device-laptop.jpg": "bb0c1914b97dd02c88516991488c71d56fd253802953151db44a7e5aac1bd25c",
+    "Source/lord/assets/drafts.js": "38796f7c79d60be08e146711fe5c22ef717c94ddd648932c639aa6cfc797b16d",
+    "Source/lord/assets/gsps-wordmark.webp": "d74fabf5cecc7bb497dc5f16bbc94881f92147200103ec002281536736481d58",
+    "Source/lord/assets/booking-rules.js": "b35501f8aaaa3b60b306ffdfeeba1ed13dab7ce7c5245612060cf9ef0e5392db",
+    "Source/lord/assets/trolley-photo-example.webp": "fba8bd8110e15c7c47ff1eda6a4752a19b5632e01b0c51fd9fe216e4b3339e24",
+    "Source/lord/assets/styles.css": "5eadcccd2da41a2a0df36bcb54bcf2c4ef1db873f55e702575fe4aa77030069f",
+    "Source/lord/assets/app.js": "74bac529a294e428c19ca5eef1f3265e58e19fb9f1cc88b7b0afc889ed7283bb",
+    "Source/overlord/assets/gsps-wordmark.webp": "d74fabf5cecc7bb497dc5f16bbc94881f92147200103ec002281536736481d58",
+    "Source/overlord/assets/styles.css": "7425a6f8f69882680488699ca4fb4ff83ab4e5276c7bde4dd24ceaeeaf72563a",
+    "Source/overlord/assets/app.js": "5633189f41fb862c33d81118177c1255c68b2daaec4eafa4be3bf708bf7e9d78"
+  },
+  "configurationSanitisedForGSiSSuite": true
+}

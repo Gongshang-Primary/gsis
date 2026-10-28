@@ -1,0 +1,13 @@
+'use strict';
+const assert=require('node:assert/strict');
+const {makeHarness}=require('./calendar/backend_harness.cjs');
+const h=makeHarness(),sheet=h.sheets.get('Tags'),getRange=sheet.getRange.bind(sheet);
+sheet.getRange=(...args)=>{const range=getRange(...args);range.sort=()=>{sheet.values=[sheet.values[0],...sheet.values.slice(1).sort((a,b)=>String(a[0]).localeCompare(String(b[0])))];return range;};return range;};
+const loaded=h.call('bootstrap',{year:2026}),old=h.sandbox.findRowByKeyCaseInsensitive_(sheet,'Tag','Mtg').object,oldRevision=h.sandbox.calendarMetadataRevision_(old);
+const saved=h.call('saveTag',{Tag:'AAA',Meaning:'First alphabetically'});
+const actual=h.sandbox.findRowByKeyCaseInsensitive_(sheet,'Tag','AAA').object;
+assert.equal(saved._metadataRevision,h.sandbox.calendarMetadataRevision_(actual),'Returned revision must match the actual durable record');
+assert.equal(h.sandbox.calendarMetadataRevision_(h.sandbox.findRowByKeyCaseInsensitive_(sheet,'Tag','Mtg').object),oldRevision,'An independent glossary write must retain other loaded record tokens');
+const next=h.call('saveTag',{Tag:'AAA',Meaning:'Updated without reload',expectedMetadataRevision:saved._metadataRevision});assert.equal(next.Meaning,'Updated without reload');
+assert.equal(h.call('saveTag',{...old,Meaning:'Independent edit',expectedMetadataRevision:loaded.metadataRevisions.tags.mtg}).Meaning,'Independent edit');
+console.log('PASS Glossary acknowledgements and independent revisions support chained edits without reload');

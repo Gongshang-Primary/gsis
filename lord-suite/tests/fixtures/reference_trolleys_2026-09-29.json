@@ -1,0 +1,262 @@
+{
+  "verifiedAt": "2026-09-29",
+  "source": "data_valid / trolleys!A1:F32",
+  "values": [
+    [
+      "Trolley",
+      "Qty Per Trolley",
+      "Cart",
+      "Type",
+      "Stylus Option",
+      "Headphone Option"
+    ],
+    [
+      "Tablet E01 - E14",
+      "14",
+      "Cart E",
+      "iPad 9Gen",
+      "Yes",
+      "Yes"
+    ],
+    [
+      "Tablet E15 - E28",
+      "14",
+      "Cart E",
+      "iPad 9Gen",
+      "Yes",
+      "Yes"
+    ],
+    [
+      "Tablet E29 - E42",
+      "14",
+      "Cart E",
+      "iPad 9Gen",
+      "Yes",
+      "Yes"
+    ],
+    [
+      "Tablet T01 - T14",
+      "14",
+      "Cart T",
+      "Tab S9",
+      "Yes",
+      "Yes"
+    ],
+    [
+      "Tablet T15 - T28",
+      "14",
+      "Cart T",
+      "Tab S9",
+      "Yes",
+      "Yes"
+    ],
+    [
+      "Tablet T29 - T42",
+      "14",
+      "Cart T",
+      "Tab S9",
+      "Yes",
+      "Yes"
+    ],
+    [
+      "Tablet U01 - U14",
+      "14",
+      "Cart U",
+      "Tab S9",
+      "Yes",
+      "Yes"
+    ],
+    [
+      "Tablet U15 - U28",
+      "14",
+      "Cart U",
+      "Tab S9",
+      "Yes",
+      "Yes"
+    ],
+    [
+      "Tablet U29 - U42",
+      "14",
+      "Cart U",
+      "Tab S9",
+      "Yes",
+      "Yes"
+    ],
+    [
+      "Tablet V01 - V14",
+      "14",
+      "Cart V",
+      "Tab S9",
+      "Yes",
+      "Yes"
+    ],
+    [
+      "Tablet V15 - V28",
+      "14",
+      "Cart V",
+      "Tab S9",
+      "Yes",
+      "Yes"
+    ],
+    [
+      "Tablet V29 - V42",
+      "14",
+      "Cart V",
+      "Tab S9",
+      "Yes",
+      "Yes"
+    ],
+    [
+      "Tablet W01 - W14",
+      "14",
+      "Cart W",
+      "Tab S9",
+      "Yes",
+      "Yes"
+    ],
+    [
+      "Tablet W15 - W28",
+      "14",
+      "Cart W",
+      "Tab S9",
+      "Yes",
+      "Yes"
+    ],
+    [
+      "Tablet W29 - W42",
+      "14",
+      "Cart W",
+      "Tab S9",
+      "Yes",
+      "Yes"
+    ],
+    [
+      "Tablet Y01 - Y14",
+      "14",
+      "Cart Y",
+      "Tab S9",
+      "Yes",
+      "Yes"
+    ],
+    [
+      "Tablet Y15 - Y28",
+      "14",
+      "Cart Y",
+      "Tab S9",
+      "Yes",
+      "Yes"
+    ],
+    [
+      "Tablet Y29 - Y42",
+      "14",
+      "Cart Y",
+      "Tab S9",
+      "Yes",
+      "Yes"
+    ],
+    [
+      "Tablet Z01 - Z14",
+      "14",
+      "Cart Z",
+      "Tab S9",
+      "Yes",
+      "Yes"
+    ],
+    [
+      "Tablet Z15 - Z28",
+      "14",
+      "Cart Z",
+      "Tab S9",
+      "Yes",
+      "Yes"
+    ],
+    [
+      "Tablet Z29 - Z42",
+      "14",
+      "Cart Z",
+      "Tab S9",
+      "Yes",
+      "Yes"
+    ],
+    [
+      "Laptop Cart",
+      "45",
+      "Laptops",
+      "HP Windows",
+      "No",
+      "Yes"
+    ],
+    [
+      "Tablet X01 - X14",
+      "14",
+      "Cart X",
+      "Tab S9",
+      "Yes",
+      "Yes"
+    ],
+    [
+      "Tablet X15 - X28",
+      "14",
+      "Cart X",
+      "Tab S9",
+      "Yes",
+      "Yes"
+    ],
+    [
+      "Tablet X29 - X42",
+      "14",
+      "Cart X",
+      "Tab S9",
+      "Yes",
+      "Yes"
+    ],
+    [
+      "Laptop A01 - A14",
+      "14",
+      "Cart A",
+      "MacBook Neo",
+      "No",
+      "Yes"
+    ],
+    [
+      "Laptop A15 - A28",
+      "14",
+      "Cart A",
+      "MacBook Neo",
+      "No",
+      "Yes"
+    ],
+    [
+      "Laptop A29 - A42",
+      "14",
+      "Cart A",
+      "MacBook Neo",
+      "No",
+      "Yes"
+    ],
+    [
+      "Laptop B01 - B14",
+      "14",
+      "Cart B",
+      "MacBook Neo",
+      "No",
+      "Yes"
+    ],
+    [
+      "Laptop B15 - B28",
+      "14",
+      "Cart B",
+      "MacBook Neo",
+      "No",
+      "Yes"
+    ],
+    [
+      "Laptop B29 - B41",
+      "13",
+      "Cart B",
+      "MacBook Neo",
+      "No",
+      "Yes"
+    ]
+  ]
+}

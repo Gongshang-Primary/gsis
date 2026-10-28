@@ -1,0 +1,11 @@
+'use strict';
+const assert=require('node:assert/strict'),vm=require('node:vm'),load=require('./load-backend-role.cjs');
+const scope=vm.createContext({PropertiesService:{getScriptProperties:()=>({getProperty:k=>k==='EXISTING_SETTING'?'preserved':null})},ScriptApp:{getOAuthToken:()=> 'synthetic-token'}}),fixture=load(scope,'roster');
+assert.equal(scope.gsisRequireBackendRole_('roster'),'roster');
+assert.equal(scope.PropertiesService.getScriptProperties().getProperty('EXISTING_SETTING'),'preserved');assert.equal(scope.ScriptApp.getOAuthToken(),'synthetic-token');
+assert.throws(()=>scope.gsisRequireBackendRole_('deploy'),e=>e.code==='BACKEND_ROLE_MISMATCH');
+fixture.properties.set('ROSTER_WRITER_ENABLED','false');assert.throws(()=>scope.gsisRequireBackendRole_('roster'),e=>e.code==='ROSTER_OWNER_INACTIVE');
+fixture.properties.set('ROSTER_WRITER_ENABLED','true');fixture.properties.set('ROSTER_OWNER_SCRIPT_ID','another-project');assert.throws(()=>scope.gsisRequireBackendRole_('roster'),e=>e.code==='ROSTER_OWNER_INACTIVE');
+assert.throws(()=>load(scope,'deploy'),/match the compiled/);
+const full=vm.createContext({});vm.runInContext(load.sourceForRole("const GSIS_BACKEND_KIND='deploy';",'roster'),full);load(full,'roster');assert.equal(full.gsisRequireBackendAction_('rosterProfile'),'roster');assert.throws(()=>full.gsisRequireBackendAction_('bootstrap'),e=>e.code==='BACKEND_ROLE_MISMATCH');
+console.log('PASS backend role fixture runs real fixed-role and project-bound activation checks; existing fixture services preserved.');

@@ -1,0 +1,71 @@
+{
+  "manual": [
+    {
+      "label": "desktop",
+      "width": 1365,
+      "height": 768,
+      "overflow": false,
+      "missingAnchors": [],
+      "title": "GSiS 0.9.4 \u00b7 Staff manual",
+      "sectionCount": 22,
+      "search": true,
+      "printVisible": true,
+      "keyboardFocus": "BUTTON",
+      "errors": []
+    },
+    {
+      "label": "mobile",
+      "width": 390,
+      "height": 844,
+      "overflow": false,
+      "missingAnchors": [],
+      "title": "GSiS 0.9.4 \u00b7 Staff manual",
+      "sectionCount": 22,
+      "search": true,
+      "printVisible": true,
+      "keyboardFocus": "BUTTON",
+      "errors": []
+    }
+  ],
+  "archify": {
+    "version": "3.1.0",
+    "candidate": "docs/architecture/v094-candidate.json",
+    "phase": "final implementation map from committed source; design-mode renderer",
+    "sourceCommit": "13ea5104fa2da338aa0757033aab1b8825256d4f",
+    "sourceEvidence": "docs/architecture/v094-source-evidence.json",
+    "nativeRepositoryEvidence": "Not enabled: actual origin is a local recovery bundle, unsupported by Archify repository URL validation even with local-only links.",
+    "independentSourceEvidence": "24 source line ranges read from exact committed Git objects, checked for bounds and hashed.",
+    "showcaseFinalize": "pass",
+    "gates": {
+      "validate": "pass",
+      "deliver": "pass",
+      "check": "pass",
+      "browser-check": "pass"
+    },
+    "artifactSha256": "7d8198d80050e26eb7156fbda052b8c5ab9929fb83d840fd5d719f93ce7692b9",
+    "specificationSha256": "00bcaaad4ed99eeaa3fa5eb30dcca6d45397af5b6758c4c8829cea3520b04e5a",
+    "deliveryReceipt": "docs/architecture/GSiS_v0.9.4_Architecture.delivery.json",
+    "deliveryReceiptId": "beb81064-ea21-458b-b57c-f27b9ea91832",
+    "browserCheck": "pass",
+    "visualCheck": "pass",
+    "visualContainment": "pass",
+    "visualInspection": "1440x900 and 2048x1320 light screenshots inspected; component labels, routes, legend and evidence card checked. Automated visualReview remains pending in the tool receipt; this field records the separate inspection."
+  },
+  "drawio": {
+    "structuralValidation": "pass",
+    "errors": 0,
+    "warnings": 0,
+    "geometryScore": 0,
+    "throughVertex": 0,
+    "crossings": 0,
+    "overlaps": 0,
+    "scope": "Editable companion with local source provenance; structural validator only, not a native Draw.io screenshot claim."
+  },
+  "scope": "Local artifact checks only. No live installation or provider tests.",
+  "operator": {
+    "unitRegression": "tests/edge094-setup.cjs passed",
+    "browserReceipt": "operator-browser-verification.json",
+    "browserScope": "Synthetic authenticated/denied responses only; no live mutation",
+    "visualInspection": "1365x768 Roster page and 390x844 Deploy confirmation reviewed"
+  }
+}

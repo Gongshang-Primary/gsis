@@ -1,0 +1,1056 @@
+{
+  "checkedOn": "2026-10-16",
+  "timeZone": "Asia/Singapore",
+  "source": "WhatsApp Business MCP read-only list_templates and get_template responses",
+  "businessId": "1367896852088548",
+  "templateAccountId": "971916692625997",
+  "phoneAccountId": "1421934440063600",
+  "phoneNumberId": "1330932803442822",
+  "templates": [
+    {
+      "template_id": "1612531343710304",
+      "name": "gsis_relief_attention_v2",
+      "language": "en_GB",
+      "category": "UTILITY",
+      "status": "PENDING"
+    },
+    {
+      "template_id": "1817583972759327",
+      "name": "gsis_relief_attention_v1",
+      "language": "en_GB",
+      "category": "MARKETING",
+      "status": "PENDING"
+    },
+    {
+      "template_id": "1617835963217353",
+      "name": "gsis_urgent_forward_v1",
+      "language": "en_GB",
+      "category": "UTILITY",
+      "status": "PENDING"
+    },
+    {
+      "template_id": "1465945335400661",
+      "name": "gsis_relief_final_v1",
+      "language": "en_GB",
+      "category": "UTILITY",
+      "status": "PENDING"
+    },
+    {
+      "template_id": "1417951669852452",
+      "name": "gsis_relief_capacity_warning_v1",
+      "language": "en_GB",
+      "category": "UTILITY",
+      "status": "PENDING"
+    },
+    {
+      "template_id": "1442160464722287",
+      "name": "gsis_relief_evening_v2",
+      "language": "en_GB",
+      "category": "UTILITY",
+      "status": "PENDING"
+    },
+    {
+      "template_id": "2188657595398105",
+      "name": "gsis_relief_manual_review_v1",
+      "language": "en_GB",
+      "category": "UTILITY",
+      "status": "APPROVED"
+    },
+    {
+      "template_id": "934616792782108",
+      "name": "gsis_absence_update_v1",
+      "language": "en_GB",
+      "category": "UTILITY",
+      "status": "APPROVED"
+    },
+    {
+      "template_id": "1082281697770168",
+      "name": "gsis_relief_morning_v1",
+      "language": "en_GB",
+      "category": "UTILITY",
+      "status": "APPROVED"
+    },
+    {
+      "template_id": "1662539355443373",
+      "name": "gsis_relief_evening_v1",
+      "language": "en_GB",
+      "category": "UTILITY",
+      "status": "APPROVED"
+    },
+    {
+      "template_id": "4510849222577421",
+      "name": "gsis_relief_urgent_smc_v1",
+      "language": "en_GB",
+      "category": "UTILITY",
+      "status": "APPROVED"
+    },
+    {
+      "template_id": "2373646553447066",
+      "name": "gsis_relief_urgent_v1",
+      "language": "en_GB",
+      "category": "UTILITY",
+      "status": "APPROVED"
+    },
+    {
+      "template_id": "3993441010951993",
+      "name": "gsis_relief_unacknowledged_v1",
+      "language": "en_GB",
+      "category": "UTILITY",
+      "status": "APPROVED"
+    },
+    {
+      "template_id": "2175089153046382",
+      "name": "gsis_relief_reminder_v1",
+      "language": "en_GB",
+      "category": "UTILITY",
+      "status": "APPROVED"
+    },
+    {
+      "template_id": "1753999250059547",
+      "name": "gsis_relief_updated_v1",
+      "language": "en_GB",
+      "category": "UTILITY",
+      "status": "APPROVED"
+    },
+    {
+      "template_id": "2331306544355004",
+      "name": "gsis_relief_assignment_v1",
+      "language": "en_GB",
+      "category": "UTILITY",
+      "status": "APPROVED"
+    },
+    {
+      "template_id": "1777525793360691",
+      "name": "gsis_contact_review_v1",
+      "language": "en_GB",
+      "category": "UTILITY",
+      "status": "APPROVED"
+    },
+    {
+      "template_id": "1775720290362486",
+      "name": "gsis_relief_changed_v1",
+      "language": "en_GB",
+      "category": "UTILITY",
+      "status": "APPROVED"
+    },
+    {
+      "template_id": "1406506811640852",
+      "name": "gsis_relief_request_v1",
+      "language": "en_GB",
+      "category": "UTILITY",
+      "status": "APPROVED"
+    }
+  ],
+  "details": [
+    {
+      "id": "1612531343710304",
+      "name": "gsis_relief_attention_v2",
+      "language": "en_GB",
+      "status": "PENDING",
+      "category": "UTILITY",
+      "correct_category": null,
+      "previous_category": null,
+      "sub_category": null,
+      "components": [
+        {
+          "type": "BODY",
+          "text": "*School Relief Allocation Requires Action*\n\nHi {{1}}, you are on SMC relief duty at Gongshang Primary School on {{2}}.\n\nThe following issue has been recorded in the teacher relief allocation for your duty date:\n\n{{3}}\n\nPlease review the affected lessons and confirm or correct their teacher coverage in Roster: {{4}}.\n\nThank you.",
+          "example": {
+            "body_text": [
+              [
+                "Sample Leader",
+                "15 Oct 2026 (Thu)",
+                "The 06:29 automatic allocation did not complete. The last saved draft has no covering teacher for class 3A, period 3. Please review the draft and assign cover manually.",
+                "https://roster.gsps.edu.sg"
+              ]
+            ]
+          }
+        }
+      ],
+      "quality_score": {
+        "score": "UNKNOWN",
+        "reason": null,
+        "reasons": [],
+        "date": 1792081676
+      },
+      "rejected_reason": "NONE",
+      "parameter_format": "POSITIONAL",
+      "display_format": null,
+      "source": null,
+      "message_send_ttl_seconds": null,
+      "library_template_name": null,
+      "last_updated_time": 1792021857,
+      "ad_account_id": null,
+      "ad_adset_id": null,
+      "ad_campaign_id": null,
+      "ad_id": null,
+      "product_set_id": null,
+      "cta_url_link_tracking_opted_out": false,
+      "is_primary_device_delivery_only": false,
+      "is_sms_fallback_enabled": false,
+      "disable_ios_autofill": false,
+      "optimization_spec": null,
+      "degrees_of_freedom_spec": null
+    },
+    {
+      "id": "1617835963217353",
+      "name": "gsis_urgent_forward_v1",
+      "language": "en_GB",
+      "status": "PENDING",
+      "category": "UTILITY",
+      "correct_category": null,
+      "previous_category": null,
+      "sub_category": null,
+      "components": [
+        {
+          "type": "BODY",
+          "text": "*Urgent Message to Relief Team*\n\nHi {{1}}, a staff member has sent this urgent message:\n\n{{2}}\n\nFrom: {{3}}\nContact: {{4}}\n\nPlease contact the sender directly. This message does not create an absence report or confirm relief cover.",
+          "example": {
+            "body_text": [
+              [
+                "Sample Leader",
+                "The assigned relief teacher has not arrived for class 3A. Please check classroom cover.",
+                "Sample Teacher",
+                "Example contact number (review sample only)"
+              ]
+            ]
+          }
+        }
+      ],
+      "quality_score": {
+        "score": "UNKNOWN",
+        "reason": null,
+        "reasons": [],
+        "date": 1792081676
+      },
+      "rejected_reason": "NONE",
+      "parameter_format": "POSITIONAL",
+      "display_format": null,
+      "source": null,
+      "message_send_ttl_seconds": null,
+      "library_template_name": null,
+      "last_updated_time": 1792015222,
+      "ad_account_id": null,
+      "ad_adset_id": null,
+      "ad_campaign_id": null,
+      "ad_id": null,
+      "product_set_id": null,
+      "cta_url_link_tracking_opted_out": false,
+      "is_primary_device_delivery_only": false,
+      "is_sms_fallback_enabled": false,
+      "disable_ios_autofill": false,
+      "optimization_spec": null,
+      "degrees_of_freedom_spec": null
+    },
+    {
+      "id": "1465945335400661",
+      "name": "gsis_relief_final_v1",
+      "language": "en_GB",
+      "status": "PENDING",
+      "category": "UTILITY",
+      "correct_category": null,
+      "previous_category": null,
+      "sub_category": null,
+      "components": [
+        {
+          "type": "BODY",
+          "text": "*Final Draft Relief Allocation*\n\nHi {{1}}, the final scheduled relief allocation for {{2}} is complete.\n\n{{3}}\n\nRelief Health: {{4}}\n\nReview and publish the draft in Roster: {{5}}.\n\nThank you.",
+          "example": {
+            "body_text": [
+              [
+                "Sample Leader",
+                "15 Oct 2026 (Thu)",
+                "5 teachers are absent. 20 periods need relief; 18 have draft cover. Periods 3 and 4 for class 3A remain uncovered.",
+                "34%; 2 uncovered periods.",
+                "https://roster.gsps.edu.sg"
+              ]
+            ]
+          }
+        }
+      ],
+      "quality_score": {
+        "score": "UNKNOWN",
+        "reason": null,
+        "reasons": [],
+        "date": 1792081676
+      },
+      "rejected_reason": "NONE",
+      "parameter_format": "POSITIONAL",
+      "display_format": null,
+      "source": null,
+      "message_send_ttl_seconds": null,
+      "library_template_name": null,
+      "last_updated_time": 1792015196,
+      "ad_account_id": null,
+      "ad_adset_id": null,
+      "ad_campaign_id": null,
+      "ad_id": null,
+      "product_set_id": null,
+      "cta_url_link_tracking_opted_out": false,
+      "is_primary_device_delivery_only": false,
+      "is_sms_fallback_enabled": false,
+      "disable_ios_autofill": false,
+      "optimization_spec": null,
+      "degrees_of_freedom_spec": null
+    },
+    {
+      "id": "1417951669852452",
+      "name": "gsis_relief_capacity_warning_v1",
+      "language": "en_GB",
+      "status": "PENDING",
+      "category": "UTILITY",
+      "correct_category": null,
+      "previous_category": null,
+      "sub_category": null,
+      "components": [
+        {
+          "type": "BODY",
+          "text": "*Relief Capacity Warning*\n\nHi {{1}}, relief capacity for {{2}} needs your attention.\n\n{{3}}\n\nRelief Health: {{4}}\n\nReview the affected periods in Roster: {{5}}.\n\nPlease consider external ad hoc relief where needed. External staff are not activated automatically.",
+          "example": {
+            "body_text": [
+              [
+                "Sample Leader",
+                "15 Oct 2026 (Thu)",
+                "Period 7 has 1 eligible relief teacher remaining. Period 8 has 2. One lesson still needs cover.",
+                "34%; 1 uncovered period.",
+                "https://roster.gsps.edu.sg"
+              ]
+            ]
+          }
+        }
+      ],
+      "quality_score": {
+        "score": "UNKNOWN",
+        "reason": null,
+        "reasons": [],
+        "date": 1792081676
+      },
+      "rejected_reason": "NONE",
+      "parameter_format": "POSITIONAL",
+      "display_format": null,
+      "source": null,
+      "message_send_ttl_seconds": null,
+      "library_template_name": null,
+      "last_updated_time": 1792015181,
+      "ad_account_id": null,
+      "ad_adset_id": null,
+      "ad_campaign_id": null,
+      "ad_id": null,
+      "product_set_id": null,
+      "cta_url_link_tracking_opted_out": false,
+      "is_primary_device_delivery_only": false,
+      "is_sms_fallback_enabled": false,
+      "disable_ios_autofill": false,
+      "optimization_spec": null,
+      "degrees_of_freedom_spec": null
+    },
+    {
+      "id": "1442160464722287",
+      "name": "gsis_relief_evening_v2",
+      "language": "en_GB",
+      "status": "PENDING",
+      "category": "UTILITY",
+      "correct_category": null,
+      "previous_category": null,
+      "sub_category": null,
+      "components": [
+        {
+          "type": "BODY",
+          "text": "*School Relief Allocation Review*\n\nHi {{1}}, as an SMC member on Relief duty, you need to review lesson cover for {{2}}.\n\nReported absences, draft cover and uncovered lesson periods:\n{{3}}\n\nThese allocations are drafts pending publication. Please check for periods pending relief and confirm the relief plan in Roster: {{4}}.\n\nThank you.",
+          "example": {
+            "body_text": [
+              [
+                "Sample Leader",
+                "15 Oct 2026 (Thu)",
+                "3 teachers have reported absences. 12 lesson periods need relief. 10 periods have planned cover. 2 periods remain uncovered: 3A English, periods 3 and 4.",
+                "https://roster.gsps.edu.sg"
+              ]
+            ]
+          }
+        }
+      ],
+      "quality_score": {
+        "score": "UNKNOWN",
+        "reason": null,
+        "reasons": [],
+        "date": 1792081676
+      },
+      "rejected_reason": "NONE",
+      "parameter_format": "POSITIONAL",
+      "display_format": null,
+      "source": null,
+      "message_send_ttl_seconds": null,
+      "library_template_name": null,
+      "last_updated_time": 1792007869,
+      "ad_account_id": null,
+      "ad_adset_id": null,
+      "ad_campaign_id": null,
+      "ad_id": null,
+      "product_set_id": null,
+      "cta_url_link_tracking_opted_out": false,
+      "is_primary_device_delivery_only": false,
+      "is_sms_fallback_enabled": false,
+      "disable_ios_autofill": false,
+      "optimization_spec": null,
+      "degrees_of_freedom_spec": null
+    },
+    {
+      "id": "2188657595398105",
+      "name": "gsis_relief_manual_review_v1",
+      "language": "en_GB",
+      "status": "APPROVED",
+      "category": "UTILITY",
+      "correct_category": null,
+      "previous_category": null,
+      "sub_category": null,
+      "components": [
+        {
+          "type": "BODY",
+          "text": "*Relief Allocation Requires Review*\n\nHi {{1}}, please review the relief plan for {{2}}.\n\nThe final scheduled allocation run is complete.\n{{3}}\n\nPlease allocate the remaining cover and publish the relief plan here: {{4}}.\n\nThank you.",
+          "example": {
+            "body_text": [
+              [
+                "Sample Leader",
+                "15 Oct 2026 (Thu)",
+                "2 periods remain uncovered: 3A English, periods 3 and 4.",
+                "https://roster.gsps.edu.sg"
+              ]
+            ]
+          }
+        }
+      ],
+      "quality_score": {
+        "score": "UNKNOWN",
+        "reason": null,
+        "reasons": [],
+        "date": 1792081676
+      },
+      "rejected_reason": "NONE",
+      "parameter_format": "POSITIONAL",
+      "display_format": null,
+      "source": null,
+      "message_send_ttl_seconds": null,
+      "library_template_name": null,
+      "last_updated_time": 1791988876,
+      "ad_account_id": null,
+      "ad_adset_id": null,
+      "ad_campaign_id": null,
+      "ad_id": null,
+      "product_set_id": null,
+      "cta_url_link_tracking_opted_out": false,
+      "is_primary_device_delivery_only": false,
+      "is_sms_fallback_enabled": false,
+      "disable_ios_autofill": false,
+      "optimization_spec": null,
+      "degrees_of_freedom_spec": null
+    },
+    {
+      "id": "934616792782108",
+      "name": "gsis_absence_update_v1",
+      "language": "en_GB",
+      "status": "APPROVED",
+      "category": "UTILITY",
+      "correct_category": null,
+      "previous_category": null,
+      "sub_category": null,
+      "components": [
+        {
+          "type": "BODY",
+          "text": "*New Absence Update*\n\nHi {{1}}, {{2}} new absence(s) have been reported for {{3}} since the previous update.\n\n{{4}}\n\nReview the latest allocation and publication status here: {{5}}.\n\nThank you.",
+          "example": {
+            "body_text": [
+              [
+                "Sample Leader",
+                "1",
+                "15 Oct 2026 (Thu)",
+                "4 additional lesson periods need relief. 3 periods have planned cover. 1 period remains uncovered: 4B Mathematics, period 5.",
+                "https://roster.gsps.edu.sg"
+              ]
+            ]
+          }
+        }
+      ],
+      "quality_score": {
+        "score": "UNKNOWN",
+        "reason": null,
+        "reasons": [],
+        "date": 1792081677
+      },
+      "rejected_reason": "NONE",
+      "parameter_format": "POSITIONAL",
+      "display_format": null,
+      "source": null,
+      "message_send_ttl_seconds": null,
+      "library_template_name": null,
+      "last_updated_time": 1791988865,
+      "ad_account_id": null,
+      "ad_adset_id": null,
+      "ad_campaign_id": null,
+      "ad_id": null,
+      "product_set_id": null,
+      "cta_url_link_tracking_opted_out": false,
+      "is_primary_device_delivery_only": false,
+      "is_sms_fallback_enabled": false,
+      "disable_ios_autofill": false,
+      "optimization_spec": null,
+      "degrees_of_freedom_spec": null
+    },
+    {
+      "id": "1082281697770168",
+      "name": "gsis_relief_morning_v1",
+      "language": "en_GB",
+      "status": "APPROVED",
+      "category": "UTILITY",
+      "correct_category": null,
+      "previous_category": null,
+      "sub_category": null,
+      "components": [
+        {
+          "type": "BODY",
+          "text": "*Morning Relief Summary*\n\nHi {{1}}, here is the relief summary for {{2}}.\n\n{{3}}\n\nRelief Health: {{4}}\n\nThese allocations are drafts pending publication.\n\nReview the plan here: {{5}}.\n\nThank you.",
+          "example": {
+            "body_text": [
+              [
+                "Sample Leader",
+                "15 Oct 2026 (Thu)",
+                "2 new absences were reported overnight. 5 teachers are absent today. 20 lesson periods need relief. 18 periods have planned cover. 2 periods remain uncovered: 3A English, periods 3 and 4.",
+                "2 uncovered periods require attention.",
+                "https://roster.gsps.edu.sg"
+              ]
+            ]
+          }
+        }
+      ],
+      "quality_score": {
+        "score": "UNKNOWN",
+        "reason": null,
+        "reasons": [],
+        "date": 1792081677
+      },
+      "rejected_reason": "NONE",
+      "parameter_format": "POSITIONAL",
+      "display_format": null,
+      "source": null,
+      "message_send_ttl_seconds": null,
+      "library_template_name": null,
+      "last_updated_time": 1791988852,
+      "ad_account_id": null,
+      "ad_adset_id": null,
+      "ad_campaign_id": null,
+      "ad_id": null,
+      "product_set_id": null,
+      "cta_url_link_tracking_opted_out": false,
+      "is_primary_device_delivery_only": false,
+      "is_sms_fallback_enabled": false,
+      "disable_ios_autofill": false,
+      "optimization_spec": null,
+      "degrees_of_freedom_spec": null
+    },
+    {
+      "id": "1662539355443373",
+      "name": "gsis_relief_evening_v1",
+      "language": "en_GB",
+      "status": "APPROVED",
+      "category": "UTILITY",
+      "correct_category": "UTILITY",
+      "previous_category": "MARKETING",
+      "sub_category": null,
+      "components": [
+        {
+          "type": "BODY",
+          "text": "*Relief Planning Update*\n\nHi {{1}}, here is the relief planning update for {{2}}.\n\n{{3}}\n\nThese allocations are drafts pending publication.\n\nReview the plan here: {{4}}.\n\nThank you.",
+          "example": {
+            "body_text": [
+              [
+                "Sample Leader",
+                "15 Oct 2026 (Thu)",
+                "3 teachers have reported absences. 12 lesson periods need relief. 10 periods have planned cover. 2 periods remain uncovered: 3A English, periods 3 and 4.",
+                "https://roster.gsps.edu.sg"
+              ]
+            ]
+          }
+        }
+      ],
+      "quality_score": {
+        "score": "UNKNOWN",
+        "reason": null,
+        "reasons": [],
+        "date": 1792081676
+      },
+      "rejected_reason": "NONE",
+      "parameter_format": "POSITIONAL",
+      "display_format": null,
+      "source": null,
+      "message_send_ttl_seconds": null,
+      "library_template_name": null,
+      "last_updated_time": 1791988837,
+      "ad_account_id": null,
+      "ad_adset_id": null,
+      "ad_campaign_id": null,
+      "ad_id": null,
+      "product_set_id": null,
+      "cta_url_link_tracking_opted_out": false,
+      "is_primary_device_delivery_only": false,
+      "is_sms_fallback_enabled": false,
+      "disable_ios_autofill": false,
+      "optimization_spec": null,
+      "degrees_of_freedom_spec": null
+    },
+    {
+      "id": "4510849222577421",
+      "name": "gsis_relief_urgent_smc_v1",
+      "language": "en_GB",
+      "status": "APPROVED",
+      "category": "UTILITY",
+      "correct_category": null,
+      "previous_category": null,
+      "sub_category": null,
+      "components": [
+        {
+          "type": "BODY",
+          "text": "*Urgent Relief Cover*\n\nHi {{1}}, {{2}} has been assigned relief on {{3}}. The lesson starts in {{4}} minutes.\n\n{{5}}\n\nThe duty has not yet been acknowledged. Please check that cover is confirmed.\n\nView the current status here: {{6}}.\n\nThank you.",
+          "example": {
+            "body_text": [
+              [
+                "Sample Leader",
+                "Sample Teacher",
+                "15 Oct 2026 (Thu)",
+                "12",
+                "3A English, period 3, 8:30 am, venue C3-01.",
+                "https://roster.gsps.edu.sg"
+              ]
+            ]
+          }
+        }
+      ],
+      "quality_score": {
+        "score": "UNKNOWN",
+        "reason": null,
+        "reasons": [],
+        "date": 1792081676
+      },
+      "rejected_reason": "NONE",
+      "parameter_format": "POSITIONAL",
+      "display_format": null,
+      "source": null,
+      "message_send_ttl_seconds": null,
+      "library_template_name": null,
+      "last_updated_time": 1791988823,
+      "ad_account_id": null,
+      "ad_adset_id": null,
+      "ad_campaign_id": null,
+      "ad_id": null,
+      "product_set_id": null,
+      "cta_url_link_tracking_opted_out": false,
+      "is_primary_device_delivery_only": false,
+      "is_sms_fallback_enabled": false,
+      "disable_ios_autofill": false,
+      "optimization_spec": null,
+      "degrees_of_freedom_spec": null
+    },
+    {
+      "id": "2373646553447066",
+      "name": "gsis_relief_urgent_v1",
+      "language": "en_GB",
+      "status": "APPROVED",
+      "category": "UTILITY",
+      "correct_category": null,
+      "previous_category": null,
+      "sub_category": null,
+      "components": [
+        {
+          "type": "BODY",
+          "text": "*Urgent Relief Assignment*\n\nHi {{1}}, Relief Team has assigned you a relief duty on {{2}} that starts in {{3}} minutes.\n\n{{4}}\n\nPlease view the relief instructions and acknowledge your duty now: {{5}}.\n\nThank you.",
+          "example": {
+            "body_text": [
+              [
+                "Sample Teacher",
+                "15 Oct 2026 (Thu)",
+                "12",
+                "3A English, period 3, 8:30 am, venue C3-01.",
+                "https://roster.gsps.edu.sg/external.html#sample-not-valid"
+              ]
+            ]
+          }
+        }
+      ],
+      "quality_score": {
+        "score": "UNKNOWN",
+        "reason": null,
+        "reasons": [],
+        "date": 1792081676
+      },
+      "rejected_reason": "NONE",
+      "parameter_format": "POSITIONAL",
+      "display_format": null,
+      "source": null,
+      "message_send_ttl_seconds": null,
+      "library_template_name": null,
+      "last_updated_time": 1791988810,
+      "ad_account_id": null,
+      "ad_adset_id": null,
+      "ad_campaign_id": null,
+      "ad_id": null,
+      "product_set_id": null,
+      "cta_url_link_tracking_opted_out": false,
+      "is_primary_device_delivery_only": false,
+      "is_sms_fallback_enabled": false,
+      "disable_ios_autofill": false,
+      "optimization_spec": null,
+      "degrees_of_freedom_spec": null
+    },
+    {
+      "id": "3993441010951993",
+      "name": "gsis_relief_unacknowledged_v1",
+      "language": "en_GB",
+      "status": "APPROVED",
+      "category": "UTILITY",
+      "correct_category": null,
+      "previous_category": null,
+      "sub_category": null,
+      "components": [
+        {
+          "type": "BODY",
+          "text": "*Relief Duty Not Acknowledged*\n\nHi {{1}}, {{2}} has not acknowledged the relief duty on {{3}}.\n\n{{4}}\n\nThe lesson starts in 10 minutes. Please contact the teacher and confirm cover.\n\nView the current status here: {{5}}.\n\nThank you.",
+          "example": {
+            "body_text": [
+              [
+                "Sample Leader",
+                "Sample Teacher",
+                "15 Oct 2026 (Thu)",
+                "3A English, period 3, 8:30 am, venue C3-01.",
+                "https://roster.gsps.edu.sg"
+              ]
+            ]
+          }
+        }
+      ],
+      "quality_score": {
+        "score": "UNKNOWN",
+        "reason": null,
+        "reasons": [],
+        "date": 1792081676
+      },
+      "rejected_reason": "NONE",
+      "parameter_format": "POSITIONAL",
+      "display_format": null,
+      "source": null,
+      "message_send_ttl_seconds": null,
+      "library_template_name": null,
+      "last_updated_time": 1791988799,
+      "ad_account_id": null,
+      "ad_adset_id": null,
+      "ad_campaign_id": null,
+      "ad_id": null,
+      "product_set_id": null,
+      "cta_url_link_tracking_opted_out": false,
+      "is_primary_device_delivery_only": false,
+      "is_sms_fallback_enabled": false,
+      "disable_ios_autofill": false,
+      "optimization_spec": null,
+      "degrees_of_freedom_spec": null
+    },
+    {
+      "id": "2175089153046382",
+      "name": "gsis_relief_reminder_v1",
+      "language": "en_GB",
+      "status": "APPROVED",
+      "category": "UTILITY",
+      "correct_category": null,
+      "previous_category": null,
+      "sub_category": null,
+      "components": [
+        {
+          "type": "BODY",
+          "text": "*Relief Duty Reminder*\n\nHi {{1}}, your relief duty on {{2}} starts in 20 minutes and has not been acknowledged in Roster.\n\n{{3}}\n\nView the relief instructions and acknowledge your duty here: {{4}}.\n\nThank you.",
+          "example": {
+            "body_text": [
+              [
+                "Sample Teacher",
+                "15 Oct 2026 (Thu)",
+                "3A English, period 3, 8:30 to 9:00 am, venue C3-01.",
+                "https://roster.gsps.edu.sg/external.html#sample-not-valid"
+              ]
+            ]
+          }
+        }
+      ],
+      "quality_score": {
+        "score": "UNKNOWN",
+        "reason": null,
+        "reasons": [],
+        "date": 1792081676
+      },
+      "rejected_reason": "NONE",
+      "parameter_format": "POSITIONAL",
+      "display_format": null,
+      "source": null,
+      "message_send_ttl_seconds": null,
+      "library_template_name": null,
+      "last_updated_time": 1791988786,
+      "ad_account_id": null,
+      "ad_adset_id": null,
+      "ad_campaign_id": null,
+      "ad_id": null,
+      "product_set_id": null,
+      "cta_url_link_tracking_opted_out": false,
+      "is_primary_device_delivery_only": false,
+      "is_sms_fallback_enabled": false,
+      "disable_ios_autofill": false,
+      "optimization_spec": null,
+      "degrees_of_freedom_spec": null
+    },
+    {
+      "id": "1753999250059547",
+      "name": "gsis_relief_updated_v1",
+      "language": "en_GB",
+      "status": "APPROVED",
+      "category": "UTILITY",
+      "correct_category": null,
+      "previous_category": null,
+      "sub_category": null,
+      "components": [
+        {
+          "type": "BODY",
+          "text": "*Relief Assignment Updated*\n\nHi {{1}}, Relief Team has changed your relief duties for {{2}}.\n\n{{3}}\n\nView your updated timetable and acknowledge the change here: {{4}}.\n\nThank you.",
+          "example": {
+            "body_text": [
+              [
+                "Sample Teacher",
+                "15 Oct 2026 (Thu)",
+                "Your relief for 3A English in periods 3 and 4 has been cancelled.",
+                "https://roster.gsps.edu.sg/external.html#sample-not-valid"
+              ]
+            ]
+          }
+        }
+      ],
+      "quality_score": {
+        "score": "UNKNOWN",
+        "reason": null,
+        "reasons": [],
+        "date": 1792081676
+      },
+      "rejected_reason": "NONE",
+      "parameter_format": "POSITIONAL",
+      "display_format": null,
+      "source": null,
+      "message_send_ttl_seconds": null,
+      "library_template_name": null,
+      "last_updated_time": 1791988773,
+      "ad_account_id": null,
+      "ad_adset_id": null,
+      "ad_campaign_id": null,
+      "ad_id": null,
+      "product_set_id": null,
+      "cta_url_link_tracking_opted_out": false,
+      "is_primary_device_delivery_only": false,
+      "is_sms_fallback_enabled": false,
+      "disable_ios_autofill": false,
+      "optimization_spec": null,
+      "degrees_of_freedom_spec": null
+    },
+    {
+      "id": "2331306544355004",
+      "name": "gsis_relief_assignment_v1",
+      "language": "en_GB",
+      "status": "APPROVED",
+      "category": "UTILITY",
+      "correct_category": null,
+      "previous_category": null,
+      "sub_category": null,
+      "components": [
+        {
+          "type": "BODY",
+          "text": "*Relief Assignment*\n\nHi {{1}}, Relief Team has assigned you relief duties on {{2}}.\n\n{{3}}\n\nView the relief instructions and acknowledge your duties here: {{4}}.\n\nThank you.",
+          "example": {
+            "body_text": [
+              [
+                "Sample Teacher",
+                "15 Oct 2026 (Thu)",
+                "P3 English, class 3A, periods 3 and 4, venue C3-01.",
+                "https://roster.gsps.edu.sg/external.html#sample-not-valid"
+              ]
+            ]
+          }
+        }
+      ],
+      "quality_score": {
+        "score": "UNKNOWN",
+        "reason": null,
+        "reasons": [],
+        "date": 1792081676
+      },
+      "rejected_reason": "NONE",
+      "parameter_format": "POSITIONAL",
+      "display_format": null,
+      "source": null,
+      "message_send_ttl_seconds": null,
+      "library_template_name": null,
+      "last_updated_time": 1791988760,
+      "ad_account_id": null,
+      "ad_adset_id": null,
+      "ad_campaign_id": null,
+      "ad_id": null,
+      "product_set_id": null,
+      "cta_url_link_tracking_opted_out": false,
+      "is_primary_device_delivery_only": false,
+      "is_sms_fallback_enabled": false,
+      "disable_ios_autofill": false,
+      "optimization_spec": null,
+      "degrees_of_freedom_spec": null
+    },
+    {
+      "id": "1777525793360691",
+      "name": "gsis_contact_review_v1",
+      "language": "en_GB",
+      "status": "APPROVED",
+      "category": "UTILITY",
+      "correct_category": null,
+      "previous_category": null,
+      "sub_category": null,
+      "components": [
+        {
+          "type": "BODY",
+          "text": "*Contact Details for Ad Hoc External Relief*\n\nHi {{1}}.\n\nOn https://roster.gsps.edu.sg, contact details for an ad hoc external relief teacher were added or updated on {{2}}.\n\nPlease review these details as a Contacts Admin:\n\n{{3}}\n\nReview and confirm the details in Contacts: {{4}}.\n\nThank you.",
+          "example": {
+            "body_text": [
+              [
+                "Sample Admin",
+                "15 Oct 2026 (Thu)",
+                "A correction to an external relief teacher profile is awaiting review.",
+                "https://contacts.gsps.edu.sg/"
+              ]
+            ]
+          }
+        }
+      ],
+      "quality_score": {
+        "score": "UNKNOWN",
+        "reason": null,
+        "reasons": [],
+        "date": 1792081677
+      },
+      "rejected_reason": "NONE",
+      "parameter_format": "POSITIONAL",
+      "display_format": null,
+      "source": null,
+      "message_send_ttl_seconds": null,
+      "library_template_name": null,
+      "last_updated_time": 1791988747,
+      "ad_account_id": null,
+      "ad_adset_id": null,
+      "ad_campaign_id": null,
+      "ad_id": null,
+      "product_set_id": null,
+      "cta_url_link_tracking_opted_out": false,
+      "is_primary_device_delivery_only": false,
+      "is_sms_fallback_enabled": false,
+      "disable_ios_autofill": false,
+      "optimization_spec": null,
+      "degrees_of_freedom_spec": null
+    },
+    {
+      "id": "1775720290362486",
+      "name": "gsis_relief_changed_v1",
+      "language": "en_GB",
+      "status": "APPROVED",
+      "category": "UTILITY",
+      "correct_category": null,
+      "previous_category": null,
+      "sub_category": null,
+      "components": [
+        {
+          "type": "BODY",
+          "text": "*Peer Relief Arrangement Updated*\n\nHi {{1}}, Relief Team has changed the peer relief arrangement for {{2}}.\n\n{{3}}\n\nView the published arrangement here: {{4}}.\n\nThank you.",
+          "example": {
+            "body_text": [
+              [
+                "Sample Teacher",
+                "15 Oct 2026 (Thu)",
+                "The published relief arrangement for periods 3 and 4 has been updated.",
+                "https://roster.gsps.edu.sg/external.html#sample-not-valid"
+              ]
+            ]
+          }
+        }
+      ],
+      "quality_score": {
+        "score": "UNKNOWN",
+        "reason": null,
+        "reasons": [],
+        "date": 1792081676
+      },
+      "rejected_reason": "NONE",
+      "parameter_format": "POSITIONAL",
+      "display_format": null,
+      "source": null,
+      "message_send_ttl_seconds": null,
+      "library_template_name": null,
+      "last_updated_time": 1791988732,
+      "ad_account_id": null,
+      "ad_adset_id": null,
+      "ad_campaign_id": null,
+      "ad_id": null,
+      "product_set_id": null,
+      "cta_url_link_tracking_opted_out": false,
+      "is_primary_device_delivery_only": false,
+      "is_sms_fallback_enabled": false,
+      "disable_ios_autofill": false,
+      "optimization_spec": null,
+      "degrees_of_freedom_spec": null
+    },
+    {
+      "id": "1406506811640852",
+      "name": "gsis_relief_request_v1",
+      "language": "en_GB",
+      "status": "APPROVED",
+      "category": "UTILITY",
+      "correct_category": null,
+      "previous_category": null,
+      "sub_category": null,
+      "components": [
+        {
+          "type": "BODY",
+          "text": "*Peer Relief Arrangement*\n\nHi {{1}}, {{2}} has requested on https://roster.gsps.edu.sg that you cover his/her lesson(s) on {{3}}: {{4}}.\n\nAccept or reject using this link: {{5}}.\n\nThank you.",
+          "example": {
+            "body_text": [
+              [
+                "Sample Teacher",
+                "Sample Colleague",
+                "15 Oct 2026 (Thu)",
+                "P3 English, periods 3 and 4",
+                "https://roster.gsps.edu.sg/external.html#sample-not-valid"
+              ]
+            ]
+          }
+        }
+      ],
+      "quality_score": {
+        "score": "UNKNOWN",
+        "reason": null,
+        "reasons": [],
+        "date": 1792081677
+      },
+      "rejected_reason": "NONE",
+      "parameter_format": "POSITIONAL",
+      "display_format": null,
+      "source": null,
+      "message_send_ttl_seconds": null,
+      "library_template_name": null,
+      "last_updated_time": 1791988718,
+      "ad_account_id": null,
+      "ad_adset_id": null,
+      "ad_campaign_id": null,
+      "ad_id": null,
+      "product_set_id": null,
+      "cta_url_link_tracking_opted_out": false,
+      "is_primary_device_delivery_only": false,
+      "is_sms_fallback_enabled": false,
+      "disable_ios_autofill": false,
+      "optimization_spec": null,
+      "degrees_of_freedom_spec": null
+    }
+  ],
+  "note": "Release preparation only. No template submitted, removed or activated. Evening v1 selected; v2 retained on Meta. Conditional instructions not observed."
+}

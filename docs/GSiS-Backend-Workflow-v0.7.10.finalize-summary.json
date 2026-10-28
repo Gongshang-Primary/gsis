@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "ok": true,
+  "command": "finalize",
+  "status": "pass",
+  "type": "workflow",
+  "quality": "showcase",
+  "specification": {
+    "path": "/workspace/scratch/c84f0276cce6/build710/source/docs/architecture-source/GSiS-Backend-Workflow-v0.7.10.json",
+    "sha256": "f21bea7f3bcfd1c08e617016728530d84781db1ddfc0de97c47de7c922608942",
+    "bytes": 5974
+  },
+  "artifact": {
+    "path": "/workspace/scratch/c84f0276cce6/build710/source/docs/GSiS-Backend-Workflow-v0.7.10.html",
+    "sha256": "b0c0e904254c279f73af6fc9d45868ff1ede523f7372717cb11801463a5f7eb8",
+    "bytes": 833910
+  },
+  "gates": {
+    "validate": "pass",
+    "deliver": "pass",
+    "check": "pass",
+    "browser-check": "pass"
+  },
+  "diagnostics": [],
+  "diagnosticSummary": {
+    "total": 0,
+    "shown": 0,
+    "truncated": false
+  },
+  "evidence": {
+    "receipt": "/workspace/scratch/c84f0276cce6/build710/archify-work/workflow-review-4/GSiS-Backend-Workflow-v0.7.10.~archify-522fcf135352fe91bf3d70f678ee6cb3fd14d8c40e4b185f68f1be887055acd8.~archify-345d0ed3599475f8e058ac4fec56550e50c5402e2177df399b2e9d1583c3c7f4.finalize.json",
+    "summaryReceipt": "/workspace/scratch/c84f0276cce6/build710/archify-work/workflow-review-4/GSiS-Backend-Workflow-v0.7.10.~archify-522fcf135352fe91bf3d70f678ee6cb3fd14d8c40e4b185f68f1be887055acd8.~archify-345d0ed3599475f8e058ac4fec56550e50c5402e2177df399b2e9d1583c3c7f4.finalize-summary.json",
+    "browserCheckReceipt": "/workspace/scratch/c84f0276cce6/build710/archify-work/workflow-review-4/GSiS-Backend-Workflow-v0.7.10.~archify-522fcf135352fe91bf3d70f678ee6cb3fd14d8c40e4b185f68f1be887055acd8.browser-check.json"
+  },
+  "visualReview": "not-requested",
+  "durationMs": 4606
+}

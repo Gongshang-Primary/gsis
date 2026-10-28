@@ -1,0 +1,13 @@
+'use strict';
+const assert=require('node:assert/strict'),crypto=require('node:crypto'),{harness,fixture}=require('./stapler715-persistence.cjs'),S=require('../shared/roster-stapler.js'),O=require('../shared/roster-operations.js');
+const f=fixture(),h=harness(f.day,f.people),initial=S.create(f.day),command=(planPatch,extra={})=>({operation:'saveStapler',view:'stapler',date:f.day.date,revision:0,staplerRevision:0,requestId:crypto.randomUUID(),planPatch,...extra});
+const good=p=>{const result=h.call(p).result;assert.equal(result.ok,true,JSON.stringify(result));return result.data;};
+try{
+ const imported=command(O.staplerPlanPatch(initial,f.plan)),loaded=good(imported);assert.deepEqual(loaded.plan.tiles,f.plan.tiles);assert.deepEqual(loaded.plan.importSource,f.plan.importSource);assert.deepEqual(loaded.plan.baseline,initial.baseline);
+ const tile=loaded.plan.tiles.find(t=>t.kind==='lesson'&&t.location==='grid'),local=S.apply(loaded.plan,{type:'edit',tileId:tile.id,patch:{venue:'Local room'}}),other=S.apply(loaded.plan,{type:'edit',tileId:tile.id,patch:{group:'Other editor group'}}),left=command(O.staplerPlanPatch(loaded.plan,local),{revision:1,staplerRevision:1}),right=command(O.staplerPlanPatch(loaded.plan,other),{revision:1,staplerRevision:1});
+ const patchBytes=Buffer.byteLength(JSON.stringify(left)),legacyBytes=Buffer.byteLength(JSON.stringify({...left,planPatch:undefined,plan:local,basePlan:loaded.plan}));assert(patchBytes<1000);assert(patchBytes<legacyBytes/1000);
+ good(right);h.loseResponse();assert.equal(h.call(left).result.ok,false);const writes=h.writes();assert.equal(good({operation:'receiptStatus',command:left}).accepted,true);assert.equal(good(left).replayed,true);assert.equal(h.writes(),writes);
+ const current=good({operation:'stapler',date:f.day.date}),saved=current.plan.tiles.find(t=>t.id===tile.id);assert.equal(saved.venue,'Local room');assert.equal(saved.group,'Other editor group');assert.deepEqual(saved.source,tile.source);assert.equal(h.state().receipts.length,3);assert.equal(h.state().outbox.length,0);
+ const conflict=command(O.staplerPlanPatch(loaded.plan,S.apply(loaded.plan,{type:'edit',tileId:tile.id,patch:{venue:'Conflicting room'}})),{revision:1,staplerRevision:1}),rejected=h.call(conflict).result;assert.equal(rejected.status,409);assert.equal(rejected.code,'STAPLER_CONFLICT');assert.equal(rejected.staplerRevision,3);assert.equal(h.writes(),writes);
+ console.log('PASS 098c fresh signed runtime imported plan, same-record disjoint fields, compressed persistence, lost ACK receipt replay and conflict: '+patchBytes+' patch bytes versus '+legacyBytes+' legacy bytes');
+}finally{h.close();}

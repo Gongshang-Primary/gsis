@@ -1,0 +1,82 @@
+{
+  "version": "0.9.8l",
+  "baseline": "0.9.8k",
+  "baselineCommit": "00c118c442504330b58990924b5414cb8c7de7b5",
+  "sourceFoundation": "703d3975e05d64acc512511ae2d09b0942cc900c",
+  "scope": [
+    "Separate whole-draft Auto-allocate from Auto-fill blanks while preserving protected choices and the existing optimisation window",
+    "Use native SpreadsheetApp for Calendar data IO while preserving sync recovery and queued edit contracts",
+    "Ship and verify matched Deploy class rename handling introduced in G, preserving stable row references and unresolved local drafts"
+  ],
+  "componentCount": 8,
+  "productionChangedComponents": [
+    "rosterFrontend",
+    "rosterBackend",
+    "deployFrontend",
+    "deployBackend",
+    "calendarFrontend",
+    "calendarBackend"
+  ],
+  "sharedHelperParityComponents": [
+    "notificationWorker",
+    "operationsWorker"
+  ],
+  "optionalProductionComponents": [
+    "notificationWorker",
+    "operationsWorker"
+  ],
+  "otherComponentVersions": {
+    "contactsFrontend": "0.9.8j",
+    "contactsBackend": "0.9.8j",
+    "layoutFrontend": "0.9.8j",
+    "lordFrontend": "0.9.8j",
+    "overlordFrontend": "0.9.8j",
+    "starlordFrontend": "0.9.8j",
+    "lordBackend": "0.9.8j",
+    "venuesFrontend": "0.9.8j",
+    "venuesBackend": "0.9.8j",
+    "calendarJobWorker": "0.9.8j"
+  },
+  "productionAuthority": "Google",
+  "authorityCutoverPerformed": false,
+  "migrationRequired": false,
+  "timetableCacheChanged": false,
+  "newInfrastructureRequired": false,
+  "calendarAppendOnlyHeaderUpgradeRequired": false,
+  "productionDeployed": false,
+  "liveRecordsChanged": false,
+  "messagesSent": false,
+  "automaticRunInvokedByPreparation": false,
+  "existingProtectedChoicesRewritten": false,
+  "optimisationCutoffSingapore": "06:29",
+  "autoAllocateMode": "reoptimise-unpublished-automatic",
+  "autoFillBlanksMode": "fill-only",
+  "calendarSheetIo": "native-SpreadsheetApp",
+  "separateRehearsal": {
+    "archive": "GSiS_v0.9.8i_Rehearsal.zip",
+    "sourceCommit": "f512ac6f584c26a027c1cf2aefb3b19d01fd6838",
+    "unchanged": true,
+    "productionInstallation": false
+  },
+  "verification": {
+    "status": "targeted-local-verified",
+    "singleGreenFullSuiteClaimed": false,
+    "productionValidationPerformed": false,
+    "expectedTag": "v0.9.8l",
+    "sourceCommit": null,
+    "manifest": "PATCH.json",
+    "recovery": "Post-commit external recovery verification record",
+    "targetedPrograms": 105,
+    "targetedPassed": 105,
+    "rosterModeDomainCases": 9,
+    "rosterModeUiCases": 5,
+    "calendarNativeCases": 9,
+    "calendarNativeIoCases": 63,
+    "appsScriptSyntaxFiles": 231,
+    "independentRosterDeployGroups": 12,
+    "independentCalendarCases": 10,
+    "openMaterialFindings": 0
+  },
+  "deployRenameSource": "G atomic rename included in matched L files; no new K runtime defect reproduced",
+  "legacyDeployDraftUpgrade": "Record old open-tab pending edits before refresh; do not promise automatic legacy recovery"
+}

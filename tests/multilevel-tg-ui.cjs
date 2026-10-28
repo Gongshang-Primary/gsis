@@ -1,0 +1,22 @@
+const assert=require('node:assert/strict'),fs=require('node:fs'),make=require('./dom-helper.cjs');
+(async()=>{const {w,run}=make();try{
+ const style=w.document.createElement('style');style.textContent=fs.readFileSync('public/styles.css','utf8');w.document.head.append(style);
+ const change=x=>x.dispatchEvent(new w.Event('change',{bubbles:true})),save=d=>d.querySelector('form').onsubmit({preventDefault(){}}),q=s=>w.document.querySelector(s);
+ run(`tab='IP Deploy';level='';v().classes=[{ref:'a',level:'1',shortName:'A',name:'Alpha'},{ref:'b',level:'2',shortName:'B',name:'Beta'}];v().loads['2']={...v().loads['1'],EL:12};v().venues=[{id:'F1-16',form:'1A'},{id:'F1-17',form:'2B'}];v().levelExclusions=[{teacher:'t',levels:['2']}];render();`);
+ await run('addTG(null)');let d=q('.inline-editor');assert.equal(d.querySelector('#tgDemandMode'),null);d.querySelector('#name').value='P1 and P2 EL';d.querySelector('#sub').value='EL';change(d.querySelector('#sub'));
+ d.querySelector('[data-tg-level="2"]').click();assert.equal(d.querySelector('#tgWeeklyPeriods').required,true);assert.equal(d.querySelectorAll('[data-tg-class]').length,2);
+ assert.equal(w.getComputedStyle(d.querySelector('[data-tg-level]').closest('label')).flexDirection,'row');assert.equal(w.getComputedStyle(d.querySelector('[data-tg-class]').closest('label')).flexDirection,'row');
+ await save(d);assert.match(d.querySelector('#formerror').textContent,/actual weekly periods/);assert.equal(run('cellQueue.length'),0);
+ d.querySelector('#tgWeeklyPeriods').value='6.5';d.querySelector('[data-tg-class="a"]').click();await save(d);assert.match(d.querySelector('#formerror').textContent,/each selected level/);
+ d.querySelector('[data-tg-class="b"]').click();await save(d);assert.equal(run('v().groups.length'),1);assert.equal(run('v().groups[0].levels.join()'),'1,2');assert.equal(run('v().groups[0].weeklyPeriods'),6.5);
+ const id=run('v().groups[0].id');assert.equal(run('cellQueue[0].weeklyPeriods'),6.5);assert.equal(run('cellQueue[0].levels.join()'),'1,2');
+ run(`stageChange('addTeacher',{teacher:'t',subject:'EL',target:'${id}',expected:false});level='2';render()`);assert.ok(q('[data-edit-tg="'+id+'"]'),'TG is shown when P2 is selected');assert.match(q('[data-row="'+id+'"]').textContent,/6.5 periods\/week/);assert.match(q('[data-row="'+id+'"] .warning-badge').textContent,/P2/);assert.equal(run('exclusionMatches("t").length'),1);assert.equal(run('workloadData().rows[0].Teaching'),6.5);
+ run(`editTG('${id}')`);d=q('.tg-popup .inline-editor');assert.equal(d.querySelectorAll('[data-tg-level]:checked').length,2);assert.equal(d.querySelector('#tgWeeklyPeriods').value,'6.5');assert.equal(d.querySelectorAll('[data-tg-class]:checked').length,2);
+ d.querySelector('#tgWeeklyPeriods').value='0';await save(d);assert.equal(run('workloadData().rows[0].Teaching'),0);assert.equal(run('v().assignments.length'),1);
+ // Real frontend queue acknowledgment, then a fresh JSON snapshot and reopening.
+ w.ack=()=>JSON.parse(run('JSON.stringify({saved:true,delta:{versionId:current,revision:1,changes:GSISFields.diff(draftBase,v()).map(x=>({key:x.path||x.key,value:x.value}))}})'));
+ run('api=async(action,args)=>{if(action!=="change")throw Error(action);window.sent=args;return window.ack()}');await run('pumpQueue()');assert.equal(run('cellQueue.length'),0);assert.equal(w.sent.edits.find(e=>e.operation==='addTG').weeklyPeriods,6.5);assert.equal(w.sent.edits.find(e=>e.operation==='updateTG').weeklyPeriods,0);
+ run(`state.versions=[JSON.parse(JSON.stringify(v()))];render();editTG('${id}')`);d=q('.tg-popup .inline-editor');assert.equal(d.querySelector('#tgWeeklyPeriods').value,'0');assert.equal(d.querySelectorAll('[data-tg-level]:checked').length,2);
+ d.querySelector('[data-tg-level="1"]').click();assert.equal(d.querySelector('[data-tg-class="a"]'),null);assert.equal(d.querySelector('[data-tg-class="b"]').checked,true);assert.equal(d.querySelector('#tgWeeklyPeriods').required,false);d.querySelector('#tgWeeklyPeriods').value='';await save(d);assert.equal(run('v().groups[0].level'),'2');assert.equal(run('workloadData().rows[0].Teaching'),12);
+ console.log('PASS multi-level TG UI: inline checkboxes, required actual periods, cross-level classes, errors, P2 filter/exclusions, zero periods, queue acknowledgment, snapshot reload and single-level rate restoration');
+ }finally{w.close();}})().catch(e=>{console.error(e);process.exitCode=1});

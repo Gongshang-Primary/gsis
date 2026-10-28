@@ -1,0 +1,13 @@
+{
+  "version": "0.8.00a",
+  "packageType": "changed-deployment-items",
+  "baseline": "0.8.0",
+  "baselineCommit": "567ddeacf164cd3aedf1fbfdecdc964818eeb298",
+  "mergeIntoNextFullRelease": true,
+  "changelogItem": "049",
+  "components": {
+    "Roster frontend": "0.8.00a"
+  },
+  "requiredBackendVersion": "0.8.0",
+  "unchangedComponents": "Keep the v0.8.0 backends, other frontends and notification Worker. Only the Roster frontend deployment item changes."
+}

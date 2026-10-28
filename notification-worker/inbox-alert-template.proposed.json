@@ -1,0 +1,15 @@
+{
+  "name": "gsis_inbox_new_message_v1",
+  "language": "en_GB",
+  "category": "UTILITY",
+  "submissionState": "NOT_SUBMITTED",
+  "components": [
+    {
+      "type": "BODY",
+      "text": "*New School WhatsApp Message*\n\nHi {{1}}, a new message from {{2}} is waiting in the GSiS WhatsApp Inbox.\n\nOpen Roster to review and reply: {{3}}.",
+      "example": {
+        "body_text": [["Duty SMC", "School staff member", "https://roster.gsps.edu.sg"]]
+      }
+    }
+  ]
+}

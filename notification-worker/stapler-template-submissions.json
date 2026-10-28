@@ -1,0 +1,86 @@
+[
+  {
+    "integrationKey": "stapler_timetable",
+    "templateId": "1116798554168000",
+    "state": "PENDING",
+    "verifiedAfterSubmission": true,
+    "request": {
+      "name": "gsis_timetable_updated_v1",
+      "language": "en_GB",
+      "category": "UTILITY",
+      "parameter_format": "POSITIONAL",
+      "components": [
+        {
+          "type": "BODY",
+          "text": "*Your timetable for today has changed*\n\nHi {{1}}, your timetable for today, {{2}}, has updates.\n\nSpecifically, the changes are:\n{{3}}\n\nView your updated timetable alongside your usual timetable:\n{{4}}\n\nThank you.\nGSiS Roster",
+          "example": {
+            "body_text": [
+              [
+                "Teacher A",
+                "19 Oct 2026 (Mon)",
+                "Period 3, 8:30 to 9:00 am: English with 4P at C2-01 replaces your usual lesson.",
+                "https://roster.gsps.edu.sg/external.html#example-private-link"
+              ]
+            ]
+          }
+        }
+      ]
+    }
+  },
+  {
+    "integrationKey": "stapler_request",
+    "templateId": "1647877567013330",
+    "state": "PENDING",
+    "verifiedAfterSubmission": true,
+    "request": {
+      "name": "gsis_timetable_sponsor_v1",
+      "language": "en_GB",
+      "category": "UTILITY",
+      "parameter_format": "POSITIONAL",
+      "components": [
+        {
+          "type": "BODY",
+          "text": "*Request to plan Suspended Timetable*\n\nHi {{1}}, {{2}} has requested your approval to plan and publish a suspended timetable for {{3}}.\n\nPlease review the request and approve or reject it here:\n{{4}}\n\nThank you.",
+          "example": {
+            "body_text": [
+              [
+                "Teacher A",
+                "Teacher B",
+                "19 Oct 2026 (Mon)",
+                "https://roster.gsps.edu.sg/"
+              ]
+            ]
+          }
+        }
+      ]
+    }
+  },
+  {
+    "integrationKey": "stapler_decision",
+    "templateId": "2207471319799180",
+    "state": "PENDING",
+    "verifiedAfterSubmission": true,
+    "request": {
+      "name": "gsis_timetable_access_v1",
+      "language": "en_GB",
+      "category": "UTILITY",
+      "parameter_format": "POSITIONAL",
+      "components": [
+        {
+          "type": "BODY",
+          "text": "*Suspended timetable request outcome*\n\n{{1}} made a request to plan a suspended timetable for {{2}}.\n\nThe request has been reviewed and the outcome is:\n{{3}}\n\nView the request and decision here:\n{{4}}\n\nThank you.",
+          "example": {
+            "body_text": [
+              [
+                "Teacher B",
+                "19 Oct 2026 (Mon)",
+                "Approved. Planning access is granted for this date. Publication is available on the affected workday.",
+                "https://roster.gsps.edu.sg/"
+              ]
+            ]
+          }
+        }
+      ]
+    }
+  }
+]

@@ -1,0 +1,30 @@
+const assert=require('assert/strict'),fs=require('fs'),vm=require('vm'),make=require('./dom-helper.cjs'),{JSDOM}=require(process.env.GSIS_TEST_JSDOM||'jsdom');
+const {w,run}=make(),doc=w.document;
+const style=doc.createElement('style');style.textContent=fs.readFileSync('public/styles.css','utf8');doc.head.append(style);
+run("tab='Dept';render()");
+assert.deepEqual([...doc.querySelectorAll('#nav .nav-settings button')].map(b=>b.textContent),['Program Settings','Relief Settings','HR Settings','Workload Settings','Versions']);
+assert.deepEqual([...doc.querySelectorAll('#nav .nav-group')].slice(-2).map(group=>[...group.querySelectorAll('button')].map(b=>b.textContent)),[['ASC Export'],['Audit']]);
+assert.equal(doc.querySelector('#nav .nav-group:last-child .nav-divider').textContent,'|');
+doc.querySelector('[data-section="Program Settings"]').click();
+assert.deepEqual([...doc.querySelectorAll('#settingsSubnav button')].map(b=>b.textContent),['Classes','Venues','PAL','Subject Load','Subject Type','Fortnight Split','Dept','Committee','CCA','PLT','Events']);
+doc.querySelector('[data-tab="Dept Settings"]').click();
+let input=doc.querySelector('[data-group-name="dept-0"]');assert.equal(w.getComputedStyle(input).borderTopWidth,'0px');assert.equal(w.getComputedStyle(input).width,'100%');
+input.value='English Department';input.dispatchEvent(new w.Event('input'));input.dispatchEvent(new w.Event('change'));assert.equal(run("v().organisations.dept[0].name"),'English Department');
+input=doc.querySelector('[data-group-name="dept-0"]');input.value='Maths';input.dispatchEvent(new w.Event('input'));input.dispatchEvent(new w.Event('change'));assert.equal(run('unsavedDraft'),true);assert.equal(run("v().organisations.dept[0].name"),'English Department');
+input.dispatchEvent(new w.KeyboardEvent('keydown',{key:'Escape'}));assert.equal(run('unsavedDraft'),false);assert.equal(input.value,'English Department');
+doc.querySelector('[data-section="HR Settings"]').click();assert.deepEqual([...doc.querySelectorAll('#settingsSubnav button')].map(b=>b.textContent),['Span of Control','Teachers','Exclusions','Membership','Offload','HR Terms']);
+doc.querySelector('[data-tab="Offload"]').click();assert.match(doc.querySelector('#content thead th:last-child').textContent,/Delete/);
+run("cellQueue=[];draftBase=null;v().masterOptions={'Day of Birth':['1','2'],'Month of birth':['Jan','Feb'],Role:['Teacher'],Active:['Y','N']};tab='HR Terms';render()");assert.equal(doc.querySelectorAll('.fixed-hr-choices').length,3);assert.equal(doc.querySelector('[data-master-field="Day of Birth"]'),null);
+run("tab='Duty';render()");
+function compareRoster(){const printed=new JSDOM(run('dutyPrintHTML()'));const screenCells=[...doc.querySelectorAll('.duty-table thead th')],printCells=[...printed.window.document.querySelectorAll('thead th')];assert.deepEqual(screenCells.map(c=>c.colSpan),printCells.map(c=>c.colSpan));assert.equal(doc.querySelector('.duty-table tbody tr').cells.length,printed.window.document.querySelector('tbody tr').cells.length);printed.window.close();}
+compareRoster();const columns=[...doc.querySelectorAll('.duty-definitions [data-duty-column]')];assert.equal(columns.length,9);assert.deepEqual(columns.filter(c=>c.dataset.dutyColumn.startsWith('duty-')).map(c=>c.querySelector('button').firstChild.textContent),['P1','P2','P3','P4','P5','P6'].map(x=>x));
+assert.equal(doc.querySelector('.duty-table colgroup').children.length,13);assert.equal(doc.querySelector('.duty-scroll').querySelectorAll('.duty-entry-roster>colgroup').length,1);
+run("var extra=clone(v().duties);extra.push({id:'extra-recess',name:'Wed recess',category:'Recess',start:'11:00',end:'11:20',days:[2],adhoc:true,description:'',teachers:{}});dutyStage(extra);render()");compareRoster();assert.equal(doc.querySelectorAll('[data-duty-teacher="extra-recess"]').length,1);assert.ok(doc.querySelector('[data-duty-teacher="extra-recess"][data-day="2"]'));w.close();
+// The notices and window actions share the toolbar, and full-window actions remain reachable.
+const layout=new JSDOM(fs.readFileSync('layout-update/public/index.html','utf8'),{url:'https://layout.example',runScripts:'outside-only',pretendToBeVisual:true}),lw=layout.window,ctx=layout.getInternalVMContext();lw.scrollTo=()=>{};
+lw.eval(fs.readFileSync('layout-update/public/campus-window.js','utf8'));vm.runInContext(fs.readFileSync('layout-update/public/app.js','utf8').replace(/refreshCampus\(\);restoreSession\(\);[\s\S]+$/,''),ctx);
+const frame=lw.document.querySelector('#model'),box=frame.closest('.campus-frame'),host=lw.document.querySelector('#modelTools');lw.installCampusWindow(frame,{title:'',toolsHost:host});box.getBoundingClientRect=()=>({top:190});vm.runInContext("setView('model')",ctx);
+assert.equal(box.style.height,(lw.innerHeight-198)+'px');for(const id of ['caption','modelNote','modelState','modelTools'])assert.ok(lw.document.querySelector('#'+id).closest('.campus-toolbar'));
+const full=host.querySelector('button');full.click();assert.ok(box.classList.contains('campus-expanded'));assert.equal(full.closest('.campus-frame'),box);lw.document.dispatchEvent(new lw.KeyboardEvent('keydown',{key:'Escape'}));assert.equal(full.parentElement.parentElement,host);assert.equal(box.querySelector('.campus-frame-tools'),null);
+vm.runInContext("setView('layout')",ctx);assert.equal(host.hidden,true);assert.equal(lw.document.querySelector('#print').hidden,false);layout.window.close();
+console.log('PASS v0.4.01 settings sub-pages, direct cell edits, fixed birth choices, screen/PDF column parity, day-only Recess and compact model controls');

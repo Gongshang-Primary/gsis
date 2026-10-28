@@ -1,0 +1,71 @@
+{
+  "version": "0.9.9",
+  "baseline": "0.9.8q",
+  "baselineCommit": "50c977d79c9756dfdbee91f2922f0cd89ab6e903",
+  "componentCount": 18,
+  "components": [
+    "calendarFrontend",
+    "calendarBackend",
+    "contactsFrontend",
+    "contactsBackend",
+    "deployFrontend",
+    "layoutFrontend",
+    "deployBackend",
+    "rosterFrontend",
+    "notificationWorker",
+    "rosterBackend",
+    "lordFrontend",
+    "overlordFrontend",
+    "starlordFrontend",
+    "lordBackend",
+    "venuesFrontend",
+    "venuesBackend",
+    "operationsWorker",
+    "calendarJobWorker"
+  ],
+  "productionAuthorities": {
+    "roster": "Google",
+    "calendar": "Google",
+    "deploy": "unchanged configured authority",
+    "preparation": "shadow-only"
+  },
+  "productionDeployed": false,
+  "authorityCutoverPerformed": false,
+  "messagesSent": false,
+  "liveRecordsChanged": false,
+  "newInfrastructureDeployed": false,
+  "optionalInfrastructurePrepared": true,
+  "reliefLedgerMigrated": false,
+  "productionTimetableReadersChanged": false,
+  "separatePreparationRelease": "0.9.9",
+  "preparationProtocolRelease": "0.9.8o",
+  "preparationUpdateOptional": true,
+  "calendarCheckpointFormatChanged": false,
+  "calendarPushDefaultEnabled": false,
+  "calendarSyncContinueChanged": false,
+  "historyPruningScope": "delivery artifacts only; no live records or Git history deleted",
+  "verificationStatus": "local-validation-complete",
+  "liveAcceptancePerformed": false,
+  "evidenceScope": "0.9.9 local release preparation; earlier operator/live actions are separately documented",
+  "validation": {
+    "freshDependencyInstallVerified": false,
+    "fullSuiteRunPending": false,
+    "recoveredBroad": {
+      "nodePassed": 861,
+      "nodeFailed": 0,
+      "lordPassed": 38,
+      "lordFailed": 0,
+      "sourceState": "before final two-file Calendar UI correction"
+    },
+    "finalAffectedRecovery": {
+      "commandsPassed": 7,
+      "commandsFailed": 0,
+      "scope": "fresh build, canonical parity and five affected Calendar UI/browser programs"
+    },
+    "fullRunRepeatedAfterFinalUiCorrection": false,
+    "packagingBehavioralChecksPassed": 14,
+    "appsScriptFilesParsed": 250,
+    "historicalComparisonsNotRun": 6,
+    "liveAcceptancePerformed": false
+  }
+}

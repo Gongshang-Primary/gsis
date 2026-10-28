@@ -1,0 +1,1 @@
+const {execFileSync}=require('node:child_process');for(const f of ['backend_tests.cjs','sheets_api_tests.cjs'])execFileSync(process.execPath,[require('node:path').join(__dirname,'calendar',f)],{stdio:'inherit'});

@@ -1,0 +1,22 @@
+'use strict';
+const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
+const source=fs.readFileSync(require('node:path').join(__dirname,'../roster-update/public/roster.js'),'utf8');
+const helper=source.slice(source.indexOf(' const loadingReads='),source.indexOf(' const timetableDays='));
+let now=0,next=0;const intervals=new Map(),host={hidden:true,textContent:''};
+const ctx=vm.createContext({Symbol,performance:{now:()=>now},$:()=>host,setInterval:fn=>{intervals.set(++next,fn);return next;},clearInterval:id=>intervals.delete(id)});
+vm.runInContext(helper,ctx);
+const deferred=()=>{let resolve,reject;const promise=new Promise((a,b)=>{resolve=a;reject=b;});return {promise,resolve,reject};};
+const tick=ms=>{now+=ms;for(const fn of intervals.values())fn();};
+(async()=>{
+ const a=deferred(),b=deferred(),pa=ctx.timedRead(()=>a.promise),pb=ctx.timedRead(()=>b.promise);
+ assert.equal(intervals.size,1);assert.equal(host.textContent,'Loading… · 0s');tick(3200);
+ assert.equal(host.textContent,'Loading… · 3s');a.resolve(1);assert.equal(await pa,1);assert.equal(host.hidden,false);
+ b.reject(new Error('Network failed'));await assert.rejects(pb,/Network failed/);assert.equal(host.hidden,true);assert.equal(intervals.size,0);
+ const stale=deferred(),old=ctx.timedRead(()=>stale.promise);ctx.resetLoadCounter();
+ const fresh=deferred(),current=ctx.timedRead(()=>fresh.promise);stale.resolve();await old;
+ assert.equal(host.hidden,false);assert.equal(intervals.size,1);tick(1100);assert.equal(host.textContent,'Loading… · 1s');
+ fresh.resolve();await current;assert.equal(host.hidden,true);assert.equal(intervals.size,0);
+ await assert.rejects(ctx.timedRead(()=>{throw Error('Immediate failure');}),/Immediate failure/);
+ assert.equal(host.hidden,true);assert.equal(intervals.size,0);
+ console.log('Roster elapsed counter: overlap, failure, stale completion and cleanup passed.');
+})().catch(error=>{console.error(error);process.exitCode=1;});

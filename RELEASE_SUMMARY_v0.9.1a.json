@@ -1,0 +1,17 @@
+{
+  "version": "0.9.1a",
+  "baseline": "0.9.1",
+  "baselineCommit": "664462ff520cdb8d7f4f1c2accc0db405009f0a2",
+  "tag": "v0.9.1a",
+  "sourceCommitRecordedIn": "PATCH.json",
+  "components": ["lordBackend", "lordFrontend", "overlordFrontend", "starlordFrontend"],
+  "otherComponentVersion": "0.9.1",
+  "changes": ["Direct custom booking fields with explicit catalogue identity", "Bounded property pruning and reserved recovery capacity", "Durable uncertain-request and WhatsApp send intents"],
+  "verification": {"gsisProgramsPassed": 647, "lordProgramsPassed": 27, "propertyCasesPassed": 22, "appsScriptSourcesParsed": 139, "independentReviews": ["correctness", "quality"]},
+  "newSettingsRequired": false,
+  "schemaMigrationRequired": false,
+  "liveDeploymentPerformed": false,
+  "liveSettingsChanged": false,
+  "providerMessagesSent": false,
+  "remotePushPerformed": false
+}

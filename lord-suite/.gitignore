@@ -1,0 +1,20 @@
+__pycache__/
+Deployables/
+dist/
+RELEASE_BUILD.json
+SHA256SUMS_*.txt
+tests/*_results.json
+tests/release_review.json
+*.finalize-summary.json
+*.delivery.json
+*.browser-check.json
+*.provenance.json
+docs/archify-review*/
+
+# Durable repository bundle is delivered separately from build source.
+dist/*.bundle
+
+# Private local settings never belong in source or deployment ZIPs.
+deployment-settings.json
+.env*
+.dev.vars*

@@ -1,0 +1,321 @@
+{
+  "scope": "Current recent Offline JSON source,100 synthetic staff IDs mapped from its timetable names. Signed fresh Apps Script VM, local Drive adapter; actual context code with fixture quota/register/model I/O, no live Contacts verification. No names included. Counts exclude initial seed save; timings are not production latency.",
+  "results": [
+    {
+      "label": "one-cell-save",
+      "teachers": 100,
+      "withBase": false,
+      "quota": 1,
+      "profile": 100,
+      "classes": 1,
+      "register": 1,
+      "model": 1,
+      "lockMs": 296,
+      "gzip": 1,
+      "ungzip": 1,
+      "phases": {
+        "lock-wait": {
+          "calls": 1,
+          "ms": 0.1
+        },
+        "state-read": {
+          "calls": 1,
+          "ms": 0.9
+        },
+        "quota": {
+          "calls": 1,
+          "ms": 0.1
+        },
+        "context": {
+          "calls": 1,
+          "ms": 48.5
+        },
+        "reconcile": {
+          "calls": 1,
+          "ms": 0.3
+        },
+        "stapler-unpack": {
+          "calls": 1,
+          "ms": 6.9
+        },
+        "apply": {
+          "calls": 1,
+          "ms": 144.9
+        },
+        "stapler-validation": {
+          "calls": 1,
+          "ms": 0
+        },
+        "stapler-pack": {
+          "calls": 1,
+          "ms": 62.2
+        },
+        "commit": {
+          "calls": 1,
+          "ms": 100.8
+        },
+        "projection": {
+          "calls": 1,
+          "ms": 8.8
+        }
+      },
+      "io": {
+        "reads": 1,
+        "writes": 1,
+        "readBytes": 89284,
+        "writeBytes": 89932
+      },
+      "jsonCalls": 9351,
+      "jsonChars": 12632610,
+      "planSerializations": 10,
+      "planSerializedChars": 7836880,
+      "ok": true,
+      "planBytes": 783686,
+      "envelopeChars": 938661,
+      "payloadBytes": 784116,
+      "validation": {
+        "full": 0,
+        "incremental": 1,
+        "tiles": 1
+      },
+      "responseBytes": 792918
+    },
+    {
+      "label": "confirm",
+      "teachers": 100,
+      "withBase": false,
+      "quota": 1,
+      "profile": 100,
+      "classes": 1,
+      "register": 1,
+      "model": 1,
+      "lockMs": 261,
+      "gzip": 1,
+      "ungzip": 1,
+      "phases": {
+        "lock-wait": {
+          "calls": 1,
+          "ms": 0
+        },
+        "state-read": {
+          "calls": 1,
+          "ms": 1
+        },
+        "quota": {
+          "calls": 1,
+          "ms": 0
+        },
+        "context": {
+          "calls": 1,
+          "ms": 48.8
+        },
+        "reconcile": {
+          "calls": 1,
+          "ms": 0.2
+        },
+        "stapler-unpack": {
+          "calls": 1,
+          "ms": 8.4
+        },
+        "apply": {
+          "calls": 1,
+          "ms": 122.8
+        },
+        "stapler-validation": {
+          "calls": 1,
+          "ms": 0
+        },
+        "stapler-pack": {
+          "calls": 1,
+          "ms": 59.5
+        },
+        "commit": {
+          "calls": 1,
+          "ms": 87.7
+        },
+        "projection": {
+          "calls": 1,
+          "ms": 11.2
+        }
+      },
+      "io": {
+        "reads": 1,
+        "writes": 1,
+        "readBytes": 89932,
+        "writeBytes": 90556
+      },
+      "jsonCalls": 4562,
+      "jsonChars": 10865494,
+      "planSerializations": 12,
+      "planSerializedChars": 9404276,
+      "ok": true,
+      "planBytes": 783686,
+      "envelopeChars": 684,
+      "payloadBytes": 531,
+      "validation": {
+        "full": 0,
+        "incremental": 0,
+        "tiles": 0
+      },
+      "responseBytes": 9258
+    },
+    {
+      "label": "one-cell-save",
+      "teachers": 100,
+      "withBase": true,
+      "quota": 1,
+      "profile": 100,
+      "classes": 1,
+      "register": 1,
+      "model": 1,
+      "lockMs": 414.7,
+      "gzip": 1,
+      "ungzip": 1,
+      "phases": {
+        "lock-wait": {
+          "calls": 1,
+          "ms": 0.2
+        },
+        "state-read": {
+          "calls": 1,
+          "ms": 1.3
+        },
+        "quota": {
+          "calls": 1,
+          "ms": 0
+        },
+        "context": {
+          "calls": 1,
+          "ms": 66.2
+        },
+        "reconcile": {
+          "calls": 1,
+          "ms": 0.5
+        },
+        "stapler-unpack": {
+          "calls": 1,
+          "ms": 19.4
+        },
+        "apply": {
+          "calls": 1,
+          "ms": 221.3
+        },
+        "stapler-validation": {
+          "calls": 1,
+          "ms": 0
+        },
+        "stapler-pack": {
+          "calls": 1,
+          "ms": 66.5
+        },
+        "commit": {
+          "calls": 1,
+          "ms": 124.9
+        },
+        "projection": {
+          "calls": 1,
+          "ms": 7.7
+        }
+      },
+      "io": {
+        "reads": 1,
+        "writes": 1,
+        "readBytes": 89284,
+        "writeBytes": 89932
+      },
+      "jsonCalls": 9351,
+      "jsonChars": 14200006,
+      "planSerializations": 10,
+      "planSerializedChars": 7836880,
+      "ok": true,
+      "planBytes": 783686,
+      "envelopeChars": 1876755,
+      "payloadBytes": 1567814,
+      "validation": {
+        "full": 0,
+        "incremental": 1,
+        "tiles": 1
+      },
+      "responseBytes": 792918
+    },
+    {
+      "label": "confirm",
+      "teachers": 100,
+      "withBase": true,
+      "quota": 1,
+      "profile": 100,
+      "classes": 1,
+      "register": 1,
+      "model": 1,
+      "lockMs": 338.5,
+      "gzip": 1,
+      "ungzip": 1,
+      "phases": {
+        "lock-wait": {
+          "calls": 1,
+          "ms": 0
+        },
+        "state-read": {
+          "calls": 1,
+          "ms": 1
+        },
+        "quota": {
+          "calls": 1,
+          "ms": 0
+        },
+        "context": {
+          "calls": 1,
+          "ms": 70.4
+        },
+        "reconcile": {
+          "calls": 1,
+          "ms": 0.4
+        },
+        "stapler-unpack": {
+          "calls": 1,
+          "ms": 10.3
+        },
+        "apply": {
+          "calls": 1,
+          "ms": 166.3
+        },
+        "stapler-validation": {
+          "calls": 1,
+          "ms": 0
+        },
+        "stapler-pack": {
+          "calls": 1,
+          "ms": 68.1
+        },
+        "commit": {
+          "calls": 1,
+          "ms": 99.8
+        },
+        "projection": {
+          "calls": 1,
+          "ms": 12.2
+        }
+      },
+      "io": {
+        "reads": 1,
+        "writes": 1,
+        "readBytes": 89932,
+        "writeBytes": 90556
+      },
+      "jsonCalls": 4562,
+      "jsonChars": 10865494,
+      "planSerializations": 12,
+      "planSerializedChars": 9404276,
+      "ok": true,
+      "planBytes": 783686,
+      "envelopeChars": 684,
+      "payloadBytes": 531,
+      "validation": {
+        "full": 0,
+        "incremental": 0,
+        "tiles": 0
+      },
+      "responseBytes": 9258
+    }
+  ]
+}

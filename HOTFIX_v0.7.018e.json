@@ -1,0 +1,12 @@
+{
+  "version": "0.7.018e",
+  "packageType": "changed-deployment-items",
+  "baseline": "0.7.018d",
+  "baselineCommit": "c32a7bb38478d6dac6974360678c3b9d0af42b40",
+  "nextFullRelease": "0.7.19",
+  "components": {
+    "Roster frontend": "0.7.018e"
+  },
+  "requiredBackendVersion": "0.7.018c",
+  "unchangedComponents": "Keep the installed v0.7.018c Deploy backend. All other components retain their installed versions. This frontend includes every preceding v0.7.018 patch."
+}

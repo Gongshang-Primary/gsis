@@ -1,0 +1,40 @@
+/* Own figures are fetched only when opened. No shared or persisted client cache. */
+window.RosterCalculationsUI=(()=>{
+ 'use strict';
+ let ticket=0;
+ const esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+ const number=x=>Number.isFinite(x)?new Intl.NumberFormat('en-SG',{maximumFractionDigits:2}).format(x):'Unavailable';
+ const date=x=>/^\d{4}-\d{2}-\d{2}/.test(x||'')?new Intl.DateTimeFormat('en-SG',{day:'numeric',month:'short',year:'numeric',timeZone:'Asia/Singapore'}).format(new Date(x.slice(0,10)+'T12:00:00Z')):'Unavailable';
+ const n=x=>esc(number(x));
+ function unmount(){ticket++;}
+ function markup(data){
+  const c=data.calculation,b=c?.breakdown,h=data.completion,available=c?.available===true&&b?.available===true,wi=available?n(b.Wi):'Unavailable',quota=available?n(c.R):'Unavailable',percent=Number.isFinite(h.percentage)?n(h.percentage)+'%':'Unavailable';
+  let steps='';
+  if(available){
+   const balance=b.weeklyBudget-b.Wi,teaching=c.Ti,reference=c.reference;
+   steps='<h3>How your weekly quota is worked out</h3><ol class="calculation-steps">'+
+    '<li><strong>Start with your recorded work.</strong><p>Teaching: '+n(teaching)+' periods. Form teacher time: '+n(b.FTT)+'. Professional development: '+n(b.PD)+'. Duties: '+n(b.duties)+'. Other work: '+n(b.otherNonTeaching)+'.</p></li>'+
+    '<li><strong>Allow time for your role, preparation and marking.</strong><p>Your offload factor is '+n(c.OF*100)+'%. The school figure of '+n(reference.T_avg)+' is total teaching demand divided by '+n(reference.fullTimeTeacherCount)+' eligible full time teachers. It measures how demanding the school programme is per full time teacher. Your role allowance is '+n(c.OF*100)+'% × '+n(reference.T_avg)+' = '+n(b.offloadAllowance)+' periods.</p><p>The saved SIUE preparation and marking allowance is '+n(reference.siuePercent)+'%. This adds '+n(b.siuePeriods)+' periods: '+n(reference.siuePercent)+'% of your teaching plus role allowance.</p></li>'+
+    '<li><strong>Your weekly workload estimate, W<sub>i</sub>, is '+wi+' periods.</strong><p>This adds your recorded work, role allowance, preparation and marking.</p></li>'+
+    '<li><strong>Find the balance in your work budget.</strong><p>Your '+esc(b.employment)+' budget is '+n(b.weeklyBudget)+' periods. '+n(b.weeklyBudget)+' − '+wi+' = '+n(balance)+' periods.</p></li>'+
+    '<li><strong>Apply the timetable share and any cap.</strong><p>'+n(balance)+' × '+esc(new Intl.NumberFormat('en-SG',{maximumFractionDigits:6}).format(b.timetableFactor))+' ≈ '+n(b.rawR)+' periods.'+(b.capConfigured?' Your weekly teaching cap is '+n(b.periodCap)+'. After '+n(b.capWorkload)+' form teacher and teaching periods, its relief headroom is '+n(b.capHeadroom)+'. We use the lower of this headroom and the timetable balance.':' No weekly teaching cap applies to you.')+'</p><p>Round down to a whole period, with a minimum of zero. Your weekly relief quota, R, is <strong>'+quota+' periods</strong>.</p></li></ol>'+
+    '<details class="calculation-detail"><summary>Exact formula and terms</summary><p class="calculation-formula">W<sub>i</sub> = FTT<sub>i</sub> + PD<sub>i</sub> + Duties<sub>i</sub> + Other<sub>i</sub> + (1 + SIUE / 100) × (T<sub>i</sub> + OF<sub>i</sub> × T<sub>avg</sub>)</p><p class="calculation-formula">R<sub>i</sub> = floor(max(0, '+(b.capConfigured?'min(f<sub>i</sub> × (B<sub>i</sub> − W<sub>i</sub>), C<sub>i</sub> − FTT<sub>i</sub> − T<sub>i</sub>)':'f<sub>i</sub> × (B<sub>i</sub> − W<sub>i</sub>)')+'))</p><dl><dt>FTT / PD / Other</dt><dd>Form teacher time / professional development / other recorded work.</dd><dt>T<sub>i</sub> / OF<sub>i</sub></dt><dd>Your teaching load / role offload factor.</dd><dt>T<sub>avg</sub></dt><dd>School teaching demand per eligible full time teacher.</dd><dt>SIUE</dt><dd>The saved preparation and marking allowance: '+n(reference.siuePercent)+'%.</dd><dt>B<sub>i</sub> / f<sub>i</sub> / C<sub>i</sub></dt><dd>Your weekly budget / timetable share / weekly teaching cap, when one applies.</dd><dt>floor</dt><dd>Round down to a whole period.</dd></dl></details>';
+  }
+  return '<section class="personal-calculations" aria-labelledby="calculationsTitle"><h2 id="calculationsTitle">My Calculations</h2><p class="calculation-greeting">Hi '+esc(data.name)+', your weekly W<sub>i</sub> = <strong>'+wi+'</strong>, your relief quota R = <strong>'+quota+'</strong> and your cumulative relief done is <strong>'+percent+'</strong>.</p><p class="calculation-caption">W<sub>i</sub> is your weekly workload estimate. R is your weekly relief quota. Both are in periods per week, including when your timetable has odd and even weeks.</p>'+
+   (!available?'<p class="ops-warning-text">'+esc(data.calculationReason||'Your published calculation is unavailable. Ask Admin to review your Deploy record.')+'</p>':'')+
+   '<section class="calculation-history" aria-labelledby="reliefDoneTitle"><h3 id="reliefDoneTitle">Relief completed so far</h3><p>'+esc(date(h.from))+' to '+esc(date(h.to))+' (Singapore). Confirmed completed relief: <strong>'+n(h.completed)+' periods</strong>. Recorded accumulated quota through the week of '+esc(date(h.throughWeek))+': <strong>'+n(h.entitlement)+' periods</strong>.</p>'+
+   (Number.isFinite(h.percentage)?'<p>'+n(h.completed)+' ÷ '+n(h.entitlement)+' × 100 = <strong>'+percent+'</strong>. This excludes pending and future assignments.</p>':'<p class="ops-warning-text">'+esc(h.reason||'The percentage is unavailable.')+(Number.isFinite(h.completed)?' The recorded completed count is shown separately.':'')+'</p>')+
+   '<p class="calculation-caption">'+(Number.isFinite(h.recordedWeeks)?n(h.recordedWeeks)+' recorded weeks':'Weekly history unavailable')+(h.firstWeek?', from '+esc(date(h.firstWeek))+' to '+esc(date(h.lastWeek)):'')+(Number.isFinite(h.excludedWeeks)?'; '+n(h.excludedWeeks)+' excluded weeks. ':'. ')+'History '+(h.historyVerified?'verified':'not verified')+'. Unrecorded weekly quotas are not estimated.'+(h.zeroStart?' Counting began from zero on '+esc(date(h.startedAt))+'.':'')+'</p></section>'+steps+
+   '<p>Your weekly quota already includes the offload factor for appointment holders. KPs do not receive an additional preference to be assigned last solely because of their appointment.</p>'+
+   '<p>Displayed figures are rounded; the quota uses full precision. This is a planning estimate based on your recorded work. It does not measure every hour you worked. Your quota helps us share relief work; your timetable availability still determines which lessons you can cover.</p>'+
+   '<p class="calculation-caption">As of '+esc(date(data.asOf))+'. '+(data.source?'Published Deploy: '+esc(data.source.name)+', revision '+esc(data.source.revision)+'. Applies '+esc(date(data.source.from))+' to '+esc(date(data.source.to))+'. Calculation: '+esc(data.source.model)+'.':'No published source available.')+'</p></section>';
+ }
+ async function render(context){
+  const run=++ticket,host=context.container;
+  host.setAttribute('aria-busy','true');host.innerHTML='<section class="personal-calculations"><h2>My Calculations</h2><p role="status">Loading your calculations…</p></section>';
+  try{const data=await context.api('operations',{operation:'calculations'});if(run!==ticket||!host.isConnected)return;host.innerHTML=markup(data);}
+  catch(e){if(run!==ticket||e.stale||!host.isConnected)return;host.innerHTML='<section class="personal-calculations"><h2>My Calculations</h2><p role="alert">'+esc(e.message)+(e.diagnosticId?' Reference: '+esc(e.diagnosticId):'')+'</p><button data-calculations-retry>Retry</button></section>';host.querySelector('[data-calculations-retry]').onclick=()=>render(context);}
+  finally{if(run===ticket)host.setAttribute('aria-busy','false');}
+ }
+ return {render,unmount};
+})();

@@ -1,0 +1,18 @@
+import {toWorkerModuleURL} from './helpers/worker-module.cjs';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import {webcrypto} from 'node:crypto';
+globalThis.crypto??=webcrypto;
+const worker=await import(toWorkerModuleURL('data:text/javascript;base64,'+fs.readFileSync('roster-update/public/_worker.js').toString('base64')));
+const env={CALENDAR_APPS_SCRIPT_URL:'https://script.google.com/macros/s/calendar/exec',CALENDAR_PROXY_SECRET:'c'.repeat(40)},who={email:'smc@gsps.edu.sg',subject:'smc'},calls=[];
+globalThis.fetch=async(url,options)=>{const request=JSON.parse(options.body);calls.push(request);const dates=request.payload.dates||[request.payload.date];return Response.json({ok:true,result:request.action==='rosterDates'?{dates:dates.map(date=>({date,schoolDay:true,parity:'odd'}))}:{date:dates[0],schoolDay:true,parity:'odd'}});};
+const result=await worker.trustedOperationsInput({operation:'read',view:'schoolAbsences',from:'2026-01-01',to:'2027-12-31',calendarByDate:{forged:true},identity:{admin:true}},env,who);
+assert.equal(calls.length,0,'complete saved-record range needs no Calendar or per-day loop');assert.deepEqual(result.calendarByDate,{});assert.equal(result.identity,undefined);assert.equal(result.from,'2026-01-01');assert.equal(result.to,'2027-12-31');
+const selected=['2026-10-23','2026-11-20'];
+const deletion=await worker.trustedOperationsInput({operation:'deleteAbsences',view:'schoolAbsences',date:selected[0],dates:selected,viewFrom:'2026-01-01',viewTo:'2027-12-31',ids:['a','b'],confirm:true},env,who);
+assert.equal(calls.length,1,'selected dates share one trusted Calendar request');assert.deepEqual(calls[0].payload.dates,selected);assert.deepEqual(Object.keys(deletion.calendarByDate),selected);
+const many=Array.from({length:70},(_,i)=>new Date(Date.parse('2026-10-23')+i*86400000).toISOString().slice(0,10));calls.length=0;
+const wide=await worker.trustedOperationsInput({operation:'deleteAbsences',view:'schoolAbsences',date:many[0],dates:many,viewFrom:many[0],viewTo:many.at(-1),ids:many.map((_,i)=>'row'+i),confirm:true},env,who);
+assert.deepEqual(calls.map(call=>call.payload.dates.length),[62,8]);assert.deepEqual(Object.keys(wide.calendarByDate),many,'every selected date survives provider batching');assert.deepEqual(wide.ids,many.map((_,i)=>'row'+i),'gateway retains one atomic deletion command');
+await assert.rejects(worker.trustedOperationsInput({operation:'deleteAbsences',view:'schoolAbsences',dates:['bad']},env,who),/valid date/);
+console.log('PASS school-wide range read skips Calendar; exact selected deletion dates retain trusted context.');

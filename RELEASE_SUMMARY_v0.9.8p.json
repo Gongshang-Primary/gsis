@@ -1,0 +1,44 @@
+{
+  "version": "0.9.8p",
+  "baseline": "0.9.8o",
+  "baselineCommit": "edcb6b4c4d43b2d2af7eaa4f2d4f220e2adb7cfc",
+  "componentCount": 18,
+  "productionAuthorities": {
+    "roster": "Google",
+    "calendar": "Google",
+    "deploy": "unchanged configured authority",
+    "preparation": "shadow-only"
+  },
+  "productionDeployed": false,
+  "authorityCutoverPerformed": false,
+  "messagesSent": false,
+  "liveRecordsChanged": false,
+  "newInfrastructureRequired": false,
+  "reliefLedgerMigrated": false,
+  "productionTimetableReadersChanged": false,
+  "separatePreparationRelease": "0.9.8o",
+  "preparationWorkerReplacementRequired": false,
+  "exportDiagnosticsExcluded": true,
+  "calendarHealthyBatchYieldMs": 1000,
+  "calendarBatchSizeCap": 5,
+  "healthySyncPerformanceMeasuredLive": false,
+  "historyPruningScope": "delivery artifacts only; no live records or Git history deleted",
+  "verificationStatus": "targeted-verified-with-documented-inherited-full-suite-failures",
+  "calendarCheckpointFormatChanged": true,
+  "calendarRollbackRequiresSettledRun": true,
+  "verification": {
+    "nodeInitial": {
+      "passed": 831,
+      "selected": 852,
+      "failed": 21
+    },
+    "resolvedByTargetedReruns": 8,
+    "inheritedRemaining": 13,
+    "lordPrograms": {
+      "passed": 38,
+      "selected": 38
+    },
+    "fullSuiteWhollyGreen": false,
+    "liveAcceptancePerformed": false
+  }
+}

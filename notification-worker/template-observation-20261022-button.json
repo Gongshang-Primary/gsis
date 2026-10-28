@@ -1,0 +1,37 @@
+{
+  "observedDate": "2026-10-22",
+  "business": "Gongshang Primary",
+  "id": "1009634445543507",
+  "name": "gsis_timetable_updated_button_v2",
+  "language": "en_GB",
+  "status": "APPROVED",
+  "category": "UTILITY",
+  "parameter_format": "POSITIONAL",
+  "components": [
+    {
+      "type": "BODY",
+      "text": "*Your timetable for today has changed*\n\nHi {{1}}, your timetable for today, {{2}}, has updates.\n\nSpecifically, the changes are:\n{{3}}\n\nPlease use the buttons below to view your updated timetable alongside your usual timetable and acknowledge this update.\n\nThank you.\nAccess https://roster.gsps.edu.sg for more info."
+    },
+    {
+      "type": "BUTTONS",
+      "buttons": [
+        {
+          "type": "URL",
+          "text": "View Detail",
+          "url": "https://roster.gsps.edu.sg/external.html#{{1}}",
+          "example": [
+            "https://roster.gsps.edu.sg/external.html#review-example-not-a-valid-private-link"
+          ]
+        },
+        {
+          "type": "URL",
+          "text": "Acknowledge",
+          "url": "https://roster.gsps.edu.sg/external.html?action=ack#{{1}}",
+          "example": [
+            "https://roster.gsps.edu.sg/external.html?action=ack#review-example-not-a-valid-private-link"
+          ]
+        }
+      ]
+    }
+  ]
+}

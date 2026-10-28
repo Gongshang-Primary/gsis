@@ -1,0 +1,53 @@
+{
+  "schemaVersion": 1,
+  "ok": false,
+  "command": "finalize",
+  "status": "skipped",
+  "type": "architecture",
+  "quality": "showcase",
+  "specification": {
+    "path": "/workspace/scratch/2c52ae6e6b97/gsis-087/.archify/architecture-gsis-20261022/candidate.json",
+    "sha256": "5b1392ae35e830bc5bddcd44607d9a4b0cbeaa656896478845253293cecc44f3",
+    "bytes": 6539
+  },
+  "artifact": {
+    "path": "/workspace/scratch/2c52ae6e6b97/gsis-087/.archify/architecture-gsis-20261022/gsis.html",
+    "sha256": "b565811da7630dcb27afb8c471c31c6408ede4407f5760dd564b2482c1914394",
+    "bytes": 822916
+  },
+  "gates": {
+    "validate": "pass",
+    "deliver": "pass",
+    "check": "pass",
+    "browser-check": "skipped"
+  },
+  "failedStage": "browser-check",
+  "diagnostics": [
+    {
+      "code": "viewer/chrome-unavailable",
+      "severity": "warning",
+      "message": "Chrome or Chromium is unavailable. Set ARCHIFY_CHROME to its executable path.",
+      "subject": {
+        "artifact": "/workspace/scratch/2c52ae6e6b97/gsis-087/.archify/architecture-gsis-20261022/gsis.html"
+      },
+      "evidence": {
+        "executable": null
+      },
+      "supportedFixes": [
+        "set ARCHIFY_CHROME to a Chrome or Chromium executable and rerun browser-check"
+      ]
+    }
+  ],
+  "diagnosticSummary": {
+    "total": 1,
+    "shown": 1,
+    "truncated": false
+  },
+  "evidence": {
+    "receipt": "/workspace/scratch/2c52ae6e6b97/gsis-087/.archify/architecture-gsis-20261022/gsis.finalize.json",
+    "summaryReceipt": "/workspace/scratch/2c52ae6e6b97/gsis-087/.archify/architecture-gsis-20261022/gsis.finalize-summary.json",
+    "browserCheckReceipt": "/workspace/scratch/2c52ae6e6b97/gsis-087/.archify/architecture-gsis-20261022/gsis.browser-check.json"
+  },
+  "visualReview": "not-requested",
+  "durationMs": 924
+}

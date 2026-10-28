@@ -1,0 +1,12 @@
+const assert=require('node:assert/strict'),fixture=require('./roster701-fixture.cjs'),S=require('../shared/roster-stapler.js');
+const f=fixture(),O=f.O,d='2026-10-15';f.ctx.days[d]=structuredClone(f.ctx.days[f.date]);f.ctx.timetableEntries=[{id:'baseline',startDate:f.date,endDate:'2026-12-31',status:'published'}];const base=S.create({...f.ctx.days[d],date:d});
+O.apply(f.state,f.ctx,{operation:'saveStapler',date:d,staplerRevision:0,plan:base});O.apply(f.state,f.ctx,{operation:'confirmStapler',date:d,staplerRevision:1});
+const teacher={...f.ctx,user:{staffId:'bob',email:'bob@gsps.edu.sg',smc:false,admin:false}};
+let view=O.read(f.state,teacher,{operation:'stapler',date:d});assert(view.canViewConfirmed);assert.equal(view.canEdit,false);assert.equal(view.viewMode,'confirmed');assert.equal(view.confirmed.revision,1);
+const changed=S.apply(base,{type:'edit',tileId:base.tiles[0].id,patch:{venue:'Unconfirmed room'}});O.apply(f.state,f.ctx,{operation:'saveStapler',date:d,staplerRevision:1,basePlan:base,plan:changed});view=O.read(f.state,teacher,{operation:'stapler',date:d});assert.equal(view.plan.tiles[0].venue,base.tiles[0].venue,'unconfirmed saved edit does not leak');assert.equal(view.staplerRevision,1);assert.equal(view.canConfirm,false);assert.equal(f.state.outbox.length,0);
+assert.throws(()=>O.apply(f.state,teacher,{operation:'saveStapler',date:d,staplerRevision:2,plan:changed}),/SMC approval/);
+O.apply(f.state,f.ctx,{operation:'confirmStapler',date:d,staplerRevision:2});view=O.read(f.state,teacher,{operation:'stapler',date:d});assert.equal(view.plan.tiles[0].venue,'Unconfirmed room');assert.equal(view.confirmed.revision,2);
+assert(O.read(f.state,teacher,{operation:'staplerDates'}).dates.some(row=>row.date===d&&row.canViewConfirmed));
+const anonymous={...teacher,user:{email:'unmapped@gsps.edu.sg'}};assert.equal(O.read(f.state,anonymous,{operation:'stapler',date:d}).plan,null);
+assert.throws(()=>O.apply(f.state,f.ctx,{operation:'saveStapler',date:d,staplerRevision:-1,basePlan:base,plan:changed}),/changed/);
+console.log('082 domain confirmed upcoming timetable preview: passed');

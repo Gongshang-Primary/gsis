@@ -1,0 +1,13 @@
+import {toWorkerModuleURL} from './helpers/worker-module.cjs';
+import fs from 'node:fs';import assert from 'node:assert/strict';
+const M=await import(toWorkerModuleURL('data:text/javascript;base64,'+Buffer.from(fs.readFileSync('roster-update/public/_worker.js','utf8')).toString('base64')));
+const day=offset=>new Date(Date.now()+8*3600000+offset*86400000).toISOString().slice(0,10),date=day(1);
+const contract=JSON.parse(fs.readFileSync('notification-worker/template-contracts.json')).templates.stapler_timetable;
+const env={ROSTER_PUBLIC_ORIGIN:'https://roster.example.test',EXTERNAL_LINK_SECRET:'e'.repeat(40)},config={contactsUrl:'https://contacts.example.test',templates:{stapler_timetable:{...contract,summaryMaxCharacters:2000}}};
+const row={id:'n',claimId:'claim',recipientId:'bob',mobile:'6591234567',date,expiresAt:Date.now()+2*86400000,name:'Bob',kind:'stapler_timetable',data:{templateKey:'stapler_timetable',dailyPublication:true,publicationRevision:1,summary:'Published future timetable.'}};
+const message=await M.templateMessage(row,env,config);assert.equal(message.template.name,contract.name);assert(message.template.components[0].parameters[1].text.includes(date.slice(0,4)));const url=message.template.components[0].parameters.at(-1).text;assert(url.startsWith('https://roster.example.test/'));const cap=await M.readCapability(url.split('#')[1],env,env.ROSTER_PUBLIC_ORIGIN);assert.equal(cap.date,date);assert.equal(cap.staffId,'bob');assert(cap.expiresAt>Date.now()+86400000);
+await assert.rejects(()=>M.templateMessage({...row,date:day(-1)},env,config),/STALE_TIMETABLE/);
+await assert.rejects(()=>M.templateMessage({...row,data:{...row.data,dailyPublication:false}},env,config),/STALE_TIMETABLE/);
+await assert.rejects(()=>M.templateMessage({...row,expiresAt:Date.now()-1},env,config),/INVALID_OR_EXPIRED/);
+await assert.rejects(()=>M.templateMessage({...row,claimId:''},env,config),/INVALID_OR_EXPIRED/);
+console.log('PASS future published timetable builds provider payload/private link; past, legacy, expired and unclaimed cases reject. No sends.');
