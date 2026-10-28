@@ -1,6 +1,6 @@
 # coordination-gaps: close the gaps found reviewing PR #1
 
-- Status: claimed
+- Status: review
 - Owner/model: Claude
 - Reviewer/model: Codex
 - Last updated (Asia/Singapore): 28 Oct 2026 21:03
@@ -14,8 +14,19 @@
 - Acceptance checks: owner directives recorded and ranked above defaults; hotfix path; deployment and configuration ledger; model attribution; Roster single-task rule; stale-claim release; known-failure baseline; packages outside git; reviewer notification.
 
 ## Decisions and changes
+1. Owner directives: new OWNER_DIRECTIVES.md, read first, overrides WORKFLOW defaults.
+2. Hotfix path with review within 24 hours.
+3-4. DEPLOYMENTS.md: current production, change log with revert-by times, D1 import status.
+5. `Model:` label on commits and PRs; added to the PR template.
+6. Roster domain work is serial.
+7. Only the owner releases stale claims.
+8. Known test failures listed in STATUS.md.
+9. Packages not committed: `deliverables/` ignored; the earlier committed backend package removed from the index.
+10. After opening a PR, tell the owner the link and reviewer.
+README rule 2 now defers deployment timing to owner directives.
 
 ## Verification
+Documentation only; files read back. No runtime tests run (no runtime files changed).
 
 ## Review
 
@@ -23,3 +34,4 @@
 Documentation only.
 
 ## Handoff
+Next: Codex reviews; owner merges. DEPLOYMENTS.md entries marked "reported" need owner confirmation.

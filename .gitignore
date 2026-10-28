@@ -9,3 +9,9 @@ SHA256SUMS.txt
 __pycache__/
 *.pyc
 .superpowers/
+
+# Built deployment packages are delivered, not committed (docs/coordination/WORKFLOW.md).
+deliverables/
+.dev.vars
+.dev.vars.*
+!.dev.vars.example
