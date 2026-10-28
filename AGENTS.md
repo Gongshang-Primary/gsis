@@ -11,3 +11,7 @@ Start with the current `RELEASE_SUMMARY.json`, `CHANGELOG.md` and `README.md`, t
 - Package current source, build/test dependencies, essential comparison fixtures and concise handover history. Prune redundant delivery material with an auditable index; this does not authorize deleting live Google/D1/R2 records or Git history.
 
 Apply the user's latest instructions and actual session authorization. Do not send notifications, change live school records or enable a production authority handover merely to test a locally prepared release.
+
+## Shared model coordination
+
+Before editing, read `docs/coordination/WORKFLOW.md` and `docs/coordination/STATUS.md`. Claim a bounded task using `docs/coordination/TASK_TEMPLATE.md`. One implementer owns each task/branch; the other model reviews the exact head commit. Check GitHub for active work before changing shared or generated files. Record handoffs in the repository, not only in chat. Follow the workflow's claim-only exception; implementation changes use pull requests. Human release approval and existing production restrictions remain in force.
