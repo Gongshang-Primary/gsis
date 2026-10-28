@@ -29,6 +29,7 @@ README rule 2 now defers deployment timing to owner directives.
 Documentation only; files read back. No runtime tests run (no runtime files changed).
 
 ## Review
+Codex reviewed 53ff1d9: (1) packages rule conflicted with tracked generated outputs; (2) inventory counted 20 components; (3) Workers marked verified from modification times. All three fixed in the next commit; recovery-mode revert recorded with job-health evidence.
 
 ## Deployment
 Documentation only.
