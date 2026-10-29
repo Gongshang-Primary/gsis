@@ -1,6 +1,6 @@
-# roster-fajt-levelling: after SREs, bring FAJT staff up to the other EOs' average R%
+# roster-fajt-levelling: after SREs, FAJT staff take relief before other staff, levelled among themselves by R%
 
-- Status: approved (owner request 30 Oct 2026); confirm the reading of rule 2 before claiming. Build after roster-sre-daily-priority (same ranking code).
+- Status: approved, ready to claim after roster-sre-daily-priority (same ranking code). Owner clarified 30 Oct 2026: "FAJTs will reach higher R% before rest of the school".
 - Owner/model: Codex
 - Reviewer/model: Claude
 - Last updated (Asia/Singapore): 30 Oct 2026 07:40
@@ -11,22 +11,21 @@
 - Files/domains owned: shared/roster-allocation.js (candidate ranking, preferenceRules, balances), Roster settings text, generated copies, tests.
 - Out of scope: R quota formula; Deploy specialist counts (separate task); SRE rule itself.
 
-## Ranking order (owner)
+## Ranking order (owner, clarified)
 1. SREs first (roster-sre-daily-priority).
-2. FAJT staff whose annual R% is below the target are next, lowest R% first, until they reach the target.
-3. Then today's annual R% levelling across all staff (including FAJT at or above the target), followed by the existing tie-breakers.
+2. FAJT staff next, as a group ahead of all other staff. Within FAJT, lowest annual R% first, so FAJT staff level among themselves.
+3. Other staff only when no SRE or FAJT can take the period (absent, busy, restricted period, or at a Daily workload limit). Among them, today's annual R% levelling and tie-breakers.
 
-## Reading of the target (to confirm)
-Owner wrote both "balance FAJT R% against all other EOs R%" and "equal with FAJT average R%". Proposed reading: **target = average annual R% of all non-FAJT, non-SRE EOs** (annual utilisation, the same figure annualUtilisation uses), recomputed at each allocation run from current balances. A FAJT teacher below that average is preferred; at or above it, they join normal levelling.
-Alternative reading: target = average R% of FAJT staff themselves (levels FAJT among each other only). Owner to pick.
+Effect: FAJT staff, as supplementary manpower, absorb relief first and reach higher R% than the rest of the school. There is no target or cap on FAJT R% beyond the existing Daily workload limits.
 
 ## Rules kept
 - Daily workload limits (existing Settings), restricted periods for FAJT, absence, clashes, protected/manual/peer cells.
-- FAJT with no R entitlement (R% undefined): treat as at target (not prioritised) and show in review.
-- No hardcoded numbers; the target is computed from data.
+- FAJT with no R entitlement (R% undefined): still in the FAJT group, ordered after FAJT staff with a known R%; listed in review.
+- No hardcoded numbers.
 
 ## Acceptance
-- Two candidates free, a FAJT at 20% and a teacher at 10%, other-EO average 40%: the FAJT is chosen.
-- FAJT at 45% with other-EO average 40%: normal levelling decides (the teacher at 10% is chosen).
+- A FAJT at 60% and a teacher at 10% both free: the FAJT is chosen.
+- Two FAJT free at 30% and 50%: the 30% FAJT is chosen.
+- FAJT at its daily limit or in a restricted period: the next candidate is a non-FAJT by annual R%.
 - SRE free: SRE still chosen first.
-- Non-FAJT, non-SRE results unchanged on existing seeded solver tests.
+- Non-FAJT, non-SRE ordering unchanged on existing seeded solver tests.
