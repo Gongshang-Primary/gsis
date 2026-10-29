@@ -314,3 +314,21 @@ Cloudflare-authoritative timetables (Diagram 1), new allocation rules, and chang
 - Headcount and capacity: exclude FAJT staff.
 - Average: non-FAJT assigned periods ÷ non-FAJT headcount.
 - FAJT periods shown as a separate "FAJT supplementary" line, so the gap between demand and core capacity stays visible.
+
+### Roster: "Assigned By" shows the auto-allocator for automatic relief
+
+**Request (29 Oct 2026):** A relief made by auto-allocation must show the auto-allocator as "Assigned By", not the person who published.
+
+**Current behaviour (0.9.9a):** The relief view sets `assignedBy:a?.publishedBy||<stapler confirmedBy>||ctx.user.email` (`shared/roster-operations.js:1183`). That is the publisher, then the Stapler confirmer, then the viewer, never the assigner. Owner screenshot: Wen Di (MTL), P12 relief for Danning, shows `ngiam.song.wee@gsps.edu.sg` although the auto-allocator assigned it.
+
+**Planned change:**
+1. Derive "Assigned By" from the assignment itself: `origin:'automatic'` (Auto-allocate, Auto-fill blanks, scheduled run) → "Auto-allocation"; `origin:'smc'` or a manual change → the SMC who made or last changed it (from the assignment's own actor field or audit); `origin:'mutual'` → "Peer arrangement".
+2. Keep "Published by" as a separate fact where it is shown.
+3. Same rule in the Excel export and the teacher-facing views.
+4. Test: automatic, SMC-edited automatic, manual and peer rows each show the right label.
+
+### Roster: delivery time shows a raw number
+
+**Found (29 Oct 2026, same screenshot):** "Delivered 1793228134000 Singapore time." The provider's delivery time is stored as a digit string; `stamp()` (`roster-update/public/roster-operations-ui.js:231`) only formats values that `new Date(value)` understands, so it prints the digits.
+
+**Planned change:** `stamp()` treats a 13-digit string as milliseconds and a 10-digit string as seconds since 1970, then formats as Singapore time (here: 29 Oct 2026, about 07:35). Add a test for both forms. Check other callers that pass provider timestamps.
