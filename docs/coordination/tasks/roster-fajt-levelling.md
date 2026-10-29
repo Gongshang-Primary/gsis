@@ -20,7 +20,7 @@ Definitions (computed at each allocation run from current balances, the same ann
 - FAJT average R% = mean annual R% of active FAJT staff with an R entitlement.
 - School average R% = mean annual R% of all other active eligible staff (not FAJT, not SRE) with an R entitlement.
 
-Margin: a new Settings field beside Daily workload limits, "FAJT lead over school R% (percentage points)", with an On/Off toggle like the other rules. **Recommended default: 20 percentage points** (e.g. school 40% → FAJT priority until FAJT average reaches 60%). Stored in settings data, validated 0 to 100; no number in code paths other than the settings default.
+Margin: a new Settings field beside Daily workload limits, "FAJT lead over school R% (percentage points)", with an On/Off toggle like the other rules. **Owner (30 Oct 2026): ship it Off.** The toggle defaults to Off for new and existing settings, so deploying changes no allocation until an SMC/Admin switches it On; the margin field still shows 20 ready for use. **Recommended default: 20 percentage points** (e.g. school 40% → FAJT priority until FAJT average reaches 60%). Stored in settings data, validated 0 to 100; no number in code paths other than the settings default.
 Why points, not a ratio: early in the year all R% are small, and a ratio (e.g. 1.5×) would switch off after a handful of duties. Why 20: large enough that FAJT clearly carry more relief, small enough that teachers still see their R% move within the term. Annual R% changes slowly, so the switch will not flip daily; no extra hysteresis is needed at first. Review after four weeks of data.
 
 ## Rules kept
@@ -35,3 +35,4 @@ Why points, not a ratio: early in the year all R% are small, and a ratio (e.g. 1
 - Two FAJT free while priority is on: the lower-R% FAJT is chosen.
 - SRE free: SRE still first. FAJT at a Daily workload limit or restricted period: skipped.
 - Settings shows the current FAJT average, school average and whether FAJT priority is active, so SMCs can see why.
+- Fresh deploy with existing settings data: FAJT priority is Off and allocations match the pre-deploy result; switching it On in Settings applies the rule.
