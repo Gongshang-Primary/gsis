@@ -28,7 +28,11 @@ globalThis.fetch=async(url,init)=>{
  if(replayIds.has(payload.input?.requestId))return Response.json({ok:true,data:{revision:2,date:payload.input?.date,replayed:true}});
  return Response.json({ok:true,data:{revision:2,date:payload.input?.date}});
 };
-const db=database(),settings={...env,GSIS_JOBS:db};
+const db=database();
+// A hook that runs before the next quiet-state SELECT completes, to simulate a slow D1 read.
+let beforeQuietRead=null;
+const gated={...db,prepare(sql){const statement=db.prepare(sql);if(!/^SELECT \* FROM gsis_quiet_mode/.test(sql))return statement;const wrap=st=>({...st,bind:(...args)=>wrap(st.bind(...args)),async first(){if(beforeQuietRead){const hook=beforeQuietRead;beforeQuietRead=null;await hook();}return st.first();}});return wrap(statement);}};
+const settings={...env,GSIS_JOBS:gated};
 
 assert.equal((await request(settings,'/api/quiet-mode',{method:'GET',signedIn:false})).status,401,'status requires sign-in');
 const initial=await request(settings,'/api/quiet-mode',{method:'GET'});
@@ -77,6 +81,13 @@ await sendDaily(crypto.randomUUID());assert.equal(await quietActive(),true,'a re
 await request(settings,'/api/quiet-mode',{body:{action:'off'}});
 duringBackend=async()=>{await pause();await request(settings,'/api/quiet-mode',{body:{action:'on'}});};
 await sendDaily(crypto.randomUUID());assert.equal(await quietActive(),true,'a request from before the session does not end it');
+// A session started while this request's quiet read is still in flight was not
+// active when the request arrived, so the request must not end it (Codex on bd2513d).
+await request(settings,'/api/quiet-mode',{body:{action:'off'}});
+await pause();
+const slow=sendDaily;let armed=true;
+beforeQuietRead=async()=>{if(!armed)return;armed=false;await pause();await request(settings,'/api/quiet-mode',{body:{action:'on'}});};
+await slow(crypto.randomUUID());assert.equal(await quietActive(),true,'a session started during the quiet read is not ended');
 await request(settings,'/api/quiet-mode',{body:{action:'off'}});
 
 await request(settings,'/api/quiet-mode',{body:{action:'on'}});

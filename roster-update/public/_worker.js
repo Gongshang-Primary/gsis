@@ -313,7 +313,7 @@ export default {async fetch(req,env,ctx){
    if(['autoAllocate','optimise'].includes(input.operation))await assertAbsenceTransportReady(env,[input.date||singaporeDate()],['autoAllocate','optimise'].includes(input.operation),who);
    const calendarOutput={};
    try{const stage=Date.now();input=await trustedOperationsInput(input,env,who,calendarOutput);calendarMs=Date.now()-stage;}catch(error){return json({ok:false,error:error.message},400)}
-   const quietEnds=Object.hasOwn(QUIET_END_OPERATIONS,input.operation),quietSession=quietEnds?await readQuietMode(env.GSIS_JOBS,requestStarted).then(q=>q.active?q.startedAt:0).catch(()=>0):0;
+   const quietEnds=Object.hasOwn(QUIET_END_OPERATIONS,input.operation),quietSession=quietEnds?await readQuietMode(env.GSIS_JOBS,requestStarted).then(q=>q.active&&q.startedAt<=requestStarted?q.startedAt:0).catch(()=>0):0;
    const value=input.operation==='timetableBatch'&&!edgeRosterEnabled(env)&&!backendAvailable(env)?await timetableSnapshot(env,input,who,traceId):await backend(env,action,input,who,traceId);backendMs=value.backendMs;
    // A confirmed publish or WhatsApp send ends quiet mode on the server, not in the browser.
    // Only work done now ends it: a replayed receipt (a retry, or a request from an
