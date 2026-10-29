@@ -14,23 +14,23 @@
 ## Rule
 1. Staff with employment SRE are ranked before every other candidate (priority 1, above "Lower annual R utilisation").
 2. SREs are not ranked or balanced by annual R%, weekly R remaining or R entitlement. Their relief does not need an R quota.
-3. Daily limits for an SRE (owner correction 30 Oct 2026): a maximum number of **relief periods per day** (school currently means 8) and the **consecutive-periods limit** (school currently means 6). **No numbers in code:** both come from Roster allocation settings. The consecutive limit reuses the existing `maxConsecutivePeriods` workload rule (`workloadRules`, editable and switchable in Settings). The relief-per-day limit is a new setting in the same place, e.g. `maxDailyReliefSRE` with its default taken from settings data, shown and editable beside the other workload limits, with the same 1 to 40 validation and On/Off toggle.
+3. Daily limits for an SRE: the **existing** Settings → Daily workload limits, unchanged: "Maximum total daily periods" (`maxDailyPeriods`) and "Maximum consecutive periods" (`maxConsecutivePeriods`) in `workloadRules`, which already count lessons, relief and invigilation once per period for every teacher (roster-settings-ui.js ~line 125). No new setting and no numbers in code. The owner sets the values in Settings (owner intent: 8 a day; consecutive per the existing setting). Since SREs usually have no timetabled lessons, the daily total is in practice their relief count.
 4. Among several eligible SREs: fewer periods already that day first, then the existing rotation order.
 5. Existing hard rules still apply to SREs: restricted periods for SRE (default 0, 13 to 16 in `defaultEmploymentRestrictions`), absence, clashes, protected/manual/peer cells.
 6. Non-SRE staff keep today's order and limits (school defaults: max 9 daily, max 6 consecutive).
 
 ## Current behaviour (source reading)
 - `preferenceRules` in shared/roster-allocation.js orders candidates: annualUtilisation, alternatives, weeklyRemaining, rotation, levelMatch, subjectMatch. No employment-based priority exists.
-- `workloadRules` sets school-wide limits: dailyTotal 9, consecutive 6. No per-employment limits.
+- `workloadRules` already provides the two school-wide limits (code defaults 9 and 6; the live values are whatever Settings holds). They already apply to SREs. The new part of this task is only the SRE priority and the removal of R% from SRE ranking.
 - SRE appears only in employment restrictions (restricted periods) and employment parsing (shared/relief.js).
 
 ## Open point for the owner
-- "No 6 consecutive": the existing rule "Maximum consecutive periods = 6" allows 6 in a row and blocks a 7th. If "no 6 consecutive" means at most 5 in a row, set that rule's value to 5 in Settings (no code change). Builder applies the setting exactly as configured.
+- Check Settings → Daily workload limits shows 8 for maximum total daily periods and the intended consecutive value; these apply to all staff, not only SREs.
 - R% displays for SREs: show "Daily roster, no R%" (proposed default) unless the owner says otherwise.
 
 ## Acceptance
 - With an SRE and a teacher with lower R% both free: the SRE is chosen.
-- SRE at the configured relief-per-day limit: not chosen. SRE at the configured consecutive limit ending at P: not chosen for P+1. Changing either setting changes the result with no code change (test both values).
+- SRE at the configured daily total: not chosen. SRE at the configured consecutive limit ending at P: not chosen for P+1. Changing either existing setting changes the result with no code change (test two values each).
 - Two SREs: the one with fewer periods today is chosen; tie goes to rotation.
 - Non-SRE allocation results unchanged on existing seeded tests (roster701-r17-solver oracle cases).
 - Manual, protected and peer assignments untouched.
