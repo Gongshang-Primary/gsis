@@ -6,6 +6,7 @@ Owner (Song Wee, 30 Oct): "it can be all, let codex work while i teach". Claude 
 |---|---|---|
 | 1 | roster-relief-auto-complete.md | R% shows 0 for everyone today |
 | 2 | (new) roster-assigned-by-label | PENDING_CHANGELOG "Assigned By shows the auto-allocator" |
+| 2b | roster-sre-daily-priority.md | Business rule: SRE priority 1, daily limits 8 / no 8 consecutive; owner answers 2 open points first |
 | 3 | roster-excel-relief-for-absent.md | Report Absence → Export Excel |
 | 4 | (new) roster-reminder-cheap-check | Skip the full operations read on published days until the next reminder is due (Claude note 2 on PR #7) |
 | 5 | (new) roster-delivery-time-format | PENDING_CHANGELOG "delivery time shows a raw number" |
