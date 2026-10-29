@@ -10,7 +10,8 @@ function harness(){
  const user={rosterSMC:false,rosterAdmin:false,rosterStaffId:'alice'},c={user,rosterPeople:f.people.map(p=>({...p,adhocEligible:true})),rosterSMCIds:[],rosterAdminIds:[]};
  const quota={from:entry.from,to:entry.to,rows:f.people.map(p=>({id:p.id,R:4})),source:{versionId:'deploy',commit:'current'},formClasses:[],teachingGroups:[]};
  class Clock extends Date{constructor(...v){super(...(v.length?v:[f.ctx.now]));}static now(){return f.ctx.now;}}
- const scope=vm.createContext({Date:Clock,GSISRosterOperations:f.O,GSISRosterAllocation:A,GSISRoster:R,ROSTER_DATA:'folder',props_:()=>({getProperty:k=>k==='ROSTER_OPERATIONS_FILE'?'ops':null}),
+ const properties=new Map([['ROSTER_OPERATIONS_FILE','ops']]),props_=()=>({getProperty:key=>properties.get(key)||null,setProperty:(key,value)=>properties.set(key,value),deleteProperty:key=>properties.delete(key)});
+ const scope=vm.createContext({Date:Clock,GSISRosterOperations:f.O,GSISRosterAllocation:A,GSISRoster:R,ROSTER_DATA:'folder',props_,
   rosterReadFile_:()=>{counts.state++;events.push('state');return JSON.stringify(stored);},rosterIndex_:()=>{counts.register++;events.push('register');return {revision:1,entries:[entry]};},rosterModel_:()=>{counts.model++;events.push('model');return clone(model);},
   error_:(status,message)=>{throw Object.assign(Error(message),{status});},LockService:{getScriptLock:()=>({})},deployLock_:()=>{assert(!locked);locked=true;events.push('lock');return true;},deployUnlock_:()=>{assert(locked);locked=false;events.push('unlock');},
   deployPhase_:(_,fn)=>fn(),Utilities:{DigestAlgorithm:{SHA_256:'sha256'},computeDigest:(_,s)=>[...crypto.createHash('sha256').update(s).digest()],getUuid:()=> 'fixture-'+(++seq),formatDate:(_,tz,format)=>format==='yyyy-MM-dd'?f.date:format==='HH'?'06':'00'},

@@ -43,8 +43,21 @@ assert.equal((await request(settings,'/api/quiet-mode',{body:{action:'maybe'}}))
 backendOps=[];
 await M.default.fetch(new Request(env.ROSTER_PUBLIC_ORIGIN+'/api/operations',{method:'POST',headers:{Origin:env.ROSTER_PUBLIC_ORIGIN,'Content-Type':'application/json',Cookie:cookie()},body:JSON.stringify({operation:'notifyDaily',date:'2026-10-30',view:'allocation',compact:true,requestId:crypto.randomUUID()})}),settings);
 const after=await request(settings,'/api/quiet-mode',{method:'GET'});
-if(backendOps.includes('notifyDaily')){assert.equal(after.body.data.active,false,'a confirmed WhatsApp send ends quiet mode on the server');assert.equal(after.body.data.endReason,'whatsapp-sent');}
+if(backendOps.includes('notifyDaily')){assert.equal(after.body.data.active,false,'a confirmed WhatsApp send ends quiet mode on the server');assert.equal(after.body.data.endReason,'whatsapp-queued');}
 else assert.fail('notifyDaily did not reach the backend fixture: '+JSON.stringify(backendOps));
+
+const sendDaily=requestId=>M.default.fetch(new Request(env.ROSTER_PUBLIC_ORIGIN+'/api/operations',{method:'POST',headers:{Origin:env.ROSTER_PUBLIC_ORIGIN,'Content-Type':'application/json',Cookie:cookie()},body:JSON.stringify({operation:'notifyDaily',date:'2026-10-30',view:'allocation',compact:true,requestId})}),settings);
+// Session A: request R1 is bound to A. A newer session B must survive a replay of R1.
+const r1=crypto.randomUUID();
+await request(settings,'/api/quiet-mode',{body:{action:'on'}});
+await sendDaily(r1);
+assert.equal((await request(settings,'/api/quiet-mode',{method:'GET'})).body.data.active,false,'R1 ends session A');
+await new Promise(resolve=>setTimeout(resolve,5));
+await request(settings,'/api/quiet-mode',{body:{action:'on'}});
+await sendDaily(r1);
+assert.equal((await request(settings,'/api/quiet-mode',{method:'GET'})).body.data.active,true,'a replay of R1 leaves session B on');
+await sendDaily(crypto.randomUUID());
+assert.equal((await request(settings,'/api/quiet-mode',{method:'GET'})).body.data.active,false,'a new request in session B ends it');
 
 await request(settings,'/api/quiet-mode',{body:{action:'on'}});
 const off=await request(settings,'/api/quiet-mode',{body:{action:'off'}});

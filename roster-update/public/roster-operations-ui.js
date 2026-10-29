@@ -549,7 +549,8 @@ var RosterOpsUI = (() => {
    if(!Array.isArray(value?.entries))return;
    s.intakeAuthDenied=false;s.intakeEntries=value.entries;s.intakeTotal=value.total;s.intakeHasMore=value.hasMore;s.intakeError=false;const captured=value.entries.find(entry=>entry.requestId===s.acceptedIntakeId);if(captured&&s.formDraft?.submitted&&!s.dirty){const withdrawn=captured.intakeState==='withdrawn',message=withdrawn?intakeSummary(captured)+' Review the explanation below or contact SMC.':'Absence report received. You do not need to submit again. '+intakeSummary(captured);s.acceptedReportWithdrawn=withdrawn;if(message!==s.acceptedReportMessage){s.acceptedReportMessage=message;say(s,message,withdrawn,!withdrawn);}if(captured.absenceApplied&&captured.savedIds?.length&&JSON.stringify(s.savedIds)!==JSON.stringify(captured.savedIds)){s.savedIds=captured.savedIds;if(!s.busy&&!s.reading&&!modal)void reload(s,false,false,true);}}
   }catch(error){if(isLive(s)&&ticket===s.intakeTicket&&date===s.date){s.intakeError=true;if(error.status===401||error.status===403){s.intakeAuthDenied=true;if(s.intakeBatch)s.intakeBatch.cancelled=true;s.intakeEntries=[];}}}
-  finally{if(isLive(s)&&ticket===s.intakeTicket&&date===s.date){s.intakeLoading=false;drawIntake(s);if(s.intakeEntries?.some(e=>e.intakeState==='pending'))s.intakeTimer=setTimeout(()=>refreshIntake(s),15000);}}
+  finally{if(isLive(s)&&ticket===s.intakeTicket&&date===s.date){s.intakeLoading=false;drawIntake(s);// The all-dates review list is wider and less urgent than a single day's queue.
+  if(s.intakeEntries?.some(e=>e.intakeState==='pending'))s.intakeTimer=setTimeout(()=>refreshIntake(s),s.page==='Absences by Date'?60000:15000);}}
  }
  function acceptIntakeReceipt(s,task,receipt){
   if(receipt.accepted!==true||receipt.receiptOnly!==true||receipt.requestId!==task.payload.requestId||!Array.isArray(receipt.savedIds)||!['pending','applied','needsReview','withdrawn'].includes(receipt.intakeState))throw Error('Save confirmation is unavailable. Retry the same save.');
@@ -688,7 +689,7 @@ var RosterOpsUI = (() => {
  }
  function scheduleAllocationCheck(s){
   if(!isLive(s)||s.page!=='Assign Relief'||s.pollTimer)return;
-  s.pollTimer=setTimeout(async()=>{s.pollTimer=null;try{await refreshAllocationVersion(s);}finally{scheduleAllocationCheck(s);}},s.pollFailed?60000:allocationRunning(s.allocationRun)||s.autoStarting?5000:20000);
+  s.pollTimer=setTimeout(async()=>{s.pollTimer=null;try{await refreshAllocationVersion(s);if(isLive(s)&&s.page==='Assign Relief'){if(!document.hidden)await refreshQuiet(s);if(isLive(s))drawQuiet(s);}}finally{scheduleAllocationCheck(s);}},s.pollFailed?60000:allocationRunning(s.allocationRun)||s.autoStarting?5000:20000);
  }
  function allocationClockChanged(s,current,next){
   if(!current||!next||current===next)return false;
@@ -1286,9 +1287,11 @@ var RosterOpsUI = (() => {
  // Quiet mode pauses lock-heavy background jobs while SMCs allocate. The Worker
  // ends it after a confirmed publish or WhatsApp send, at 07:15, or after 30 minutes.
  const quietTime=value=>new Date(value).toLocaleTimeString('en-SG',{hour:'2-digit',minute:'2-digit',hour12:false,timeZone:'Asia/Singapore'});
- function quietText(q){return q?.active?'Quiet mode on: background jobs paused until '+quietTime(q.expiresAt)+' or until published':'Quiet mode off';}
+ // Treat a passed expiry as off locally; the next refresh confirms it.
+ const quietActive=q=>!!q?.active&&!(Number(q.expiresAt)<=Date.now());
+ function quietText(q){return quietActive(q)?'Quiet mode on: background jobs paused until '+quietTime(q.expiresAt)+' or until published':'Quiet mode off';}
  function drawQuiet(s){
-  const button=$(s,'[data-quiet-toggle]'),note=$(s,'[data-quiet-note]'),user=s.ctx.profile?.user,active=!!s.quiet?.active;if(!button)return;
+  const button=$(s,'[data-quiet-toggle]'),note=$(s,'[data-quiet-note]'),user=s.ctx.profile?.user,active=quietActive(s.quiet);if(!button)return;
   button.hidden=!(user?.smc||user?.admin);button.textContent=active?'End quiet mode':'Quiet mode';button.setAttribute('aria-pressed',String(active));button.title=quietText(s.quiet);
   if(note){note.hidden=!active;note.textContent=active?quietText(s.quiet)+'. New absence reports and WhatsApp keep running.':'';}
  }
@@ -1299,7 +1302,7 @@ var RosterOpsUI = (() => {
  }
  async function toggleQuiet(s){
   const button=$(s,'[data-quiet-toggle]');if(!button||button.disabled)return;button.disabled=true;
-  try{const value=await s.ctx.api('quiet-mode',{action:s.quiet?.active?'off':'on'});s.quiet=value?.data??value;s.quietCheckedAt=Date.now();say(s,quietText(s.quiet)+'.');}
+  try{const value=await s.ctx.api('quiet-mode',{action:quietActive(s.quiet)?'off':'on'});s.quiet=value?.data??value;s.quietCheckedAt=Date.now();say(s,quietText(s.quiet)+'.');}
   catch(error){say(s,error.message||'Quiet mode could not be changed.',true);}
   finally{if(isLive(s)){button.disabled=false;drawQuiet(s);}}
  }

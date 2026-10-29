@@ -34,6 +34,7 @@ async function activate(db,scope,state){
 const today='2026-10-26',realNow=Date.now,realFetch=globalThis.fetch,realInfo=console.info,realWarn=console.warn,realError=console.error;
 let now=Date.parse(today+'T07:01:00+08:00');Date.now=()=>now;
 const db=database(),objectCalls={gets:0,puts:0},networkCalls=[],queueCalls=[],serviceCalls=[];
+let onService=null;
 try{
  const state=O.initial();state.systemConfig.scheduledAllocationEnabled=true;
  // Handled delivery failures remain in the private history after their alerts
@@ -78,7 +79,7 @@ try{
   const url=String(input),request=JSON.parse(init.body);networkCalls.push(url);
   if(url===env.CALENDAR_APPS_SCRIPT_URL){const dates=request.payload.dates||[request.payload.date],values=dates.map(date=>({date,schoolDay:true,parity:'odd'}));return Response.json({ok:true,result:request.action==='rosterDates'?{dates:values}:values[0]});}
   assert.equal(url,env.APPS_SCRIPT_URL,'recovery calls only its existing Google Roster/Calendar adapters');
-  const command=JSON.parse(request.payload);assert.equal(command.action,'rosterService');serviceCalls.push(command.input.operation);
+  const command=JSON.parse(request.payload);assert.equal(command.action,'rosterService');serviceCalls.push(command.input.operation);if(onService)await onService(command.input.operation);
   const responses={nextAbsenceIntake:{job:null},claimNotifications:{transportVersion:2,notifications:[]},sendPeerMail:{sent:0},inboxPendingDispatch:{replies:[],alerts:[]},scheduledRoster:{idle:true,notificationsQueued:0}};
   assert(Object.hasOwn(responses,command.input.operation),'noncritical job must not run: '+command.input.operation);return Response.json({ok:true,data:responses[command.input.operation]});
  };
@@ -121,6 +122,17 @@ try{
   serviceCalls.length=0;const auditPending=[];
   await worker.scheduled({cron:'2-57/5 * * * *',scheduledTime:now},env,{waitUntil(promise){auditPending.push(promise);}});await Promise.all(auditPending);
   assert.deepEqual(serviceCalls,[],'quiet mode skips the audit export lane');
+ }
+ // Quiet mode switched on while the received-report drain runs still stops
+ // the deferred peer-mail and allocation lanes of that same tick.
+ {
+  const {endQuietMode,startQuietMode}=await moduleAt('shared/roster-quiet-mode.js');
+  now=Date.parse(today+'T06:52:00+08:00');await endQuietMode(db,'smc@gsps.edu.sg','manual',now);
+  onService=async operation=>{if(operation==='nextAbsenceIntake')await startQuietMode(db,'smc@gsps.edu.sg',now);};
+  serviceCalls.length=0;const pending=[];console.info=()=>{};
+  await worker.scheduled({cron:'* * * * *',scheduledTime:now},env,{waitUntil(promise){pending.push(promise);}});await Promise.all(pending);console.info=realInfo;onService=null;
+  assert(serviceCalls.includes('nextAbsenceIntake'),'the received-report drain ran');
+  assert(!serviceCalls.includes('scheduledRoster')&&!serviceCalls.includes('sendPeerMail'),'quiet mode enabled mid-tick stops deferred allocation and peer mail: '+JSON.stringify(serviceCalls));
  }
  console.log('PASS recovery minute cron: critical Google lanes run, retained D1 history remains unread and unchanged, no migrated queue/R2 jobs, explicit private idle helpers remain bounded.');
 }finally{

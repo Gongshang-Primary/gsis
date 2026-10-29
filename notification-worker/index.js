@@ -89,10 +89,13 @@ export default {
    const notifications=send();
    const inbox=run('inbox','roster-inbox-dispatch',()=>dispatchInboxPending(env));
    const ingress=env.WHATSAPP_DURABLE_INGRESS==='true'?run('webhook','roster-webhook-drain',()=>dispatchWebhookJobs(env)):Promise.resolve();
-   const peerMail=(async()=>{await received;return quiet.active?null:run('peer-mail','roster-peer-mail-drain',()=>dispatchPeerMail(env));})();
+   // Re-read quiet mode after the received-report drain: an SMC may have turned
+   // it on while that drain was running. Jobs already started run to completion.
+   const quietNow=()=>readQuietMode(env.GSIS_JOBS,Date.now()).then(q=>q.active).catch(()=>quiet.active);
+   const peerMail=(async()=>{await received;return await quietNow()?null:run('peer-mail','roster-peer-mail-drain',()=>dispatchPeerMail(env));})();
    const planning=(async()=>{
     const receiptResult=await received;
-    const result=quiet.active?null:await run('allocation','roster-scheduled-cycle',()=>scheduledRoster(env,event.scheduledTime));
+    const result=await quietNow()?null:await run('allocation','roster-scheduled-cycle',()=>scheduledRoster(env,event.scheduledTime));
     // Reuse the same durable outbox. Never reconstruct or reset provider claims.
     if(result?.notificationsQueued>0||receiptResult?.intake?.notificationsQueued>0){await notifications;await send();}
    })();
