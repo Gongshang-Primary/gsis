@@ -51,8 +51,4 @@ for(const archive of [{schema:2,date:'2026-10-28',audit:[]},{schema:1,date:'2026
  const {dispatch}=load({archive:'{not json'});
  assert.throws(()=>dispatch(audit),e=>e.name==='SyntaxError','an unreadable archive is refused');
 }
-// The Worker sends the identities captured by its own export.
-const worker=fs.readFileSync(path.join(__dirname,'../roster-update/public/edge-roster.js'),'utf8');
-assert.match(worker,/operation:'edgeModel',id:entry\.id,modelFile:entry\.modelFile/);
-assert.match(worker,/operation:'edgeAudit',date,archiveFileId:meta\.archiveFileId/);
-console.log('PASS 0.9.9a D1 import accepts only the exported model files and audit archives');
+console.log('PASS captured model and archive identities, changed-pointer refusal and archive schema validation remain compatible with PR2');

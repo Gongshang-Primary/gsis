@@ -16,7 +16,7 @@ function wrapper(entries){
   entries.map(([name,file])=>`const ${name}=(()=>{const module={exports:{}};const require=sharedRequire;\n${fs.readFileSync(path.join(root,'shared',file),'utf8')}\nreturn module.exports;})();\n`).join('\n')+
   `export {${names.join(',')}};\n`;
 }
-for(const folder of ['public','roster-update/public'])fs.writeFileSync(path.join(root,folder,'edge-store.js'),wrapper([['GSiSEdgeStore','edge-store.js']]));
+for(const folder of ['public','roster-update/public'])fs.writeFileSync(path.join(root,folder,'edge-store.js'),wrapper([['GSiSEdgeStore','edge-store.js'],['GSiSRosterImport','roster-import.js']]));
 fs.writeFileSync(path.join(root,'roster-update/public/edge-roster-domain.js'),wrapper(roster));
 // Both gateways use the same published Deploy authority; no cross-origin callback.
 for(const file of ['edge-deploy.js','edge-deploy-domain.js','edge-deploy-sha256.js']){

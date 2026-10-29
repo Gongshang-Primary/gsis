@@ -2726,7 +2726,7 @@ function rosterModelResponse_(entry,p){const known=Array.isArray(p.knownModelIds
 function rosterFile_(folderId,name,blob){return rosterFindFile_(folderId,name)||rosterCreateFile_(folderId,name,blob);}
 function rosterInput_(fn){try{return fn()}catch(e){error_(400,e.message)}}
 function rosterDispatch_(req,c){gsisRequireBackendRole_('roster');
- if(!['edgeExport','edgeModel','edgeFence','edgeReferences','edgeContactCreate','edgeAudit'].includes(req.input?.operation)&&typeof rosterEdgeAssertLegacyWrite_==='function')rosterEdgeAssertLegacyWrite_();
+ if(!['edgeExport','edgeExportManifest','edgeExportPart','edgeModel','edgeFence','edgeReferences','edgeContactCreate','edgeAudit'].includes(req.input?.operation)&&typeof rosterEdgeAssertLegacyWrite_==='function')rosterEdgeAssertLegacyWrite_();
  if(typeof c?.user?.rosterSMC!=='boolean'){
   if(typeof deployTrace_!=='undefined'&&deployTrace_)deployTrace_.phase='contacts-authority';
   error_(503,'Contacts did not return verified Roster authority. Update the existing Contacts web app deployment.');
@@ -9790,7 +9790,9 @@ function rosterEdgeReferences_(c,adminVerified){
  return {contacts,adminVerified:adminVerified===true,contactsSource:rosterOperationsDigest_(contacts),checkedAt:new Date().toISOString()};
 }
 function rosterEdgeMigrationDispatch_(req,c){
- const p=req.input||{},op=p.operation;if(!['edgeExport','edgeModel','edgeFence','edgeReferences','edgeContactCreate','edgeAudit'].includes(op))return null;if(op==='edgeContactCreate'){if(!c?.user?.rosterSMC&&!c?.user?.rosterAdmin)error_(403,'SMC or Admin access is required.');}else rosterEdgeAdmin_(c);
+ const p=req.input||{},op=p.operation;if(!['edgeExport','edgeExportManifest','edgeExportPart','edgeModel','edgeFence','edgeReferences','edgeContactCreate','edgeAudit'].includes(op))return null;if(op==='edgeContactCreate'){if(!c?.user?.rosterSMC&&!c?.user?.rosterAdmin)error_(403,'SMC or Admin access is required.');}else rosterEdgeAdmin_(c);
+ if(op==='edgeExportManifest')return {handled:true,result:rosterEdgeExportManifest_(req)};
+ if(op==='edgeExportPart')return {handled:true,result:rosterEdgeExportPart_(req)};
  if(op==='edgeReferences')return {handled:true,result:rosterEdgeReferences_(c,true)};
  if(op==='edgeContactCreate'){const created=contacts_(req.identity,false,'rosterContactCreate',{name:p.name,mobile:p.mobile,employment:p.employment,modifier:p.modifier,requestId:p.requestId,confirmDistinct:p.confirmDistinct}),fresh=rosterServiceContacts_();return {handled:true,result:{...created,references:rosterEdgeReferences_(fresh.c,false)}};}
  if(op==='edgeAudit'){/* 0.9.9a: archives are written once; read the archive reference without re-fingerprinting the whole Roster. Activation still re-checks the exact source digest under the writer fence. */if(typeof p.archiveFileId!=='string'||!p.archiveFileId)error_(400,'Reload the Roster import page and import again.');const date=GSISRosterOperations.date(p.date),id=rosterOperationsState_(true).allocationAuditExports?.[date]?.archiveFileId;if(!id)error_(404,'Audit archive not found.');if(id!==p.archiveFileId)error_(409,'An audit archive changed during import. Import again.');const archive=JSON.parse(rosterReadFile_(id));if(archive.schema!==1||archive.date!==date||!Array.isArray(archive.audit))error_(503,'The allocation audit archive is invalid.');return {handled:true,result:archive};}
@@ -9807,6 +9809,80 @@ function rosterEdgeServiceMigrationDispatch_(req){
  if(op==='edgeFenceStatus')return {handled:true,result:{legacyWritesDisabled:props_().getProperty('ROSTER_EDGE_AUTHORITY')==='d1',sourceDigest:props_().getProperty('ROSTER_EDGE_SOURCE_DIGEST')||null}};
  return null;
 }
+
+/* One request owns one immutable snapshot. A failed upload cannot be recaptured
+ * under the same identity: missing frozen bytes require an explicit restart. */
+function rosterEdgeExportHash_(value){return Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256,typeof value==='string'?Utilities.newBlob(value).getBytes():value).map(n=>(n&255).toString(16).padStart(2,'0')).join('');}
+function rosterEdgeExportBinding_(req){
+ const p=req.input||{},actor=req.identity?.email,requestId=p.requestId;
+ if(typeof actor!=='string'||!actor||typeof requestId!=='string'||!requestId||requestId.length>200||/[\u0000-\u001f]/.test(requestId))error_(400,'An actor and stable import request ID are required.');
+ const sessionId=rosterEdgeExportHash_(JSON.stringify([actor,requestId]));if(p.sessionId!==undefined&&p.sessionId!==sessionId)error_(409,'The export session belongs to another actor or request.');
+ if(Object.keys(p).some(key=>!['operation','requestId','sessionId','partId'].includes(key)))error_(400,'Export file IDs and byte ranges are selected only by the backend.');return {actor,requestId,sessionId};
+}
+function rosterEdgeExportSave_(descriptor){props_().setProperty('ROSTER_EDGE_EXPORT:'+descriptor.sessionId,JSON.stringify(descriptor));}
+function rosterEdgeExportDescriptor_(binding){const raw=props_().getProperty('ROSTER_EDGE_EXPORT:'+binding.sessionId);if(!raw)return null;const descriptor=JSON.parse(raw);if(descriptor.actor!==binding.actor||descriptor.requestId!==binding.requestId||descriptor.sessionId!==binding.sessionId)error_(409,'The export session identity does not match.');return descriptor;}
+function rosterEdgeExportRange_(id,offset,bytes,total){
+ if(!Number.isSafeInteger(offset)||!Number.isSafeInteger(bytes)||bytes<1||bytes>GSiSRosterImport.MAX_PART_BYTES||offset<0||offset+bytes>total)error_(503,'The immutable export range is invalid.');
+ const response=rosterDriveRequest_('https://www.googleapis.com/drive/v3/files/'+encodeURIComponent(id)+'?supportsAllDrives=true&alt=media',{headers:{Range:'bytes='+offset+'-'+(offset+bytes-1)}},'immutable-export-part'),headers=response.getAllHeaders(),key=Object.keys(headers).find(key=>key.toLowerCase()==='content-range'),value=response.getContent();
+ if(response.getResponseCode()!==206||headers[key]!=='bytes '+offset+'-'+(offset+bytes-1)+'/'+total||value.length!==bytes)error_(503,'Drive did not return the exact bounded export range. No import progress was saved.');return Utilities.newBlob(value).getDataAsString('UTF-8');
+}
+function rosterEdgeExportHeader_(descriptor,fileId){
+ const metadata=rosterDriveJson_(rosterDriveRequest_('https://www.googleapis.com/drive/v3/files/'+encodeURIComponent(fileId)+'?supportsAllDrives=true&fields=id,size,parents,trashed',{},'immutable-export-metadata'),'immutable-export-metadata');
+ if(Number(metadata.size)!==descriptor.totalBytes||metadata.trashed||!metadata.parents?.includes(ROSTER_DATA))error_(503,'The immutable export container length or private folder changed.');
+ const prefix=rosterEdgeExportRange_(fileId,0,9,descriptor.totalBytes);if(!/^\d{8}\n$/.test(prefix)||Number(prefix.slice(0,8))!==descriptor.headerBytes||descriptor.headerBytes>GSiSRosterImport.MAX_MANIFEST_BYTES+200)error_(503,'The immutable export header is invalid.');
+ const header=JSON.parse(rosterEdgeExportRange_(fileId,9,descriptor.headerBytes,descriptor.totalBytes)),manifest=header.manifest;
+ GSiSRosterImport.validateManifest(manifest);if(rosterEdgeExportHash_(JSON.stringify(manifest))!==descriptor.manifestDigest||header.manifestDigest!==descriptor.manifestDigest||manifest.sourceDigest!==descriptor.sourceDigest||manifest.sessionId!==descriptor.sessionId||manifest.actor!==descriptor.actor||manifest.requestId!==descriptor.requestId||9+descriptor.headerBytes+manifest.totalBytes!==descriptor.totalBytes)error_(503,'The immutable export header does not match the frozen source.');return header;
+}
+function rosterEdgeExportFind_(descriptor){
+ const folder=rosterFolder_(ROSTER_DATA),quote=value=>String(value).replace(/\\/g,'\\\\').replace(/'/g,"\\'"),query="'"+quote(ROSTER_DATA)+"' in parents and name = '"+quote(descriptor.name)+"' and trashed = false",url='https://www.googleapis.com/drive/v3/files?supportsAllDrives=true&includeItemsFromAllDrives=true&pageSize=20&fields='+encodeURIComponent('files(id,size),nextPageToken,incompleteSearch')+'&q='+encodeURIComponent(query)+(folder.driveId?'&corpora=drive&driveId='+encodeURIComponent(folder.driveId):'&corpora=user'),result=rosterDriveJson_(rosterDriveRequest_(url,{},'immutable-export-recovery'),'immutable-export-recovery');
+ if(!Array.isArray(result.files)||result.nextPageToken||result.incompleteSearch||result.files.length>20)error_(503,'The immutable export recovery listing is incomplete.');const verified=[];
+ for(const file of result.files){if(Number(file.size)!==descriptor.totalBytes)continue;try{const header=rosterEdgeExportHeader_(descriptor,file.id);verified.push({id:file.id,header});}catch(error){if(error.status!==503)throw error;}}
+ if(verified.length>1)error_(409,'More than one verified export container exists. Retain this session for administrator review.');return verified[0]||null;
+}
+function rosterEdgeExportReply_(descriptor,header){return {adminVerified:true,sessionId:descriptor.sessionId,requestId:descriptor.requestId,sourceDigest:descriptor.sourceDigest,...(descriptor.state==='ready'?{manifest:header.manifest,manifestDigest:descriptor.manifestDigest}:descriptor.state==='failed'?{preparationFailed:true,requiresRestart:true,message:'The frozen bytes are incomplete or unavailable. Retain this session and restart with a new request ID.'}:{preparing:true,retryAfterMs:2000})};}
+function rosterEdgeExportObject_(id){
+ const metadata=rosterDriveJson_(rosterDriveRequest_('https://www.googleapis.com/drive/v3/files/'+encodeURIComponent(id)+'?supportsAllDrives=true&fields=id,size,trashed',{},'immutable-object-metadata'),'immutable-object-metadata');
+ if(metadata.trashed||!Number.isSafeInteger(Number(metadata.size))||Number(metadata.size)>GSiSRosterImport.MAX_OBJECT_BYTES)error_(413,'A captured object exceeds the supported 32 MiB source-object bound.');const raw=rosterReadFile_(id);if(Utilities.newBlob(raw).getBytes().length!==Number(metadata.size))error_(409,'A captured immutable object changed during preparation.');return JSON.parse(raw);
+}
+function rosterEdgeExportResume_(binding,descriptor){
+ if(descriptor.state==='failed')return rosterEdgeExportReply_(descriptor);
+ if(descriptor.state==='ready')return rosterEdgeExportReply_(descriptor,rosterEdgeExportHeader_(descriptor,descriptor.fileId));
+ if(Date.now()<descriptor.leaseUntil)return rosterEdgeExportReply_(descriptor);
+ // Immutable network reads can be slow. They must not hold the production
+ // writer lock; the short commit below rechecks the exact descriptor instead.
+ const recovered=descriptor.manifestDigest?rosterEdgeExportFind_(descriptor):null,script=LockService.getScriptLock();if(!deployLock_(script,8000))error_(503,'A Roster save is finishing. Retry the same import.');let current;
+ try{
+  current=rosterEdgeExportDescriptor_(binding);if(!current)error_(409,'The retained export descriptor is unavailable.');
+  const same=['actor','requestId','sessionId','sourceDigest','manifestDigest','totalBytes','headerBytes','name','leaseUntil'].every(key=>current[key]===descriptor[key]);
+  if(current.state==='preparing'&&same&&Date.now()>=current.leaseUntil){current={...current,state:recovered?'ready':'failed',...(recovered?{fileId:recovered.id}:{})};rosterEdgeExportSave_(current);}
+ }finally{deployUnlock_(script);}
+ // A concurrent verifier may have made the session ready while our listing was
+ // stale. Its durable ready result wins; never downgrade it to failed.
+ if(current.state==='ready'){const header=recovered?.id===current.fileId&&current.manifestDigest===descriptor.manifestDigest?recovered.header:rosterEdgeExportHeader_(current,current.fileId);return rosterEdgeExportReply_(current,header);}
+ return rosterEdgeExportReply_(current);
+}
+
+function rosterEdgeExportManifest_(req){
+ const binding=rosterEdgeExportBinding_(req),script=LockService.getScriptLock();if(!deployLock_(script,8000))error_(503,'A Roster save is finishing. Retry the same import.');let user,snapshot,descriptor,created=false;
+ try{
+  descriptor=rosterEdgeExportDescriptor_(binding);if(!descriptor){
+  if(Object.keys(props_().getProperties()).filter(key=>key.startsWith('ROSTER_EDGE_EXPORT:')).length>=GSiSRosterImport.MAX_RETAINED_SESSIONS)error_(409,'Preparation has eight retained sessions. Reviewed archival and cleanup are required before a new capture; existing sessions remain resumable.');
+  rosterEdgeAssertLegacyWrite_();user=typeof rosterNotificationLock_==='function'?rosterNotificationLock_():LockService.getUserLock();if(!deployLock_(user,8000))error_(503,'Notification delivery is finishing. Retry the same import.');
+  descriptor={...binding,state:'preparing',sourceDigest:null,createdAt:Date.now(),leaseUntil:Date.now()+600000,name:'Roster immutable import '+binding.sessionId+'.bin'};rosterEdgeExportSave_(descriptor);created=true;
+  snapshot=rosterEdgeSnapshot_();descriptor.sourceDigest=snapshot.sourceDigest;rosterEdgeExportSave_(descriptor);
+  }
+ }catch(error){if(created){descriptor.state='failed';rosterEdgeExportSave_(descriptor);}throw error;}finally{if(user)deployUnlock_(user);deployUnlock_(script);}
+ if(!created)return rosterEdgeExportResume_(binding,descriptor);
+ let uploadStarted=false;
+ try{
+  snapshot.state=GSISRosterOperations.validateState(snapshot.state);
+  const frozen=GSiSRosterImport.freeze(snapshot,binding,{hash:rosterEdgeExportHash_,gzip:value=>Utilities.gzip(Utilities.newBlob(value,'application/json')).getBytes(),base64:bytes=>Utilities.base64Encode(bytes),readModel:entry=>GSISRoster.validate(rosterEdgeExportObject_(entry.modelFile)),readArchive:(date,id)=>{const archive=rosterEdgeExportObject_(id);if(archive.schema!==1||archive.date!==date||!Array.isArray(archive.audit))error_(503,'The captured allocation audit archive is invalid.');return archive;}}),header=JSON.stringify({manifest:frozen.manifest,manifestDigest:frozen.manifestDigest}),headerBytes=Utilities.newBlob(header).getBytes().length;
+  Object.assign(descriptor,{manifestDigest:frozen.manifestDigest,headerBytes,totalBytes:9+headerBytes+frozen.manifest.totalBytes});rosterEdgeExportSave_(descriptor);
+  const container=String(headerBytes).padStart(8,'0')+'\n'+header+frozen.parts.join('');uploadStarted=true;const fileId=rosterCreateFile_(ROSTER_DATA,descriptor.name,Utilities.newBlob(container,'application/octet-stream')),verified=rosterEdgeExportHeader_(descriptor,fileId);
+  Object.assign(descriptor,{state:'ready',fileId});rosterEdgeExportSave_(descriptor);return rosterEdgeExportReply_(descriptor,verified);
+ }catch(error){if(!uploadStarted){descriptor.state='failed';rosterEdgeExportSave_(descriptor);}throw error;}
+}
+function rosterEdgeExportPart_(req){const binding=rosterEdgeExportBinding_(req),descriptor=rosterEdgeExportDescriptor_(binding);if(!descriptor||descriptor.state!=='ready')error_(409,'The immutable export is not ready. Resume its manifest request.');const header=rosterEdgeExportHeader_(descriptor,descriptor.fileId),part=header.manifest.parts.find(row=>row.id===req.input.partId);if(!part)error_(404,'The immutable export part is not in this session.');const payload=rosterEdgeExportRange_(descriptor.fileId,9+descriptor.headerBytes+part.offset,part.bytes,descriptor.totalBytes);if(rosterEdgeExportHash_(payload)!==part.digest)error_(503,'The immutable export part failed its digest check.');return {adminVerified:true,sessionId:binding.sessionId,manifestDigest:descriptor.manifestDigest,partId:part.id,payload};}
 
 /* GSIS_ROSTER_EDGE_MIGRATION_END */
 
@@ -9912,3 +9988,351 @@ function rosterTimetablePreparationDispatch_(req,c){
 }
 
 /* GSIS_ROSTER_TIMETABLE_PREPARATION_END */
+
+/* GSIS_EDGE_STORE_BEGIN */
+/* D1 owns records, revisions and receipts together. Domain rules remain in callers. */
+var GSiSEdgeStore=(()=>{
+ const SCHEMA=`CREATE TABLE IF NOT EXISTS gsis_edge_heads (
+ scope TEXT PRIMARY KEY, revision INTEGER NOT NULL DEFAULT 0 CHECK(revision >= 0),
+ mode TEXT NOT NULL DEFAULT 'legacy' CHECK(mode IN ('legacy','imported','active','paused')),
+ write_token TEXT NOT NULL DEFAULT '', updated_at INTEGER NOT NULL,
+ source_digest TEXT NOT NULL DEFAULT '', imported_records INTEGER NOT NULL DEFAULT 0,
+ metadata_json TEXT NOT NULL DEFAULT '{}', schema_version INTEGER NOT NULL DEFAULT 1 CHECK(schema_version = 1));
+CREATE TABLE IF NOT EXISTS gsis_edge_records (
+ scope TEXT NOT NULL REFERENCES gsis_edge_heads(scope) ON DELETE CASCADE, collection TEXT NOT NULL,
+ record_id TEXT NOT NULL, position INTEGER NOT NULL DEFAULT 0, record_date TEXT NOT NULL DEFAULT '',
+ value_json TEXT NOT NULL, revision INTEGER NOT NULL, PRIMARY KEY(scope,collection,record_id));
+CREATE INDEX IF NOT EXISTS gsis_edge_records_date ON gsis_edge_records(scope,collection,record_date,record_id);
+CREATE INDEX IF NOT EXISTS gsis_edge_dispatch_outbox ON gsis_edge_records(scope,collection,record_id)
+ WHERE collection='outbox' AND record_id<>'$' AND (COALESCE(json_extract(value_json,'$.status'),'') NOT IN ('sent','cancelled','superseded','expired') OR (json_extract(value_json,'$.deliveryStatus') IN ('delivered','read') AND json_extract(value_json,'$.status')<>'sent'));
+CREATE INDEX IF NOT EXISTS gsis_edge_dispatch_inbox_messages ON gsis_edge_records(scope,collection,record_id)
+ WHERE collection='inboxMessages' AND record_id<>'$' AND json_extract(value_json,'$.direction')='outbound' AND json_extract(value_json,'$.status') IN ('queued','sending');
+CREATE INDEX IF NOT EXISTS gsis_edge_dispatch_inbox_alerts ON gsis_edge_records(scope,collection,record_id)
+ WHERE collection='inboxAlerts' AND record_id<>'$' AND json_extract(value_json,'$.status') IN ('queued','sending');
+CREATE INDEX IF NOT EXISTS gsis_edge_dispatch_peer_mail ON gsis_edge_records(scope,collection,record_id)
+ WHERE collection='peerMail' AND record_id<>'$' AND COALESCE(json_extract(value_json,'$.status'),'') NOT IN ('sent','cancelled');
+CREATE INDEX IF NOT EXISTS gsis_edge_dispatch_peer_requests ON gsis_edge_records(scope,collection,CAST(json_extract(value_json,'$.expiresAt') AS REAL),json_extract(value_json,'$.date'))
+ WHERE collection='requests' AND record_id<>'$' AND json_extract(value_json,'$.status')='pending';
+CREATE INDEX IF NOT EXISTS gsis_edge_dispatch_peer_alerts ON gsis_edge_records(scope,collection,json_extract(value_json,'$.key'))
+ WHERE collection='smcAlerts' AND record_id<>'$' AND json_extract(value_json,'$.status')='open';
+CREATE INDEX IF NOT EXISTS gsis_edge_dispatch_employment_mail ON gsis_edge_records(scope,collection,record_id)
+ WHERE collection='dailyEmploymentMail' AND record_id<>'$' AND json_extract(value_json,'$.status') IN ('queued','sending');
+CREATE INDEX IF NOT EXISTS gsis_edge_pending_service ON gsis_edge_records(scope,collection,position,record_id)
+ WHERE record_id<>'$' AND json_extract(value_json,'$.status')='pending';
+CREATE INDEX IF NOT EXISTS gsis_edge_pending_handoffs ON gsis_edge_records(scope,collection,record_id)
+ WHERE collection='jobs' AND record_id<>'$' AND json_extract(value_json,'$.state') IN ('pending','running');
+CREATE INDEX IF NOT EXISTS gsis_edge_ack_snapshot ON gsis_edge_records(scope,collection,json_extract(value_json,'$.snapshotId'))
+ WHERE collection='acknowledgements' AND record_id<>'$';
+CREATE INDEX IF NOT EXISTS gsis_edge_alert_key ON gsis_edge_records(scope,json_extract(value_json,'$.key'),collection)
+ WHERE collection='smcAlerts' AND record_id<>'$';
+CREATE TABLE IF NOT EXISTS gsis_edge_receipts (
+ scope TEXT NOT NULL REFERENCES gsis_edge_heads(scope) ON DELETE CASCADE, actor TEXT NOT NULL,
+ request_id TEXT NOT NULL, digest TEXT NOT NULL, revision INTEGER NOT NULL, result_json TEXT NOT NULL,
+ created_at INTEGER NOT NULL, PRIMARY KEY(scope,actor,request_id));
+CREATE INDEX IF NOT EXISTS gsis_edge_receipts_age ON gsis_edge_receipts(scope,created_at);
+CREATE TABLE IF NOT EXISTS gsis_edge_transitions (
+ scope TEXT NOT NULL REFERENCES gsis_edge_heads(scope) ON DELETE CASCADE, revision INTEGER NOT NULL,
+ previous_mode TEXT NOT NULL, next_mode TEXT NOT NULL, actor TEXT NOT NULL,
+ proof_json TEXT NOT NULL, created_at INTEGER NOT NULL, PRIMARY KEY(scope,revision));
+CREATE TABLE IF NOT EXISTS gsis_edge_import_resets (
+ scope TEXT NOT NULL REFERENCES gsis_edge_heads(scope) ON DELETE CASCADE, actor TEXT NOT NULL,
+ request_id TEXT NOT NULL, previous_revision INTEGER NOT NULL, source_digest TEXT NOT NULL,
+ archive_digest TEXT NOT NULL, metadata_json TEXT NOT NULL, imported_records INTEGER NOT NULL,
+ created_at INTEGER NOT NULL, PRIMARY KEY(scope,actor,request_id));`;
+ // Dispatch indexes are additive and built once by SQLite from existing rows.
+ // The first schema upgrade pays that scan; subsequent ticks probe only live
+ // candidates. No roster history is deleted or copied into a second queue.
+ const initialized=new WeakMap(),scopes=new WeakMap(),projections=new WeakMap(),ROOT='$root',MAX_RECORD_BYTES=1750000,MAX_BATCH_BYTES=1900000;
+ const own=(o,k)=>Object.prototype.hasOwnProperty.call(o,k);
+ function fail(status,code,message){throw Object.assign(Error(message),{status,code});}
+ function text(value,name,max=320){if(typeof value!=='string'||!value.trim()||value.length>max||/[\u0000-\u001f]/.test(value))fail(400,'EDGE_INPUT','Invalid '+name+'.');return value;}
+ function hash(value){if(typeof value!=='string'||!/^[a-f0-9]{64}$/i.test(value))fail(400,'EDGE_DIGEST','A SHA-256 command digest is required.');return value.toLowerCase();}
+ function revision(value){if(!Number.isSafeInteger(value)||value<0)fail(400,'EDGE_REVISION','A valid expected revision is required.');return value;}
+ function stable(value){if(value===null||typeof value!=='object')return value;if(Array.isArray(value))return value.map(stable);return Object.fromEntries(Object.keys(value).sort().map(key=>[key,stable(value[key])]));}
+ function canonicalJson(value){return JSON.stringify(stable(value));}
+ async function digest(value){const bytes=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(canonicalJson(value)));return Array.from(new Uint8Array(bytes),x=>x.toString(16).padStart(2,'0')).join('');}
+ function serialize(value){let result;try{result=JSON.stringify(value);}catch{fail(400,'EDGE_STATE','State must contain JSON values.');}if(result===undefined)fail(400,'EDGE_STATE','State must contain JSON values.');if((typeof TextEncoder!=='undefined'?new TextEncoder().encode(result).length:Utilities.newBlob(result).getBytes().length)>MAX_RECORD_BYTES)fail(413,'EDGE_RECORD_TOO_LARGE','Store large immutable content in R2 and retain its reference.');return result;}
+ const key=(collection,id)=>JSON.stringify([collection,id]);
+ const recordDate=(value,id)=>typeof value?.date==='string'&&/^20\d\d-\d\d-\d\d$/.test(value.date)?value.date:/^20\d\d-\d\d-\d\d$/.test(id)?id:'';
+ function encode(state){
+  if(!state||typeof state!=='object'||Array.isArray(state))fail(400,'EDGE_STATE','A state object is required.');
+  const records=new Map(),put=(collection,id,value,position=0,date='')=>{
+   text(collection,'collection',250);text(id,'record identity',1024);const k=key(collection,id);if(records.has(k))fail(409,'EDGE_RECORD_ID','Duplicate record identity.');records.set(k,{collection,record_id:id,position,record_date:date,value_json:serialize(value)});
+  };
+  const names=Object.keys(state);if(names.includes(ROOT))fail(400,'EDGE_STATE','Reserved state property.');put(ROOT,'$',{keys:names});
+  for(const collection of names){const value=state[collection];
+   if(Array.isArray(value)){
+    put(collection,'$',{kind:'array'});
+    const natural=entry=>entry&&typeof entry==='object'&&!Array.isArray(entry)?recordDate(entry,'')?'date:'+entry.date:typeof entry.timetableName==='string'?'name:'+entry.timetableName:typeof entry.teacher==='string'?'teacher:'+entry.teacher:null:null,counts=new Map();for(const entry of value){const id=natural(entry);if(id)counts.set(id,(counts.get(id)||0)+1);}
+    value.forEach((entry,index)=>{const candidate=entry&&typeof entry==='object'&&!Array.isArray(entry)?entry.id??entry.ref:null,naturalId=natural(entry);const id=candidate!==null&&candidate!==undefined&&String(candidate)!==''?'id:'+String(candidate):naturalId&&counts.get(naturalId)===1?naturalId:'index:'+index;put(collection,id,entry,index,recordDate(entry,''));});
+   }else if(value!==null&&typeof value==='object'){
+    put(collection,'$',{kind:'map'});Object.keys(value).forEach(id=>put(collection,'key:'+id,value[id],0,recordDate(value[id],id)));
+   }else put(collection,'$',{kind:'value',value:value===undefined?null:value});
+  }
+  return records;
+ }
+ function decode(rows){
+  const root=rows.find(row=>row.collection===ROOT&&row.record_id==='$');if(!root)return null;
+  const grouped=new Map();for(const row of rows){if(!grouped.has(row.collection))grouped.set(row.collection,[]);grouped.get(row.collection).push(row);}
+  const state={};for(const name of JSON.parse(root.value_json).keys){const records=grouped.get(name)||[],meta=records.find(row=>row.record_id==='$');if(!meta)fail(503,'EDGE_CORRUPT','A stored collection is incomplete.');const shape=JSON.parse(meta.value_json),data=records.filter(row=>row.record_id!=='$').sort((a,b)=>a.position-b.position||a.record_id.localeCompare(b.record_id));let value;
+   if(shape.kind==='value')value=shape.value;
+   else if(shape.kind==='array')value=data.map(row=>JSON.parse(row.value_json));
+   else if(shape.kind==='map'){value={};for(const row of data)Object.defineProperty(value,row.record_id.slice(4),{value:JSON.parse(row.value_json),enumerable:true,writable:true,configurable:true});}
+   else fail(503,'EDGE_CORRUPT','A stored collection has an invalid shape.');
+   Object.defineProperty(state,name,{value,enumerable:true,writable:true,configurable:true});
+  }return state;
+ }
+ function same(a,b){return a?.value_json===b.value_json&&a?.position===b.position&&a?.record_date===b.record_date;}
+ function headValue(row){return row?{scope:row.scope,revision:row.revision,mode:row.mode,updatedAt:row.updated_at,sourceDigest:row.source_digest,importedRecords:row.imported_records,metadata:JSON.parse(row.metadata_json),schemaVersion:row.schema_version}:null;}
+ function receiptValue(row){return row?{saved:true,revision:row.revision,result:JSON.parse(row.result_json),digest:row.digest,actor:row.actor,requestId:row.request_id,createdAt:row.created_at}:null;}
+ function checkResults(results){if(!Array.isArray(results)||results.some(r=>r?.success===false))fail(503,'EDGE_STORAGE','The database operation could not be confirmed. Retry the same request.');return results;}
+ function chunks(records){const groups=[];let group=[],bytes=2;for(const record of records){const size=new TextEncoder().encode(JSON.stringify(record)).length+1;if(bytes+size>MAX_BATCH_BYTES&&group.length){groups.push(JSON.stringify(group));group=[];bytes=2;}if(size>MAX_BATCH_BYTES)fail(413,'EDGE_RECORD_TOO_LARGE','Store large immutable content in R2 and retain its reference.');group.push(record);bytes+=size;}if(group.length)groups.push(JSON.stringify(group));return groups;}
+ function selection(options){
+  if(options===undefined||!Object.keys(options).length)return null;
+  const collections=options.collections??(options.prefixes?Object.keys(options.prefixes):null),prefixes=options.prefixes||{},excludeCollections=options.excludeCollections||[];
+  if(collections!==null&&(!Array.isArray(collections)||collections.length>28)||!prefixes||typeof prefixes!=='object'||Array.isArray(prefixes)||!Array.isArray(excludeCollections)||excludeCollections.length>40)fail(400,'EDGE_PROJECTION','Invalid collection projection.');
+  let count=0;for(const name of collections||[])text(name,'collection',250);for(const name of excludeCollections){text(name,'excluded collection',250);if(name===ROOT)fail(400,'EDGE_PROJECTION','Root metadata cannot be excluded.');}
+  for(const [name,list]of Object.entries(prefixes)){if(!collections?.includes(name)||!Array.isArray(list)||!list.length)fail(400,'EDGE_PROJECTION','Prefixes need a selected collection.');for(const prefix of list){text(prefix,'record prefix',800);count++;}}if(count>20)fail(400,'EDGE_PROJECTION','Select no more than 20 map prefixes.');
+  return {collections:collections===null?null:[...new Set(collections)],prefixes,excludeCollections:[...new Set(excludeCollections)]};
+ }
+ function upperBound(prefix){const points=Array.from(prefix);for(let i=points.length-1;i>=0;i--){const code=points[i].codePointAt(0);if(code<0x10ffff)return points.slice(0,i).join('')+String.fromCodePoint(code+1);}fail(400,'EDGE_PROJECTION','Invalid record prefix.');}
+ function open(db,scope){
+  if(!db?.prepare||!db?.batch)fail(503,'EDGE_NOT_CONFIGURED','The operational D1 binding is required.');text(scope,'scope',180);
+  // Every operation starts at the primary. A previous request's session must not
+  // certify a stale head, especially after a different user committed a write.
+  const session=()=>typeof db.withSession==='function'?db.withSession('first-primary'):db;
+  async function ensure(){
+   if(!initialized.has(db))initialized.set(db,(async()=>{const statements=SCHEMA.split(';').map(s=>s.trim()).filter(Boolean);checkResults(await db.batch(statements.map(sql=>db.prepare(sql))));})().catch(error=>{initialized.delete(db);throw error;}));await initialized.get(db);
+   if(!scopes.has(db))scopes.set(db,new Map());const known=scopes.get(db);if(!known.has(scope))known.set(scope,db.prepare('INSERT OR IGNORE INTO gsis_edge_heads (scope,updated_at) VALUES (?,?)').bind(scope,Date.now()).run().then(result=>{checkResults([result]);}).catch(error=>{known.delete(scope);throw error;}));await known.get(scope);
+  }
+  async function head(){await ensure();return headValue(await session().prepare('SELECT * FROM gsis_edge_heads WHERE scope=?').bind(scope).first());}
+  async function load(options){
+   await ensure();const selected=selection(options),connection=session();let query='SELECT collection,record_id,position,record_date,value_json FROM gsis_edge_records WHERE scope=?',args=[scope];
+   if(selected){
+    query="SELECT r.collection,r.record_id,r.position,r.record_date,r.value_json FROM gsis_edge_records r WHERE r.scope=? AND (r.collection='$root' OR r.record_id='$') UNION ALL SELECT r.collection,r.record_id,r.position,r.record_date,r.value_json FROM gsis_edge_records r JOIN gsis_edge_records m ON m.scope=r.scope AND m.collection=r.collection AND m.record_id='$' WHERE r.scope=? AND r.record_id<>'$'";args=[scope,scope];
+    if(selected.collections!==null)query+=" AND json_extract(m.value_json,'$.kind')<>'map'";
+    if(selected.excludeCollections.length){query+=' AND r.collection NOT IN ('+selected.excludeCollections.map(()=>'?').join(',')+')';args.push(...selected.excludeCollections);}
+    for(const name of selected.collections||[]){if(selected.excludeCollections.includes(name))continue;query+=" UNION ALL SELECT collection,record_id,position,record_date,value_json FROM gsis_edge_records WHERE scope=? AND collection=? AND record_id<>'$'";args.push(scope,name);const prefixes=selected.prefixes[name];if(prefixes){query+=' AND ('+prefixes.map(prefix=>{const first='key:'+prefix;args.push(first,upperBound(first));return '(record_id>=? AND record_id<?)';}).join(' OR ')+')';}}
+    if(args.length>100)fail(400,'EDGE_PROJECTION','Select fewer collections or prefixes in one request.');
+   }
+   const rs=checkResults(await connection.batch([connection.prepare('SELECT * FROM gsis_edge_heads WHERE scope=?').bind(scope),connection.prepare(query).bind(...args)])),h=headValue(rs[0].results[0]);
+   const unique=[...new Map(rs[1].results.map(row=>[key(row.collection,row.record_id),row])).values()],state=decode(unique);if(h.mode!=='legacy'&&state===null)fail(503,'EDGE_CORRUPT','The operational state is incomplete.');
+   let projection;if(selected){for(const name of selected.excludeCollections)if(state&&own(state,name)&&(state[name]===null||typeof state[name]!=='object'))fail(400,'EDGE_PROJECTION','Only array or map collections can be excluded.');projection={schema:1,scope,revision:h.revision,...selected,mapCollections:unique.filter(row=>row.collection!==ROOT&&row.record_id==='$'&&JSON.parse(row.value_json).kind==='map').map(row=>row.collection)};if(state)projections.set(state,projection);}
+   return {...h,state,...(projection?{projection}:{})};
+  }
+  async function receipt(actor,requestId,expectedDigest){await ensure();text(actor,'actor');text(requestId,'request identity',200);const r=receiptValue(await session().prepare('SELECT * FROM gsis_edge_receipts WHERE scope=? AND actor=? AND request_id=?').bind(scope,actor,requestId).first());if(r&&expectedDigest!==undefined&&r.digest!==hash(expectedDigest))fail(409,'EDGE_REQUEST_REUSED','This request identity was already used for different content.');return r;}
+  async function write(input,mode,nextMode,source){
+   await ensure();const actor=text(input.actor,'actor'),requestId=text(input.requestId,'request identity',200),commandDigest=hash(input.digest),expected=revision(input.expectedRevision),prior=await receipt(actor,requestId,commandDigest);if(prior)return {...prior,duplicate:true};
+   const before=input.before===null?new Map():encode(input.before),after=encode(input.after),changed=[...after].filter(([id,row])=>!same(before.get(id),row)).map(([,row])=>row),removed=[...before].filter(([id])=>!after.has(id)).map(([,row])=>({collection:row.collection,record_id:row.record_id}));
+   const projection=input.projection||projections.get(input.before);if(projection){
+    if(projection.scope!==scope||projection.revision!==expected||projection.schema!==1)fail(409,'EDGE_PROJECTION','The projected state revision does not match.');
+    for(const row of [...changed,...removed]){
+     if(projection.excludeCollections?.includes(row.collection))fail(409,'EDGE_PROJECTION','The change touches an excluded collection. Load that collection before editing it.');
+     if(projection.collections!==null){const priorRow=before.get(key(row.collection,row.record_id)),nextRow=after.get(key(row.collection,row.record_id)),scalarChange=row.collection!==ROOT&&row.record_id==='$'&&priorRow&&nextRow&&JSON.parse(priorRow.value_json).kind==='value'&&JSON.parse(nextRow.value_json).kind==='value';if(row.collection===ROOT||row.record_id==='$'&&!scalarChange)fail(409,'EDGE_PROJECTION','Read the full state before changing a collection shape.');if(row.record_id!=='$'&&projection.mapCollections.includes(row.collection)&&(!projection.collections.includes(row.collection)||projection.prefixes[row.collection]&&!projection.prefixes[row.collection].some(prefix=>row.record_id.startsWith('key:'+prefix))))fail(409,'EDGE_PROJECTION','The change is outside the selected map records.');}
+    }
+   }
+   const guards=input.guards||[];if(!Array.isArray(guards)||guards.length>20)fail(400,'EDGE_GUARD','Choose no more than 20 source guards.');for(const g of guards){if(!g||typeof g!=='object')fail(400,'EDGE_GUARD','Invalid source guard.');text(g.scope,'guard scope',180);revision(g.revision);if(!['legacy','imported','active','paused'].includes(g.mode))fail(400,'EDGE_GUARD','A source guard mode is required.');}
+   const connection=session(),token=crypto.randomUUID(),now=Date.now(),resultJson=serialize(input.result??{}),guard='EXISTS (SELECT 1 FROM gsis_edge_heads WHERE scope=? AND write_token=?)';
+   const statements=[connection.prepare('UPDATE gsis_edge_heads SET revision=revision+1,mode=?,write_token=?,updated_at=?'+(source?',source_digest=?,imported_records=?,metadata_json=?':'')+' WHERE scope=? AND revision=? AND mode=?'+(source?' AND NOT EXISTS (SELECT 1 FROM gsis_edge_records WHERE scope=?)':'')+guards.map(()=> ' AND EXISTS (SELECT 1 FROM gsis_edge_heads source WHERE source.scope=? AND source.revision=? AND source.mode=?)').join(''))
+    .bind(nextMode,token,now,...(source?[source.digest,after.size,serialize(source.metadata)]:[]),scope,expected,mode,...(source?[scope]:[]),...guards.flatMap(g=>[g.scope,g.revision,g.mode]))];
+   for(const group of chunks(removed))statements.push(connection.prepare('DELETE FROM gsis_edge_records WHERE scope=? AND '+guard+' AND (collection,record_id) IN (SELECT json_extract(value,\'$.collection\'),json_extract(value,\'$.record_id\') FROM json_each(?))').bind(scope,scope,token,group));
+   for(const group of chunks(changed))statements.push(connection.prepare('INSERT INTO gsis_edge_records (scope,collection,record_id,position,record_date,value_json,revision) SELECT ?,json_extract(value,\'$.collection\'),json_extract(value,\'$.record_id\'),json_extract(value,\'$.position\'),json_extract(value,\'$.record_date\'),json_extract(value,\'$.value_json\'),? FROM json_each(?) WHERE '+guard+' ON CONFLICT(scope,collection,record_id) DO UPDATE SET position=excluded.position,record_date=excluded.record_date,value_json=excluded.value_json,revision=excluded.revision').bind(scope,expected+1,group,scope,token));
+   statements.push(connection.prepare('INSERT INTO gsis_edge_receipts (scope,actor,request_id,digest,revision,result_json,created_at) SELECT ?,?,?,?,?,?,? WHERE '+guard).bind(scope,actor,requestId,commandDigest,expected+1,resultJson,now,scope,token));
+   statements.push(connection.prepare('SELECT * FROM gsis_edge_receipts WHERE scope=? AND actor=? AND request_id=?').bind(scope,actor,requestId));
+   statements.push(connection.prepare('SELECT * FROM gsis_edge_heads WHERE scope=?').bind(scope));
+   // Callers can fence time-sensitive writes after every awaited storage read.
+   // This synchronous callback is supplied by trusted runtime code, not serialized commands.
+   if(input.beforeWrite)input.beforeWrite();
+   let rs;try{rs=checkResults(await connection.batch(statements));}catch(error){const recovered=await receipt(actor,requestId,commandDigest).catch(()=>null);if(recovered)return {...recovered,duplicate:true,recovered:true};throw error;}
+   const r=receiptValue(rs.at(-2).results[0]),h=headValue(rs.at(-1).results[0]);if(r){if(r.digest!==commandDigest)fail(409,'EDGE_REQUEST_REUSED','This request identity was already used for different content.');return {...r,duplicate:!rs[0].meta?.changes,changedRecords:rs[0].meta?.changes?changed.length+removed.length:0};}
+   if(h.mode!==mode)fail(409,'EDGE_AUTHORITY','This operational store is not the active writer.');fail(409,'EDGE_CONFLICT','A newer change was saved. Reload the affected records before retrying.');
+  }
+  async function commit(input){return write(input,'active','active');}
+  async function importState(input){const sourceDigest=await digest(input.state),h=await head(),prior=await receipt(input.actor,input.requestId,input.digest||sourceDigest);if(prior)return {...await head(),...prior,duplicate:true};if(h.mode!=='legacy'||h.revision!==0)fail(409,'EDGE_IMPORT_STATE','Import requires an empty legacy store.');const result=await write({before:null,after:input.state,expectedRevision:h.revision,actor:input.actor,requestId:input.requestId,digest:input.digest||sourceDigest,result:{imported:true,sourceDigest,records:encode(input.state).size}},'legacy','imported',{digest:sourceDigest,metadata:{source:input.source||null,importedAt:Date.now()}});return {...await head(),...result};}
+  async function resetImport(input){
+   await ensure();const actor=text(input.actor,'actor'),requestId=text(input.requestId,'request identity',200),expected=revision(input.expectedRevision),archiveDigest=hash(input.proof?.archiveDigest),sourceDigest=hash(input.proof?.sourceDigest),connection=session();
+   const readReset=()=>session().prepare('SELECT * FROM gsis_edge_import_resets WHERE scope=? AND actor=? AND request_id=?').bind(scope,actor,requestId).first(),result=(row,duplicate=false)=>{if(row.archive_digest!==archiveDigest||row.source_digest!==sourceDigest||row.previous_revision!==expected)fail(409,'EDGE_REQUEST_REUSED','This reset identity was already used for different evidence.');return {reset:true,scope,mode:'legacy',revision:0,sourceDigest:'',previousSourceDigest:row.source_digest,archiveDigest:row.archive_digest,createdAt:row.created_at,requestId,duplicate};};
+   const prior=await readReset();if(prior)return result(prior,true);const h=await head();if(h.mode!=='imported'||h.revision!==expected||h.sourceDigest!==sourceDigest)fail(409,'EDGE_IMPORT_RESET','Only the unchanged imported snapshot can be restarted; active or paused authority cannot be reset.');
+   const token=crypto.randomUUID(),now=Date.now(),guard='EXISTS (SELECT 1 FROM gsis_edge_heads WHERE scope=? AND write_token=? AND mode=\'imported\')';
+   const statements=[connection.prepare("UPDATE gsis_edge_heads SET write_token=?,updated_at=? WHERE scope=? AND revision=? AND mode='imported' AND source_digest=?").bind(token,now,scope,expected,sourceDigest),connection.prepare('INSERT INTO gsis_edge_import_resets (scope,actor,request_id,previous_revision,source_digest,archive_digest,metadata_json,imported_records,created_at) SELECT ?,?,?,?,?,?,?,?,? WHERE '+guard).bind(scope,actor,requestId,expected,sourceDigest,archiveDigest,serialize(h.metadata),h.importedRecords,now,scope,token),connection.prepare('DELETE FROM gsis_edge_records WHERE scope=? AND '+guard).bind(scope,scope,token),connection.prepare('DELETE FROM gsis_edge_receipts WHERE scope=? AND '+guard).bind(scope,scope,token),connection.prepare("UPDATE gsis_edge_heads SET revision=0,mode='legacy',source_digest='',imported_records=0,metadata_json='{}' WHERE scope=? AND write_token=? AND mode='imported'").bind(scope,token),connection.prepare('SELECT * FROM gsis_edge_import_resets WHERE scope=? AND actor=? AND request_id=?').bind(scope,actor,requestId)];
+   let rs;try{rs=checkResults(await connection.batch(statements));}catch(error){const recovered=await readReset().catch(()=>null);if(recovered)return {...result(recovered,true),recovered:true};throw error;}const saved=rs.at(-1).results[0];if(!saved)fail(409,'EDGE_IMPORT_RESET','The imported snapshot changed before restart.');return result(saved,!rs[0].meta?.changes);
+  }
+  async function transition(input){
+   await ensure();const actor=text(input.actor,'actor'),expected=revision(input.expectedRevision),h=await head(),proof=input.proof||{};
+   if(h.revision!==expected||h.mode!==input.from)fail(409,'EDGE_CONFLICT','The authority state changed. Reload before proceeding.');
+   const pair=input.from+'>'+input.to;if(!['imported>active','active>paused','paused>active'].includes(pair))fail(400,'EDGE_TRANSITION','Unsupported authority transition.');
+   if(input.to==='active'&&(proof.legacyWritesDisabled!==true||pair==='imported>active'&&(proof.sourceDigest!==h.sourceDigest||proof.verifiedRecords!==h.importedRecords)))fail(409,'EDGE_CUTOVER_PROOF','Verify the imported records and disable legacy writers before activation.');
+   if(input.to==='paused')text(proof.reason,'pause reason',500);
+   const connection=session(),token=crypto.randomUUID(),now=Date.now(),safeProof={legacyWritesDisabled:proof.legacyWritesDisabled===true,...(typeof proof.sourceDigest==='string'?{sourceDigest:hash(proof.sourceDigest)}:{}),...(Number.isSafeInteger(proof.verifiedRecords)?{verifiedRecords:proof.verifiedRecords}:{}),...(typeof proof.reason==='string'?{reason:proof.reason}:{})};
+   const rs=checkResults(await connection.batch([connection.prepare('UPDATE gsis_edge_heads SET revision=revision+1,mode=?,write_token=?,updated_at=? WHERE scope=? AND revision=? AND mode=?').bind(input.to,token,now,scope,expected,input.from),connection.prepare('INSERT INTO gsis_edge_transitions (scope,revision,previous_mode,next_mode,actor,proof_json,created_at) SELECT ?,?,?,?,?,?,? WHERE EXISTS (SELECT 1 FROM gsis_edge_heads WHERE scope=? AND write_token=?)').bind(scope,expected+1,input.from,input.to,actor,serialize(safeProof),now,scope,token),connection.prepare('SELECT * FROM gsis_edge_heads WHERE scope=?').bind(scope)]));if(!rs[0].meta?.changes)fail(409,'EDGE_CONFLICT','The authority state changed. Reload before proceeding.');return headValue(rs[2].results[0]);
+  }
+  async function rows(collection,options={}){
+   await ensure();text(collection,'collection',250);if(collection===ROOT)fail(400,'EDGE_COLLECTION','Choose a data collection.');const where=['scope=?','collection=?',"record_id<>'$'"],values=[scope,collection];
+   for(const [field,operator]of [['date','='],['from','>='],['to','<=']])if(options[field]!==undefined){if(!/^20\d\d-\d\d-\d\d$/.test(options[field]))fail(400,'EDGE_DATE','Invalid record date.');where.push('record_date'+operator+'?');values.push(options[field]);}
+   if(options.after!==undefined){text(options.after,'record cursor',1024);where.push('record_id>?');values.push(options.after);}const limit=options.limit===undefined?200:options.limit;if(!Number.isSafeInteger(limit)||limit<1||limit>1000)fail(400,'EDGE_LIMIT','Choose a limit from 1 to 1000.');
+   const connection=session(),rs=checkResults(await connection.batch([connection.prepare('SELECT * FROM gsis_edge_heads WHERE scope=?').bind(scope),connection.prepare('SELECT record_id,position,record_date,value_json,revision FROM gsis_edge_records WHERE '+where.join(' AND ')+' ORDER BY record_id LIMIT ?').bind(...values,limit+1)]));const data=rs[1].results,more=data.length>limit;return {...headValue(rs[0].results[0]),records:data.slice(0,limit).map(r=>({id:r.record_id,position:r.position,date:r.record_date,value:JSON.parse(r.value_json),revision:r.revision})),next:more?data[limit-1].record_id:null};
+  }
+  async function exportState(){const snapshot=await load();return {schema:'gsis-edge-state-v1',...snapshot,capturedAt:new Date().toISOString(),stateDigest:snapshot.state===null?null:await digest(snapshot.state)};}
+  return {scope,ensure,head,load,receipt,commit,importState,resetImport,transition,rows,exportState};
+ }
+ return {open,encode,decode,digest,canonicalJson,SCHEMA,MAX_RECORD_BYTES};
+})();
+if(typeof module!=='undefined'&&module.exports)module.exports=GSiSEdgeStore;
+
+/* GSIS_EDGE_STORE_END */
+
+/* GSIS_ROSTER_IMPORT_BEGIN */
+/* Immutable Roster preparation. Source capture stays in Google; D1 remains legacy
+ * until the complete, verified session is committed in one transaction. */
+var GSiSRosterImport=(()=>{
+ const Store=typeof GSiSEdgeStore!=='undefined'?GSiSEdgeStore:require('./edge-store.js');
+ const FORMAT='gsis-roster-import-v1',TARGET_BYTES=196608,SEGMENT_BYTES=196608,MAX_PART_BYTES=1900000,MAX_MANIFEST_BYTES=524288,MAX_PARTS=2048,MAX_TOTAL_BYTES=41943040,MAX_OBJECT_BYTES=33554432,MAX_RETAINED_SESSIONS=8;
+ const SCOPES=['roster','roster-register'];
+ const fail=(status,code,message)=>{throw Object.assign(Error(message),{status,code});};
+ function utf8Length(value){let size=0;for(const char of value){const n=char.codePointAt(0);size+=n<128?1:n<2048?2:n<65536?3:4;}return size;}
+ function digestValue(value){return typeof value==='string'&&/^[a-f0-9]{64}$/.test(value);}
+ function identity(value,name,max=200){if(typeof value!=='string'||!value||value.length>max||/[\u0000-\u001f]/.test(value))fail(400,'ROSTER_IMPORT_ID','Invalid '+name+'.');return value;}
+ function freeze(snapshot,binding,adapter){
+  const {actor,requestId,sessionId}=binding;identity(actor,'actor',320);identity(requestId,'request');if(!digestValue(sessionId)||!digestValue(snapshot.sourceDigest))fail(400,'ROSTER_IMPORT_DIGEST','Invalid import digest.');
+  const state=JSON.parse(JSON.stringify(snapshot.state)),index=JSON.parse(JSON.stringify(snapshot.index)),parts=[],manifest={schema:FORMAT,sessionId,actor,requestId,sourceDigest:snapshot.sourceDigest,parts:[],scopes:{},totalBytes:0};
+  function add(kind,body,scope='',records=0){const payload=JSON.stringify(body),bytes=utf8Length(payload);if(bytes>MAX_PART_BYTES||manifest.parts.length>=MAX_PARTS||manifest.totalBytes+bytes>MAX_TOTAL_BYTES)fail(413,'ROSTER_IMPORT_LIMIT','The immutable export exceeds a documented part/container limit.');const id='part-'+String(parts.length).padStart(5,'0');manifest.parts.push({id,kind,scope,records,offset:manifest.totalBytes,bytes,digest:adapter.hash(payload)});parts.push(payload);manifest.totalBytes+=bytes;return id;}
+  function object(kind,id,value){
+   const json=JSON.stringify(value);if(utf8Length(json)>MAX_OBJECT_BYTES)fail(413,'ROSTER_IMPORT_OBJECT_LIMIT','A captured object exceeds the supported 32 MiB source-object bound.');const digest=adapter.hash(json),reference={key:'gsis/roster/'+kind+'/'+encodeURIComponent(id)+'/'+digest+'.json.gz',digest,encoding:'gzip-json-v1'},gzip=adapter.gzip(json),segments=[];
+   for(let n=0;n<gzip.length;n+=SEGMENT_BYTES)segments.push(add('segment',{base64:adapter.base64(gzip.slice(n,n+SEGMENT_BYTES))}));
+   add('object',{reference,kind,gzipBytes:gzip.length,segments});return reference;
+  }
+  for(const entry of index.entries||[]){if(!entry.modelFile)fail(409,'ROSTER_IMPORT_MODEL','The captured model has no immutable file identity.');entry.modelObject=object('baseline',entry.id,adapter.readModel(entry));entry.modelObjectKey=entry.modelObject.key;entry.modelDigest=entry.modelObject.digest;delete entry.modelFile;}
+  for(const [date,meta] of Object.entries(state.allocationAuditExports||{}))if(meta.archiveFileId){meta.archiveObject=object('audit',date,adapter.readArchive(date,meta.archiveFileId));delete meta.archiveFileId;}
+  for(const row of [...(state.staplerPlans||[]),...(state.staplerArchives||[])])for(const field of ['draft','published','confirmedPlan'])if(row[field]&&!row[field].edgeObject)row[field]={edgeObject:true,...object('stapler',(row.id||row.date)+'/'+field,row[field])};
+  for(const [scope,value]of [['roster',state],['roster-register',index]]){
+   // Encode the entire collection once: natural-key multiplicity and positions
+   // are global. Encoding arbitrary slices changes durable record identities.
+   const records=Store.encode(value);manifest.scopes[scope]={records:records.size,digest:adapter.hash(Store.canonicalJson(value))};let rows=[],bytes=12;
+   for(const row of records.values()){const size=utf8Length(JSON.stringify(row))+1;if(rows.length&&bytes+size>TARGET_BYTES){add('records',{rows},scope,rows.length);rows=[];bytes=12;}rows.push(row);bytes+=size;}
+   if(rows.length)add('records',{rows},scope,rows.length);
+  }
+  validateManifest(manifest);return {manifest,manifestDigest:adapter.hash(JSON.stringify(manifest)),parts};
+ }
+ function validateManifest(manifest){
+  if(!manifest||manifest.schema!==FORMAT||!digestValue(manifest.sessionId)||!digestValue(manifest.sourceDigest)||utf8Length(JSON.stringify(manifest))>MAX_MANIFEST_BYTES)fail(400,'ROSTER_IMPORT_MANIFEST','Invalid or oversized immutable manifest.');
+  identity(manifest.actor,'actor',320);identity(manifest.requestId,'request');if(!Array.isArray(manifest.parts)||!manifest.parts.length||manifest.parts.length>MAX_PARTS||!manifest.scopes||Object.keys(manifest.scopes).sort().join(',')!==[...SCOPES].sort().join(','))fail(400,'ROSTER_IMPORT_MANIFEST','Invalid manifest scopes or parts.');
+  let offset=0;const ids=new Set(),counts={roster:0,'roster-register':0};for(const part of manifest.parts){identity(part.id,'part',80);if(ids.has(part.id)||!['records','segment','object'].includes(part.kind)||part.offset!==offset||!Number.isSafeInteger(part.bytes)||part.bytes<1||part.bytes>MAX_PART_BYTES||!digestValue(part.digest)||!Number.isSafeInteger(part.records)||part.records<0||part.kind==='records'&&!SCOPES.includes(part.scope)||part.kind!=='records'&&(part.scope!==''||part.records!==0))fail(400,'ROSTER_IMPORT_MANIFEST','Duplicate, missing or invalid manifest part.');ids.add(part.id);offset+=part.bytes;if(part.kind==='records')counts[part.scope]+=part.records;}
+  if(offset!==manifest.totalBytes||offset>MAX_TOTAL_BYTES||SCOPES.some(scope=>!digestValue(manifest.scopes[scope]?.digest)||manifest.scopes[scope]?.records!==counts[scope]||counts[scope]<1))fail(400,'ROSTER_IMPORT_MANIFEST','Manifest lengths or record counts do not match.');return manifest;
+ }
+ const SQL=`CREATE TABLE IF NOT EXISTS gsis_roster_import_sessions (
+ session_id TEXT PRIMARY KEY, actor TEXT NOT NULL, request_id TEXT NOT NULL, state TEXT NOT NULL,
+ manifest_json TEXT NOT NULL DEFAULT '', manifest_digest TEXT NOT NULL DEFAULT '', source_digest TEXT NOT NULL DEFAULT '',
+ references_ready INTEGER NOT NULL DEFAULT 0, write_token TEXT NOT NULL DEFAULT '', reset_request TEXT NOT NULL DEFAULT '',
+ created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL, UNIQUE(actor,request_id));
+ CREATE TABLE IF NOT EXISTS gsis_roster_import_locks (scope TEXT PRIMARY KEY, session_id TEXT NOT NULL REFERENCES gsis_roster_import_sessions(session_id), base_revision INTEGER NOT NULL);
+ CREATE TABLE IF NOT EXISTS gsis_roster_import_parts (session_id TEXT NOT NULL REFERENCES gsis_roster_import_sessions(session_id), part_id TEXT NOT NULL,
+ ordinal INTEGER NOT NULL, kind TEXT NOT NULL, scope TEXT NOT NULL, digest TEXT NOT NULL, bytes INTEGER NOT NULL, records INTEGER NOT NULL,
+ receipt_json TEXT, PRIMARY KEY(session_id,part_id), UNIQUE(session_id,ordinal));
+ CREATE TABLE IF NOT EXISTS gsis_roster_import_rows (session_id TEXT NOT NULL REFERENCES gsis_roster_import_sessions(session_id), scope TEXT NOT NULL,
+ collection TEXT NOT NULL, record_id TEXT NOT NULL, position INTEGER NOT NULL, record_date TEXT NOT NULL, value_json TEXT NOT NULL,
+ PRIMARY KEY(session_id,scope,collection,record_id));`;
+ const schemas=new WeakMap();
+ async function hashText(value){return Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(value))),n=>n.toString(16).padStart(2,'0')).join('');}
+ function checked(results){if(!Array.isArray(results)||results.some(row=>row?.success===false))fail(503,'ROSTER_IMPORT_STORAGE','Import progress was not confirmed. Retry the same request.');return results;}
+ async function ensure(db){await Promise.all(SCOPES.map(scope=>Store.open(db,scope).ensure()));if(!schemas.has(db))schemas.set(db,db.batch(SQL.split(';').map(s=>s.trim()).filter(Boolean).map(s=>db.prepare(s))).then(checked).catch(error=>{schemas.delete(db);throw error;}));await schemas.get(db);}
+ function open(db,binding){
+  const {actor,requestId,sessionId}=binding;identity(actor,'actor',320);identity(requestId,'request');if(!digestValue(sessionId))fail(400,'ROSTER_IMPORT_ID','Invalid session.');
+  const connection=()=>typeof db.withSession==='function'?db.withSession('first-primary'):db;
+  const read=async()=>{await ensure(db);const row=await connection().prepare('SELECT * FROM gsis_roster_import_sessions WHERE session_id=?').bind(sessionId).first();if(row&&(row.actor!==actor||row.request_id!==requestId))fail(409,'ROSTER_IMPORT_ID','The session belongs to another actor or request.');return row;};
+  const guard="EXISTS (SELECT 1 FROM gsis_roster_import_sessions WHERE session_id=? AND write_token=?)";
+  async function reserve(){
+   const prior=await read();if(prior){if(prior.state==='abandoned')fail(409,'ROSTER_IMPORT_RESTART','This retained session was restarted. Use a new request ID.');return progress();}
+   const retained=await connection().prepare('SELECT COUNT(*) n FROM gsis_roster_import_sessions').first();if(retained.n>=MAX_RETAINED_SESSIONS)fail(409,'ROSTER_IMPORT_CAPACITY','Preparation has eight retained sessions. Reviewed archival and cleanup are required before a new capture; existing sessions remain resumable.');
+   const c=connection(),now=Date.now(),stmt=[c.prepare(`INSERT INTO gsis_roster_import_sessions (session_id,actor,request_id,state,created_at,updated_at)
+    SELECT ?,?,?,'preparing',?,? WHERE (SELECT COUNT(*) FROM gsis_edge_heads WHERE scope IN ('roster','roster-register') AND mode='legacy' AND revision=0)=2
+    AND NOT EXISTS(SELECT 1 FROM gsis_edge_records WHERE scope IN ('roster','roster-register')) AND NOT EXISTS(SELECT 1 FROM gsis_roster_import_locks) AND (SELECT COUNT(*) FROM gsis_roster_import_sessions)<?`).bind(sessionId,actor,requestId,now,now,MAX_RETAINED_SESSIONS)];
+   for(const scope of SCOPES)stmt.push(c.prepare('INSERT INTO gsis_roster_import_locks (scope,session_id,base_revision) SELECT scope,?,revision FROM gsis_edge_heads WHERE scope=? AND EXISTS(SELECT 1 FROM gsis_roster_import_sessions WHERE session_id=?)').bind(sessionId,scope,sessionId));
+   try{checked(await c.batch(stmt));}catch(error){if(await read())return progress();throw error;}
+   if(!await read())fail(409,'ROSTER_IMPORT_BUSY','Both scopes must be empty and legacy, with no other import in progress. Resume or explicitly restart the retained session.');return progress();
+  }
+  async function bind(manifest,manifestDigest){
+   validateManifest(manifest);if(manifest.actor!==actor||manifest.requestId!==requestId||manifest.sessionId!==sessionId||await hashText(JSON.stringify(manifest))!==manifestDigest)fail(409,'ROSTER_IMPORT_ID','The manifest does not match this actor, request and session.');
+   const row=await read();if(!row)fail(409,'ROSTER_IMPORT_SESSION','Reserve the import before binding its source.');if(row.manifest_digest){if(row.manifest_digest!==manifestDigest)fail(409,'ROSTER_IMPORT_SOURCE_CHANGED','This request already captured another immutable source.');return progress();}
+   if(row.state!=='preparing')fail(409,'ROSTER_IMPORT_RESTART','This session requires an explicit restart.');const token=crypto.randomUUID(),c=connection();
+   const statements=[c.prepare("UPDATE gsis_roster_import_sessions SET state='staging',manifest_json=?,manifest_digest=?,source_digest=?,write_token=?,updated_at=? WHERE session_id=? AND state='preparing' AND manifest_digest=''").bind(JSON.stringify(manifest),manifestDigest,manifest.sourceDigest,token,Date.now(),sessionId),c.prepare(`INSERT INTO gsis_roster_import_parts (session_id,part_id,ordinal,kind,scope,digest,bytes,records)
+    SELECT ?,json_extract(value,'$.id'),CAST(key AS INTEGER),json_extract(value,'$.kind'),json_extract(value,'$.scope'),json_extract(value,'$.digest'),json_extract(value,'$.bytes'),json_extract(value,'$.records') FROM json_each(?) WHERE ${guard}`).bind(sessionId,JSON.stringify(manifest.parts),sessionId,token)];
+   try{checked(await c.batch(statements));}catch(error){const saved=await read();if(saved?.manifest_digest===manifestDigest)return progress();throw error;}return progress();
+  }
+  async function progress(){const row=await read();if(!row)return null;const c=connection(),count=await c.prepare('SELECT COUNT(*) total,SUM(receipt_json IS NOT NULL) completed FROM gsis_roster_import_parts WHERE session_id=?').bind(sessionId).first(),next=await c.prepare('SELECT part_id id,kind,scope,digest,bytes,records FROM gsis_roster_import_parts WHERE session_id=? AND receipt_json IS NULL ORDER BY ordinal LIMIT 1').bind(sessionId).first();return {sessionId,requestId,actor,state:row.state,sourceDigest:row.source_digest||null,manifestDigest:row.manifest_digest||null,completedParts:count.completed||0,totalParts:count.total,imported:row.state==='imported',referencesReady:!!row.references_ready,nextPart:next||null,requiresRestart:['failed','abandoned'].includes(row.state),next:row.state==='preparing'?'prepare':next?'part':!row.references_ready?'references':row.state==='imported'?'complete':'finalize'};}
+  async function manifest(){const row=await read();if(!row?.manifest_json)fail(409,'ROSTER_IMPORT_PREPARING','The immutable snapshot is not ready.');return JSON.parse(row.manifest_json);}
+  async function partReceipt(partId){identity(partId,'part',80);await read();const row=await connection().prepare('SELECT receipt_json FROM gsis_roster_import_parts WHERE session_id=? AND part_id=?').bind(sessionId,partId).first();return row?.receipt_json?JSON.parse(row.receipt_json):null;}
+  async function segmentReceipts(ids){
+   if(!Array.isArray(ids)||!ids.length||ids.length>MAX_PARTS||new Set(ids).size!==ids.length)fail(409,'ROSTER_IMPORT_OBJECT','Invalid segment dependency list.');await read();const found=await connection().prepare("SELECT part_id,receipt_json FROM gsis_roster_import_parts WHERE session_id=? AND kind='segment' AND receipt_json IS NOT NULL AND part_id IN (SELECT value FROM json_each(?))").bind(sessionId,JSON.stringify(ids)).all(),byId=new Map(found.results.map(row=>[row.part_id,JSON.parse(row.receipt_json)]));if(found.results.length!==ids.length)fail(409,'ROSTER_IMPORT_OBJECT','Object segments are incomplete.');return ids.map(id=>byId.get(id));
+  }
+  async function validatePart(partId,payload){
+   identity(partId,'part',80);if(typeof payload!=='string'||utf8Length(payload)>MAX_PART_BYTES)fail(413,'ROSTER_IMPORT_PART','The export part is too large.');const row=await read();if(!row)fail(409,'ROSTER_IMPORT_SESSION','Unknown import session.');
+   const part=await connection().prepare('SELECT part_id id,kind,scope,digest,bytes,records,receipt_json FROM gsis_roster_import_parts WHERE session_id=? AND part_id=?').bind(sessionId,partId).first();if(!part||utf8Length(payload)!==part.bytes||await hashText(payload)!==part.digest)fail(409,'ROSTER_IMPORT_PART','The immutable export part failed its length or digest check.');
+   let body;try{body=JSON.parse(payload);}catch{fail(409,'ROSTER_IMPORT_PART','The export part is not JSON.');}return {part,body};
+  }
+  async function stage(partId,payload,objectReceipt){
+   const {part,body}=await validatePart(partId,payload);if(part.receipt_json)return JSON.parse(part.receipt_json);
+   let rows=[];if(part.kind==='records'){
+    rows=body.rows;if(!Array.isArray(rows)||rows.length!==part.records)fail(409,'ROSTER_IMPORT_PART','The export record count is invalid.');const ids=new Set();
+    for(const r of rows){identity(r.collection,'collection',250);identity(r.record_id,'record',1024);if(!Number.isSafeInteger(r.position)||r.position<0||typeof r.record_date!=='string'||!/^$|^20\d\d-\d\d-\d\d$/.test(r.record_date)||typeof r.value_json!=='string'||utf8Length(r.value_json)>Store.MAX_RECORD_BYTES)fail(409,'ROSTER_IMPORT_PART','Invalid exported record.');try{JSON.parse(r.value_json);}catch{fail(409,'ROSTER_IMPORT_PART','Invalid exported record JSON.');}const id=JSON.stringify([r.collection,r.record_id]);if(ids.has(id))fail(409,'ROSTER_IMPORT_DUPLICATE','Duplicate record identity in import part.');ids.add(id);}
+   }else{
+    if(!objectReceipt||objectReceipt.verified!==true||typeof objectReceipt.key!=='string'||!Number.isSafeInteger(objectReceipt.bytes)||objectReceipt.bytes<1)fail(409,'ROSTER_IMPORT_OBJECT','The private object write has no verified receipt.');
+    if(part.kind==='object'){
+     if(!body.reference||body.reference.encoding!=='gzip-json-v1'||!digestValue(body.reference.digest)||!body.reference.key.startsWith('gsis/roster/')||!body.reference.key.endsWith('/'+body.reference.digest+'.json.gz')||objectReceipt.key!==body.reference.key||objectReceipt.bytes!==body.gzipBytes||!Array.isArray(body.segments)||!body.segments.length||new Set(body.segments).size!==body.segments.length)fail(409,'ROSTER_IMPORT_OBJECT','Invalid assembled private object.');
+     const dependencies=await connection().prepare("SELECT part_id,receipt_json FROM gsis_roster_import_parts WHERE session_id=? AND kind='segment' AND part_id IN (SELECT value FROM json_each(?))").bind(sessionId,JSON.stringify(body.segments)).all();if(dependencies.results.length!==body.segments.length||dependencies.results.some(row=>!row.receipt_json)||dependencies.results.reduce((n,row)=>n+(JSON.parse(row.receipt_json).object?.bytes||0),0)!==body.gzipBytes)fail(409,'ROSTER_IMPORT_OBJECT','The object segments are incomplete.');
+    }else if(objectReceipt.key!=='gsis/roster/import-staging/'+sessionId+'/'+partId||objectReceipt.bytes>SEGMENT_BYTES||!digestValue(objectReceipt.digest))fail(409,'ROSTER_IMPORT_OBJECT','Invalid private object segment.');
+   }
+   const receipt={partId,digest:part.digest,records:rows.length,...(objectReceipt?{object:objectReceipt}:{} )},c=connection(),token=crypto.randomUUID(),now=Date.now();
+   const statements=[c.prepare("UPDATE gsis_roster_import_sessions SET write_token=?,updated_at=? WHERE session_id=? AND state='staging' AND EXISTS(SELECT 1 FROM gsis_roster_import_parts WHERE session_id=? AND part_id=? AND receipt_json IS NULL)").bind(token,now,sessionId,sessionId,partId)];
+   if(rows.length)statements.push(c.prepare(`INSERT INTO gsis_roster_import_rows (session_id,scope,collection,record_id,position,record_date,value_json) SELECT ?,?,json_extract(value,'$.collection'),json_extract(value,'$.record_id'),json_extract(value,'$.position'),json_extract(value,'$.record_date'),json_extract(value,'$.value_json') FROM json_each(?) WHERE ${guard}`).bind(sessionId,part.scope,JSON.stringify(rows),sessionId,token));
+   statements.push(c.prepare('UPDATE gsis_roster_import_parts SET receipt_json=? WHERE session_id=? AND part_id=? AND receipt_json IS NULL AND '+guard).bind(JSON.stringify(receipt),sessionId,partId,sessionId,token));
+   try{checked(await c.batch(statements));}catch(error){const saved=await partReceipt(partId);if(saved)return saved;if(/UNIQUE constraint failed.*gsis_roster_import_rows/.test(error.message))fail(409,'ROSTER_IMPORT_DUPLICATE','An import record identity occurs in more than one part.');throw error;}
+   const saved=await partReceipt(partId);if(!saved)fail(409,'ROSTER_IMPORT_SESSION','This import is no longer staging.');return saved;
+  }
+  async function referencesReady(){await read();checked([await connection().prepare("UPDATE gsis_roster_import_sessions SET references_ready=1,updated_at=? WHERE session_id=? AND state='staging' AND NOT EXISTS(SELECT 1 FROM gsis_roster_import_parts WHERE session_id=? AND receipt_json IS NULL)").bind(Date.now(),sessionId,sessionId).run()]);return progress();}
+  async function failPreparation(){await read();checked([await connection().prepare("UPDATE gsis_roster_import_sessions SET state='failed',updated_at=? WHERE session_id=? AND state='preparing'").bind(Date.now(),sessionId).run()]);return progress();}
+  async function finalize(){
+   const row=await read();if(row?.state==='imported')return progress();if(!row?.manifest_json)fail(409,'ROSTER_IMPORT_INCOMPLETE','The immutable export is incomplete.');const m=JSON.parse(row.manifest_json),c=connection(),token=crypto.randomUUID(),now=Date.now(),metadata=JSON.stringify({source:{kind:'apps-script',sourceDigest:m.sourceDigest,manifestDigest:row.manifest_digest},importedAt:now,importSession:sessionId,digestFormat:FORMAT});
+   const conditions=SCOPES.map(()=>" AND EXISTS(SELECT 1 FROM gsis_edge_heads h JOIN gsis_roster_import_locks l ON l.scope=h.scope WHERE h.scope=? AND l.session_id=? AND h.revision=l.base_revision AND h.mode='legacy') AND (SELECT COUNT(*) FROM gsis_roster_import_rows WHERE session_id=? AND scope=?)=?").join('');
+   const statements=[c.prepare(`UPDATE gsis_roster_import_sessions SET state='imported',write_token=?,updated_at=? WHERE session_id=? AND state='staging' AND references_ready=1
+    AND (SELECT COUNT(*) FROM gsis_roster_import_parts WHERE session_id=?)=? AND NOT EXISTS(SELECT 1 FROM gsis_roster_import_parts WHERE session_id=? AND receipt_json IS NULL)
+    AND NOT EXISTS(SELECT 1 FROM gsis_edge_records WHERE scope IN ('roster','roster-register'))${conditions}`).bind(token,now,sessionId,sessionId,m.parts.length,sessionId,...SCOPES.flatMap(scope=>[scope,sessionId,sessionId,scope,m.scopes[scope].records]))];
+   for(const scope of SCOPES){statements.push(c.prepare("UPDATE gsis_edge_heads SET revision=revision+1,mode='imported',write_token=?,source_digest=?,imported_records=?,metadata_json=?,updated_at=? WHERE scope=? AND "+guard).bind(token,m.scopes[scope].digest,m.scopes[scope].records,metadata,now,scope,sessionId,token));}
+   statements.push(c.prepare(`INSERT INTO gsis_edge_records (scope,collection,record_id,position,record_date,value_json,revision) SELECT r.scope,r.collection,r.record_id,r.position,r.record_date,r.value_json,h.revision FROM gsis_roster_import_rows r JOIN gsis_edge_heads h ON h.scope=r.scope WHERE r.session_id=? AND h.write_token=? AND ${guard}`).bind(sessionId,token,sessionId,token));
+   for(const scope of SCOPES)statements.push(c.prepare(`INSERT INTO gsis_edge_receipts (scope,actor,request_id,digest,revision,result_json,created_at) SELECT scope,?,?,?,revision,?,? FROM gsis_edge_heads WHERE scope=? AND ${guard}`).bind(actor,requestId+(scope==='roster-register'?'-register':''),row.manifest_digest,JSON.stringify({imported:true,sourceDigest:m.sourceDigest,sessionId}),now,scope,sessionId,token));
+   try{checked(await c.batch(statements));}catch(error){if((await read())?.state==='imported')return progress();throw error;}const result=await progress();if(!result.imported)fail(409,'ROSTER_IMPORT_INCOMPLETE','Parts, object receipts or scope guards are incomplete; neither head was imported.');return result;
+  }
+  async function evidence(){const session=await progress();if(!session)fail(404,'ROSTER_IMPORT_SESSION','No retained import session.');const m=session.manifestDigest?await manifest():null,rows=await connection().prepare('SELECT receipt_json FROM gsis_roster_import_parts WHERE session_id=? AND receipt_json IS NOT NULL ORDER BY ordinal').bind(sessionId).all();return {schema:FORMAT,session,manifest:m,receipts:rows.results.map(row=>JSON.parse(row.receipt_json)),retainedInD1:true};}
+  async function restart(resetRequest){
+   identity(resetRequest,'restart request');const row=await read();if(!row)fail(404,'ROSTER_IMPORT_SESSION','No retained import session.');if(row.state==='abandoned'){if(row.reset_request!==resetRequest)fail(409,'ROSTER_IMPORT_RESTART','The session was already restarted by another request.');return {restarted:true,sessionId,retained:true};}
+   const c=connection(),token=crypto.randomUUID(),statements=[c.prepare("UPDATE gsis_roster_import_sessions SET state='abandoned',reset_request=?,write_token=?,updated_at=? WHERE session_id=? AND state IN ('preparing','staging','failed','imported') AND (SELECT COUNT(*) FROM gsis_edge_heads h JOIN gsis_roster_import_locks l ON h.scope=l.scope WHERE l.session_id=? AND ((h.mode='legacy' AND h.revision=l.base_revision) OR (h.mode='imported' AND h.revision=l.base_revision+1 AND json_extract(h.metadata_json,'$.importSession')=?)))=2").bind(resetRequest,token,Date.now(),sessionId,sessionId,sessionId)];
+   for(const table of ['gsis_edge_records','gsis_edge_receipts'])statements.push(c.prepare('DELETE FROM '+table+" WHERE scope IN ('roster','roster-register') AND "+guard).bind(sessionId,token));
+   statements.push(c.prepare("UPDATE gsis_edge_heads SET revision=0,mode='legacy',source_digest='',imported_records=0,metadata_json='{}',write_token=?,updated_at=? WHERE scope IN ('roster','roster-register') AND "+guard).bind(token,Date.now(),sessionId,token),c.prepare('DELETE FROM gsis_roster_import_locks WHERE session_id=? AND '+guard).bind(sessionId,sessionId,token));
+   try{checked(await c.batch(statements));}catch(error){if((await read())?.reset_request===resetRequest)return {restarted:true,sessionId,retained:true};throw error;}if((await read())?.reset_request!==resetRequest)fail(409,'ROSTER_RESTART_ACTIVE','An active, paused or changed authority cannot be reset.');return {restarted:true,sessionId,retained:true,evidence:{sessionId,manifestDigest:row.manifest_digest,sourceDigest:row.source_digest},next:'Use a new request ID to capture a new Google source.'};
+  }
+  return {reserve,bind,progress,manifest,validatePart,partReceipt,segmentReceipts,stage,referencesReady,failPreparation,finalize,evidence,restart};
+ }
+ async function hashBytes(bytes){return Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',bytes)),n=>n.toString(16).padStart(2,'0')).join('');}
+ async function stageObject(bucket,store,sessionId,part,body){
+  if(!bucket?.put||!bucket?.head||!bucket?.get)fail(503,'ROSTER_IMPORT_BUCKET','Private R2 storage with verified readback is required.');
+  if(part.kind==='segment'){
+   if(typeof body.base64!=='string'||body.base64.length>4*Math.ceil(SEGMENT_BYTES/3)||! /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(body.base64))fail(409,'ROSTER_IMPORT_OBJECT','Invalid compressed object segment.');
+   const bytes=Uint8Array.from(atob(body.base64),char=>char.charCodeAt(0));if(!bytes.length||bytes.length>SEGMENT_BYTES)fail(409,'ROSTER_IMPORT_OBJECT','Invalid compressed object segment size.');const digest=await hashBytes(bytes),key='gsis/roster/import-staging/'+sessionId+'/'+part.id;
+   await bucket.put(key,bytes,{customMetadata:{digest,sessionId,partId:part.id}});const saved=await bucket.head(key);if(!saved||saved.size!==bytes.length||saved.customMetadata?.digest!==digest)fail(503,'ROSTER_IMPORT_OBJECT','The compressed segment write could not be verified.');return {verified:true,key,bytes:bytes.length,digest};
+  }
+  if(part.kind!=='object'||!body.reference||body.reference.encoding!=='gzip-json-v1'||!digestValue(body.reference.digest)||!['baseline','audit','stapler'].includes(body.kind)||!body.reference.key?.startsWith('gsis/roster/'+body.kind+'/')||!body.reference.key.endsWith('/'+body.reference.digest+'.json.gz')||!Number.isSafeInteger(body.gzipBytes)||body.gzipBytes<1||body.gzipBytes>MAX_TOTAL_BYTES||!Array.isArray(body.segments)||!body.segments.length||body.segments.length>MAX_PARTS||new Set(body.segments).size!==body.segments.length)fail(409,'ROSTER_IMPORT_OBJECT','Invalid immutable object assembly.');
+  const receipts=await store.segmentReceipts(body.segments);if(receipts.length!==body.segments.length||receipts.reduce((n,r)=>n+r.object.bytes,0)!==body.gzipBytes)fail(409,'ROSTER_IMPORT_OBJECT','The compressed object segments are incomplete.');
+  // workerd requires a known-length stream for R2.put. The TransformStream
+  // fallback is only for compatible local runtimes; it never buffers the object.
+  const stream=typeof FixedLengthStream==='function'?new FixedLengthStream(body.gzipBytes):new TransformStream(),writer=stream.writable.getWriter();
+  const upload=bucket.put(body.reference.key,stream.readable,{httpMetadata:{contentType:'application/gzip'},customMetadata:{digest:body.reference.digest,kind:body.kind,schema:'1'}}).catch(error=>{writer.abort(error).catch(()=>{});throw error;});
+  const pump=(async()=>{try{for(const receipt of receipts){const segment=receipt.object,stored=await bucket.get(segment.key);if(!stored||stored.size!==segment.bytes||stored.size>SEGMENT_BYTES)fail(503,'ROSTER_IMPORT_OBJECT','A retained object segment is missing or altered.');const bytes=await stored.arrayBuffer();if(bytes.byteLength!==segment.bytes||await hashBytes(bytes)!==segment.digest)fail(503,'ROSTER_IMPORT_OBJECT','A retained object segment failed its digest check.');await writer.write(new Uint8Array(bytes));}await writer.close();}catch(error){writer.abort(error).catch(()=>{});throw error;}})();
+  await Promise.all([upload,pump]);const saved=await bucket.head(body.reference.key);if(!saved||saved.size!==body.gzipBytes||saved.customMetadata?.digest!==body.reference.digest)fail(503,'ROSTER_IMPORT_OBJECT','The immutable object assembly could not be verified.');return {verified:true,key:body.reference.key,bytes:body.gzipBytes,digest:body.reference.digest};
+ }
+
+ async function latest(db){await ensure(db);return (await (typeof db.withSession==='function'?db.withSession('first-primary'):db).prepare('SELECT s.session_id sessionId,s.actor,s.request_id requestId,s.state,s.source_digest sourceDigest,s.manifest_digest manifestDigest FROM gsis_roster_import_sessions s ORDER BY EXISTS(SELECT 1 FROM gsis_roster_import_locks l WHERE l.session_id=s.session_id) DESC,s.created_at DESC,s.rowid DESC LIMIT 1').first())||null;}
+
+ return {freeze,validateManifest,utf8Length,open,ensure,latest,hashText,hashBytes,stageObject,FORMAT,SCOPES,TARGET_BYTES,SEGMENT_BYTES,MAX_PART_BYTES,MAX_PARTS,MAX_MANIFEST_BYTES,MAX_TOTAL_BYTES,MAX_OBJECT_BYTES,MAX_RETAINED_SESSIONS};
+})();
+if(typeof module!=='undefined'&&module.exports)module.exports=GSiSRosterImport;
+
+/* GSIS_ROSTER_IMPORT_END */
