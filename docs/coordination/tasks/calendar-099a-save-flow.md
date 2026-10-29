@@ -1,4 +1,4 @@
-# calendar-099a-save-flow: instant save receipt, stable weekly view, year-switch overlay
+# calendar-099a-save-flow: instant save receipt, stable weekly view, year-switch overlay, multi-venue chips
 
 - Status: proposed (owner go 29 Oct 2026 for the D1-first receipt; Codex builds, not Friday-critical)
 - Owner/model: Codex
@@ -27,6 +27,18 @@ Full analysis and acceptance checks: /docs/v099a/PENDING_CHANGELOG.md and the ow
 
 ## Part 3: overlay while switching year (request 28 Oct)
 Reuse `.sync-overlay` (blur, spinner) labelled "Loading <year> calendar…" on year change only; hide when rendered or on error; no flash for cached years (show after ~300 ms); never for background refresh or job updates.
+
+## Part 4: several venues per event, as chips (request 29 Oct)
+Today: one `VenueID` per event plus free-text `Location` (calendar-update/public/app.js venue picker; backend `calendarValidateVenue_`, calendar-backend/VenueDirectory.gs ~69 and Code.gs ~10306). Only Calendar reads `VenueID`; Roster and Venues do not.
+
+Required:
+1. Picking a venue from the suggestions adds a chip and clears the input for the next search. Each chip shows the unit and name ("B2-03 Oracle 2") with an x button on the LEFT of the label; x removes it. Keyboard: Backspace in an empty input removes the last chip; chips are focusable buttons with aria-label "Remove <venue>".
+2. Typed text that matches no venue can still be added as one custom location (Enter), shown as a chip in a muted style.
+3. Storage stays backward compatible: `VenueID` holds venue ids joined by "," in chip order (one id = today's format); `Location` holds the chip labels joined by ", " and is what Google Calendar shows.
+4. Backend validates every id against the venue catalogue, rejects duplicates, caps at 6 venues, and keeps today's rules for one id and for custom text. Selecting venues still does not reserve them.
+5. Edit, copy and relocate keep all chips; existing single-venue and custom events open unchanged.
+
+Acceptance: picker unit test (add, remove by x, Backspace, custom chip, duplicate ignored); backend test (two valid ids saved, an unknown id rejected, legacy single id unchanged); browser check that the chip row wraps at phone width.
 
 ## Release note
 `app.js` rejects a backend whose version differs from FRONTEND_VERSION. Ship frontend and backend as a matched 0.9.9a pair, or relax the check to the base version. Worker change ships with the pair.
