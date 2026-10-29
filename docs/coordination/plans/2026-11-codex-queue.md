@@ -12,6 +12,7 @@ Owner (Song Wee, 30 Oct): "it can be all, let codex work while i teach". Claude 
 | 6 | (new) roster-published-time-chip | PENDING_CHANGELOG, time only, no publisher |
 | 7 | lord-queued-writes.md phase 1 | Queue and status list, no UI change |
 | 8 | lord-queued-writes.md phase 2 | Book cart, open/collect, collect photos, return, return photos |
+| 8b | deploy-queued-writes.md | Same queue as LORD; keep clash detection and who-did-what notices |
 | 9 | calendar-099a-save-flow.md | Instant save, weekly view, year overlay, venue chips (max 6) |
 | 10 | (new) roster-stapler-all-dates | Owner decisions 1 and 2 under Annual R% in PENDING_CHANGELOG |
 | 11 | (new) roster-peer-release-notify | Owner decision 3 |
