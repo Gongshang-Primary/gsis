@@ -944,10 +944,11 @@ const next=stapler().effectiveDay(plan,ctx.baselineDays?.[d]||ctx.days[d]);for(c
     if(!pending.length)return 'Duty acknowledged, cancelled or superseded.';
     const v=pending.sort((a,b)=>assignmentStart(a.assignment)-assignmentStart(b.assignment))[0];data.snapshotIds=pending.map(v=>v.id);data.startAt=assignmentStart(v.assignment);data.assignedTeacherId=v.staffId;data.assignedTeacherName=v.assignment.relieverName;
     data.summary=pending.map(v=>'P'+v.period+' · '+v.assignment.timeStart+' to '+v.assignment.timeEnd+' · '+[v.assignment.className,v.assignment.subject,v.assignment.venue].filter(Boolean).join(' · ')).join('; ');
-    if(j.kind==='relief_reminder')data.summary=publicationSummary(pending);
     const minutes=(data.startAt-now)/60000;
     if(minutes<=0)return 'The lesson has started. Review outstanding acknowledgement in Roster.';
     if(data.templateKey==='relief_reminder'&&!(minutes>19&&minutes<=20))data.templateKey='relief_urgent';
+    // Choose the text after the final template: a reminder keeps full detail, an urgent notice is compact.
+    if(j.kind==='relief_reminder')data.summary=data.templateKey==='relief_urgent'?shortPublicationSummary(pending,false):publicationSummary(pending);
     if(data.templateKey==='relief_unacknowledged'&&!(minutes>9&&minutes<=10))data.templateKey='relief_urgent_smc';
    }
   }else if(['relief_publication','relief_reminder','conditional_relief_instruction'].includes(j.kind))return 'Legacy notification has no publication revision. Review it in Roster.';
@@ -1035,7 +1036,7 @@ const next=stapler().effectiveDay(plan,ctx.baselineDays?.[d]||ctx.days[d]);for(c
    }
   }
   for(const id of new Set(s.publicationSnapshots.map(v=>v.staffId))){for(const v of pendingPublications(s,id)){if(v.kind==='cancelled'||v.date!==ctx.today||s.dailyPublicationStates?.[v.date]&&!s.outbox.some(j=>j.date===v.date&&j.recipientId===id&&j.data?.dailyPublication&&j.data.fingerprint===s.dailyPublicationStates[v.date].teachers.find(t=>t.staffId===id)?.fingerprint))continue;const start=assignmentStart(v.assignment),before=(start-ctx.now)/60000;if(before<=0)continue;
-    if(before<=20&&!v.urgent)queue(s,ctx,'relief_reminder',id,v.date,{templateKey:before>19?'relief_reminder':'relief_urgent',summary:publicationSummary([v]),snapshotIds:[v.id],startAt:start},null,'reminder:'+v.id);
+    if(before<=20&&!v.urgent)queue(s,ctx,'relief_reminder',id,v.date,{templateKey:before>19?'relief_reminder':'relief_urgent',summary:before>19?publicationSummary([v]):shortPublicationSummary([v],false),snapshotIds:[v.id],startAt:start},null,'reminder:'+v.id);
     if(before<=10)smcAlert(s,ctx,v.date,'unacknowledged:'+v.id,'Unacknowledged relief: '+staff(ctx,id).name+', P'+v.period+' at '+v.assignment.timeStart+'.',true,'smc_alert',{templateKey:before>9?'relief_unacknowledged':'relief_urgent_smc',snapshotIds:[v.id],assignedTeacherId:id,assignedTeacherName:staff(ctx,id).name,startAt:start});
   }}
   const report=queueDailyEmployment(s,ctx,ctx.today),allocated=!skipAllocation&&allocationSlot&&s.systemConfig.scheduledAllocationEnabled;
