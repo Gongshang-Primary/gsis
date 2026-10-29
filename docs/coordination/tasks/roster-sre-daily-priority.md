@@ -1,6 +1,6 @@
 # roster-sre-daily-priority: SREs are rostered daily first, not by annual R%
 
-- Status: approved (owner request 30 Oct 2026; all logged items have owner go); confirm the two open points below before claiming
+- Status: approved, ready to claim (owner decisions recorded 30 Oct 2026)
 - Owner/model: Codex
 - Reviewer/model: Claude
 - Last updated (Asia/Singapore): 30 Oct 2026 07:10
@@ -24,9 +24,9 @@
 - `workloadRules` already provides the two school-wide limits (code defaults 9 and 6; the live values are whatever Settings holds). They already apply to SREs. The new part of this task is only the SRE priority and the removal of R% from SRE ranking.
 - SRE appears only in employment restrictions (restricted periods) and employment parsing (shared/relief.js).
 
-## Open point for the owner
-- Check Settings → Daily workload limits shows 8 for maximum total daily periods and the intended consecutive value; these apply to all staff, not only SREs.
-- R% displays for SREs: show "Daily roster, no R%" (proposed default) unless the owner says otherwise.
+## Owner decisions (30 Oct 2026)
+- SREs use the same Daily workload limits settings as all staff; no separate SRE values.
+- R% displays show SREs as "Daily roster, no R%" (My Calculations, annual balances, statistics).
 
 ## Acceptance
 - With an SRE and a teacher with lower R% both free: the SRE is chosen.
@@ -34,3 +34,4 @@
 - Two SREs: the one with fewer periods today is chosen; tie goes to rotation.
 - Non-SRE allocation results unchanged on existing seeded tests (roster701-r17-solver oracle cases).
 - Manual, protected and peer assignments untouched.
+- SRE rows on R% displays read "Daily roster, no R%".
