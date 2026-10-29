@@ -3498,7 +3498,8 @@ const next=stapler().effectiveDay(plan,ctx.baselineDays?.[d]||ctx.days[d]);for(c
   if(!ctx.days[d]?.schoolDay||ctx.days[d]?.verified===false)fail(409,'A confirmed school timetable is required.');
   A.initialiseHistory(s,ctx,d);A.captureWeek(s,ctx,d);const Y=A.year(d);
   if(!s.accountingYears[Y]?.verified){smcAlert(s,ctx,d,'accounting-required:'+Y,'Automatic allocation is paused: Admin must verify '+Y+' historical weekly R entitlements and relief already performed. No history has been invented.',false);captureOptimisationRun(s,{id:ctx.uuid(),date:d,key:cycleKey,at:ctx.iso,status:'paused',reason:'Annual accounting history is not verified.',...(s.systemConfig?.verboseLogging===false?{}:{decisionEvidence:{version:1,inputs:{baselineId:ctx.days[d]?.id||null,staplerRevision:ctx.days[d]?.staplerRevision||0},lessons:[],periods:[],teachers:[]}})});return {paused:true,reason:'Annual accounting history is not verified.',savedIds:[]};}
-  const proposal=A.optimise(s,ctx,d,demand(ctx,s,d),{maxNodes:256,fillOnly,preferences:operationalSettings(s).systemConfig.allocationPreferences}),existing=fillOnly?[]:A.effectiveAssignments(s).filter(a=>a.date===d&&!A.protectedAssignment(a)&&!A.periodStarted(ctx,d,a.period,a)&&!ctx.people.some(person=>person.id===a.staffId&&!A.reliefCandidateEligible(person))),savedIds=[],changes=[],replacementAncestry=new Map([...s.assignments.filter(a=>a.date===d&&a.status==='draft'&&a.replaces),...existing].filter(a=>a.replaces).map(a=>[a.demandId,a.replaces]));
+  const proposal=A.optimise(s,ctx,d,demand(ctx,s,d),{maxNodes:256,fillOnly,preferences:operationalSettings(s).systemConfig.allocationPreferences,...(!manual&&ctx.allocationBudgetCheck?{checkBudget:ctx.allocationBudgetCheck}:{})}),existing=fillOnly?[]:A.effectiveAssignments(s).filter(a=>a.date===d&&!A.protectedAssignment(a)&&!A.periodStarted(ctx,d,a.period,a)&&!ctx.people.some(person=>person.id===a.staffId&&!A.reliefCandidateEligible(person))),savedIds=[],changes=[],replacementAncestry=new Map([...s.assignments.filter(a=>a.date===d&&a.status==='draft'&&a.replaces),...existing].filter(a=>a.replaces).map(a=>[a.demandId,a.replaces]));
+  if(!manual&&ctx.allocationBudgetCheck)ctx.allocationBudgetCheck();
   if(!proposal.coverageProven){smcAlert(s,ctx,d,'solver-budget:'+cycleKey,'Optimisation reached its deterministic search bound. The last valid draft is retained for SMC review.',false);captureOptimisationRun(s,{id:ctx.uuid(),date:d,key:cycleKey,at:ctx.iso,status:'bounded',upperBound:proposal.upperBound,solver:proposal.solver,decisionEvidence:proposal.decisionEvidence});return {paused:true,reason:'Coverage could not be certified within the search bound.',savedIds:[]};}
   if(proposal.changed){const byDem=new Map(demand(ctx,s,d).map(x=>[x.id,x]));for(const a of existing)if(!proposal.assignments.some(x=>x.demandId===a.demandId&&x.staffId===a.staffId&&x.period===a.period&&A.cost(x)===A.cost(a)&&!!x.repurposedDuty===!!a.repurposedDuty)){changes.push({demandId:a.demandId,period:a.period,from:a.staffId,to:proposal.assignments.find(x=>x.demandId===a.demandId)?.staffId||null});a.status='cancelled';a.cancellationReason='Automatic reoptimisation';a.cancelledAt=ctx.iso;if(a.replaces&&!proposal.assignments.some(x=>x.demandId===a.demandId))s.assignments.push({...copy(a),id:ctx.uuid(),status:'draft',origin:'automatic',protected:false,remove:true,noRelief:false,rCost:0,createdAt:ctx.iso,createdBy:'automatic'});}
    for(const x of proposal.assignments){if(existing.some(a=>a.status==='draft'&&a.demandId===x.demandId&&a.staffId===x.staffId&&a.period===x.period&&A.cost(a)===A.cost(x)&&!!a.repurposedDuty===!!x.repurposedDuty))continue;const dem=byDem.get(x.demandId);if(!dem)fail(409,'Relief demand changed.');const abs=s.absences.find(a=>a.id===dem.absenceId),row=snapshot({id:ctx.uuid(),demandId:dem.id,staffId:x.staffId,status:'draft',origin:'automatic',protected:false,mutual:false,noRelief:false,remove:false,replaces:replacementAncestry.get(dem.id)||null,rCost:x.rCost??1,repurposedDuty:x.repurposedDuty===true,version:1,createdAt:ctx.iso,createdBy:'automatic'},dem,{...ctx,instruction:assignmentInstructions(s,dem),customInstruction:customText(s,dem)});for(const removal of s.assignments.filter(a=>a.demandId===dem.id&&a.status==='draft'&&a.remove)){removal.status='cancelled';removal.cancelledAt=ctx.iso;}s.assignments.push(row);savedIds.push(row.id);if(!changes.some(c=>c.demandId===dem.id))changes.push({demandId:dem.id,period:dem.period,from:null,to:x.staffId});
@@ -3533,9 +3534,9 @@ const next=stapler().effectiveDay(plan,ctx.baselineDays?.[d]||ctx.days[d]);for(c
  }
  function scheduledTick(s,ctx,scheduledTime){
   const A=allocation();A.ensure(s);if(!ctx.service)fail(403,'Only the signed scheduler may run this operation.');if(!Number.isFinite(scheduledTime)||scheduledTime>ctx.now+60000||ctx.now-scheduledTime>120000)fail(400,'Scheduled tick is stale.');const slot=A.schedule(scheduledTime),d=slot.date,key=slot.key;
-  const cancellation=s.scheduleReceipts[key]?.cancelled?s.scheduleReceipts[key]:null,skipAllocation=ctx.skipScheduledAllocation===true||!!cancellation;
+  const allocationKey=ctx.scheduledAllocationKey||key,allocationSlot=slot.optimise||ctx.scheduledAllocationRetry===true&&slot.allocationKey===allocationKey,cancellation=s.scheduleReceipts[allocationKey]?.cancelled?s.scheduleReceipts[allocationKey]:null;let skipAllocation=ctx.skipScheduledAllocation===true||!!cancellation;
   if(s.scheduleReceipts[key]&&(!cancellation||cancellation.reportComplete))return {replayed:true,savedIds:[]};let result={savedIds:[],allocationPaused:operationalSettings(s).systemConfig.scheduledAllocationEnabled!==true,...(skipAllocation?{allocationSkipped:true}:{})};
-  if(!skipAllocation&&slot.optimise&&operationalSettings(s).systemConfig.scheduledAllocationEnabled&&ctx.days[d]?.schoolDay===true){if(A.mayOptimise(ctx,d))result=runOptimisation(s,ctx,d,key);else smcAlert(s,ctx,d,'missed-cutoff:'+d,'Final optimisation did not complete before the cut-off. Review the last valid draft and allocate manually.',false);}
+  if(!skipAllocation&&allocationSlot&&operationalSettings(s).systemConfig.scheduledAllocationEnabled&&ctx.days[d]?.schoolDay===true){if(A.mayOptimise(ctx,d)){try{result=runOptimisation(s,ctx,d,allocationKey);}catch(error){if(error.code!=='ALLOCATION_BUDGET')throw error;skipAllocation=true;result={savedIds:[],allocationSkipped:true,allocationTimedOut:true};}}else smcAlert(s,ctx,d,'missed-cutoff:'+d,'Final optimisation did not complete before the cut-off. Review the last valid draft and allocate manually.',false);}
   const summarySlot=smcSummarySlot(s,scheduledTime),window=summarySlot?.phase||null;
   const finalRunComplete=result.run?.status==='complete'||s.optimisationRuns.some(r=>r.date===d&&r.key.includes('T06:29')&&r.status==='complete');
   if([389,390].includes(slot.minute)&&ctx.days[d]?.schoolDay===true&&!finalRunComplete)smcAlert(s,ctx,d,'final-incomplete:'+d,'The final scheduled optimisation has NOT completed successfully. Review the last valid draft and allocate manually.',true,'smc_alert',{templateKey:'smc_attention'});
@@ -3556,7 +3557,9 @@ const next=stapler().effectiveDay(plan,ctx.baselineDays?.[d]||ctx.days[d]);for(c
     if(before<=20&&!v.urgent)queue(s,ctx,'relief_reminder',id,v.date,{templateKey:before>19?'relief_reminder':'relief_urgent',summary:publicationSummary([v]),snapshotIds:[v.id],startAt:start},null,'reminder:'+v.id);
     if(before<=10)smcAlert(s,ctx,v.date,'unacknowledged:'+v.id,'Unacknowledged relief: '+staff(ctx,id).name+', P'+v.period+' at '+v.assignment.timeStart+'.',true,'smc_alert',{templateKey:before>9?'relief_unacknowledged':'relief_urgent_smc',snapshotIds:[v.id],assignedTeacherId:id,assignedTeacherName:staff(ctx,id).name,startAt:start});
   }}
-  const report=queueDailyEmployment(s,ctx,ctx.today);s.scheduleReceipts[key]={...cancellation,at:ctx.iso,report:window,optimise:!skipAllocation&&slot.optimise&&s.systemConfig.scheduledAllocationEnabled,...(cancellation?{reportComplete:true}:{})};return {...result,...report};
+  const report=queueDailyEmployment(s,ctx,ctx.today),allocated=!skipAllocation&&allocationSlot&&s.systemConfig.scheduledAllocationEnabled;
+  s.scheduleReceipts[key]={...(key===allocationKey?cancellation:null),at:ctx.iso,report:window,optimise:allocated,...(cancellation&&key===allocationKey?{reportComplete:true}:{}),...(result.allocationTimedOut?{allocationStatus:'budget'}:allocated?{allocationStatus:'complete'}:{})};
+  if(key!==allocationKey&&(allocated||result.allocationTimedOut))s.scheduleReceipts[allocationKey]={...s.scheduleReceipts[allocationKey],at:ctx.iso,optimise:allocated,allocationStatus:result.allocationTimedOut?'budget':'complete'};return {...result,...report};
  }
 
  function publicDuty(a){
@@ -4263,6 +4266,9 @@ function rosterOperationsCommit_(state,intakeFenceDates=null,intakeFencePeers=fa
  const stored=props_().getProperty('ROSTER_OPERATIONS_FILE'),id=stored||rosterFindFile_(ROSTER_DATA,'Roster operations.json');
  // External preparation and file lookup can cross a period start. The allocator
  // rechecks its trusted clock inside the final write closure, never from input.
+ // A failed hint-version update after a successful write must not preserve a
+ // stale no-work hint. Fence hint readers before submitting any source write.
+ props_().setProperty('ROSTER_SCHEDULE_DIRTY','1');
  if(beforeWrite)beforeWrite();
  const saved=id?(rosterDriveRequest_('https://www.googleapis.com/upload/drive/v3/files/'+encodeURIComponent(id)+'?uploadType=media&supportsAllDrives=true&fields=id',{method:'patch',contentType:'application/json; charset=UTF-8',payload:data},'operations-commit'),id):rosterCreateFile_(ROSTER_DATA,'Roster operations.json',Utilities.newBlob(data,'application/json'));
  if(!stored)props_().setProperty('ROSTER_OPERATIONS_FILE',saved);
@@ -4553,12 +4559,12 @@ function rosterOperationsAllocationChangeKey_(s,dayToken){
 // Read hints only. Mutation validation always reloads authoritative records.
 // A lost Drive acknowledgement still invalidates the hint; failed invalidation
 // cannot fail a committed save and is recovered by the embedded 30-second age.
-function rosterOperationsVersionChanged_(){try{props_().setProperty('ROSTER_VERSION_HINT',Utilities.getUuid());}catch(ignore){}}
+function rosterOperationsVersionChanged_(){try{const p=props_();p.setProperty('ROSTER_VERSION_HINT',Utilities.getUuid());if(p.deleteProperty)p.deleteProperty('ROSTER_SCHEDULE_DIRTY');}catch(ignore){}}
 function rosterOperationsVersionSnapshot_(date,ctx,index,people,run){
  const now=Date.now();let cache,key;
  try{key='roster-version-v2:'+rosterOperationsDigest_({date,runId:run?.id||null,marker:props_().getProperty('ROSTER_VERSION_HINT'),file:props_().getProperty('ROSTER_OPERATIONS_FILE'),index,people,build:typeof GSIS_DEPLOY_VERSION==='string'?GSIS_DEPLOY_VERSION:null});cache=CacheService.getScriptCache();const raw=cache.get(key),hit=raw?JSON.parse(raw):null;if(hit?.schema===1&&hit.date===date&&Number.isFinite(hit.at)&&now>=hit.at&&now-hit.at<30000&&typeof hit.allocationChangeKey==='string'&&typeof hit.dayToken==='string'&&Number.isInteger(hit.revision)&&Number.isInteger(hit.dayRevision)&&Array.isArray(hit.nameBridges)&&hit.systemConfig)return hit;}catch(ignore){cache=null;}
  const s=rosterOperationsState_(true);GSISRosterOperations.seedNameBridges(s,people);
- const value={schema:1,date,at:now,revision:s.revision,dayRevision:s.dayRevisions[date]||0,dayToken:rosterOperationsDayToken_(s,ctx,date),nameBridges:s.nameBridges,systemConfig:s.systemConfig,runReceipt:run&&typeof rosterAllocationRunReceipt_==='function'?rosterAllocationRunReceipt_(run,s)?{cancelled:rosterAllocationRunReceipt_(run,s).cancelled===true}:null:null};
+ const value={schema:1,date,at:now,revision:s.revision,dayRevision:s.dayRevisions[date]||0,dayToken:rosterOperationsDayToken_(s,ctx,date),nameBridges:s.nameBridges,systemConfig:s.systemConfig,runReceipt:run&&typeof rosterAllocationRunReceipt_==='function'?rosterAllocationRunReceipt_(run,s)?{cancelled:rosterAllocationRunReceipt_(run,s).cancelled===true,optimise:rosterAllocationRunReceipt_(run,s).optimise,allocationStatus:rosterAllocationRunReceipt_(run,s).allocationStatus}:null:null};
  value.allocationChangeKey=rosterOperationsAllocationChangeKey_(s,value.dayToken);
  try{const encoded=JSON.stringify(value);if(cache&&encoded.length<90000)cache.put(key,encoded,30);}catch(ignore){}
  return value;
@@ -5184,40 +5190,63 @@ function rosterScheduledIdle_(s,slot,today){
  if(!slot.optimise&&!slot.report&&!notices&&!s.publicationSnapshots.some(v=>v.date===today&&v.kind!=='cancelled'))return {idle:true};
  return null;
 }
+// Conservative, version-fenced no-work projection. Any operations commit changes
+// the version hint, including publication, absence, notification and settings saves.
+function rosterScheduledHintWrite_(s,version){
+ try{if(!version||props_().getProperty('ROSTER_SCHEDULE_DIRTY')||version!==props_().getProperty('ROSTER_VERSION_HINT'))return;const value={schema:1,version,at:Date.now(),enabled:s.systemConfig.scheduledAllocationEnabled===true,times:s.systemConfig.smcSummaryTimes,noticeDates:[...new Set([...Object.keys(s.massPublications),...s.staplerPlans.filter(r=>r.published).map(r=>r.date),...s.publicationSnapshots.filter(r=>r.kind!=='cancelled').map(r=>r.date)])]},json=JSON.stringify(value);if(json.length<7500)props_().setProperty('ROSTER_SCHEDULE_HINT',json);}catch(_){}
+}
+function rosterScheduledFastSkip_(slot,gate,today){
+ try{const raw=props_().getProperty('ROSTER_SCHEDULE_HINT'),hint=raw&&JSON.parse(raw);if(!hint||hint.schema!==1||!hint.version||props_().getProperty('ROSTER_SCHEDULE_DIRTY')||hint.version!==props_().getProperty('ROSTER_VERSION_HINT')||Date.now()<hint.at||Date.now()-hint.at>=15*60000)return null;
+ const phase=slot.minute>=960?'evening':slot.minute<390?'morning':null,time=String(Math.floor(slot.minute/60)).padStart(2,'0')+':'+String(slot.minute%60).padStart(2,'0');
+ if([389,390].includes(slot.minute)||phase&&hint.times?.[phase]?.includes(time)||hint.noticeDates.includes(today)||gate.allocate&&hint.enabled)return null;
+ return {idle:true,allocationSkipped:true,...(gate.allocationStopped?{allocationStopped:true}:{}),...(gate.allocationInProgress?{allocationInProgress:true}:{}),...(!hint.enabled?{allocationPaused:true}:{})};
+ }catch(_){return null;}
+}
 function rosterScheduledDispatch_(req){gsisRequireBackendRole_('roster');
  const p=req.input||{},stamp=p.scheduledTime,started=Date.now();if(!Number.isFinite(stamp)||stamp>started+60000||started-stamp>120000)error_(400,'Scheduled tick is stale.');
- if(typeof rosterAbsenceIntakeGate_==='function'){const slot=GSISRosterAllocation.schedule(stamp);rosterAbsenceIntakeGate_([slot.date],slot.optimise===true);}
- const slot={...GSISRosterAllocation.schedule(stamp),stamp},today=new Date(started+8*3600000).toISOString().slice(0,10);let initial=rosterOperationsState_();if(typeof rosterAllocationAuditEnsureDay_==='function')initial=rosterAllocationAuditEnsureDay_(initial,p.calendarByDate,today);const preflight=rosterScheduledIdle_(initial,slot,today);if(preflight)return preflight;
- const fresh=rosterServiceContacts_();
+ const slot={...GSISRosterAllocation.schedule(stamp),stamp},today=new Date(started+8*3600000).toISOString().slice(0,10),tracked=typeof rosterScheduledAllocationGate_==='function';
+ if(tracked)rosterScheduledAllocationRecover_(slot);const gate=tracked?rosterScheduledAllocationGate_(slot):{allocate:slot.optimise};
+ if(tracked&&slot.allocationKey){const visible=rosterAllocationRunRead_(slot.date);if(visible?.scheduleKey===slot.allocationKey&&(visible.tickKey||visible.scheduleKey)===slot.key){if(visible.state==='completed')return {replayed:true,allocationSkipped:true};if(gate.allocationInProgress)throw Object.assign(Error('An allocator is already running for this date.'),{status:409,code:'ALLOCATION_IN_PROGRESS'});}}
+ const fast=rosterScheduledFastSkip_(slot,gate,today);if(fast)return fast;
  const execute=(run,reportOnly=false)=>{
- for(let attempt=0;attempt<2;attempt++){
-  const now=Date.now();if(now-stamp>120000)error_(400,'Scheduled tick is stale.');
-  const s=rosterOperationsPhase_('prepare-state',()=>rosterOperationsState_()),today=new Date(now+8*3600000).toISOString().slice(0,10),idle=rosterScheduledIdle_(s,slot,today);if(idle)return idle;
-  const base=rosterOperationsPackedSnapshot_(s),ctx=rosterOperationsPhase_('prepare-context',()=>rosterOperationsContext_({identity:fresh.identity,input:{...p,operation:'scheduledRoster',date:slot.date}},fresh.c,s));
-  ctx.user={staffId:null,email:'roster-service',smc:true,admin:false};ctx.service=true;ctx.skipScheduledAllocation=reportOnly;
-  const command={...p,operation:'scheduledRoster',date:slot.date};
-  try{
-   if(run)rosterAllocationRunStage_(run,attempt?'Planning inputs changed; recalculating against current records.':'Calculating scheduled relief while retaining manual choices.');
-   const references=rosterOperationsReferenceKey_(ctx),dependencies=rosterOperationsDependencies_(base,command,ctx),beforeOutbox=s.outbox.length;
-   rosterOperationsClock_(ctx);const preparedClock=ctx.today+':'+ctx.minute;
-   rosterOperationsPhase_('prepare-reconcile',()=>rosterOperationsReconcile_(s,ctx));const result=rosterOperationsPhase_('prepare-apply',()=>GSISRosterOperations.scheduledTick(s,ctx,stamp));
-   for(const [key,value] of Object.entries(s.scheduleReceipts))if(Date.parse(value.at)<now-3*86400000)delete s.scheduleReceipts[key];
-   const next=rosterOperationsPackedSnapshot_(s),domainChanged=rosterOperationsDependencies_(base,{},ctx)!==rosterOperationsDependencies_(next,{},ctx);
-   const lock=LockService.getScriptLock();if(!rosterOperationsPhase_('lock-wait',()=>deployLock_(lock,8000)))error_(503,'Another relief update is finishing. Retry the scheduler tick.');
+  if(typeof rosterAbsenceIntakeGate_==='function')rosterAbsenceIntakeGate_([slot.date],!!run||slot.optimise&&!reportOnly);
+  const version=props_().getProperty('ROSTER_VERSION_HINT');let initial=rosterOperationsState_();rosterScheduledHintWrite_(initial,version);
+  if(run&&rosterAllocationRunAccepted_(run,initial)){rosterAllocationRunLocked_(()=>rosterAllocationRunComplete_(run,initial));return {replayed:true};}
+  if(typeof rosterAllocationAuditEnsureDay_==='function')initial=rosterAllocationAuditEnsureDay_(initial,p.calendarByDate,today);
+  const effectiveSlot={...slot,optimise:!reportOnly&&(!!run||slot.optimise)},preflight=rosterScheduledIdle_(initial,effectiveSlot,today);if(preflight)return {...preflight,...(reportOnly?{allocationSkipped:true,...(gate.allocationStopped?{allocationStopped:true}:{})}:{})};
+  const fresh=rosterServiceContacts_();
+  for(let attempt=0;attempt<2;attempt++){
+   const now=Date.now();if(now-stamp>120000)error_(400,'Scheduled tick is stale.');
+   const s=rosterOperationsPhase_('prepare-state',()=>rosterOperationsState_()),today=new Date(now+8*3600000).toISOString().slice(0,10),idle=rosterScheduledIdle_(s,effectiveSlot,today);if(idle)return idle;
+   const base=rosterOperationsPackedSnapshot_(s),ctx=rosterOperationsPhase_('prepare-context',()=>rosterOperationsContext_({identity:fresh.identity,input:{...p,operation:'scheduledRoster',date:slot.date}},fresh.c,s));
+   ctx.user={staffId:null,email:'roster-service',smc:true,admin:false};ctx.service=true;ctx.skipScheduledAllocation=reportOnly;ctx.scheduledAllocationKey=run?.scheduleKey||slot.allocationKey||slot.key;ctx.scheduledAllocationRetry=!!run&&!slot.optimise;if(run)ctx.allocationBudgetCheck=()=>rosterScheduledAllocationBudget_(run);
+   const command={...p,operation:'scheduledRoster',date:slot.date};
    try{
-    if(typeof rosterAbsenceIntakeGate_==='function')rosterAbsenceIntakeGate_([slot.date],slot.optimise===true&&!reportOnly);
-    const current=rosterOperationsState_();if(run&&current.scheduleReceipts[slot.key]?.cancelled)rosterAllocationRunCancellation_();if(current.scheduleReceipts[slot.key]&&(!current.scheduleReceipts[slot.key].cancelled||current.scheduleReceipts[slot.key].reportComplete))return {replayed:true};
-    const finalClock={};rosterOperationsClock_(finalClock);if(finalClock.now-stamp>120000)error_(400,'Scheduled tick is stale.');
-    if(!reportOnly&&!s.scheduleReceipts[slot.key]?.cancelled&&slot.optimise&&s.systemConfig.scheduledAllocationEnabled&&ctx.days[slot.date]?.schoolDay&&finalClock.now>Date.parse(slot.date+'T06:29:59.999+08:00'))rosterOperationsConflict_('ALLOCATION_CUTOFF','Optimisation crossed the morning cut-off. No draft changes were saved.');
-    if(finalClock.today+':'+finalClock.minute!==preparedClock||rosterOperationsReferenceStamp_(ctx)!==references||rosterOperationsDependencies_(rosterOperationsPackPlans_(current),command,ctx)!==dependencies)rosterOperationsConflict_('PREPARED_RETRY','Planning inputs changed during allocation.');
-    const merged=rosterOperationsMergePrepared_(base,next,rosterOperationsPackedSnapshot_(current));merged.revision=current.revision+(domainChanged?1:0);
-    const committed=GSISRosterOperations.validateState(rosterOperationsUnpackPlans_(merged));if(typeof rosterAllocationAuditAccepted_==='function')rosterAllocationAuditAccepted_(committed,current,ctx,{scheduleKey:slot.key});rosterOperationsPhase_('commit',()=>rosterOperationsCommit_(committed,[slot.date],slot.optimise===true&&!reportOnly,()=>{const checkClock=()=>{const writeClock={};rosterOperationsClock_(writeClock);if(writeClock.now-stamp>120000)error_(400,'Scheduled tick is stale.');if(!reportOnly&&!s.scheduleReceipts[slot.key]?.cancelled&&slot.optimise&&s.systemConfig.scheduledAllocationEnabled&&ctx.days[slot.date]?.schoolDay&&writeClock.now>Date.parse(slot.date+'T06:29:59.999+08:00'))rosterOperationsConflict_('ALLOCATION_CUTOFF','Optimisation crossed the morning cut-off. No draft changes were saved.');if(writeClock.today+':'+writeClock.minute!==preparedClock)rosterOperationsConflict_('PREPARED_RETRY','The school-day clock changed before writing.');};checkClock();if(run)rosterAllocationRunBeforeCommit_(run,checkClock);}));if(run)rosterAllocationRunComplete_(run,committed);return {...result,revision:committed.revision,notificationsQueued:s.outbox.length-beforeOutbox};
-   }finally{deployUnlock_(lock);}
-  }catch(e){if(e.code!=='PREPARED_RETRY')throw e;if(attempt===1)error_(503,'Planning inputs changed during allocation. Retry this scheduler tick.');}
- }
+    if(run)rosterAllocationRunStage_(run,attempt?'Planning inputs changed; recalculating against current records.':'Calculating scheduled relief while retaining manual choices.');
+    const references=rosterOperationsReferenceKey_(ctx),dependencies=rosterOperationsDependencies_(base,command,ctx),beforeOutbox=s.outbox.length;
+    rosterOperationsClock_(ctx);const preparedClock=ctx.today+':'+ctx.minute;
+    rosterOperationsPhase_('prepare-reconcile',()=>rosterOperationsReconcile_(s,ctx));const result=rosterOperationsPhase_('prepare-apply',()=>GSISRosterOperations.scheduledTick(s,ctx,stamp)),allocating=effectiveSlot.optimise&&!result.allocationTimedOut;
+    for(const [key,value] of Object.entries(s.scheduleReceipts))if(Date.parse(value.at)<now-3*86400000)delete s.scheduleReceipts[key];
+    const next=rosterOperationsPackedSnapshot_(s),domainChanged=rosterOperationsDependencies_(base,{},ctx)!==rosterOperationsDependencies_(next,{},ctx);
+    if(run)rosterScheduledAllocationBudget_(run,true);
+    const lock=LockService.getScriptLock();if(!rosterOperationsPhase_('lock-wait',()=>deployLock_(lock,8000)))error_(503,'Another relief update is finishing. Retry the scheduler tick.');
+    try{
+     if(typeof rosterAbsenceIntakeGate_==='function')rosterAbsenceIntakeGate_([slot.date],allocating);
+     const current=rosterOperationsState_();if(run&&current.scheduleReceipts[run.scheduleKey]?.cancelled)rosterAllocationRunCancellation_();if(current.scheduleReceipts[slot.key]&&(!current.scheduleReceipts[slot.key].cancelled||current.scheduleReceipts[slot.key].reportComplete))return {replayed:true};
+     const checkClock=()=>{const clock={};rosterOperationsClock_(clock);if(run)rosterScheduledAllocationBudget_(run,true);if(clock.now-stamp>120000)error_(400,'Scheduled tick is stale.');if(allocating&&!s.scheduleReceipts[ctx.scheduledAllocationKey]?.cancelled&&s.systemConfig.scheduledAllocationEnabled&&ctx.days[slot.date]?.schoolDay&&clock.now>Date.parse(slot.date+'T06:29:59.999+08:00'))rosterOperationsConflict_('ALLOCATION_CUTOFF','Optimisation crossed the morning cut-off. No draft changes were saved.');if(clock.today+':'+clock.minute!==preparedClock)rosterOperationsConflict_('PREPARED_RETRY','The school-day clock changed before writing.');};
+     checkClock();if(rosterOperationsReferenceStamp_(ctx)!==references||rosterOperationsDependencies_(rosterOperationsPackPlans_(current),command,ctx)!==dependencies)rosterOperationsConflict_('PREPARED_RETRY','Planning inputs changed during allocation.');
+     const merged=rosterOperationsMergePrepared_(base,next,rosterOperationsPackedSnapshot_(current));merged.revision=current.revision+(domainChanged?1:0);
+     const committed=GSISRosterOperations.validateState(rosterOperationsUnpackPlans_(merged));if(typeof rosterAllocationAuditAccepted_==='function')rosterAllocationAuditAccepted_(committed,current,ctx,{scheduleKey:run?.scheduleKey||slot.key});
+     rosterOperationsPhase_('commit',()=>rosterOperationsCommit_(committed,[slot.date],allocating,()=>{checkClock();if(run)rosterAllocationRunBeforeCommit_(run,checkClock);}));if(run)rosterAllocationRunComplete_(run,committed);rosterScheduledHintWrite_(committed,props_().getProperty('ROSTER_VERSION_HINT'));
+     return {...result,revision:committed.revision,notificationsQueued:s.outbox.length-beforeOutbox};
+    }finally{deployUnlock_(lock);}
+   }catch(e){if(e.code!=='PREPARED_RETRY')throw e;if(attempt===1)error_(503,'Planning inputs changed during allocation. Retry this scheduler tick.');}
+  }
  };
- try{return slot.optimise&&initial.systemConfig.scheduledAllocationEnabled&&!initial.scheduleReceipts[slot.key]?.cancelled&&typeof rosterAllocationRunExecute_==='function'?rosterAllocationRunExecute_({...req,identity:fresh.identity},fresh.c,execute,{trigger:'scheduled',date:slot.date,scheduleKey:slot.key}):execute(null);}
- catch(error){if(!['ALLOCATION_CANCELLED','ALLOCATION_IN_PROGRESS','ALLOCATION_UNCONFIRMED'].includes(error.code))throw error;const active=rosterAllocationRunRead_(slot.date);if(error.code!=='ALLOCATION_CANCELLED'&&active?.trigger==='scheduled'&&active.scheduleKey===slot.key)throw error;return execute(null,true);}
+ try{return gate.allocate&&tracked?rosterAllocationRunExecute_(req,null,execute,{trigger:'scheduled',date:slot.date,scheduleKey:slot.allocationKey,tickKey:slot.key,budgetDeadline:Math.min(started+75000,stamp+90000),saveDeadline:Math.min(started+110000,stamp+115000)}):execute(null,!gate.allocate);}
+ catch(error){if(!['ALLOCATION_SLOT_DONE','ALLOCATION_CANCELLED','ALLOCATION_IN_PROGRESS','ALLOCATION_UNCONFIRMED'].includes(error.code))throw error;const active=rosterAllocationRunRead_(slot.date);if(!['ALLOCATION_SLOT_DONE','ALLOCATION_CANCELLED'].includes(error.code)&&active?.trigger==='scheduled'&&active.scheduleKey===slot.allocationKey)throw error;
+  const currentGate=tracked?rosterScheduledAllocationGate_(slot):gate,skip=rosterScheduledFastSkip_(slot,currentGate,today);return skip||execute(null,true);
+ }
 }
 
 function rosterNotificationManual_(s,j){
@@ -5626,26 +5655,27 @@ var GSISRosterAllocation = (() => {
   }
   /* The flow limits daily headroom as well as weekly R. Branches forbid one
      added period in an overlong run; any feasible plan must omit one such edge. */
-  function flow(teachers,demands,banned,weights){
+  function flow(teachers,demands,banned,weights,checkBudget){
+    if(checkBudget)checkBudget();
     const graph=[];const node=()=>{graph.push([]);return graph.length-1;};const source=node(),sink=node(),dn=new Map(),links=[];
     const edge=(u,v,cap,cost,tag)=>{const a={to:v,rev:graph[v].length,cap,cost,initial:cap,tag},b={to:u,rev:graph[u].length,cap:0,cost:negateCost(cost)};graph[u].push(a);graph[v].push(b);return a;};
     for(const d of demands){const n=node();dn.set(d.id,n);edge(n,sink,1,0);}
-    for(const t of teachers){const n=node();const daily=(t.allocationLimits||workloadLimits()).dailyTotal,headroom=daily==null?Infinity:Math.max(0,daily-new Set([...(t.workloadBase||t.base),...t.assigned]).size),capacity=Math.min(demands.length,allocationCapacity(t),headroom);for(let i=0;i<capacity;i++)edge(source,n,1,(weights.teacherCost?.(t,i)||0));
+    for(const t of teachers){if(checkBudget)checkBudget();const n=node();const daily=(t.allocationLimits||workloadLimits()).dailyTotal,headroom=daily==null?Infinity:Math.max(0,daily-new Set([...(t.workloadBase||t.base),...t.assigned]).size),capacity=Math.min(demands.length,allocationCapacity(t),headroom);for(let i=0;i<capacity;i++)edge(source,n,1,(weights.teacherCost?.(t,i)||0));
       for(const p of new Set([...t.eligible,...(t.repurposePeriods||[])])){const key=t.id+'|'+p;if(banned.has(key))continue;const pn=node(),repurpose=t.repurposePeriods?.has(p);edge(repurpose?source:n,pn,1,repurpose?(weights.repurposeCost??-100000000):0);
         for(const d of demands)if(d.period===p&&d.staffId!==t.id&&!banned.has(t.id+'|d:'+d.id)&&(!t.eligibleDemands||t.eligibleDemands.has(d.id))&&(!repurpose||recessDuty(t,p,d))){const e=edge(pn,dn.get(d.id),1,weights.edgeCost?.(t,d,repurpose)||0,{staffId:t.id,demandId:d.id,period:p,...(repurpose?{rCost:0,repurposedDuty:true}:{})});links.push(e);}
       }
     }
     let total=0,totalCost=0,potentials=null;const N=graph.length;
-    while(true){const dist=Array(N).fill(null),prev=Array(N);dist[source]=0;
+    while(true){if(checkBudget)checkBudget();const dist=Array(N).fill(null),prev=Array(N);dist[source]=0;
       if(potentials){
         // Previous shortest distances make reduced residual costs nonnegative. A
         // small binary heap avoids repeatedly scanning the school-sized graph.
         const heap=[],negative=potentials.map(negateCost),push=(u,value)=>{const item={u,value,priority:addCost(value,negative[u])};let i=heap.length;heap.push(item);while(i){const p=(i-1)>>1;if(compareCost(heap[p].priority,item.priority)<=0)break;heap[i]=heap[p];i=p;}heap[i]=item;};
         const pop=()=>{const first=heap[0],last=heap.pop();if(heap.length){let i=0;while(i*2+1<heap.length){let c=i*2+1;if(c+1<heap.length&&compareCost(heap[c+1].priority,heap[c].priority)<0)c++;if(compareCost(last.priority,heap[c].priority)<=0)break;heap[i]=heap[c];i=c;}heap[i]=last;}return first;};
-        push(source,0);while(heap.length){const {u,value}=pop();if(compareCost(value,dist[u])!==0)continue;for(let i=0;i<graph[u].length;i++){const e=graph[u][i];if(e.cap>0&&improvesCost(value,e.cost,dist[e.to])){dist[e.to]=addCost(value,e.cost);prev[e.to]=[u,i];push(e.to,dist[e.to]);}}}
+        push(source,0);while(heap.length){if(checkBudget)checkBudget();const {u,value}=pop();if(compareCost(value,dist[u])!==0)continue;for(let i=0;i<graph[u].length;i++){const e=graph[u][i];if(e.cap>0&&improvesCost(value,e.cost,dist[e.to])){dist[e.to]=addCost(value,e.cost);prev[e.to]=[u,i];push(e.to,dist[e.to]);}}}
       }else{
         const inQueue=Array(N).fill(false),queue=[source];inQueue[source]=true;
-        for(let qi=0;qi<queue.length;qi++){const u=queue[qi];inQueue[u]=false;for(let i=0;i<graph[u].length;i++){const e=graph[u][i];if(e.cap>0&&improvesCost(dist[u],e.cost,dist[e.to])){dist[e.to]=addCost(dist[u],e.cost);prev[e.to]=[u,i];if(!inQueue[e.to]){inQueue[e.to]=true;queue.push(e.to);}}}}
+        for(let qi=0;qi<queue.length;qi++){if(checkBudget)checkBudget();const u=queue[qi];inQueue[u]=false;for(let i=0;i<graph[u].length;i++){const e=graph[u][i];if(e.cap>0&&improvesCost(dist[u],e.cost,dist[e.to])){dist[e.to]=addCost(dist[u],e.cost);prev[e.to]=[u,i];if(!inQueue[e.to]){inQueue[e.to]=true;queue.push(e.to);}}}}
       }
       potentials=dist.map((value,i)=>value??potentials?.[i]??0);
       if(dist[sink]===null)break;for(let v=sink;v!==source;){const [u,i]=prev[v],e=graph[u][i];e.cap--;graph[v][e.rev].cap++;v=u;}total++;totalCost=addCost(totalCost,dist[sink]);
@@ -5669,7 +5699,7 @@ var GSISRosterAllocation = (() => {
     let best={coverage:0,assignments:[],cost:0},upper=0,nodes=0,exhausted=false;const maxNodes=limits.maxNodes||256,seen=new Set(),stack=[new Set()];
     // Each relaxed flow bounds both coverage and the complete ordered policy score.
     // Reaching full coverage alone does not prove the best business-rule fit.
-    while(stack.length){if(nodes>=maxNodes){exhausted=true;break;}const banned=stack.pop(),key=[...banned].sort().join('\n');if(seen.has(key))continue;seen.add(key);nodes++;const result=flow(teachers,demands,banned,weights);if(nodes===1)upper=result.coverage;if(result.coverage<best.coverage||result.coverage===best.coverage&&compareCost(result.cost,best.cost)>=0)continue;const bad=violation(teachers,result.assignments);if(!bad){best=result;continue;}for(let i=bad.length-1;i>=0;i--){const branch=new Set(banned);branch.add(bad[i]);stack.push(branch);}}
+    while(stack.length){if(limits.checkBudget)limits.checkBudget();if(nodes>=maxNodes){exhausted=true;break;}const banned=stack.pop(),key=[...banned].sort().join('\n');if(seen.has(key))continue;seen.add(key);nodes++;const result=flow(teachers,demands,banned,weights,limits.checkBudget);if(nodes===1)upper=result.coverage;if(result.coverage<best.coverage||result.coverage===best.coverage&&compareCost(result.cost,best.cost)>=0)continue;const bad=violation(teachers,result.assignments);if(!bad){best=result;continue;}for(let i=bad.length-1;i>=0;i--){const branch=new Set(banned);branch.add(bad[i]);stack.push(branch);}}
     return {...best,proven:!exhausted||best.coverage===upper,preferencesProven:!exhausted,searchComplete:!exhausted,nodes,upper};
   }
   // Consecutive subject rules are hard lesson units, separate from ranking and
@@ -5717,11 +5747,12 @@ var GSISRosterAllocation = (() => {
     // When a block is split, branch on its complete teacher choices or no cover.
     // This is bounded by the same deterministic search budget as workload rules.
     while(stack.length){
+      if(limits.checkBudget)limits.checkBudget();
       if(nodes>=maxNodes){exhausted=true;break;}
       const {forced,omitted}=stack.pop(),reserved=new Set(forced.map(a=>a.demandId)),remaining=usable.filter(d=>!reserved.has(d.id)&&!omitted.has(d.id)),counts=new Map(),periods=new Map();
       for(const a of forced){counts.set(a.staffId,(counts.get(a.staffId)||0)+cost(a));if(!periods.has(a.staffId))periods.set(a.staffId,[]);periods.get(a.staffId).push(a.period);}
       const residual=teachers.map(t=>{const used=counts.get(t.id)||0,added=periods.get(t.id)||[];return {...t,balance:{...t.balance,remaining:t.balance.remaining-used,capRemaining:t.balance.capRemaining===null?null:t.balance.capRemaining-used},assigned:new Set([...t.assigned,...added]),consecutiveAssigned:new Set([...(t.consecutiveAssigned||t.assigned),...forced.filter(a=>a.staffId===t.id&&countsConsecutive(t,a)).map(a=>a.period)]),eligible:new Set([...t.eligible].filter(p=>!added.includes(p))),repurposePeriods:new Set([...(t.repurposePeriods||[])].filter(p=>!added.includes(p)))};});
-      const result=solveCoverage(residual,remaining,{...weights,teacherCost:(t,i)=>weights.teacherCost(t,i+(counts.get(t.id)||0))},{maxNodes:maxNodes-nodes});nodes+=result.nodes;
+      const result=solveCoverage(residual,remaining,{...weights,teacherCost:(t,i)=>weights.teacherCost(t,i+(counts.get(t.id)||0))},{maxNodes:maxNodes-nodes,checkBudget:limits.checkBudget});nodes+=result.nodes;
       if(!result.searchComplete)exhausted=true;
       const plan=[...forced,...result.assignments],coverage=plan.length,value=weights.total(plan);
       if(nodes===result.nodes)upper=forced.length+result.upper;
@@ -5769,9 +5800,10 @@ var GSISRosterAllocation = (() => {
     return {teacherCost,edgeCost,repurposeCost,total};
   }
   function optimise(s,ctx,d,demands,options={}){
+    const checkBudget=options.checkBudget;if(checkBudget)checkBudget();
     ensure(s);const resolve=subjectResolver(ctx.days[d]?.teachingGroups,s.systemConfig),preferencePriority=preferenceOrder(options.preferences??s.systemConfig?.allocationPreferences),enabled=ruleToggles(options.ruleEnabled??s.systemConfig?.allocationRuleEnabled),preferences=preferencePriority.filter(id=>enabled[id]),fillOnly=options.fillOnly===true,excludedIds=new Set(ctx.people.filter(p=>!reliefCandidateEligible(p)).map(p=>p.id)),live=effectiveAssignments(s).filter(a=>a.date===d),fixed=fillOnly?live:live.filter(a=>protectedAssignment(a)||excludedIds.has(a.staffId)||periodStarted(ctx,d,a.period,a)),peerPending=pendingPeerRequests(s,ctx,d),peerDemandIds=new Set(peerPending.flatMap(r=>r.demandIds)),fixedIds=new Set([...peerDemandIds,...fixed.map(a=>a.demandId),...manualOwnership(s,d).map(a=>a.demandId),...demands.filter(dem=>manualDecisionForDemand(s,dem)).map(dem=>dem.id)]),pending=demands.filter(dem=>!dem.noReliefRequired&&resolve(dem).reliefRequired&&!fixedIds.has(dem.id)&&!periodStarted(ctx,d,dem.period,dem)).sort((a,b)=>a.period-b.period||a.id.localeCompare(b.id)),byDemand=new Map(pending.map(dem=>[dem.id,dem])),previous=fillOnly?[]:live.filter(a=>!protectedAssignment(a)&&!a.noRelief&&!excludedIds.has(a.staffId)&&!periodStarted(ctx,d,a.period,a)),oldIds=new Set(previous.map(a=>a.id));
-    const base={...s,assignments:s.assignments.filter(a=>!oldIds.has(a.id))},tm=teacherContext(base,ctx,d),teachers=[...tm.values()].filter(t=>reliefCandidateEligible(t.person)&&t.person.active&&!t.ext&&!t.identityConflict&&(!t.canonicalId||t.canonicalId===t.id)).map(t=>{const eligible=pending.filter(dem=>eligibility(t,dem.period,[],{demand:dem,repurpose:recessDuty(t,dem.period,dem)}).autoEligible);return {...t,eligibleDemands:new Set(eligible.map(dem=>dem.id)),consecutiveExcludedDemands:new Set(pending.filter(dem=>!countsConsecutive(t,dem)).map(dem=>dem.id)),eligible:new Set(eligible.filter(dem=>!recessDuty(t,dem.period,dem)).map(dem=>dem.period)),repurposePeriods:new Set(eligible.filter(dem=>recessDuty(t,dem.period,dem)).map(dem=>dem.period))};}).filter(t=>t.eligible.size||t.repurposePeriods.size).sort((a,b)=>a.id.localeCompare(b.id)),population=new Set(teachers.map(t=>t.id)),candidates=new Map();
-    for(const p of new Set(pending.map(d=>d.period)))ranked(base,ctx,d,p,[],tm,preferencePriority,enabled).forEach(r=>candidates.set(r.staffId+'|'+p,r));
+    const base={...s,assignments:s.assignments.filter(a=>!oldIds.has(a.id))},tm=teacherContext(base,ctx,d),teachers=[...tm.values()].filter(t=>reliefCandidateEligible(t.person)&&t.person.active&&!t.ext&&!t.identityConflict&&(!t.canonicalId||t.canonicalId===t.id)).map(t=>{if(checkBudget)checkBudget();const eligible=pending.filter(dem=>eligibility(t,dem.period,[],{demand:dem,repurpose:recessDuty(t,dem.period,dem)}).autoEligible);return {...t,eligibleDemands:new Set(eligible.map(dem=>dem.id)),consecutiveExcludedDemands:new Set(pending.filter(dem=>!countsConsecutive(t,dem)).map(dem=>dem.id)),eligible:new Set(eligible.filter(dem=>!recessDuty(t,dem.period,dem)).map(dem=>dem.period)),repurposePeriods:new Set(eligible.filter(dem=>recessDuty(t,dem.period,dem)).map(dem=>dem.period))};}).filter(t=>t.eligible.size||t.repurposePeriods.size).sort((a,b)=>a.id.localeCompare(b.id)),population=new Set(teachers.map(t=>t.id)),candidates=new Map();
+    for(const p of new Set(pending.map(d=>d.period))){if(checkBudget)checkBudget();ranked(base,ctx,d,p,[],tm,preferencePriority,enabled).forEach(r=>candidates.set(r.staffId+'|'+p,r));}
     for(const dem of pending.filter(dem=>matchesSubjectPattern(dem.subject,s.systemConfig?.consecutiveCountExclusions)))ranked(base,ctx,d,dem.period,[dem],tm,preferencePriority,enabled).forEach(r=>candidates.set(r.staffId+'|d:'+dem.id,r));
     const baseline=ctx.baselineDays?.[d]||ctx.days[d];for(const t of teachers){const row=baseline.teachers.find(row=>row.staffId===t.id);t.teachingProfile=row?.teachingProfile||teachingProfile(row?.weekCells||row?.cells||[],baseline.formClasses,baseline.teachingGroups,baseline.subjectCategories,s.systemConfig);}
     const blockPolicy=consecutiveBlocks(s,ctx.days[d],demands,pending,fixed),weights=allocationCosts(teachers,candidates,preferences,pending,ctx.days[d],s.systemConfig),result=solveConsecutiveCoverage(teachers,pending,weights,blockPolicy,options),originalScore=score(teachers,population,previous,previous);
@@ -5779,8 +5811,8 @@ var GSISRosterAllocation = (() => {
     const originalCost=validPrevious?weights.total(previous):null;let next=result.assignments,bestScore=score(teachers,population,next,previous),bestCost=weights.total(next);
     // Bounded local exchanges use the same complete-allocation comparison as the flow.
     // They cannot reinstate annual balancing above an Admin's higher ranked preference.
-    let improvementPasses=0;for(;!blockPolicy.blocks.length&&!result.preferencesProven&&improvementPasses<Math.min(40,pending.length*2);improvementPasses++){let candidate=null,candidateScore=bestScore,candidateCost=bestCost;const counts=new Map(),added=new Map();for(const a of next)if(!a.repurposedDuty){counts.set(a.staffId,(counts.get(a.staffId)||0)+1);if(!added.has(a.staffId))added.set(a.staffId,[]);added.get(a.staffId).push(a);}
-      for(let i=0;i<next.length;i++){const from=next[i];if(from.repurposedDuty)continue;const oldTeacher=tm.get(from.staffId),without=addCost(bestCost,negateCost(addCost(weights.edgeCost(oldTeacher,from,false),weights.teacherCost(oldTeacher,counts.get(from.staffId)-1))));
+    let improvementPasses=0;for(;!blockPolicy.blocks.length&&!result.preferencesProven&&improvementPasses<Math.min(40,pending.length*2);improvementPasses++){if(checkBudget)checkBudget();let candidate=null,candidateScore=bestScore,candidateCost=bestCost;const counts=new Map(),added=new Map();for(const a of next)if(!a.repurposedDuty){counts.set(a.staffId,(counts.get(a.staffId)||0)+1);if(!added.has(a.staffId))added.set(a.staffId,[]);added.get(a.staffId).push(a);}
+      for(let i=0;i<next.length;i++){if(checkBudget)checkBudget();const from=next[i];if(from.repurposedDuty)continue;const oldTeacher=tm.get(from.staffId),without=addCost(bestCost,negateCost(addCost(weights.edgeCost(oldTeacher,from,false),weights.teacherCost(oldTeacher,counts.get(from.staffId)-1))));
         for(const t of teachers){if(t.id===from.staffId||t.id===byDemand.get(from.demandId).staffId||!t.eligibleDemands.has(from.demandId))continue;const value=addCost(without,addCost(weights.edgeCost(t,from,false),weights.teacherCost(t,counts.get(t.id)||0))),comparison=compareCost(value,candidateCost);if(comparison>0||!eligibility(t,from.period,added.get(t.id)||[],{demand:byDemand.get(from.demandId)}).autoEligible)continue;
           // Check the receiver's complete work, including zero-R recess cover.
           const trial=next.map((a,j)=>j===i?{...a,staffId:t.id}:a);if(violation([t],trial))continue;const sc=score(teachers,population,trial,previous);if(comparison<0||sc.changes<candidateScore.changes){candidate=trial;candidateScore=sc;candidateCost=value;}}
@@ -5790,8 +5822,9 @@ var GSISRosterAllocation = (() => {
     const accept=!same&&(bestScore.coverage>originalScore.coverage||!validPrevious||bestScore.coverage===originalScore.coverage&&compareCost(bestCost,originalCost)<0);
     const accepted=accept?next:previous,selected=new Map(accepted.map(a=>[a.demandId,a])),fixedById=new Map(fixed.map(a=>[a.demandId,a]));let decisionEvidence;
     if(s.systemConfig?.verboseLogging!==false){const candidateTeachers=new Map(teachers.map(t=>[t.id,t])),periodEvidence=[];
-    for(const period of [...new Set(demands.map(dem=>dem.period))].sort((a,b)=>a-b)){const eligible=[],excluded=new Map(),eligibleRanks=new Map(),lessons=demands.filter(dem=>dem.period===period);for(const t of tm.values()){const rows=lessons.map(dem=>candidates.get(t.id+'|d:'+dem.id)||{...candidates.get(t.id+'|'+period),...eligibility(t,period,[],{demand:dem})}),e=rows.find(r=>r.autoEligible)||rows[0];if(e.autoEligible&&!excludedIds.has(t.id)){eligible.push(t.id);eligibleRanks.set(t.id,e);}else {const reasons=[...(excludedIds.has(t.id)?['This staff category is not included in relief candidates.']:[]),...e.reasons,...e.warnings,...(e.automaticDailyViolation?['Configured maximum daily periods.']:[]),...(e.automaticStreakViolation?['Configured maximum consecutive periods.']:[]),...(t.ext?['External teachers are allocated manually.']:[])];const reason=reasons.join(' ')||'Not eligible for automatic allocation.';if(!excluded.has(reason))excluded.set(reason,[]);excluded.get(reason).push(t.id);}}periodEvidence.push({period,eligibleStaffIds:eligible,comparisons:eligible.map(id=>{const r=eligibleRanks.get(id);return r?{staffId:id,rank:r.rank,fairnessBand:Number.isFinite(r.fairnessBand)?r.fairnessBand:null,alternatives:r.alternatives,rotation:r.rotation}:null;}).filter(Boolean),excluded:[...excluded].map(([reason,staffIds])=>({reason,staffIds}))});}
+    for(const period of [...new Set(demands.map(dem=>dem.period))].sort((a,b)=>a-b)){if(checkBudget)checkBudget();const eligible=[],excluded=new Map(),eligibleRanks=new Map(),lessons=demands.filter(dem=>dem.period===period);for(const t of tm.values()){const rows=lessons.map(dem=>candidates.get(t.id+'|d:'+dem.id)||{...candidates.get(t.id+'|'+period),...eligibility(t,period,[],{demand:dem})}),e=rows.find(r=>r.autoEligible)||rows[0];if(e.autoEligible&&!excludedIds.has(t.id)){eligible.push(t.id);eligibleRanks.set(t.id,e);}else {const reasons=[...(excludedIds.has(t.id)?['This staff category is not included in relief candidates.']:[]),...e.reasons,...e.warnings,...(e.automaticDailyViolation?['Configured maximum daily periods.']:[]),...(e.automaticStreakViolation?['Configured maximum consecutive periods.']:[]),...(t.ext?['External teachers are allocated manually.']:[])];const reason=reasons.join(' ')||'Not eligible for automatic allocation.';if(!excluded.has(reason))excluded.set(reason,[]);excluded.get(reason).push(t.id);}}periodEvidence.push({period,eligibleStaffIds:eligible,comparisons:eligible.map(id=>{const r=eligibleRanks.get(id);return r?{staffId:id,rank:r.rank,fairnessBand:Number.isFinite(r.fairnessBand)?r.fairnessBand:null,alternatives:r.alternatives,rotation:r.rotation}:null;}).filter(Boolean),excluded:[...excluded].map(([reason,staffIds])=>({reason,staffIds}))});}
     decisionEvidence={version:1,inputs:{baselineId:baseline.id||null,deploySource:deploySource(ctx,d),staplerRevision:ctx.days[d]?.staplerRevision||0,allocationRevision:s.dayRevisions?.[d]||0,accountingYear:year(d),accountingVerified:s.accountingYears?.[year(d)]?.verified===true,configUpdatedAt:s.systemConfig?.updatedAt||null},policy:{preferences,ruleEnabled:enabled,workloadLimits:workloadLimits(s.systemConfig),effectiveWorkloadLimits:workloadLimits(s.systemConfig),workloadCalculationSkipped:ctx.days[d]?.workloadIgnored===true,consecutiveSubjectRules:blockPolicy.rules,consecutiveCountExclusions:clone(s.systemConfig?.consecutiveCountExclusions||[]),objective:'Maximum feasible coverage, then ordered preferences across the complete plan.'},teachers:[...tm.values()].map(t=>({staffId:t.id,name:t.person.name,remaining:t.balance.remaining,capRemaining:t.balance.capRemaining,annualUtilisation:t.balance.utilisation,entitlement:t.balance.entitlement,alternatives:candidateTeachers.get(t.id)?.eligible.size||0,teachingProfile:candidateTeachers.get(t.id)?.teachingProfile||null})),periods:periodEvidence,lessons:demands.map(dem=>{const block=blockPolicy.byDemand.get(dem.id),manual=manualDecisionForDemand(s,dem),chosen=selected.get(dem.id),existing=fixedById.get(dem.id),policy=resolve(dem),disposition=manual?'smc-choice':peerDemandIds.has(dem.id)?'peer-pending':existing?'already-covered':dem.noReliefRequired||!policy.reliefRequired?'exempt':chosen?'selected':'uncovered';return {demandId:dem.id,period:dem.period,className:dem.className||'',subject:dem.subject||'',groupName:dem.groupName||'',venue:dem.venue||'',disposition,selectedStaffId:chosen?.staffId||existing?.staffId||null,subjectPolicy:policy,...(block?{consecutiveBlock:{subject:block.subject,periods:block.periods,demandIds:block.demandIds,anchor:block.anchor},...(block.blockedReason?{reviewReason:block.blockedReason}:{})}:{}),levels:lessonLevels(dem,ctx.days[d]?.formClasses,ctx.days[d]?.teachingGroups),...(manual?{manual:clone(manual)}:{}),...(chosen?{selectionExplanation:'Selected by the complete-plan coverage and ordered-preference comparison; this does not claim an individual first rank.'}:disposition==='uncovered'?{uncoveredReason:block?(block.blockedReason||block.subject+' consecutive '+block.periods+'-period block needs one eligible teacher for all remaining periods within quota and workload limits.'):periodEvidence.find(p=>p.period===dem.period)?.eligibleStaffIds.length?'Available candidates were needed elsewhere or reached complete-plan capacity or workload constraints.':'No automatically eligible teacher for this period.'}:{})};})};}
+    if(checkBudget)checkBudget();
     const consecutiveBlockWarnings=blockPolicy.blocks.filter(block=>block.blockedReason||block.pendingIds.some(id=>!selected.has(id))).map(block=>({subject:block.subject,periods:block.periods,demandIds:block.demandIds,reason:block.blockedReason||block.subject+' needs one eligible teacher across the whole '+block.periods+'-period block. Remaining lessons are unfilled for review.'}));
     return {date:d,decisionEvidence,consecutiveBlockWarnings,preferences,ruleEnabled:enabled,workloadLimits:workloadLimits(s.systemConfig),policyScore:{before:originalCost,after:accept?bestCost:originalCost},assignments:accept?next:previous.map(({demandId,staffId,period,rCost,repurposedDuty})=>({demandId,staffId,period,rCost,repurposedDuty})),changed:accept,coverage:accept?bestScore.coverage:originalScore.coverage,fixedCoverage:fixed.filter(a=>!a.noRelief).length,manualUncovered:demands.filter(dem=>manualDecisionForDemand(s,dem)&&!fixedById.has(dem.id)&&!dem.noReliefRequired&&resolve(dem).reliefRequired).length,uncovered:pending.length-(accept?bestScore.coverage:originalScore.coverage)+demands.filter(dem=>peerDemandIds.has(dem.id)&&!fixed.some(a=>a.demandId===dem.id)).length+demands.filter(dem=>manualDecisionForDemand(s,dem)&&!fixedById.has(dem.id)&&!dem.noReliefRequired&&resolve(dem).reliefRequired).length,coverageProven:result.proven&&(!validPrevious||result.coverage>=previous.length),upperBound:result.upper,fairness:{before:originalScore.spread,after:accept?bestScore.spread:originalScore.spread,improvement:accept?originalScore.spread-bestScore.spread:0,population:[...population].sort(),changes:accept?bestScore.changes:0,search:'ordered allocation preferences; spread diagnostic only'},solver:{nodes:result.nodes,improvementPasses,preferencesProven:result.preferencesProven,searchComplete:result.searchComplete,status:result.preferencesProven?'optimal':'bounded',limits:{maxNodes:options.maxNodes||256}},candidates:teachers.map(t=>({staffId:t.id,annual:t.balance.utilisation,remaining:t.balance.remaining,alternatives:t.eligible.size,entitlement:t.balance.entitlement})),reason:same?'unchanged':accept?bestScore.coverage>originalScore.coverage?'higher coverage':!validPrevious?'invalid draft repaired':'saved allocation preferences improved':'retain stable draft: no ordered preference improvement'};
   }
@@ -5802,7 +5835,10 @@ var GSISRosterAllocation = (() => {
     else if(minute<345)optimise=minute%30===0;
     else if([345,360,375,389].includes(minute)){optimise=true;report=minute===345?'morning':minute===389?'final':'new-absence';}
     else if(minute===390)report='handover';
-    return {today,date,minute,quiet,optimise,report,key:date+':'+iso.slice(0,16),lateAbsenceWindow:minute>=390&&minute<=450};
+    // The tick receipt is minute-specific; retries belong to the last actual
+    // allocation slot and expire at the next slot (or the 06:30 cutoff).
+    const allocationMinute=minute>=960||minute<345?Math.floor(minute/30)*30:minute<390?[345,360,375,389].filter(n=>n<=minute).at(-1):null,allocationKey=allocationMinute===null?null:date+':'+today+'T'+String(Math.floor(allocationMinute/60)).padStart(2,'0')+':'+String(allocationMinute%60).padStart(2,'0');
+    return {today,date,minute,quiet,optimise,report,key:date+':'+iso.slice(0,16),allocationKey,lateAbsenceWindow:minute>=390&&minute<=450};
   }
   function mayOptimise(ctx,d){const start=Date.parse(addDays(d,-1)+'T16:00:00+08:00'),end=Date.parse(d+'T06:29:59.999+08:00');return ctx.now>=start&&ctx.now<=end;}
   function warningEvents(s,ctx,summary){ensure(s);const quiet=schedule(ctx.now).quiet,events=[];for(const p of summary.periods){if(periodStarted(ctx,summary.date,p.period))continue;const key=summary.date+':'+p.period,old=s.healthWarningState[key]||{seen:[],episode:0};if(p.green.length>2){s.healthWarningState[key]={seen:[],episode:old.seen.length?old.episode+1:old.episode,last:p.green.length};continue;}if(!old.seen.includes(p.green.length)){events.push({key:'capacity:'+key+':'+old.episode+':'+p.green.length,period:p.period,count:p.green.length,date:summary.date,quiet});old.seen.push(p.green.length);}old.last=p.green.length;s.healthWarningState[key]=old;}return events;}
@@ -8360,22 +8396,92 @@ function rosterDeliveryReviewDispatch_(req,contacts){
    lock; computation never holds it. Durable command receipts own completion. */
 function rosterAllocationRunKey_(date){return 'ROSTER_ALLOCATION_RUN:'+GSISRosterOperations.date(date);}
 function rosterAllocationRunRead_(date){const text=props_().getProperty(rosterAllocationRunKey_(date));if(!text)return null;try{const row=JSON.parse(text);if(row.schema!==1||row.date!==date||typeof row.id!=='string'||!Array.isArray(row.log))throw Error('shape');return row;}catch(_){error_(503,'Allocation status could not be read. Refresh before starting another run.');}}
-function rosterAllocationRunExpired_(row){return Date.now()-Date.parse(row.updatedAt)>10*60000;}
+function rosterAllocationRunExpired_(row){return Date.now()-Date.parse(row.trigger==='scheduled'?row.startedAt:row.updatedAt)>(row.trigger==='scheduled'?150000:10*60000);}
 function rosterAllocationRunPublic_(row,state){
  if(!row)return null;let status=row.state;if(state&&rosterAllocationRunCancelled_(row,state))status='cancelled';else if(state&&rosterAllocationRunAccepted_(row,state))status='completed';
  else if(rosterAllocationRunExpired_(row)&&['running','cancelling','committing'].includes(status))status=status==='committing'?'uncertain':'abandoned';
- return {id:row.id,date:row.date,state:status,trigger:row.trigger,...(row.allocationMode?{allocationMode:row.allocationMode}:{}),requestId:row.trigger==='manual'?row.requestId:null,actorName:row.actorName,startedAt:row.startedAt,updatedAt:row.updatedAt,log:row.log,canCancel:['running','cancelling'].includes(status)};
+ return {id:row.id,date:row.date,state:status,trigger:row.trigger,...(row.trigger==='scheduled'?{attempts:row.attempts||1,allocationStopped:row.state==='failed'&&(row.attempts>=2||row.slotStopped===true)}:{}),...(row.allocationMode?{allocationMode:row.allocationMode}:{}),requestId:row.trigger==='manual'?row.requestId:null,actorName:row.actorName,startedAt:row.startedAt,updatedAt:row.updatedAt,log:row.log,canCancel:['running','cancelling'].includes(status)};
 }
 function rosterAllocationRunReceipt_(row,state){return row.trigger==='scheduled'?state.scheduleReceipts?.[row.scheduleKey]:state.receipts?.find(r=>r.id===row.requestId&&r.actor===row.actor&&r.digest===row.digest);}
-function rosterAllocationRunAccepted_(row,state){const receipt=rosterAllocationRunReceipt_(row,state);return !!receipt&&!receipt.cancelled;}
+function rosterAllocationRunAccepted_(row,state){const receipt=rosterAllocationRunReceipt_(row,state);return !!receipt&&!receipt.cancelled&&(row.trigger!=='scheduled'||receipt.allocationStatus==='complete'||receipt.allocationStatus===undefined&&receipt.optimise!==false);}
 function rosterAllocationRunCancelled_(row,state){return rosterAllocationRunReceipt_(row,state)?.cancelled===true;}
 function rosterAllocationRunCancellation_(){throw Object.assign(Error('This allocation was cancelled. Start a new run to allocate again.'),{status:409,code:'ALLOCATION_CANCELLED'});}
 function rosterAllocationRunWrite_(row,message){if(typeof rosterEdgeAssertLegacyWrite_==='function')rosterEdgeAssertLegacyWrite_();
+ if(row.trigger==='scheduled'&&row.attempts){if(row.state==='failed'&&row.attempts>=2)message='Auto-allocation stopped after 2 attempts for '+row.scheduleKey.slice(-5)+'. Review the saved draft; SMC Auto-allocate remains available.';rosterScheduledAllocationRecord_(row);}
  const at=new Date().toISOString(),seq=(row.log.at(-1)?.seq||0)+1;row={...row,updatedAt:at,log:[...row.log,{seq,at,message:String(message).slice(0,180)}].slice(-12)};
  const json=JSON.stringify(row);if(json.length>7000)error_(503,'Allocation status is too large. Refresh before retrying.');props_().setProperty(rosterAllocationRunKey_(row.date),json);return row;
 }
 function rosterAllocationRunLocked_(work){const lock=LockService.getScriptLock();if(!deployLock_(lock,8000))error_(503,'Another save is finishing. Retry this action.');try{return work();}finally{deployUnlock_(lock);}}
+// Separate dated attempt ledgers survive replacement of the visible run by an
+// SMC command. A date has 32 scheduled slots; compact rows stay below 9 KB.
+function rosterScheduledAllocationLedger_(date){
+ const key='ROSTER_ALLOCATION_SLOTS:'+GSISRosterOperations.date(date),raw=props_().getProperty(key);if(!raw)return {schema:1,date,slots:{}};
+ try{const value=JSON.parse(raw);if(value.schema!==1||value.date!==date||!value.slots||typeof value.slots!=='object'||Array.isArray(value.slots))throw Error('shape');for(const [slot,row] of Object.entries(value.slots))if(!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(slot)||![1,2].includes(row.attempts)||!['running','committing','uncertain','failed','completed','stopped'].includes(row.state)||!Number.isFinite(row.started)||typeof row.fence!=='string')throw Error('row');return value;}catch(_){error_(503,'Scheduled allocation history could not be read. Ask Admin to review it before retrying.');}
+}
+function rosterScheduledAllocationSave_(ledger){
+ const json=JSON.stringify(ledger);if(json.length>7500)error_(503,'Scheduled allocation history is full. Ask Admin to review unfinished slots.');props_().setProperty('ROSTER_ALLOCATION_SLOTS:'+ledger.date,json);
+}
+function rosterScheduledAllocationRecord_(run){
+ const ledger=rosterScheduledAllocationLedger_(run.date),key=run.scheduleKey.slice(11),old=ledger.slots[key];if(!old||old.fence!==run.fence)return;
+ const state=['cancelled','cancelling'].includes(run.state)||run.state==='failed'&&(run.attempts>=2||run.slotStopped===true)?'stopped':run.state;
+ ledger.slots[key]={...old,state};rosterScheduledAllocationSave_(ledger);
+}
+function rosterScheduledAllocationGate_(slot){
+ if(!slot.allocationKey)return {allocate:false};
+ const row=rosterScheduledAllocationLedger_(slot.date).slots[slot.allocationKey.slice(11)];
+ if(!row)return {allocate:slot.optimise};
+ if(['completed','stopped'].includes(row.state))return {allocate:false,allocationSkipped:true,allocationStopped:row.state==='stopped'};
+ if(row.state==='failed'&&row.tick===slot.key.slice(11))return {allocate:false,allocationSkipped:true};
+ if(['running','committing'].includes(row.state)&&Date.now()-row.started<=150000)return {allocate:false,allocationSkipped:true,allocationInProgress:true};
+ return {allocate:true};
+}
+function rosterScheduledAllocationRecover_(slot){
+ const pending=row=>row?.trigger==='scheduled'&&['running','cancelling','committing','uncertain'].includes(row.state)&&(row.state==='uncertain'||rosterAllocationRunExpired_(row));
+ if(!pending(rosterAllocationRunRead_(slot.date)))return;
+ rosterAllocationRunLocked_(()=>{
+  const row=rosterAllocationRunRead_(slot.date);if(!pending(row))return;const state=rosterOperationsState_(true);
+  if(rosterAllocationRunAccepted_(row,state))rosterAllocationRunComplete_(row,state);
+  else if(rosterAllocationRunCancelled_(row,state))rosterAllocationRunWrite_({...row,state:'cancelled'},'Cancelled scheduled allocation remains stopped.');
+  else rosterAllocationRunWrite_({...row,state:'failed',slotStopped:row.scheduleKey!==slot.allocationKey},row.scheduleKey!==slot.allocationKey?'Auto-allocation stopped when its scheduled slot ended. SMC Auto-allocate remains available.':'The previous attempt ended without a saved allocation receipt.');
+ });
+}
+function rosterScheduledAllocationStart_(req,descriptor){
+ const date=GSISRosterOperations.date(descriptor.date),scheduleKey=descriptor.scheduleKey,tickKey=descriptor.tickKey||scheduleKey,id=rosterOperationsDigest_({date,actor:'roster-service',key:scheduleKey});
+ return rosterAllocationRunLocked_(()=>{
+  const ledger=rosterScheduledAllocationLedger_(date),key=scheduleKey.slice(11);let slot=ledger.slots[key],prior=rosterAllocationRunRead_(date),state;
+  const read=()=>state||(state=rosterOperationsState_(true)),done=()=>{throw Object.assign(Error('This scheduled allocation slot is finished.'),{status:409,code:'ALLOCATION_SLOT_DONE'});};
+  if(slot&&['completed','stopped'].includes(slot.state))done();
+  if(prior&&['running','cancelling','committing','uncertain'].includes(prior.state)){
+   if(['committing','uncertain'].includes(prior.state)&&rosterAllocationRunAccepted_(prior,read())){rosterAllocationRunComplete_(prior,state);prior={...prior,state:'completed'};}
+   else if(!rosterAllocationRunExpired_(prior)&&!(prior.id===id&&prior.state==='uncertain'))throw Object.assign(Error('An allocator is already running for this date. Follow its status before starting another.'),{status:409,code:['committing','uncertain'].includes(prior.state)?'ALLOCATION_UNCONFIRMED':'ALLOCATION_IN_PROGRESS'});
+  }
+  if(slot&&['running','committing','uncertain'].includes(slot.state)){
+   // Always resolve the durable receipt under the writer lock before treating
+   // an expired attempt as failed. A timed-out response is not a failed write.
+   const receipt=read().scheduleReceipts[scheduleKey];
+   if(receipt&&!receipt.cancelled&&(receipt.allocationStatus==='complete'||receipt.allocationStatus===undefined&&receipt.optimise!==false)){
+    ledger.slots[key]={...slot,state:'completed'};rosterScheduledAllocationSave_(ledger);if(prior?.id===id)rosterAllocationRunWrite_({...prior,state:'completed'},'Saved allocation confirmed from its durable receipt.');done();
+   }
+   if(receipt?.cancelled){ledger.slots[key]={...slot,state:'stopped'};rosterScheduledAllocationSave_(ledger);if(prior?.id===id)rosterAllocationRunWrite_({...prior,state:'cancelled'},'Cancelled scheduled allocation remains stopped.');done();}
+   if(Date.now()-slot.started<=150000&&slot.state!=='uncertain'&&prior?.state!=='completed')throw Object.assign(Error('An allocator is already running for this date.'),{status:409,code:'ALLOCATION_IN_PROGRESS'});
+   slot={...slot,state:slot.attempts>=2?'stopped':'failed'};ledger.slots[key]=slot;rosterScheduledAllocationSave_(ledger);
+   if(prior?.id===id&&prior.fence===slot.fence)rosterAllocationRunWrite_({...prior,state:'failed'},'The previous attempt ended without a saved allocation receipt.');
+   if(slot.state==='stopped')done();
+  }
+  if(slot?.attempts>=2)done();
+  // Retain unresolved slots. Old terminal dates alone may be pruned; exhausting
+  // the bound fails closed instead of forgetting an uncertain save.
+  const prefix='ROSTER_ALLOCATION_SLOTS:',properties=props_().getProperties?.()||{},cutoff=new Date(Date.now()-7*86400000).toISOString().slice(0,10);let dates=0;
+  for(const name of Object.keys(properties).filter(k=>k.startsWith(prefix))){let old;try{old=JSON.parse(properties[name]);}catch(_){}if(name!==prefix+date&&name.slice(prefix.length)<cutoff&&old?.slots&&Object.values(old.slots).every(row=>['completed','stopped','failed'].includes(row.state))){props_().deleteProperty(name);const visibleKey='ROSTER_ALLOCATION_RUN:'+name.slice(prefix.length);let visible;try{visible=JSON.parse(properties[visibleKey]||'null');}catch(_){}if(visible&&!['running','cancelling','committing','uncertain'].includes(visible.state))props_().deleteProperty(visibleKey);}else dates++;}
+  if(dates>=14&&!properties[prefix+date])error_(503,'Scheduled allocation history is full. Ask Admin to review unfinished slots.');
+  const started=Date.now(),attempts=(slot?.attempts||0)+1,fence=Utilities.getUuid(),base={schema:1,id,fence,date,trigger:'scheduled',allocationMode:'reoptimise',actor:'roster-service',actorName:'Scheduled allocator',requestId:null,scheduleKey,tickKey,digest:rosterOperationsDigest_({date,scheduleKey}),attempts,startedAt:new Date(started).toISOString(),state:'running',log:prior?.id===id?prior.log:[],budgetDeadline:descriptor.budgetDeadline||started+75000,saveDeadline:descriptor.saveDeadline||started+110000};
+  ledger.slots[key]={attempts,state:'running',started,fence,tick:tickKey.slice(11)};rosterScheduledAllocationSave_(ledger);
+  return rosterAllocationRunWrite_(base,'Scheduled allocation attempt '+attempts+' of 2. Preparing current records.');
+ });
+}
+function rosterScheduledAllocationBudget_(run,save=false){if(run&&Date.now()>=(save?run.saveDeadline:run.budgetDeadline))throw Object.assign(Error('Scheduled allocation time budget reached. The last saved draft is retained.'),{status:409,code:'ALLOCATION_BUDGET'});}
 function rosterAllocationRunStart_(req,c,descriptor){
+ if(descriptor?.trigger==='scheduled')return rosterScheduledAllocationStart_(req,descriptor);
  const p=req.input||{},scheduled=descriptor?.trigger==='scheduled',user=rosterOperationsAuthority_(c,req.identity);
  if(!scheduled&&!user.smc&&!user.admin)error_(403,'SMC or Admin access is required.');
  const date=GSISRosterOperations.date(descriptor?.date||p.date||rosterToday_()),actor=scheduled?'roster-service':req.identity.email,digest=rosterOperationsCommandDigest_(p),scheduleKey=scheduled?descriptor.scheduleKey:null;
@@ -8395,6 +8501,12 @@ function rosterAllocationRunStart_(req,c,descriptor){
    else if(['committing','uncertain'].includes(prior.state)&&prior.id!==id&&!rosterAllocationRunExpired_(prior))throw Object.assign(Error('The previous allocation save is awaiting confirmation. Retry the original request or refresh current records before starting another run.'),{status:409,code:'ALLOCATION_UNCONFIRMED'});
    else if(['running','cancelling'].includes(prior.state)&&!rosterAllocationRunExpired_(prior))throw Object.assign(Error('An allocator is already running for this date. Follow its status or cancel it before starting another.'),{status:409,code:'ALLOCATION_IN_PROGRESS'});
    else if(prior.id===id&&['cancelled','cancelling'].includes(prior.state))rosterAllocationRunCancellation_();
+   // This locked read already resolved the superseded scheduled command. Close
+   // its independent ledger before a manual row replaces the only visible run.
+   if(prior.trigger==='scheduled'&&!rosterAllocationRunAccepted_(prior,state)){
+    if(rosterAllocationRunCancelled_(prior,state))rosterAllocationRunWrite_({...prior,state:'cancelled'},'Cancelled scheduled allocation remains stopped.');
+    else if(rosterAllocationRunExpired_(prior)&&['running','cancelling','committing','uncertain'].includes(prior.state))rosterAllocationRunWrite_({...prior,state:'failed',slotStopped:true},'Auto-allocation stopped after its interrupted run was replaced by an SMC command.');
+   }
   }
   // Keep at most a bounded dated control history; no timetable payload lives here.
   const properties=props_().getProperties?.()||{},cutoff=new Date(Date.now()-7*86400000).toISOString().slice(0,10),keys=Object.keys(properties).filter(k=>k.startsWith('ROSTER_ALLOCATION_RUN:')).sort();
@@ -8425,7 +8537,7 @@ function rosterAllocationRunBeforeCommit_(run,checkBeforeWrite){
 function rosterAllocationRunComplete_(run,state){if(!run)return;try{const row=rosterAllocationRunRead_(run.date);if(row?.id===run.id&&row.fence===run.fence&&rosterAllocationRunAccepted_(row,state))rosterAllocationRunWrite_({...row,state:'completed'},'Allocation draft saved.');}catch(_){/* Durable receipt remains authoritative if status storage is unavailable. */}}
 function rosterAllocationRunExecute_(req,c,work,descriptor){
  const run=rosterAllocationRunStart_(req,c,descriptor);
- try{const result=work(run);if(run)try{rosterAllocationRunLocked_(()=>{const row=rosterAllocationRunRead_(run.date);if(row?.fence!==run.fence||row.state==='completed')return;const state=rosterOperationsState_(true);if(rosterAllocationRunCancelled_(row,state))rosterAllocationRunWrite_({...row,state:'cancelled'},'Cancelled before saving the proposed allocation.');else if(rosterAllocationRunAccepted_(row,state))rosterAllocationRunComplete_(run,state);else if(['running','cancelling'].includes(row.state))rosterAllocationRunWrite_({...row,state:row.state==='cancelling'?'cancelled':'failed'},row.state==='cancelling'?'Cancelled before saving the proposed allocation.':'No allocation draft was saved by this run.');});}catch(_){}return result;}catch(error){
+ try{const result=work(run);if(run)try{rosterAllocationRunLocked_(()=>{const row=rosterAllocationRunRead_(run.date);if(row?.fence!==run.fence||row.state==='completed')return;const state=rosterOperationsState_(true);if(rosterAllocationRunCancelled_(row,state))rosterAllocationRunWrite_({...row,state:'cancelled'},'Cancelled before saving the proposed allocation.');else if(rosterAllocationRunAccepted_(row,state))rosterAllocationRunComplete_(run,state);else if(['running','cancelling'].includes(row.state)||result.allocationTimedOut&&rosterAllocationRunReceipt_(row,state)?.allocationStatus==='budget')rosterAllocationRunWrite_({...row,state:row.state==='cancelling'?'cancelled':'failed'},row.state==='cancelling'?'Cancelled before saving the proposed allocation.':result.allocationTimedOut?'Time budget reached; the last saved draft is retained.':'No allocation draft was saved by this run.');});}catch(_){}return result;}catch(error){
   if(run)try{rosterAllocationRunLocked_(()=>{
    const row=rosterAllocationRunRead_(run.date);if(row?.id!==run.id||row.fence!==run.fence)return;
    const state=rosterOperationsState_(true);if(rosterAllocationRunAccepted_(row,state)){rosterAllocationRunComplete_(run,state);return;}
