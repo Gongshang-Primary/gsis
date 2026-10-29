@@ -57,8 +57,9 @@ CREATE TABLE IF NOT EXISTS gsis_edge_import_resets (
  function hash(value){if(typeof value!=='string'||!/^[a-f0-9]{64}$/i.test(value))fail(400,'EDGE_DIGEST','A SHA-256 command digest is required.');return value.toLowerCase();}
  function revision(value){if(!Number.isSafeInteger(value)||value<0)fail(400,'EDGE_REVISION','A valid expected revision is required.');return value;}
  function stable(value){if(value===null||typeof value!=='object')return value;if(Array.isArray(value))return value.map(stable);return Object.fromEntries(Object.keys(value).sort().map(key=>[key,stable(value[key])]));}
- async function digest(value){const bytes=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(JSON.stringify(stable(value))));return Array.from(new Uint8Array(bytes),x=>x.toString(16).padStart(2,'0')).join('');}
- function serialize(value){let result;try{result=JSON.stringify(value);}catch{fail(400,'EDGE_STATE','State must contain JSON values.');}if(result===undefined)fail(400,'EDGE_STATE','State must contain JSON values.');if(new TextEncoder().encode(result).length>MAX_RECORD_BYTES)fail(413,'EDGE_RECORD_TOO_LARGE','Store large immutable content in R2 and retain its reference.');return result;}
+ function canonicalJson(value){return JSON.stringify(stable(value));}
+ async function digest(value){const bytes=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(canonicalJson(value)));return Array.from(new Uint8Array(bytes),x=>x.toString(16).padStart(2,'0')).join('');}
+ function serialize(value){let result;try{result=JSON.stringify(value);}catch{fail(400,'EDGE_STATE','State must contain JSON values.');}if(result===undefined)fail(400,'EDGE_STATE','State must contain JSON values.');if((typeof TextEncoder!=='undefined'?new TextEncoder().encode(result).length:Utilities.newBlob(result).getBytes().length)>MAX_RECORD_BYTES)fail(413,'EDGE_RECORD_TOO_LARGE','Store large immutable content in R2 and retain its reference.');return result;}
  const key=(collection,id)=>JSON.stringify([collection,id]);
  const recordDate=(value,id)=>typeof value?.date==='string'&&/^20\d\d-\d\d-\d\d$/.test(value.date)?value.date:/^20\d\d-\d\d-\d\d$/.test(id)?id:'';
  function encode(state){
@@ -182,6 +183,6 @@ CREATE TABLE IF NOT EXISTS gsis_edge_import_resets (
   async function exportState(){const snapshot=await load();return {schema:'gsis-edge-state-v1',...snapshot,capturedAt:new Date().toISOString(),stateDigest:snapshot.state===null?null:await digest(snapshot.state)};}
   return {scope,ensure,head,load,receipt,commit,importState,resetImport,transition,rows,exportState};
  }
- return {open,encode,decode,digest,SCHEMA,MAX_RECORD_BYTES};
+ return {open,encode,decode,digest,canonicalJson,SCHEMA,MAX_RECORD_BYTES};
 })();
 if(typeof module!=='undefined'&&module.exports)module.exports=GSiSEdgeStore;

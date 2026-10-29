@@ -9,13 +9,15 @@
     "test:lord": "python3 lord-suite/tests/run_all_checks.py",
     "package:suite": "python3 scripts/package-099-suite.py --evidence-dir verification/v099",
     "test:packaging": "python3 tests/release098p-packaging.py && python3 tests/release098q-packaging.py && python3 tests/release099-packaging.py",
-    "test:recovery": "python3 scripts/check-099-recovery.py --help"
+    "test:recovery": "python3 scripts/check-099-recovery.py --help",
+    "test:roster-import-runtime": "node tests/performance/roster-chunked-import.mjs"
   },
   "devDependencies": {
     "acorn": "8.15.0",
     "esbuild": "0.28.2",
     "jsdom": "30.1.1",
     "jszip": "3.10.1",
+    "miniflare": "4.20260730.0",
     "playwright": "1.62.1"
   },
   "gsisRelease": "0.9.9",
