@@ -3,11 +3,11 @@
 - Status: review — implemented and locally verified; Claude exact-head review pending
 - Owner/model: Codex
 - Reviewer/model: Claude
-- Last updated (Asia/Singapore): 29 Oct 2026 10:48
+- Last updated (Asia/Singapore): 29 Oct 2026 10:51
 - Branch: codex/roster-d1-chunked-import
 - Base SHA: 7b0d54bdb853e419ebc7ff7c98fc752d6ad9639f (accepted claim)
 - Current head SHA (or PR head; avoid self-referential commit hashes): the PR description records the exact final review head; any new commit requires another head-specific review
-- PR: opening from the verified branch; link recorded in the handoff commit
+- PR: [#8 — Resume Roster D1 imports from immutable chunks](https://github.com/helper-gsps/gsis/pull/8)
 - User-authorised scope: Song Wee, 29 Oct 2026: review Claude PRs #2–#6, build roster-allocation-run-once first, then claim and build this task as priority 2. No ROSTER_EDGE_AUTHORITY switch.
 - Files/domains owned (include generated outputs): backend/RosterEdgeMigration.gs and the Roster dispatch allowlist (export side); canonical shared edge-store/import helpers and shared/edge-setup.js; roster-update/public/edge-roster.js; builders and generated backend/browser/Worker copies; focused tests, runtime profiling evidence, task/changelog/roadmap records.
 - Out of scope: activation (edgeFence), notification Worker behavior (generated bundle refresh only), quiet mode (PR #5), absence policy.
