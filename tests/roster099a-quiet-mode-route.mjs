@@ -18,12 +18,13 @@ async function request(settings,path,{method='POST',body,signedIn=true}={}){
  return {status:response.status,body:await response.json()};
 }
 let roles={smc:true,admin:false},backendOps=[];
-const replayIds=new Set();let duringBackend=null;
+const replayIds=new Set(),failOnce=new Set();let duringBackend=null;
 globalThis.fetch=async(url,init)=>{
  assert.equal(String(url),env.APPS_SCRIPT_URL);
  const envelope=JSON.parse(init.body),payload=JSON.parse(envelope.payload);backendOps.push(payload.input?.operation);
  if(payload.input?.operation==='read')return Response.json({ok:true,data:{user:roles,entries:[]}});
  if(duringBackend&&payload.input?.operation==='notifyDaily'){const hook=duringBackend;duringBackend=null;await hook();}
+ if(failOnce.has(payload.input?.requestId)){failOnce.delete(payload.input.requestId);replayIds.add(payload.input.requestId);return Response.json({ok:false,error:'Backend busy'},{status:503});}
  if(replayIds.has(payload.input?.requestId))return Response.json({ok:true,data:{revision:2,date:payload.input?.date,replayed:true}});
  return Response.json({ok:true,data:{revision:2,date:payload.input?.date}});
 };
@@ -60,6 +61,11 @@ await sendDaily(old);assert.equal(await quietActive(),true,'a replayed receipt l
 await sendDaily(old);assert.equal(await quietActive(),true,'repeated replays leave it on');
 // Concurrent retries of an old request: still nothing ends.
 await Promise.all([sendDaily(old),sendDaily(old)]);assert.equal(await quietActive(),true,'concurrent replays leave it on');
+// Lost first response (503), then a retry that the backend answers as replayed:
+// quiet mode stays on (Codex probe 2 on e0e6066).
+const lost=crypto.randomUUID();failOnce.add(lost);
+await sendDaily(lost);assert.equal(await quietActive(),true,'a failed first attempt leaves quiet mode on');
+await sendDaily(lost);assert.equal(await quietActive(),true,'its replayed retry leaves quiet mode on');
 // Work done now ends the session it arrived in.
 await sendDaily(crypto.randomUUID());assert.equal(await quietActive(),false,'a new accepted send ends the current session');
 // A request that arrives in session A and completes after B started ends neither B
