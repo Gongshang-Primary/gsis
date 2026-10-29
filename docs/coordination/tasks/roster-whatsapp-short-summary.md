@@ -1,6 +1,6 @@
 # roster-whatsapp-short-summary: period numbers only in teacher relief messages
 
-- Status: proposed (owner decision recorded; Codex builds when owner says go)
+- Status: proposed, approved for Friday 30 Oct release (owner go 29 Oct 2026); priority 2 after roster-allocation-run-once
 - Owner/model: Codex
 - Reviewer/model: Claude
 - Last updated (Asia/Singapore): 29 Oct 2026 10:45
