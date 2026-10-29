@@ -1,15 +1,15 @@
 # roster-d1-chunked-import: import the Roster into D1 in pieces
 
-- Status: proposed (handoff to Codex; Codex claims by updating Owner and Status)
-- Owner/model: Codex (proposed by Claude at owner's request)
+- Status: claimed
+- Owner/model: Codex
 - Reviewer/model: Claude
-- Last updated (Asia/Singapore): 28 Oct 2026 23:07
+- Last updated (Asia/Singapore): 29 Oct 2026 09:42
 - Branch: codex/roster-d1-chunked-import
-- Base SHA: 3af60bc76340ede35249b414ad7047eaf00c05a1
+- Base SHA: 0b42df332d09f62e22b39071000cf11d40aa365f
 - Current head SHA (or PR head; avoid self-referential commit hashes): none
 - PR: none
-- User-authorised scope: Song Wee, 29 Oct 2026 ~07:05: hand D1 chunking to Codex.
-- Files/domains owned (include generated outputs): backend/Code.gs and backend/RosterEdgeMigration.gs (export side), roster-update/public/edge-roster.js (import side), roster-update/public/edge-store.js if needed, generated Roster/Deploy backends and Worker bundles, tests.
+- User-authorised scope: Song Wee, 29 Oct 2026: review Claude PRs #2–#6, build roster-allocation-run-once first, then claim and build this task as priority 2. No ROSTER_EDGE_AUTHORITY switch.
+- Files/domains owned (include generated outputs): backend/RosterEdgeMigration.gs and the Roster dispatch allowlist (export side); canonical shared edge-store/import helpers and shared/edge-setup.js; roster-update/public/edge-roster.js; builders and generated backend/browser/Worker copies; focused tests, runtime profiling evidence, task/changelog/roadmap records.
 - Out of scope: activation (edgeFence), notification Worker, quiet mode (PR #5), absence policy.
 - Acceptance checks: see below.
 
@@ -32,3 +32,8 @@
 
 ## Handoff
 Next: Codex claims, branches from current main, and coordinates with Claude's open Roster PRs (#2, #3, #5) under the serial Roster rule.
+
+## Claim and serial handoff, 29 Oct 2026
+Codex completed the first task and opened allocation PR #7 for Claude at `6744cf232848089af771ed085d97bffca8f6e146`; that branch is now handed off for review. This is the only next implementation claimed in this session, following the owner's explicit chat order. The later plan adds WhatsApp summary work, which is not included here. Claude retains PRs #2/#3/#5 and their fixes. Reuse PR #2's captured model/archive identity checks, and regenerate shared bundles when the PRs are integrated. Do not merge or deploy any branch as part of this claim.
+
+The implementation will freeze one immutable export, serve bounded verified parts, stage rows and durable part receipts, and finalize both scopes only at imported. Status/resume must avoid full-state reads; accepted progress is not completed import. Existing activation fencing and Google authority remain unchanged. Local production-size Worker measurements and failure/replay tests are required before handoff; no real school snapshot or notification will be used for testing.
