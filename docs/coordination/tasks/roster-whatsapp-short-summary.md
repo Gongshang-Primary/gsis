@@ -1,13 +1,13 @@
 # roster-whatsapp-short-summary: period numbers only in teacher relief messages
 
-- Status: claimed; approved for Friday 30 Oct release (owner go 29 Oct 2026); priority 2 after roster-allocation-run-once
+- Status: review; approved for Friday 30 Oct release (owner go 29 Oct 2026); priority 2 after roster-allocation-run-once
 - Owner/model: Codex
 - Reviewer/model: Claude
-- Last updated (Asia/Singapore): 29 Oct 2026 16:43
+- Last updated (Asia/Singapore): 29 Oct 2026 17:00
 - Branch: codex/roster-whatsapp-short-summary
 - Base SHA: 590971c263fd5560f08f703825d209da5c223f2a
-- Current head SHA (or PR head; avoid self-referential commit hashes): none
-- PR: none
+- Current head SHA (or PR head; avoid self-referential commit hashes): exact review head is recorded in the PR description
+- PR: opening from codex/roster-whatsapp-short-summary
 - User-authorised scope: Song Wee, 29 Oct 2026: option B; peer messages unchanged; no new template.
 - Files/domains owned (include generated outputs): `publicationSummary()` and its callers in shared/roster-operations.js (~line 851, 875, 922), the D1 edge copy if it duplicates the builder, generated backends, tests asserting summary text.
 - Out of scope: template bodies (no Meta submission), mutual_request, mutual_override, relief_reminder, relief_unacknowledged, SMC summaries, stapler_timetable.
@@ -35,4 +35,33 @@ Bounded design: keep the full publicationSummary default for reminders and peer 
 
 Acceptance: ascending unique period numbers; singular/plural counts; mixed New/Changed/Cancelled categories; no lesson/SMC text in the short variants; byte-identical relief_reminder and mutual_override output; existing template contracts and focused notification regressions pass. No production sends or deployment. Claude reviews the exact PR head; the owner merges and releases. Generated Worker output overlaps PR #5 mechanically and must be rebuilt after integration.
 
-Claim retry: main advanced during the first expected-head update with a documentation-only Stapler policy directive at 590971c. Re-read that directive and task ownership; no summary-scope implementation overlap. This claim preserves the new directive and supersedes the unpublished first claim attempt.
+Claim retry: main advanced during the first expected-head update with a documentation-only Stapler policy directive at 590971c. Re-read that directive and task ownership; no summary-scope implementation overlap. This claim preserves the new directive and supersedes the first claim attempt that was not accepted onto main.
+
+## Decisions and changes
+- Model: Codex. Accepted claim/base commit: 0c2efde9aa0a99accde34754b86c8f5bc2ec5951.
+- publicationSummary(rows, templateKey) opts into compact text only for relief_assignment, relief_updated and relief_urgent. Its default retains the exact full-detail format. Numeric unique periods count combined classes once; update groups follow New, Changed, Cancelled order.
+- Enqueue and dispatch-time revalidation use the final selected template. A 20-minute relief_reminder remains byte-identical; a reminder promoted to relief_urgent uses compact text.
+- Contract clarification: the task's "{{3}}" shorthand is correct for assignment/updated. In the approved relief_urgent contract, field 3 is minutes_remaining and the summary is field 4. Preserve both fields and all approved bodies.
+- Full instructions remain in assignments and immutable publication snapshots for the private link. Peer messages, SMC messages, conditional instruction messages and stapler_timetable retain their existing behavior. Prepared/uncertain provider attempts retain existing frozen payload and receipt rules.
+- Generated copies rebuilt through npm run build: backend/Code.gs; root Roster/Deploy v0.9.9 backends; Roster browser/edge models; both notification and operations Worker bundles and text copies. No dependencies, schema, settings or authority flags changed.
+
+## Verification
+All commands used TZ=Asia/Singapore. Exact review head and its post-commit focused checks are in the PR description. Local source inventory was checked against current main; generated file hashes matched before implementation.
+- Red/green: tests/roster-whatsapp-short-summary.cjs failed four cases against unchanged source, then passed all six final tests. Covers singular/plural, combined classes, P0/P16 numeric order, each update group and mixed groups, maximum school periods below 1024 characters, byte-identical full reminders/peer text, enqueue, stale queued-summary revalidation, urgent promotion, generated Worker domain and emitted approved-template fields.
+- npm run build PASS, including Apps Script ES2020 parse gate and Worker generation. git diff --check PASS.
+- PASS: tests/roster701-whatsapp-contracts.mjs (29 contract/private-link/countdown/approval checks); roster701-whatsapp-domain.cjs (7); roster093-targeted-publication.cjs (13); roster087-notification-store.cjs; roster099a-edge-model-fetch.cjs; roster098h-communication-display.cjs; roster098j-publication-compact.cjs (11); roster-allocation-run-once.cjs (18); paid097-bundles.cjs.
+- Broad TZ=Asia/Singapore npm test completed the Node stage: 859/865 programs passed on the initial run. It is not a clean full-suite pass.
+- Recovered on focused rerun: roster-prepared-parts-browser.cjs and roster097-batch-lifecycle-browser.cjs passed with ROSTER_TEST_CHROMIUM=/tmp/chromium; their initial failures were a missing default executable path. roster701-r19.cjs initially asserted that full instructions were in the WhatsApp summary; updated that obsolete assertion to Changed: P2. and verified full instructions remain in the published snapshot. All 5 R19 checks pass.
+- Three remaining known baseline failures, retained explicitly: package.cjs lacks historical Q commit 50c977d; roster098o-preparation-package.cjs and roster098o-timetable-export.cjs fail the expired 28 Oct native-export capture window. Do not count these as passes. Broad run plus the three recovered programs gives coverage of 862/865 programs; the full run was not repeated.
+- npm run test:lord separately PASS: 38/38 programs, because npm test stops before LORD after the Node-stage failures.
+- Not run: historical comparison branches excluded by the standard runner, staging, live school sign-in, real WhatsApp delivery or production deployment. Module-type warnings are inherited; no package type change was introduced for this task.
+
+## Review
+Claude to review the exact PR head. The implementer self-reviewed every canonical change and the emitted template payload. Advisory model review is separate from owner merge/release.
+
+## Deployment and rollback
+Not deployed to staging or production. No messages sent and no live records changed. Google remains authoritative; ROSTER_EDGE_AUTHORITY stays unchanged. No operator configuration change is required.
+Rollback: revert this PR and rebuild/redeploy the previously accepted matching source/bundles; do not reset receipts, prepared payloads or uncertain provider outcomes.
+
+## Handoff
+Owner passes the PR link and exact head to Claude. Keep PR #8 paused at 55c266b7ca00f2f228f52f40b13febcebfdd9994; no files or refs on that branch changed. Claude retains PR #5's quiet-mode replay finding at a5db470. This PR does not include quiet mode; after integrating #5, regenerate the shared Worker bundles from the combined canonical sources before release. No auto-merge or deployment performed.

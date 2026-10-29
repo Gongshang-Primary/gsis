@@ -1,3 +1,9 @@
+# Roster short WhatsApp relief summaries, 29 October 2026, local implementation
+
+Teacher relief_assignment and relief_urgent messages now list unique ascending periods, for example `2 relief duties: P3, P5.`. relief_updated groups applicable periods as `New: P4. Changed: P3. Cancelled: P5.`. Full instructions remain in the published record behind the private link. Existing relief_reminder and peer text, approved template bodies and field positions stay unchanged. Reminders promoted to the urgent template use the short urgent text. The current stapler_timetable daily notification is outside this change.
+
+Google remains authoritative. No settings, schema, provider sends or deployment changed. Generated Google and Worker copies are rebuilt. See [task evidence, known baseline test failures, rollback and Claude handoff](docs/coordination/tasks/roster-whatsapp-short-summary.md). Exact-head review, staging and the owner's release decision remain pending. PR #8 stays paused.
+
 # Roster scheduled allocation bounds — 29 October 2026, local implementation
 
 Scheduled Google allocation records at most two attempts per dated slot, counts interrupted attempts, reconciles unknown saves by durable receipt and skips completed/stopped no-work ticks before full reads. A 75-second calculation budget preserves the last valid draft and leaves time for due SMC reporting; manual allocation and protected cells keep their existing behavior. Google remains authoritative. See [task decisions, focused verification and rollback](docs/coordination/tasks/roster-allocation-run-once.md). Generated builds, full-suite verification, exact-head review and production release remain separate controller/owner gates.

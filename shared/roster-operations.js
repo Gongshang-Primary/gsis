@@ -848,7 +848,13 @@ const next=stapler().effectiveDay(plan,ctx.baselineDays?.[d]||ctx.days[d]);for(c
   const existing=s.publicationSnapshots.filter(x=>x.assignmentId===a.id&&x.staffId===a.staffId),rev=(existing.at(-1)?.revision||0)+1;
   const v={id:ctx.uuid(),assignmentId:a.id,revision:rev,staffId:a.staffId,date:a.date,period:a.period,kind,publishedAt:ctx.iso,publishedBy:ctx.user.email,assignment:copy(a),instructions:String(a.instructions||''),customInstructions:String(a.customInstructions||''),conditionalRules:matchingCustom(s,a).map(r=>({id:r.id,version:r.version,text:r.text}))};s.publicationSnapshots.push(v);return v;
  }
- function publicationSummary(rows){return rows.map(v=>{const a=v.assignment;return (v.kind==='cancelled'?'Cancelled: ':'')+'P'+a.period+' '+(a.timeStart||'')+' '+[a.className,a.subject,a.groupName,a.venue].filter(Boolean).join(' · ')+(a.combination?' (class combination)':'')+(v.instructions?'\n'+v.instructions:'')+(v.customInstructions?'\nSMC: '+v.customInstructions:'');}).join('\n\n');}
+ function publicationSummary(rows,templateKey){
+  const periods=values=>[...new Set(values.map(v=>Number(v.assignment.period)))].sort((a,b)=>a-b).map(p=>'P'+p);
+  if(['relief_assignment','relief_urgent'].includes(templateKey)){const list=periods(rows.filter(v=>v.kind!=='cancelled'));return list.length+' relief '+(list.length===1?'duty':'duties')+': '+list.join(', ')+'.';}
+  if(templateKey==='relief_updated')return [['New',rows.filter(v=>v.kind==='assigned')],['Changed',rows.filter(v=>!['assigned','cancelled'].includes(v.kind))],['Cancelled',rows.filter(v=>v.kind==='cancelled')]].filter(([,values])=>values.length).map(([label,values])=>label+': '+periods(values).join(', ')+'.').join(' ');
+  // Reminders and peer messages retain their complete, existing detail.
+  return rows.map(v=>{const a=v.assignment;return (v.kind==='cancelled'?'Cancelled: ':'')+'P'+a.period+' '+(a.timeStart||'')+' '+[a.className,a.subject,a.groupName,a.venue].filter(Boolean).join(' · ')+(a.combination?' (class combination)':'')+(v.instructions?'\n'+v.instructions:'')+(v.customInstructions?'\nSMC: '+v.customInstructions:'');}).join('\n\n');
+ }
  function assignmentStart(a){return Date.parse(a.date+'T'+(a.timeStart||'00:00')+':00+08:00');}
  function matchingCustom(s,dem){
   if(dem.members){const ids=new Set(dem.members.flatMap(m=>matchingCustom(s,m)).map(r=>r.id));return s.customInstructions.filter(r=>ids.has(r.id)).sort((a,b)=>a.id.localeCompare(b.id));}
@@ -872,7 +878,7 @@ const next=stapler().effectiveDay(plan,ctx.baselineDays?.[d]||ctx.days[d]);for(c
    const urgent=values.filter(v=>v.kind!=='cancelled').filter(v=>{const minutes=(assignmentStart(v.assignment)-ctx.now)/60000;return minutes>0&&minutes<=20;}).sort((a,b)=>assignmentStart(a.assignment)-assignmentStart(b.assignment));
    const mutualChange=values.some(v=>v.kind==='cancelled'&&v.assignment.mutual&&v.assignment.cancellationReason==='Published replacement');
    const templateKey=mutualChange?'mutual_override':urgent.length&&!changes?'relief_urgent':changes?'relief_updated':'relief_assignment';
-   queue(s,ctx,'relief_publication',id,d,{templateKey,mutualChange,summary:publicationSummary(values),snapshotIds:ids,acknowledge:true,startAt:urgent.length?assignmentStart(urgent[0].assignment):null},null,'publication:'+ids.join(':'));
+   queue(s,ctx,'relief_publication',id,d,{templateKey,mutualChange,summary:publicationSummary(values,templateKey),snapshotIds:ids,acknowledge:true,startAt:urgent.length?assignmentStart(urgent[0].assignment):null},null,'publication:'+ids.join(':'));
    urgent.forEach(v=>{v.urgent=true;});
    if(urgent.length)smcAlert(s,ctx,d,'urgent:'+urgent.map(x=>x.id).join(':'),'Urgent published relief: '+urgent.map(v=>'P'+v.period+' '+v.assignment.timeStart+' '+v.assignment.className+' '+v.assignment.subject+' '+(v.assignment.venue||'')).join('; '),true,'smc_alert',{templateKey:'relief_urgent_smc',snapshotIds:urgent.map(v=>v.id),assignedTeacherId:id,assignedTeacherName:staff(ctx,id).name,startAt:assignmentStart(urgent[0].assignment)});
    queueConditional(s,ctx,values);
@@ -919,8 +925,9 @@ const next=stapler().effectiveDay(plan,ctx.baselineDays?.[d]||ctx.days[d]);for(c
    if(currentDayNotice&&values.some(v=>{const at=v.kind==='cancelled'?v.publishedAt:index.assignments.get(v.assignmentId)?.publishedAt,publication=s.dailyPublicationStates?.[j.date];return !publishedOnDate(at,j.date)&&!(v.date===j.date&&publication&&Date.parse(at)<=Date.parse(publication.publishedAt));}))return 'Publish these duties on their Singapore workday before sending notices.';
    if(j.kind==='relief_publication'){
     const own=values.filter(v=>v.staffId===j.recipientId&&v.date===j.date);if(!own.length)return 'Published recipient changed.';
-    data.snapshotIds=own.map(v=>v.id);data.summary=publicationSummary(own);
+    data.snapshotIds=own.map(v=>v.id);
     if(data.mutualChange&&own.some(v=>v.kind==='cancelled'&&v.assignment.mutual))data.templateKey='mutual_override';else if(own.some(v=>v.kind!=='assigned'))data.templateKey='relief_updated';else if(data.templateKey!=='relief_urgent')data.templateKey='relief_assignment';
+    data.summary=publicationSummary(own,data.templateKey);
    }else if(j.kind==='conditional_relief_instruction'){
     const v=values.find(v=>v.staffId===j.recipientId&&v.kind!=='cancelled');if(!v)return 'Conditional instruction recipient changed.';
     const a=index.assignments.get(v.assignmentId),rule=(v.conditionalRules||[]).find(r=>r.id===data.ruleId&&r.version===data.ruleVersion);
@@ -931,11 +938,11 @@ const next=stapler().effectiveDay(plan,ctx.baselineDays?.[d]||ctx.days[d]);for(c
     if(!pending.length)return 'Duty acknowledged, cancelled or superseded.';
     const v=pending.sort((a,b)=>assignmentStart(a.assignment)-assignmentStart(b.assignment))[0];data.snapshotIds=pending.map(v=>v.id);data.startAt=assignmentStart(v.assignment);data.assignedTeacherId=v.staffId;data.assignedTeacherName=v.assignment.relieverName;
     data.summary=pending.map(v=>'P'+v.period+' · '+v.assignment.timeStart+' to '+v.assignment.timeEnd+' · '+[v.assignment.className,v.assignment.subject,v.assignment.venue].filter(Boolean).join(' · ')).join('; ');
-    if(j.kind==='relief_reminder')data.summary=publicationSummary(pending);
     const minutes=(data.startAt-now)/60000;
     if(minutes<=0)return 'The lesson has started. Review outstanding acknowledgement in Roster.';
     if(data.templateKey==='relief_reminder'&&!(minutes>19&&minutes<=20))data.templateKey='relief_urgent';
     if(data.templateKey==='relief_unacknowledged'&&!(minutes>9&&minutes<=10))data.templateKey='relief_urgent_smc';
+    if(j.kind==='relief_reminder')data.summary=publicationSummary(pending,data.templateKey);
    }
   }else if(['relief_publication','relief_reminder','conditional_relief_instruction'].includes(j.kind))return 'Legacy notification has no publication revision. Review it in Roster.';
   if(j.kind==='relief_publication'&&data.templateKey==='relief_urgent'&&!(data.startAt>now))data.templateKey='relief_assignment';
@@ -1022,7 +1029,7 @@ const next=stapler().effectiveDay(plan,ctx.baselineDays?.[d]||ctx.days[d]);for(c
    }
   }
   for(const id of new Set(s.publicationSnapshots.map(v=>v.staffId))){for(const v of pendingPublications(s,id)){if(v.kind==='cancelled'||v.date!==ctx.today||s.dailyPublicationStates?.[v.date]&&!s.outbox.some(j=>j.date===v.date&&j.recipientId===id&&j.data?.dailyPublication&&j.data.fingerprint===s.dailyPublicationStates[v.date].teachers.find(t=>t.staffId===id)?.fingerprint))continue;const start=assignmentStart(v.assignment),before=(start-ctx.now)/60000;if(before<=0)continue;
-    if(before<=20&&!v.urgent)queue(s,ctx,'relief_reminder',id,v.date,{templateKey:before>19?'relief_reminder':'relief_urgent',summary:publicationSummary([v]),snapshotIds:[v.id],startAt:start},null,'reminder:'+v.id);
+    if(before<=20&&!v.urgent)queue(s,ctx,'relief_reminder',id,v.date,{templateKey:before>19?'relief_reminder':'relief_urgent',summary:publicationSummary([v],before>19?'relief_reminder':'relief_urgent'),snapshotIds:[v.id],startAt:start},null,'reminder:'+v.id);
     if(before<=10)smcAlert(s,ctx,v.date,'unacknowledged:'+v.id,'Unacknowledged relief: '+staff(ctx,id).name+', P'+v.period+' at '+v.assignment.timeStart+'.',true,'smc_alert',{templateKey:before>9?'relief_unacknowledged':'relief_urgent_smc',snapshotIds:[v.id],assignedTeacherId:id,assignedTeacherName:staff(ctx,id).name,startAt:start});
   }}
   const report=queueDailyEmployment(s,ctx,ctx.today),allocated=!skipAllocation&&allocationSlot&&s.systemConfig.scheduledAllocationEnabled;
