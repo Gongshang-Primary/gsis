@@ -1,6 +1,6 @@
 # lord-queued-writes: LORD suite actions feel instant via a Worker queue; Google stays the record
 
-- Status: proposed (changelog entry; design to confirm, not Friday)
+- Status: approved (owner go 30 Oct 2026: all logged items may proceed while the owner teaches); Codex builds phase 1 then phase 2 in the priority order below
 - Owner/model: Codex (builder), Claude (architect and reviewer)
 - Reviewer/model: Claude
 - Last updated (Asia/Singapore): 29 Oct 2026 19:30
@@ -13,6 +13,15 @@
 
 ## Intent
 Same pattern as Calendar's job queue (calendar-job-worker): the browser gets a durable receipt from Cloudflare in under a second, the screen updates at once with a "Saved at 10:42, syncing" indicator, and Apps Script applies the change to Google in the background. If the queue or D1 is unavailable, the page falls back to today's direct Google call. Google remains authoritative.
+
+## Owner priority (30 Oct 2026), slowest first
+1. Book cart
+2. Submit open / collect
+3. Submit photos for collect
+4. Return
+5. Submit photos for return
+
+Photos: upload to a private R2 object first (receipt in under a second, thumbnail shown with "Submitted, please wait for confirmation"), then Apps Script copies to Drive in the background. Never send photo bytes through the Apps Script call on the user's click.
 
 ## Actions in scope (from lord/assets/app.js)
 bookingCreateBatch, bookingUpdate, bookingCancel, bookingRespond, notificationPreferences; OVERLORD and STARLORD write actions to be listed during design.
