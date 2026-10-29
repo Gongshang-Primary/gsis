@@ -7,7 +7,7 @@
 - Branch: codex/roster-allocation-run-once
 - Base SHA: 77dbe38ac3243362493641869ffe1dcf82d2c8ae (accepted claim commit)
 - Current head SHA (or PR head; avoid self-referential commit hashes): exact published review head is recorded in the PR description
-- PR: pending controller publication
+- PR: https://github.com/helper-gsps/gsis/pull/7
 - User-authorised scope: Song Wee, 29 Oct 2026: Friday 30 Oct production target; Codex does most coding.
 - Files/domains owned (include generated outputs): backend scheduled allocation dispatch (`rosterScheduledDispatch_` and its slot/run records in backend/*.gs), shared/roster-operations.js for scheduled receipt/budget handling, bounded schedule/checkpoint additions in shared/roster-allocation.js, generated Roster/Deploy backends, tests.
 - Out of scope: allocation rules and scoring, quiet mode (PR #5), D1 import, notification Worker logic.
