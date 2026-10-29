@@ -1,6 +1,6 @@
 # lord-whatsapp-not-sending: LORD / OVERLORD WhatsApp notifications not arriving
 
-- Status: proposed (changelog entry; diagnose first, then fix). Not Friday-critical.
+- Status: cancelled 29 Oct 2026: owner confirmed LORD WhatsApp is working; report was mistaken. Kept for the source notes below. Optional follow-up only: show why WhatsApp is off in the admin panel.
 - Owner/model: Codex (diagnosis may be done by Claude with owner evidence)
 - Reviewer/model: Claude
 - Last updated (Asia/Singapore): 29 Oct 2026 13:00
