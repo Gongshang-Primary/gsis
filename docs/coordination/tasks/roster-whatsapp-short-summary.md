@@ -1,11 +1,11 @@
 # roster-whatsapp-short-summary: period numbers only in teacher relief messages
 
-- Status: proposed, approved for Friday 30 Oct release (owner go 29 Oct 2026); priority 2 after roster-allocation-run-once
-- Owner/model: Codex
-- Reviewer/model: Claude
-- Last updated (Asia/Singapore): 29 Oct 2026 10:45
-- Branch: codex/roster-whatsapp-short-summary
-- Base SHA: df8c93a
+- Status: claimed by Claude. Reassigned by owner (Song Wee, 29 Oct 2026 ~17:10): "claude pick up short WhatsApp text". Codex's claim of 16:43 is superseded; its branch had no commits beyond main. Approved for Friday 30 Oct release.
+- Owner/model: Claude (was Codex)
+- Reviewer/model: Codex
+- Last updated (Asia/Singapore): 29 Oct 2026 17:10
+- Branch: claude/roster-whatsapp-short-summary
+- Base SHA: 590971c263fd5560f08f703825d209da5c223f2a
 - Current head SHA (or PR head; avoid self-referential commit hashes): none
 - PR: none
 - User-authorised scope: Song Wee, 29 Oct 2026: option B; peer messages unchanged; no new template.
@@ -27,3 +27,12 @@ See docs/coordination/review/whatsapp-messages-29oct.md. Today {{3}} of relief_a
 - Unit tests for each format, singular/plural, combined classes, mixed new/changed/cancelled.
 - relief_reminder output byte-identical to before.
 - Template contract tests still pass (no body or field change).
+
+## Claim and serial handoff, 29 Oct 2026
+Model: Codex. The owner's latest instruction explicitly prioritises this task after the exact-head re-reviews of PR #5 at a5db470 and PR #6 at 24452e5. Those advisory reviews are posted. PR #5 retains one P2 replay-retention finding for Claude; Codex will not edit that branch. PR #8 stays paused and unchanged. This is the sole implementation task owned by Codex in this session, branched from the accepted claim commit on current main.
+
+Bounded design: keep the full publicationSummary default for reminders and peer messages. Add template-specific short formatting only for relief_assignment, relief_updated and relief_urgent at enqueue and dispatch revalidation, including reminders promoted to relief_urgent. Reuse the canonical Roster model and regenerate its Google and Worker copies. Do not change template contracts, delivery identities, notification recipients, published duty data, private links or ROSTER_EDGE_AUTHORITY. Newer stapler_timetable daily notifications are outside this task and retain their current text.
+
+Acceptance: ascending unique period numbers; singular/plural counts; mixed New/Changed/Cancelled categories; no lesson/SMC text in the short variants; byte-identical relief_reminder and mutual_override output; existing template contracts and focused notification regressions pass. No production sends or deployment. Claude reviews the exact PR head; the owner merges and releases. Generated Worker output overlaps PR #5 mechanically and must be rebuilt after integration.
+
+Claim retry: main advanced during the first expected-head update with a documentation-only Stapler policy directive at 590971c. Re-read that directive and task ownership; no summary-scope implementation overlap. This claim preserves the new directive and supersedes the unpublished first claim attempt.

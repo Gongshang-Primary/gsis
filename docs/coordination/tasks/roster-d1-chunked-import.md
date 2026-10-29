@@ -1,9 +1,9 @@
 # roster-d1-chunked-import: import the Roster into D1 in pieces
 
-- Status: review — implemented and locally verified; Claude exact-head review pending
+- Status: review; resumed integration and local verification complete; Claude exact-head review pending
 - Owner/model: Codex
 - Reviewer/model: Claude
-- Last updated (Asia/Singapore): 29 Oct 2026 10:51
+- Last updated (Asia/Singapore): 29 Oct 2026 17:27
 - Branch: codex/roster-d1-chunked-import
 - Base SHA: 7b0d54bdb853e419ebc7ff7c98fc752d6ad9639f (accepted claim)
 - Current head SHA (or PR head; avoid self-referential commit hashes): the PR description records the exact final review head; any new commit requires another head-specific review
@@ -106,3 +106,27 @@ Retained preparation is admitted up to **eight sessions** in both Google and D1.
 Internal review corrections: finite session admission is now enforced before expensive capture/reserve, including concurrent last-slot claims. A new actual-Worker regression first failed when Admin was revoked during manifest generation; the adapter now revalidates Admin before manifest binding or durable preparation-failure mutation. Authorized recovery resumes the same reserved identity and frozen source.
 
 Further internal review regressions now pass: ready-manifest and expired-upload recovery perform immutable Drive reads without the production writer lock; the short recovery commit compares the retained descriptor and cannot overwrite a concurrently verified ready outcome. Browser status adopts the current same-Admin session after another tab restarts, clears confirmed abandoned IDs, preserves different-actor ownership and accepts the backend's 8–160-character stable import IDs. New IDs clear stale paired session IDs. Status selects the currently reserved session even when creation timestamps tie.
+
+## Owner resume, 29 Oct 2026 17:11 SGT
+
+Model: Codex. Song Wee's latest direct instruction resumes and claims PR #8 for Codex, superseding the pause recorded in PR #8. Current main observed at 3fb3b780f6b26c2ee1f6fa26a1ed4dda3f7f8440. The existing implementation is retained; no restart from an old release or replacement task is needed.
+
+Bounded remaining work: integrate current main into codex/roster-d1-chunked-import without force-push, retain the merged allocator/quiet-mode/identity fixes, inspect import failure and recovery paths, address concrete findings with focused checks, rebuild canonical generated outputs, rerun import and local-runtime checks, and update PR #8 for Claude's exact-head review. This does not claim Claude's WhatsApp summary task or edit its branch. This latest owner instruction authorises import work now; shared generated outputs will be rebuilt from the integrated canonical source and checked again against main before handoff. No deployment, real school import, provider send or ROSTER_EDGE_AUTHORITY change.
+
+## Resumed integration and verification, 29 Oct 2026
+Model: Codex. Original head 55c266b was integrated with accepted resume claim/main 02a573e without rewriting or discarding the original branch. The remote integration commit has both as parents; exact review head is in PR #8. Only the changelog, chunked route and adapted captured-model test needed content reconciliation. Chunked source/part retrieval remains backend-bound, while current main's identity validations, allocator and quiet mode are retained. The latter two conflicted files retain the already-tested PR #8 implementation; no new import behavior was invented to resolve the merge.
+
+Canonical source was rebuilt with npm run build, including the Apps Script syntax gate. All nine focused import/store/setup/identity programs passed on the combined source. Internal parallel code inspection found no concrete remaining import defect; it is not a substitute for Claude's review. Google remains authoritative and no authority setting was changed. Claude's chosen WhatsApp PR #10 is separate and not merged into this import branch.
+
+Fresh real local workerd/Miniflare 4.20260730.0, D1 and R2 profiling passed: 14,907,897-byte synthetic source, 15,558,228 frozen bytes, 72 parts, 75 requests, maximum bridge response 262,400 bytes. Sampled peak application isolate memory 51,653,638 bytes; maximum sampled active CPU 152.175 ms; maximum wall time 194.697 ms. The updated runtime evidence identifies its generated harness bundle by SHA-256 9effccab940897d6f8bb63d7758bf7d86e38157a3524d5db7d736433bcc032da. These local samples do not certify the free 10 ms CPU plan, live Apps Script/Drive timing or production RSS.
+
+The complete unchanged tests/run.cjs selection was partitioned across three isolated source clones, retaining the runner's exclusions and 45-second per-program timeout. Selections were checked for no overlaps or omissions: 872 programs. Initial shard results were 282/291, 283/291 and 288/290. Two package/bundle programs initially lacked the ignored build archive in their isolated clone; both passed after supplying the just-built matching archive. Final combined result: 855/872, with 17 failures retained. LORD separately passed 38/38. See roster-d1-chunked-import-resume-tests.json for every program outcome. No clean full-suite pass is claimed.
+
+Remaining failure classification on integrated main:
+1. Ten notification harness programs strip imports but do not define the merged quiet-mode readQuietMode helper: paid097-jobs-worker.cjs, roster081-notification-lanes.cjs, roster082-audit-worker-lane.cjs, roster086-delivery-review-worker.mjs, roster087-notification-worker.mjs, roster089-worker-calendar-lane.mjs, roster089-worker-durability.mjs, roster093b-notification-lanes.cjs, roster096-cleanup-lane.cjs, roster710-worker-reports.mjs. Their production notification entrypoint is byte-identical to current main, and the failure is ReferenceError in the stripped-import fixture. PR #10 separately fixes one of these harnesses; that unmerged fix is not silently included here.
+2. Four old UI fixtures treat the new Quiet mode status read as a write or omit the toolbar button: release082-orphan-manual-ui.cjs, roster711-workspace-ui.cjs, roster711-workspace-browser.cjs, roster719-relief-tools-browser.cjs. Focused reruns reproduce these failures. The production UI is byte-identical to current main; this import change does not edit it.
+3. package.cjs still lacks historical Q commit 50c977d; roster098o-preparation-package.cjs and roster098o-timetable-export.cjs retain the expired 28 Oct capture-window fixture failures.
+
+The relevant current-main notification/UI/shared-domain file hashes were checked when reconciling the source. These are inherited integration test gaps; they are reported, not removed or counted as passes. No changes to those unrelated fixtures are bundled into this import PR. Current quiet-mode state/route/UI and idle-lane focused tests also pass; Codex's separate exact-head review of e0e6066 reports the remaining replay-provenance issue, which this import PR does not claim to fix.
+
+Not run: excluded historical comparison branches, administrator staging, real school import, live delivery or production deployment. Rollback remains preparation-only and retains all immutable source containers, D1 sessions/receipts/staging and R2 objects. Owner chooses merge/release after Claude reviews the updated exact head. No other task or branch is claimed by this handoff.

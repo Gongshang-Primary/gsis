@@ -1,5 +1,6 @@
 ## Task and ownership
 Task record:
+Model: Claude / Codex
 Implementer/model:
 Reviewer/model:
 Base commit:
@@ -14,6 +15,7 @@ Authority/configuration change (or none):
 Exact tested SHA, commands, results and evidence:
 Checks not run:
 Staging evidence (or not run / documentation-only):
+Deployment record (DEPLOYMENTS.md entry, or not deployed):
 
 ## Review and release
 - [ ] Other model reviewed the current head SHA; findings are recorded.

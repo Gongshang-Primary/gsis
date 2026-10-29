@@ -10,7 +10,7 @@ const assert=require('node:assert/strict'),fs=require('node:fs'),{chromium}=requ
   await page.evaluate(async()=>{
    const f=__fixture;window.requests=[];
    f.state.absences=Array.from({length:40},(_,i)=>({id:'absence-'+i,date:i<20?f.ctx.today:'2026-10-15',staffId:'alice',name:'Alice',typeId:'mc',periods:[2],reliefRequired:true,reportedBy:'smc',reportedAt:f.ctx.today+'T06:00:00+08:00',instructions:{}}));
-   window.ctx={profile:f.profile,today:()=>f.ctx.today,container:document.getElementById('content'),api:async(route,input)=>{requests.push(input);return GSISRosterOperations.read(f.state,f.ctx,input);}};
+   window.ctx={profile:f.profile,today:()=>f.ctx.today,container:document.getElementById('content'),api:async(route,input)=>{(input?.view!=='intake'&&requests.push(input));return GSISRosterOperations.read(f.state,f.ctx,input);}};
    await RosterOpsUI.render('Absences by Date',ctx);
   });
   assert.equal(await page.locator('[data-absence-from]').inputValue(),'2026-10-14');assert.equal(await page.locator('[data-absence-to]').inputValue(),'2026-10-15');

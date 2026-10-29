@@ -8,6 +8,10 @@ Focused synthetic checks cover global record identities/UTF-8, legacy state and 
 
 Admission retains at most eight sessions in each backend; existing identities can resume at capacity, while new captures require reviewed archival/cleanup. No uncertain evidence is automatically deleted. Bounds: 192 KiB ordinary record target and compressed segments; 1,900,000-byte maximum part; 2,048 parts; 512 KiB manifest; 40 MiB payload plus bounded header; 32 MiB raw individual object, also constrained by total payload. Build, focused import checks and 38 LORD programs pass; the full current JavaScript selection has 860/867 passes with seven reproduced baseline failures recorded in the task. The initial Google capture/encoding/upload still needs separate Apps Script/live staging verification. No live throughput, deployment or cutover is claimed. Rollback before activation stops preparation while preserving the retained sessions, source containers and objects; do not delete shared D1/R2 data or reuse failed request IDs. Claude review of the published exact head, staging, release approval and all authority-handover gates remain open.
 
+# Roster scheduled allocation bounds — 29 October 2026, local implementation
+
+Scheduled Google allocation records at most two attempts per dated slot, counts interrupted attempts, reconciles unknown saves by durable receipt and skips completed/stopped no-work ticks before full reads. A 75-second calculation budget preserves the last valid draft and leaves time for due SMC reporting; manual allocation and protected cells keep their existing behavior. Google remains authoritative. See [task decisions, focused verification and rollback](docs/coordination/tasks/roster-allocation-run-once.md). Generated builds, full-suite verification, exact-head review and production release remain separate controller/owner gates.
+
 # GSiS revision K
 
 See [K changes](CHANGELOG_v0.9.8k.md), [setup](SETUP_v0.9.8k.md) and [validation](VALIDATION_v0.9.8k.md). This is a focused Roster correction on J. Other products remain J.
