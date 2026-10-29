@@ -18,7 +18,7 @@ Same pattern as Calendar's job queue (calendar-job-worker): the browser gets a d
 bookingCreateBatch, bookingUpdate, bookingCancel, bookingRespond, notificationPreferences; OVERLORD and STARLORD write actions to be listed during design.
 
 ## Design points to settle
-1. Conflicts are the main risk. A queued booking is not a confirmed booking: two teachers can queue the same cart or slot. The UI must show "Requested 10:42, confirming" until Google accepts, then "Confirmed" or "Not available: <reason>". Never show a queued booking as confirmed.
+1. Conflicts are the main risk. A queued booking is not a confirmed booking: two teachers can queue the same cart or slot. **Owner wording (29 Oct 2026): "Submitted, please wait for confirmation"**, with the submit time, until Google accepts; then "Confirmed" or "Not available: <reason>". Teachers may leave the page while it waits; the outcome appears on their bookings list and in the existing notification. Never show a queued booking as confirmed.
 2. Low-risk actions (preferences, cancel own booking) can show final state optimistically; contended actions (create, update, respond) show pending until accepted.
 3. Receipt first, idempotent: one operation id per click, retries reuse it, the backend dedupes (the Calendar receipt model).
 4. Reads: serve the last known list from the Worker cache with an "as of <time>" stamp, then refresh from Google in the background.
@@ -27,7 +27,7 @@ bookingCreateBatch, bookingUpdate, bookingCancel, bookingRespond, notificationPr
 7. Jobs panel: each user can see queued, saved, rejected items with timestamps.
 
 ## Acceptance (draft)
-- Booking action shows a receipt and pending state within 1 s on a normal connection.
+- Booking action shows "Submitted, please wait for confirmation" with its time within 1 s on a normal connection.
 - Two concurrent requests for one cart: one confirmed, one shown "Not available" with no double booking.
 - Queue down: direct Google path still works, with a visible note.
 - A retried click never creates two bookings.
