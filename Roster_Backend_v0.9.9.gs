@@ -2049,12 +2049,13 @@ function rosterPersonalCalculations_(req,c){
  catch(e){if(e.status!==503)throw e;output.completion={from:today.slice(0,4)+'-01-01',to:today,throughWeek:GSISRosterAllocation.monday(today),completed:null,entitlement:null,percentage:null,historyVerified:false,recordedWeeks:null,excludedWeeks:null,reason:'Relief history could not be read. Use Refresh to retry; ask Admin to review if this continues.'};}
  return output;
 }
-function rosterPersonalCompletion_(state,staffId,today){
+function rosterPersonalCompletion_(state,staffId,today,now=Date.now()){
+ const sg=new Date(now+28800000),ctx={today,minute:sg.getUTCHours()*60+sg.getUTCMinutes(),days:state.dailyPublicationStates||{}};
  const A=GSISRosterAllocation,year=today.slice(0,4),week=A.monday(today),history=state.accountingYears?.[year],seen=new Set();
  const rows=(state.entitlements||[]).filter(r=>r.staffId===staffId&&r.year===year&&r.week<=week).sort((a,b)=>String(a.week).localeCompare(String(b.week)));
  let valid=true,entitlement=0;for(const row of rows){if(!/^\d{4}-\d{2}-\d{2}$/.test(row.week)||seen.has(row.week)||!Number.isFinite(row.quota)||row.quota<0){valid=false;continue;}seen.add(row.week);entitlement+=row.excluded?0:row.quota;}
  // Shared accounting resolves replacements, duplicates, corrections and zero-cost duties.
- const completed=A.accounted(state).filter(a=>a.staffId===staffId&&(a.accountingYear||A.year(a.date))===year&&a.date<=today&&(a.status==='completed'||a.completionStatus==='completed')).reduce((n,a)=>n+A.cost(a),0);
+ const completed=A.accounted(state,ctx).filter(a=>a.staffId===staffId&&(a.accountingYear||A.year(a.date))===year&&a.date<=today&&A.reliefCompleted(a,ctx)).reduce((n,a)=>n+A.cost(a),0);
  const verified=history?.verified===true,currentWeekRecorded=seen.has(week),reason=!valid?'Recorded weekly quotas need review.':!verified?'Relief history has not been verified.':!rows.length?'No weekly quota history is recorded.':!currentWeekRecorded?'This week’s quota has not been recorded yet.':entitlement===0?'No relief quota is recorded for this period.':'';
  return {from:year+'-01-01',to:today,throughWeek:week,completed,entitlement:valid&&rows.length?entitlement:null,percentage:!reason?100*completed/entitlement:null,reason,historyVerified:verified,currentWeekRecorded,recordedWeeks:seen.size,excludedWeeks:rows.filter(r=>r.excluded).length,firstWeek:rows[0]?.week||null,lastWeek:rows.at(-1)?.week||null,zeroStart:history?.mode==='zero-start',startedAt:history?.mode==='zero-start'?history.at:null};
 }
@@ -5505,7 +5506,7 @@ var GSISRosterAllocation = (() => {
   function annual(s,ctx,id,accountYear=year(ctx.today)){
     const maxWeek=monday(ctx.today),rows=(s.entitlements||[]).filter(r=>r.staffId===id&&r.year===accountYear&&r.week<=maxWeek),denominator=rows.reduce((n,r)=>n+(r.excluded?0:r.quota),0);
     let completed=0,committed=0;
-    for(const a of accounted(s,ctx)){if(a.staffId!==id||(a.accountingYear||year(a.date))!==accountYear)continue;if(a.status==='completed'||a.completionStatus==='completed')completed+=cost(a);else committed+=cost(a);}
+    for(const a of accounted(s,ctx)){if(a.staffId!==id||(a.accountingYear||year(a.date))!==accountYear)continue;if(reliefCompleted(a,ctx))completed+=cost(a);else committed+=cost(a);}
     return {entitlement:denominator,completed,committed,spent:completed+committed,utilisation:denominator>0?(completed+committed)/denominator*100:completed+committed===0?0:null,historyVerified:s.accountingYears?.[accountYear]?.verified===true};
   }
   // Employment caps use numbered timetable-period units, exactly as capWorkload
@@ -5541,7 +5542,7 @@ var GSISRosterAllocation = (() => {
   function balances(s,ctx,d){
     const rows=accounted(s,ctx),totals=new Map(),weekly=new Map(),denominators=new Map(),weeklyQuotas=new Map(),week=monday(d),teachers=new Map((ctx.days[d]?.teachers||[]).map(t=>[t.staffId,t])),Y=year(d),through=monday(ctx.today);
     for(const r of s.entitlements||[])if(r.year===Y){if(r.week<=through)denominators.set(r.staffId,(denominators.get(r.staffId)||0)+(r.excluded?0:r.quota));if(r.week===week&&!weeklyQuotas.has(r.staffId))weeklyQuotas.set(r.staffId,r);}
-    for(const a of rows){if((a.accountingYear||year(a.date))===Y){const t=totals.get(a.staffId)||{completed:0,committed:0};t[a.status==='completed'||a.completionStatus==='completed'?'completed':'committed']+=cost(a);totals.set(a.staffId,t);}if(monday(a.date)===monday(d))weekly.set(a.staffId,(weekly.get(a.staffId)||0)+cost(a));}
+    for(const a of rows){if((a.accountingYear||year(a.date))===Y){const t=totals.get(a.staffId)||{completed:0,committed:0};t[reliefCompleted(a,ctx)?'completed':'committed']+=cost(a);totals.set(a.staffId,t);}if(monday(a.date)===monday(d))weekly.set(a.staffId,(weekly.get(a.staffId)||0)+cost(a));}
     const result=new Map();for(const p of ctx.people){const q=weekQuota(s,ctx,p.id,d,weeklyQuotas),teacher=effectiveUTTeacher(s,ctx,d,teachers.get(p.id),p),capped=teacher?.capConfigured===true||teacher?.periodCap!==null&&teacher?.periodCap!==undefined,v=totals.get(p.id)||{completed:0,committed:0},entitlement=denominators.get(p.id)||0,spent=v.completed+v.committed,used=weekly.get(p.id)||0,quota=q.quota;result.set(p.id,{...v,spent,entitlement,utilisation:entitlement>0?100*spent/entitlement:spent===0?0:null,R:quota,remaining:quota===null?null:quota-used,weeklyUsed:used,periodCap:capped?teacher.periodCap:null,utCap:capped&&teacher.capBasis==='total',capConfigured:capped,capWorkload:capped?teacher.capWorkload:null,capRemaining:capped&&teacher.capVerified===true&&Number.isFinite(teacher.capHeadroom)?teacher.capHeadroom-used:null,capVerified:!capped||teacher.capVerified===true,capVerificationReason:capped?teacher.capVerificationReason||null:null,quotaVerified:q.verified&&quota!==null,historyVerified:s.accountingYears?.[Y]?.verified===true});}return result;
   }
   // Each cross-project decision names the immutable published Deploy snapshot it
@@ -5563,6 +5564,9 @@ var GSISRosterAllocation = (() => {
   }
   function periodStarted(ctx,d,p,snapshot){const start=ctx.days[d]?.periods.find(x=>x.period===p)?.startMinutes;const label=snapshot?.timeStart||snapshot?.start;const n=Number.isFinite(start)?start:/^\d\d:\d\d$/.test(label||'')?Number(label.slice(0,2))*60+Number(label.slice(3)):null;return d<ctx.today||d===ctx.today&&(n===null||ctx.minute>=n);}
   function periodEnded(ctx,d,p,snapshot){const end=ctx.days[d]?.periods.find(x=>x.period===p)?.endMinutes,label=snapshot?.timeEnd||snapshot?.end,n=Number.isFinite(end)?end:/^\d\d:\d\d$/.test(label||'')?Number(label.slice(0,2))*60+Number(label.slice(3)):null;return d<ctx.today||d===ctx.today&&n!==null&&ctx.minute>=n;}
+  // Classify counted records without rewriting publication or notification history.
+  // Explicit SMC completion corrections take precedence over the school clock.
+  function reliefCompleted(a,ctx){if(a.completionStatus)return a.completionStatus==='completed';return a.status==='completed'||a.status==='published'&&periodEnded(ctx,a.date,a.period,a);}
   function assignedPeriods(s,id,d,ignore=new Set()){return new Set(effectiveAssignments(s).filter(a=>a.date===d&&a.staffId===id&&!a.noRelief&&!ignore.has(a.demandId)).map(a=>a.period));}
   // Immutable identity and timetable joins are reused only inside one read projection.
   // Mutable absence, assignment and R state is rebuilt for every candidate/mutation state.
@@ -5856,7 +5860,7 @@ var GSISRosterAllocation = (() => {
   }
   function mayOptimise(ctx,d){const start=Date.parse(addDays(d,-1)+'T16:00:00+08:00'),end=Date.parse(d+'T06:29:59.999+08:00');return ctx.now>=start&&ctx.now<=end;}
   function warningEvents(s,ctx,summary){ensure(s);const quiet=schedule(ctx.now).quiet,events=[];for(const p of summary.periods){if(periodStarted(ctx,summary.date,p.period))continue;const key=summary.date+':'+p.period,old=s.healthWarningState[key]||{seen:[],episode:0};if(p.green.length>2){s.healthWarningState[key]={seen:[],episode:old.seen.length?old.episode+1:old.episode,last:p.green.length};continue;}if(!old.seen.includes(p.green.length)){events.push({key:'capacity:'+key+':'+old.episode+':'+p.green.length,period:p.period,count:p.green.length,date:summary.date,quiet});old.seen.push(p.green.length);}old.last=p.green.length;s.healthWarningState[key]=old;}return events;}
-  return {reliefCandidateEligible,normalizeSubjectPatterns,matchesSubjectPattern,absencePeriods,defaultConsecutiveSubjectRules,normalizeConsecutiveSubjectRules,manualDecision,manualDecisionForDemand,manualOwnership,defaultSubjectFamilies,normalizeSubjectFamilies,normalizeTeachingGroupOverrides,subjectResolver,lessonSubject,teachingProfile,defaultRestrictedPeriods,defaultEmploymentRestrictions,preferenceRules,workloadRules,ruleToggles,workloadLimits,preferenceOrder,sameVenue,teacherSource,recessDuty,manualAssignments,manualModel,withManualAssignments,manualRanks,isClassLesson,ensure,clone,fail,norm,addDays,monday,year,cost,active,protectedAssignment,effectiveAssignments,accounted,corrected,initialiseHistory,annual,balances,weekQuota,captureWeek,addAudit,bumpDay,periodStarted,periodEnded,teacherContext,eligibility,runAt,opportunities,health,rotation,ranked,optimise,score,solveCoverage,schedule,mayOptimise,warningEvents,pendingPeerRequests};
+  return {reliefCandidateEligible,normalizeSubjectPatterns,matchesSubjectPattern,absencePeriods,defaultConsecutiveSubjectRules,normalizeConsecutiveSubjectRules,manualDecision,manualDecisionForDemand,manualOwnership,defaultSubjectFamilies,normalizeSubjectFamilies,normalizeTeachingGroupOverrides,subjectResolver,lessonSubject,teachingProfile,defaultRestrictedPeriods,defaultEmploymentRestrictions,preferenceRules,workloadRules,ruleToggles,workloadLimits,preferenceOrder,sameVenue,teacherSource,recessDuty,manualAssignments,manualModel,withManualAssignments,manualRanks,isClassLesson,ensure,clone,fail,norm,addDays,monday,year,cost,active,protectedAssignment,effectiveAssignments,accounted,corrected,initialiseHistory,annual,balances,weekQuota,captureWeek,addAudit,bumpDay,periodStarted,periodEnded,reliefCompleted,teacherContext,eligibility,runAt,opportunities,health,rotation,ranked,optimise,score,solveCoverage,schedule,mayOptimise,warningEvents,pendingPeerRequests};
 })();
 if(typeof module!=='undefined'&&module.exports)module.exports=GSISRosterAllocation;
 

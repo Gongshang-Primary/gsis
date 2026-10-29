@@ -1,3 +1,7 @@
+# Roster automatic relief completion accounting — 30 October 2026
+
+Model: Codex. First task in the approved November queue. Ended published relief counts as completed in annual balances and personal calculations without a manual completion click. Explicit SMC corrections override the clock; cancelled, removed and zero-cost duties retain their existing accounting rules. Total spent, quota formula, allocation priorities and stored publication/notification records stay unchanged. Google remains authoritative. Local verification and Claude exact-head review are recorded in [the task](docs/coordination/tasks/roster-relief-auto-complete.md); no deployment or live record change is included.
+
 # Roster import integration after PRs #10 and #11 — 29 October 2026
 
 Model: Codex. Existing PR #8 now integrates actual main 699749f through normal merges, retaining short WhatsApp summaries and the quiet-mode replay/arrival fixes. Canonical bundles rebuilt; nine requested import programs, WhatsApp summary, quiet-mode state/route, 18-component generated parity and diff checks pass. No full-suite rerun, deployment, live import, provider send or authority change. Google remains authoritative. See the task’s final integration handoff and post11 test evidence. Claude reviews the exact new PR head.
