@@ -25,6 +25,7 @@
 - SRE appears only in employment restrictions (restricted periods) and employment parsing (shared/relief.js).
 
 ## Owner decisions (30 Oct 2026)
+- Ships On: the SRE rule applies from deploy (unlike roster-fajt-levelling, which ships Off).
 - SREs use the same Daily workload limits settings as all staff; no separate SRE values.
 - R% displays show SREs as "Daily roster, no R%" (My Calculations, annual balances, statistics).
 
