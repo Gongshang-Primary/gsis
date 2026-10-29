@@ -67,3 +67,8 @@ Keep as is: relief_reminder (one duty, useful 20 minutes before), mutual_request
 Optional, needs Meta approval: a v3 of the timetable template without "Specifically, the changes are:".
 
 No Meta re-approval is needed for options A or B. Code: `publicationSummary()` and the mutual_override builder in `shared/roster-operations.js`; rebuild generated backends; update tests that assert summary text.
+
+## Owner decision (29 Oct 2026)
+- Option B for relief_assignment, relief_updated, relief_urgent. Task: roster-whatsapp-short-summary.
+- Peer messages (mutual_request, mutual_override): no change for now.
+- No new timetable template.
