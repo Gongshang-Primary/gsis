@@ -1293,7 +1293,7 @@ var RosterOpsUI = (() => {
  function drawQuiet(s){
   const button=$(s,'[data-quiet-toggle]'),note=$(s,'[data-quiet-note]'),user=s.ctx.profile?.user,active=quietActive(s.quiet);if(!button)return;
   button.hidden=!(user?.smc||user?.admin);button.textContent=active?'End quiet mode':'Quiet mode';button.setAttribute('aria-pressed',String(active));button.title=quietText(s.quiet);
-  if(note){note.hidden=!active;note.textContent=active?quietText(s.quiet)+'. New absence reports and WhatsApp keep running.':'';}
+  if(note){note.hidden=!active;note.textContent=active?quietText(s.quiet)+'. New absence reports and WhatsApp keep running; jobs already running finish first.':'';}
  }
  async function refreshQuiet(s,force=false){
   if(!isLive(s)||s.page!=='Assign Relief'||!force&&Date.now()-(s.quietCheckedAt||0)<20000)return;s.quietCheckedAt=Date.now();

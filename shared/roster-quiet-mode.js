@@ -37,18 +37,26 @@ export async function startQuietMode(db,actor,now=Date.now()){
  return readQuietMode(db,now);
 }
 // Binds a publish or WhatsApp request to the quiet session active when it was
-// first seen. A retry keeps its first binding, so a replayed old receipt can
-// only end the session it was issued in, never a newer one. 0 = no session.
+// first seen. A retry keeps its first binding, so it can only end the session
+// it was issued in. `fresh` marks a request seen for the first time: if the
+// backend then reports a replayed receipt, the request predates its binding
+// (pruned after two days, or accepted before this feature) and ends nothing.
 export async function bindQuietRequest(db,requestId,now=Date.now()){
- if(!db?.prepare)return 0;
+ if(!db?.prepare)return {session:0,fresh:true};
  await ensure(db);const current=await readQuietMode(db,now),session=current.active?current.startedAt:0;
- if(typeof requestId!=='string'||!requestId)return session;
- await db.batch([
+ if(typeof requestId!=='string'||!requestId)return {session,fresh:true};
+ const [,inserted]=await db.batch([
   db.prepare('DELETE FROM gsis_quiet_mode_requests WHERE at<?').bind(now-2*86400000),
   db.prepare('INSERT OR IGNORE INTO gsis_quiet_mode_requests(request_id,session_started_at,at) VALUES(?,?,?)').bind(requestId,session,now)
  ]);
  const row=await db.prepare('SELECT session_started_at FROM gsis_quiet_mode_requests WHERE request_id=?').bind(requestId).first();
- return Number(row?.session_started_at)||0;
+ return {session:Number(row?.session_started_at)||0,fresh:inserted?.meta?.changes===1};
+}
+// A first-seen request whose receipt is a replay belongs to no current
+// session: record that, so its later retries end nothing either.
+export async function releaseQuietRequest(db,requestId){
+ if(!db?.prepare||typeof requestId!=='string'||!requestId)return;
+ await ensure(db);await db.prepare('UPDATE gsis_quiet_mode_requests SET session_started_at=0 WHERE request_id=?').bind(requestId).run();
 }
 export async function endQuietModeSession(db,actor,reason,session,now=Date.now()){
  if(!db?.prepare||!session)return view(null,now);

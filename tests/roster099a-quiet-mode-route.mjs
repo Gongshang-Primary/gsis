@@ -18,10 +18,12 @@ async function request(settings,path,{method='POST',body,signedIn=true}={}){
  return {status:response.status,body:await response.json()};
 }
 let roles={smc:true,admin:false},backendOps=[];
+const replayIds=new Set();
 globalThis.fetch=async(url,init)=>{
  assert.equal(String(url),env.APPS_SCRIPT_URL);
  const envelope=JSON.parse(init.body),payload=JSON.parse(envelope.payload);backendOps.push(payload.input?.operation);
  if(payload.input?.operation==='read')return Response.json({ok:true,data:{user:roles,entries:[]}});
+ if(replayIds.has(payload.input?.requestId))return Response.json({ok:true,data:{revision:2,date:payload.input?.date,replayed:true}});
  return Response.json({ok:true,data:{revision:2,date:payload.input?.date}});
 };
 const db=database(),settings={...env,GSIS_JOBS:db};
@@ -58,6 +60,16 @@ await sendDaily(r1);
 assert.equal((await request(settings,'/api/quiet-mode',{method:'GET'})).body.data.active,true,'a replay of R1 leaves session B on');
 await sendDaily(crypto.randomUUID());
 assert.equal((await request(settings,'/api/quiet-mode',{method:'GET'})).body.data.active,false,'a new request in session B ends it');
+// A receipt the backend replays for a request first seen now (binding pruned
+// after two days, or accepted before quiet mode existed) ends nothing.
+await new Promise(resolve=>setTimeout(resolve,5));
+await request(settings,'/api/quiet-mode',{body:{action:'on'}});
+const old=crypto.randomUUID();replayIds.add(old);
+await sendDaily(old);
+assert.equal((await request(settings,'/api/quiet-mode',{method:'GET'})).body.data.active,true,'a first-seen replayed receipt leaves quiet mode on');
+await sendDaily(old);
+assert.equal((await request(settings,'/api/quiet-mode',{method:'GET'})).body.data.active,true,'its retries stay bound to that decision');
+await request(settings,'/api/quiet-mode',{body:{action:'off'}});
 
 await request(settings,'/api/quiet-mode',{body:{action:'on'}});
 const off=await request(settings,'/api/quiet-mode',{body:{action:'off'}});

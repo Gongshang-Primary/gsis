@@ -6,7 +6,7 @@ import {backendAvailable,callOperationalBackend,forwardOperationalRequest} from 
 import {assertRecoveryWritable} from '../../shared/edge-recovery.js';
 import {readSystemHealth,safeHealthError} from '../../shared/edge-health.js';
 import {rosterRecoveryEnvironment} from '../../shared/roster-recovery-profile.js';
-import {readQuietMode,startQuietMode,endQuietMode,bindQuietRequest,endQuietModeSession,QUIET_END_OPERATIONS} from '../../shared/roster-quiet-mode.js';
+import {readQuietMode,startQuietMode,endQuietMode,bindQuietRequest,releaseQuietRequest,endQuietModeSession,QUIET_END_OPERATIONS} from '../../shared/roster-quiet-mode.js';
 /* GSIS_API_SECRET_BEGIN */
 // First-party API credentials share one operator-selected setting. Browser
 // sessions, private relief links and third-party credentials stay independent.
@@ -313,12 +313,12 @@ export default {async fetch(req,env,ctx){
    if(['autoAllocate','optimise'].includes(input.operation))await assertAbsenceTransportReady(env,[input.date||singaporeDate()],['autoAllocate','optimise'].includes(input.operation),who);
    const calendarOutput={};
    try{const stage=Date.now();input=await trustedOperationsInput(input,env,who,calendarOutput);calendarMs=Date.now()-stage;}catch(error){return json({ok:false,error:error.message},400)}
-   const quietEnds=Object.hasOwn(QUIET_END_OPERATIONS,input.operation),quietSession=quietEnds?await bindQuietRequest(env.GSIS_JOBS,input.requestId,requestStarted).catch(()=>0):0;
+   const quietEnds=Object.hasOwn(QUIET_END_OPERATIONS,input.operation),quietBinding=quietEnds?await bindQuietRequest(env.GSIS_JOBS,input.requestId,requestStarted).catch(()=>({session:0,fresh:true})):{session:0,fresh:true};
    const value=input.operation==='timetableBatch'&&!edgeRosterEnabled(env)&&!backendAvailable(env)?await timetableSnapshot(env,input,who,traceId):await backend(env,action,input,who,traceId);backendMs=value.backendMs;
    // A confirmed publish or WhatsApp send ends quiet mode on the server, not in the browser.
-   // Only the quiet session this request was first issued in can end; a request
-   // without an identity that returns a replayed receipt ends nothing.
-   if(value.result?.ok&&quietEnds&&quietSession&&(input.requestId||!(value.result.data?.replayed||value.result.replayed)))await endQuietModeSession(env.GSIS_JOBS,who.email,QUIET_END_OPERATIONS[input.operation],quietSession).catch(()=>{});
+   // Only the quiet session this request was first issued in can end. A replayed
+   // receipt for a request first seen now (pruned or pre-feature) ends nothing.
+   if(value.result?.ok&&quietEnds&&quietBinding.session){if(quietBinding.fresh&&(value.result.data?.replayed||value.result.replayed))await releaseQuietRequest(env.GSIS_JOBS,input.requestId).catch(()=>{});else await endQuietModeSession(env.GSIS_JOBS,who.email,QUIET_END_OPERATIONS[input.operation],quietBinding.session).catch(()=>{});}
    if(input.operation==='statisticsCalendar'&&!edgeRosterEnabled(env)&&!backendAvailable(env)&&value.result.ok){const stage=Date.now();value.result.data=await statisticsCalendar(env,who,input.year);calendarMs=Date.now()-stage;}
    if(value.result.ok&&['createStapler','importStapler','saveStapler','confirmStapler','publishStapler','resetStapler','moveStapler','restoreStapler','deleteStapler','renameStapler'].includes(input.operation))warmAfterRosterWrite(env,who,traceId,ctx);
    if(value.result.ok&&value.result.data)Object.assign(value.result.data,calendarOutput);
