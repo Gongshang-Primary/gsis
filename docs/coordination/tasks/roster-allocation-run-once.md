@@ -1,11 +1,11 @@
 # roster-allocation-run-once: stop the scheduled allocator retrying every minute
 
-- Status: proposed (handoff to Codex; Codex claims by updating Owner and Status)
-- Owner/model: Codex (proposed by Claude as architect, owner's directive 29 Oct: Codex implements)
+- Status: claimed
+- Owner/model: Codex
 - Reviewer/model: Claude
-- Last updated (Asia/Singapore): 29 Oct 2026 09:30
+- Last updated (Asia/Singapore): 29 Oct 2026 08:56
 - Branch: codex/roster-allocation-run-once
-- Base SHA: 4eb1208
+- Base SHA: 1b9c915c525472131553da2e54d87b0dc7f83301
 - Current head SHA (or PR head; avoid self-referential commit hashes): none
 - PR: none
 - User-authorised scope: Song Wee, 29 Oct 2026: Friday 30 Oct production target; Codex does most coding.
@@ -34,3 +34,6 @@
 
 ## Handoff
 Needed for Friday 30 Oct 05:30 SGT run. Deploy with bundle A Thursday evening. Claude reviews the exact head SHA.
+
+## Coordination
+Owner's latest directive orders this task before chunked import. Reviews of PRs #2–#6 have been posted at their exact heads. Claude retains its existing PR branches and fixes; this task excludes their UI and quiet-mode logic. Only this allocator task is now claimed for implementation. Google remains authoritative; no production deployment, merge or authority flag change is included. Any later merge must regenerate shared bundles from the combined sources.
