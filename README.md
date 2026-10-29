@@ -13,7 +13,7 @@ TZ=Asia/Singapore npm test
 
 ## Rules
 1. Never commit secrets, `.dev.vars` files or school data exports.
-2. No production deploys on school days between 06:00 and the last period.
+2. Deployment timing is the owner's decision (docs/coordination/OWNER_DIRECTIVES.md). Record every deployment in docs/coordination/DEPLOYMENTS.md.
 3. Every change goes through staging before production.
 
 ---
