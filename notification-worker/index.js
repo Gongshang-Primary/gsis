@@ -3,6 +3,8 @@ import {recordJobHealth,safeHealthError} from '../shared/edge-health.js';
 import {assertRecoveryWritable} from '../shared/edge-recovery.js';
 import {rosterRecoveryEnvironment} from '../shared/roster-recovery-profile.js';
 import {readQuietMode} from '../shared/roster-quiet-mode.js';
+// Test harnesses load this file with its imports removed; treat quiet mode as off there.
+const quietMode=(db,at)=>typeof readQuietMode==='function'?readQuietMode(db,at):Promise.resolve({active:false});
 import {dispatchNotifications,scheduledRoster,diagnoseNotificationConnections,dispatchInboxPending,dispatchWebhookJobs,dispatchReceivedReports,dispatchPeerMail,dispatchAllocationAudit} from '../roster-update/public/_worker.js';
 /* GSIS_API_SECRET_BEGIN */
 // First-party API credentials share one operator-selected setting. Browser
@@ -70,7 +72,7 @@ export default {
    }
    const run=(job,name,work)=>stage(env,job,name,work,{scheduledTime:event.scheduledTime});
    // Assign Relief quiet mode pauses lock-heavy, deferrable work while SMCs allocate.
-   const quiet=await readQuietMode(env.GSIS_JOBS,event.scheduledTime).catch(()=>({active:false}));
+   const quiet=await quietMode(env.GSIS_JOBS,event.scheduledTime).catch(()=>({active:false}));
    // Daily private-cache pruning reads only bounded cache metadata and objects.
    // No timetable build or Google roster read runs in this maintenance lane.
    if(event.cron==='15 18 * * *'){
@@ -91,7 +93,7 @@ export default {
    const ingress=env.WHATSAPP_DURABLE_INGRESS==='true'?run('webhook','roster-webhook-drain',()=>dispatchWebhookJobs(env)):Promise.resolve();
    // Re-read quiet mode after the received-report drain: an SMC may have turned
    // it on while that drain was running. Jobs already started run to completion.
-   const quietNow=()=>readQuietMode(env.GSIS_JOBS,Date.now()).then(q=>q.active).catch(()=>quiet.active);
+   const quietNow=()=>quietMode(env.GSIS_JOBS,Date.now()).then(q=>q.active).catch(()=>quiet.active);
    const peerMail=(async()=>{await received;return await quietNow()?null:run('peer-mail','roster-peer-mail-drain',()=>dispatchPeerMail(env));})();
    const planning=(async()=>{
     const receiptResult=await received;
@@ -116,7 +118,7 @@ export default {
   const run=(job,work)=>stage(env,job,null,work);
   const received=await run('received-reports',()=>dispatchReceivedReports(env,{budgetMs:150000}));
   const result=await run('notifications',()=>dispatchNotifications(env,{budgetMs:240000}));
-  const peer=(await readQuietMode(env.GSIS_JOBS).catch(()=>({active:false}))).active?{}:await run('peer-mail',()=>dispatchPeerMail(env));
+  const peer=(await quietMode(env.GSIS_JOBS).catch(()=>({active:false}))).active?{}:await run('peer-mail',()=>dispatchPeerMail(env));
   console.info(JSON.stringify({event:'roster-notification-queue',...safeSummary(result)}));
   if(received.stageFailed||result.stageFailed||peer.stageFailed||received.hasMore||received.transport?.pending||received.intake?.deferred||result.pending||result.prepareFailures||result.resultFailures||peer.pending||peer.failed||peer.blocked){
    const delaySeconds=Math.max(1,Math.min(900,Math.ceil(((received.hasMore?Date.now()+1000:result.readyAt||Date.now()+60000)-Date.now())/1000)));
