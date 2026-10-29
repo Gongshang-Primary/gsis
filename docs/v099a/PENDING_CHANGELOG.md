@@ -237,3 +237,98 @@ Cloudflare-authoritative timetables (Diagram 1), new allocation rules, and chang
 **Packages:** `Roster_Backend_v0.9.9a-latestwins.gs` SHA-256 `a504a47d98a422fa37c7152b2fb8941e2c4900818a06792e15d76955f631e905`; `Roster_Frontend_v0.9.9a-latestwins.zip` SHA-256 `85ccb4dc2c06dc5f054a5872743e23fdec1bc896f0690e679e12bccefcb3923c`. Runtime labels still read 0.9.9.
 
 **Rollback:** Apps Script → Manage deployments → previous version; Pages → previous deployment.
+
+## Owner requests logged 29 Oct 2026 (proposed, not implemented)
+
+### Stapler: teachers see upcoming suspended dates and ask an SMC sponsor to plan
+
+**Request:** Teachers can view upcoming suspended dates and ask an SMC sponsor to do the planning. Answered: see Owner decisions (29 Oct 2026) 1 and 2 under Annual R% below.
+
+**Current behaviour (0.9.9a):** Largely present. `requestStapler` (`shared/roster-operations.js:761`) lets an active teacher request Stapler planning and publication access for a date, naming an eligible SMC sponsor; the sponsor gets a `stapler_request` notification and decides with `decideStapler`. `staplerDatesView` (`shared/roster-operations.js:170`) lists dates; teachers see their own requests and confirmed dates subject to `confirmedDateAccess`.
+
+**Answered 29 Oct 2026 (Owner decisions 1 and 2 below):** teachers see all upcoming suspended dates; a request asks an SMC for permission to help plan. Original question: whether teachers can already see every upcoming suspended date (including ones they did not request), and whether the request should ask the SMC to plan on the teacher's behalf (current flow grants the teacher planning access instead). Change only after that answer.
+
+### Peer arrangements respected?
+
+**Question:** Are peer (mutual) arrangements respected?
+
+**Current behaviour:** Yes for allocation. Assignments from accepted peer arrangements carry `origin:'mutual'` / `peerApproved` (`shared/roster-allocation.js:307`); Auto-allocate and Auto-fill blanks treat them as protected and do not replace them.
+
+**Change introduced by 0.9.9a latest-wins (fc0abb9):** when a later absence report shortens an absence, relief on the removed periods is released, including peer arrangements (owner directive: release protected relief). Ended periods are kept.
+
+**Proposed:** (a) on release, notify both peers that the arrangement is no longer needed; (b) confirm the owner wants peer arrangements released in this case, or kept as the one exception.
+
+### Annual R%: reliefs accumulate across the year regardless of workload changes
+
+**Request:** Count reliefs cumulatively across the year regardless of workload changes, and account for annual R%.
+
+**Current behaviour:** Present in the allocator. `annual()` (`shared/roster-allocation.js` ~179) sums completed plus committed relief cost for the accounting year, and divides by the sum of each week's recorded R entitlement in `s.entitlements` (week by week, so mid-year workload changes are reflected week by week). Candidates are ranked by lower annual utilisation when the "Lower annual R utilisation" preference is on.
+
+**Gaps:**
+1. Relief done outside the system is not counted. 28 Oct 2026 (Excel day) and any day before Roster went live are missing unless entered. R% for those teachers is understated.
+2. Weeks with no recorded entitlement row add nothing to the denominator; `historyVerified` marks whether the year's history is verified.
+3. R% is used for ranking but is not shown as a simple per-teacher annual report.
+
+**Proposed:** (a) an SMC tool to enter off-system relief (date, teacher, periods) so annual R% is complete; (b) a per-teacher annual R% report (reliefs, entitlement, %), exportable; (c) a warning when weeks lack entitlement records.
+
+**Owner decisions (29 Oct 2026):**
+1. Teachers see all upcoming suspended dates, not only their own requests.
+2. Teachers ask an SMC for permission to help plan (the request grants planning help, approved by the SMC).
+3. Released peer arrangements notify both peers.
+4. My Relief Duties shows each teacher their relief count for the year and their accumulated annual R%.
+
+### Timetable page: on suspended days, show the baseline aligned underneath
+
+**Request (29 Oct 2026, 07:22):** On the Timetable page, for a suspended day, show the usual baseline directly underneath the published suspended timetable.
+
+**Current behaviour (0.9.9a):** Timetable → Teacher timetables shows "Published suspended timetable · <date>" as one table, then a separate "Baseline weekly timetable" section further down with its own Odd/Even week tables. The two are not aligned, so a teacher must scroll and compare by eye (owner screenshot, teacher view on a phone, 29 Oct).
+
+**Reference design already in production:** the private "My published timetable" page (`external.html`) shows one table per date with rows "Today's published timetable" and "Usual baseline" under the same period columns, with changed cells highlighted (owner screenshot, 23 Oct).
+
+**Planned change:**
+1. On a suspended (or published-changed) day, the Teacher, Class and TG timetables render one table with two rows per subject: "Published (suspended)" and "Usual baseline", sharing the same period and time columns.
+2. Cells that differ are highlighted in the same yellow as the external page, with "Changed".
+3. On ordinary days, show only the timetable (no duplicate baseline row).
+4. The separate "Baseline weekly timetable" section stays below for the full week view.
+5. Phone width: the period columns scroll horizontally together; the row labels stay fixed.
+6. PDF/Print and Excel exports of the day include both rows.
+7. Combine with the relief overlay entry above, so the published row also shows relief.
+
+**Scope:** Roster frontend (`roster-update/public/roster.js`); reuse the external page's alignment logic where possible. No data change.
+
+### Deploy: specialist count excludes FAJT staff
+
+**Request (29 Oct 2026):** In Deploy, the specialist count must not include staff whose employment is FAJT.
+
+**Current behaviour (0.9.9a):** `shared/workload.js` builds each specialist subject's pool as every active, eligible teacher who teaches the subject (`const pool=rows.filter(r=>r.active&&r.rules.eligible&&taught(r.teacher.id,s))`, ~line 171). `headcount` is `pool.length` (~lines 190-192), so FAJT teachers are counted. The same pool also feeds `capacity` (FAJT retained ratio 65/84, ~line 209) and the indicator `average` (assigned specialist periods ÷ headcount).
+
+**Planned change:**
+1. Exclude `employment==='FAJT'` from the specialist headcount.
+2. To keep the average honest, exclude FAJT periods from the indicator's assigned periods too (otherwise their periods are divided among fewer people). Answered: see Owner decision below.
+3. Capacity: keep or exclude FAJT? Answered: exclude (Owner decision below). Default proposal: exclude from headcount and average, keep their periods visible as a separate "FAJT support" line so no load disappears.
+
+**Scope:** `shared/workload.js` (canonical; regenerate Deploy bundles), Deploy and Layout workload UI labels, tests for a pool with and without FAJT staff.
+
+**Owner decision (29 Oct 2026):** Count school-wide demand in full, but do not count FAJT staff, who are supplementary manpower.
+- Demand: unchanged; every class and group's specialist periods count, including periods FAJT staff teach.
+- Headcount and capacity: exclude FAJT staff.
+- Average: non-FAJT assigned periods ÷ non-FAJT headcount.
+- FAJT periods shown as a separate "FAJT supplementary" line, so the gap between demand and core capacity stays visible.
+
+### Roster: "Assigned By" shows the auto-allocator for automatic relief
+
+**Request (29 Oct 2026):** A relief made by auto-allocation must show the auto-allocator as "Assigned By", not the person who published.
+
+**Current behaviour (0.9.9a):** The relief view sets `assignedBy:a?.publishedBy||<stapler confirmedBy>||ctx.user.email` (`shared/roster-operations.js:1183`). That is the publisher, then the Stapler confirmer, then the viewer, never the assigner. Owner screenshot: Wen Di (MTL), P12 relief for Danning, shows `ngiam.song.wee@gsps.edu.sg` although the auto-allocator assigned it.
+
+**Planned change:**
+1. Derive "Assigned By" from the assignment itself: `origin:'automatic'` (Auto-allocate, Auto-fill blanks, scheduled run) → "Auto-allocation"; `origin:'smc'` or a manual change → the SMC who made or last changed it (from the assignment's own actor field or audit); `origin:'mutual'` → "Peer arrangement".
+2. Keep "Published by" as a separate fact where it is shown.
+3. Same rule in the Excel export and the teacher-facing views.
+4. Test: automatic, SMC-edited automatic, manual and peer rows each show the right label.
+
+### Roster: delivery time shows a raw number
+
+**Found (29 Oct 2026, same screenshot):** "Delivered 1793228134000 Singapore time." The provider's delivery time is stored as a digit string; `stamp()` (`roster-update/public/roster-operations-ui.js:231`) only formats values that `new Date(value)` understands, so it prints the digits.
+
+**Planned change:** `stamp()` treats a 13-digit string as milliseconds and a 10-digit string as seconds since 1970, then formats as Singapore time (here: 29 Oct 2026, 06:55:34). Add a test for both forms. Check other callers that pass provider timestamps.
