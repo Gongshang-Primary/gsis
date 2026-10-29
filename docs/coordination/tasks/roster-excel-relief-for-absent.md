@@ -17,7 +17,7 @@ In every Roster Excel export, a relief teacher's cell reads `<Subject> (for <abs
 ## Current behaviour (source reading)
 - All-teacher workbook ("Export Excel" → `makeReliefWorkbook`): `roster-stapler-export.js` ~line 131 already builds `(a.subject||'Relief')+(absentName?' (for '+absentName+')':'')`, with `absentName = a.absentName || members' names`. If the cell shows no name, the export snapshot's assignment lacks `absentName` and `members` names: fix the projection (fall back to the absence record's staff name), not the label.
 - Daily relief list ("Export relief excel" → `RosterExport.dailyRelief`) and Class POV workbook (`makeClassWorkbook`, ~line 207): check and apply the same label where a relief teacher's subject is shown.
-- Owner to confirm which button showed the missing name.
+- Owner confirmed (30 Oct): the missing name was seen via **Report Absence → Export Excel**, i.e. `exportRelief(...,'teacher')` → `RosterStaplerExport.makeReliefWorkbook` (roster-operations-ui.js ~1496). The label code exists, so start with the export snapshot (`localExportSnapshot` / `exportContext.teacherSummary.assignments`): ensure each relief assignment carries `absentName` or member names; fall back to the absence record's staff name.
 
 ## Acceptance
 - Test fixture: relief for an absent teacher with and without `absentName` on the assignment; every export shows `Art (for Nisha)`.
