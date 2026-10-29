@@ -1,10 +1,10 @@
 # roster-whatsapp-short-summary: period numbers only in teacher relief messages
 
-- Status: claimed; approved for Friday 30 Oct release (owner go 29 Oct 2026); priority 2 after roster-allocation-run-once
-- Owner/model: Codex
-- Reviewer/model: Claude
-- Last updated (Asia/Singapore): 29 Oct 2026 16:43
-- Branch: codex/roster-whatsapp-short-summary
+- Status: claimed by Claude. Reassigned by owner (Song Wee, 29 Oct 2026 ~17:10): "claude pick up short WhatsApp text". Codex's claim of 16:43 is superseded; its branch had no commits beyond main. Approved for Friday 30 Oct release.
+- Owner/model: Claude (was Codex)
+- Reviewer/model: Codex
+- Last updated (Asia/Singapore): 29 Oct 2026 17:10
+- Branch: claude/roster-whatsapp-short-summary
 - Base SHA: 590971c263fd5560f08f703825d209da5c223f2a
 - Current head SHA (or PR head; avoid self-referential commit hashes): none
 - PR: none
