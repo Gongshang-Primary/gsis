@@ -1,0 +1,66 @@
+{
+  "model": "Codex",
+  "timezone": "Asia/Singapore",
+  "integratedMain": "699749fbabd4cbd0248b2655e3ff990e68b6c499",
+  "originalRemoteHead": "86c94443f7bf59c67de344679bd7db73e3a31580",
+  "results": [
+    {
+      "program": "tests/roster099-chunked-import.cjs",
+      "exitCode": 0
+    },
+    {
+      "program": "tests/roster099-export-snapshot.cjs",
+      "exitCode": 0
+    },
+    {
+      "program": "tests/roster099-import-staging.cjs",
+      "exitCode": 0
+    },
+    {
+      "program": "tests/roster099-import-objects.cjs",
+      "exitCode": 0
+    },
+    {
+      "program": "tests/roster099-import-worker.mjs",
+      "exitCode": 0
+    },
+    {
+      "program": "tests/roster099a-edge-model-fetch.cjs",
+      "exitCode": 0
+    },
+    {
+      "program": "tests/roster094-edge-roster.mjs",
+      "exitCode": 0
+    },
+    {
+      "program": "tests/edge094-store.cjs",
+      "exitCode": 0
+    },
+    {
+      "program": "tests/edge094-setup.cjs",
+      "exitCode": 0
+    },
+    {
+      "program": "tests/roster099a-whatsapp-short-summary.cjs",
+      "exitCode": 0
+    },
+    {
+      "program": "tests/roster099a-quiet-mode.mjs",
+      "exitCode": 0
+    },
+    {
+      "program": "tests/roster099a-quiet-mode-route.mjs",
+      "exitCode": 0
+    }
+  ],
+  "build": "PASS; npm run build; 85 Apps Script files",
+  "generatedParity": "PASS; canonical installation_files/verify_runtime; 18 components",
+  "diffCheck": "PASS",
+  "notRun": [
+    "full suite",
+    "new runtime profile",
+    "staging",
+    "live import",
+    "provider delivery"
+  ]
+}

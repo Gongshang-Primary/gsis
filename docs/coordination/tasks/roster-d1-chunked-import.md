@@ -1,6 +1,6 @@
 # roster-d1-chunked-import: import the Roster into D1 in pieces
 
-- Status: review; resumed integration and local verification complete; Claude exact-head review pending
+- Status: post-#10/#11 integration verified; Claude current-head review pending
 - Owner/model: Codex
 - Reviewer/model: Claude
 - Last updated (Asia/Singapore): 29 Oct 2026 17:27
@@ -130,3 +130,25 @@ Remaining failure classification on integrated main:
 The relevant current-main notification/UI/shared-domain file hashes were checked when reconciling the source. These are inherited integration test gaps; they are reported, not removed or counted as passes. No changes to those unrelated fixtures are bundled into this import PR. Current quiet-mode state/route/UI and idle-lane focused tests also pass; Codex's separate exact-head review of e0e6066 reports the remaining replay-provenance issue, which this import PR does not claim to fix.
 
 Not run: excluded historical comparison branches, administrator staging, real school import, live delivery or production deployment. Rollback remains preparation-only and retains all immutable source containers, D1 sessions/receipts/staging and R2 objects. Owner chooses merge/release after Claude reviews the updated exact head. No other task or branch is claimed by this handoff.
+
+## Post-PR #10 integration, 29 October 2026
+
+Model: Codex. Song Wee explicitly wants #8 tonight, superseding the earlier defer recommendation. GitHub confirms #10 merged at 1708c3d7c8a798993fc1d39a131097993873ae5e on 29 Oct 2026 at 18:11:26 SGT, with reviewed head 94fd01576b6f631e32769ce3a52939244410f54f as its second parent. Existing #8 head was still 86c94443f7bf59c67de344679bd7db73e3a31580 and ownership remained Codex. Claude’s advisory review at that old head found no blocker; the new head needs review again.
+
+Integrating actual main 1708c3d with a normal two-parent merge. Canonical sources merge cleanly; four generated Worker bundles conflict and will be regenerated through npm run build. The separate open #11 quiet-mode follow-up is not taken over. Existing allocator, quiet mode, immutable import identities, source/staging/receipts and uncertainty stay intact. No authority switch, live import, provider send, merge to main or deployment is authorized. Validation results will follow here before handoff.
+
+### Post-#10 verification and handoff
+
+All nine owner-specified programs ran with TZ=Asia/Singapore and exited 0; exact commands/results are retained in ../review/roster-d1-chunked-import-post10-tests.json. npm run build passed, including the 85-file Apps Script syntax gate. Generated-runtime verification rebuilt and compared all 18 components using verify-099-suite.py verify_runtime and installation_files against current sources: PASS. Two initial parity invocations used the wrong archive path/format; the final invocation used the packager’s canonical installation mapping and completed successfully. git diff --check and the staged check passed. The inherited roster099a-whatsapp-short-summary.cjs passed 6/6, including actual payload, countdown field 3/summary field 4, enqueue/dispatch and promoted urgent reminder paths.
+
+No unnecessary full-suite or runtime-profile rerun was performed. Prior full-suite and performance figures above remain historical evidence at their stated source/head; they are not current-head results. PR #10 includes notification harness/UI fixture fixes; no updated broad-suite total is claimed. The separate #5 quiet-mode replay finding and #11 follow-up remain outside this task.
+
+Handoff: Claude reviews the new full exact head posted on PR #8. The owner decides merge and deployment. Immutable Drive containers (up to eight retained), D1 staging and receipts remain recovery evidence; do not delete them mid-import. Staging/storage and production finalize limits from Claude’s old-head review remain release gates. No live school import, provider send, deployment or ROSTER_EDGE_AUTHORITY change occurred.
+
+## Final integration after both required merges, 29 October 2026
+
+Model: Codex. Latest owner instruction requires BOTH #10 and #11 merged before updating #8. Verified GitHub: #10 merged at 1708c3d7c8a798993fc1d39a131097993873ae5e; #11 merged at 699749fbabd4cbd0248b2655e3ff990e68b6c499 on 29 Oct at 18:49:02 SGT, with reviewed head a4aa2abe4134c9115898273d4aa74dbd4f8af779. Current main is 699749f. GitHub #8 remained at 86c94443f7bf59c67de344679bd7db73e3a31580; the earlier local post-#10 integration was never published. The unpublished local checkpoint is retained locally. The final remote update is a normal merge with the existing remote head and actual main as parents. No force-push or actor’s branch replacement.
+
+Canonical source merged cleanly. Four conflicting generated Worker outputs were rebuilt using npm run build. All nine requested import programs PASS again with TZ=Asia/Singapore. Additional inherited WhatsApp summary (6 cases), quiet-mode state and quiet-mode route programs PASS. Generated runtime parity rebuilt and compared all 18 production components. Canonical gateway, quiet-mode module, summary domain, notification entrypoint and allocator hashes match actual main. git diff --check passes. Commands/results: ../review/roster-d1-chunked-import-post11-tests.json. No full-suite or runtime-profile rerun; prior results above remain historical.
+
+The earlier #5 replay finding is now addressed by merged #11; it was not repaired by import code. Import source/staging/recovery identities, immutable containers, receipts, provider uncertainty and protected manual/peer work remain preserved. No real school data import, deployment, provider message or authority change. Google remains authoritative. Claude must review the new exact full head recorded in PR #8; owner chooses merge/release. Rollback and storage/production finalize gates remain as stated above.

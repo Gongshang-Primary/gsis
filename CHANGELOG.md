@@ -1,3 +1,11 @@
+# Roster import integration after PRs #10 and #11 — 29 October 2026
+
+Model: Codex. Existing PR #8 now integrates actual main 699749f through normal merges, retaining short WhatsApp summaries and the quiet-mode replay/arrival fixes. Canonical bundles rebuilt; nine requested import programs, WhatsApp summary, quiet-mode state/route, 18-component generated parity and diff checks pass. No full-suite rerun, deployment, live import, provider send or authority change. Google remains authoritative. See the task’s final integration handoff and post11 test evidence. Claude reviews the exact new PR head.
+
+# Roster import integration after PR #10 — 29 October 2026
+
+Model: Codex. Existing PR #8 incorporates main 1708c3d with a normal merge, preserving merged WhatsApp short summaries, allocator and quiet mode. Canonical generated outputs rebuilt; nine focused import programs, generated parity for all 18 components, Apps Script syntax gate and the six WhatsApp summary cases pass. Prior broad-suite/runtime figures remain historical; no new full-suite result is claimed. Google remains authoritative. No deployment, live import or provider send. See the [task handoff](docs/coordination/tasks/roster-d1-chunked-import.md) and focused evidence. Claude must review the new exact head.
+
 # Roster bounded D1 preparation — 29 October 2026, local only
 
 Model: Codex. Task: [roster-d1-chunked-import](docs/coordination/tasks/roster-d1-chunked-import.md). The existing administrator import route now captures one immutable Google snapshot, transfers verified parts, retains durable D1 progress and commits both Roster scopes together at **imported**. Production Roster remains Google-first; no authority flags, activation fence, provider messages or school records were changed.

@@ -1,0 +1,75 @@
+{
+  "model": "Codex",
+  "date": "2026-10-29",
+  "timezone": "Asia/Singapore",
+  "previousHead": "86c94443f7bf59c67de344679bd7db73e3a31580",
+  "integratedMain": "1708c3d7c8a798993fc1d39a131097993873ae5e",
+  "programs": [
+    {
+      "command": "TZ=Asia/Singapore node tests/roster099-chunked-import.cjs",
+      "exitCode": 0,
+      "seconds": 0.746
+    },
+    {
+      "command": "TZ=Asia/Singapore node tests/roster099-export-snapshot.cjs",
+      "exitCode": 0,
+      "seconds": 1.338
+    },
+    {
+      "command": "TZ=Asia/Singapore node tests/roster099-import-staging.cjs",
+      "exitCode": 0,
+      "seconds": 0.597
+    },
+    {
+      "command": "TZ=Asia/Singapore node tests/roster099-import-objects.cjs",
+      "exitCode": 0,
+      "seconds": 1.59
+    },
+    {
+      "command": "TZ=Asia/Singapore node tests/roster099-import-worker.mjs",
+      "exitCode": 0,
+      "seconds": 0.257
+    },
+    {
+      "command": "TZ=Asia/Singapore node tests/roster099a-edge-model-fetch.cjs",
+      "exitCode": 0,
+      "seconds": 0.071
+    },
+    {
+      "command": "TZ=Asia/Singapore node tests/roster094-edge-roster.mjs",
+      "exitCode": 0,
+      "seconds": 1.25
+    },
+    {
+      "command": "TZ=Asia/Singapore node tests/edge094-store.cjs",
+      "exitCode": 0,
+      "seconds": 0.387
+    },
+    {
+      "command": "TZ=Asia/Singapore node tests/edge094-setup.cjs",
+      "exitCode": 0,
+      "seconds": 0.868
+    }
+  ],
+  "build": "PASS; npm run build; 85 Apps Script files parsed",
+  "generatedParity": "PASS; verify_runtime using installation_files; 18 components",
+  "additionalTests": {
+    "tests/roster099a-whatsapp-short-summary.cjs": "PASS 6/6"
+  },
+  "notRun": [
+    "full suite",
+    "new runtime profile",
+    "staging",
+    "live import",
+    "live message delivery"
+  ],
+  "canonicalSha256": {
+    "backend/RosterEdgeMigration.gs": "27382be126a6247173e05dc380aa1dbc590de05ccda41f1c2745cb39806b3de2",
+    "shared/roster-import.js": "54778bd4517498cb1c60234f4296dfe1078029467b676ea5f464f5d4c9eb96b7",
+    "shared/edge-store.js": "a23c6d67ff419133a909df9461dcc164f0780121fea19e3ff326f9f5d9f9ea13",
+    "shared/roster-operations.js": "ce1fb442377905fcc96366f8c05f85e6e4af8d193806bb6f647c66d48cf02e05",
+    "notification-worker/index.js": "0770df7085fe8a9d01dd0467892426f0debaea0897780ec0aedf9c6729d6a1ee",
+    "notification-worker/dashboard-worker.mjs": "239d970c595b2564e4df2bc9e478e7e52851c4a7573687cdfef926a5ebaf2c50",
+    "operations-worker/dashboard-worker.mjs": "1e9bb2e42ea3a14052eca8f3d64188ec9d7252fd6c354500a32350128812f791"
+  }
+}

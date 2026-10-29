@@ -1,7 +1,7 @@
 // 0.9.9a quiet mode: D1 state, expiry rules and audit log.
 import assert from 'node:assert/strict';
 import {DatabaseSync} from 'node:sqlite';
-import {quietExpiry,readQuietMode,startQuietMode,endQuietMode,bindQuietRequest,endQuietModeSession,QUIET_PAUSED_JOBS,QUIET_END_OPERATIONS} from '../shared/roster-quiet-mode.js';
+import {quietExpiry,readQuietMode,startQuietMode,endQuietMode,endQuietModeSession,QUIET_PAUSED_JOBS,QUIET_END_OPERATIONS} from '../shared/roster-quiet-mode.js';
 
 // Minimal D1 stand-in over SQLite: prepare/bind/first/run/batch.
 function d1(){
@@ -43,31 +43,15 @@ assert.deepEqual(QUIET_END_OPERATIONS,{publish:'publish-accepted',notifyDaily:'w
  assert.equal(again.active,true);assert.equal(again.expiresAt,at('10:30'),'daytime quiet mode lasts 30 minutes');
 }
 {
- // A replayed request from an older session cannot end a newer one.
+ // Ending by session: only the session named ends; 0 ends nothing.
  const db=d1();
  await startQuietMode(db,'smc-a@gsps.edu.sg',at('06:10'));
- const a=await bindQuietRequest(db,'req-a',at('06:11'));
- assert.deepEqual(a,{session:at('06:10'),fresh:true},'request binds to the active session on first sight');
  await endQuietMode(db,'smc-a@gsps.edu.sg','manual',at('06:15'));
  await startQuietMode(db,'smc-b@gsps.edu.sg',at('06:20'));
- assert.deepEqual(await bindQuietRequest(db,'req-a',at('06:21')),{session:at('06:10'),fresh:false},'a retry keeps its first binding');
- assert.equal((await endQuietModeSession(db,'smc-a@gsps.edu.sg','publish-accepted',a.session,at('06:21'))).active,true,'old receipt leaves the newer session on');
- const b=await bindQuietRequest(db,'req-b',at('06:22'));
- const ended=await endQuietModeSession(db,'smc-b@gsps.edu.sg','publish-accepted',b.session,at('06:23'));
- assert.equal(ended.active,false);assert.equal(ended.endReason,'publish-accepted','same-session request ends it');
- assert.equal((await bindQuietRequest(db,'req-c',at('06:30'))).session,0,'no active session binds to 0');
- assert.equal((await endQuietModeSession(db,'x','publish-accepted',0,at('06:31'))).active,false,'session 0 ends nothing');
-}
-{
- // After two days the binding is pruned: the same request id is fresh again,
- // so the route treats a replayed receipt for it as ending nothing.
- const db=d1(),day=ms=>Date.parse('2026-10-27T06:10:00+08:00')+ms;
- await startQuietMode(db,'smc-a@gsps.edu.sg',day(0));
- assert.equal((await bindQuietRequest(db,'req-old',day(60000))).fresh,true);
- const later=day(3*86400000);await startQuietMode(db,'smc-b@gsps.edu.sg',later);
- const again=await bindQuietRequest(db,'req-old',later+60000);
- assert.equal(again.fresh,true,'a pruned request is seen as fresh');
- assert.equal(again.session,later,'and is bound to the current session, so only freshness protects it');
+ assert.equal((await endQuietModeSession(db,'x','publish-accepted',at('06:10'),at('06:21'))).active,true,'an older session id leaves the newer session on');
+ await endQuietModeSession(db,'x','publish-accepted',0,at('06:21'));assert.equal((await readQuietMode(db,at('06:21'))).active,true,'session 0 ends nothing');
+ const ended=await endQuietModeSession(db,'x','publish-accepted',at('06:20'),at('06:22'));
+ assert.equal(ended.active,false);assert.equal(ended.endReason,'publish-accepted','the matching session ends');
 }
 assert.equal((await readQuietMode(undefined)).active,false,'missing storage reads as off');
 await assert.rejects(()=>startQuietMode(undefined,'smc@gsps.edu.sg'),/not configured/);
