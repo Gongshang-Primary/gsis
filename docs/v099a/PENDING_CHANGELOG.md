@@ -331,4 +331,4 @@ Cloudflare-authoritative timetables (Diagram 1), new allocation rules, and chang
 
 **Found (29 Oct 2026, same screenshot):** "Delivered 1793228134000 Singapore time." The provider's delivery time is stored as a digit string; `stamp()` (`roster-update/public/roster-operations-ui.js:231`) only formats values that `new Date(value)` understands, so it prints the digits.
 
-**Planned change:** `stamp()` treats a 13-digit string as milliseconds and a 10-digit string as seconds since 1970, then formats as Singapore time (here: 29 Oct 2026, about 07:35). Add a test for both forms. Check other callers that pass provider timestamps.
+**Planned change:** `stamp()` treats a 13-digit string as milliseconds and a 10-digit string as seconds since 1970, then formats as Singapore time (here: 29 Oct 2026, 06:55:34). Add a test for both forms. Check other callers that pass provider timestamps.
