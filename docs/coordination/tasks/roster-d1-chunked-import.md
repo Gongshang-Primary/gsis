@@ -1,13 +1,13 @@
 # roster-d1-chunked-import: import the Roster into D1 in pieces
 
-- Status: claimed
+- Status: implementing; resumed by owner on 29 Oct 2026
 - Owner/model: Codex
 - Reviewer/model: Claude
-- Last updated (Asia/Singapore): 29 Oct 2026 09:42
+- Last updated (Asia/Singapore): 29 Oct 2026 17:11
 - Branch: codex/roster-d1-chunked-import
 - Base SHA: 0b42df332d09f62e22b39071000cf11d40aa365f
-- Current head SHA (or PR head; avoid self-referential commit hashes): none
-- PR: none
+- Current head SHA (or PR head; avoid self-referential commit hashes): existing PR head 55c266b7ca00f2f228f52f40b13febcebfdd9994; updated exact review head will be in PR #8
+- PR: https://github.com/helper-gsps/gsis/pull/8
 - User-authorised scope: Song Wee, 29 Oct 2026: review Claude PRs #2–#6, build roster-allocation-run-once first, then claim and build this task as priority 2. No ROSTER_EDGE_AUTHORITY switch.
 - Files/domains owned (include generated outputs): backend/RosterEdgeMigration.gs and the Roster dispatch allowlist (export side); canonical shared edge-store/import helpers and shared/edge-setup.js; roster-update/public/edge-roster.js; builders and generated backend/browser/Worker copies; focused tests, runtime profiling evidence, task/changelog/roadmap records.
 - Out of scope: activation (edgeFence), notification Worker, quiet mode (PR #5), absence policy.
@@ -37,3 +37,8 @@ Next: Codex claims, branches from current main, and coordinates with Claude's op
 Codex completed the first task and opened allocation PR #7 for Claude at `6744cf232848089af771ed085d97bffca8f6e146`; that branch is now handed off for review. This is the only next implementation claimed in this session, following the owner's explicit chat order. The later plan adds WhatsApp summary work, which is not included here. Claude retains PRs #2/#3/#5 and their fixes. Reuse PR #2's captured model/archive identity checks, and regenerate shared bundles when the PRs are integrated. Do not merge or deploy any branch as part of this claim.
 
 The implementation will freeze one immutable export, serve bounded verified parts, stage rows and durable part receipts, and finalize both scopes only at imported. Status/resume must avoid full-state reads; accepted progress is not completed import. Existing activation fencing and Google authority remain unchanged. Local production-size Worker measurements and failure/replay tests are required before handoff; no real school snapshot or notification will be used for testing.
+
+## Owner resume, 29 Oct 2026 17:11 SGT
+Model: Codex. Song Wee's latest direct instruction resumes and claims PR #8 for Codex, superseding the pause recorded in PR #8. Current main observed at 3fb3b780f6b26c2ee1f6fa26a1ed4dda3f7f8440. The existing implementation is retained; no restart from an old release or replacement task is needed.
+
+Bounded remaining work: integrate current main into codex/roster-d1-chunked-import without force-push, retain the merged allocator/quiet-mode/identity fixes, inspect import failure and recovery paths, address concrete findings with focused checks, rebuild canonical generated outputs, rerun import and local-runtime checks, and update PR #8 for Claude's exact-head review. This does not claim Claude's WhatsApp summary task or edit its branch. This latest owner instruction authorises import work now; shared generated outputs will be rebuilt from the integrated canonical source and checked again against main before handoff. No deployment, real school import, provider send or ROSTER_EDGE_AUTHORITY change.
