@@ -1,0 +1,3619 @@
+{
+  "task": "roster-relief-auto-complete",
+  "model": "Codex",
+  "reviewer": "Claude",
+  "checkedAtSGT": "2026-10-30T06:36:21.634407+08:00",
+  "upstreamBase": "e3c31da427edae242ae09ecaaefb991175a623ba",
+  "publishedClaim": "3fde317e03e97a894438272311fa7ff5ce60c6fa",
+  "evidenceBinding": "Product source and test blob hashes below match the final PR tree. The local verification claim checkpoint differs in commit metadata from the remote claim; no remote-head test total is fabricated.",
+  "node": {
+    "command": "TZ=Asia/Singapore ROSTER_TEST_CHROMIUM=/tmp/chromium GSIS_BROWSER_EXECUTABLE=/tmp/chromium npm test",
+    "exit": 1,
+    "passedPrograms": 871,
+    "totalPrograms": 874,
+    "programs": [
+      {
+        "program": "082-domain-attendance-notify.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "082-domain-confirmed-preview.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "082-domain-link-audit.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "082-domain-manual-authority.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "082-domain-stapler-merge.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "082-domain-teacher-daily-update.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "ability-teacher-save.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "absence080a-save-shortcut.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "absence718d-flow.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "apps-script-syntax.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "arrival-stair.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "asc0810-browser.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "asc0810-demand.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "asc0810-export.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "asc0810-settings.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "asc0810-ui.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "audit-loading.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "audit-read-path.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "backend-role-fixture.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "backend.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "baseline710-backend.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "baseline710-browser.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "cache-backend.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "cache-frontend.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "calendar-stable-view-browser.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "calendar0810-birthday-responsive.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "calendar0810-birthday-ui.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "calendar0810-birthdays.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "calendar0811-cleanup.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "calendar085-write-cache.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "calendar087-statistics.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "calendar089-background-gateway.mjs",
+        "status": "pass"
+      },
+      {
+        "program": "calendar089-sync-concurrency.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "calendar093-cooldown-ui.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "calendar093-provider-cooldown.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "calendar093-roster-window.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "calendar098j-commands.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "calendar098j-glossary-api.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "calendar098j-jobs.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "calendar098j-source-reads.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "calendar098j-venues.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "calendar098l-native-storage.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "calendar098o-sync-isolation.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "calendar098o-sync-ui.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "calendar098p-throughput-checkpoints.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "calendar098q-status-native-cost.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "calendar098q-sync-transport-ui.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "calendar099-change-browser.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "calendar099-change-gateway.mjs",
+        "status": "pass"
+      },
+      {
+        "program": "calendar099-change-ui.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "calendar099-changes.mjs",
+        "status": "pass"
+      },
+      {
+        "program": "calendar099-delta.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "calendar099-venue-diagnostics.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "calendar605.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "calendar606-gateway.mjs",
+        "status": "pass"
+      },
+      {
+        "program": "calendar606-inherited.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "calendar606.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "calendar608-publication-ui.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "calendar608-publish.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "calendar609-api.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "calendar708-concurrency.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "calendar708-metadata-concurrency.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "calendar708-metadata-ui.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "campus-controls-b2.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "campus-version-ui.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "campus-window.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "cap708-ui.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "cap708.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "class-checklist.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "class-editor.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "class-validation.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "classes-sort.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "classes.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "combined-backend.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "compact-planning-ui.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "contacts-data-loading.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "contacts-data.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "contacts-login.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "contacts-management-ui.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "contacts-management.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "contacts0810-birthdays.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "contacts083-vcard-browser.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "contacts083-vcard.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "contacts084-asset-recovery-ui.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "contacts084-http-browser.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "contacts095-venues-errors.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "contacts407.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "contacts409.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "contacts410-backup.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "contacts410-save-ui.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "contacts410-transport.mjs",
+        "status": "pass"
+      },
+      {
+        "program": "contacts411-recovery-ui.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "contacts411-recovery.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "contacts414-api.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "contacts418-diy-ui.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "contacts418-loading.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "contacts502-save.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "contacts502-ui.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "contacts503-commit.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "contacts503-save.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "contacts503-ui.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "contacts503-view.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "contacts707-modifier.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "contacts710-fasttrack.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "contacts718-roster-performance.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "deploy085-tg-duplicates.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "deploy085-tg-recovery.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "deploy085-tg-review-browser.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "deploy094-edge.mjs",
+        "status": "pass"
+      },
+      {
+        "program": "deploy098g-class-dependencies.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "deploy098g-class-drafts.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "deploy098g-class-renames-backend.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "deploy098g-class-renames.mjs",
+        "status": "pass"
+      },
+      {
+        "program": "deploy098l-class-rename-regression.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "deploy418-info.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "deploy418-projection.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "edge094-setup.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "edge094-store.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "exclusion-cells.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "exclusion-ui.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "exclusions.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "explicit-save.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "first-load-contacts.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "first-load-deploy.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "frontend-recovery.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "garden605.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "gateway.mjs",
+        "status": "pass"
+      },
+      {
+        "program": "gsis098g-backend-secret.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "gsis098g-secret-edge.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "gsis098h-secret-diagnostics.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "hr-terms.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "imp-nonteaching-api.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "imp-nonteaching-ui.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "imp-nonteaching.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "import707.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "import708-browser.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "import708.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "inplace-select.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "ip-anchor413.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "landmark-alias.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "landmark-api.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "layout-courtyard-draft.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "layout-sync.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "layout-tg-compact.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "layout413.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "layout609-export-bold.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "layout713-geometry.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "layout714-geometry.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "live-hub.mjs",
+        "status": "pass"
+      },
+      {
+        "program": "load-editor.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "loading.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "lord-source-bridges.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "lord091a-component-patch.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "model-k.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "model404.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "model419.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "multilevel-tg-storage.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "multilevel-tg-ui.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "multilevel-tg.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "name-sets-backend.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "name-sets-ui.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "notices415-ui.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "notices415.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "package-suite-correction.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "package.cjs",
+        "status": "fail"
+      },
+      {
+        "program": "package092-inventory.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "pages096-packaged-worker.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "paid097-backend-gateway.mjs",
+        "status": "pass"
+      },
+      {
+        "program": "paid097-backend.mjs",
+        "status": "pass"
+      },
+      {
+        "program": "paid097-bundles.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "paid097-cache.mjs",
+        "status": "pass"
+      },
+      {
+        "program": "paid097-health-ui.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "paid097-health.mjs",
+        "status": "pass"
+      },
+      {
+        "program": "paid097-jobs-idle.mjs",
+        "status": "pass"
+      },
+      {
+        "program": "paid097-jobs-worker.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "paid097-jobs.mjs",
+        "status": "pass"
+      },
+      {
+        "program": "paid097-receipts-browser.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "paid097-receipts.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "paid097-recovery.mjs",
+        "status": "pass"
+      },
+      {
+        "program": "paid097-venues-names.mjs",
+        "status": "pass"
+      },
+      {
+        "program": "planning.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "public-campus.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "public-gateway.mjs",
+        "status": "pass"
+      },
+      {
+        "program": "public-layout.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "queue-recovery.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "queued-saves.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "read-transport.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "recovery411-deploy.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "recovery411-gateway.mjs",
+        "status": "pass"
+      },
+      {
+        "program": "release04-planning.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "release04-ui.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "release0401-ui.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "release082-conflict-envelope.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "release082-latest-conflict-ui.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "release082-local-draft-tabs.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "release082-local-workflow-ui.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "release082-notify-ack-dashboard-browser.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "release082-notify-ack-dashboard-ui.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "release082-orphan-manual-ui.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "release082-stapler-local.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "release082-stapler-readonly-ui.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "release082-teacher-daily-browser.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "release082-teacher-daily-ui.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "release082-timetable-stacked-browser.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "release083-class-field-arrows.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "release083-confirmed-suspensions-browser.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "release083-confirmed-suspensions.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "release083-own-arrangements.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "release084-absence-browser.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "release084-backend-role.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "release084-confirmed-dates-browser.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "release084-confirmed-dates.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "release084-deploy-source-evidence.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "release084-instruction-concurrency.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "release084-ip-focus-browser.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "release084-own-arrangements.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "release084-report-backend.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "release084-report-instructions.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "release084-report-transport-browser.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "release084-report-transport.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "release086-deploy-cap-ui.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "release086-deploy-version-browser.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "release086-deploy-version-loading.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "release086-ut-cap.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "release087-composition.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "release088-class-rename-ui.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "release088-class-rename.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "release089-clear-venues-ui.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "release089-clear-venues.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "release098g-component-patch.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "release098h-component-patch.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "release098h-suite-routing.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "release099-metadata.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "release14-contacts.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "release14-geometry.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "release14-ui.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "release14.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "release15-backend.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "release15-geometry.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "release15-rules.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "release15-ui.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "release17-backend.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "release17-contacts.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "release17-corridor.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "release17-roles.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "release17-table.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "release18-geometry.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "release18-loading.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "release18-summary.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "release402-catalogue.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "release402-filters.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "release402-storage.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "release403-notes.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "release403-ui.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "release404-contacts.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "release404-storage.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "release404-upgrade.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "release405-storage.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "release405-transport.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "release407-storage.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "release408-storage.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "release409-storage.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "release409.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "release410-protocol.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "release419-backend.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "release419-summary.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "release500-excel.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "release500-saves.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "release501-contacts.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "release501-layout.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "release504-contacts.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "release504-rules.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "release504-storage.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "release504-transport.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "release504-ui.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "release505-catalogue-ui.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "release505-catalogue.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "release505-gateway.mjs",
+        "status": "pass"
+      },
+      {
+        "program": "release505-layout-cache.mjs",
+        "status": "pass"
+      },
+      {
+        "program": "release505-layout-poll.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "release505-performance.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "release505-projection.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "release505-receipt.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "release505-relief-api.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "release505-relief-ui.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "release505-relief.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "release505-storage-contacts.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "release505-storage-relief.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "release505-storage.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "release505-tg-storage.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "release505-tg-ui.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "release505-tg.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "release505-timing.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "release505-transport.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "release506-groups-storage.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "release506-groups-ui.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "release506-groups.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "release506-hr-ui.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "release506-info.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "release506-layout-names.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "release506-performance.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "release506-storage.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "release506-tg-storage.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "release506-tg-ui.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "release506-workload-ui.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "release507-layout.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "release507-relief-refresh.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "release507-security.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "release508-atomic.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "release508-contacts.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "release508-relief.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "release508-storage.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "release508-ui.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "release509-exclusions.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "release509-ui.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "release600-rules.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "release600-storage.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "release600-ui.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "release601-admin.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "release601-diagnostics.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "release601-gateway.mjs",
+        "status": "pass"
+      },
+      {
+        "program": "release601-membership.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "release601-ui.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "release603-ledger.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "release604-contacts.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "release604-pal.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "release604-ui.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "release605-workload.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "release607-workload.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "release608-teachers.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "release708-ui-browser.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "release710-resource-properties.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "release711-quota-accounting.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "review04-background-contacts.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "review04-cache.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "review04-geometry.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "review04-ui.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster-absence-year-browser.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster-absence-year-worker.mjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster-absence-year.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster-allocation-run-once.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster-draft-absence-instructions-browser.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster-draft-auto-retry-browser.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster-draft-baseline-cache-browser.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster-draft-cell-save-browser.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster-draft-cell-save-speed.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster-draft-health-chart-browser.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster-draft-inbox-backend.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster-draft-inbox-domain.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster-external-prominent-ack-browser.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster-inbox-browser.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster-lord-component-patch.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster-next-window-source.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster-prepared-parts-browser.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster-prepared-parts.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster-report-picker-browser.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster-speed-authority.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster-subject-catalogue.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster-subject-family-policy.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster080-batch-backend.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster080-batch-browser.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster080-batch-ui.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster080-batch.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster080-timetable-day.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster080-timetable-gateway.mjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster080-timetable-privacy.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster080-timetable-ui.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster081-api-roundtrips.mjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster081-compact-summary.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster081-conflict-envelope.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster081-day-ownership-browser.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster081-day-transactions.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster081-notification-lanes.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster0810-allocation-index.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster0810-delivery-drive.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster0810-delivery-report-worker.mjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster0810-entry-cache.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster0810-identity-index.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster0810-scoped-absence.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster0810-timetable-projection.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster0811-cache-storage-browser.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster0811-cell-index.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster0811-conflict-save.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster0811-notice-copy.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster0811-preload-guard.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster0811-range-gateway.mjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster0811-school-absences-browser.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster0811-school-absences-ui.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster0811-school-absences.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster0811-timetable-redraw-browser.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster0811-urgent-forward.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster0812-allocation-monitor-browser.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster0812-allocation-run.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster0812-human-decisions.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster082-advance-notify-worker.mjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster082-advance-notify.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster082-audit-worker-lane.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster082-backend-audit.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster082-backend-confirmed-storage.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster082-backend-merge.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster082-backend-private.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster082-backend-teacher-reads.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster082-email-settings-backend.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster082-email-settings-gateway.mjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster082-email-settings-recovery-browser.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster082-inbox-images-browser.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster082-inbox-images-domain.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster082-inbox-images-worker.mjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster082-notify-performance-browser.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster082-notify-service.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster082-notify-ui-browser.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster082-private-actions-browser.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster082-private-buttons-dispatch.mjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster082-private-capabilities.mjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster083-external-ack-gateway.mjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster083-inbox-diagnostics.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster083-no-relief-ui-browser.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster083-notify-ack-browser.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster083-provider-diagnostics.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster083-subject-settings-browser.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster083-template-dispatch.mjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster083-template-transport.mjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster083-timetable-ack.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster084-consecutive-performance.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster084-consecutive-settings-browser.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster084-consecutive-settings-dom.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster084-consecutive-subjects.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster084-manual-dispatch.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster084-notify-status-browser.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster084-private-link-reuse-browser.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster084-recipient-policy.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster084-stapler-unchanged.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster084a-relief-pool.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster085-inbox-lock-scope.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster085a-consecutive-backend.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster085a-consecutive-catalogue.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster085a-consecutive-picker-dom.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster085b-custom-backend.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster085b-custom-gateway.mjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster085b-custom-rules.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster085b-custom-toggle-browser.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster085b-custom-toggle-dom.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster085c-assign-default-date-dom.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster085c-next-school-day-gateway.mjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster086-counting-logging.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster086-current-duty-gateway.mjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster086-current-duty.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster086-delivery-review-worker.mjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster086-delivery-review.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster086-home-duty-browser.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster086-report-loading-browser.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster086-retired-route-dom.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster086-ui-dom.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster086a-confirmation-ui-browser.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster086a-confirmed-rename.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster086a-review-receipt.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster087-acknowledgement-ui.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster087-approved-buttons.mjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster087-cache-storage-browser.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster087-delivery-review-close.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster087-manual-policy.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster087-notification-maintenance.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster087-notification-store.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster087-notification-worker.mjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster087-operations-ui.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster087-scoped-ack.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster087-shell-routing-browser.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster087-statistics-ui.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster087-statistics.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster088-audit-priority.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster088-delivery-controls.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster088-delivery-review-remount.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster088-delivery-review-ui.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster088-inbox-responsive.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster088-load-counter.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster088-maintenance-intent-race.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster088-notification-batch.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster088-notification-worker.mjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster088-notify-refresh-browser.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster088-ops-responsiveness.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster088-statistics-contrast.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster089-cache-concurrency-browser.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster089-cache-storage-browser.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster089-cache.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster089-receipt-refresh-browser.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster089-source-read.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster089-worker-calendar-lane.mjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster089-worker-durability.mjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster089a-home-timetable-browser.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster09-absence-selector-browser.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster09-batch-absence-browser.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster09-report-outcome-browser.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster090-absence-save-cost.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster090-multiple-absence.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster090-mutual-grid-browser.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster090-mutual-timetable.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster090-report-selection-cache.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster090-school-absence-pagination.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster093-allocation-cache-browser.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster093-allocation-cache-ui.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster093-allocation-reference.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster093-background-loading.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster093-calendar-cache-ui.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster093-calendar-proof.mjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster093-emergency-absence.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster093-publication-preview-ui.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster093-targeted-publication.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster093a-absence-arrangements.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster093a-arrangements-draft.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster093a-client-cache.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster093a-fast-report-browser.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster093a-home-report-warm.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster093a-instruction-review.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster093a-local-report-browser.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster093a-pending-own-arrangements.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster093a-preload-local.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster093a-report-form.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster093a-report-gateway.mjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster093a-report-projection.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster093a-report-shell.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster093b-absence-intake.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster093b-absence-pipeline.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster093b-intake-gateway.mjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster093b-notification-lanes.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster093b-peer-delivery.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster093b-peer-source.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster093b-peer-ui.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster093b-peer-workflow.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster093b-worker-capture.mjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster093b-worker-routes.mjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster094-delivery-review.mjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster094-edge-notifications.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster094-edge-roster.mjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster094-edge-timetable.mjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster094-email-sink.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster094-external-peer-scope.mjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster094-notification-adapter.mjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster094-peer-processing-ui.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster094-peer-template.mjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster094-sender-pacing.mjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster095-manage-periods.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster096-absence-adapter.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster096-absence-coverage-browser.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster096-absence-coverage.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster096-cleanup-lane.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster096-cron-idle.mjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster096-deploy-idle.mjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster096-dispatch-idle.mjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster096-probe-plans.mjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster096-r2-cleanup.mjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster096-scheduled-idle.mjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster096-timetable-idle.mjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster097-batch-backend.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster097-batch-client.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster097-batch-errors.mjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster097-batch-gateway.mjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster097-batch-lifecycle-browser.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster097-batch-shell.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster097-confirmed-view.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster097-stapler-preload.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster098-backend-errors.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster098-recovery-worker.mjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster098a-intake-flush-browser.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster098a-intake-flush.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster098b-balance-awareness.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster098b-health-ui.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster098b-health.mjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster098b-ui-awareness.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster098b-version-cache.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster098c-cache-write-hook.mjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster098c-cache.mjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster098c-health-diagnostics.mjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster098c-notification-diagnostics.mjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster098c-peer-mail-health.mjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster098c-peer-mail-review-ui.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster098c-peer-mail-review.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster098c-planner-shell.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster098c-worker-diagnostics.mjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster098d-choice-browser.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster098d-coverage-choice.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster098d-intake-throughput.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster098d-pipeline.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster098d-resubmissions.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster098d-review-counts.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster098e-allocation-browser.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster098e-management.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster098e-pipeline.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster098f-publication.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster098f-selection.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster098f-workload.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster098g-converter-times.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster098g-export-headers.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster098h-communication-display.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster098h-communication-edge.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster098h-communication-link.mjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster098h-publication-policy.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster098h-publication-ui.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster098h-stapler-domain-browser.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster098h-stapler-domain-persistence.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster098h-stapler-domain-privacy.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster098h-stapler-domain.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster098i-audit-health-ui.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster098i-audit-health.mjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster098i-audit-packaged.mjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster098i-audit-recovery.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster098i-domain.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster098i-rehearsal-setup.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster098i-rehearsal.mjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster098j-exports.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster098j-publication-compact.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster098j-rules-categories.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster098j-ui-dom.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster098j-ui.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster098k-suspended-rules.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster098k-ui-audit.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster098l-allocation-modes-ui.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster098l-allocation-modes.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster098m-anytime-ui.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster098m-anytime.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster098m-edge-clock.mjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster098n-capacity-ui.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster098n-capacity.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster098n-intake-lazy.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster098n-shorter.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster098o-preparation-package.cjs",
+        "status": "fail"
+      },
+      {
+        "program": "roster098o-preparation-routing.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster098o-preparation-ui.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster098o-timetable-export.cjs",
+        "status": "fail"
+      },
+      {
+        "program": "roster098o-timetable-worker.mjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster098p-export-contract.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster099-chunked-import.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster099-export-snapshot.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster099-import-objects.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster099-import-staging.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster099-import-worker.mjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster099a-edge-model-fetch.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster099a-intake-polling.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster099a-quiet-mode-route.mjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster099a-quiet-mode-ui.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster099a-quiet-mode.mjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster099a-relief-auto-complete.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster099a-whatsapp-short-summary.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster605-authority.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster605-gateway.mjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster605-ui.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster605.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster607-diagnostics.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster608-access.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster608-diagnostic-detail.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster608-shared-drive.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster609-domain.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster609-exports.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster609-gateway.mjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster609-ui.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster700-contacts.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster700-model-cache.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster700-timetable.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster701-assets.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster701-backend-speed.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster701-delivery-lease.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster701-gateway-integration.mjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster701-integrity-review.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster701-r01.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster701-r05.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster701-r10.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster701-r11-gateway.mjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster701-r11.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster701-r12.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster701-r13.mjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster701-r15.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster701-r17-core.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster701-r17-integration.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster701-r17-service.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster701-r17-solver.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster701-r18-performance.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster701-r18.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster701-r19-performance.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster701-r19.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster701-r20-export.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster701-r20-notifications.mjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster701-r20-performance.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster701-r20-service.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster701-r20.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster701-r21.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster701-speed-gateway.mjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster701-speed-ui.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster701-whatsapp-contracts.mjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster701-whatsapp-domain.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster702-absence-remarks.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster702-backend.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster702-calendar-batch.mjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster702-memory-ui.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster702-mutual-candidates.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster702-notification-setup.mjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster702-operations-ui.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster702-shell-recovery.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster702-transport-reliability.mjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster704-entry-read.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster704-notification-readiness.mjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster704-report-load.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster704-save-candidates.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster705-auto-allocate.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster705-quota.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster706-backend-speed.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster706-domain.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster706-gateway.mjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster707-backend-domain.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster707-storage.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster707-timing.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster707-ui.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster709-date-publication.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster709-publish-ui.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster709-whatsapp-contracts.mjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster710-absence-policy-ui.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster710-adhoc-ui.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster710-allocation-preferences.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster710-context.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster710-mail.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster710-operations.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster710-settings-ui.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster710-worker-reports.mjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster711-backend-authority.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster711-backend.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster711-inbox-worker.mjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster711-reconcile-speed.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster711-settings-dom.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster711-worker-diagnostics.mjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster711-workspace-browser.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster711-workspace-ui.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster712-absence-concurrency.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster712-absence-eligibility-browser.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster712-duty-browser.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster712-duty-lists.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster712-shared-subject-browser.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster712-shared-subject.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster712-whatsapp-menu.mjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster713-manual-ranking.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster713-settings-browser.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster713-settings.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster713-smc-summary-browser.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster713-smc-summary.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster713-smc-template.mjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster714-allocation-policy.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster714-export-ui.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster714-settings-persistence.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster714-teacher-export.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster716-absence-fast-browser.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster716-allocator.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster716-calculations-browser.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster716-calculations-gateway.mjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster716-calculations.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster716-home-browser.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster716-inbox-activation.mjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster716-settings-browser.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster717-calculations.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster717-failure-diagnostics.mjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster717-inbox-performance.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster718-absence-performance-browser.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster718-bootstrap-cache.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster718-concurrency.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster718-gateway.mjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster718a-relief-readability-browser.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster718b-signature.mjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster719-class-pov.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster719-performance.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster719-relief-tools-browser.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "roster719-suspended-report-load.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "selected-campus-version.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "sessions.mjs",
+        "status": "pass"
+      },
+      {
+        "program": "sheets414.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "showcase416.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "signature415.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "spinner.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "stair-mirror.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "stapler-draft-excel-export-browser.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "stapler-draft-excel-export-model.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "stapler-draft-level-recess-browser.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "stapler-draft-level-recess-model.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "stapler080-contact-origin.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "stapler080-date-retention.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "stapler080-dates-contacts.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "stapler080-pending-request-retry.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "stapler0810-planner-browser.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "stapler0810-planner-ui.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "stapler0810-relief-tiles.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "stapler0812-backend-recovery.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "stapler0812-draft-recovery-browser.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "stapler092-cap-reasons.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "stapler092-indexeddb-recovery-browser.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "stapler093-confirmed-parts.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "stapler093-save-cost.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "stapler095a-add-teacher-ui.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "stapler095a-staff-eligibility.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "stapler098c-patch-persistence.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "stapler098c-recess-browser.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "stapler098c-recess.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "stapler098c-surgical.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "stapler098g-own-timetable.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "stapler098h-authority-ui.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "stapler098h-compact-comparison-ui.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "stapler098h-import-gateway.mjs",
+        "status": "pass"
+      },
+      {
+        "program": "stapler098h-recovery-browser.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "stapler098h-recovery-controls-ui.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "stapler098h-standalone-export.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "stapler098i-baseline-comparison-browser.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "stapler707-integration-review.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "stapler707-model.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "stapler710-browser.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "stapler711-model.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "stapler711-ui.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "stapler712-leases.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "stapler712-lock-browser.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "stapler714-import-browser.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "stapler714-import-ui.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "stapler714-import.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "stapler714a-operations.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "stapler715-loading-browser.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "stapler715-loading.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "stapler715-persistence.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "stapler716-browser.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "stapler716-canonical.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "stapler716-performance.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "stapler717-reopen-ui.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "stapler717-reopen.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "stapler718-lifecycle-persistence.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "stapler718-lifecycle-ui.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "stapler718-lifecycle.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "stapler718a-relief-import.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "stapler718b-envelope.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "stapler718b-save-recovery-browser.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "stapler718c-import-policy.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "stapler718c-persistence.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "stapler718c-warning-ui.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "stapler719-contacts-import-ui.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "stapler719-contacts-import.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "storage.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "subject704-backend.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "subject704-model.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "subject704-ui.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "suite098i-separate-package.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "suite703-calendar-reliability.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "suite703-local-interactions.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "suite703-roster-diagnostics.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "suite703-roster-memory.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "suite708-signing-keys.mjs",
+        "status": "pass"
+      },
+      {
+        "program": "table-controls.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "tables412.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "teacher-lifecycle-ui.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "teacher-notes.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "teacher-publish-contacts.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "teachers-publish.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "teachers-ui.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "ui-structure.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "venues-backend.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "venues-browser.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "venues-domain.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "venues-jobs.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "venues-links.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "venues-publications.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "venues-sources.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "venues-worker.mjs",
+        "status": "pass"
+      },
+      {
+        "program": "venues093-roster-source.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "venues094-refresh.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "venues095-admin.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "venues095-authority.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "venues098j-calendar-catalogue.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "version-copy.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "worker089-gateway-coalescing.mjs",
+        "status": "pass"
+      },
+      {
+        "program": "worker089-read-coalescing.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "workload408.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "workload412-ui.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "workload414-ui.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "workload415-ui.cjs",
+        "status": "pass"
+      },
+      {
+        "program": "workload415.cjs",
+        "status": "pass"
+      }
+    ],
+    "failures": [
+      {
+        "program": "package.cjs",
+        "classification": "reproduced-on-unchanged-main",
+        "reason": "Missing historical Q commit 50c977d79c9756dfdbee91f2922f0cd89ab6e903; package ancestry verification cannot run.",
+        "baselineExit": 1,
+        "laterAssertionsNotCovered": true
+      },
+      {
+        "program": "roster098o-preparation-package.cjs",
+        "classification": "reproduced-on-unchanged-main",
+        "reason": "Fixed 28 October capture window has expired; preparation package fixture fails on unchanged main.",
+        "baselineExit": 1,
+        "laterAssertionsNotCovered": true
+      },
+      {
+        "program": "roster098o-timetable-export.cjs",
+        "classification": "reproduced-on-unchanged-main",
+        "reason": "Fixed 28 October capture window has expired; INVALID_WINDOW on unchanged main.",
+        "baselineExit": 1,
+        "laterAssertionsNotCovered": true
+      }
+    ],
+    "historicalComparisonsNotRun": 6
+  },
+  "lord": {
+    "command": "TZ=Asia/Singapore LORD_TEST_CHROMIUM=/tmp/chromium ROSTER_TEST_CHROMIUM=/tmp/chromium GSIS_BROWSER_EXECUTABLE=/tmp/chromium npm run test:lord",
+    "exit": 0,
+    "passedPrograms": 38,
+    "failedPrograms": 0,
+    "note": "Run separately because npm test stops after the failing Node stage."
+  },
+  "targeted": {
+    "regression": "tests/roster099a-relief-auto-complete.cjs",
+    "unchangedMain": {
+      "passed": 0,
+      "failed": 5
+    },
+    "implemented": {
+      "passed": 5,
+      "failed": 0
+    },
+    "additionalPassed": [
+      "roster716-calculations.cjs",
+      "roster717-calculations.cjs",
+      "roster701-r17-core.cjs",
+      "roster701-r17-integration.cjs",
+      "roster098i-domain.cjs",
+      "roster716-calculations-browser.cjs"
+    ]
+  },
+  "build": {
+    "command": "npm run build",
+    "exit": 0,
+    "productionComponents": 18,
+    "appsScriptFilesParsed": 85,
+    "canonicalRuntimeParity": "passed using verify_runtime with installation_files canonical mapping",
+    "diffCheck": "passed"
+  },
+  "initialAttempts": "Earlier browser launch failures during runtime setup and one wrongly prefixed parity archive are retained as local attempt logs and excluded from the final counts; no product workaround was introduced.",
+  "notRun": [
+    "fresh network dependency installation",
+    "staging deployment",
+    "school sign-in",
+    "live school record validation",
+    "real message delivery",
+    "production deployment"
+  ],
+  "production": {
+    "authority": "Google",
+    "authorityChanged": false,
+    "deployed": false,
+    "messagesSent": false,
+    "liveRecordsChanged": false
+  },
+  "codeGitBlobs": {
+    "Deploy_Backend_v0.9.9.gs": "de8d8bc6114d2600ca9cd06e31341f31dc6deebd",
+    "Roster_Backend_v0.9.9.gs": "dce5eb0bd7ddb344609c27b12cb197de9f0f5ebf",
+    "backend/Code.gs": "b9f262fcc4eee5522c96c2cc4af321432a939e68",
+    "backend/Relief.gs": "0e43ac70f2f08bdbf4c8db09dbfaf09011c6da63",
+    "notification-worker/dashboard-worker.mjs": "4952cdad0816cbef57091a5a82ae2b7595c22125",
+    "notification-worker/dashboard-worker.txt": "4952cdad0816cbef57091a5a82ae2b7595c22125",
+    "operations-worker/dashboard-worker.mjs": "4d1e85f0a1abbf9d1ce8be09578c8d6e039d58c2",
+    "operations-worker/dashboard-worker.txt": "4d1e85f0a1abbf9d1ce8be09578c8d6e039d58c2",
+    "roster-update/public/edge-roster-domain.js": "f8ad93ca7e59637cc44fae8dfeca291e4fd184e8",
+    "roster-update/public/edge-roster.js": "a971ea9be65dff8f94fcb16b2664a026c1600e85",
+    "roster-update/public/roster-allocation.js": "2771e917b63657b7f1af65dec79ea26fc6a549e2",
+    "roster-update/public/roster-calculations.js": "1043529db09c358a18c90d8242f74495411cc3fd",
+    "shared/roster-allocation.js": "2771e917b63657b7f1af65dec79ea26fc6a549e2",
+    "tests/roster099a-relief-auto-complete.cjs": "17e7bc89359f982796ed5df71645214130117158"
+  },
+  "logSha256": {
+    "auto-complete-full-suite-final.log": "fe4e373c376e883215c76758336e9c7455479d00bbf421f2a09eea26aa5f50ab",
+    "auto-complete-lord-all.log": "de2691edfe85fa87d0e9ed54552f9d164514225aed8b953519809e9c22f8d172",
+    "auto-complete-main-red.log": "8f437f0b6087ed90c0eb51c3a00a6091a730640a0a689a7af283f2e401a7aefe"
+  },
+  "integratedMain": "8fb6bf28af1e34f842516c91f548fad30e482790",
+  "postVerificationIntegration": {
+    "files": [
+      "docs/coordination/plans/2026-11-codex-queue.md",
+      "docs/coordination/tasks/deploy-queued-writes.md"
+    ],
+    "productSourceChanged": false,
+    "testsChanged": false,
+    "fullSuiteRerun": false,
+    "reason": "Documentation-only upstream advance; product/test blob identities unchanged."
+  }
+}
