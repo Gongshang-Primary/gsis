@@ -14,7 +14,7 @@
 - Acceptance checks: entries state current behaviour with code references, open questions and proposed changes.
 
 ## Decisions and changes
-Three entries appended to docs/v099a/PENDING_CHANGELOG.md with code references.
+Seven entries appended to docs/v099a/PENDING_CHANGELOG.md with code references: Stapler access, peer arrangements, annual R%, suspended-day baseline alignment, Deploy specialist count without FAJT, Assigned By, delivery time format. Earlier open questions are marked answered by the dated owner decisions.
 
 ## Verification
 Documentation only. Code references read at base SHA.

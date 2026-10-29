@@ -242,11 +242,11 @@ Cloudflare-authoritative timetables (Diagram 1), new allocation rules, and chang
 
 ### Stapler: teachers see upcoming suspended dates and ask an SMC sponsor to plan
 
-**Request:** Teachers can view upcoming suspended dates and ask an SMC sponsor to do the planning. To confirm.
+**Request:** Teachers can view upcoming suspended dates and ask an SMC sponsor to do the planning. Answered: see Owner decisions (29 Oct 2026) 1 and 2 under Annual R% below.
 
 **Current behaviour (0.9.9a):** Largely present. `requestStapler` (`shared/roster-operations.js:761`) lets an active teacher request Stapler planning and publication access for a date, naming an eligible SMC sponsor; the sponsor gets a `stapler_request` notification and decides with `decideStapler`. `staplerDatesView` (`shared/roster-operations.js:170`) lists dates; teachers see their own requests and confirmed dates subject to `confirmedDateAccess`.
 
-**To confirm with the owner:** whether teachers can already see every upcoming suspended date (including ones they did not request), and whether the request should ask the SMC to plan on the teacher's behalf (current flow grants the teacher planning access instead). Change only after that answer.
+**Answered 29 Oct 2026 (Owner decisions 1 and 2 below):** teachers see all upcoming suspended dates; a request asks an SMC for permission to help plan. Original question: whether teachers can already see every upcoming suspended date (including ones they did not request), and whether the request should ask the SMC to plan on the teacher's behalf (current flow grants the teacher planning access instead). Change only after that answer.
 
 ### Peer arrangements respected?
 
@@ -304,8 +304,8 @@ Cloudflare-authoritative timetables (Diagram 1), new allocation rules, and chang
 
 **Planned change:**
 1. Exclude `employment==='FAJT'` from the specialist headcount.
-2. To keep the average honest, exclude FAJT periods from the indicator's assigned periods too (otherwise their periods are divided among fewer people). To confirm.
-3. Capacity: keep or exclude FAJT? To confirm. Default proposal: exclude from headcount and average, keep their periods visible as a separate "FAJT support" line so no load disappears.
+2. To keep the average honest, exclude FAJT periods from the indicator's assigned periods too (otherwise their periods are divided among fewer people). Answered: see Owner decision below.
+3. Capacity: keep or exclude FAJT? Answered: exclude (Owner decision below). Default proposal: exclude from headcount and average, keep their periods visible as a separate "FAJT support" line so no load disappears.
 
 **Scope:** `shared/workload.js` (canonical; regenerate Deploy bundles), Deploy and Layout workload UI labels, tests for a pool with and without FAJT staff.
 
