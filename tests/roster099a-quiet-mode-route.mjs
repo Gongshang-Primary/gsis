@@ -18,15 +18,21 @@ async function request(settings,path,{method='POST',body,signedIn=true}={}){
  return {status:response.status,body:await response.json()};
 }
 let roles={smc:true,admin:false},backendOps=[];
-const replayIds=new Set();
+const replayIds=new Set(),failOnce=new Set();let duringBackend=null;
 globalThis.fetch=async(url,init)=>{
  assert.equal(String(url),env.APPS_SCRIPT_URL);
  const envelope=JSON.parse(init.body),payload=JSON.parse(envelope.payload);backendOps.push(payload.input?.operation);
  if(payload.input?.operation==='read')return Response.json({ok:true,data:{user:roles,entries:[]}});
+ if(duringBackend&&payload.input?.operation==='notifyDaily'){const hook=duringBackend;duringBackend=null;await hook();}
+ if(failOnce.has(payload.input?.requestId)){failOnce.delete(payload.input.requestId);replayIds.add(payload.input.requestId);return Response.json({ok:false,error:'Backend busy'},{status:503});}
  if(replayIds.has(payload.input?.requestId))return Response.json({ok:true,data:{revision:2,date:payload.input?.date,replayed:true}});
  return Response.json({ok:true,data:{revision:2,date:payload.input?.date}});
 };
-const db=database(),settings={...env,GSIS_JOBS:db};
+const db=database();
+// A hook that runs before the next quiet-state SELECT completes, to simulate a slow D1 read.
+let beforeQuietRead=null;
+const gated={...db,prepare(sql){const statement=db.prepare(sql);if(!/^SELECT \* FROM gsis_quiet_mode/.test(sql))return statement;const wrap=st=>({...st,bind:(...args)=>wrap(st.bind(...args)),async first(){if(beforeQuietRead){const hook=beforeQuietRead;beforeQuietRead=null;await hook();}return st.first();}});return wrap(statement);}};
+const settings={...env,GSIS_JOBS:gated};
 
 assert.equal((await request(settings,'/api/quiet-mode',{method:'GET',signedIn:false})).status,401,'status requires sign-in');
 const initial=await request(settings,'/api/quiet-mode',{method:'GET'});
@@ -49,26 +55,39 @@ if(backendOps.includes('notifyDaily')){assert.equal(after.body.data.active,false
 else assert.fail('notifyDaily did not reach the backend fixture: '+JSON.stringify(backendOps));
 
 const sendDaily=requestId=>M.default.fetch(new Request(env.ROSTER_PUBLIC_ORIGIN+'/api/operations',{method:'POST',headers:{Origin:env.ROSTER_PUBLIC_ORIGIN,'Content-Type':'application/json',Cookie:cookie()},body:JSON.stringify({operation:'notifyDaily',date:'2026-10-30',view:'allocation',compact:true,requestId})}),settings);
-// Session A: request R1 is bound to A. A newer session B must survive a replay of R1.
-const r1=crypto.randomUUID();
-await request(settings,'/api/quiet-mode',{body:{action:'on'}});
-await sendDaily(r1);
-assert.equal((await request(settings,'/api/quiet-mode',{method:'GET'})).body.data.active,false,'R1 ends session A');
-await new Promise(resolve=>setTimeout(resolve,5));
-await request(settings,'/api/quiet-mode',{body:{action:'on'}});
-await sendDaily(r1);
-assert.equal((await request(settings,'/api/quiet-mode',{method:'GET'})).body.data.active,true,'a replay of R1 leaves session B on');
-await sendDaily(crypto.randomUUID());
-assert.equal((await request(settings,'/api/quiet-mode',{method:'GET'})).body.data.active,false,'a new request in session B ends it');
-// A receipt the backend replays for a request first seen now (binding pruned
-// after two days, or accepted before quiet mode existed) ends nothing.
-await new Promise(resolve=>setTimeout(resolve,5));
-await request(settings,'/api/quiet-mode',{body:{action:'on'}});
+const quietActive=async()=>(await request(settings,'/api/quiet-mode',{method:'GET'})).body.data.active;
+const pause=()=>new Promise(resolve=>setTimeout(resolve,5));
+// A replayed receipt never ends quiet mode: a retry, an old or pre-feature
+// request, or a lost-response retry (quiet then lasts until expiry or manual end).
+await pause();await request(settings,'/api/quiet-mode',{body:{action:'on'}});
 const old=crypto.randomUUID();replayIds.add(old);
-await sendDaily(old);
-assert.equal((await request(settings,'/api/quiet-mode',{method:'GET'})).body.data.active,true,'a first-seen replayed receipt leaves quiet mode on');
-await sendDaily(old);
-assert.equal((await request(settings,'/api/quiet-mode',{method:'GET'})).body.data.active,true,'its retries stay bound to that decision');
+await sendDaily(old);assert.equal(await quietActive(),true,'a replayed receipt leaves quiet mode on');
+await sendDaily(old);assert.equal(await quietActive(),true,'repeated replays leave it on');
+// Concurrent retries of an old request: still nothing ends.
+await Promise.all([sendDaily(old),sendDaily(old)]);assert.equal(await quietActive(),true,'concurrent replays leave it on');
+// Lost first response (503), then a retry that the backend answers as replayed:
+// quiet mode stays on (Codex probe 2 on e0e6066).
+const lost=crypto.randomUUID();failOnce.add(lost);
+await sendDaily(lost);assert.equal(await quietActive(),true,'a failed first attempt leaves quiet mode on');
+await sendDaily(lost);assert.equal(await quietActive(),true,'its replayed retry leaves quiet mode on');
+// Work done now ends the session it arrived in.
+await sendDaily(crypto.randomUUID());assert.equal(await quietActive(),false,'a new accepted send ends the current session');
+// A request that arrives in session A and completes after B started ends neither B
+// (A was already ended by hand during the request).
+await pause();await request(settings,'/api/quiet-mode',{body:{action:'on'}});
+duringBackend=async()=>{await request(settings,'/api/quiet-mode',{body:{action:'off'}});await pause();await request(settings,'/api/quiet-mode',{body:{action:'on'}});};
+await sendDaily(crypto.randomUUID());assert.equal(await quietActive(),true,'a request from session A does not end session B');
+// A request that arrives with quiet off ends nothing started later.
+await request(settings,'/api/quiet-mode',{body:{action:'off'}});
+duringBackend=async()=>{await pause();await request(settings,'/api/quiet-mode',{body:{action:'on'}});};
+await sendDaily(crypto.randomUUID());assert.equal(await quietActive(),true,'a request from before the session does not end it');
+// A session started while this request's quiet read is still in flight was not
+// active when the request arrived, so the request must not end it (Codex on bd2513d).
+await request(settings,'/api/quiet-mode',{body:{action:'off'}});
+await pause();
+const slow=sendDaily;let armed=true;
+beforeQuietRead=async()=>{if(!armed)return;armed=false;await pause();await request(settings,'/api/quiet-mode',{body:{action:'on'}});};
+await slow(crypto.randomUUID());assert.equal(await quietActive(),true,'a session started during the quiet read is not ended');
 await request(settings,'/api/quiet-mode',{body:{action:'off'}});
 
 await request(settings,'/api/quiet-mode',{body:{action:'on'}});
