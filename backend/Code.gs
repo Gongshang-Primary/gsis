@@ -522,11 +522,11 @@ function validateClassNameSet_(set){
  });return {id:set.id,name,pairs};
 }
 // Deploy backend. Separate Apps Script project; Contacts is accessed only via signed API.
-const GSIS_DEPLOY_VERSION='0.9.9';
+const GSIS_DEPLOY_VERSION='0.9.9b';
 const DEPLOY_ID='1gXyYNbb8tHKDsb3Q3yepLEuc3cjsbbAsfLl7_XACfls';
 function error_(status,message){const e=new Error(message);e.status=status;throw e;}
 function deployResponseIO_(){try{return GSISSheets.stats();}catch(e){return {};}}
-function out_(x){const started=Date.now(),payload=JSON.stringify(x.data===undefined?x:x.data),serializationMs=Date.now()-started;let text;
+function out_(x){x={...x,backendVersion:GSIS_DEPLOY_VERSION};const started=Date.now(),payload=JSON.stringify(x.data===undefined?x:x.data),serializationMs=Date.now()-started;let text;
  if(deployTrace_){const timing={backendVersion:deployTrace_.backendVersion,diagnosticBuild:deployTrace_.diagnosticBuild,requestId:deployTrace_.requestId,traceId:deployTrace_.requestId,action:deployTrace_.action,phases:deployTrace_.phases,contacts:deployTrace_.contacts,io:deployResponseIO_(),reliefCacheHit:!!deployTrace_.reliefCacheHit,serializationMs,totalMs:Date.now()-deployTrace_.started},meta=JSON.stringify(timing);try{console.info(JSON.stringify({event:'gsis-request',status:x.ok?200:x.status,...timing}));}catch(ignore){}
   if(x.data&&typeof x.data==='object'&&!Array.isArray(x.data)){const shell={...x};delete shell.data;const header=JSON.stringify(shell);text=header.slice(0,-1)+',"data":'+payload.slice(0,-1)+(payload==='{}'?'':',')+'"timing":'+meta+'}}';}
   else text=JSON.stringify({...x,timing});
@@ -637,7 +637,7 @@ function doPost(e){
   deployTrace_.phase='request-identity';
   if(!req.identity||! /^[^@\s]+@gsps\.edu\.sg$/.test(req.identity.email||'')||!req.identity.subject)error_(401,'Invalid identity');
   if(req.action==='deployEdge')return out_({ok:true,data:deployEdgeAdapter_(req)});
-  if(req.action==='change'&&req.input?.protocol!==500)error_(409,'Update the frontend to v0.9.9 and reload before saving.');
+  if(req.action==='change'&&req.input?.protocol!==500)error_(409,'Update the frontend to v0.9.9b and reload before saving.');
   // Published data is already available to every verified school identity. Avoid a Contacts callback.
   rosterStage_('contacts-authority');
   const c=req.action==='active'?{user:{email:req.identity.email,roles:[]}}:contacts_(req.identity,false,'deploySnapshot',{rosterProjection:req.action==='rosterOperations'&&req.input?.operation==='staplerDates'?'staplerDates':undefined,rosterAuthority:/^roster/.test(req.action),rosterDirectory:['rosterOperations','rosterInbox'].includes(req.action)||req.action==='rosterProfile'&&req.input?.view==='report',palAuthority:req.action==='change'&&(req.input?.subject==='PAL'||['removeTG','updateTG','convertLegacySubject'].includes(req.input?.operation)||req.input?.edits?.some(x=>x.subject==='PAL'||['removeTG','updateTG'].includes(x.operation))),authorityOnly:(req.action==='change'&&['saveDraft','saveVersionNote','metadata','delete','purge'].includes(req.input?.operation)&&!req.input.edits?.some(x=>['upsertTeacherProfile','setTeacherField','initReporting'].includes(x.operation)))||['acknowledgeNotices','access','receipt','delta','relief','auditPage','versionNote','rosterProfile','rosterRead','rosterUpload','rosterUpdate','rosterOperations','rosterInbox','campusProfile','renameCampusUnit','active','landmarkUnit','landmarkSearch','lease'].includes(req.action),readOnly:['sync','bootstrap'].includes(req.action)&&!req.input?.freshContacts&&!req.input?.reviewContacts,knownCatalogueHash:req.input?.knownCatalogueHash});
@@ -4314,16 +4314,16 @@ const next=stapler().effectiveDay(plan,ctx.baselineDays?.[d]||ctx.days[d]);for(c
   const incomingAt=ctx.reportedAt||ctx.iso,sequence=ctx.reportSequence||0;
   for(const date of dates)for(const staffId of staffIds){
    const dd=day(ctx,date),coverage=p.fullDay===true?{kind:'fullDay'}:p.coverage,requested={periods:p.periods||[],coverage},want=resubmissionIntervals([requested],dd);
-   // 0.9.9a: the latest action wins. A deletion saved after this report supersedes it.
+   // 0.9.9b: the latest action wins. A deletion saved after this report supersedes it.
    if(candidate.absences.some(a=>a.deletedAt&&Date.parse(a.deletedAt)>=Date.parse(incomingAt)&&a.date===date&&samePerson(ctx,a.staffId,staffId)&&absenceOverlap(a,requested,dd)))continue;
    const overlapping=candidate.absences.filter(a=>!a.deletedAt&&a.date===date&&samePerson(ctx,a.staffId,staffId)&&absenceOverlap(a,requested,dd));
    if(!overlapping.length){const command={...p,staffId,date};delete command.staffIds;delete command.dates;delete command.from;delete command.to;const r=apply(candidate,{...ctx,resubmission:false},command);for(const id of r.savedIds){const a=candidate.absences.find(a=>a.id===id);a.lastSubmissionAt=incomingAt;a.lastSubmissionSequence=sequence;if(Object.keys(a.instructions||{}).length){const notes=mergeSubmittedInstructions({...a,instructions:{},instructionAuthors:{}},a.instructions,ctx);Object.assign(a,notes);}}savedIds.push(...r.savedIds);continue;}
    const stale=a=>Date.parse(incomingAt)<Date.parse(a.lastSubmissionAt||a.reportedAt)||incomingAt===(a.lastSubmissionAt||a.reportedAt)&&sequence<(a.lastSubmissionSequence||0);
    if(overlapping.every(stale)){savedIds.push(...overlapping.map(a=>a.id));continue;}
-   // 0.9.9a: saved portions newer than this report keep their coverage; older portions follow it.
+   // 0.9.9b: saved portions newer than this report keep their coverage; older portions follow it.
    savedIds.push(...overlapping.filter(stale).map(a=>a.id));const matches=overlapping.filter(a=>!stale(a));
    const existing=resubmissionIntervals(matches,dd),gaps=subtractAbsenceIntervals(want,existing),outside=subtractAbsenceIntervals(existing,want),shorter=!gaps.length&&outside.length>0;
-   // 0.9.9a: a later report replaces the saved coverage without SMC review.
+   // 0.9.9b: a later report replaces the saved coverage without SMC review.
    // Periods that have already started keep their recorded absence and relief.
    // Equal-order replays are not later reports: they keep the saved coverage.
    const later=matches.every(a=>Date.parse(incomingAt)>Date.parse(a.lastSubmissionAt||a.reportedAt)||incomingAt===(a.lastSubmissionAt||a.reportedAt)&&sequence>(a.lastSubmissionSequence||0));
@@ -9852,8 +9852,8 @@ function rosterEdgeMigrationDispatch_(req,c){
  if(op==='edgeExportPart')return {handled:true,result:rosterEdgeExportPart_(req)};
  if(op==='edgeReferences')return {handled:true,result:rosterEdgeReferences_(c,true)};
  if(op==='edgeContactCreate'){const created=contacts_(req.identity,false,'rosterContactCreate',{name:p.name,mobile:p.mobile,employment:p.employment,modifier:p.modifier,requestId:p.requestId,confirmDistinct:p.confirmDistinct}),fresh=rosterServiceContacts_();return {handled:true,result:{...created,references:rosterEdgeReferences_(fresh.c,false)}};}
- if(op==='edgeAudit'){/* 0.9.9a: archives are written once; read the archive reference without re-fingerprinting the whole Roster. Activation still re-checks the exact source digest under the writer fence. */if(typeof p.archiveFileId!=='string'||!p.archiveFileId)error_(400,'Reload the Roster import page and import again.');const date=GSISRosterOperations.date(p.date),id=rosterOperationsState_(true).allocationAuditExports?.[date]?.archiveFileId;if(!id)error_(404,'Audit archive not found.');if(id!==p.archiveFileId)error_(409,'An audit archive changed during import. Import again.');const archive=JSON.parse(rosterReadFile_(id));if(archive.schema!==1||archive.date!==date||!Array.isArray(archive.audit))error_(503,'The allocation audit archive is invalid.');return {handled:true,result:archive};}
- if(op==='edgeModel'){/* 0.9.9a: uploaded model files are immutable and each upload has a new ID; read the register only. Activation still re-checks the exact source digest under the writer fence. */if(typeof p.modelFile!=='string'||!p.modelFile)error_(400,'Reload the Roster import page and import again.');const entry=rosterIndex_().entries.find(row=>row.id===p.id);if(!entry)error_(404,'Baseline model not found.');if(entry.modelFile!==p.modelFile)error_(409,'A timetable model changed during import. Import again.');return {handled:true,result:{id:entry.id,model:rosterModel_(entry)}};}
+ if(op==='edgeAudit'){/* 0.9.9b: archives are written once; read the archive reference without re-fingerprinting the whole Roster. Activation still re-checks the exact source digest under the writer fence. */if(typeof p.archiveFileId!=='string'||!p.archiveFileId)error_(400,'Reload the Roster import page and import again.');const date=GSISRosterOperations.date(p.date),id=rosterOperationsState_(true).allocationAuditExports?.[date]?.archiveFileId;if(!id)error_(404,'Audit archive not found.');if(id!==p.archiveFileId)error_(409,'An audit archive changed during import. Import again.');const archive=JSON.parse(rosterReadFile_(id));if(archive.schema!==1||archive.date!==date||!Array.isArray(archive.audit))error_(503,'The allocation audit archive is invalid.');return {handled:true,result:archive};}
+ if(op==='edgeModel'){/* 0.9.9b: uploaded model files are immutable and each upload has a new ID; read the register only. Activation still re-checks the exact source digest under the writer fence. */if(typeof p.modelFile!=='string'||!p.modelFile)error_(400,'Reload the Roster import page and import again.');const entry=rosterIndex_().entries.find(row=>row.id===p.id);if(!entry)error_(404,'Baseline model not found.');if(entry.modelFile!==p.modelFile)error_(409,'A timetable model changed during import. Import again.');return {handled:true,result:{id:entry.id,model:rosterModel_(entry)}};}
  const script=LockService.getScriptLock();if(!deployLock_(script,8000))error_(503,'A Roster save is finishing. Retry migration.');let user;
  try{user=typeof rosterNotificationLock_==='function'?rosterNotificationLock_():LockService.getUserLock();if(!deployLock_(user,8000))error_(503,'Notification delivery is finishing. Retry migration.');const snapshot=rosterEdgeSnapshot_();if(op==='edgeExport')return {handled:true,result:{...snapshot,adminVerified:true}};
   if(typeof p.sourceDigest!=='string'||p.sourceDigest!==snapshot.sourceDigest)error_(409,'The imported snapshot is no longer current. Legacy writers remain enabled; migrate the latest source before cutover.');

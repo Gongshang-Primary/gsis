@@ -19,7 +19,7 @@
 
 const CALV2 = Object.freeze({
   VERSION: 'v2 RC1.9', // Retained workbook schema marker; no migration.
-  RELEASE_VERSION: '0.9.9',
+  RELEASE_VERSION: '0.9.9b',
   TZ: 'Asia/Singapore',
   CACHE_SECONDS: 120,
   DOMAIN: 'gsps.edu.sg',
@@ -8953,6 +8953,7 @@ function constantTimeEqual_(a, b) {
 }
 
 function jsonOutput_(obj) {
+  obj={...obj,backendVersion:CALV2.RELEASE_VERSION};
   return ContentService.createTextOutput(JSON.stringify(obj))
     .setMimeType(ContentService.MimeType.JSON);
 }

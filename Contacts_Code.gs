@@ -1,4 +1,4 @@
-const GSIS_CONTACTS_VERSION='0.9.9';
+const GSIS_CONTACTS_VERSION='0.9.9b';
 /* GSIS_SHEETS_IO_BEGIN */
 /* Bounded Sheets API v4 value I/O. Journals, locks and commit markers belong to callers. */
 var GSISSheets = (function(){
@@ -189,7 +189,7 @@ function doPost(e) {
 }
 var contactRequestEpoch_=null;
 function contactEpoch_(){PropertiesService.getScriptProperties().setProperty('CONTACTS_DATA_EPOCH',Utilities.getUuid());}
-function reply_(data){if(data.ok&&contactRequestEpoch_!==null&&(contactRequestEpoch_!==(PropertiesService.getScriptProperties().getProperty('CONTACTS_DATA_EPOCH')||'')||PropertiesService.getScriptProperties().getProperty('DEPLOY_CATALOGUE_PENDING')||Object.keys(JSON.parse(PropertiesService.getScriptProperties().getProperty('CONTACTS_PENDING_V2')||'{}')).length))throw fault_(503,'Contacts changed while reading. Retry the load.');if(contactTrace_){const timing={backendVersion:GSIS_CONTACTS_VERSION,requestId:contactTrace_.requestId,traceId:contactTrace_.requestId,action:contactTrace_.action,cache:contactTrace_.cache,phases:contactTrace_.phases,preparedIO:contactTrace_.preparedIO,io:GSISSheets.stats(),totalMs:Date.now()-contactTrace_.started};if(data.data)data.data.timing=timing;else data.timing=timing;console.info(JSON.stringify({event:'gsis-contacts-request',status:data.ok?200:data.status,...timing}));}return ContentService.createTextOutput(JSON.stringify(data)).setMimeType(ContentService.MimeType.JSON);}
+function reply_(data){data={...data,backendVersion:GSIS_CONTACTS_VERSION};if(data.ok&&contactRequestEpoch_!==null&&(contactRequestEpoch_!==(PropertiesService.getScriptProperties().getProperty('CONTACTS_DATA_EPOCH')||'')||PropertiesService.getScriptProperties().getProperty('DEPLOY_CATALOGUE_PENDING')||Object.keys(JSON.parse(PropertiesService.getScriptProperties().getProperty('CONTACTS_PENDING_V2')||'{}')).length))throw fault_(503,'Contacts changed while reading. Retry the load.');if(contactTrace_){const timing={backendVersion:GSIS_CONTACTS_VERSION,requestId:contactTrace_.requestId,traceId:contactTrace_.requestId,action:contactTrace_.action,cache:contactTrace_.cache,phases:contactTrace_.phases,preparedIO:contactTrace_.preparedIO,io:GSISSheets.stats(),totalMs:Date.now()-contactTrace_.started};if(data.data)data.data.timing=timing;else data.timing=timing;console.info(JSON.stringify({event:'gsis-contacts-request',status:data.ok?200:data.status,...timing}));}return ContentService.createTextOutput(JSON.stringify(data)).setMimeType(ContentService.MimeType.JSON);}
 function fault_(status,message){const e=new Error(message);e.status=status;return e;}
 function equal_(a,b){if(typeof b!=='string'||a.length!==b.length)return false;let mismatch=0;for(let i=0;i<a.length;i++)mismatch|=a.charCodeAt(i)^b.charCodeAt(i);return mismatch===0;}
 var contactReadCache_=new Map(),contactCacheEnabled_=false,contactPrefetchedValues_=new Map(),contactReadOnly_=false;
@@ -512,7 +512,7 @@ function requireContactsBackup_(ss){
 function prepareContactsPerformance410(){
  const ss=SpreadsheetApp.openById(GSIS_SHEET),req={action:'maintenance',identity:{email:''},input:{}};
  ensureContactsReady_(ss,req);contactReadOnly_=req.action==='bootstrap';const lock=LockService.getScriptLock();if(!contactLock_(lock,8000))throw fault_(503,'A save is running. Retry preparation after it finishes.');
- try{contactWriterReady_(req);backupContactsOnce_(ss,table_(ss,'contacts'));requireContactsBackup_(ss);return {ready:true,version:'0.9.9'};}
+ try{contactWriterReady_(req);backupContactsOnce_(ss,table_(ss,'contacts'));requireContactsBackup_(ss);return {ready:true,version:'0.9.9b'};}
  finally{lock.releaseLock();}
 }
 function persistContactCalculations_(ss){const raw=table_(ss,'contacts'),t=deriveContacts_(ss,{...raw,rows:raw.rows.map(r=>({...r}))}),pending=[];for(let i=0;i<t.rows.length;i++){const r=t.rows[i],old=raw.rows[i],values=t.headers.map(k=>safeCell_((['Subject Modifier','Mobile No',...CONTACT_DERIVED_FIELDS].includes(k)?r[k]:old?.[k])||''));writeContactDirtyRow_(t.sheet,r._row,values,t.headers.map(k=>safeCell_(old?.[k]||'')),pending);}contactValues_(ss,[{sheet:t.sheet,writes:pending}]);return t.rows.filter(r=>r['Staff ID']).length;}
@@ -813,7 +813,7 @@ function contactPhase_(name,fn){const start=Date.now();try{return fn();}catch(e)
 function contactErrorCategory_(err){const text=String(err?.message||'');return /protect|protected cell/i.test(text)?'protected-range':/permission|forbidden|access denied|not have access/i.test(text)?'permission':/quota|too many|rate limit/i.test(text)?'quota':/timed? ?out|deadline|timeout/i.test(text)?'timeout':/unavailable|internal error|service error/i.test(text)?'service':err?.status?'validation':'unknown';}
 function contactFailure_(err){
  const requestId=/^[\w-]{36}$/.test(contactTrace_?.requestId||'')?contactTrace_.requestId:'unavailable',phase=contactTrace_?.failedPhase||'request',status=err.status||503;
- const category=contactErrorCategory_(err),reference={version:'0.9.9',requestId,phase,category,operation:contactTrace_?.action||'editor',serviceMode:GSISSheets.enabled()?'sheets-api':'native'};
+ const category=contactErrorCategory_(err),reference={version:'0.9.9b',requestId,phase,category,operation:contactTrace_?.action||'editor',serviceMode:GSISSheets.enabled()?'sheets-api':'native'};
  // Never log contact values, payloads, exception messages, credentials or stacks.
  console.error(JSON.stringify({event:'gsis-contacts-error',status,...reference,errorType:['TypeError','ReferenceError','RangeError','SyntaxError'].includes(err.name)?err.name:'Error'}));
  return {ok:false,status,...(['GSIS_SECRET_INVALID','CONTACTS_RECOVERY_REQUIRED','CONTACTS_BUSY','VENUES_SOURCE_SETUP','VENUES_SOURCE_AUTH','VENUES_SOURCE_INPUT','VENUES_SOURCE_CHANGED','VENUES_SOURCE_INVALID','VENUES_SOURCE_PENDING','VENUES_FENCE_PENDING','SOURCE_UNAUTHORIZED','SOURCE_UNAVAILABLE','SOURCE_REQUEST_INVALID','SOURCE_CHANGED','SOURCE_INVALID'].includes(err.code)?{code:err.code}:{}),error:(err.status?err.message:category==='protected-range'?'The executing Apps Script account cannot edit a required range. Ask the script maintainer to run inspectContactsWriteAccess504().':category==='permission'?'The executing Apps Script account lacks spreadsheet access.':'The school service could not complete this request.')+' [v0.9.7 · '+phase+' · '+requestId+']',reference,draftEditable:!!err.status&&([400,409].includes(status)||err.code==='CONTACTS_RECOVERY_REQUIRED')&&!contactTrace_?.journalStarted};
@@ -828,7 +828,7 @@ deriveContacts_=function(...a){return contactPhase_('derive',()=>contactMeasured
 validateDirectory_=function(...a){return contactPhase_('validate',()=>contactMeasured_.validate(...a));};
 ensureContactsReady_=function(...a){return contactPhase_('recovery',()=>contactMeasured_.recovery(...a));};
 
-function prepareContactsPerformance404(){ensureContactsReady_(SpreadsheetApp.openById(GSIS_SHEET),{action:'maintenance',identity:{email:''},input:{}});return {ready:true,version:'0.9.9'};}
+function prepareContactsPerformance404(){ensureContactsReady_(SpreadsheetApp.openById(GSIS_SHEET),{action:'maintenance',identity:{email:''},input:{}});return {ready:true,version:'0.9.9b'};}
 
 // Read-only editor check; does not migrate or clear any data.
 function prepareSheetsAPI414(){return GSISSheets.check(SpreadsheetApp.openById(GSIS_SHEET).getSheetByName('contacts'));}
@@ -840,7 +840,7 @@ function prepareContactsPerformance502(){
  const ss=SpreadsheetApp.openById(GSIS_SHEET);if(!GSISSheets.enabled())throw Error('Enable Google Sheets API v4 under Apps Script Services.');
  const sheet=ss.getSheetByName('contacts');if(!sheet)throw Error('Missing contacts sheet');
  GSISSheets.readAcross(ss,[{sheet,row:1,col:1,height:1,width:Math.max(1,sheet.getLastColumn())}],true,{flush:false});
- return {ready:true,version:'0.9.9',pending:Object.keys(contactRecoveryPointers_(ss)).length,mode:'batched Contacts values; original-request recovery'};
+ return {ready:true,version:'0.9.9b',pending:Object.keys(contactRecoveryPointers_(ss)).length,mode:'batched Contacts values; original-request recovery'};
 }
 // An editor-run alternative to the Recovery button. The executing account must
 // be a current Contacts Admin; the helper cannot replace or discard the payload.

@@ -29,3 +29,11 @@
 ## Current claim
 
 Model: Codex. Owner requested the next two changelog items. This task is prepared on a separate branch while PRs #19 and #20 use both open-PR slots. It builds on the unmerged #20 head; no additional PR is opened until the queue permits it. Claude reviews the exact final head. No merge, deployment, live record change or messages are part of this implementation.
+
+## Implementation and verification
+
+Model: Codex. All 18 component outputs now build as 0.9.9b. The source VERSION stamps production metadata, headers, backend constants, Worker labels and local asset URLs. The shared notice reads actual backend response metadata and does not block operations. Optional Workers expose only their label at GET /health; existing administrative data remains authenticated.
+
+Numeric npm metadata, workbook schemas, historical release documentation and the separately versioned shadow timetable preparation package remain at their own existing versions. Final packaging requires the next letter, places COMMIT.txt and DEPLOY_STEPS.md inside and beside the bundle, and advances release/LAST_BUNDLE_VERSION only after successful archive writes. Preview and component builds may repeat.
+
+Verified locally: full 18-component build; page/header/asset parity; optional Worker health; mismatch/equal/invalid response fixtures; header-tamper detection; repeated/skipped letter rejection and z owner gate. Windows packaging tests cannot create the symlink fixture; complete validation runs in Linux CI. Exact final head and CI are recorded in the branch handoff after completion.

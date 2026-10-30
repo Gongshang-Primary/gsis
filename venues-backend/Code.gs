@@ -1,5 +1,5 @@
 /** Standalone Venues persistence and authenticated entrypoints, GSiS 0.9.2. */
-var VENUES_VERSION = '0.9.9';
+var VENUES_VERSION = '0.9.9b';
 var VENUES_TABLES = {meta:'VenuesMeta',venues:'VenuePolicy',admins:'AdminGrant',owners:'RoomOwnerGrant',series:'BookingSeries',occurrences:'BookingOccurrence',transfers:'TransferRequest',decisions:'ApprovalDecision',closures:'Closure',waivers:'TimetableWaiver',outbox:'NotificationOutbox',audit:'AuditEvent',receipts:'RequestReceipt',nonces:'TransportNonce',people:'StaffSnapshot'};
 var VENUES_SHEET_IDS = Object.keys(VENUES_TABLES).reduce(function(out,key,index){out[VENUES_TABLES[key]]=9200+index;return out;},{});
 function venuesNow_(){return new Date().toISOString();}
@@ -45,7 +45,7 @@ function venuesCommitState_(before,after,extraRequests){
 }
 function venuesCheckCommit_(state){var props=venuesProperties_(),raw=props.getProperty('VENUES_COMMIT_PENDING');if(!raw)return;var marker;try{marker=JSON.parse(raw);}catch(e){throw venuesError_('COMMIT_UNCERTAIN','The transaction recovery marker needs administrator review.');}if(state.commitToken===marker.token){props.deleteProperty('VENUES_COMMIT_PENDING');return;}throw venuesError_('COMMIT_UNCERTAIN','A prior save has an unknown outcome. An administrator must review transaction '+marker.token+'.');}
 function venuesTransaction_(fn){return venuesWithLock_(function(){var before=venuesLoadState_();venuesCheckCommit_(before);var outcome=fn(JSON.parse(JSON.stringify(before)))||{};if(outcome.state)venuesCommitState_(before,outcome.state,outcome.requests);return outcome.result;});}
-function venuesJson_(value){return ContentService.createTextOutput(JSON.stringify(value)).setMimeType(ContentService.MimeType.JSON);}
+function venuesJson_(value){value={...value,backendVersion:VENUES_VERSION};return ContentService.createTextOutput(JSON.stringify(value)).setMimeType(ContentService.MimeType.JSON);}
 function venuesVerifyEnvelope_(event){
   var raw=event&&event.postData&&event.postData.contents;if(typeof raw!=='string'||raw.length>250000)throw venuesError_('INVALID_REQUEST','Send a signed JSON request.',400);var outer,p;try{outer=JSON.parse(raw);p=JSON.parse(outer.payload);}catch(e){throw venuesError_('INVALID_REQUEST','Invalid signed JSON request.',400);}
   if(!['venues','venuesService','calendarCatalogue'].includes(p.action))throw venuesError_('INVALID_ACTION','Unsupported signed action.',400);

@@ -60,7 +60,7 @@ export default {async fetch(req,env,ctx){
  if(['/api/edge/service','/api/venues-source','/api/lord-source'].includes(u.pathname)){try{const delegated=await forwardOperationalRequest(req,env,'deploy');return delegated===undefined?edgeDeployService(req,env,ctx):delegated;}catch(error){return json({ok:false,code:error.code,error:error.status<500?error.message:'The operational service could not be confirmed.'},error.status||503);}}
  const sessionResponse=await sessionRoute(req,env);if(sessionResponse)return sessionResponse;
  if(u.pathname==='/campus-base.svg')return json({ok:false,error:'Sign in to view the map'},403);if(!u.pathname.startsWith('/api/'))return env.ASSETS.fetch(req);
- if(u.pathname==='/api/config')return json({version:'0.9.9',clientId:env.GOOGLE_CLIENT_ID||'',configured:!!(env.GOOGLE_CLIENT_ID&&env.APPS_SCRIPT_URL&&gsisApiSecret(env,'BRIDGE_SECRET')),liveConfigured:!!env.LIVE_HUB});
+ if(u.pathname==='/api/config')return json({version:'0.9.9b',clientId:env.GOOGLE_CLIENT_ID||'',configured:!!(env.GOOGLE_CLIENT_ID&&env.APPS_SCRIPT_URL&&gsisApiSecret(env,'BRIDGE_SECRET')),liveConfigured:!!env.LIVE_HUB});
  if(u.pathname==='/api/live'){
   if(!env.LIVE_HUB)return json({ok:false,error:'Live updates are not configured'},503);
   if(req.method!=='GET'||req.headers.get('Origin')!==u.origin||req.headers.get('Upgrade')?.toLowerCase()!=='websocket')return json({ok:false,error:'WebSocket required'},403);

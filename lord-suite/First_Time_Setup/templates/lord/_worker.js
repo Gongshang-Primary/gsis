@@ -84,7 +84,7 @@ function compatibleFetchOptions(init, signal) {
 }
 
 function json(data, status = 200, extraHeaders = {}) {
-  return Response.json(data, { status, headers: { 'Cache-Control': 'no-store', 'X-LORD-Worker-Version': '0.9.9', ...extraHeaders } });
+  return Response.json(data, { status, headers: { 'Cache-Control': 'no-store', 'X-LORD-Worker-Version': '0.9.9b', ...extraHeaders } });
 }
 function b64urlDecode(value) {
   value = value.replace(/-/g, '+').replace(/_/g, '/');
@@ -244,7 +244,7 @@ async function loadReferenceResponse(env, forceRefresh = false, reloadDate = '',
   if (cached) {
     const fetchedAt = Number(cached.headers.get('X-LORD-Fetched-At') || 0);
     if (fetchedAt && now - fetchedAt < REFERENCE_FRESH_SECONDS * 1000) {
-      return new Response(await cached.clone().text(), { status: 200, headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'private, no-store', 'X-LORD-Worker-Version': '0.9.9', 'X-LORD-Reference': 'edge-fresh' } });
+      return new Response(await cached.clone().text(), { status: 200, headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'private, no-store', 'X-LORD-Worker-Version': '0.9.9b', 'X-LORD-Reference': 'edge-fresh' } });
     }
   }
 
@@ -274,7 +274,7 @@ async function loadReferenceResponse(env, forceRefresh = false, reloadDate = '',
       if (forceRefresh || !latest || (Number(latest.headers.get('X-LORD-Reloaded-At') || 0) < now && Number(latest.headers.get('X-LORD-Fetched-At') || 0) <= now)) {
         await cache.put(cacheKey, stored.clone());
       }
-      return new Response(JSON.stringify(payload), { status: 200, headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'private, no-store', 'X-LORD-Worker-Version': '0.9.9', 'X-LORD-Reference': 'live', 'Server-Timing': `backend;dur=${Math.max(0, Date.now() - backendStartedAt)}` } });
+      return new Response(JSON.stringify(payload), { status: 200, headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'private, no-store', 'X-LORD-Worker-Version': '0.9.9b', 'X-LORD-Reference': 'live', 'Server-Timing': `backend;dur=${Math.max(0, Date.now() - backendStartedAt)}` } });
     }
     lastError = new Error((payload && payload.error) || 'Reference backend returned an unexpected response.');
   } catch (error) { lastError = error; }
@@ -282,7 +282,7 @@ async function loadReferenceResponse(env, forceRefresh = false, reloadDate = '',
   if (forceRefresh) throw lastError || new Error('Could not reload from Sheets.');
   if (!cached) cached = await cache.match(cacheKey);
   if (cached) {
-    return new Response(await cached.clone().text(), { status: 200, headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'private, no-store', 'X-LORD-Worker-Version': '0.9.9', 'X-LORD-Reference': 'edge-stale' } });
+    return new Response(await cached.clone().text(), { status: 200, headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'private, no-store', 'X-LORD-Worker-Version': '0.9.9b', 'X-LORD-Reference': 'edge-stale' } });
   }
   throw lastError || new Error('Reference data could not be loaded.');
 }

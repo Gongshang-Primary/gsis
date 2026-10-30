@@ -1,7 +1,7 @@
 /* Current source recovery opens with current installation boundaries, not obsolete migration guidance. */
 const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
 const root=path.resolve(__dirname,'..'),version=JSON.parse(fs.readFileSync(path.join(root,'package.json'),'utf8')).gsisRelease,readme=fs.readFileSync(path.join(root,'README.md'),'utf8'),notice=readme.split('## Historical v0.9.7 installation handbook')[0];
-if(version==='0.9.9'){
+if(/^0[.]9[.]9[a-z]?$/.test(version)){
  const settings=require('../package.json'),guide=fs.readFileSync(path.join(root,'docs/v099/SETUP.md'),'utf8');
  for(const name of ['docs/v099/SETUP.html','CHANGELOG_v0.9.9.md','VALIDATION_v0.9.9.md','docs/v099/HANDOVER.md','docs/v099/REQUIREMENTS_STATUS.md','docs/v099/ROSTER_WORKER_ROADMAP.md','docs/v099/SOURCE_REVIEW.md']){
   assert(readme.includes(name),'Current entry point links '+name);assert(fs.existsSync(path.join(root,name)),'Current guide exists '+name);

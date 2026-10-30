@@ -18,6 +18,7 @@ root=Path(__file__).resolve().parents[1]
 import runpy
 installation_manifest=runpy.run_path(str(root/'scripts/installation-manifest.py'))['installation_manifest']
 import json
+runpy.run_path(str(root/'scripts/release-version.py'))['stamp'](root)
 release=json.loads((root/'package.json').read_text())
 version=release['gsisRelease']
 # Working-source checks must not overwrite the last authorised deployment.
@@ -224,7 +225,7 @@ try:
  # Only release inputs determine provenance; unrelated local review files do not.
  release_inputs=list(installation['frontends'].values())+['backend','shared','data','calendar-backend','Contacts_Code.gs',
   'notification-worker','operations-worker','migrations','scripts','package.json','package-lock.json','release-installation-manifest.json']
- release_inputs += [str(members[name.format(version=version)].relative_to(root)) for name in installation['documents']]
+ release_inputs += [str(members[name.format(version=re.sub(r'[a-z]$', '', version))].relative_to(root)) for name in installation['documents']]
  if 'LORD' in installation['backends']:release_inputs.append('lord-suite/Source/backend')
  if 'Venues' in installation['backends']:release_inputs.append('venues-backend')
  dirty=bool(subprocess.check_output(['git','status','--porcelain','--',*release_inputs],cwd=root,text=True).strip())

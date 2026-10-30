@@ -124,7 +124,7 @@ async function backendJson(target, init = {}, { timeoutMs = 45000, label = 'LORD
   }
 }
 function json(data, status = 200, extraHeaders = {}) {
-  return Response.json(data, { status, headers: { 'Cache-Control': 'no-store', 'X-LORD-Worker-Version': '0.9.9', ...extraHeaders } });
+  return Response.json(data, { status, headers: { 'Cache-Control': 'no-store', 'X-LORD-Worker-Version': '0.9.9b', ...extraHeaders } });
 }
 function b64urlDecode(value) {
   value = value.replace(/-/g, '+').replace(/_/g, '/');
@@ -281,7 +281,7 @@ async function loadReferenceResponse(env, forceRefresh = false, latestOnly = fal
   if (cached) {
     const fetchedAt = Number(cached.headers.get('X-OVERLORD-Fetched-At') || 0);
     if (fetchedAt && now - fetchedAt < REFERENCE_FRESH_SECONDS * 1000) {
-      return new Response(await cached.clone().text(), { status: 200, headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'private, no-store', 'X-LORD-Worker-Version': '0.9.9', 'X-OVERLORD-Reference': 'edge-fresh' } });
+      return new Response(await cached.clone().text(), { status: 200, headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'private, no-store', 'X-LORD-Worker-Version': '0.9.9b', 'X-OVERLORD-Reference': 'edge-fresh' } });
     }
   }
   const target = new URL(backendUrl(env));
@@ -301,14 +301,14 @@ async function loadReferenceResponse(env, forceRefresh = false, latestOnly = fal
     if (forceRefresh || !latest || (Number(latest.headers.get('X-OVERLORD-Reloaded-At') || 0) < now && Number(latest.headers.get('X-OVERLORD-Fetched-At') || 0) <= now)) {
       await cache.put(cacheKey, stored.clone());
     }
-    return new Response(JSON.stringify(payload), { status: 200, headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'private, no-store', 'X-LORD-Worker-Version': '0.9.9', 'X-OVERLORD-Reference': 'live' } });
+    return new Response(JSON.stringify(payload), { status: 200, headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'private, no-store', 'X-LORD-Worker-Version': '0.9.9b', 'X-OVERLORD-Reference': 'live' } });
   } catch (error) {
     if (forceRefresh) throw error;
     if (!cached) cached = await cache.match(cacheKey);
     if (cached) {
       const fallback = await cached.clone().json();
       if (fallback.data) fallback.data = {...fallback.data, referenceReadDelayed:true};
-      return new Response(JSON.stringify(fallback), { status: 200, headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'private, no-store', 'X-LORD-Worker-Version': '0.9.9', 'X-OVERLORD-Reference': 'edge-stale' } });
+      return new Response(JSON.stringify(fallback), { status: 200, headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'private, no-store', 'X-LORD-Worker-Version': '0.9.9b', 'X-OVERLORD-Reference': 'edge-stale' } });
     }
     throw error;
   }

@@ -32,7 +32,7 @@
  * GSiS Suite v0.9.7 unifies release labels; device and provider acceptance remain operational checks.
  */
 var LORD_CONFIG = Object.freeze({
-  VERSION: '0.9.9',
+  VERSION: '0.9.9b',
   RELEASE_CHANNEL: 'GSiS Suite',
 
   // ---- Deployment identity / storage from Script Properties ----
@@ -450,7 +450,7 @@ function doGet(e) {
     if (action === 'health') {
       return jsonResponse_({
         ok: true,
-        service: 'LORD Suite Backend v0.9.9',
+        service: 'LORD Suite Backend v0.9.9b',
         version: LORD_CONFIG.VERSION,
         releaseChannel: LORD_CONFIG.RELEASE_CHANNEL,
         timestamp: new Date().toISOString()
@@ -2615,6 +2615,7 @@ function padNumber_(value, width) {
 }
 
 function jsonResponse_(payload) {
+  payload={...payload,backendVersion:LORD_CONFIG.VERSION};
   return ContentService
     .createTextOutput(JSON.stringify(payload))
     .setMimeType(ContentService.MimeType.JSON);

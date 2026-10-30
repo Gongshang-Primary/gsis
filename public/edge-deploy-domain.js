@@ -2,7 +2,7 @@
 export function createDeployDomain(runtime){
 /* Request-local adapters. This file is included by the domain generator, not imported. */
 const state=runtime.state, clone=x=>JSON.parse(JSON.stringify(x));
-const GSIS_DEPLOY_VERSION='0.9.9',GSIS_BACKEND_KIND='deploy';
+const GSIS_DEPLOY_VERSION='0.9.9b',GSIS_BACKEND_KIND='deploy';
 const Utilities={getUuid:()=>crypto.randomUUID(),DigestAlgorithm:{SHA_256:'SHA256'},computeDigest:(algorithm,text)=>runtime.sha256(text)};
 const LockService={getScriptLock:()=>({tryLock:()=>true,releaseLock:()=>{}})};
 function deployLock_(){return true;}function deployUnlock_(){}function gsisRequireBackendRole_(){}function deployPhase_(name,fn){return fn();}

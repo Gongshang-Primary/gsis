@@ -12,7 +12,7 @@ function gsisApiSecret(env,legacyName){
 
 /* GSIS_API_SECRET_END */
 // GSiS Venues 0.9.2. Access authenticates; Contacts and Venues authorise each operation.
-const VERSION='0.9.9',encoder=new TextEncoder(),decoder=new TextDecoder();
+const VERSION='0.9.9b',encoder=new TextEncoder(),decoder=new TextDecoder();
 const READS=new Set(['bootstrap','manifest','piece','bookings','admin']);
 const COMMANDS=new Set(['book','amend','cancel','decide','requestTransfer','decideTransfer','respond','saveVenue','saveRoomOwners','saveRoomMetadata','saveGrant','saveClosure','sync','notificationDecision']);
 const keySets=new Map(),keyFlights=new Map();
