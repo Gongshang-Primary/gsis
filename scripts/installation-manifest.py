@@ -21,9 +21,9 @@ def installation_manifest(root, version):
         members[name.format(version=version)] = root / relative
     for name in spec['documents']:
         relative = Path(name.format(version=version))
-        assert not relative.is_absolute() and '..' not in relative.parts and '\\' not in str(relative)
+        assert not relative.is_absolute() and '..' not in relative.parts and '\\' not in name
         assert str(relative) == 'README.md' or (relative.parts[0] == 'docs' and len(relative.parts) in (2, 3))
-        members[str(relative)] = root / relative
+        members[relative.as_posix()] = root / relative
     for name in spec.get('migrations',[]):
         relative=Path(name)
         assert len(relative.parts)==2 and relative.parts[0]=='migrations' and relative.suffix=='.sql'

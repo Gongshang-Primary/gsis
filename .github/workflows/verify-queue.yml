@@ -1,0 +1,47 @@
+name: Verify GSiS queue changes
+on:
+  push:
+    branches:
+      - codex/roster-operations-split-files
+      - codex/roster-sre-fajt-r-calc
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: gsis-verify-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  full-suite:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      TZ: Asia/Singapore
+      CI: 'true'
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '24'
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Prepare test browser
+        run: |
+          node node_modules/playwright/cli.js install --with-deps chromium
+          BROWSER=$(node -p "require('playwright').chromium.executablePath()")
+          echo "ROSTER_TEST_CHROMIUM=$BROWSER" >> "$GITHUB_ENV"
+          echo "GSIS_BROWSER_EXECUTABLE=$BROWSER" >> "$GITHUB_ENV"
+      - name: Regenerate all 18 components
+        run: npm run build
+      - name: Check browser fixture portability
+        run: |
+          node tests/roster084-private-link-reuse-browser.cjs
+          node tests/roster098h-communication-display.cjs
+          node tests/roster098h-publication-ui.cjs
+          node tests/stapler-draft-excel-export-browser.cjs
+          node tests/stapler-draft-level-recess-browser.cjs
+          node tests/stapler098h-recovery-browser.cjs
+      - name: Run full regression suite
+        run: npm test

@@ -1781,7 +1781,7 @@ var GSISRelief=(function(){
  const own=(x,k)=>Object.prototype.hasOwnProperty.call(x,k);
  const record=x=>!!x&&typeof x==='object'&&!Array.isArray(x);
  const nonnegative=x=>typeof x==='number'&&Number.isFinite(x)&&x>=0;
- const model='whole-week-v5';
+ const model='whole-week-v6';
  function defaults(){return {schema:3,calculationVersion:model,mode:'actual',weeklyPeriods:84,fourFifthsFraction:0.8,fajtWeeklyPeriods:65,timetablePeriods:60,siuePercent:150,blocks:{}};}
  function validate(doc,value){
   const keys=Object.keys(defaults());
@@ -1802,7 +1802,7 @@ var GSISRelief=(function(){
   if(saved==null)return validate(doc,defaults());
   if(!record(saved)||![1,2,3].includes(saved.schema))throw Error('Unknown relief settings schema.');
   if(saved.schema===3){
-   if(![model,'whole-week-v4','whole-week-v3','whole-week-v2','whole-week-v1'].includes(saved.calculationVersion)||!['actual','expected'].includes(saved.mode))throw Error('Unknown relief calculation version.');
+   if(![model,'whole-week-v5','whole-week-v4','whole-week-v3','whole-week-v2','whole-week-v1'].includes(saved.calculationVersion)||!['actual','expected'].includes(saved.mode))throw Error('Unknown relief calculation version.');
    return validate(doc,{...saved,calculationVersion:model,mode:'actual'});
   }
   return validate(doc,{...defaults(),siuePercent:saved.siuePercent===undefined?150:saved.siuePercent,blocks:saved.blocks===undefined?{}:saved.blocks});
@@ -1814,6 +1814,7 @@ var GSISRelief=(function(){
   const fraction=parts.includes('4/5');
   return parts.some(x=>!known.includes(x))||fajt&&fraction?null:fajt?'FAJT':fraction?'4/5':'Full time';
  }
+ function sre(teacher){const p=teacher.profile||{};return String(p['Employment Modifier']||teacher.employment||'').split(/[,;]/).some(v=>v.trim().toUpperCase()==='SRE')||String(p.Role||teacher.role||'').toUpperCase()==='SRE';}
  function offload(rules,catalogue){
   if(!rules?.eligible)return {OF:null,components:[],reason:'Not eligible for teaching.'};
   const tags=catalogue?.tags||[],components=[];let retained=1,reason=(rules.pending||[]).join('; ');
@@ -1841,15 +1842,18 @@ var GSISRelief=(function(){
   const reference={weeklyPeriods:settings.weeklyPeriods,fourFifthsFraction:settings.fourFifthsFraction,fajtWeeklyPeriods:settings.fajtWeeklyPeriods,timetablePeriods:settings.timetablePeriods,siuePercent:settings.siuePercent,T_avg,teachingPeriodTotal:demandMissing?null:teachingPeriodTotal,fullTimeTeacherCount,available:T_avg!==null,reason:demandMissing?'Teaching demand is incomplete.':employmentMissing?'Employment category needs correction.':!fullTimeTeacherCount?'No eligible full-time teachers.':null};
   const rows=[...teachers.values()].map(teacher=>{
    const r=sources.get(teacher.id),rules=r?.rules,type=employment(teacher),of=offload(rules,doc.offload),active=r?r.active:teacher.active===true||teacher.active==='Y';
-   const budget=type==='FAJT'?settings.fajtWeeklyPeriods:type==='4/5'?settings.weeklyPeriods*settings.fourFifthsFraction:type==='Full time'?settings.weeklyPeriods:null;
-   const factor=type==='FAJT'?1:type?settings.timetablePeriods/settings.weeklyPeriods:null;
-   const out={teacher,id:teacher.id,name:teacher.name||teacher.id,active,eligible:!!rules?.eligible,employment:type,OF:of.OF,offloadComponents:of.components,offloadPercent:of.OF===null?null:of.OF*100,retained:null,actualTeaching:r?.Teaching??null,teachingVerified:!!r&&!r.incomplete&&!teacher.orphan&&nonnegative(r.Teaching),teachingUsed:r?.Teaching??null,teachingBasis:'Actual teaching',FTT:r?.FTT??null,pd:r?.pd??null,duties:r?.duties??null,otherNonTeaching:r?.otherNonTeaching??null,nonTeachingActivities:r?.nonTeachingActivities||[],weeklyBudget:budget,timetableFactor:factor,Wi:null,siuePeriods:null,offloadAllowance:null,rawQuota:null,normalQuota:null,periodCap:rules?.cap??null,capConfigured:rules?.cap!=null||(rules?.matched||[]).some(r=>r.periods!==''&&r.periods!=null),capBasis:rules?.capBasis||'teaching',capNonTeachingPeriods:r?.capNonTeachingPeriods||null,capWorkload:null,capHeadroom:null,capApplied:false,quota:null,blocks:settings.blocks[teacher.id]||0,remaining:null,reason:'',comparison:null};
+   // SRE changes the quota basis, not the existing school-average denominator.
+   const isSre=sre(teacher),hasTeaching=!!r&&!r.incomplete&&!teacher.orphan&&nonnegative(r.Teaching),longTerm=isSre&&hasTeaching&&r.Teaching>0,fajtBasis=type==='FAJT'||longTerm;
+   const budget=isSre&&!longTerm?null:fajtBasis?settings.fajtWeeklyPeriods:type==='4/5'?settings.weeklyPeriods*settings.fourFifthsFraction:type==='Full time'?settings.weeklyPeriods:null;
+   const factor=isSre&&!longTerm?null:fajtBasis?1:type?settings.timetablePeriods/settings.weeklyPeriods:null;
+   const out={teacher,id:teacher.id,name:teacher.name||teacher.id,active,eligible:!!rules?.eligible,employment:type,...(isSre?{reliefBasis:longTerm?'long-term':hasTeaching?'daily':'unknown',basisLabel:longTerm?'SRE with timetable: FAJT basis':null}:{}),OF:of.OF,offloadComponents:of.components,offloadPercent:of.OF===null?null:of.OF*100,retained:null,actualTeaching:r?.Teaching??null,teachingVerified:!!r&&!r.incomplete&&!teacher.orphan&&nonnegative(r.Teaching),teachingUsed:r?.Teaching??null,teachingBasis:'Actual teaching',FTT:r?.FTT??null,pd:r?.pd??null,duties:r?.duties??null,otherNonTeaching:r?.otherNonTeaching??null,nonTeachingActivities:r?.nonTeachingActivities||[],weeklyBudget:budget,timetableFactor:factor,Wi:null,siuePeriods:null,offloadAllowance:null,rawQuota:null,normalQuota:null,periodCap:rules?.cap??null,capConfigured:rules?.cap!=null||(rules?.matched||[]).some(r=>r.periods!==''&&r.periods!=null),capBasis:rules?.capBasis||'teaching',capNonTeachingPeriods:r?.capNonTeachingPeriods||null,capWorkload:null,capHeadroom:null,capApplied:false,quota:null,blocks:settings.blocks[teacher.id]||0,remaining:null,reason:'',comparison:null};
    const missing=reason=>{out.reason=reason;return out;};
    if(settingsError)return missing('Relief settings need correction: '+settingsError);
    if(teacher.orphan)return missing('Teacher record is missing.');
    if(!active)return missing('Inactive teacher.');
    if(!r||!rules?.eligible)return missing('Not eligible for relief.');
    if(!type)return missing('Employment category needs correction.');
+   if(isSre&&hasTeaching&&!longTerm)return missing('Daily roster, no R%');
    if(T_avg===null)return missing(reference.reason);
    if(of.reason||of.OF===null)return missing(of.reason||'Offload rate needs configuration.');
    if(r.incomplete||r.capIncomplete||![r.Teaching,r.FTT,r.pd,r.duties,r.otherNonTeaching].every(nonnegative))return missing('Workload data is incomplete.');
@@ -1879,7 +1883,7 @@ function reliefAnalysis_(source){
  d.offload=GSISTeachingRules.migrate(d.offload);
  return GSISRelief.analyse(d,GSISWorkload.analyse(d,t=>GSISTeachingRules.calculate(t,d.offload)));
 }
-function reliefResultRows_(result,details=false){return result.rows.map(r=>({teacherId:r.id,name:r.name,active:r.active,eligible:r.eligible,R:r.quota,available:r.quota!==null,reason:r.quota!==null?null:details?r.reason:!r.active?'Inactive teacher.':!r.eligible?'Not eligible for relief.':'Capacity unavailable. Ask Admin to review.',...(details?{OF:r.OF??null,Ti:r.actualTeaching,breakdown:{employment:r.employment??null,teachingVerified:r.teachingVerified===true,FTT:r.FTT,PD:r.pd,duties:r.duties,otherNonTeaching:r.otherNonTeaching,nonTeachingActivities:r.nonTeachingActivities,weeklyBudget:r.weeklyBudget??null,timetableFactor:r.timetableFactor??null,Wi:r.Wi??null,rawR:r.rawQuota,normalR:r.normalQuota,periodCap:r.periodCap,capConfigured:r.capConfigured,capBasis:r.capBasis,capWorkload:r.capWorkload,capHeadroom:r.capHeadroom,capApplied:r.capApplied,offloadAllowance:r.offloadAllowance??null,siuePeriods:r.siuePeriods,offloadComponents:r.offloadComponents||[],available:result.calculationVersion===GSISRelief.model&&r.quota!==null,reason:result.calculationVersion!==GSISRelief.model?'Legacy calculation model.':r.reason||null}}:{})}));}
+function reliefResultRows_(result,details=false){return result.rows.map(r=>({teacherId:r.id,name:r.name,active:r.active,eligible:r.eligible,R:r.quota,available:r.quota!==null,reason:r.quota!==null?null:details?r.reason:!r.active?'Inactive teacher.':!r.eligible?'Not eligible for relief.':'Capacity unavailable. Ask Admin to review.',...(details?{OF:r.OF??null,Ti:r.actualTeaching,breakdown:{employment:r.employment??null,...(r.basisLabel?{basisLabel:r.basisLabel}:{}),teachingVerified:r.teachingVerified===true,FTT:r.FTT,PD:r.pd,duties:r.duties,otherNonTeaching:r.otherNonTeaching,nonTeachingActivities:r.nonTeachingActivities,weeklyBudget:r.weeklyBudget??null,timetableFactor:r.timetableFactor??null,Wi:r.Wi??null,rawR:r.rawQuota,normalR:r.normalQuota,periodCap:r.periodCap,capConfigured:r.capConfigured,capBasis:r.capBasis,capWorkload:r.capWorkload,capHeadroom:r.capHeadroom,capApplied:r.capApplied,offloadAllowance:r.offloadAllowance??null,siuePeriods:r.siuePeriods,offloadComponents:r.offloadComponents||[],available:result.calculationVersion===GSISRelief.model&&r.quota!==null,reason:result.calculationVersion!==GSISRelief.model?'Legacy calculation model.':r.reason||null}}:{})}));}
 function reliefAdminDetail_(result){
  return {settings:result.settings,weeklyPeriods:result.weeklyPeriods,weeklyLunch:result.weeklyLunch,settingsError:result.settingsError||null,
   calculationVersion:result.calculationVersion,reference:result.reference,
@@ -5405,6 +5409,9 @@ var GSISRosterAllocation = (() => {
     for(let i=0;i<Math.max(aa.length,bb.length,cc.length);i++){const difference=(aa[i]||0)+(bb[i]||0)-(cc[i]||0);if(Math.abs(difference)>EPS)return difference<0;}return false;
   }
   const negateCost=x=>Array.isArray(x)?x.map(v=>-v):-x;
+  // Compare weekly SRE headroom with annual staff utilisation on the same scale.
+  // Historical SRE entitlement remains visible, but never sets a ranking key.
+  const rankingUtilisation=(r,remaining=r.remaining)=>r.sreMode==='long-term'?(Number.isFinite(r.R)&&r.R>0&&Number.isFinite(remaining)?100*(r.R-remaining)/r.R:null):r.annual;
   const preferenceValues=r=>r.dailyRoster?{annualUtilisation:[0,0],alternatives:[0],weeklyRemaining:[0],rotation:[0],subjectMatch:[0],levelMatch:[0]}:({annualUtilisation:[Number.isFinite(r.fairnessBand)?0:1,Number.isFinite(r.fairnessBand)?r.fairnessBand:0],alternatives:[r.alternatives],weeklyRemaining:[-(r.remaining??0)],rotation:[r.rotation],subjectMatch:[r.subjectPenalty||0],levelMatch:[r.levelPenalty||0]});
   const orderedValues=(values,order)=>order.flatMap(id=>values[id]);
   const norm=x=>String(x||'').normalize('NFKC').trim().replace(/\s+/g,' ').toLowerCase();
@@ -5674,7 +5681,7 @@ var GSISRosterAllocation = (() => {
   }
   function ranked(s,ctx,d,period,demands=[],teacherMap,preferences,enabled=ruleToggles(s.systemConfig?.allocationRuleEnabled)){
     const order=preferenceOrder(preferences).filter(id=>enabled[id]),teachers=teacherMap||teacherContext(s,ctx,d),rot=rotation(s,year(d)),rotationValue=id=>rot.indexOf(id)<0?-1:rot.indexOf(id),list=[...teachers.values()].filter(t=>reliefCandidateEligible(t.person)).map(t=>({...eligibility(t,period,[],{demand:demands.find(dem=>dem.period===period)}),alternatives:Array.from({length:t.periodCount},(_,p)=>p).filter(p=>p!==period&&eligibility(t,p).autoEligible).length,rotation:rotationValue(t.id)}));
-    for(const category of [0,1,2,3,4]){const same=list.filter(x=>x.automaticCategory===category),finite=same.filter(x=>Number.isFinite(x.annual)),min=finite.length?Math.min(...finite.map(x=>x.annual)):null;for(const x of same)x.fairnessBand=x.annual===null?Infinity:min!==null&&x.annual-min<=1+EPS?min:x.annual;}
+    for(const category of [0,1,2,3,4]){const same=list.filter(x=>x.automaticCategory===category),finite=same.map(x=>rankingUtilisation(x)).filter(Number.isFinite),min=finite.length?Math.min(...finite):null;for(const x of same){const value=rankingUtilisation(x);x.fairnessBand=value===null?Infinity:min!==null&&value-min<=1+EPS?min:value;}}
     return list.sort((a,b)=>a.automaticCategory-b.automaticCategory||compareCost(srePriority(a),srePriority(b))||compareCost(orderedValues(preferenceValues(a),order),orderedValues(preferenceValues(b),order))||a.staffId.localeCompare(b.staffId)).map((t,i)=>({...t,rank:i+1}));
   }
   /* Manual recommendations share the configured business policy. Eligibility
@@ -5711,8 +5718,8 @@ var GSISRosterAllocation = (() => {
     });
     const loads=rows.filter(r=>r.available).map(r=>r.load).sort((a,b)=>a-b),low=loads.length?loads[Math.floor((loads.length-1)*.35)]:0;
     for(const r of rows){r.suitabilityTier=r.category===4?6:r.repurposedDuty?-1:r.external?0:r.streakViolation?5:r.nearFree&&r.load<=low?1:r.nearFree?2:r.surrounded?4:3;r.tier=r.category===4?6:r.repurposedDuty?-1:r.external?0:r.category+1;r.why=r.category===4?r.reasons.join(' '):r.dailyRoster?'Daily roster, no R%; daily SRE priority':r.repurposedDuty?'Repurpose existing recess duty; no additional R':r.external?'Activated ad hoc relief':r.suitabilityTier===1?'Free within two periods either side; lighter daily load':r.suitabilityTier===2?'Free within two periods either side':r.suitabilityTier===4?'Occupied immediately before and after':r.suitabilityTier===5?'Consecutive workload override':'Standard free-period fit';}
-    const fairness=new Map(),group=r=>r.category+'|'+r.tier+'|'+r.highDailyLoad;for(const r of rows)if(Number.isFinite(r.annual)){const key=group(r);fairness.set(key,Math.min(fairness.get(key)??Infinity,r.annual));}
-    for(const r of rows){const min=fairness.get(group(r))??null;r.fairnessBand=r.annual===null?Infinity:r.annual-min<=1+EPS?min:r.annual;}
+    const fairness=new Map(),group=r=>r.category+'|'+r.tier+'|'+r.highDailyLoad;for(const r of rows)if(Number.isFinite(rankingUtilisation(r,r.remainingWithReplacement))){const key=group(r);fairness.set(key,Math.min(fairness.get(key)??Infinity,rankingUtilisation(r,r.remainingWithReplacement)));}
+    for(const r of rows){const min=fairness.get(group(r))??null,value=rankingUtilisation(r,r.remainingWithReplacement);r.fairnessBand=value===null?Infinity:value-min<=1+EPS?min:value;}
     for(const r of rows)if(r.highDailyLoad)r.why+='; already '+r.load+' work periods today, lower priority within this eligibility group';
     return rows.sort((a,b)=>a.category-b.category||compareCost(srePriority({...a,dailyPeriods:a.load}),srePriority({...b,dailyPeriods:b.load}))||a.tier-b.tier||Number(a.highDailyLoad)-Number(b.highDailyLoad)||compareCost(orderedValues(preferenceValues({...a,remaining:a.remainingWithReplacement}),order),orderedValues(preferenceValues({...b,remaining:b.remainingWithReplacement}),order))||a.suitabilityTier-b.suitabilityTier||a.id.localeCompare(b.id)).map((r,i)=>({...r,rank:i+1}));
   }
@@ -5853,7 +5860,7 @@ var GSISRosterAllocation = (() => {
   function allocationCosts(teachers,candidates,order,demands,day,config){
     const resolve=subjectResolver(day.teachingGroups,config),ids=teachers.map(t=>t.id).sort(),byId=new Map(teachers.map(t=>[t.id,t])),profiles=new Map(teachers.map(t=>{const p=t.teachingProfile;return [t.id,{...p,subjects:[...new Set([...(p.subjects||[]).filter(code=>!p.subjectLessons||!code.startsWith('family:')).map(code=>code.startsWith('family:')?code:resolve({subject:code}).key),...(p.subjectLessons||[]).map(lesson=>resolve(lesson).key)])]}];})),demandProfiles=new Map(demands.map(d=>[d.id,{subject:resolve(d).key,levels:lessonLevels(d,day.formClasses,day.teachingGroups)}]));
     const dailyPriority=teachers.some(t=>t.dailyRoster),priority=r=>dailyPriority?srePriority(r):[];
-    const teacherCost=(t,i)=>[0,...(dailyPriority?[0,t.dailyRoster?i:0,0]:[]),...orderedValues({annualUtilisation:[0,t.dailyRoster?0:t.balance.entitlement>0?100*i/t.balance.entitlement:0],alternatives:[0],weeklyRemaining:[t.dailyRoster?0:i],rotation:[0],subjectMatch:[0],levelMatch:[0]},order),0];
+    const teacherCost=(t,i)=>[0,...(dailyPriority?[0,t.dailyRoster?i:0,0]:[]),...orderedValues({annualUtilisation:[0,t.dailyRoster?0:t.sreMode==='long-term'?(t.balance.R>0?100*i/t.balance.R:0):t.balance.entitlement>0?100*i/t.balance.entitlement:0],alternatives:[0],weeklyRemaining:[t.dailyRoster?0:i],rotation:[0],subjectMatch:[0],levelMatch:[0]},order),0];
     // Policy inputs stay fixed throughout the search; reuse every edge's score
     // across branch flows and local exchanges instead of rebuilding the vectors.
     const edgeScores=new Map(),dutyScores=new Map();

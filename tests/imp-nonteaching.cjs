@@ -18,7 +18,7 @@ function analyse(d){const w=W.analyse(d,t=>T.calculate(t,d.offload));return {w,r
 const d=fixture(),before=analyse(d);d.workload.nonTeachingActivities=[activity()];
 const raw=JSON.stringify(d),after=analyse(d);
 assert.equal(JSON.stringify(d),raw,'calculations must not mutate version-owned activity records');
-assert.equal(after.r.calculationVersion,'whole-week-v5');
+assert.equal(after.r.calculationVersion,'whole-week-v6');
 assert.equal(after.w.totals.Teaching,before.w.totals.Teaching);
 assert.deepEqual(after.r.reference,before.r.reference,'IMP must not change teaching demand, T_avg, or its population');
 assert.equal(after.w.demand.total-before.w.demand.total,8,'four participants add eight weekly man-periods of provision');
@@ -41,7 +41,7 @@ assert.equal(after.r.byTeacher.yanyu.pd,2,'IMP is separate from PLT PD');
 assert.equal(after.r.byTeacher.yanyu.duties,2,'IMP is separate from duties');
 for(const legacy of ['whole-week-v1','whole-week-v2','whole-week-v3']){
  const old=clone(d);old.relief.calculationVersion=legacy;const result=analyse(old).r;
- assert.equal(result.calculationVersion,'whole-week-v5');assert.equal(result.byTeacher.yanyu.Wi,after.r.byTeacher.yanyu.Wi);
+ assert.equal(result.calculationVersion,'whole-week-v6');assert.equal(result.byTeacher.yanyu.Wi,after.r.byTeacher.yanyu.Wi);
  assert.equal(old.relief.calculationVersion,legacy,'read compatibility must not rewrite saved settings');
 }
 const empty=fixture();empty.workload.nonTeachingActivities=[];

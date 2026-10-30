@@ -4,7 +4,7 @@ var GSISRelief=(function(){
  const own=(x,k)=>Object.prototype.hasOwnProperty.call(x,k);
  const record=x=>!!x&&typeof x==='object'&&!Array.isArray(x);
  const nonnegative=x=>typeof x==='number'&&Number.isFinite(x)&&x>=0;
- const model='whole-week-v5';
+ const model='whole-week-v6';
  function defaults(){return {schema:3,calculationVersion:model,mode:'actual',weeklyPeriods:84,fourFifthsFraction:0.8,fajtWeeklyPeriods:65,timetablePeriods:60,siuePercent:150,blocks:{}};}
  function validate(doc,value){
   const keys=Object.keys(defaults());
@@ -25,7 +25,7 @@ var GSISRelief=(function(){
   if(saved==null)return validate(doc,defaults());
   if(!record(saved)||![1,2,3].includes(saved.schema))throw Error('Unknown relief settings schema.');
   if(saved.schema===3){
-   if(![model,'whole-week-v4','whole-week-v3','whole-week-v2','whole-week-v1'].includes(saved.calculationVersion)||!['actual','expected'].includes(saved.mode))throw Error('Unknown relief calculation version.');
+   if(![model,'whole-week-v5','whole-week-v4','whole-week-v3','whole-week-v2','whole-week-v1'].includes(saved.calculationVersion)||!['actual','expected'].includes(saved.mode))throw Error('Unknown relief calculation version.');
    return validate(doc,{...saved,calculationVersion:model,mode:'actual'});
   }
   return validate(doc,{...defaults(),siuePercent:saved.siuePercent===undefined?150:saved.siuePercent,blocks:saved.blocks===undefined?{}:saved.blocks});
@@ -37,6 +37,7 @@ var GSISRelief=(function(){
   const fraction=parts.includes('4/5');
   return parts.some(x=>!known.includes(x))||fajt&&fraction?null:fajt?'FAJT':fraction?'4/5':'Full time';
  }
+ function sre(teacher){const p=teacher.profile||{};return String(p['Employment Modifier']||teacher.employment||'').split(/[,;]/).some(v=>v.trim().toUpperCase()==='SRE')||String(p.Role||teacher.role||'').toUpperCase()==='SRE';}
  function offload(rules,catalogue){
   if(!rules?.eligible)return {OF:null,components:[],reason:'Not eligible for teaching.'};
   const tags=catalogue?.tags||[],components=[];let retained=1,reason=(rules.pending||[]).join('; ');
@@ -64,15 +65,18 @@ var GSISRelief=(function(){
   const reference={weeklyPeriods:settings.weeklyPeriods,fourFifthsFraction:settings.fourFifthsFraction,fajtWeeklyPeriods:settings.fajtWeeklyPeriods,timetablePeriods:settings.timetablePeriods,siuePercent:settings.siuePercent,T_avg,teachingPeriodTotal:demandMissing?null:teachingPeriodTotal,fullTimeTeacherCount,available:T_avg!==null,reason:demandMissing?'Teaching demand is incomplete.':employmentMissing?'Employment category needs correction.':!fullTimeTeacherCount?'No eligible full-time teachers.':null};
   const rows=[...teachers.values()].map(teacher=>{
    const r=sources.get(teacher.id),rules=r?.rules,type=employment(teacher),of=offload(rules,doc.offload),active=r?r.active:teacher.active===true||teacher.active==='Y';
-   const budget=type==='FAJT'?settings.fajtWeeklyPeriods:type==='4/5'?settings.weeklyPeriods*settings.fourFifthsFraction:type==='Full time'?settings.weeklyPeriods:null;
-   const factor=type==='FAJT'?1:type?settings.timetablePeriods/settings.weeklyPeriods:null;
-   const out={teacher,id:teacher.id,name:teacher.name||teacher.id,active,eligible:!!rules?.eligible,employment:type,OF:of.OF,offloadComponents:of.components,offloadPercent:of.OF===null?null:of.OF*100,retained:null,actualTeaching:r?.Teaching??null,teachingVerified:!!r&&!r.incomplete&&!teacher.orphan&&nonnegative(r.Teaching),teachingUsed:r?.Teaching??null,teachingBasis:'Actual teaching',FTT:r?.FTT??null,pd:r?.pd??null,duties:r?.duties??null,otherNonTeaching:r?.otherNonTeaching??null,nonTeachingActivities:r?.nonTeachingActivities||[],weeklyBudget:budget,timetableFactor:factor,Wi:null,siuePeriods:null,offloadAllowance:null,rawQuota:null,normalQuota:null,periodCap:rules?.cap??null,capConfigured:rules?.cap!=null||(rules?.matched||[]).some(r=>r.periods!==''&&r.periods!=null),capBasis:rules?.capBasis||'teaching',capNonTeachingPeriods:r?.capNonTeachingPeriods||null,capWorkload:null,capHeadroom:null,capApplied:false,quota:null,blocks:settings.blocks[teacher.id]||0,remaining:null,reason:'',comparison:null};
+   // SRE changes the quota basis, not the existing school-average denominator.
+   const isSre=sre(teacher),hasTeaching=!!r&&!r.incomplete&&!teacher.orphan&&nonnegative(r.Teaching),longTerm=isSre&&hasTeaching&&r.Teaching>0,fajtBasis=type==='FAJT'||longTerm;
+   const budget=isSre&&!longTerm?null:fajtBasis?settings.fajtWeeklyPeriods:type==='4/5'?settings.weeklyPeriods*settings.fourFifthsFraction:type==='Full time'?settings.weeklyPeriods:null;
+   const factor=isSre&&!longTerm?null:fajtBasis?1:type?settings.timetablePeriods/settings.weeklyPeriods:null;
+   const out={teacher,id:teacher.id,name:teacher.name||teacher.id,active,eligible:!!rules?.eligible,employment:type,...(isSre?{reliefBasis:longTerm?'long-term':hasTeaching?'daily':'unknown',basisLabel:longTerm?'SRE with timetable: FAJT basis':null}:{}),OF:of.OF,offloadComponents:of.components,offloadPercent:of.OF===null?null:of.OF*100,retained:null,actualTeaching:r?.Teaching??null,teachingVerified:!!r&&!r.incomplete&&!teacher.orphan&&nonnegative(r.Teaching),teachingUsed:r?.Teaching??null,teachingBasis:'Actual teaching',FTT:r?.FTT??null,pd:r?.pd??null,duties:r?.duties??null,otherNonTeaching:r?.otherNonTeaching??null,nonTeachingActivities:r?.nonTeachingActivities||[],weeklyBudget:budget,timetableFactor:factor,Wi:null,siuePeriods:null,offloadAllowance:null,rawQuota:null,normalQuota:null,periodCap:rules?.cap??null,capConfigured:rules?.cap!=null||(rules?.matched||[]).some(r=>r.periods!==''&&r.periods!=null),capBasis:rules?.capBasis||'teaching',capNonTeachingPeriods:r?.capNonTeachingPeriods||null,capWorkload:null,capHeadroom:null,capApplied:false,quota:null,blocks:settings.blocks[teacher.id]||0,remaining:null,reason:'',comparison:null};
    const missing=reason=>{out.reason=reason;return out;};
    if(settingsError)return missing('Relief settings need correction: '+settingsError);
    if(teacher.orphan)return missing('Teacher record is missing.');
    if(!active)return missing('Inactive teacher.');
    if(!r||!rules?.eligible)return missing('Not eligible for relief.');
    if(!type)return missing('Employment category needs correction.');
+   if(isSre&&hasTeaching&&!longTerm)return missing('Daily roster, no R%');
    if(T_avg===null)return missing(reference.reason);
    if(of.reason||of.OF===null)return missing(of.reason||'Offload rate needs configuration.');
    if(r.incomplete||r.capIncomplete||![r.Teaching,r.FTT,r.pd,r.duties,r.otherNonTeaching].every(nonnegative))return missing('Workload data is incomplete.');
