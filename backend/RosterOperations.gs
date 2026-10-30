@@ -38,6 +38,9 @@ function rosterOperationsState_(skipTransport=false){
   phase='operations-schema';const state=GSISRosterOperations.validateState(rosterOperationsUnpackPlans_(typeof rosterAllocationAuditUnpack_==='function'?rosterAllocationAuditUnpack_(value):value));return skipTransport!==true&&typeof rosterNotificationOverlay_==='function'?rosterNotificationOverlay_(state):state;
  }catch(e){if(e.status){e.failurePhase=e.failurePhase||phase;throw e;}throw Object.assign(Error('Relief records could not be read.'),{status:503,failurePhase:e.failurePhase||phase});}
 }
+// Save ceiling for Roster operations.json. Admin may raise it in Script Properties
+// (ROSTER_OPERATIONS_MAX_CHARS) up to 24,000,000; anything else keeps 16,000,000.
+function rosterOperationsMaxChars_(){let raw=null;try{raw=props_().getProperty('ROSTER_OPERATIONS_MAX_CHARS');}catch(ignore){}const n=Number(raw);return raw&&Number.isInteger(n)&&n>=16000000&&n<=24000000?n:16000000;}
 function rosterOperationsCommit_(state,intakeFenceDates=null,intakeFencePeers=false,beforeWrite=null){if(typeof rosterEdgeAssertLegacyWrite_==='function')rosterEdgeAssertLegacyWrite_();gsisRequireBackendRole_('roster');
  if(typeof rosterAllocationAuditCapture_==='function')rosterAllocationAuditCapture_(state);
  const packed=rosterOperationsPackPlans_(state);let data=JSON.stringify(typeof rosterAllocationAuditPack_==='function'?rosterAllocationAuditPack_(packed):packed);
@@ -47,7 +50,7 @@ function rosterOperationsCommit_(state,intakeFenceDates=null,intakeFencePeers=fa
  // Existing Google document only: bounded emergency headroom preserves every
  // record while the retained intake can finish. The 12M derived-cache fallback
  // above stays first; no new storage format, authority or automatic pruning.
- if(data.length>16000000)throw Object.assign(Error('Relief records are full. Ask Admin to review storage capacity before retrying this same report.'),{status:507,code:'ROSTER_STORAGE_CAPACITY'});
+ if(data.length>rosterOperationsMaxChars_())throw Object.assign(Error('Relief records are full. Ask Admin to review storage capacity before retrying this same report.'),{status:507,code:'ROSTER_STORAGE_CAPACITY'});
  const batchTicket=typeof rosterTimetableBatchCommitBegin_==='function'?rosterTimetableBatchCommitBegin_(state):null,venueTicket=typeof rosterVenuesBegin_==='function'?rosterVenuesBegin_('operations',state):null;
  const write=()=>{
  const stored=props_().getProperty('ROSTER_OPERATIONS_FILE'),id=stored||rosterFindFile_(ROSTER_DATA,'Roster operations.json');
@@ -216,7 +219,7 @@ function rosterOperationsContext_(req,c,state,providedIndex){
  if(p.operation==='sendDailyEmploymentReport'&&state.dailyEmploymentSnapshots?.some(r=>r.date===requested))return recordContext;
  if(p.operation==='scheduledRoster'&&(state.massPublications?.[today]||state.staplerPlans.some(r=>r.date===today&&r.published))&&minute>=GSISRosterOperations.clock(state.dailyEmploymentSettings.time)&&!state.dailyEmploymentAutomatic?.[today])dates.push(today);
  // These views use durable records, not a rebuilt school-wide timetable or quota.
- if(['history','acknowledge','audit','prunePreview','accounting','saveRecessSettings'].includes(p.operation)||p.operation==='read'&&['duties','mine','prune','notificationReadiness'].includes(p.view))return {user,people:c.rosterPeople.map(p=>({id:String(p.id),name:String(p.name||''),active:p.active===true,mobile:String(p.mobile||'')})),days:{},timetableEntries:rosterOperationsRecordOnly_(p)?[]:rosterIndex_().entries,today,minute,now:now.getTime(),iso:now.toISOString(),uuid:()=>Utilities.getUuid(),notificationsConfigured:p.notificationsReady===true,adminRecipients:[],smcIds:c.rosterSMCIds||[]};
+ if(['history','acknowledge','audit','prunePreview','accounting','saveRecessSettings'].includes(p.operation)||p.operation==='read'&&['duties','mine','prune','notificationReadiness'].includes(p.view))return {user,storageMaxChars:p.operation==='prunePreview'?rosterOperationsMaxChars_():undefined,people:c.rosterPeople.map(p=>({id:String(p.id),name:String(p.name||''),active:p.active===true,mobile:String(p.mobile||'')})),days:{},timetableEntries:rosterOperationsRecordOnly_(p)?[]:rosterIndex_().entries,today,minute,now:now.getTime(),iso:now.toISOString(),uuid:()=>Utilities.getUuid(),notificationsConfigured:p.notificationsReady===true,adminRecipients:[],smcIds:c.rosterSMCIds||[]};
  if(p.operation==='saveRecess')dates.push(...GSISRosterOperations.dates(p));
  if(p.operation==='moveStapler')dates.push(GSISRosterOperations.date(p.newDate));
  if(p.operation==='saveAbsence'&&!p.id)dates.push(...GSISRosterOperations.absenceDates({...p,date:requested},recordContext));
