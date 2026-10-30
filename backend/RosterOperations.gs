@@ -40,7 +40,7 @@ function rosterOperationsState_(skipTransport=false){
 }
 // Save ceiling for Roster operations.json. Admin may raise it in Script Properties
 // (ROSTER_OPERATIONS_MAX_CHARS) up to 24,000,000; anything else keeps 16,000,000.
-function rosterOperationsMaxChars_(){const raw=props_().getProperty('ROSTER_OPERATIONS_MAX_CHARS'),n=Number(raw);return raw&&Number.isInteger(n)&&n>=16000000&&n<=24000000?n:16000000;}
+function rosterOperationsMaxChars_(){let raw=null;try{raw=props_().getProperty('ROSTER_OPERATIONS_MAX_CHARS');}catch(ignore){}const n=Number(raw);return raw&&Number.isInteger(n)&&n>=16000000&&n<=24000000?n:16000000;}
 function rosterOperationsCommit_(state,intakeFenceDates=null,intakeFencePeers=false,beforeWrite=null){if(typeof rosterEdgeAssertLegacyWrite_==='function')rosterEdgeAssertLegacyWrite_();gsisRequireBackendRole_('roster');
  if(typeof rosterAllocationAuditCapture_==='function')rosterAllocationAuditCapture_(state);
  const packed=rosterOperationsPackPlans_(state);let data=JSON.stringify(typeof rosterAllocationAuditPack_==='function'?rosterAllocationAuditPack_(packed):packed);
