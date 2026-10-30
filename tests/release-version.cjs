@@ -17,7 +17,7 @@ for(const folder of Object.values(spec.frontends)){
  assert.equal(read(folder+'/gsis-version.js'),read('shared/release-notice.js'),folder+' notice parity');
 }
 async function notice(body,headers={}){
- const dom=new JSDOM('<meta name="gsis-version" content="'+version+'"><body><main>usable</main>',{url:'https://school.invalid',runScripts:'outside-only'});
+ const dom=new JSDOM('<meta name="gsis-version" content="'+'0.9.9b'+'"><body><main>usable</main>',{url:'https://school.invalid',runScripts:'outside-only'});
  dom.window.fetch=async()=>new Response(JSON.stringify(body),{headers:{'content-type':'application/json',...headers}});
  dom.window.eval(read('shared/release-notice.js'));
  const response=await dom.window.fetch('/api/read');
@@ -36,7 +36,7 @@ async function notice(body,headers={}){
  const doc=await notice({ok:true,backendVersion:'0.9.9c',data:{revision:4}});
  assert.equal(doc.querySelector('#gsis-version-notice')?.textContent,'This page is v0.9.9b; the server is v0.9.9c. Press Ctrl+Shift+R to refresh.');
  assert.equal(doc.querySelector('main').textContent,'usable');
- assert(!await notice({ok:true,backendVersion:version}).then(d=>d.querySelector('#gsis-version-notice')));
+ assert(!await notice({ok:true,backendVersion:'0.9.9b'}).then(d=>d.querySelector('#gsis-version-notice')));
  assert(!await notice({version:'0.9.9c'}).then(d=>d.querySelector('#gsis-version-notice')),'business version is not a release');
  assert(!await notice({backendVersion:'<script>bad</script>'}).then(d=>d.querySelector('#gsis-version-notice')));
  console.log('PASS release label parity and nonblocking mismatch notice');

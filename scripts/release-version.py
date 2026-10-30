@@ -49,7 +49,7 @@ def stamp(root=ROOT):
     for name in sorted(set(targets)):
         path = root / name
         if not path.is_file(): continue
-        text = pattern.sub(version, path.read_text())
+        text = ''.join(line if line.lstrip().startswith('//') else pattern.sub(version, line) for line in path.read_text().splitlines(keepends=True))
         if path.suffix == '.html':
             text = re.sub(r'<meta name="gsis-version" content="[^"]*">', '', text)
             text = re.sub(r'<script src="[^"]*gsis-version\.js[^\"]*"></script>', '', text)
