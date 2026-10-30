@@ -4,6 +4,7 @@ on:
     branches:
       - codex/roster-operations-split-files
       - codex/roster-sre-fajt-r-calc
+      - codex/release-version-phase2
   workflow_dispatch:
 permissions:
   contents: read
@@ -35,6 +36,16 @@ jobs:
           echo "GSIS_BROWSER_EXECUTABLE=$BROWSER" >> "$GITHUB_ENV"
       - name: Regenerate all 18 components
         run: npm run build
+      - name: Retain generated changes for exact source parity
+        run: |
+          python3 - <<'PY'
+          import base64, subprocess
+          data = base64.b64encode(subprocess.check_output(['git','diff','--no-ext-diff','--no-color','--text','--unified=3'])).decode()
+          print('GSIS_GENERATED_DIFF_BEGIN')
+          for i in range(0,len(data),12000):
+              print('GSIS_GENERATED_DIFF_CHUNK '+data[i:i+12000])
+          print('GSIS_GENERATED_DIFF_END')
+          PY
       - name: Check browser fixture portability
         run: |
           node tests/roster084-private-link-reuse-browser.cjs

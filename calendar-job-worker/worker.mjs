@@ -7,6 +7,7 @@ const PURPOSE='calendar-job-gateway-v1';
 
 export default {
  async fetch(request,env){
+  if(request.method==='GET'&&new URL(request.url).pathname==='/health')return Response.json({ok:true,version:GSIS_BUILD_LABEL},{headers:{'Cache-Control':'no-store'}});
   try{
    if(new URL(request.url).pathname==='/changes'&&request.method==='POST')return await calendarChangesRequest(request,env);
    if(new URL(request.url).pathname!=='/commands'||request.method!=='POST')return json({ok:false,error:'Not found.'},404);

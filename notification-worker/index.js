@@ -126,6 +126,7 @@ export default {
   }else settleMessages(batch,supported,'ack');
  },
  async fetch(req,env){
+  if(req.method==='GET'&&new URL(req.url).pathname==='/health')return Response.json({ok:true,version:GSIS_BUILD_LABEL},{headers:{'Cache-Control':'no-store'}});
   env=rosterRecoveryEnvironment(env);
   if(new URL(req.url).pathname!=='/dispatch'||req.method!=='POST')return new Response('Not found',{status:404,headers:{'Cache-Control':'no-store'}});
   try{writable(env);}catch{return Response.json({ok:false,error:'Background work is paused for recovery.'},{status:503,headers:{'Cache-Control':'no-store'}});}

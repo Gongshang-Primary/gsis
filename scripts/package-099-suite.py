@@ -15,6 +15,8 @@ import zipfile
 
 ROOT = Path(__file__).resolve().parents[1]
 VERSION = '0.9.9'
+import runpy
+build_labels = runpy.run_path(str(ROOT / 'scripts/build-label.py'))
 # The repository starts at the 0.9.9 release as deployed on 28 Oct 2026.
 # Earlier history (0.9.8q, 50c977d) was not imported into GitHub.
 BASELINE = '2efd6e003fa9ee3846cf590d07902a22309861ff'
@@ -279,6 +281,9 @@ def build(root):
 
 
 def package(root, output, preview=False, evidence_dir=None):
+    build_label = build_labels['current_label'](root)
+    if not preview:
+        build_labels['check_bundle_label'](root, build_label)
     settings = json.loads(read_required(root, 'package.json', 'release metadata'))
     assert settings['gsisRelease'] == VERSION, 'Package release is not 0.9.9'
     assert set(settings['gsisComponentVersions'].values()) == {VERSION}, 'Production component labels are not harmonised'
@@ -291,14 +296,14 @@ def package(root, output, preview=False, evidence_dir=None):
     dirty = bool(git(root, 'status', '--porcelain').strip())
     if not preview:
         assert not dirty, 'Commit every source change before final packaging'
-        assert git(root, 'rev-parse', 'refs/tags/v' + VERSION + '^{commit}').decode().strip() == commit, '0.9.9 tag does not identify HEAD'
+        assert git(root, 'rev-parse', 'refs/tags/v' + build_label + '^{commit}').decode().strip() == commit, '0.9.9 tag does not identify HEAD'
     names = sorted(set(tracked + (untracked if preview else [])))
     current = {name for name in names if (root / name).is_file()}
     assert not (set(tracked) - current), 'Tracked source deletion must be committed before packaging'
     review, index = source_files(root, sorted(current))
     metadata = {'schema': 1, 'release': VERSION, 'sourceCommit': commit,
                 'sourceState': 'working-tree-preview' if dirty or preview else 'committed',
-                'baseline': BASELINE_LABEL, 'baselineCommit': BASELINE, 'componentVersions': settings['gsisComponentVersions'], 'tag': None if dirty or preview else 'v' + VERSION,
+                'baseline': BASELINE_LABEL, 'baselineCommit': BASELINE, 'componentVersions': settings['gsisComponentVersions'], 'buildLabel': build_label, 'tag': None if dirty or preview else 'v' + build_label,
                 'productionDeployed': False, 'productionAuthorities': PRODUCTION_AUTHORITIES,
                 'authorityCutoverPerformed': False, 'historyKind': 'current-source-with-baseline-diff'}
     review['SOURCE_INDEX.json'] = json_bytes(index)
@@ -330,10 +335,16 @@ def package(root, output, preview=False, evidence_dir=None):
     suite['REVIEW_SOURCE.json'] = json_bytes({'file': review_name, 'sha256': digest(review_path.read_bytes()),
                                            'bytes': review_path.stat().st_size,
                                            'description': 'Separate lean source and second-opinion evidence; not a Pages upload'})
+    suite['COMMIT.txt'] = (build_label + '\n' + commit + '\n').encode()
+    suite['DEPLOY_STEPS.md'] = (f'# Deploy GSiS v{build_label}\n\nInstall the matched production components using START_HERE.html. Keep existing URLs, settings and credentials.\n\nDeployment and live verification are separate owner actions.\n').encode()
     suite_path = output / f'GSiS_v{VERSION}_Full_Suite.zip'
     write_archive(suite_path, suite, {**metadata, 'kind': 'full-suite',
                                     'frontends': list(FRONTENDS), 'backends': list(BACKENDS),
                                     'optionalWorkers': list(WORKERS), 'separatePackages': separate})
+    (output / 'COMMIT.txt').write_bytes(suite['COMMIT.txt'])
+    (output / 'DEPLOY_STEPS.md').write_bytes(suite['DEPLOY_STEPS.md'])
+    if not preview:
+        build_labels['record_bundle_label'](root, build_label)
     return {'suite': {'path': str(suite_path), 'bytes': suite_path.stat().st_size, 'sha256': digest(suite_path.read_bytes())},
             'review': {'path': str(review_path), 'bytes': review_path.stat().st_size, 'sha256': digest(review_path.read_bytes())},
             'sourceIncludedCount': len(index['included']), 'sourceOmittedCount': len(index['omitted']),
@@ -347,4 +358,7 @@ if __name__ == '__main__':
     parser.add_argument('--build-only', action='store_true')
     parser.add_argument('--preview', action='store_true')
     args = parser.parse_args()
-    print(json.dumps(build(ROOT) if args.build_only else package(ROOT, args.output_dir.resolve(), args.preview, args.evidence_dir), indent=2))
+    output = args.output_dir.resolve()
+    if not args.preview and not args.build_only:
+        output = output / ('GSiS_v' + build_labels['current_label'](ROOT))
+    print(json.dumps(build(ROOT) if args.build_only else package(ROOT, output, args.preview, args.evidence_dir), indent=2))

@@ -8953,6 +8953,7 @@ function constantTimeEqual_(a, b) {
 }
 
 function jsonOutput_(obj) {
+  obj = gsisBuildLabelPayload_(obj);
   return ContentService.createTextOutput(JSON.stringify(obj))
     .setMimeType(ContentService.MimeType.JSON);
 }

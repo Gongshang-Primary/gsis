@@ -18,6 +18,7 @@ root=Path(__file__).resolve().parents[1]
 import runpy
 installation_manifest=runpy.run_path(str(root/'scripts/installation-manifest.py'))['installation_manifest']
 import json
+runpy.run_path(str(root/'scripts/build-label.py'))['stamp'](root)
 release=json.loads((root/'package.json').read_text())
 version=release['gsisRelease']
 # One visible build label (release plus deploy letter) on every frontend header and

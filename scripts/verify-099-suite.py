@@ -41,6 +41,15 @@ def verify_source_inventory(root, index, preview):
     return 'complete-trusted-git-inventory'
 
 
+def trusted_source_bytes(root, name, metadata):
+    """The bundle ledger may advance after success; verify its archived Git value."""
+    if name == p.build_labels['LEDGER'] and metadata.get('sourceState') == 'committed':
+        probe = subprocess.run(['git', 'rev-parse', '--show-toplevel'], cwd=root, capture_output=True, text=True)
+        if not probe.returncode and Path(probe.stdout.strip()).resolve() == root.resolve():
+            return p.git(root, 'show', metadata['sourceCommit'] + ':' + name)
+    return p.read_required(root, name, 'trusted source')
+
+
 def verify_source_provenance(root, metadata, review):
     """A trusted checkout can establish commit/tag/diff claims; extracted source cannot."""
     probe = subprocess.run(['git', 'rev-parse', '--show-toplevel'], cwd=root, capture_output=True, text=True)
@@ -51,9 +60,17 @@ def verify_source_provenance(root, metadata, review):
     p.git(root, 'merge-base', '--is-ancestor', p.BASELINE, head)
     committed = metadata['sourceState'] == 'committed'
     if committed:
-        assert not p.git(root, 'status', '--porcelain').strip(), 'Committed source claim has a dirty checkout'
-        assert metadata['tag'] == 'v' + p.VERSION, 'Committed release tag claim differs'
-        assert p.git(root, 'rev-parse', 'refs/tags/v' + p.VERSION + '^{commit}').decode().strip() == head, 'Release tag differs from trusted HEAD'
+        dirty = p.git(root, 'status', '--porcelain').decode().splitlines()
+        label = metadata.get('buildLabel', p.VERSION)
+        ledger = p.build_labels['LEDGER']
+        if dirty:
+            assert dirty == [' M ' + ledger], 'Committed source claim has a dirty checkout'
+            path = root / ledger
+            assert path.is_file() and not path.is_symlink() and path.read_text().strip() == label, 'Bundle ledger differs'
+            prior = trusted_source_bytes(root, ledger, metadata).decode().strip()
+            assert prior != label, 'Bundle ledger did not advance'
+        assert metadata['tag'] == 'v' + label, 'Committed release tag claim differs'
+        assert p.git(root, 'rev-parse', 'refs/tags/v' + label + '^{commit}').decode().strip() == head, 'Release tag differs from trusted HEAD'
     else:
         assert metadata['sourceState'] == 'working-tree-preview' and metadata['tag'] is None, 'Unexpected preview provenance'
     expected = p.git(root, 'diff', '--binary', p.BASELINE, *([head] if committed else []))
@@ -163,6 +180,12 @@ def verify_support_files(suite, root, component_names):
     for name, data in support.items():
         assert suite.read(name) == data, 'Installation guidance/configuration differs from trusted source: ' + name
     expected_inventory = set(component_names) | set(support) | {'REVIEW_SOURCE.json', 'MANIFEST.json', 'Timetable_Preparation/' + p.PREPARATION_NAME}
+    metadata = json.loads(suite.read('MANIFEST.json'))
+    if metadata.get('buildLabel'):
+        label, commit = metadata['buildLabel'], metadata['sourceCommit']
+        expected_inventory.update({'COMMIT.txt', 'DEPLOY_STEPS.md'})
+        assert suite.read('COMMIT.txt') == (label + '\n' + commit + '\n').encode(), 'Bundle commit label differs'
+        assert suite.read('DEPLOY_STEPS.md').startswith(('# Deploy GSiS v' + label + '\n').encode()), 'Deployment guide label differs'
     assert set(suite.namelist()) == expected_inventory, 'Installation/support inventory differs'
 
 
@@ -171,6 +194,7 @@ def verify(suite_path, review_path, source_root, preview=False):
     review_meta = p.verify_archive(review_path)
     for field in ['release', 'sourceCommit', 'sourceState', 'baselineCommit', 'productionDeployed', 'productionAuthorities', 'authorityCutoverPerformed', 'componentVersions', 'tag', 'baseline']:
         assert suite_meta[field] == review_meta[field], 'Suite/review provenance differs: ' + field
+    assert suite_meta.get('buildLabel') == review_meta.get('buildLabel'), 'Suite/review build labels differ'
     assert suite_meta['release'] == p.VERSION and suite_meta['baselineCommit'] == p.BASELINE
     assert suite_meta['productionAuthorities'] == p.PRODUCTION_AUTHORITIES
     expected_keys = {name.lower() + 'Frontend' for name in p.FRONTENDS} | {name.lower() + 'Backend' for name in p.BACKENDS} | {'notificationWorker', 'operationsWorker', 'calendarJobWorker'}
@@ -193,7 +217,7 @@ def verify(suite_path, review_path, source_root, preview=False):
             data = review.read('source/' + name)
             assert len(data) == item['bytes'] and p.digest(data) == item['sha256'], 'Source index mismatch: ' + name
             assert p.source_exclusion_reason(name) is None, 'Private or obsolete content was included: ' + name
-            assert data == p.read_required(source_root, name, 'trusted source'), 'Source differs from checkout: ' + name
+            assert data == trusted_source_bytes(source_root, name, suite_meta), 'Source differs from checkout: ' + name
         for name, item in index['omitted'].items():
             assert p.source_exclusion_reason(name) == item['reason'], 'Unexplained source omission: ' + name
         required = {'package.json', 'package-lock.json', 'scripts/build-release.py',

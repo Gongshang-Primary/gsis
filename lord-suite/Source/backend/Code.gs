@@ -2615,6 +2615,7 @@ function padNumber_(value, width) {
 }
 
 function jsonResponse_(payload) {
+  payload = gsisBuildLabelPayload_(payload);
   return ContentService
     .createTextOutput(JSON.stringify(payload))
     .setMimeType(ContentService.MimeType.JSON);
