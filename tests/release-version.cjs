@@ -21,6 +21,7 @@ for(const folder of Object.values(spec.frontends)){
 }
 const externalPage=read('roster-update/public/external.html');
 assert(externalPage.indexOf('/gsis-version.js')<externalPage.indexOf('src="external.js'),'private timetable installs the notice before its immediate API read');
+assert(externalPage.indexOf('/gsis-version.js')<externalPage.indexOf('rel="stylesheet"'),'a delayed stylesheet cannot block the notice or private API startup');
 async function notice(body,headers={}){
  const dom=new JSDOM('<meta name="gsis-version" content="'+'0.9.9b'+'"><body><main>usable</main>',{url:'https://school.invalid',runScripts:'outside-only'});
  dom.window.fetch=async()=>new Response(JSON.stringify(body),{headers:{'content-type':'application/json',...headers}});
