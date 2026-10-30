@@ -37,3 +37,5 @@ Model: Codex. All 18 component outputs now build as 0.9.9b. The source VERSION s
 Numeric npm metadata, workbook schemas, historical release documentation and the separately versioned shadow timetable preparation package remain at their own existing versions. Final packaging requires the next letter, places COMMIT.txt and DEPLOY_STEPS.md inside and beside the bundle, and advances release/LAST_BUNDLE_VERSION only after successful archive writes. Preview and component builds may repeat.
 
 Verified locally: full 18-component build; page/header/asset parity; optional Worker health; mismatch/equal/invalid response fixtures; header-tamper detection; repeated/skipped letter rejection and z owner gate. Windows packaging tests cannot create the symlink fixture; complete validation runs in Linux CI. Exact final head and CI are recorded in the branch handoff after completion.
+
+Browser correction: the first CI run caught the new script loading before the private page referrer policy. The shared script now loads at the end of head after policy meta tags; the unchanged private-link test passes locally.

@@ -56,7 +56,9 @@ def stamp(root=ROOT):
             folder = next(root / f for f in spec['frontends'].values() if path.is_relative_to(root / f))
             import os
             notice_path = os.path.relpath(folder / 'gsis-version.js', path.parent).replace('\\', '/')
-            text = re.sub(r'(<head\b[^>]*>)', lambda m: m[1] + '<meta name="gsis-version" content="' + version + '"><script src="' + notice_path + '?v=' + version + '"></script>', text, count=1, flags=re.I)
+            text = re.sub(r'(<head\b[^>]*>)', lambda m: m[1] + '<meta name="gsis-version" content="' + version + '">', text, count=1, flags=re.I)
+            # Referrer and CSP meta policies must be parsed before this request.
+            text = text.replace('</head>', '<script src="' + notice_path + '?v=' + version + '"></script></head>', 1)
             def asset(m):
                 value = m[2]
                 if re.match(r'^(?:[a-z]+:|//|#|data:)', value, re.I): return m[0]
