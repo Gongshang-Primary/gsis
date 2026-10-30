@@ -1337,7 +1337,7 @@ const next=stapler().effectiveDay(plan,ctx.baselineDays?.[d]||ctx.days[d]);for(c
    if(effective.some(a=>a.requestId===request.id&&a.demandId===lesson.id&&!a.remove&&!a.noRelief))continue;
    const original=s.assignments.filter(a=>a.requestId===request.id&&a.demandId===lesson.id&&!a.remove&&!a.noRelief).at(-1);
    if(!original)continue;
-   const removal=effective.find(a=>a.remove&&a.replaces===original.id);
+   const removal=s.assignments.find(a=>a.remove&&a.replaces===original.id&&['draft','published','completed'].includes(a.status));
    if(!removal&&original.status!=='cancelled')continue;
    rows.push({...lesson,releaseToken:JSON.stringify([lesson.id,original.id,removal?.id||original.cancelledAt||original.version||original.status])});
   }
@@ -1347,9 +1347,17 @@ const next=stapler().effectiveDay(plan,ctx.baselineDays?.[d]||ctx.days[d]);for(c
   let queued=0;
   for(const request of s.requests.filter(r=>r.date===d&&(!selectedId||[r.staffId,r.recipientId].includes(selectedId)))){
    const released=releasedPeerLessons(s,request);if(!released.length)continue;
+   const currentTokens=new Set(released.map(row=>row.releaseToken));
    for(const recipientId of new Set([request.staffId,request.recipientId])){
     if(!ctx.people.some(person=>person.id===recipientId))continue;
-    const previous=new Set(s.outbox.filter(j=>j.kind==='mutual_override'&&j.recipientId===recipientId&&j.data?.peerRelease===true&&j.data?.peerRequestIds?.includes(request.id)&&j.status!=='cancelled').flatMap(j=>j.data.peerReleaseTokens||[]));
+    const jobs=s.outbox.filter(j=>j.kind==='mutual_override'&&j.recipientId===recipientId&&j.data?.peerRelease===true&&j.data?.peerRequestIds?.includes(request.id));
+    for(const job of jobs){
+     const status=dailyDeliveryState(job);if(!['failed','cancelled','blocked'].includes(status)||!job.data.peerReleaseTokens?.length||!job.data.peerReleaseTokens.every(token=>currentTokens.has(token)))continue;
+     allocation().addAudit(s,ctx,'retryPeerReleaseNotification',{date:d,notificationId:job.id,previousStatus:status,previousError:job.error||'',previousProviderError:copy(job.providerError||null)});
+     job.status='queued';job.error='';job.retryable=true;job.expiresAt=expiry(ctx,d);job.notificationIntentRevision=(job.notificationIntentRevision||0)+1;job.notificationIntentAt=ctx.iso;
+     for(const key of ['providerError','deliveryStatus','nextAttemptAt','claimId','claimExpiresAt','preparedAt','holdReason','nextEligibleAt'])delete job[key];queued++;
+    }
+    const previous=new Set(jobs.filter(j=>!['failed','cancelled','blocked'].includes(dailyDeliveryState(j))).flatMap(j=>j.data.peerReleaseTokens||[]));
     const lessons=released.filter(row=>!previous.has(row.releaseToken));if(!lessons.length)continue;
     const tokens=lessons.map(row=>row.releaseToken),before=s.outbox.length;
     queue(s,ctx,'mutual_override',recipientId,d,{templateKey:'mutual_override',peerRelease:true,peerRequestIds:[request.id],peerReleasedDemandIds:lessons.map(row=>row.id),peerReleaseTokens:tokens,summary:'Your peer relief arrangement has been released. Review the updated timetable in Roster.'},null,'peer-release:'+request.id+':'+recipientId+':'+JSON.stringify(tokens));
