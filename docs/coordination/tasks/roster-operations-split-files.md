@@ -62,3 +62,7 @@ Local verification: ten fake-Drive cases, the UI retry/Calendar-independence che
 Rollback: use Admin Return to one file only when the assembled state fits the configured per-file ceiling. Earlier files remain retained. Failed pre-manifest attempts may leave unreferenced parts; no automated historical-record pruning is included.
 
 Windows verification note: the runtime and canonical builds pass. The packaging security test that creates a file symlink cannot run under this Windows account (WinError 1314, required privilege not held). Its assertion is retained. No full-green claim is made until every required check runs in a suitable environment.
+
+## Linux verification
+
+A branch-scoped GitHub Actions job runs the complete existing suite on Linux with pinned official checkout/setup actions, read-only repository permissions, no deployment secrets and the locked Playwright browser. It covers these two task branches only. This avoids changing or skipping the Windows-blocked symlink security test. CI results remain pending until the run completes.
