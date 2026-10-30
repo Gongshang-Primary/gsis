@@ -24,9 +24,14 @@ Same with `5_gsis-operations_worker.js`.
 ## 5b. Deploy frontend (Cloudflare Pages, the Deploy site)
 Workers & Pages → the Deploy Pages project → Create deployment → upload `6_Deploy_Frontend.zip` → Deploy to production.
 
-## 5c. HAL tag (after 1 to 5b, in this order)
-1. Deploy → Teaching rules → Add rule: name HAL, source Staff tag, match HAL, 30% → Save.
-2. Only then add "HAL" to the staff member's Employment Modifier (e.g. "HAL" or "Full time, HAL").
+## 5c. HAL tag (after 1 to 5b, in this order; Admin, in the Deploy site)
+1. Open the Deploy version you normally publish → HR Terms tab → in the "Employment Modifier" box, add a new line `HAL` → click outside the box.
+2. Offload tab → Add rule → a new row appears. Fill it in:
+   Group / tag: `HAL` · Match field: `Staff tag` · Matching value: `HAL` (pick from the list) · Offload %: `30` · leave the rest blank.
+   (Copy the existing BT row: it is the same shape with 20%.)
+3. Teachers tab → the teacher → Employment Modifier → add `HAL` (alone, or alongside an existing value).
+4. Save and publish the version as you normally do, so Roster sees it.
+Check: the teacher's Details show offload 20% SH and 30% HAL stacking, (1−0.2)×(1−0.3).
 Never add HAL to anyone before this deploy: the old code cannot read it and would blank R for all staff.
 
 ## 5d. Storage cap (Roster backend, after step 1)
