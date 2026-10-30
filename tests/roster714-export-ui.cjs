@@ -28,6 +28,15 @@ const assert=require('node:assert/strict'),fs=require('node:fs'),{JSDOM}=require
   for(const name of ['Alice Teacher','Bob Colleague','Charlie Busy','Dora Free'])assert(fullXml.includes(name),name+' included with no filter');
   assert.match(fullXml,/Dora Free/);assert.match(fullXml,/Local snapshot/);assert.match(fullXml,/not saved/);assert.doesNotMatch(reliefXml,/Bob Colleague|Charlie Busy/);assert.match(reliefXml,/Alice Teacher/);assert.match(reliefXml,/Dora Free/);assert.match(reliefXml,/not saved/);
   assert.match(downloads[0].filename,/Relief local snapshot/);assert.equal(downloads[1].filename,'GSiS Relief 2026-10-14.xlsx');assert.deepEqual(errors,[]);
+  const classZip=await JSZip.loadAsync(await downloads[2].blob.arrayBuffer()),classXml=await classZip.file('xl/worksheets/sheet1.xml').async('string');
+  for(const xml of [fullXml,reliefXml,classXml])assert(!xml.includes('Assigned by'),'Excel exports carry relief-for only, not the assigner (owner, 30 Oct)');
+  w.RosterOpsUI.unmount();networkBlocked=false;const actor=f.ctx.user.email,O=w.GSISRosterOperations;
+  O.apply(f.state,f.ctx,{operation:'assign',date:f.ctx.today,demandIds:['absent:2'],staffId:'dora'});
+  O.apply(f.state,{...f.ctx,user:{...f.ctx.user,email:'publisher@test.invalid'}},{operation:'publish',date:f.ctx.today,allocationRevision:f.state.dayRevisions[f.ctx.today],notifyMode:'none'});
+  f.ctx.user={staffId:'dora',email:'dora@test.invalid',smc:false,admin:false};f.profile.user=f.ctx.user;w.RosterOpsUI.resetPreloads();
+  await w.RosterOpsUI.render('My Relief Duties',ctx);
+  const table=w.document.querySelector('[data-duty-today] table');assert([...table.querySelectorAll('th')].some(th=>th.textContent==='Assigned By'));
+  {const shown=table.querySelector('tbody tr').children[3].textContent;assert(shown&&!shown.includes('@'),'the assigner shows as a name, not an email: '+shown);}assert.deepEqual(errors,[]);
   console.log('PASS v0.8.2 all three offline exports create real XLSX from the unsaved local projection with snapshot labels and no network calls.');
  }finally{dom.window.close();}
 })().catch(error=>{console.error(error);process.exitCode=1;});
