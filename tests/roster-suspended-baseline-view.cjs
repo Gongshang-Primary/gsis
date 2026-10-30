@@ -4,6 +4,7 @@ global.GSISRoster=R;global.JSZip=require('jszip');
 const X=require('../roster-update/public/roster-export.js'),fixture=require('./roster701-fixture.cjs'),S=require('../shared/roster-stapler.js');
 const f=fixture(),base=f.ctx.days[f.date],plan=S.create({...base,date:f.date}),before=JSON.stringify(plan),original=f.O.timetableBaseline(plan,f.date);
 assert.equal(JSON.stringify(plan),before);assert.equal(original.teachers.find(t=>t.staffId==='alice').cells[2][0],'EL');
+plan.baseline.recessDefaults=[{level:4,startMinutes:570,endMinutes:600}];assert(f.O.timetableBaseline(plan,f.date).recesses.some(r=>r.className==='4A'&&r.periods.includes(5)),'usual baseline retains configured recess');
 const periods=base.periods.slice(0,4),teachers=[{staffId:'alice',name:'Alice',cells:[['','','',''],['','','',''],['MA','4A','New room','G1'],['EL','4A','Old room','G1']]}],baseline={date:f.date,periods,teachers:[{staffId:'alice',name:'Alice',cells:[['','','',''],['','','',''],['EL','4A','Old room','G1'],['EL','4A','Old room','G1']]}]};
 const day={date:f.date,source:'published',periods,teachers,baseline,classes:['4A']};
 for(const type of ['teacher','class','tg']){
