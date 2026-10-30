@@ -7,7 +7,9 @@ const a=source.indexOf(' const dateFormat='),b=source.indexOf(' const singaporeT
 assert(c>0&&d>c);
 const dom=new JSDOM('<main><label><input type="date" data-ops-date><span class="hint"></span></label><span data-publication-chip></span></main>'),root=dom.window.document.querySelector('main');
 const scope={Intl,Date,$:(s,q)=>s.root.querySelector(q)};
-const {updatePublicationChip:update}=vm.runInNewContext(source.slice(a,b)+source.slice(c,d)+';({updatePublicationChip})',scope);
+const mergeStart=source.indexOf(' function mergePublicationResponse(');
+const {updatePublicationChip:update,mergePublicationResponse:merge}=vm.runInNewContext(source.slice(a,b)+source.slice(mergeStart,d)+';({updatePublicationChip,mergePublicationResponse})',scope);
+assert(source.includes('s.data=mergePublicationResponse(s.data,result);'),'the live publication response uses the tested merge');
 const chip=root.querySelector('[data-publication-chip]'),s={root,date:'2026-10-29',data:{date:'2026-10-29',publishedAt:null}};
 update(s);assert.equal(chip.textContent,'Not published');
 s.data={date:s.date,publishedAt:'2026-10-28T22:55:34.000Z',publishedRevision:3,allocationRevision:3,publicationPreview:{count:0},publishedBy:'private@example.invalid'};
@@ -30,6 +32,23 @@ s.date=f.date;s.data=read();assert(s.data.allocationRevision>s.data.publishedRev
 for(let i=0;i<8;i++)publish();
 assign('charlie');s.data=read();assert(s.data.allocationRevision<s.data.publishedRevision);update(s);assert.equal(chip.dataset.state,'changed','new edits remain pending after repeated publications');
 publish();s.data=read();update(s);assert.equal(chip.dataset.state,'published');
+
+// Use the real compact backend acknowledgement, not a full reread.
+assign('bob');
+s.data=read();update(s);assert.equal(chip.dataset.state,'changed');
+const acknowledgementSource=fs.readFileSync('backend/RosterOperations.gs','utf8');
+const acknowledgementStart=acknowledgementSource.indexOf('function rosterOperationsPublicationAcknowledgement_('),acknowledgementEnd=acknowledgementSource.indexOf('\nfunction rosterOperationsPublishDispatch_',acknowledgementStart);
+assert(acknowledgementStart>=0&&acknowledgementEnd>acknowledgementStart);
+const acknowledge=vm.runInNewContext(acknowledgementSource.slice(acknowledgementStart,acknowledgementEnd)+';rosterOperationsPublicationAcknowledgement_',{GSISRosterOperations:f.O,rosterOperationsDayToken_:()=> 'test-day-token'});
+publish();
+const receipt=acknowledge(f.state,f.ctx,{date:f.date,requestId:'test'}, {},f.state.revision);
+assert.equal(receipt.publicationPreview,undefined,'exercise the real compact acknowledgement');
+s.data=merge(s.data,receipt);update(s);assert.equal(chip.dataset.state,'published','successful publication clears the chip without a full read');
+assign('charlie');s.data=read();update(s);assert.equal(chip.dataset.state,'changed');
+const revision=s.data.revision,allocationRevision=s.data.allocationRevision;
+s.data=merge(s.data,{...receipt,currentRevision:f.state.revision});update(s);
+assert.equal(chip.dataset.state,'changed','replayed acknowledgement cannot hide newer saved edits');
+assert.equal(s.data.revision,revision);assert.equal(s.data.allocationRevision,allocationRevision);
 
 // Run the actual date handler and loader with the cache read deliberately held.
 (async()=>{
