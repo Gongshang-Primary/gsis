@@ -4314,16 +4314,16 @@ const next=stapler().effectiveDay(plan,ctx.baselineDays?.[d]||ctx.days[d]);for(c
   const incomingAt=ctx.reportedAt||ctx.iso,sequence=ctx.reportSequence||0;
   for(const date of dates)for(const staffId of staffIds){
    const dd=day(ctx,date),coverage=p.fullDay===true?{kind:'fullDay'}:p.coverage,requested={periods:p.periods||[],coverage},want=resubmissionIntervals([requested],dd);
-   // 0.9.9a: the latest action wins. A deletion saved after this report supersedes it.
+   // 0.9.9b: the latest action wins. A deletion saved after this report supersedes it.
    if(candidate.absences.some(a=>a.deletedAt&&Date.parse(a.deletedAt)>=Date.parse(incomingAt)&&a.date===date&&samePerson(ctx,a.staffId,staffId)&&absenceOverlap(a,requested,dd)))continue;
    const overlapping=candidate.absences.filter(a=>!a.deletedAt&&a.date===date&&samePerson(ctx,a.staffId,staffId)&&absenceOverlap(a,requested,dd));
    if(!overlapping.length){const command={...p,staffId,date};delete command.staffIds;delete command.dates;delete command.from;delete command.to;const r=apply(candidate,{...ctx,resubmission:false},command);for(const id of r.savedIds){const a=candidate.absences.find(a=>a.id===id);a.lastSubmissionAt=incomingAt;a.lastSubmissionSequence=sequence;if(Object.keys(a.instructions||{}).length){const notes=mergeSubmittedInstructions({...a,instructions:{},instructionAuthors:{}},a.instructions,ctx);Object.assign(a,notes);}}savedIds.push(...r.savedIds);continue;}
    const stale=a=>Date.parse(incomingAt)<Date.parse(a.lastSubmissionAt||a.reportedAt)||incomingAt===(a.lastSubmissionAt||a.reportedAt)&&sequence<(a.lastSubmissionSequence||0);
    if(overlapping.every(stale)){savedIds.push(...overlapping.map(a=>a.id));continue;}
-   // 0.9.9a: saved portions newer than this report keep their coverage; older portions follow it.
+   // 0.9.9b: saved portions newer than this report keep their coverage; older portions follow it.
    savedIds.push(...overlapping.filter(stale).map(a=>a.id));const matches=overlapping.filter(a=>!stale(a));
    const existing=resubmissionIntervals(matches,dd),gaps=subtractAbsenceIntervals(want,existing),outside=subtractAbsenceIntervals(existing,want),shorter=!gaps.length&&outside.length>0;
-   // 0.9.9a: a later report replaces the saved coverage without SMC review.
+   // 0.9.9b: a later report replaces the saved coverage without SMC review.
    // Periods that have already started keep their recorded absence and relief.
    // Equal-order replays are not later reports: they keep the saved coverage.
    const later=matches.every(a=>Date.parse(incomingAt)>Date.parse(a.lastSubmissionAt||a.reportedAt)||incomingAt===(a.lastSubmissionAt||a.reportedAt)&&sequence>(a.lastSubmissionSequence||0));

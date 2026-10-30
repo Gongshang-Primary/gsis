@@ -105,7 +105,7 @@ def verify_runtime(suite, root):
         temporary = Path(td)
         for app, folder in FRONTEND_FOLDERS.items():
             with zipfile.ZipFile(io.BytesIO(suite.read(f'Production/{app}_Frontend_v{p.VERSION}.zip'))) as frontend:
-                expected = {str(path.relative_to(root / folder)) for path in (root / folder).rglob('*') if path.is_file()}
+                expected = {path.relative_to(root / folder).as_posix() for path in (root / folder).rglob('*') if path.is_file()}
                 assert set(frontend.namelist()) == expected, 'Frontend canonical inventory differs: ' + app
                 html = frontend.read('index.html').decode()
                 assert 'v' + p.VERSION in html, 'Frontend label differs: ' + app

@@ -10,6 +10,11 @@ class ReleaseVersionTests(unittest.TestCase):
     def test_release_helper_is_available(self):
         self.assertTrue((ROOT / 'scripts/release-version.py').is_file(), 'central release stamping is missing')
 
+    def test_comment_history_is_not_a_release_pin(self):
+        helper = runpy.run_path(str(ROOT / 'scripts/release-version.py'))
+        text = "const V='0.9.9'; /* 0.9.9a history */ // 0.9.9 history\n"
+        self.assertEqual(helper['stamp_script'](text, '0.9.9b'), "const V='0.9.9b'; /* 0.9.9a history */ // 0.9.9 history\n")
+
     def test_header_drift_is_detected(self):
         if not (ROOT / 'scripts/release-version.py').is_file(): self.skipTest('helper not implemented')
         helper = runpy.run_path(str(ROOT / 'scripts/release-version.py'))

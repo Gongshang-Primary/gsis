@@ -152,6 +152,8 @@ app=root/'public/app.js'
 app.write_text(re.sub(r'^controls\(\);startSignIn\(\);\s*$', '', app.read_text(), flags=re.M).rstrip()+'\n\ncontrols();startSignIn();\n')
 subprocess.run(['node',str(root/'scripts/build-edge-deploy.cjs')],cwd=root,check=True)
 subprocess.run(['node',str(root/'scripts/build-edge-modules.cjs')],cwd=root,check=True)
+# Derived setup pages and Worker domains now exist; stamp before assembling outputs.
+runpy.run_path(str(root/'scripts/release-version.py'))['stamp'](root)
 code=(root/'backend/Code.gs').read_text()+'\n'+(root/'backend/Seed.gs').read_text()
 assert code.count("const GSIS_BACKEND_KIND='deploy';")==1, 'Canonical backend needs one fixed Deploy role'
 roster_version=release.get('gsisComponentVersions',{}).get('rosterBackend',version)

@@ -24,6 +24,13 @@ def write_changed(path, text):
         path.write_text(text)
 
 
+def stamp_script(text, version):
+    pattern = re.compile(r'(?<![\d.])' + re.escape(version[:-1]) + r'[a-z]?(?![\d.a-z])')
+    # Quoted release pins may change; comments explain historical behavior.
+    tokens = r'//[^\n]*|/\*[\s\S]*?\*/|\x27(?:\\.|[^\x27\\])*\x27|"(?:\\.|[^"\\])*"|\x60(?:\\.|[^\x60\\])*\x60'
+    return re.sub(tokens, lambda m: m[0] if m[0].startswith(('//', '/*')) else pattern.sub(version, m[0]), text)
+
+
 def stamp(root=ROOT):
     version = current_version(root)
     family = version[:-1]
@@ -49,7 +56,7 @@ def stamp(root=ROOT):
     for name in sorted(set(targets)):
         path = root / name
         if not path.is_file(): continue
-        text = ''.join(line if line.lstrip().startswith('//') else pattern.sub(version, line) for line in path.read_text().splitlines(keepends=True))
+        text = pattern.sub(version, path.read_text()) if path.suffix == '.html' else stamp_script(path.read_text(), version)
         if path.suffix == '.html':
             text = re.sub(r'<meta name="gsis-version" content="[^"]*">', '', text)
             text = re.sub(r'<script src="[^"]*gsis-version\.js[^\"]*"></script>', '', text)
