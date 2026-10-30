@@ -1,7 +1,7 @@
 'use strict';
 // Production Stapler UI/model, real Chromium and synthetic save/reload only.
 const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),{chromium}=require('playwright');
-const root=path.resolve(__dirname,'..'),prefix=process.env.STAPLER_RECESS_SCREENSHOT||'/workspace/scratch/466198083d1a/stapler-level-recess-draft',capture=prefix!=='0';
+const root=path.resolve(__dirname,'..'),prefix=process.env.STAPLER_RECESS_SCREENSHOT||path.join(require('node:os').tmpdir(),'gsis-stapler-recess-'+process.pid),capture=prefix!=='0';
 const p1=page=>page.locator('[data-scroll="class"] [data-recess-group]').filter({hasText:'P1 Recess'});
 const classCell=(page,id,period)=>page.locator('[data-scroll="class"] [data-target="class"][data-row="'+id+'"][data-period="'+period+'"]');
 const teacherTile=(page,id)=>page.locator('[data-scroll="teacher"] [data-tile="'+id+'"]');
