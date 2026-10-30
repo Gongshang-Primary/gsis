@@ -1,0 +1,13 @@
+'use strict';
+const assert=require('node:assert/strict'),fixture=require('./roster701-fixture.cjs'),A=require('../shared/roster-allocation.js');
+const f=fixture(),{O,state,ctx,date}=f,id='bob',teacher={...ctx,user:{...ctx.user,staffId:id,smc:false,admin:false}},week=A.monday(date);
+state.accountingYears['2026']={verified:true};state.entitlements.push({staffId:id,year:'2026',week,quota:10},{staffId:id,year:'2026',week:'2026-10-05',quota:10},{staffId:'alice',year:'2026',week,quota:99});
+state.assignments.push({id:'done',staffId:id,date:'2026-10-12',period:1,status:'completed',rCost:2},{id:'future',staffId:id,date:'2026-10-15',period:1,status:'published',rCost:3},{id:'draft',staffId:id,date:'2026-10-16',period:1,status:'draft',rCost:8},{id:'other',staffId:'alice',date:'2026-10-12',period:1,status:'completed',rCost:50});
+let before=JSON.stringify(state),v=O.ownAnnualRelief(state,teacher);
+assert.deepEqual([v.completed,v.committed,v.spent,v.entitlement,v.utilisation],[2,3,5,20,25]);assert.equal(JSON.stringify(state),before,'summary never captures or rewrites history');
+let view=O.read(state,teacher,{operation:'read',view:'duties',staffId:'alice'});assert.deepEqual(view.annualRelief,v,'caller cannot select another teacher');
+state.accountingYears['2026'].verified=false;assert.equal(O.ownAnnualRelief(state,teacher).utilisation,null);state.accountingYears['2026'].verified=true;
+state.entitlements=state.entitlements.filter(r=>r.staffId!==id||r.week!==week);assert.match(O.ownAnnualRelief(state,teacher).reason,/This week/);
+state.entitlements.push({staffId:id,year:'2026',week,quota:0});state.entitlements=state.entitlements.filter(r=>r.staffId!==id||r.week===week);assert.equal(O.ownAnnualRelief(state,teacher).utilisation,null);
+state.entitlements.push({staffId:id,year:'2026',week,quota:10});assert.match(O.ownAnnualRelief(state,teacher).reason,/review/);
+console.log('PASS own published annual relief, completed/committed separation, hidden drafts, scoped identity and unavailable histories');

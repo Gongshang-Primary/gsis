@@ -6,6 +6,7 @@ on:
       - codex/roster-sre-fajt-r-calc
       - codex/roster-stapler-all-dates
       - codex/roster-peer-release-notify
+      - codex/roster-my-relief-r-percent
   workflow_dispatch:
 permissions:
   contents: read
