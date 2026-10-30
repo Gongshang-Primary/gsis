@@ -127,7 +127,7 @@ class PackagingTests(unittest.TestCase):
             def archive(diff=b''):
                 data = io.BytesIO()
                 with zipfile.ZipFile(data, 'w') as z:
-                    z.writestr('CHANGES_FROM_0.9.8q.patch', diff)
+                    z.writestr('CHANGES_FROM_0.9.9_BASELINE.patch', diff)
                     z.writestr('RECENT_COMMITS.txt', b'')
                 return zipfile.ZipFile(io.BytesIO(data.getvalue()))
             with archive() as z:

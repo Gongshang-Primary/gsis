@@ -6,7 +6,8 @@ const origin='https://roster.gsps.edu.sg',now=Date.now(),env={BRIDGE_SECRET:'fix
 const payload=JSON.stringify({purpose:'gsis-session-v1',origin,email:'admin@gsps.edu.sg',subject:'fixture',issued:now,expires:now+3600000}),cookie='__Host-gsis_session='+Buffer.from(payload).toString('base64url')+'.'+createHmac('sha256',env.BRIDGE_SECRET+'|gsis-browser-session-v1|'+origin).update(payload).digest('hex');
 const post=(body,path='/api/operations')=>new Request(origin+path,{method:'POST',headers:{Origin:origin,Cookie:cookie},body:JSON.stringify(body)});
 const fetchBefore=globalThis.fetch,logBefore=console.error;const work=[],calls=[],logs=[];let result={ok:true,data:{saved:true,revision:7}},release,arrived;const waiting=new Promise(resolve=>arrived=resolve);
-console.error=value=>logs.push(JSON.parse(value));
+// Node may print its own warnings through console.error; keep only structured log entries.
+console.error=value=>{let entry;try{entry=JSON.parse(value);}catch{logBefore(value);return;}logs.push(entry);};
 globalThis.fetch=async(_,init)=>{const req=JSON.parse(JSON.parse(init.body).payload);calls.push(req);if(req.input.operation!=='timetableBatch')return Response.json(result);if(req.input.stage==='baseline')return new Promise(resolve=>{arrived();release=()=>resolve(Response.json({ok:true,data:{baselineKey:'a'.repeat(64),sourceKey:'b'.repeat(64)}}));});return Response.json({ok:false,status:503,code:'BACKEND_UNAVAILABLE'});};
 try{
  const response=await worker.fetch(post({operation:'renameStapler',date:'2026-10-27',name:'Fixture plan',requestId:crypto.randomUUID()}),env,{waitUntil:p=>work.push(p)});

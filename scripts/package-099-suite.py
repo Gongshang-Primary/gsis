@@ -15,7 +15,10 @@ import zipfile
 
 ROOT = Path(__file__).resolve().parents[1]
 VERSION = '0.9.9'
-BASELINE = '50c977d79c9756dfdbee91f2922f0cd89ab6e903'
+# The repository starts at the 0.9.9 release as deployed on 28 Oct 2026.
+# Earlier history (0.9.8q, 50c977d) was not imported into GitHub.
+BASELINE = '2efd6e003fa9ee3846cf590d07902a22309861ff'
+BASELINE_LABEL = '0.9.9 (deployed 28 Oct 2026)'
 PREPARATION_NAME = 'GSiS_v0.9.9_Timetable_Preparation.zip'
 # Narrow historical fixtures are executable recovery-test dependencies, not duplicate deliveries.
 HISTORICAL_TEST_FIXTURES = {
@@ -295,11 +298,11 @@ def package(root, output, preview=False, evidence_dir=None):
     review, index = source_files(root, sorted(current))
     metadata = {'schema': 1, 'release': VERSION, 'sourceCommit': commit,
                 'sourceState': 'working-tree-preview' if dirty or preview else 'committed',
-                'baseline': '0.9.8q', 'baselineCommit': BASELINE, 'componentVersions': settings['gsisComponentVersions'], 'tag': None if dirty or preview else 'v' + VERSION,
+                'baseline': BASELINE_LABEL, 'baselineCommit': BASELINE, 'componentVersions': settings['gsisComponentVersions'], 'tag': None if dirty or preview else 'v' + VERSION,
                 'productionDeployed': False, 'productionAuthorities': PRODUCTION_AUTHORITIES,
                 'authorityCutoverPerformed': False, 'historyKind': 'current-source-with-baseline-diff'}
     review['SOURCE_INDEX.json'] = json_bytes(index)
-    review['CHANGES_FROM_0.9.8q.patch'] = git(root, 'diff', '--binary', BASELINE, *([] if preview else [commit]))
+    review['CHANGES_FROM_0.9.9_BASELINE.patch'] = git(root, 'diff', '--binary', BASELINE, *([] if preview else [commit]))
     review['RECOVERY_HISTORY.md'] = read_required(root, 'docs/v099/RECOVERY_HISTORY.md', 'concise recovery history')
     review['RECENT_COMMITS.txt'] = git(root, 'log', '--format=fuller', BASELINE + '..' + commit)
     review['README_REVIEW.md'] = read_required(root, 'docs/v099/SOURCE_REVIEW.md', 'review guide')
