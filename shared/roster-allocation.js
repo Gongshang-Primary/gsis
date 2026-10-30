@@ -44,6 +44,9 @@ var GSISRosterAllocation = (() => {
     for(let i=0;i<Math.max(aa.length,bb.length,cc.length);i++){const difference=(aa[i]||0)+(bb[i]||0)-(cc[i]||0);if(Math.abs(difference)>EPS)return difference<0;}return false;
   }
   const negateCost=x=>Array.isArray(x)?x.map(v=>-v):-x;
+  // Compare weekly SRE headroom with annual staff utilisation on the same scale.
+  // Historical SRE entitlement remains visible, but never sets a ranking key.
+  const rankingUtilisation=(r,remaining=r.remaining)=>r.sreMode==='long-term'?(Number.isFinite(r.R)&&r.R>0&&Number.isFinite(remaining)?100*(r.R-remaining)/r.R:null):r.annual;
   const preferenceValues=r=>r.dailyRoster?{annualUtilisation:[0,0],alternatives:[0],weeklyRemaining:[0],rotation:[0],subjectMatch:[0],levelMatch:[0]}:({annualUtilisation:[Number.isFinite(r.fairnessBand)?0:1,Number.isFinite(r.fairnessBand)?r.fairnessBand:0],alternatives:[r.alternatives],weeklyRemaining:[-(r.remaining??0)],rotation:[r.rotation],subjectMatch:[r.subjectPenalty||0],levelMatch:[r.levelPenalty||0]});
   const orderedValues=(values,order)=>order.flatMap(id=>values[id]);
   const norm=x=>String(x||'').normalize('NFKC').trim().replace(/\s+/g,' ').toLowerCase();
@@ -313,7 +316,7 @@ var GSISRosterAllocation = (() => {
   }
   function ranked(s,ctx,d,period,demands=[],teacherMap,preferences,enabled=ruleToggles(s.systemConfig?.allocationRuleEnabled)){
     const order=preferenceOrder(preferences).filter(id=>enabled[id]),teachers=teacherMap||teacherContext(s,ctx,d),rot=rotation(s,year(d)),rotationValue=id=>rot.indexOf(id)<0?-1:rot.indexOf(id),list=[...teachers.values()].filter(t=>reliefCandidateEligible(t.person)).map(t=>({...eligibility(t,period,[],{demand:demands.find(dem=>dem.period===period)}),alternatives:Array.from({length:t.periodCount},(_,p)=>p).filter(p=>p!==period&&eligibility(t,p).autoEligible).length,rotation:rotationValue(t.id)}));
-    for(const category of [0,1,2,3,4]){const same=list.filter(x=>x.automaticCategory===category),finite=same.filter(x=>Number.isFinite(x.annual)),min=finite.length?Math.min(...finite.map(x=>x.annual)):null;for(const x of same)x.fairnessBand=x.annual===null?Infinity:min!==null&&x.annual-min<=1+EPS?min:x.annual;}
+    for(const category of [0,1,2,3,4]){const same=list.filter(x=>x.automaticCategory===category),finite=same.map(x=>rankingUtilisation(x)).filter(Number.isFinite),min=finite.length?Math.min(...finite):null;for(const x of same){const value=rankingUtilisation(x);x.fairnessBand=value===null?Infinity:min!==null&&value-min<=1+EPS?min:value;}}
     return list.sort((a,b)=>a.automaticCategory-b.automaticCategory||compareCost(srePriority(a),srePriority(b))||compareCost(orderedValues(preferenceValues(a),order),orderedValues(preferenceValues(b),order))||a.staffId.localeCompare(b.staffId)).map((t,i)=>({...t,rank:i+1}));
   }
   /* Manual recommendations share the configured business policy. Eligibility
@@ -350,8 +353,8 @@ var GSISRosterAllocation = (() => {
     });
     const loads=rows.filter(r=>r.available).map(r=>r.load).sort((a,b)=>a-b),low=loads.length?loads[Math.floor((loads.length-1)*.35)]:0;
     for(const r of rows){r.suitabilityTier=r.category===4?6:r.repurposedDuty?-1:r.external?0:r.streakViolation?5:r.nearFree&&r.load<=low?1:r.nearFree?2:r.surrounded?4:3;r.tier=r.category===4?6:r.repurposedDuty?-1:r.external?0:r.category+1;r.why=r.category===4?r.reasons.join(' '):r.dailyRoster?'Daily roster, no R%; daily SRE priority':r.repurposedDuty?'Repurpose existing recess duty; no additional R':r.external?'Activated ad hoc relief':r.suitabilityTier===1?'Free within two periods either side; lighter daily load':r.suitabilityTier===2?'Free within two periods either side':r.suitabilityTier===4?'Occupied immediately before and after':r.suitabilityTier===5?'Consecutive workload override':'Standard free-period fit';}
-    const fairness=new Map(),group=r=>r.category+'|'+r.tier+'|'+r.highDailyLoad;for(const r of rows)if(Number.isFinite(r.annual)){const key=group(r);fairness.set(key,Math.min(fairness.get(key)??Infinity,r.annual));}
-    for(const r of rows){const min=fairness.get(group(r))??null;r.fairnessBand=r.annual===null?Infinity:r.annual-min<=1+EPS?min:r.annual;}
+    const fairness=new Map(),group=r=>r.category+'|'+r.tier+'|'+r.highDailyLoad;for(const r of rows)if(Number.isFinite(rankingUtilisation(r,r.remainingWithReplacement))){const key=group(r);fairness.set(key,Math.min(fairness.get(key)??Infinity,rankingUtilisation(r,r.remainingWithReplacement)));}
+    for(const r of rows){const min=fairness.get(group(r))??null,value=rankingUtilisation(r,r.remainingWithReplacement);r.fairnessBand=value===null?Infinity:value-min<=1+EPS?min:value;}
     for(const r of rows)if(r.highDailyLoad)r.why+='; already '+r.load+' work periods today, lower priority within this eligibility group';
     return rows.sort((a,b)=>a.category-b.category||compareCost(srePriority({...a,dailyPeriods:a.load}),srePriority({...b,dailyPeriods:b.load}))||a.tier-b.tier||Number(a.highDailyLoad)-Number(b.highDailyLoad)||compareCost(orderedValues(preferenceValues({...a,remaining:a.remainingWithReplacement}),order),orderedValues(preferenceValues({...b,remaining:b.remainingWithReplacement}),order))||a.suitabilityTier-b.suitabilityTier||a.id.localeCompare(b.id)).map((r,i)=>({...r,rank:i+1}));
   }
@@ -492,7 +495,7 @@ var GSISRosterAllocation = (() => {
   function allocationCosts(teachers,candidates,order,demands,day,config){
     const resolve=subjectResolver(day.teachingGroups,config),ids=teachers.map(t=>t.id).sort(),byId=new Map(teachers.map(t=>[t.id,t])),profiles=new Map(teachers.map(t=>{const p=t.teachingProfile;return [t.id,{...p,subjects:[...new Set([...(p.subjects||[]).filter(code=>!p.subjectLessons||!code.startsWith('family:')).map(code=>code.startsWith('family:')?code:resolve({subject:code}).key),...(p.subjectLessons||[]).map(lesson=>resolve(lesson).key)])]}];})),demandProfiles=new Map(demands.map(d=>[d.id,{subject:resolve(d).key,levels:lessonLevels(d,day.formClasses,day.teachingGroups)}]));
     const dailyPriority=teachers.some(t=>t.dailyRoster),priority=r=>dailyPriority?srePriority(r):[];
-    const teacherCost=(t,i)=>[0,...(dailyPriority?[0,t.dailyRoster?i:0,0]:[]),...orderedValues({annualUtilisation:[0,t.dailyRoster?0:t.balance.entitlement>0?100*i/t.balance.entitlement:0],alternatives:[0],weeklyRemaining:[t.dailyRoster?0:i],rotation:[0],subjectMatch:[0],levelMatch:[0]},order),0];
+    const teacherCost=(t,i)=>[0,...(dailyPriority?[0,t.dailyRoster?i:0,0]:[]),...orderedValues({annualUtilisation:[0,t.dailyRoster?0:t.sreMode==='long-term'?(t.balance.R>0?100*i/t.balance.R:0):t.balance.entitlement>0?100*i/t.balance.entitlement:0],alternatives:[0],weeklyRemaining:[t.dailyRoster?0:i],rotation:[0],subjectMatch:[0],levelMatch:[0]},order),0];
     // Policy inputs stay fixed throughout the search; reuse every edge's score
     // across branch flows and local exchanges instead of rebuilding the vectors.
     const edgeScores=new Map(),dutyScores=new Map();

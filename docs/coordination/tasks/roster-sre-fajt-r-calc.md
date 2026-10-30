@@ -6,7 +6,7 @@
 - Last updated (Asia/Singapore): 30 Oct 2026 08:10
 - Branch: codex/roster-sre-fajt-r-calc
 - Base SHA: 135b8a55fe027975facca29cbebeea5700f42e8e
-- PR: none
+- PR: https://github.com/helper-gsps/gsis/pull/20
 - User-authorised scope: Song Wee, 30 Oct 2026: "SRE follows FAJT R calculation if their timetable is present in deploy".
 - Files/domains owned: shared/relief.js (`employment()`, budget/factor), shared/workload.js only if it classifies employment, Roster ranking in shared/roster-allocation.js if the open point requires, generated Deploy/Roster copies, tests.
 - Out of scope: FAJT formula itself; specialist counts.
@@ -36,3 +36,13 @@ A long-term SRE is ranked with other staff (after daily SREs and, when switched 
 ## Claim and handoff
 
 Model: Codex. The owner explicitly requested row S and row 2b2 as separate PRs now. This is the second bounded branch; row S retains its merge hold. No authority change, messages, live records or deployment. Claude reviews the exact head before owner merge.
+
+## Implementation and ranking scale
+
+Model: Codex. SRE remains an employment modifier, so the existing school-wide T_avg denominator and other teachers' results are unchanged. Verified positive teaching selects fajtWeeklyPeriods and factor 1; verified zero teaching has no quota. The calculation model is whole-week-v6, with read compatibility for older models, so cached v5 calculations are not reused. My Calculations labels the SRE FAJT basis.
+
+To compare weekly headroom with ordinary annual percentages without giving all SREs unconditional priority, the annualUtilisation preference uses 100 * (R - weekly remaining) / R for long-term SREs. Its marginal solver cost also uses weekly R. Annual R and R% remain recorded and displayed. This explicit interpretation is for Claude and owner review.
+
+Local checks: five new formula/ranking/calculation cases pass, including both ordering directions and independence from annual history; the existing daily-SRE, cap, IMP and whole-week formula checks pass. The unchanged manual-ranking check passes. All 18 components build. Full npm test remains pending. No deployment or messages.
+
+Two Windows-only build portability changes match row S: write access for ZIP fsync, and POSIX archive member paths.

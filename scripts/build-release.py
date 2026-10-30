@@ -34,7 +34,7 @@ def release_zip(destination):
  try:
   with zipfile.ZipFile(temporary,'w',zipfile.ZIP_DEFLATED) as archive:
    yield archive
-  with open(temporary,'rb') as handle: os.fsync(handle.fileno())
+  with open(temporary,'r+b') as handle: os.fsync(handle.fileno())
   os.replace(temporary,destination)
  finally:
   Path(temporary).unlink(missing_ok=True)
