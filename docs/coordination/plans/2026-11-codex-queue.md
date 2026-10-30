@@ -22,8 +22,8 @@ Owner (Song Wee, 30 Oct): "it can be all, let codex work while i teach". Claude 
 | 2c | roster-fajt-levelling.md | After SRE: FAJT first until FAJT average R% leads school average by a Settings margin (default 20 points) |
 | 3 | roster-excel-relief-for-absent.md | Report Absence → Export Excel |
 | 4 | (new) roster-reminder-cheap-check | Skip the full operations read on published days until the next reminder is due (Claude note 2 on PR #7) |
-| 5 | (new) roster-delivery-time-format | PENDING_CHANGELOG "delivery time shows a raw number" |
-| 6 | (new) roster-published-time-chip | PENDING_CHANGELOG, time only, no publisher |
+| 5 | (new) roster-delivery-time-format | PENDING_CHANGELOG "delivery time shows a raw number". **Claimed by Claude 30 Oct (owner: work through changelog).** |
+| 6 | (new) roster-published-time-chip | PENDING_CHANGELOG, time only, no publisher. **Claimed by Claude 30 Oct.** |
 | 7 | lord-queued-writes.md phase 1 | Queue and status list, no UI change |
 | 8 | lord-queued-writes.md phase 2 | Book cart, open/collect, collect photos, return, return photos |
 | 8b | deploy-queued-writes.md | Same queue as LORD; keep clash detection and who-did-what notices |
