@@ -9,6 +9,7 @@ on:
       - codex/deploy-siue-by-specialism
       - codex/roster-reminder-cheap-check
       - codex/roster-delivery-time-format
+      - codex/roster-published-time-chip
   workflow_dispatch:
 permissions:
   contents: read

@@ -262,3 +262,8 @@
 
 /* Keep saving on the following toolbar row; publication stays an explicit action. */
 .ops-assign-page .ops-day-actions [data-notify-mode=all]{max-width:245px;height:auto;min-height:40px;white-space:normal}.ops-assign-page .ops-freshness [data-save-online]{margin-left:0}.ops-assign-page .ops-day-actions{width:100%;justify-content:flex-end;margin-left:0}.ops-assign-page .ops-freshness{clear:both;margin-top:8px}
+
+/* Publication state stays beside the selected workday. */
+.ops-publication-chip{display:inline-block;max-width:100%;padding:5px 9px;border:1px solid #cbd5df;border-radius:5px;background:#f1f4f7;color:#425466;font-size:12px;line-height:1.4;white-space:normal}
+.ops-publication-chip[data-state=published]{background:#e8f5ec;border-color:#a3cdb0;color:#205f34}
+.ops-publication-chip[data-state=changed]{background:#fff4d8;border-color:#dfbd65;color:#715000}
