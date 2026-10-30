@@ -25,7 +25,7 @@
    - Write only the parts whose digest changed. Old part files are trashed only after the new manifest is saved.
    - `Roster register.json` and the other snapshot parts follow the same rule if any exceeds 8M.
    - Reuse PR #8's chunking in reverse so the Worker never holds the whole Roster.
-3b. **Legacy reads the split layout:** `rosterOperationsRead_` and the commit path learn the manifest layout (read manifest, then parts; commit changed parts, then manifest). If no manifest exists, they use the single file as today. This is required for `release`, because the switched-back Google Roster will be larger than one file can hold. Behaviour for users must be the same; add a one-time `splitOperations` Admin operation that converts the current single file (keep the old file, renamed with a date, never deleted).
+3b. **Depends on roster-operations-split-files.md** (built first, own PR): the mirror writes that layout, and `release` relies on the legacy split read path it adds.
 4. **Lag visibility:** edge setup page and D1 job health show "Google backup: revision N, X minutes behind". Alert the Admin if behind more than 10 minutes during school hours (threshold from settings, not code).
 5. **Switch back (`release`):** an Admin operation that (a) pauses D1 writes, (b) waits until the mirror reaches the current D1 revision, (c) verifies the manifest digests equal D1's, (d) clears the fence property, (e) tells the Admin to set the Pages variable `ROSTER_EDGE_AUTHORITY=legacy`. Refuses if any step cannot be proven.
 6. Google remains read-only for users while D1 is the record; the mirror is the only writer.

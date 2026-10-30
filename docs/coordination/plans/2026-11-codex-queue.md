@@ -1,6 +1,6 @@
 # Codex build queue from 30 Oct 2026 (owner go: all logged items)
 
-Priority update 30 Oct 2026: D1 as the Roster record comes first. After any PR already open, build roster-d1-google-backup before other rows.
+Priority update 30 Oct 2026: build roster-operations-split-files (row S) first, then roster-d1-google-backup (row D1), before other rows.
 
 Owner (Song Wee, 30 Oct): "it can be all, let codex work while i teach". Claude reviews every PR at its exact head; owner merges and deploys. Work top to bottom, at most two open PRs at a time. Each task file holds its own background.
 
@@ -8,6 +8,7 @@ Owner (Song Wee, 30 Oct): "it can be all, let codex work while i teach". Claude 
 |---|---|---|
 | 1 | roster-relief-auto-complete.md | R% shows 0 for everyone today |
 | 2 | (new) roster-assigned-by-label | PENDING_CHANGELOG "Assigned By shows the auto-allocator" |
+| **S** | roster-operations-split-files.md | **Owner 30 Oct: first.** Removes the 16M cap on Google before D1. Own PR. |
 | **D1** | roster-d1-google-backup.md | **Owner priority 30 Oct: D1 as Roster record.** Next after the SRE work already in progress. Claude writes roster-d1-cutover-runbook.md in parallel. |
 | 2b | roster-sre-daily-priority.md | PR #14: daily SRE priority; approved Ad hoc relief max periods setting (initial 10), existing consecutive limit, no R%. Latest task decisions supersede the earlier no-new-setting note. |
 | 2b2 | roster-sre-fajt-r-calc.md | SRE with a Deploy timetable uses the FAJT R calculation |
