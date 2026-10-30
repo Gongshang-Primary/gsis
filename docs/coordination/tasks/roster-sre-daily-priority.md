@@ -1,6 +1,6 @@
 # roster-sre-daily-priority: SREs are rostered daily first, not by annual R%
 
-- Status: claimed; implementation in progress after PR #13 merged
+- Status: implementing; focused policy, route and browser checks passed; full suite pending
 - Owner/model: Codex
 - Reviewer/model: Claude
 - Last updated (Asia/Singapore): 30 Oct 2026 07:10
@@ -76,3 +76,17 @@ No runtime implementation, build, tests, staging, deployment, provider send, aut
 PR #13 is merged as 17fc352e905043c1eb95b441e6f89f622d068006. GitHub now shows only this draft PR open. This branch integrates that exact main before product edits. Codex owns the bounded daily-SRE implementation described above; Claude reviews its final exact head. The subsequent long-term SRE/FAJT formula and ranking rows remain separate. The previously reported My Relief Duties name-resolution callback miss remains logged on PR #13; it is not silently combined with this policy change.
 
 The feature-branch claim path is retained because automatic approval review previously rejected direct main claims. No main mutation, authority change, live data edit, deployment or provider send is part of this task.
+
+## Implementation and current evidence
+
+The workload-rule registry now supplies Ad hoc relief max periods, initial 10, with the existing integer 1 to 40 validation and On/Off control. Daily SREs use that daily total and the existing consecutive limit. Other staff retain their existing daily limits. Ordinary preference order remains unchanged.
+
+Verified published Deploy projections carry teaching counts and whether those counts are known. Google and edge readers share the same versioned evidence shape. A free selected day, absent R, old cache payload or incomplete teaching count cannot classify a teacher as daily SRE. Existing prepared-input cache keys and the edge reference key change for the new shape. The published calculation and source reads are reused; no per-teacher network read was added.
+
+Verified daily SREs enter both the candidate order and whole-plan solver before annual preferences, without needing R. Their daily load, then rotation, break ties. Date activation, selected periods, identity/absence/clash checks, employment restrictions, configured weekly caps, protected/manual/peer cover and maximum coverage remain enforced. Composite SRE modifiers retain the SRE restricted periods. Consecutive subject blocks use the same daily cap in forced and residual flows.
+
+Annual balance and personal projections retain completed/committed counts but suppress R entitlement and percentage for verified daily SREs. My Calculations and candidate cards say Daily roster, no R%. The activity Statistics view contains no R% column; its activity counts are unchanged. Long-term SRE calculation and ranking remain for queue row 2b2, as scoped; no FAJT priority rule is included.
+
+Nine focused regressions pass, including actual Google/edge Deploy evidence, actual edge context, both configured limits, date activation and source uncertainty. Real Chromium verifies the new setting default, editing, toggle, save/reload and Admin-only writes, plus daily personal display and escaping. Existing 70 seeded maximum-coverage oracle cases pass. A separate 100-case exact old/new assignment comparison against merged 17fc352 passes for non-SRE staff. Existing R17 core and integration cases pass. Build passes with 18 production components and 85 Apps Script ES2020 files.
+
+Full npm test and LORD results will be recorded before review. No fresh network installation, staging, school sign-in, live data/latency validation or real delivery is claimed. Google remains authoritative. No ROSTER_EDGE_AUTHORITY or live configuration change was made. Rollback uses the prior matched source and bundles; no stored-data migration is required.

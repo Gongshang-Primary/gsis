@@ -1,3 +1,11 @@
+# Daily SRE priority and capacity — 30 October 2026
+
+Model: Codex. Queue row 2b. A verified daily SRE is allocated before annual R preferences, without an R quota. Published Deploy teaching evidence identifies the SRE type. Daily capacity uses Ad hoc relief max periods, initial 10 with an On/Off control, and the existing consecutive limit. Lower daily load then rotation orders daily SREs. Counts remain recorded; displays say Daily roster, no R%. Existing activation, employment restrictions and protected manual/peer work remain enforced. Long-term SRE calculations and FAJT priority remain separate queued tasks. [Task and verification](docs/coordination/tasks/roster-sre-daily-priority.md). Not deployed.
+
+## PR #13 owner follow-up
+
+PR #13 merged as 17fc352e905043c1eb95b441e6f89f622d068006. The owner changed the final presentation: human assigners use timetable/Contacts names or an alias fallback; Excel retains its earlier relief-for cell text without Assigned By. The earlier entry below describes the original implementation before that follow-up. The My Relief Duties callback finding in PR #13 comment 6512974388 remains logged; it is not combined with this policy task.
+
 # Roster assignment attribution — 30 October 2026
 
 Model: Codex. Queue row 2. Assigned By follows the relief assignment: Auto-allocation, the recorded SMC editor, Peer arrangement or Shared subject rule. Unknown legacy actors show Not recorded. Daily Notify, My Relief Duties and all three relief Excel exports use this attribution, including unsaved local choices. Publishing remains a separate recorded action. Updating a label alone keeps the existing timetable notice identity; teacher publications and retained communication evidence keep their existing boundaries. Google remains authoritative. See [the task](docs/coordination/tasks/roster-assigned-by-label.md) for verification, review and rollback. Not deployed.

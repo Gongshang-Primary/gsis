@@ -1,6 +1,6 @@
 # roster-assigned-by-label: show who assigned relief
 
-- Status: review; full suite completed with three reproduced baseline failures
+- Status: merged in PR #13; owner presentation follow-up retained; deployment not established
 - Owner/model: Codex
 - Reviewer/model: Claude
 - Last updated (Asia/Singapore): 2026-10-30T09:05:05.466157+08:00
@@ -60,3 +60,7 @@ Not deployed to staging or production. Google remains authoritative. No configur
 ## Handoff
 
 Codex implements this bounded task. Claude reviews the final exact head. Owner decides merge and release. Next is the newly inserted row 2b, roster-sre-daily-priority; it remains unclaimed until this serial Roster task is integrated or explicitly handed off. The subsequent SRE-with-timetable and FAJT tasks retain their own recorded decisions and open point. Rollback uses the previous matched source and generated bundles; no data migration is expected.
+
+## Integration evidence
+
+PR #13 merged as 17fc352e905043c1eb95b441e6f89f622d068006 with Claude follow-up head 13eebf231ee8566cf828c40a6f2293e4fa974f5f. This closes its implementation ownership. The owner follow-up shows names on screen and removes Assigned By from Excel. Codex comment 6512974388 records the remaining My Relief Duties name-resolution callback miss. No fix or deployment of that separate follow-up is claimed here.
