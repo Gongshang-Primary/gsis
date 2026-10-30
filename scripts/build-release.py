@@ -25,7 +25,8 @@ version=release['gsisRelease']
 build_label=release.get('gsisBuildLabel',version)
 assert re.fullmatch(re.escape(version)+r'[a-z]?',build_label), 'gsisBuildLabel must be the release plus at most one letter'
 label_pattern=re.compile(r'(\?v=|(?<![\w.])v)'+re.escape(version)+r'[a-z]?(?![\w.])')
-for folder in json.loads((root/'release-installation-manifest.json').read_text())['frontends'].values():
+# LORD setup templates must stay byte-identical to their Source pages.
+for folder in [*json.loads((root/'release-installation-manifest.json').read_text())['frontends'].values(),*['lord-suite/First_Time_Setup/templates/'+app for app in ['lord','overlord','starlord']]]:
  for page in sorted((root/folder).rglob('*.html')):
   text=page.read_text();stamped=label_pattern.sub(lambda m:m.group(1)+build_label,text)
   if stamped!=text:page.write_text(stamped)
