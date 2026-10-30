@@ -1,13 +1,13 @@
 # roster-relief-auto-complete: count ended published relief as done
 
-- Status: review; full suite completed with three reproduced baseline failures
+- Status: merged in PR #12; deployment not established
 - Owner/model: Codex
 - Reviewer/model: Claude
 - Last updated (Asia/Singapore): 2026-10-30T06:36:21.634407+08:00
 - Branch: codex/roster-relief-auto-complete
 - Base SHA: e3c31da427edae242ae09ecaaefb991175a623ba
-- Current head SHA: claim commit; the PR will record the exact implementation head
-- PR: not opened
+- Current head SHA: b0664ce461274e950e5e0fbb13808de1b4f12903, reviewed by Claude
+- PR: https://github.com/helper-gsps/gsis/pull/12
 - User-authorised scope: Song Wee approved all logged items on 30 October 2026 and instructed Codex to execute docs/coordination/plans/2026-11-codex-queue.md top to bottom, one task at a time. This is row 1. Full suite before a merge request; Claude reviews each exact head.
 - Files/domains owned: shared/roster-allocation.js accounting; shared/roster-operations.js correction/completion consumers if needed; backend/Relief.gs personal completion; roster-update/public/edge-roster.js matching read; roster-calculations.js explanatory text; focused tests and generated backends/browser/Worker bundles.
 - Out of scope: quota formula, allocation scoring/priorities, zero-quota display policy, authority/configuration changes, live records, notifications and deployment.
@@ -72,3 +72,7 @@ Next queue row: roster-assigned-by-label. It remains unclaimed while this Roster
 ## Main advanced during verification
 
 Before publishing, GitHub main advanced from e3c31da to 8fb6bf28af1e34f842516c91f548fad30e482790. The complete comparison contains only the November queue update and new approved deploy-queued-writes task. Both documents are preserved byte-for-byte. No product source, tests, runtime or configuration changed, so the completed full-suite and generated-parity evidence still binds the product source. No new full-suite run is claimed after this documentation-only integration. The final commit retains the published claim and this actual main as parents; no force-push or main update is performed.
+
+## 30 October 2026 integration evidence
+
+Claude reviewed exact head b0664ce461274e950e5e0fbb13808de1b4f12903 with no blocking finding in PR #12 comment 6510216878. Owner merged #12 as 50c5283c3d4c6ad39f31273541cb78d0b35bd4f1 at 06:44 Singapore time. GitHub merge status and tree were checked at the start of the next task. This closes the serial implementation claim. Merge does not establish deployment.

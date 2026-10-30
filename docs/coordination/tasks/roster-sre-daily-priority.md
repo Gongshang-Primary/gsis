@@ -1,12 +1,12 @@
 # roster-sre-daily-priority: SREs are rostered daily first, not by annual R%
 
-- Status: prepared; runtime ownership waits for PR #13 to merge or an explicit owner handoff
+- Status: claimed; implementation in progress after PR #13 merged
 - Owner/model: Codex
 - Reviewer/model: Claude
 - Last updated (Asia/Singapore): 30 Oct 2026 07:10
 - Branch: codex/roster-sre-daily-priority
-- Base SHA: fd5b0c75248a838a4327f1d9cca2f58e65986502, documentation preparation only
-- PR: preparation draft; final implementation/review head will be recorded after PR #13 integrates
+- Base SHA: 17fc352e905043c1eb95b441e6f89f622d068006
+- PR: https://github.com/helper-gsps/gsis/pull/14
 - User-authorised scope: Song Wee, 30 Oct 2026: "SRE's do not count by accumulated R% but are rostered on a daily basis subject to the business rules of 8 max, no 8 consecutive. they will be priority 1 above annual R%".
 - Files/domains owned: shared/roster-allocation.js (candidate ranking, eligibility limits, balances), shared/relief.js (employment parsing) only if needed, Roster settings UI text, generated copies, tests.
 - Out of scope: quota formula for other staff; FAJT; Deploy figures.
@@ -70,3 +70,9 @@ The next queue row, roster-sre-fajt-r-calc, owns the long-term SRE FAJT formula 
 Use synthetic published Deploy metadata to distinguish a free day with weekly teaching from a genuine daily SRE. Cover missing metadata, source/version changes, active versus date-activated staff, a lower-R% ordinary teacher, multiple daily SREs and rotation ties, different configured daily/consecutive limits and their disabled states, absence/restricted periods, protected/manual/peer work, combined lesson blocks and Google/edge parity. Run the existing 70 seeded independent maximum-coverage oracle cases unchanged and verify that personal displays retain counts without inventing R%.
 
 No runtime implementation, build, tests, staging, deployment, provider send, authority switch or live school record mutation is claimed by this preparation.
+
+## Runtime claim, 2026-10-30T10:20:46.989498+08:00
+
+PR #13 is merged as 17fc352e905043c1eb95b441e6f89f622d068006. GitHub now shows only this draft PR open. This branch integrates that exact main before product edits. Codex owns the bounded daily-SRE implementation described above; Claude reviews its final exact head. The subsequent long-term SRE/FAJT formula and ranking rows remain separate. The previously reported My Relief Duties name-resolution callback miss remains logged on PR #13; it is not silently combined with this policy change.
+
+The feature-branch claim path is retained because automatic approval review previously rejected direct main claims. No main mutation, authority change, live data edit, deployment or provider send is part of this task.

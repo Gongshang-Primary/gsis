@@ -1,3 +1,7 @@
+# Roster assignment attribution — 30 October 2026
+
+Model: Codex. Queue row 2. Assigned By follows the relief assignment: Auto-allocation, the recorded SMC editor, Peer arrangement or Shared subject rule. Unknown legacy actors show Not recorded. Daily Notify, My Relief Duties and all three relief Excel exports use this attribution, including unsaved local choices. Publishing remains a separate recorded action. Updating a label alone keeps the existing timetable notice identity; teacher publications and retained communication evidence keep their existing boundaries. Google remains authoritative. See [the task](docs/coordination/tasks/roster-assigned-by-label.md) for verification, review and rollback. Not deployed.
+
 # Roster automatic relief completion accounting — 30 October 2026
 
 Model: Codex. First task in the approved November queue. Ended published relief counts as completed in annual balances and personal calculations without a manual completion click. Explicit SMC corrections override the clock; cancelled, removed and zero-cost duties retain their existing accounting rules. Total spent, quota formula, allocation priorities and stored publication/notification records stay unchanged. Google remains authoritative. Local verification and Claude exact-head review are recorded in [the task](docs/coordination/tasks/roster-relief-auto-complete.md); no deployment or live record change is included.
