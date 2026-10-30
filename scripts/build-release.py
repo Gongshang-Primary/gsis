@@ -20,6 +20,15 @@ installation_manifest=runpy.run_path(str(root/'scripts/installation-manifest.py'
 import json
 release=json.loads((root/'package.json').read_text())
 version=release['gsisRelease']
+# One visible build label (release plus deploy letter) on every frontend header and
+# asset query string, so users can tell builds apart and caches never serve old files.
+build_label=release.get('gsisBuildLabel',version)
+assert re.fullmatch(re.escape(version)+r'[a-z]?',build_label), 'gsisBuildLabel must be the release plus at most one letter'
+label_pattern=re.compile(r'(\?v=|(?<![\w.])v)'+re.escape(version)+r'[a-z]?(?![\w.])')
+for folder in json.loads((root/'release-installation-manifest.json').read_text())['frontends'].values():
+ for page in sorted((root/folder).rglob('*.html')):
+  text=page.read_text();stamped=label_pattern.sub(lambda m:m.group(1)+build_label,text)
+  if stamped!=text:page.write_text(stamped)
 # Working-source checks must not overwrite the last authorised deployment.
 source_only='--source-only' in sys.argv
 FONT_SUFFIXES=set() if release.get('gsisAssetsIncluded') else {'.ttf','.woff','.woff2','.otf','.eot'}
