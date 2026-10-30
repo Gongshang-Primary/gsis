@@ -4,8 +4,8 @@ var GSISRelief=(function(){
  const own=(x,k)=>Object.prototype.hasOwnProperty.call(x,k);
  const record=x=>!!x&&typeof x==='object'&&!Array.isArray(x);
  const nonnegative=x=>typeof x==='number'&&Number.isFinite(x)&&x>=0;
- const model='whole-week-v6';
- function defaults(){return {schema:3,calculationVersion:model,mode:'actual',weeklyPeriods:84,fourFifthsFraction:0.8,fajtWeeklyPeriods:65,timetablePeriods:60,siuePercent:150,blocks:{}};}
+ const model='whole-week-v7';
+ function defaults(){return {schema:3,calculationVersion:model,mode:'actual',weeklyPeriods:84,fourFifthsFraction:0.8,fajtWeeklyPeriods:65,timetablePeriods:60,siuePercent:150,siuePercentBySpecialism:{PE:null,Art:null,Music:null},blocks:{}};}
  function validate(doc,value){
   const keys=Object.keys(defaults());
   if(!record(value)||Object.keys(value).some(k=>!keys.includes(k))||value.schema!==3||value.calculationVersion!==model||value.mode!=='actual')throw Error('Use the PDF relief model with actual teaching. Refresh older clients before editing rules.');
@@ -13,10 +13,13 @@ var GSISRelief=(function(){
   if(value.timetablePeriods>value.weeklyPeriods)throw Error('Timetable periods cannot exceed the full-time weekly budget.');
   if(!nonnegative(value.fourFifthsFraction)||value.fourFifthsFraction<=0||value.fourFifthsFraction>1)throw Error('The part-time budget fraction must be greater than zero and at most one.');
   if(!nonnegative(value.siuePercent)||!Number.isFinite(1+value.siuePercent/100))throw Error('SIUE must be a finite, non-negative percentage.');
+  const supplied=value.siuePercentBySpecialism===undefined?defaults().siuePercentBySpecialism:value.siuePercentBySpecialism;
+  if(!record(supplied)||Object.keys(supplied).some(key=>!['PE','Art','Music'].includes(key)))throw Error('SIUE specialist overrides must use PE, Art or Music.');
+  const siuePercentBySpecialism={};for(const key of ['PE','Art','Music']){const n=supplied[key]===undefined?null:supplied[key];if(n!==null&&(!nonnegative(n)||!Number.isFinite(1+n/100)))throw Error('SIUE must be a finite, non-negative percentage, or blank to inherit.');siuePercentBySpecialism[key]=n;}
   if(!record(value.blocks))throw Error('Enter Block periods for teachers in this version.');
   const teachers=new Set((doc.teachers||[]).map(t=>t.id)),blocks={};
   for(const [id,n] of Object.entries(value.blocks)){if(!teachers.has(id)||!nonnegative(n))throw Error('Block periods must be finite, non-negative weekly periods for a teacher in this version.');blocks[id]=n;}
-  return {...value,blocks};
+  return {...value,siuePercentBySpecialism,blocks};
  }
  // Read compatibility only: never rewrite a version or publication while reading.
  // Timetable/lunch budgets from schema 1/2 are not whole-week work budgets.
@@ -25,10 +28,17 @@ var GSISRelief=(function(){
   if(saved==null)return validate(doc,defaults());
   if(!record(saved)||![1,2,3].includes(saved.schema))throw Error('Unknown relief settings schema.');
   if(saved.schema===3){
-   if(![model,'whole-week-v5','whole-week-v4','whole-week-v3','whole-week-v2','whole-week-v1'].includes(saved.calculationVersion)||!['actual','expected'].includes(saved.mode))throw Error('Unknown relief calculation version.');
+   if(![model,'whole-week-v6','whole-week-v5','whole-week-v4','whole-week-v3','whole-week-v2','whole-week-v1'].includes(saved.calculationVersion)||!['actual','expected'].includes(saved.mode))throw Error('Unknown relief calculation version.');
    return validate(doc,{...saved,calculationVersion:model,mode:'actual'});
   }
   return validate(doc,{...defaults(),siuePercent:saved.siuePercent===undefined?150:saved.siuePercent,blocks:saved.blocks===undefined?{}:saved.blocks});
+ }
+ function appliedSiue(teacher,settings){
+  const tokens=String(teacher.profile?.['Subject Modifier']||teacher.subject||'').split(/[,;]/).map(value=>value.trim().toLowerCase()),specialisms=['PE','Art','Music'].filter(name=>tokens.includes(name.toLowerCase()));
+  if(!specialisms.length)return {percent:settings.siuePercent,specialism:null};
+  const candidates=specialisms.map(name=>({name,override:settings.siuePercentBySpecialism[name],percent:settings.siuePercentBySpecialism[name]??settings.siuePercent})),percent=Math.min(...candidates.map(row=>row.percent));
+  const chosen=candidates.filter(row=>row.percent===percent&&row.override!==null).map(row=>row.name);
+  return {percent,specialism:chosen.length?chosen.join(', '):null};
  }
  function employment(teacher){
   const p=teacher.profile||{},raw=String(p['Employment Modifier']||teacher.employment||'').trim();
@@ -82,7 +92,8 @@ var GSISRelief=(function(){
    if(r.incomplete||r.capIncomplete||![r.Teaching,r.FTT,r.pd,r.duties,r.otherNonTeaching].every(nonnegative))return missing('Workload data is incomplete.');
    if(out.capConfigured&&!nonnegative(out.periodCap))return missing('Weekly period cap needs correction.');
    out.capWorkload=r.FTT+r.Teaching+(out.capBasis==='total'?r.pd+r.duties+r.otherNonTeaching:0);out.capHeadroom=out.periodCap===null?null:Math.max(0,out.periodCap-out.capWorkload);
-   const allowance=of.OF*T_avg,siue=(r.Teaching+allowance)*settings.siuePercent/100;
+   const applied=appliedSiue(teacher,settings),allowance=of.OF*T_avg,siue=(r.Teaching+allowance)*applied.percent/100;
+   if(applied.specialism){out.siuePercentApplied=applied.percent;out.siueSpecialism=applied.specialism;}
    // Every captured period enters once; only teaching and its offload allowance receive SIUE.
    const Wi=r.FTT+r.pd+r.duties+r.otherNonTeaching+r.Teaching+allowance+siue,raw=factor*(budget-Wi);
    if(!Number.isFinite(raw)||!nonnegative(Wi))return missing('Relief factors exceed the calculation range.');
@@ -91,6 +102,6 @@ var GSISRelief=(function(){
   });
   return {settings,settingsError,calculationVersion:model,reference,weeklyPeriods:settings.weeklyPeriods,weeklyLunch:0,rows,byTeacher:Object.fromEntries(rows.map(r=>[r.id,r])),issues:rows.filter(r=>r.reason).map(r=>r.name+': '+r.reason)};
  }
- return {defaults,settingsFor,validate,analyse,employment,offload,model};
+ return {defaults,settingsFor,validate,analyse,employment,offload,appliedSiue,model};
 })();
 if(typeof module!=='undefined'&&module.exports)module.exports=GSISRelief;

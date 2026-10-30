@@ -28,7 +28,7 @@ run(`
 const beforeRead=stored(),published=plain(run("call('relief',{})"));
 assert.equal(stored(),beforeRead,'published relief read must not mutate storage');
 assert.equal(published.version.id,run('impVersion'));assert.equal(published.version.published,true);
-assert.equal(published.calculationVersion,'whole-week-v6');
+assert.equal(published.calculationVersion,'whole-week-v7');
 for(const id of ['yanyu','razilah','wen-di','fae']){
  const row=published.teachers.find(t=>t.teacherId===id);
  assert.equal(row.available,true);assert.equal(row.breakdown.otherNonTeaching,2);

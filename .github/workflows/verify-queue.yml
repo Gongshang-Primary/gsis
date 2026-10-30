@@ -6,6 +6,7 @@ on:
       - codex/roster-sre-fajt-r-calc
       - codex/release-version-letter
       - codex/roster-fajt-levelling
+      - codex/deploy-siue-by-specialism
   workflow_dispatch:
 permissions:
   contents: read

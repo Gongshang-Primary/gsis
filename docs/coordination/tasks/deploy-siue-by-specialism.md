@@ -34,3 +34,9 @@ Relief Settings gets more user-adjustable fields: SIUE (general) plus SIUE for P
 ## Implementation plan
 
 Model: Codex. Add nullable specialism percentages with read compatibility for old saved settings and a calculation-version refresh guard. Select PE/Art/Music from Subject Modifier or the existing legacy subject field; apply the lowest matching effective percentage to the whole teaching-plus-offload term. Keep default calculation rows unchanged when all overrides inherit. Surface applied overrides in Deploy details and Roster My Calculations. Regenerate bundles; run focused formula/UI checks and the full Linux suite. No merge or deployment.
+
+## Local verification and decisions
+
+Model: Codex. Calculation model whole-week-v7 reads prior v6 and older saved settings but rejects old-client writes with the existing refresh message. All-null overrides preserve existing calculation rows. Per-person override metadata is added only when a specialist override is selected; general rows retain their prior shape. Subject Modifier (fallback legacy subject) determines specialism; display names are ignored.
+
+Five formula/compatibility/personal projection cases pass, including R=34 in a synthetic PE-zero fixture and the matching teaching-weight projection. New UI validation/inheritance/save checks pass. Existing whole-week, cap, IMP, storage/cache, Admin-only editing and own-calculation tests pass. All 18 components rebuilt. Full Linux CI pending.

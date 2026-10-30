@@ -16,7 +16,7 @@ test('Configured cap is the lower of normal R and actual FTT plus teaching headr
 test('Normal R includes PD, duties and SIUE while a non-UT teaching cap does not',()=>{
  const a=calculation({cap:26}),b=calculation({cap:26,pd:2,duties:2,other:2,siue:100});assert.equal(a.capWorkload,b.capWorkload);assert.equal(a.capHeadroom,b.capHeadroom);assert(b.rawQuota<a.rawQuota);
  const rules=Rules.migrate(null);rules.tags.push({id:'second-cap',source:'Employment Modifier',match:'UT',periods:24,name:'Lower cap',percent:''});assert.equal(Rules.calculate({id:'ut',active:true,profile:{Role:'Teacher','Employment Modifier':'UT'}},rules).cap,24);
- const old={...Relief.defaults(),calculationVersion:'whole-week-v4'};assert.equal(Relief.settingsFor({relief:old}).calculationVersion,'whole-week-v6');assert.equal(old.calculationVersion,'whole-week-v4');
+ const old={...Relief.defaults(),calculationVersion:'whole-week-v4'};assert.equal(Relief.settingsFor({relief:old}).calculationVersion,'whole-week-v7');assert.equal(old.calculationVersion,'whole-week-v4');
 });
 test('Selected week workload classifies FTT and teaching, rejects unknown data',()=>{
  assert.equal(S.capWorkload([['FT','','',''],['EL','1A','',''],['PD (P5 EL)','','',''],['DUTY','','',''],['BLK','','',''],['IMP','','','']],{IMP:'Non-teaching'}),2);
