@@ -29,3 +29,8 @@
 ## Continuation directive, 30 Oct 2026
 
 Owner: "do not wait for review on completion of changelog items keep on going". Build and test each item, record an exact-head handoff, then continue the next eligible item while review proceeds. Keep one branch per task, the existing PR limit, owner-controlled merges, and explicit production/deployment holds. Pending review alone is not an implementation blocker. Any overlapping pending task is reconciled before integration; do not edit another implementer's branch.
+
+## Phases (30 Oct 2026, quiet hours)
+- **Phase 1, Claude:** `package.json` `gsisBuildLabel` (now `0.9.9b`). `scripts/build-release.py` stamps it on every manifest frontend's HTML: visible `v0.9.9b` labels and every `?v=0.9.9b` asset query string. File names, `gsisRelease` and `GSIS_DEPLOY_VERSION` stay `0.9.9` (protocol and packaging unchanged). `tests/release-build-label.cjs` fails on any stale label.
+- **Phase 2, Codex:** Worker health `version` field; backend exposes the build label; page/server mismatch notice (Required 3); bundle script refuses a repeated label (Required 4).
+- **Bundle rule (Claude, until phase 2):** before each deploy bundle, advance `gsisBuildLabel` by one letter, run `npm run build`, run the full suite, and take frontend ZIPs only from the release build (`<App>_Frontend_v0.9.9.zip`), never by zipping folders.
