@@ -332,3 +332,14 @@ Cloudflare-authoritative timetables (Diagram 1), new allocation rules, and chang
 **Found (29 Oct 2026, same screenshot):** "Delivered 1793228134000 Singapore time." The provider's delivery time is stored as a digit string; `stamp()` (`roster-update/public/roster-operations-ui.js:231`) only formats values that `new Date(value)` understands, so it prints the digits.
 
 **Planned change:** `stamp()` treats a 13-digit string as milliseconds and a 10-digit string as seconds since 1970, then formats as Singapore time (here: 29 Oct 2026, 06:55:34). Add a test for both forms. Check other callers that pass provider timestamps.
+
+### Roster System Config: collapsible teaching group exceptions
+
+**Request (30 Oct 2026):** Make "Teaching group exceptions" in Roster System Config collapsible. Owner screenshot: the list shows every teaching group (1CL1 CCE, 1CL1 CL, 1CL2 CCE …) with two dropdowns each, so the page is very long.
+
+**Planned change:**
+1. Wrap the list (search box and group rows) in a `<details>` block under the existing heading and hint. Collapsed by default.
+2. The summary line shows counts, e.g. "Teaching group exceptions · 3 saved exceptions of 84 groups".
+3. Open automatically when any group has a saved exception that is not "Inherit", or when the search box has text; remember open/closed per browser session.
+4. No change to saved data or allocation. Test: collapsed by default with no exceptions, open with one exception, the search still filters, Save still includes every row.
+Files: roster-update/public/roster-settings-ui.js (section near "Subject families and teaching groups", line ~110).
