@@ -3,7 +3,7 @@
 - Status: implementing; focused policy, route and browser checks passed; full suite pending
 - Owner/model: Codex
 - Reviewer/model: Claude
-- Last updated (Asia/Singapore): 30 Oct 2026 07:10
+- Last updated (Asia/Singapore): 30 Oct 2026 10:55
 - Branch: codex/roster-sre-daily-priority
 - Base SHA: 17fc352e905043c1eb95b441e6f89f622d068006
 - PR: https://github.com/helper-gsps/gsis/pull/14
@@ -87,6 +87,10 @@ Verified daily SREs enter both the candidate order and whole-plan solver before 
 
 Annual balance and personal projections retain completed/committed counts but suppress R entitlement and percentage for verified daily SREs. My Calculations and candidate cards say Daily roster, no R%. The activity Statistics view contains no R% column; its activity counts are unchanged. Long-term SRE calculation and ranking remain for queue row 2b2, as scoped; no FAJT priority rule is included.
 
-Nine focused regressions pass, including actual Google/edge Deploy evidence, actual edge context, both configured limits, date activation and source uncertainty. Real Chromium verifies the new setting default, editing, toggle, save/reload and Admin-only writes, plus daily personal display and escaping. Existing 70 seeded maximum-coverage oracle cases pass. A separate 100-case exact old/new assignment comparison against merged 17fc352 passes for non-SRE staff. Existing R17 core and integration cases pass. Build passes with 18 production components and 85 Apps Script ES2020 files.
+Ten focused regressions pass, including actual Google/edge Deploy evidence, actual edge context, both configured limits, date activation, source uncertainty and unchanged non-SRE composite modifiers/response fields. Real Chromium verifies the new setting default, editing, toggle, save/reload and Admin-only writes, plus daily personal display and escaping. Existing 70 seeded maximum-coverage oracle cases pass. A separate 100-case exact old/new assignment comparison against merged 17fc352 passes for non-SRE staff. Existing R17 core and integration cases pass. Build passes with 18 production components and 85 Apps Script ES2020 files.
+
+Discovery verification caught extra SRE metadata on ordinary candidate responses, breaking the original byte-for-byte ranking fixture, and a separately reproduced expansion of FAJT modifier restrictions. The correction emits SRE metadata only where applicable and expands composite employment restrictions only for SRE. The original ranking fixture now passes unchanged; the new regression preserves ordinary balance/manual-model fields and exact configured combined-employment matches. The final full-suite capture must test this corrected source, not infer completion from the earlier discovery run.
+
+Current main d535e294b3f5dfd06f61b1891b86a1c6981ba877 is integrated; it changes only three queue/task documents. Its owner priority makes roster-d1-google-backup the next implementation after this already-open SRE task, ahead of the remaining SRE/FAJT rows. Read-only preparation identified receipt replay, notification transport and R2 object restoration as required switch-back boundaries; no D1 runtime task or authority change is claimed here. Claude's separate PR #15 owns the old test/packaging failures.
 
 Full npm test and LORD results will be recorded before review. No fresh network installation, staging, school sign-in, live data/latency validation or real delivery is claimed. Google remains authoritative. No ROSTER_EDGE_AUTHORITY or live configuration change was made. Rollback uses the prior matched source and bundles; no stored-data migration is required.

@@ -9,6 +9,17 @@ function setup(){
 }
 const demand=(period)=>({id:'d'+period,staffId:'alice',date:'2026-10-14',period,subject:'EL',className:'4A'});
 const assignment=(id,period,extra={})=>({id,date:'2026-10-14',period,staffId:'bob',demandId:id,status:'published',origin:'automatic',rCost:1,version:1,...extra});
+test('non-SRE composite modifiers and candidate response fields retain their existing contract',()=>{
+ const f=fixture();f.people[1].employment='FAJT, BT';
+ let t=A.teacherContext(f.state,f.ctx,f.date).get('bob'),r=A.eligibility(t,0);
+ assert(r.autoEligible,'the SRE change must not introduce a new restriction for FAJT modifiers');
+ assert(!Object.hasOwn(r,'dailyRoster'));assert(!Object.hasOwn(r,'sreMode'));
+ assert(!Object.hasOwn(A.balances(f.state,f.ctx,f.date).get('bob'),'dailyRoster'));
+ assert(!Object.hasOwn(A.annual(f.state,f.ctx,'bob'),'dailyRoster'));
+ const row=A.manualModel(f.state,f.ctx,f.date).teachers.find(row=>row.id==='bob');assert(!Object.hasOwn(row,'dailyRoster'));assert(!Object.hasOwn(row,'sreMode'));
+ f.state.systemConfig.employmentPeriodRestrictions=[{employment:'FAJT, BT',periods:[2]}];
+ t=A.teacherContext(f.state,f.ctx,f.date).get('bob');assert(!A.eligibility(t,2).autoEligible);assert(A.eligibility(t,0).autoEligible);
+});
 test('verified daily SREs need no R and precede lower annual utilisation without inventing entitlements',()=>{
  const f=setup();f.state.assignments.push(assignment('past',2,{date:'2026-10-13',status:'completed',rCost:80}));
  const t=A.teacherContext(f.state,f.ctx,f.date).get('bob');assert(A.eligibility(t,3).autoEligible);
