@@ -450,9 +450,13 @@ var GSISRosterOperations=(()=>{
    if(!Array.isArray(publication.teachers)||publication.teachers.some(row=>!Array.isArray(row.snapshotIds)))continue;
    publishedDates.add(d);const selected=new Set(publication.teachers.flatMap(row=>row.snapshotIds)),latest=new Map();
    for(const {entry} of [...selected].map(key=>snapshots.get(key)).filter(value=>value?.entry.date===d).sort((a,b)=>a.index-b.index))latest.set(entry.assignmentId,entry);
-   for(const entry of latest.values())if(entry.kind!=='cancelled'&&entry.assignment)visibleAssignments.push({...entry.assignment,status:entry.assignment.status==='completed'?'completed':'published'});
+   for(const entry of latest.values())if(entry.assignment)visibleAssignments.push({...entry.assignment,status:entry.kind==='cancelled'?'cancelled':entry.assignment.status==='completed'?'completed':'published'});
   }
   visibleAssignments.push(...s.assignments.filter(a=>a.status!=='draft'&&!publishedDates.has(a.date)));
+  const actualIds=new Set((s.reliefCorrections||[]).map(row=>row.assignmentId));
+  for(const original of s.assignments)if(original.actualReviewRequired||actualIds.has(original.id)&&original.status!=='draft'){
+   const visible=visibleAssignments.find(row=>row.id===original.id);if(visible){if(original.actualReviewRequired){visible.actualReviewRequired=true;visible.actualStatusBeforeReplacement=original.actualStatusBeforeReplacement;}}else visibleAssignments.push({...original});
+  }
   const accounting={...s,assignments:visibleAssignments,importedRelief:(s.importedRelief||[]).filter(a=>a.status!=='draft')};
   for(const a of A.accounted(accounting,ctx)){
    if(a.staffId!==id||(a.accountingYear||A.year(a.date))!==year||!['published','completed'].includes(a.status)&&a.completionStatus!=='completed')continue;

@@ -12,4 +12,10 @@ state.accountingYears['2026'].verified=false;assert.equal(O.ownAnnualRelief(stat
 state.entitlements=state.entitlements.filter(r=>r.staffId!==id||r.week!==week);assert.match(O.ownAnnualRelief(state,teacher).reason,/This week/);
 state.entitlements.push({staffId:id,year:'2026',week,quota:0});state.entitlements=state.entitlements.filter(r=>r.staffId!==id||r.week===week);assert.equal(O.ownAnnualRelief(state,teacher).utilisation,null);
 state.entitlements.push({staffId:id,year:'2026',week,quota:10});assert.match(O.ownAnnualRelief(state,teacher).reason,/review/);
+const corrected=fixture(),old={id:'cancelled-duty',staffId:id,date:corrected.date,period:2,status:'cancelled',rCost:1,publishedAt:corrected.ctx.iso};
+corrected.state.assignments.push({...old});corrected.state.accountingYears['2026']={verified:true};corrected.state.entitlements.push({staffId:id,year:'2026',week:A.monday(corrected.date),quota:10});
+corrected.state.dailyPublicationStates[corrected.date]={teachers:[{staffId:id,snapshotIds:['cancelled-snapshot']}]};corrected.state.publicationSnapshots.push({id:'cancelled-snapshot',staffId:id,date:corrected.date,assignmentId:old.id,kind:'cancelled',assignment:old});
+corrected.state.reliefCorrections.push({assignmentId:old.id,sequence:1,actual:{staffId:id,date:corrected.date,period:2,completionStatus:'completed'}});
+assert.equal(O.ownAnnualRelief(corrected.state,{...corrected.ctx,user:teacher.user}).completed,1,'actual completion correction survives published cancellation');
+corrected.state.reliefCorrections=[];Object.assign(corrected.state.assignments[0],{actualReviewRequired:true,actualStatusBeforeReplacement:'published'});assert.equal(O.ownAnnualRelief(corrected.state,{...corrected.ctx,user:teacher.user}).spent,1,'pending actual-work review preserves its original accounting source');
 console.log('PASS own published annual relief, completed/committed separation, hidden drafts, scoped identity and unavailable histories');
