@@ -51,7 +51,13 @@ def verify_source_provenance(root, metadata, review):
     p.git(root, 'merge-base', '--is-ancestor', p.BASELINE, head)
     committed = metadata['sourceState'] == 'committed'
     if committed:
-        assert not p.git(root, 'status', '--porcelain').strip(), 'Committed source claim has a dirty checkout'
+        dirty = p.git(root, 'status', '--porcelain').decode().splitlines()
+        ledger = root / 'release/LAST_BUNDLE_VERSION'
+        # Successful final packaging advances only this tracked bookkeeping file.
+        # Product sources and the archived ledger still belong to the tagged HEAD.
+        if dirty:
+            assert len(dirty) == 1 and dirty[0][3:] == 'release/LAST_BUNDLE_VERSION', 'Committed source claim has a dirty checkout'
+            assert ledger.is_file() and not ledger.is_symlink() and ledger.read_text() == p.VERSION + '\n', 'Unexpected bundle ledger change'
         assert metadata['tag'] == 'v' + p.VERSION, 'Committed release tag claim differs'
         assert p.git(root, 'rev-parse', 'refs/tags/v' + p.VERSION + '^{commit}').decode().strip() == head, 'Release tag differs from trusted HEAD'
     else:
@@ -61,6 +67,14 @@ def verify_source_provenance(root, metadata, review):
     expected_log = p.git(root, 'log', '--format=fuller', p.BASELINE + '..' + head)
     assert review.read('RECENT_COMMITS.txt') == expected_log, 'Recent commit history differs from trusted source'
     return 'trusted-git-commit-tag-and-parent-diff'
+
+
+def trusted_source_bytes(root, name, metadata):
+    if name == 'release/LAST_BUNDLE_VERSION' and metadata['sourceState'] == 'committed':
+        probe = subprocess.run(['git', 'rev-parse', '--show-toplevel'], cwd=root, capture_output=True, text=True)
+        if probe.returncode == 0 and Path(probe.stdout.strip()).resolve() == root.resolve():
+            return p.git(root, 'show', metadata['sourceCommit'] + ':' + name)
+    return p.read_required(root, name, 'trusted source')
 
 
 def verify_installation_bytes(name, installed, rebuilt, recovered=False):
@@ -193,7 +207,7 @@ def verify(suite_path, review_path, source_root, preview=False):
             data = review.read('source/' + name)
             assert len(data) == item['bytes'] and p.digest(data) == item['sha256'], 'Source index mismatch: ' + name
             assert p.source_exclusion_reason(name) is None, 'Private or obsolete content was included: ' + name
-            assert data == p.read_required(source_root, name, 'trusted source'), 'Source differs from checkout: ' + name
+            assert data == trusted_source_bytes(source_root, name, suite_meta), 'Source differs from checkout: ' + name
         for name, item in index['omitted'].items():
             assert p.source_exclusion_reason(name) == item['reason'], 'Unexplained source omission: ' + name
         required = {'package.json', 'package-lock.json', 'scripts/build-release.py',

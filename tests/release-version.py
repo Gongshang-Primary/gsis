@@ -31,6 +31,41 @@ class ReleaseVersionTests(unittest.TestCase):
         text = b'Roster_Backend_v0.9.9.gs GSiS_Operations_Worker_v0.9.9.txt GSiS_v0.9.9_Timetable_Preparation.zip'
         self.assertEqual(helper['release_document'](text, '0.9.9b'), b'Roster_Backend_v0.9.9b.gs GSiS_Operations_Worker_v0.9.9b.txt GSiS_v0.9.9_Timetable_Preparation.zip')
 
+    def test_final_bundle_ledger_advance_preserves_tagged_source_verification(self):
+        import subprocess
+        import io
+        import zipfile
+        v = runpy.run_path(str(ROOT / 'scripts/verify-099-suite.py'))
+        p = v['p']
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            (root / 'release').mkdir()
+            (root / 'release/LAST_BUNDLE_VERSION').write_text('0.9.9a\n')
+            (root / 'current.js').write_text('current')
+            def git(*args):
+                return subprocess.check_output(['git', *args], cwd=root).decode().strip()
+            git('init', '-q')
+            git('add', '.')
+            git('-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.invalid', 'commit', '-qm', 'fixture')
+            head = git('rev-parse', 'HEAD')
+            git('tag', 'v' + p.VERSION)
+            p.BASELINE = head
+            metadata = {'sourceCommit': head, 'sourceState': 'committed', 'tag': 'v' + p.VERSION}
+            data = io.BytesIO()
+            with zipfile.ZipFile(data, 'w') as z:
+                z.writestr('CHANGES_FROM_0.9.9_BASELINE.patch', b'')
+                z.writestr('RECENT_COMMITS.txt', b'')
+            with zipfile.ZipFile(io.BytesIO(data.getvalue())) as z:
+                p.release_labels['record_bundle_version'](root, p.VERSION)
+                self.assertEqual(v['verify_source_provenance'](root, metadata, z), 'trusted-git-commit-tag-and-parent-diff')
+                self.assertEqual(v['trusted_source_bytes'](root, 'release/LAST_BUNDLE_VERSION', metadata), b'0.9.9a\n')
+                self.assertEqual(git('rev-parse', 'HEAD'), head)
+                (root / 'current.js').write_text('tampered')
+                with self.assertRaises(AssertionError): v['verify_source_provenance'](root, metadata, z)
+                (root / 'current.js').write_text('current')
+                (root / 'release/LAST_BUNDLE_VERSION').write_text('0.9.9z\n')
+                with self.assertRaises(AssertionError): v['verify_source_provenance'](root, metadata, z)
+
     def test_repeat_and_skipped_letter_are_refused(self):
         if not (ROOT / 'scripts/release-version.py').is_file(): self.skipTest('helper not implemented')
         helper = runpy.run_path(str(ROOT / 'scripts/release-version.py'))
