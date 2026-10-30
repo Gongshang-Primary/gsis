@@ -351,3 +351,15 @@ Cloudflare-authoritative timetables (Diagram 1), new allocation rules, and chang
 3. Open automatically when any group has a saved exception that is not "Inherit", or when the search box has text; remember open/closed per browser session.
 4. No change to saved data or allocation. Test: collapsed by default with no exceptions, open with one exception, the search still filters, Save still includes every row.
 Files: roster-update/public/roster-settings-ui.js (section near "Subject families and teaching groups", line ~110).
+
+### Roster: peer email job reports failure every minute for already-reviewed messages
+
+**Found (30 Oct 2026, D1 job health; still present after the v0.9.9b deploy, 31 Oct 05:09):** `peer-mail` records `JOB_FAILED` (and some `TIMEOUT`) every minute since at least 30 Oct 18:00, with counts `{pending:0, sent:0, uncertain:2, reviewedUncertain:2}`. The two uncertain messages were already reviewed, yet each run counts them as a failure. No message is lost; the noise hides real failures in System Health.
+
+**Planned change:**
+1. Reviewed uncertain peer messages do not make the job fail; report them as `reviewedUncertain` with status idle or success.
+2. Unreviewed uncertain messages still fail once and raise one SMC alert, not one per minute.
+3. Investigate the TIMEOUTs on the same job (likely the full operations-file read; may ease after roster-archive-cold-output).
+4. Test: job with only reviewed uncertain messages records idle/success; with one unreviewed, records failure.
+
+**Scope:** peer-mail job in the notification Worker and `backend/RosterPeerMail.gs`. Not deployed.
