@@ -17,7 +17,7 @@ if(['0.9.8p','0.9.8q'].includes(require('../package.json').gsisRelease)){
 if(require('../package.json').gsisRelease==='0.9.8q'){
  historical['release098p-metadata.cjs']='past full-suite P inventory and labels; release098q-metadata.cjs and package.cjs verify the Calendar-only Q patch';
 }
-if(require('../package.json').gsisRelease==='0.9.9'){
+if(require('../package.json').gsisRelease.match(/^0[.]9[.]9[a-z]?$/)){
  // Exact past-release inventories are historical; runtime/security checks stay selected.
  for(const file of ['release098h-metadata.cjs','release098k-metadata.cjs','release098l-metadata.cjs','release098m-metadata.cjs','release098n-metadata.cjs','release098o-metadata.cjs','release098p-metadata.cjs','release098q-metadata.cjs'])historical[file]='past release inventory and labels; release099-metadata.cjs and package.cjs verify the harmonized 0.9.9 full suite';
 }

@@ -24,7 +24,7 @@ function assertSelfContained(node,label){
   assert(release.file(`Calendar_Frontend_v${settings.gsisRelease}.zip`),'Calendar matched frontend is required');
   for(const app of ['Roster','Deploy','Contacts','LORD','OVERLORD','STARLORD','Venues','Layout'])assert.equal(release.file(`${app}_Frontend_v${settings.gsisRelease}.zip`),null,'unchanged frontend must not ship');
  }
- for(const app of (settings.gsisRelease==='0.9.8q'?['Calendar']:settings.gsisRelease==='0.9.9'?['Roster','Deploy','Calendar']:['Roster','Deploy'])){
+ for(const app of (settings.gsisRelease==='0.9.8q'?['Calendar']:settings.gsisRelease.match(/^0[.]9[.]9[a-z]?$/)?['Roster','Deploy','Calendar']:['Roster','Deploy'])){
   const name=`${app}_Frontend_v${settings.gsisRelease}.zip`;
   if(!release.file(name))continue;
   try{

@@ -1,7 +1,7 @@
 (() => {
   'use strict';
 
-  const FRONTEND_VERSION = '0.9.9';
+  const FRONTEND_VERSION = '0.9.9b';
   const PAGE_STORAGE_KEY = 'gspsCalPage';
   const LANDING_VERSION_KEY = 'gspsCalLandingVersion';
   const PUBLICATION_REQUESTS_KEY = 'gspsCalPublicationRequests';

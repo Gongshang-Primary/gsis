@@ -31,7 +31,7 @@ const root=path.resolve(__dirname,'..'),settings=require('../package.json'),vers
    const waiting=[],oldError=console.error;console.error=()=>{};
    try{await notification.scheduled({cron:'* * * * *',scheduledTime:Date.now()},{GSIS_RECOVERY_MODE:'true',GSIS_JOBS:{prepare(){effects++;throw Error('Paused worker touched D1');}}},{waitUntil:promise=>waiting.push(promise)});await Promise.all(waiting);}finally{console.error=oldError;}
   }else assert.equal(deployment.file(`Roster_Notification_Worker_v${version}.txt`),null,'frontend patch does not replace the notification Worker');
-  if(['0.9.8q','0.9.9'].includes(version)){
+  if(version==='0.9.8q'||/^0[.]9[.]9[a-z]?$/.test(version)){
    const frontend=await JSZip.loadAsync(await deployment.file(`Calendar_Frontend_v${version}.zip`).async('nodebuffer'));
    const calendar=await load('Calendar',await frontend.file('_worker.js').async('string'));
    const config=await calendar.fetch(new Request('https://calendar.example.test/api/client-config'),{GOOGLE_CLIENT_ID:'offline-client'},{});

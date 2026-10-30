@@ -11,9 +11,10 @@ module.exports = function suiteCandidate(root) {
       '--source-root', root, ...(process.env.GSIS_RECOVERY_PREVIEW === 'true' ? ['--preview'] : [])], {cwd: root, stdio: 'pipe'});
     return recoveredSuite;
   }
+  const version=require(path.join(root, 'package.json')).gsisRelease;
   const output = path.join(root, 'verification/v099/package-candidate');
-  const suite = path.join(output, 'GSiS_v0.9.9_Full_Suite.zip');
-  const review = path.join(output, 'GSiS_v0.9.9_Review_Source.zip');
+  const suite = path.join(output, 'GSiS_v'+version+'_Full_Suite.zip');
+  const review = path.join(output, 'GSiS_v'+version+'_Review_Source.zip');
   execFileSync('python3', ['scripts/package-timetable-preparation.py', '--zip',
     path.join(output, 'GSiS_v0.9.9_Timetable_Preparation.zip')], {cwd: root, stdio: 'pipe'});
   execFileSync('python3', ['scripts/package-099-suite.py', '--preview', '--output-dir', output], {cwd: root, stdio: 'pipe'});

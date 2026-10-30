@@ -20,7 +20,7 @@ def installation_manifest(root, version):
         assert not relative.is_absolute() and '..' not in relative.parts and relative.suffix == '.txt'
         members[name.format(version=version)] = root / relative
     for name in spec['documents']:
-        relative = Path(name.format(version=version))
+        relative = Path(name.format(version=__import__('re').sub(r'[a-z]$', '', version)))
         assert not relative.is_absolute() and '..' not in relative.parts and '\\' not in name
         assert str(relative) == 'README.md' or (relative.parts[0] == 'docs' and len(relative.parts) in (2, 3))
         members[relative.as_posix()] = root / relative

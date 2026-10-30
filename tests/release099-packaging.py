@@ -87,7 +87,7 @@ class PackagingTests(unittest.TestCase):
         p = module()
         def archive(**updates):
             files = {'worker.mjs': b'export default {};'}
-            manifest = {'release': p.VERSION, 'productionInstallation': False,
+            manifest = {'release': p.DOC_VERSION, 'productionInstallation': False,
                         'productionCutover': False, 'deployed': False, 'mode': 'shadow-only',
                         'workerName': 'gsis-roster-rehearsal',
                         'existingBindings': ['REHEARSAL_LEDGER', 'REHEARSAL_TIMETABLES'],
@@ -98,7 +98,7 @@ class PackagingTests(unittest.TestCase):
                 for name, data in files.items(): result.writestr(name, data)
                 result.writestr('MANIFEST.json', json.dumps(manifest))
             return buffer.getvalue()
-        self.assertEqual(p.verify_preparation_bytes(archive())['release'], p.VERSION)
+        self.assertEqual(p.verify_preparation_bytes(archive())['release'], p.DOC_VERSION)
         for updates in [{'release': '0.9.8o'}, {'productionInstallation': True},
                         {'productionCutover': True}, {'deployed': True},
                         {'mode': 'production'}, {'workerName': 'replacement-worker'},
@@ -157,7 +157,7 @@ class PackagingTests(unittest.TestCase):
             def archive(changes=None):
                 data = io.BytesIO()
                 contents = {**canonical, 'REVIEW_SOURCE.json': b'{}', 'MANIFEST.json': b'{}',
-                            'Timetable_Preparation/' + v.p.PREPARATION_NAME: b'fixture'}
+                            'Timetable_Preparation/' + v.p.PREPARATION_NAME: b'fixture', 'COMMIT.txt': b'fixture', 'DEPLOY_STEPS.md': b'fixture'}
                 contents.update(changes or {})
                 with zipfile.ZipFile(data, 'w') as z:
                     for name, value in contents.items(): z.writestr(name, value)
@@ -230,7 +230,7 @@ class PackagingTests(unittest.TestCase):
             files = p.installation_files(root)
             self.assertEqual(len(files), 18)
             self.assertFalse(any('0.9.8j' in name for name in files))
-            (root / 'LORD_Backend_v0.9.9.gs').unlink()
+            (root / f'LORD_Backend_v{p.VERSION}.gs').unlink()
             with self.assertRaisesRegex(AssertionError, 'Missing installation component'):
                 p.installation_files(root)
 

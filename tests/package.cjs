@@ -1,6 +1,6 @@
 const {execFileSync}=require('child_process');
 const settings=require('../package.json');
-if(settings.gsisRelease==='0.9.9'){
+if(settings.gsisRelease.match(/^0[.]9[.]9[a-z]?$/)){
  execFileSync('python3',['tests/release099-packaging.py'],{stdio:'inherit'});
  console.log('Verified 0.9.9 suite: '+require('./helpers/suite099-package.cjs')(require('node:path').resolve(__dirname,'..')));
 }else if(settings.gsisRelease==='0.9.8q'){

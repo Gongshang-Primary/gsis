@@ -14,7 +14,9 @@ import tempfile
 import zipfile
 
 ROOT = Path(__file__).resolve().parents[1]
-VERSION = '0.9.9'
+VERSION = '0.9.9b'
+DOC_VERSION = VERSION[:-1]
+release_labels = __import__('runpy').run_path(str(ROOT / 'scripts/release-version.py'))
 # The repository starts at the 0.9.9 release as deployed on 28 Oct 2026.
 # Earlier history (0.9.8q, 50c977d) was not imported into GitHub.
 BASELINE = '2efd6e003fa9ee3846cf590d07902a22309861ff'
@@ -29,9 +31,9 @@ STAMP = (2026, 10, 28, 0, 0, 0)
 FRONTENDS = ('Contacts', 'Deploy', 'Layout', 'Roster', 'Calendar', 'LORD', 'OVERLORD', 'STARLORD', 'Venues')
 BACKENDS = ('Contacts', 'Deploy', 'Roster', 'Calendar', 'LORD', 'Venues')
 WORKERS = {
-    'Roster_Notification_Worker_v0.9.9.txt': 'notification-worker/dashboard-worker.txt',
-    'GSiS_Operations_Worker_v0.9.9.txt': 'operations-worker/dashboard-worker.txt',
-    'GSiS_Calendar_Job_Worker_v0.9.9.txt': 'calendar-job-worker/dashboard-worker.txt',
+    f'Roster_Notification_Worker_v{VERSION}.txt': 'notification-worker/dashboard-worker.txt',
+    f'GSiS_Operations_Worker_v{VERSION}.txt': 'operations-worker/dashboard-worker.txt',
+    f'GSiS_Calendar_Job_Worker_v{VERSION}.txt': 'calendar-job-worker/dashboard-worker.txt',
 }
 PRODUCTION_AUTHORITIES = {'roster': 'Google', 'calendar': 'Google',
                          'deploy': 'unchanged configured authority', 'preparation': 'shadow-only'}
@@ -80,11 +82,11 @@ def source_exclusion_reason(name):
         return 'Private configuration or credential material'
     if p.suffix.lower() in {'.zip', '.bundle', '.pyc'}:
         return 'Generated archive, prior full history or bytecode; current source is supplied directly'
-    if len(p.parts) == 1 and re.fullmatch(r'[A-Za-z]+_Backend_v\d[^/]+\.gs', p.name) and not p.name.endswith(('_v0.9.8p.gs', '_v0.9.8q.gs', '_v0.9.9.gs')):
+    if len(p.parts) == 1 and re.fullmatch(r'[A-Za-z]+_Backend_v\d[^/]+\.gs', p.name) and not p.name.endswith(('_v0.9.8p.gs', '_v0.9.8q.gs', '_v0.9.9.gs', '_v' + VERSION + '.gs')):
         return 'Superseded generated backend release; canonical modules, P/Q comparison and current output retained'
     if name.startswith('docs/.GSiS-') or name.startswith('docs/.archify-delivery-'):
         return 'Temporary historical document output; canonical current documentation retained'
-    if name.startswith('docs/') and p.suffix in {'.html', '.drawio', '.svg', '.pdf'} and VERSION not in name:
+    if name.startswith('docs/') and p.suffix in {'.html', '.drawio', '.svg', '.pdf'} and DOC_VERSION not in name:
         if re.search(r'(?:GSiS[-_]v\d|GSiS-.*-v\d)', name):
             return 'Superseded release manual or architecture copy; current 0.9.9 guide retained'
     # Tracked review notes and older contracts remain small and can explain why a
@@ -220,14 +222,14 @@ def relocate_document_links(data, origin, destination, mapping):
 
 def support_files(root):
     """Canonical installation guidance/configuration is verified as rigorously as code."""
-    origins = {'START_HERE.html': f'SETUP_v{VERSION}.html', 'START_HERE.md': f'SETUP_v{VERSION}.md'}
-    for filename in [f'CHANGELOG_v{VERSION}.md', f'VALIDATION_v{VERSION}.md']:
+    origins = {'START_HERE.html': f'SETUP_v{DOC_VERSION}.html', 'START_HERE.md': f'SETUP_v{DOC_VERSION}.md'}
+    for filename in [f'CHANGELOG_v{DOC_VERSION}.md', f'VALIDATION_v{DOC_VERSION}.md']:
         origins['Docs/' + filename] = filename
     for path in sorted((root / 'docs/v099').rglob('*')):
         if path.is_file():
             assert not path.is_symlink(), 'Documentation symlink refused'
             origins['Docs/' + path.relative_to(root / 'docs/v099').as_posix()] = path.relative_to(root).as_posix()
-    for path in [f'docs/GSiS-v{VERSION}-User-Manual.html', f'docs/architecture/GSiS_v{VERSION}_Architecture.html', f'docs/architecture/GSiS_v{VERSION}_Architecture.drawio']:
+    for path in [f'docs/GSiS-v{DOC_VERSION}-User-Manual.html', f'docs/architecture/GSiS_v{DOC_VERSION}_Architecture.html', f'docs/architecture/GSiS_v{VERSION}_Architecture.drawio']:
         if (root / path).is_file(): origins['Docs/' + Path(path).name] = path
     origins.update({
         'Optional_Workers/Calendar_Jobs_schema.sql': 'calendar-job-worker/schema.sql',
@@ -246,7 +248,7 @@ def support_files(root):
     mapping = {source: destination for destination, source in origins.items()}
     # Prefer the canonical Docs copy over its additional Worker-side alias.
     mapping['docs/v099/WORKERS_INVENTORY.md'] = 'Docs/WORKERS_INVENTORY.md'
-    return {destination: relocate_document_links(read_required(root, source, 'setup dependency'), source, destination, mapping)
+    return {destination: relocate_document_links(release_labels['release_document'](read_required(root, source, 'setup dependency'), VERSION), source, destination, mapping)
             for destination, source in origins.items()}
 
 
@@ -258,7 +260,7 @@ def verify_preparation_bytes(data):
         assert len(names) == len(set(names)) and archive.testzip() is None, 'Invalid preparation archive'
         for name in names: safe_path(name)
         manifest = json.loads(archive.read('MANIFEST.json'))
-        assert manifest['release'] == VERSION, 'Preparation release is not harmonised'
+        assert manifest['release'] == DOC_VERSION, 'Preparation release is not harmonised'
         assert manifest['productionInstallation'] is False and manifest['productionCutover'] is False
         assert manifest.get('deployed') is False and manifest['mode'] == 'shadow-only'
         assert manifest['workerName'] == 'gsis-roster-rehearsal'
@@ -270,6 +272,7 @@ def verify_preparation_bytes(data):
 
 
 def build(root):
+    release_labels['stamp'](root)
     settings = json.loads(read_required(root, 'package.json', 'release metadata'))
     assert settings['gsisRelease'] == VERSION and settings['gsisPackageKind'] == 'full-suite'
     assert set(settings['gsisComponentVersions'].values()) == {VERSION}
@@ -279,6 +282,7 @@ def build(root):
 
 
 def package(root, output, preview=False, evidence_dir=None):
+    if not preview: release_labels['check_bundle_version'](root, VERSION)
     settings = json.loads(read_required(root, 'package.json', 'release metadata'))
     assert settings['gsisRelease'] == VERSION, 'Package release is not 0.9.9'
     assert set(settings['gsisComponentVersions'].values()) == {VERSION}, 'Production component labels are not harmonised'
@@ -330,10 +334,15 @@ def package(root, output, preview=False, evidence_dir=None):
     suite['REVIEW_SOURCE.json'] = json_bytes({'file': review_name, 'sha256': digest(review_path.read_bytes()),
                                            'bytes': review_path.stat().st_size,
                                            'description': 'Separate lean source and second-opinion evidence; not a Pages upload'})
+    suite['COMMIT.txt'] = (VERSION + '\n' + commit + '\n').encode()
+    suite['DEPLOY_STEPS.md'] = (f'# Deploy GSiS v{VERSION}\n\nInstall the production components from this bundle using START_HERE.html. Preserve existing URLs, settings, secrets and bindings.\n\nThis bundle is prepared only; deployment and live verification are separate owner actions.\n').encode()
     suite_path = output / f'GSiS_v{VERSION}_Full_Suite.zip'
     write_archive(suite_path, suite, {**metadata, 'kind': 'full-suite',
                                     'frontends': list(FRONTENDS), 'backends': list(BACKENDS),
                                     'optionalWorkers': list(WORKERS), 'separatePackages': separate})
+    (output / 'COMMIT.txt').write_bytes(suite['COMMIT.txt'])
+    (output / 'DEPLOY_STEPS.md').write_bytes(suite['DEPLOY_STEPS.md'])
+    if not preview: release_labels['record_bundle_version'](root, VERSION)
     return {'suite': {'path': str(suite_path), 'bytes': suite_path.stat().st_size, 'sha256': digest(suite_path.read_bytes())},
             'review': {'path': str(review_path), 'bytes': review_path.stat().st_size, 'sha256': digest(review_path.read_bytes())},
             'sourceIncludedCount': len(index['included']), 'sourceOmittedCount': len(index['omitted']),
@@ -347,4 +356,6 @@ if __name__ == '__main__':
     parser.add_argument('--build-only', action='store_true')
     parser.add_argument('--preview', action='store_true')
     args = parser.parse_args()
-    print(json.dumps(build(ROOT) if args.build_only else package(ROOT, args.output_dir.resolve(), args.preview, args.evidence_dir), indent=2))
+    output = args.output_dir.resolve()
+    if not args.preview: output = output / ('GSiS_v' + VERSION)
+    print(json.dumps(build(ROOT) if args.build_only else package(ROOT, output, args.preview, args.evidence_dir), indent=2))

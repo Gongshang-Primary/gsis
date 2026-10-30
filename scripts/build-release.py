@@ -18,6 +18,7 @@ root=Path(__file__).resolve().parents[1]
 import runpy
 installation_manifest=runpy.run_path(str(root/'scripts/installation-manifest.py'))['installation_manifest']
 import json
+runpy.run_path(str(root/'scripts/release-version.py'))['stamp'](root)
 release=json.loads((root/'package.json').read_text())
 version=release['gsisRelease']
 # Working-source checks must not overwrite the last authorised deployment.
@@ -151,6 +152,8 @@ app=root/'public/app.js'
 app.write_text(re.sub(r'^controls\(\);startSignIn\(\);\s*$', '', app.read_text(), flags=re.M).rstrip()+'\n\ncontrols();startSignIn();\n')
 subprocess.run(['node',str(root/'scripts/build-edge-deploy.cjs')],cwd=root,check=True)
 subprocess.run(['node',str(root/'scripts/build-edge-modules.cjs')],cwd=root,check=True)
+# Derived setup pages and Worker domains now exist; stamp before assembling outputs.
+runpy.run_path(str(root/'scripts/release-version.py'))['stamp'](root)
 code=(root/'backend/Code.gs').read_text()+'\n'+(root/'backend/Seed.gs').read_text()
 assert code.count("const GSIS_BACKEND_KIND='deploy';")==1, 'Canonical backend needs one fixed Deploy role'
 roster_version=release.get('gsisComponentVersions',{}).get('rosterBackend',version)
@@ -218,13 +221,13 @@ for name,folder in frontend_spec.items():
 # installation ZIP. Runtime dependencies remain inside their frontend ZIPs.
 package=root/f'GSiS_v{version}_Deployment.zip'
 installation,members=installation_manifest(root,version)
-files={name:path.read_bytes() for name,path in members.items()}
+files={name:(runpy.run_path(str(root/'scripts/release-version.py'))['release_document'](path.read_bytes(),version) if path.suffix in {'.md','.html'} else path.read_bytes()) for name,path in members.items()}
 try:
  commit=subprocess.check_output(['git','rev-parse','HEAD'],cwd=root,text=True,stderr=subprocess.DEVNULL).strip()
  # Only release inputs determine provenance; unrelated local review files do not.
  release_inputs=list(installation['frontends'].values())+['backend','shared','data','calendar-backend','Contacts_Code.gs',
   'notification-worker','operations-worker','migrations','scripts','package.json','package-lock.json','release-installation-manifest.json']
- release_inputs += [str(members[name.format(version=version)].relative_to(root)) for name in installation['documents']]
+ release_inputs += [str(members[name.format(version=re.sub(r'[a-z]$', '', version))].relative_to(root)) for name in installation['documents']]
  if 'LORD' in installation['backends']:release_inputs.append('lord-suite/Source/backend')
  if 'Venues' in installation['backends']:release_inputs.append('venues-backend')
  dirty=bool(subprocess.check_output(['git','status','--porcelain','--',*release_inputs],cwd=root,text=True).strip())

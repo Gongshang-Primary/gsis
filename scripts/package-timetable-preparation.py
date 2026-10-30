@@ -28,7 +28,7 @@ def canonical_files(build_dir):
         'TIMETABLE_EXPORT_CONTRACT.md': ROOT / 'docs/v098o/TIMETABLE_EXPORT_CONTRACT.md',
     }
     source_names = set(provenance['inputs'])
-    source_names.update(str(p.relative_to(ROOT)) for p in (ROOT / 'timetable-prep-worker').glob('*') if p.is_file())
+    source_names.update(p.relative_to(ROOT).as_posix() for p in (ROOT / 'timetable-prep-worker').glob('*') if p.is_file())
     source_names.update(['scripts/build-timetable-prep-worker.cjs', 'scripts/package-timetable-preparation.py',
                          'scripts/verify-timetable-preparation.py', 'backend/RosterTimetablePreparation.gs',
                          'docs/v098o/TIMETABLE_EXPORT_CONTRACT.md'])

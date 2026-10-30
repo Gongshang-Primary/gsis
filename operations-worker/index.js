@@ -77,6 +77,7 @@ async function relay(env,command,ctx){
  return (domain==='roster'?rosterGateway:deployGateway).fetch(request,env,ctx);
 }
 export default {async fetch(request,bindings,ctx){
+  if(request.method==='GET'&&new URL(request.url).pathname==='/health')return Response.json({ok:true,version:'0.9.9b'},{headers:{'Cache-Control':'no-store'}});
  try{
   const command=await verifyBackendEnvelope(request,bindings),domain=command.purpose.startsWith('deploy')?'deploy':'roster',env=backendDomainEnv(bindings,domain);
   if(command.purpose==='health')return Response.json({ok:true,value:await health(env,command)},{headers:{'Cache-Control':'no-store'}});

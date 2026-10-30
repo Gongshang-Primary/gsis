@@ -32,7 +32,7 @@ function gsisApiSecret(env,legacyName){
  * Apps Script requests.
  */
 
-const WORKER_VERSION = '0.9.9';
+const WORKER_VERSION = '0.9.9b';
 const COOKIE_NAME = '__Host-gsps_cal_session';
 const SESSION_SECONDS = 12 * 60 * 60;
 const GSPS_DOMAIN = 'gsps.edu.sg';

@@ -271,7 +271,7 @@ export default {async fetch(req,env,ctx){
  if(u.pathname.startsWith('/api/')&&!['/api/session','/api/logout'].includes(u.pathname))try{gsisApiSecret(env,'BRIDGE_SECRET');}catch(error){return json({ok:false,code:error.code,error:error.message},503);}
  // Migration is deliberately absent from the restoration release. In
  // particular, an old dashboard binding must not reactivate a second writer.
- // 0.9.9a D1 preparation: ROSTER_D1_PREPARE=import reopens only read and copy
+ // 0.9.9b D1 preparation: ROSTER_D1_PREPARE=import reopens only read and copy
  // controls. Activation, restart, pause and resume stay closed, so Google
  // remains the only writer and users keep the Google route.
  if(u.pathname==='/api/edge/migration'&&!(await d1PrepareAllows(req,env)))return json({ok:false,code:'RECOVERY_MIGRATION_DISABLED',error:'Migration is disabled in this Roster restoration release.'},404);
@@ -290,7 +290,7 @@ export default {async fetch(req,env,ctx){
   if(!['/external.html','/external.js','/external.css'].includes(u.pathname))return response;
   const safe=new Response(response.body,response);safe.headers.set('Cache-Control','no-store');safe.headers.set('Referrer-Policy','no-referrer');safe.headers.set('X-Content-Type-Options','nosniff');safe.headers.set('Content-Security-Policy',"default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'");return safe;
  }
- if(u.pathname==='/api/config'){const {routes,...notifications}=notificationStatus(env);return json({version:'0.9.9',clientId:env.GOOGLE_CLIENT_ID||'',notifications});}
+ if(u.pathname==='/api/config'){const {routes,...notifications}=notificationStatus(env);return json({version:'0.9.9b',clientId:env.GOOGLE_CLIENT_ID||'',notifications});}
  if(u.pathname==='/api/quiet-mode')return quietModeRoute(req,env,u);
  const action={'/api/profile':'rosterProfile','/api/read':'rosterRead','/api/upload':'rosterUpload','/api/update':'rosterUpdate','/api/operations':'rosterOperations','/api/edge/migration':'edgeMigration'}[u.pathname];
  if(!action)return json({ok:false,error:'Not found'},404);

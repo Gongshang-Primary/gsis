@@ -105,7 +105,7 @@ def verify_runtime(suite, root):
         temporary = Path(td)
         for app, folder in FRONTEND_FOLDERS.items():
             with zipfile.ZipFile(io.BytesIO(suite.read(f'Production/{app}_Frontend_v{p.VERSION}.zip'))) as frontend:
-                expected = {str(path.relative_to(root / folder)) for path in (root / folder).rglob('*') if path.is_file()}
+                expected = {path.relative_to(root / folder).as_posix() for path in (root / folder).rglob('*') if path.is_file()}
                 assert set(frontend.namelist()) == expected, 'Frontend canonical inventory differs: ' + app
                 html = frontend.read('index.html').decode()
                 assert 'v' + p.VERSION in html, 'Frontend label differs: ' + app
@@ -145,15 +145,15 @@ def verify_runtime(suite, root):
             else:
                 assert re.findall(r"\bVENUES_VERSION\s*=\s*['\"]([^'\"]+)['\"]", text) == [p.VERSION]
 
-        for name, entry in {'Roster_Notification_Worker_v0.9.9.txt': 'notification-worker/dashboard-entry.js',
-                            'GSiS_Operations_Worker_v0.9.9.txt': 'operations-worker/index.js'}.items():
+        for name, entry in {f'Roster_Notification_Worker_v{p.VERSION}.txt': 'notification-worker/dashboard-entry.js',
+                            f'GSiS_Operations_Worker_v{p.VERSION}.txt': 'operations-worker/index.js'}.items():
             output = temporary / name
             subprocess.run(['node', 'scripts/bundle-worker.cjs', entry, str(output)], cwd=root, check=True, capture_output=True)
             data = suite.read('Optional_Workers/' + name)
             assert data == output.read_bytes(), 'Optional Worker canonical derivation differs: ' + name
             labels = re.findall(rb"\bversion\s*:\s*['\"]([^'\"]+)['\"]", data)
             assert labels and set(labels) == {p.VERSION.encode()}, 'Optional Worker label differs: ' + name
-        calendar = suite.read('Optional_Workers/GSiS_Calendar_Job_Worker_v0.9.9.txt')
+        calendar = suite.read(f'Optional_Workers/GSiS_Calendar_Job_Worker_v{p.VERSION}.txt')
         assert calendar == (root / 'calendar-job-worker/worker.mjs').read_bytes(), 'Calendar jobs Worker canonical derivation differs'
         assert p.VERSION.encode() in calendar, 'Calendar jobs Worker label differs'
 
@@ -162,7 +162,7 @@ def verify_support_files(suite, root, component_names):
     support = p.support_files(root)
     for name, data in support.items():
         assert suite.read(name) == data, 'Installation guidance/configuration differs from trusted source: ' + name
-    expected_inventory = set(component_names) | set(support) | {'REVIEW_SOURCE.json', 'MANIFEST.json', 'Timetable_Preparation/' + p.PREPARATION_NAME}
+    expected_inventory = set(component_names) | set(support) | {'REVIEW_SOURCE.json', 'MANIFEST.json', 'Timetable_Preparation/' + p.PREPARATION_NAME, 'COMMIT.txt', 'DEPLOY_STEPS.md'}
     assert set(suite.namelist()) == expected_inventory, 'Installation/support inventory differs'
 
 

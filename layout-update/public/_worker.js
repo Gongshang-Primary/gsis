@@ -90,7 +90,7 @@ export default {async fetch(req,env){
  const u=new URL(req.url),traceId=requestTrace(req),started=Date.now(); if(u.pathname.startsWith('/api/')&&!['/api/session','/api/logout'].includes(u.pathname))try{gsisApiSecret(env,'BRIDGE_SECRET');}catch(error){return json({ok:false,code:error.code,error:error.message},503);}
 const session=await sessionRoute(req,env);if(session)return session;
  if(!u.pathname.startsWith('/api/'))return env.ASSETS.fetch(req);
- if(u.pathname==='/api/config')return json({version:'0.9.9',clientId:env.GOOGLE_CLIENT_ID||''});
+ if(u.pathname==='/api/config')return json({version:'0.9.9b',clientId:env.GOOGLE_CLIENT_ID||''});
  if(!env.APPS_SCRIPT_URL||!gsisApiSecret(env,'BRIDGE_SECRET')||gsisApiSecret(env,'BRIDGE_SECRET').length<32)return json({ok:false,error:'Campus connection is not configured.'},503);
  try{
   if(u.pathname==='/api/public/campus'){
