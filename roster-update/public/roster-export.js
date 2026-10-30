@@ -120,9 +120,9 @@ var RosterExport=(()=>{
  function comparisonPages(day,options={}){
   if(!day.baseline?.periods?.length||!Array.isArray(day.baseline.teachers))return reliefPages(day,options);
   const align=day.baseline,unmatched=day.periods.map(p=>!align.periods.some(q=>q.startMinutes===p.startMinutes&&q.endMinutes===p.endMinutes)),baseline={...align,date:day.date,periods:day.periods,teachers:align.teachers.map(t=>({...t,cells:day.periods.map(p=>{const q=align.periods.find(q=>q.startMinutes===p.startMinutes&&q.endMinutes===p.endMinutes);return q?t.cells[q.period]||['','','','']:['','','',''];})}))};
-  const type=options.type||'teacher',currentNames=reliefPages(day,{...options,names:undefined}).map(page=>page.name),baselineNames=names(dayModel(baseline),type),chosen=options.names||sorted(new Set([...currentNames,...baselineNames]));
+  const type=options.type||'teacher',currentPages=new Map(reliefPages(day,{...options,names:undefined}).map(page=>[page.name,page])),baselinePages=new Map(dayPages(baseline,{...options,names:undefined}).map(page=>[page.name,page])),currentNames=[...currentPages.keys()],baselineNames=[...baselinePages.keys()],chosen=options.names||sorted(new Set([...currentNames,...baselineNames]));
   return chosen.map(name=>{
-   const current=currentNames.includes(name)?reliefPages(day,{...options,names:[name]})[0]:null,original=baselineNames.includes(name)?dayPages(baseline,{...options,names:[name]})[0]:null,shape=current||original;
+   const current=currentPages.get(name),original=baselinePages.get(name),shape=current||original;
    if(!shape)throw Error('Select names from this timetable.');
    const published=current?.rows[0]?.cells||shape.periods.map(()=>''),usual=(original?.rows[0]?.cells||shape.periods.map(()=>'')).map((cell,i)=>unmatched[i]?'Baseline timing unavailable':cell),changed=published.map((cell,i)=>!unmatched[i]&&cell!==usual[i]);
    return {...shape,rows:[{day:day.source==='confirmed'?'Confirmed (suspended)':'Published (suspended)',cells:published,changed,relief:current?.rows[0]?.relief,styles:changed.map((value,i)=>current?.rows[0]?.styles?.[i]===9?9:value?8:5)},{day:'Usual baseline',cells:usual}],subtitle:shape.subtitle+' · Changed cells are highlighted.'};
