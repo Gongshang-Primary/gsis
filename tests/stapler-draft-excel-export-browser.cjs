@@ -1,7 +1,7 @@
 'use strict';
 // Actual browser download from an unsaved Stapler plan, with synthetic baselines only.
 const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),{chromium}=require('playwright'),{JSDOM}=require('jsdom'),JSZip=require('../roster-update/public/jszip.min.js');
-const root=path.resolve(__dirname,'..'),output='/workspace/scratch/466198083d1a/stapler-export-qa';
+const root=path.resolve(__dirname,'..'),output=fs.mkdtempSync(path.join(require('node:os').tmpdir(),'gsis-stapler-export-'));
 async function workbook(file){
  const zip=await JSZip.loadAsync(fs.readFileSync(file)),documents=[];
  const xml=async name=>{const dom=new JSDOM(await zip.file(name).async('string'),{contentType:'application/xml'});documents.push(dom);return dom.window.document;};

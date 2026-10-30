@@ -35,7 +35,7 @@ const root='roster-update/public/',origin='https://private.test',link=origin+'/e
   });
   return ctx;
  }
- async function shows(page,teacher){await page.waitForFunction(text=>document.getElementById('duty-list').textContent.includes(text),'Teacher '+teacher+' lesson');}
+ async function shows(page,teacher){await page.waitForFunction(text=>document.getElementById('duty-list').textContent.includes(text)&&document.getElementById('private-actions').getAttribute('aria-busy')==='false'&&!document.getElementById('refresh').disabled,'Teacher '+teacher+' lesson');}
  try{
   const first=await context(),page=await first.newPage();
   await page.goto(link+'#fixture-a');await shows(page,'A');

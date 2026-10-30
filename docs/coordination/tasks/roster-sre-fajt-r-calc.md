@@ -52,3 +52,5 @@ Windows verification note: the runtime and canonical builds pass. The packaging 
 ## Linux verification
 
 A branch-scoped GitHub Actions job runs the complete existing suite on Linux with pinned official checkout/setup actions, read-only repository permissions, no deployment secrets and the locked Playwright browser. It covers these two task branches only. This avoids changing or skipping the Windows-blocked symlink security test. CI results remain pending until the run completes.
+
+CI discovery: the first full Linux SRE run passed 868/879 scripts. Seven browser fixtures needed the two existing browser environment names or removal of a hardcoded /tmp path; three screenshot fixtures used old /workspace/scratch paths. They now use the configured browser and OS temporary directories. A private-link wait also now observes the existing aria-busy and refresh-ready signals, rather than lesson text alone. No assertions are removed. The complete suite is rerun without exclusions.
