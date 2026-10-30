@@ -1,11 +1,11 @@
 # roster-fajt-levelling: after SREs, FAJT average R% rises first until it leads the school by a set margin
 
-- Status: approved, ready to claim after roster-sre-daily-priority (same ranking code). Owner clarified 30 Oct 2026: "FAJT average R% to rise first, but once significantly above school-wide R%, start prioritising others".
+- Status: implementing, prepared branch; PR waits for an available queue slot.
 - Owner/model: Codex
 - Reviewer/model: Claude
-- Last updated (Asia/Singapore): 30 Oct 2026 07:40
+- Last updated (Asia/Singapore): 30 Oct 2026 21:50
 - Branch: codex/roster-fajt-levelling
-- Base SHA: current main
+- Base SHA: 16624d4de46caf8b3a1547069eea1e6ab9ab24aa, with current main 9393377c644ee977be2573a94afd28280a06c98b merged for queue context.
 - PR: none
 - User-authorised scope: Song Wee, 30 Oct 2026: "after SRE; then FAJT but balance FAJT R% against all other EOs R%. rule 1: SREs first; rule 2: level up FAJT R% first to be equal with FAJT average R%; rule 3: annual R% levelling across all staff".
 - Files/domains owned: shared/roster-allocation.js (candidate ranking, preferenceRules, balances), Roster settings text, generated copies, tests.
@@ -36,3 +36,7 @@ Why points, not a ratio: early in the year all R% are small, and a ratio (e.g. 1
 - SRE free: SRE still first. FAJT at a Daily workload limit or restricted period: skipped.
 - Settings shows the current FAJT average, school average and whether FAJT priority is active, so SMCs can see why.
 - Fresh deploy with existing settings data: FAJT priority is Off and allocations match the pre-deploy result; switching it On in Settings applies the rule.
+
+## Current claim
+
+Model: Codex. Owner requested the next two changelog items. This task is prepared on a separate branch while PRs #19 and #20 use both open-PR slots. It builds on the unmerged #20 head; no additional PR is opened until the queue permits it. Claude reviews the exact final head. No merge, deployment, live record change or messages are part of this implementation.
