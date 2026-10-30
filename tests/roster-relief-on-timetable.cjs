@@ -29,3 +29,4 @@ stale.state.assignments=[];stale.state.absences.push({id:'absence',staffId:'alic
 const frozen=O.timetableDay(stale.state,{...stale.ctx,timetableNames:names,user:teacher.user},{date});assert.equal(frozen.relief.rows[0].staffId,'bob','ordinary user retains prior published reliever');
 
 (async()=>{const out=await X.makeWorkbook(X.reliefPages(day,{type:'teacher',names:['Bob'],lastPeriod:8})),zip=await JSZip.loadAsync(await out.blob.arrayBuffer());assert.match(await zip.file('xl/worksheets/sheet1.xml').async('string'),/Relief for Alice/);console.log('PASS frozen published and saved-only relief, six duties, teacher/class/TG, parity, labels and Excel');})().catch(e=>{console.error(e);process.exitCode=1;});
+

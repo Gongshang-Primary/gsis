@@ -17,3 +17,4 @@ Pending Linux build and full suite. No local execution claim, live read, deploym
 
 ## Handoff
 Controller opens the PR when authorised; Claude reviews the exact tested head.
+

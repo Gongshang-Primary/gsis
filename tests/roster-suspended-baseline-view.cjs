@@ -13,3 +13,4 @@ for(const type of ['teacher','class','tg']){
 const shifted=structuredClone(day);shifted.baseline.periods[2].startMinutes++;assert.match(X.comparisonPages(shifted,{type:'teacher',lastPeriod:3})[0].rows[1].cells[2],/unavailable/);
 const ordinary={...day};delete ordinary.baseline;assert.equal(X.comparisonPages(ordinary,{type:'teacher',lastPeriod:3})[0].rows.length,1);
 (async()=>{const pages=X.comparisonPages(day,{type:'teacher',lastPeriod:3}),out=await X.makeWorkbook(pages),zip=await JSZip.loadAsync(await out.blob.arrayBuffer()),xml=await zip.file('xl/worksheets/sheet1.xml').async('string');assert.match(xml,/Usual baseline/);assert.match(xml,/Published \(suspended\)/);assert.match(xml,/s="8"/);console.log('PASS aligned baseline across teacher, class, TG, changed timing, screen and Excel');})().catch(e=>{console.error(e);process.exitCode=1;});
+
