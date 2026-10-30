@@ -445,12 +445,11 @@ var GSISRosterOperations=(()=>{
   const A=allocation(),year=A.year(ctx.today),week=A.monday(ctx.today),id=ctx.user.staffId,historyVerified=s.accountingYears?.[year]?.verified===true,seen=new Set();
   const quotas=(s.entitlements||[]).filter(row=>row.staffId===id&&row.year===year&&row.week<=week);let entitlement=0,valid=true,completed=0,committed=0;
   for(const row of quotas){if(!/^\d{4}-\d{2}-\d{2}$/.test(row.week)||seen.has(row.week)||!Number.isFinite(row.quota)||row.quota<0){valid=false;continue;}seen.add(row.week);entitlement+=row.excluded?0:row.quota;}
-  const publishedDates=new Set(),visibleAssignments=[];
+  const publishedDates=new Set(),visibleAssignments=[],snapshots=new Map((s.publicationSnapshots||[]).map((entry,index)=>[entry.id,{entry,index}]));
   for(const [d,publication] of Object.entries(s.dailyPublicationStates||{})){
-   const own=publication.teachers?.find(row=>row.staffId===id);
-   if(own&&!Array.isArray(own.snapshotIds))continue;
-   publishedDates.add(d);const selected=new Set(own?.snapshotIds||[]),latest=new Map();
-   for(const entry of s.publicationSnapshots||[])if(selected.has(entry.id)&&entry.staffId===id&&entry.date===d)latest.set(entry.assignmentId,entry);
+   if(!Array.isArray(publication.teachers)||publication.teachers.some(row=>!Array.isArray(row.snapshotIds)))continue;
+   publishedDates.add(d);const selected=new Set(publication.teachers.flatMap(row=>row.snapshotIds)),latest=new Map();
+   for(const {entry} of [...selected].map(key=>snapshots.get(key)).filter(value=>value?.entry.date===d).sort((a,b)=>a.index-b.index))latest.set(entry.assignmentId,entry);
    for(const entry of latest.values())if(entry.kind!=='cancelled'&&entry.assignment)visibleAssignments.push({...entry.assignment,status:entry.assignment.status==='completed'?'completed':'published'});
   }
   visibleAssignments.push(...s.assignments.filter(a=>a.status!=='draft'&&!publishedDates.has(a.date)));
