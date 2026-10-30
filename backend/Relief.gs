@@ -6,7 +6,7 @@ function reliefAnalysis_(source){
  d.offload=GSISTeachingRules.migrate(d.offload);
  return GSISRelief.analyse(d,GSISWorkload.analyse(d,t=>GSISTeachingRules.calculate(t,d.offload)));
 }
-function reliefResultRows_(result,details=false){return result.rows.map(r=>({teacherId:r.id,name:r.name,active:r.active,eligible:r.eligible,R:r.quota,available:r.quota!==null,reason:r.quota!==null?null:details?r.reason:!r.active?'Inactive teacher.':!r.eligible?'Not eligible for relief.':'Capacity unavailable. Ask Admin to review.',...(details?{OF:r.OF??null,Ti:r.actualTeaching,breakdown:{employment:r.employment??null,FTT:r.FTT,PD:r.pd,duties:r.duties,otherNonTeaching:r.otherNonTeaching,nonTeachingActivities:r.nonTeachingActivities,weeklyBudget:r.weeklyBudget??null,timetableFactor:r.timetableFactor??null,Wi:r.Wi??null,rawR:r.rawQuota,normalR:r.normalQuota,periodCap:r.periodCap,capConfigured:r.capConfigured,capBasis:r.capBasis,capWorkload:r.capWorkload,capHeadroom:r.capHeadroom,capApplied:r.capApplied,offloadAllowance:r.offloadAllowance??null,siuePeriods:r.siuePeriods,offloadComponents:r.offloadComponents||[],available:result.calculationVersion===GSISRelief.model&&r.quota!==null,reason:result.calculationVersion!==GSISRelief.model?'Legacy calculation model.':r.reason||null}}:{})}));}
+function reliefResultRows_(result,details=false){return result.rows.map(r=>({teacherId:r.id,name:r.name,active:r.active,eligible:r.eligible,R:r.quota,available:r.quota!==null,reason:r.quota!==null?null:details?r.reason:!r.active?'Inactive teacher.':!r.eligible?'Not eligible for relief.':'Capacity unavailable. Ask Admin to review.',...(details?{OF:r.OF??null,Ti:r.actualTeaching,breakdown:{employment:r.employment??null,teachingVerified:r.teachingVerified===true,FTT:r.FTT,PD:r.pd,duties:r.duties,otherNonTeaching:r.otherNonTeaching,nonTeachingActivities:r.nonTeachingActivities,weeklyBudget:r.weeklyBudget??null,timetableFactor:r.timetableFactor??null,Wi:r.Wi??null,rawR:r.rawQuota,normalR:r.normalQuota,periodCap:r.periodCap,capConfigured:r.capConfigured,capBasis:r.capBasis,capWorkload:r.capWorkload,capHeadroom:r.capHeadroom,capApplied:r.capApplied,offloadAllowance:r.offloadAllowance??null,siuePeriods:r.siuePeriods,offloadComponents:r.offloadComponents||[],available:result.calculationVersion===GSISRelief.model&&r.quota!==null,reason:result.calculationVersion!==GSISRelief.model?'Legacy calculation model.':r.reason||null}}:{})}));}
 function reliefAdminDetail_(result){
  return {settings:result.settings,weeklyPeriods:result.weeklyPeriods,weeklyLunch:result.weeklyLunch,settingsError:result.settingsError||null,
   calculationVersion:result.calculationVersion,reference:result.reference,
@@ -59,7 +59,7 @@ function reliefExport_(b,idx,c,input){
 // checked by dispatch before this code, and role projection happens afterward.
 const reliefRoots_=['id','name','from','to','relief','teachers','teacherDrafts','membership','offload','workload','loads','subjectTypes','classes','groups','assignments','organisations','duties','pal','venues','venueRegistry'];
 function reliefSource_(d){return Object.fromEntries(reliefRoots_.filter(k=>Object.prototype.hasOwnProperty.call(d,k)).map(k=>[k,d[k]]));}
-function reliefCacheKey_(b,en){return 'relief086-total-cap:'+hash_([b.getId(),en.id,en.store||'',en.commit,en.revision,GSISRelief.model]);}
+function reliefCacheKey_(b,en){return 'relief099-sre-teaching:'+hash_([b.getId(),en.id,en.store||'',en.commit,en.revision,GSISRelief.model]);}
 function reliefCache_(b,en,value){
  try{
   const cache=CacheService.getScriptCache(),key=reliefCacheKey_(b,en);
@@ -104,7 +104,7 @@ function reliefRosterQuota_(b,idx,en){
  // Roster is served by this same authenticated Deploy API. Reuse its confirmed
  // calculation rather than make a second HTTP call while a save holds the lock.
  if(idx.pendingFieldCommit)error_(503,'Save confirmation pending.');
- const now=Date.now(),day=new Date(now+8*3600000).toISOString().slice(0,10),key='roster-quota-total-cap1:'+hash_([b.getId(),en.id,en.store||'',en.commit,en.revision,GSISRelief.model,day]);
+ const now=Date.now(),day=new Date(now+8*3600000).toISOString().slice(0,10),key='roster-quota-sre-teaching1:'+hash_([b.getId(),en.id,en.store||'',en.commit,en.revision,GSISRelief.model,day]);
  let cache=null,value=null;
  try{cache=CacheService.getScriptCache();const raw=cache.get(key),item=raw?JSON.parse(raw):null;
   const v=item?.value,s=v?.source;
@@ -115,7 +115,7 @@ function reliefRosterQuota_(b,idx,en){
  const formClasses=(d.classes||[]).map(c=>{const level=Number(String(c.level||'').replace(/\D/g,'')),short=String(c.shortName||c.ref||c.name||''),name=short.startsWith(String(level))?short:String(level)+short;return {id:c.ref||c.id||name,name,level,venue:c.venue||d.assignments?.[c.ref]?.venue||d.assignments?.[name]?.venue||''};}).filter(c=>c.id&&c.name&&c.level>=1&&c.level<=6);
  const catalogue=Array.isArray(d.membership)?membershipCatalogue_(d.membership):undefined,smcIds=(d.teachers||[]).map(t=>GSISTeachingRules.resolve(t,catalogue,undefined,d.teacherDrafts?.[t.id])).filter(t=>t.active&&(t.groups||[]).includes('SMC')).map(t=>t.id);
  const teachingGroups=reliefTeachingGroups_(d);
- value={formClasses,teachingGroups,smcIds,subjectCategories:Object.fromEntries([...GSISWorkload.subjects(d).map(subject=>[subject,GSISWorkload.category(d,subject)]),...GSISWorkload.nonTeachingActivities(d).map(a=>[a.code,'Non-teaching'])]),venues:[...new Set(formClasses.map(c=>c.venue).concat(Object.values(d.assignments||{}).map(a=>a.venue),(d.venueRegistry?.venues||d.venues||[]).flatMap(v=>[v.unitNumber||v.id,v.name])).filter(Boolean))].sort(),from:d.from||'',to:d.to||'',rows:confirmed.result.rows.map(r=>({id:r.id,R:Number.isFinite(r.quota)?r.quota:null,rawR:r.rawQuota,periodCap:r.periodCap??null,capConfigured:r.capConfigured===true,capBasis:r.capBasis,capNonTeachingPeriods:r.capNonTeachingPeriods,capWorkload:r.capWorkload??null,capVerified:r.quota!==null,capVerificationReason:r.quota===null?r.reason||'Published Deploy workload is unverified.':null,timetableFactor:r.timetableFactor,teachingWeight:1+confirmed.result.settings.siuePercent/100,offloadFactor:r.OF,fullTimeTeacherCount:confirmed.result.reference.fullTimeTeacherCount})),versionId:en.id,source:{service:'deploy',versionId:en.id,revision:en.revision,from:d.from||'',to:d.to||'',commit:en.commit||en.publishedAt||'',calculationVersion:GSISRelief.model,cacheDay:day,checkedAt:new Date(now).toISOString()}};
+ value={teachingEvidenceVersion:1,formClasses,teachingGroups,smcIds,subjectCategories:Object.fromEntries([...GSISWorkload.subjects(d).map(subject=>[subject,GSISWorkload.category(d,subject)]),...GSISWorkload.nonTeachingActivities(d).map(a=>[a.code,'Non-teaching'])]),venues:[...new Set(formClasses.map(c=>c.venue).concat(Object.values(d.assignments||{}).map(a=>a.venue),(d.venueRegistry?.venues||d.venues||[]).flatMap(v=>[v.unitNumber||v.id,v.name])).filter(Boolean))].sort(),from:d.from||'',to:d.to||'',rows:confirmed.result.rows.map(r=>({id:r.id,R:Number.isFinite(r.quota)?r.quota:null,rawR:r.rawQuota,teachingPeriods:r.actualTeaching,teachingVerified:r.teachingVerified===true,periodCap:r.periodCap??null,capConfigured:r.capConfigured===true,capBasis:r.capBasis,capNonTeachingPeriods:r.capNonTeachingPeriods,capWorkload:r.capWorkload??null,capVerified:r.quota!==null,capVerificationReason:r.quota===null?r.reason||'Published Deploy workload is unverified.':null,timetableFactor:r.timetableFactor,teachingWeight:1+confirmed.result.settings.siuePercent/100,offloadFactor:r.OF,fullTimeTeacherCount:confirmed.result.reference.fullTimeTeacherCount})),versionId:en.id,source:{service:'deploy',versionId:en.id,revision:en.revision,from:d.from||'',to:d.to||'',commit:en.commit||en.publishedAt||'',calculationVersion:GSISRelief.model,cacheDay:day,checkedAt:new Date(now).toISOString()}};
  reliefGuard_(b,idx,en);
  // Singapore-day boundary, with the platform's six-hour maximum and possible
  // early eviction. Cache only quota data; authority and mutable cover stay live.
@@ -163,7 +163,7 @@ function rosterPersonalCalculations_(req,c){
   if(d.id!==en.id)error_(503,'The published calculation could not be verified. Retry.');
   output.source={name:d.name||en.id,revision:en.revision,commit:en.commit||'',from:d.from||'',to:d.to||'',model:result.calculationVersion};
   const inRange=/^\d{4}-\d{2}-\d{2}$/.test(d.from||'')&&/^\d{4}-\d{2}-\d{2}$/.test(d.to||'')&&today>=d.from&&today<=d.to;
-  const rows=reliefResultRows_({...result,rows:result.rows.filter(r=>r.id===user.staffId)},true),row=rows.length===1?rows[0]:null;
+  const rawRows=result.rows.filter(r=>r.id===user.staffId),rows=reliefResultRows_({...result,rows:rawRows},true),row=rows.length===1?rows[0]:null;output.deployTeachingEvidence={verified:inRange&&result.calculationVersion===GSISRelief.model,rows:rawRows.map(r=>({id:r.id,periods:r.actualTeaching,verified:r.teachingVerified===true}))};
   output.calculationReason=!inRange?'The published Deploy version does not cover today.':result.calculationVersion!==GSISRelief.model?'The published calculation model needs an update.':!row?'Your teacher record is not uniquely matched in the published Deploy version.':row.reason||row.breakdown.reason||'';
   if(inRange&&result.calculationVersion===GSISRelief.model&&row){
    // Whitelist the person's calculation fields. Never return the source document or other staff.
@@ -174,7 +174,7 @@ function rosterPersonalCalculations_(req,c){
  }
  try{output.completion=rosterOperationsPhase_('calculations-history',()=>rosterPersonalCompletion_(rosterOperationsPhase_('calculations-history-read',()=>rosterOperationsState_()),user.staffId,today));}
  catch(e){if(e.status!==503)throw e;output.completion={from:today.slice(0,4)+'-01-01',to:today,throughWeek:GSISRosterAllocation.monday(today),completed:null,entitlement:null,percentage:null,historyVerified:false,recordedWeeks:null,excludedWeeks:null,reason:'Relief history could not be read. Use Refresh to retry; ask Admin to review if this continues.'};}
- return output;
+ return GSISRosterAllocation.dailyRosterCalculation(output,people[0]);
 }
 function rosterPersonalCompletion_(state,staffId,today,now=Date.now()){
  const sg=new Date(now+28800000),ctx={today,minute:sg.getUTCHours()*60+sg.getUTCMinutes(),days:state.dailyPublicationStates||{}};
