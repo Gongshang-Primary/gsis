@@ -52,3 +52,5 @@ Implementation plan: regression fixtures for default-Off parity, threshold/margi
 ## Local verification
 
 Eight new FAJT cases pass. Existing complete-allocation preference oracle (10 checks), allocator/settings (14), SRE formula/ranking (5), daily-SRE (10), suspended rules (15) and settings browser checks pass. All 18 components rebuilt. Full Linux CI pending. No new PR while #19 and #20 use both slots.
+
+Independent review found Settings lacked the allocator identity-conflict filter. The Settings projection now reuses teacherSource identity joining without a new quota read. Regression reproduced Settings showing active against allocator inactive for duplicate mobile identities; all nine FAJT cases now pass.

@@ -2891,7 +2891,8 @@ var GSISRosterOperations=(()=>{
  }
  function fajtLevellingView(s,ctx){
   const A=allocation(),balances=A.balances(s,ctx,ctx.today),pool=new Set(ctx.fajtPoolIds||ctx.days[ctx.today]?.teachers.map(t=>t.staffId)||[]);
-  return A.fajtStatus(ctx.people.map(person=>({id:person.id,person,t:pool.has(person.id)?{}:null,balance:balances.get(person.id)})),s.systemConfig);
+  const source=A.teacherSource({...ctx,days:{[ctx.today]:{teachers:[...pool].map(staffId=>({staffId,cells:[]}))}}},ctx.today);
+  return A.fajtStatus(source.rows.map(row=>({...row,id:row.person.id,balance:balances.get(row.person.id)})),s.systemConfig);
  }
  function systemConfigView(s,ctx){smc(ctx);operationalSettings(s);return {revision:s.revision,canEdit:ctx.user.admin===true,config:copy(s.systemConfig),fajtLevelling:fajtLevellingView(s,ctx),periods:configPeriods(s,ctx),employmentTypes:[...new Set([...ctx.people.map(p=>String(p.employment||'').trim().toUpperCase()).filter(Boolean),...s.systemConfig.employmentPeriodRestrictions.map(r=>r.employment)])].sort(),subjects:copy(ctx.subjects||[]),consecutiveSubjects:consecutiveSubjects(s,ctx),teachingGroups:copy(ctx.teachingGroups||[]),baseline:copy(ctx.subjectBaseline||null),preferenceRules:copy(allocation().preferenceRules||[]),schedulerAvailable:ctx.schedulerAvailable===true,nameBridges:ctx.user.admin?nameBridgesView(s,ctx):null};}
  function allocationLearningView(s,ctx){

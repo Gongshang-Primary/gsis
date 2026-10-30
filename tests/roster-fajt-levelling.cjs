@@ -50,3 +50,11 @@ test('a later run recalculates the cohort threshold from changed recorded balanc
  f.state.importedRelief.find(r=>r.staffId==='bob').rCost=55;
  assert.deepEqual(winners(f),['bob','bob','bob']);
 });
+
+test('Settings and allocation exclude the same conflicting Contacts identities',()=>{
+ const f=setup();f.people[0].mobile=f.people[2].mobile='90000000';
+ f.state.importedRelief.find(r=>r.staffId==='alice').rCost=100;
+ f.state.importedRelief.find(r=>r.staffId==='charlie').rCost=100;
+ const expected=A.fajtStatus(A.teacherContext(f.state,f.ctx,f.date),f.state.systemConfig),actual=f.O.view(f.state,f.ctx,{view:'systemConfig'}).fajtLevelling;
+ assert.equal(expected.schoolMean,10);assert.deepEqual(actual,expected);
+});
