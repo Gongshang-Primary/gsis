@@ -3,7 +3,7 @@
 - Status: review prepared; open the PR only after the current full CI passes
 - Owner/model: Codex (builder)
 - Reviewer/model: Claude
-- Last updated (Asia/Singapore): 31 Oct 2026 05:30
+- Last updated (Asia/Singapore): 31 Oct 2026 05:42
 - Branch: codex/roster-archive-cold-output
 - Base SHA: 082dec5ddb34c20275348ac9eaaeba26d64952b3 (latest main integrated; changelog and deployment notes retained)
 - PR: [row A branch pull request](https://github.com/helper-gsps/gsis/pulls?q=is%3Apr+head%3Acodex%2Froster-archive-cold-output)
@@ -88,4 +88,10 @@ The additional 16 MB synthetic fixture reduced 16,486,779 main-file characters t
 
 The two failing source-pattern assertions were replaced or narrowed without relaxing their behavior contracts. The lock test still checks every planner ScriptLock release; the new archive runtime check verifies lock order and exact release counts on success, save failure and transport contention. The storage test now invokes the real context helper for both Storage and prune preview, checks the configured 20M capacity, verifies stored-form measurements and rejects any history decompression.
 
-Fresh local commands passed: `TZ=Asia/Singapore node tests/release505-timing.cjs`, `TZ=Asia/Singapore node tests/roster099a-storage-cap.cjs`, `TZ=Asia/Singapore node tests/roster-archive-storage.cjs` (11 checks), `TZ=Asia/Singapore node tests/roster-archive-capacity.cjs` and `git diff --check`. The final full CI rerun must pass before the PR opens. Its URL and exact head are recorded in the PR body. No product logic changed after source head `c8cce80927832218563ba3787b9032c8d83bc9ed`; this follow-up retains latest main documentation and adds verification evidence/tests.
+Fresh local commands passed: `TZ=Asia/Singapore node tests/release505-timing.cjs`, `TZ=Asia/Singapore node tests/roster099a-storage-cap.cjs`, `TZ=Asia/Singapore node tests/roster-archive-storage.cjs` (11 checks), `TZ=Asia/Singapore node tests/roster-archive-capacity.cjs` and `git diff --check`. The final full CI rerun must pass before the PR opens. Its URL and exact head are recorded in the PR body. The verification follow-up retained latest main documentation and added tests. The additional derived-export correction is recorded below.
+
+### Derived daily export recovery
+
+Adversarial review reproduced a second historical path: `auditExportCaptured` can be true before the first daily file is written. If that run had already moved to a monthly archive, the later daily export used its stub and falsely reported limited evidence. The monthly original was intact. The exporter now resolves cold audit/run references only for its selected date, reads each needed month once, preserves complete existing daily entries and repairs prior stub entries. Normal Roster requests remain unchanged.
+
+The new regression failed before the correction, then passed. It covers two referenced runs and a system audit, exact original JSON/text evidence, one monthly read, no monthly read when a complete daily file exists, repair of a prior incomplete daily entry, unchanged compact primary records and unchanged monthly originals. `tests/roster-archive-storage.cjs` now passes 12 checks; audit recovery and audit priority also pass. CI run 41131614423 is superseded by this source correction; it is not a final-head pass.

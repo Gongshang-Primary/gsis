@@ -7722,7 +7722,15 @@ function rosterAllocationAuditArchive_(snapshot,date,monthFolder){gsisRequireBac
  if(!folder){const response=rosterDriveRequest_('https://www.googleapis.com/drive/v3/files?supportsAllDrives=true&fields=id',{method:'post',contentType:'application/json; charset=UTF-8',payload:JSON.stringify({name:'Evidence',mimeType:'application/vnd.google-apps.folder',parents:[monthFolder]})},'allocation-audit-evidence-folder');folder=rosterDriveJson_(response,'allocation-audit-evidence-folder').id;if(!folder)error_(503,'The allocation evidence folder could not be confirmed.');}
  const meta=snapshot.allocationAuditExports[date],name=date+'.json',id=meta.archiveFileId||rosterFindFile_(folder,name);let previous={audit:[],optimisationRuns:[]};
  if(id){try{previous=JSON.parse(rosterReadFile_(id));if(previous.schema!==1||previous.date!==date||!Array.isArray(previous.audit)||!Array.isArray(previous.optimisationRuns))throw Error('identity');}catch(error){error_(503,'The stored allocation evidence could not be read. It was not overwritten.');}}
- const unique=(old,next)=>{const rows=new Map(old.map(row=>[row.id,row]));for(const row of next){const prior=rows.get(row.id);if(row.archiveRef&&prior)continue;rows.set(row.id,prior?{...prior,...row,...(!row.decisionEvidence&&prior.decisionEvidence?{decisionEvidence:prior.decisionEvidence}:{})}:row);}return [...rows.values()];};
+ // Read each required month once for this selected day's derived export.
+ // Ordinary Roster reads retain compact stubs and do not enter this path.
+ const months=new Map(),hydrate=row=>{
+  if(!row.archiveRef)return row;
+  const ref=rosterColdArchiveRef_(row.archiveRef);let entries=months.get(ref.month);
+  if(!entries){entries=new Map(rosterColdArchiveRead_(ref.month,snapshot).value.items.map(item=>[JSON.stringify([item.collection,item.id,item.digest]),item]));months.set(ref.month,entries);}
+  return rosterColdArchiveEntry_(entries.get(JSON.stringify([ref.collection,ref.id,ref.digest])),ref);
+ };
+ const unique=(old,next)=>{const rows=new Map(old.map(row=>[row.id,hydrate(row)]));for(const source of next){const prior=rows.get(source.id);if(source.archiveRef&&prior)continue;const row=hydrate(source);rows.set(row.id,prior?{...prior,...row,...(!row.decisionEvidence&&prior.decisionEvidence?{decisionEvidence:prior.decisionEvidence}:{})}:row);}return [...rows.values()];};
  const evidence={schema:1,date,version:meta.pendingVersion,revision:meta.pendingRevision,audit:unique(previous.audit,snapshot.audit.filter(row=>row.date===date&&row.auditExportCaptured&&!row.auditExportSuppressed)),optimisationRuns:unique(previous.optimisationRuns,snapshot.optimisationRuns.filter(row=>row.date===date&&!row.auditExportSuppressed))};
  const json=JSON.stringify(evidence),saved=id?(rosterDriveRequest_('https://www.googleapis.com/upload/drive/v3/files/'+encodeURIComponent(id)+'?uploadType=media&supportsAllDrives=true&fields=id',{method:'patch',contentType:'application/json; charset=UTF-8',payload:json},'allocation-audit-evidence'),id):rosterCreateFile_(folder,name,Utilities.newBlob(json,'application/json; charset=UTF-8'));
  return {fileId:saved,state:{...snapshot,audit:[...snapshot.audit.filter(row=>row.date!==date),...evidence.audit],optimisationRuns:[...snapshot.optimisationRuns.filter(row=>row.date!==date),...evidence.optimisationRuns]}};
