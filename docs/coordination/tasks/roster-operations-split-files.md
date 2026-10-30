@@ -70,3 +70,11 @@ A branch-scoped GitHub Actions job runs the complete existing suite on Linux wit
 Final API review: oversized joinOperations is a 409 conflict, preserving the exact size/ceiling explanation through the existing privacy wrapper. Unexpected server failures remain redacted. The ten storage tests pass and canonical bundles were regenerated after this correction.
 
 CI discovery: the first full Linux SRE run passed 868/879 scripts. Seven browser fixtures needed the two existing browser environment names or removal of a hardcoded /tmp path; three screenshot fixtures used old /workspace/scratch paths. They now use the configured browser and OS temporary directories. A private-link wait also now observes the existing aria-busy and refresh-ready signals, rather than lesson text alone. No assertions are removed. The complete suite is rerun without exclusions.
+
+## PR #19 review follow-up, 31 October 2026
+
+Model: Codex. The regression at e231cfe fails with "routine read hashed the whole state" in Linux run 41120009560. Normal state reads now skip complete serialisation and hashing; every part remains size/digest checked. The version hint reuses the manifest revision already read. A small metadata digest binds field names, revision and descriptors; older manifests without it retain complete verification until their next write. Split and Join still verify the entire byte stream under the existing lock.
+
+Storage reports include manifest/part/assembly/serialisation/total read timing. Prune preview retains the same source text so its collection figures and storage token cannot mix revisions. Conversion asks once before creating its retained command; an uncertain retry reuses that command without another prompt.
+
+Source and generated backend copies are committed together. New checks cover routine-read work, manifest metadata corruption, legacy fallback, exact preview text, confirmation cancellation/retry and a synthetic 16M-character benchmark. Syntax parsing passed for the edited backend, UI and tests. Linux full regression is pending at the new head. The synthetic benchmark cannot prove Apps Script/Drive latency; a production-size copy measurement and the Storage screenshot remain live operator gates. No live records, provider sends, conversion, deployment or authority change.

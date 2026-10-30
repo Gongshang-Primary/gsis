@@ -39,6 +39,8 @@ jobs:
           echo "GSIS_BROWSER_EXECUTABLE=$BROWSER" >> "$GITHUB_ENV"
       - name: Regenerate all 18 components
         run: npm run build
+      - name: Check committed backend parity
+        run: git diff --exit-code -- backend/Code.gs Roster_Backend_v0.9.9.gs Deploy_Backend_v0.9.9.gs
       - name: Check browser fixture portability
         run: |
           node tests/roster084-private-link-reuse-browser.cjs

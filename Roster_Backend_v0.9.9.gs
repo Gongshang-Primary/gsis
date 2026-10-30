@@ -4282,11 +4282,11 @@ function rosterOperationsPackPlans_(state,prepareTimetables=true){
   return packed;});return {...state,staplerPlans:rows(state.staplerPlans,prepareTimetables),staplerArchives:rows(state.staplerArchives)};
 }
 /* One operational document commits absence, relief, audit and notification intent together. */
-function rosterOperationsState_(skipTransport=false){
+function rosterOperationsState_(skipTransport=false,includeText=false){
  let phase='operations-location';try{
   const id=props_().getProperty('ROSTER_OPERATIONS_FILE')||rosterFindFile_(ROSTER_DATA,'Roster operations.json');
   if(!id)return GSISRosterOperations.initial();
-  phase='operations-read';const {value}=rosterOperationsRaw_();phase='operations-json';
+  phase='operations-read';const {value}=rosterOperationsRaw_(includeText);phase='operations-json';
   phase='operations-schema';const state=GSISRosterOperations.validateState(rosterOperationsUnpackPlans_(typeof rosterAllocationAuditUnpack_==='function'?rosterAllocationAuditUnpack_(value):value));return skipTransport!==true&&typeof rosterNotificationOverlay_==='function'?rosterNotificationOverlay_(state):state;
  }catch(e){if(e.status){e.failurePhase=e.failurePhase||phase;throw e;}throw Object.assign(Error('Relief records could not be read.'),{status:503,failurePhase:e.failurePhase||phase});}
 }
@@ -4971,7 +4971,7 @@ function rosterOperationsDispatchCore_(req,c){gsisRequireBackendRole_('roster');
   return created;
  }const readonly=GSISRosterOperations.READS.includes(op);
  if(op==='externalLink'){const s=rosterOperationsState_(),ctx=rosterOperationsContext_(req,c,s);GSISRosterOperations.read(s,ctx,p);const lock=LockService.getScriptLock();if(!deployLock_(lock,8000))error_(503,'Another save is finishing. Retry this private link request.');try{const latest=rosterOperationsState_(),before=JSON.stringify(latest.privateLinks||{}),result=GSISRosterOperations.read(latest,ctx,p);if(before!==JSON.stringify(latest.privateLinks||{}))rosterOperationsCommit_(latest);return result;}finally{deployUnlock_(lock);}}
- if(readonly){const s=rosterOperationsPhase_('state-read',()=>rosterOperationsState_(rosterOperationsPrimaryRead_(p))),ctx=rosterOperationsPhase_('context',()=>rosterOperationsContext_(req,c,s));if(op==='currentDuty'||op==='read'&&p.view==='currentDuty')return GSISRosterOperations.read(s,ctx,{operation:'currentDuty'});if(op==='candidates'&&p.previewAbsence!==undefined)rosterOperationsPhase_('reconcile',()=>GSISRosterOperations.reconcile(s,ctx));else if(!rosterOperationsRecordOnly_(p)&&op!=='stapler')rosterOperationsPhase_('reconcile',()=>rosterOperationsReadReconcile_(s,ctx));return rosterOperationsReportTransport_(rosterOperationsPlanningAttach_(rosterOperationsAttachDayToken_(rosterOperationsPhase_('projection',()=>GSISRosterOperations.read(s,ctx,{...p,operation:op})),s,ctx,p),ctx.user,p,s,ctx),{...p,operation:op},ctx);}
+ if(readonly){const s=rosterOperationsPhase_('state-read',()=>rosterOperationsState_(rosterOperationsPrimaryRead_(p),op==='prunePreview')),ctx=rosterOperationsPhase_('context',()=>rosterOperationsContext_(req,c,s));if(op==='currentDuty'||op==='read'&&p.view==='currentDuty')return GSISRosterOperations.read(s,ctx,{operation:'currentDuty'});if(op==='candidates'&&p.previewAbsence!==undefined)rosterOperationsPhase_('reconcile',()=>GSISRosterOperations.reconcile(s,ctx));else if(!rosterOperationsRecordOnly_(p)&&op!=='stapler')rosterOperationsPhase_('reconcile',()=>rosterOperationsReadReconcile_(s,ctx));return rosterOperationsReportTransport_(rosterOperationsPlanningAttach_(rosterOperationsAttachDayToken_(rosterOperationsPhase_('projection',()=>GSISRosterOperations.read(s,ctx,{...p,operation:op})),s,ctx,p),ctx.user,p,s,ctx),{...p,operation:op},ctx);}
  if(typeof p.requestId!=='string'||! /^[\w-]{36}$/.test(p.requestId))error_(400,'A save request ID is required.');
  // Hash input before taking the lock. Reject stale commands before loading models or quotas.
  const digest=rosterOperationsCommandDigest_(p);
@@ -5377,14 +5377,19 @@ function rosterOperationsPartPlan_(text){
  }
  return {schema:1,format:'gsis-roster-operations-split-v1',revision:state.revision,fields,chars:text.length,digest:rosterOperationsPlanDigest_(text),parts};
 }
-function rosterOperationsAssemble_(manifest){
+function rosterOperationsManifestDigest_(manifest){return rosterOperationsPlanDigest_(JSON.stringify([manifest.schema,manifest.format,manifest.revision,manifest.fields,manifest.chars,manifest.digest,manifest.folderId,manifest.parts]));}
+function rosterOperationsAssemble_(manifest,verifyWhole=false,includeText=true){
+ const started=Date.now();let partsReadMs=0;
  const fail=()=>rosterOperationsStorageError_('Split relief records failed verification. Keep the saved files and ask Admin to check storage.');
  if(manifest?.schema!==1||manifest.format!=='gsis-roster-operations-split-v1'||!Number.isSafeInteger(manifest.revision)||manifest.revision<0||!Array.isArray(manifest.fields)||!Array.isArray(manifest.parts)||!manifest.parts.length)fail();
+ // Earlier split manifests have no metadata digest, so retain their complete
+ // verification until the next successful write upgrades the manifest.
+ if(manifest.integrityDigest!==undefined){if(!/^[a-f0-9]{64}$/.test(manifest.integrityDigest)||rosterOperationsManifestDigest_(manifest)!==manifest.integrityDigest)fail();}else verifyWhole=true;
  const fields=manifest.fields,entries=fields.map(()=>[]),seen=new Set();
  for(const field of fields){if(!Array.isArray(field)||field.length!==2||typeof field[0]!=='string'||seen.has(field[0])||!['array','object','value'].includes(field[1]))fail();seen.add(field[0]);}
  const ids=new Set(),keys=new Set();for(const part of manifest.parts){
   if(typeof part.fileId!=='string'||!part.fileId||ids.has(part.fileId)||keys.has(part.key)||!Number.isSafeInteger(part.chars)||part.chars<1)fail();ids.add(part.fileId);keys.add(part.key);
-  const data=rosterReadFile_(part.fileId);if(data.length!==part.chars||rosterOperationsPlanDigest_(data)!==part.digest)fail();const parsed=JSON.parse(data);if(parsed.schema!==1||!Array.isArray(parsed.entries))fail();
+  const readStarted=Date.now(),data=rosterReadFile_(part.fileId);partsReadMs+=Date.now()-readStarted;if(data.length!==part.chars||rosterOperationsPlanDigest_(data)!==part.digest)fail();const parsed=JSON.parse(data);if(parsed.schema!==1||!Array.isArray(parsed.entries))fail();
   for(const row of parsed.entries){if(!Array.isArray(row)||row.length!==4||!Number.isInteger(row[0])||!entries[row[0]]||!Number.isInteger(row[1]))fail();entries[row[0]].push(row);}
  }
  if(!keys.has('core'))fail();const value={};
@@ -5393,14 +5398,18 @@ function rosterOperationsAssemble_(manifest){
   else{result=type==='array'?[]:{};const names=new Set();entries[field].sort((a,b)=>a[1]-b[1]).forEach((row,index)=>{if(row[1]!==index||type==='object'&&(typeof row[2]!=='string'||names.has(row[2])))fail();if(type==='array')result.push(row[3]);else{names.add(row[2]);Object.defineProperty(result,row[2],{value:row[3],writable:true,enumerable:true,configurable:true});}});}
   Object.defineProperty(value,name,{value:result,writable:true,enumerable:true,configurable:true});
  });
- const text=JSON.stringify(value);if(text.length!==manifest.chars||rosterOperationsPlanDigest_(text)!==manifest.digest)fail();return {value,text};
+ const assembledAt=Date.now(),text=includeText||verifyWhole?JSON.stringify(value):null,serialisedAt=Date.now();
+ // Parts are verified on every read. Verify the complete byte stream only at
+ // conversion boundaries; normal state reads do not re-serialise all history.
+ if(verifyWhole&&(text.length!==manifest.chars||rosterOperationsPlanDigest_(text)!==manifest.digest))fail();
+ return {value,text,timings:{partsReadMs,assembleMs:assembledAt-started-partsReadMs,serialiseMs:serialisedAt-assembledAt}};
 }
-function rosterOperationsRaw_(){
+function rosterOperationsRaw_(includeText=true){
  for(let attempt=0;attempt<2;attempt++){
-  const id=rosterOperationsActiveFile_();if(!id){const value=GSISRosterOperations.initial();return rosterOperationsStorageSnapshot_={id:null,value,text:JSON.stringify(value),manifest:null};}
-  const source=rosterReadFile_(id),value=JSON.parse(source);
-  if(value?.format!=='gsis-roster-operations-split-v1')return rosterOperationsStorageSnapshot_={id,value,text:source,manifest:null};
-  try{return rosterOperationsStorageSnapshot_={id,...rosterOperationsAssemble_(value),manifest:value};}catch(error){
+  const started=Date.now(),id=rosterOperationsActiveFile_();if(!id){const value=GSISRosterOperations.initial();return rosterOperationsStorageSnapshot_={id:null,value,text:JSON.stringify(value),manifest:null};}
+  const source=rosterReadFile_(id),readAt=Date.now(),value=JSON.parse(source);
+  if(value?.format!=='gsis-roster-operations-split-v1')return rosterOperationsStorageSnapshot_={id,value,text:source,manifest:null,timings:{manifestReadMs:readAt-started,partsReadMs:0,assembleMs:Date.now()-readAt,serialiseMs:0,totalMs:Date.now()-started}};
+  try{const assembled=rosterOperationsAssemble_(value,false,includeText);return rosterOperationsStorageSnapshot_={id,...assembled,manifest:value,timings:{...assembled.timings,manifestReadMs:readAt-started,totalMs:Date.now()-started}};}catch(error){
    // A reader can be pinned to parts retired by a newer manifest. Retry only
    // when the active manifest changed; a corrupt current manifest must fail.
    if(attempt===0&&(rosterOperationsActiveFile_()!==id||rosterReadFile_(id)!==source))continue;throw error;
@@ -5414,7 +5423,7 @@ function rosterOperationsSplitCandidate_(text,prior,folderId){
  const parts=plan.parts.map(part=>{const old=previous.get(part.key);if(old?.digest===part.digest&&old.chars===part.chars)return old;
   const fileId=rosterCreateFile_(folderId,part.name,Utilities.newBlob(part.data,'application/json'));if(rosterReadFile_(fileId)!==part.data)rosterOperationsStorageError_('A new relief storage part could not be verified. The previous saved version remains active.');
   const {data,...descriptor}=part;return {...descriptor,fileId};
- });return {...plan,folderId,parts};
+ });const manifest={...plan,folderId,parts};manifest.integrityDigest=rosterOperationsManifestDigest_(manifest);return manifest;
 }
 function rosterOperationsWriteRaw_(text,beforeWrite=null){
  const id=rosterOperationsActiveFile_();let snapshot=rosterOperationsStorageSnapshot_?.id===id?rosterOperationsStorageSnapshot_:null;
@@ -5431,8 +5440,9 @@ function rosterOperationsWriteRaw_(text,beforeWrite=null){
  try{if(rosterOperationsActiveFile_()===id&&rosterReadFile_(id)===data){const live=new Set(manifest.parts.map(p=>p.fileId));for(const old of previous.parts)if(!live.has(old.fileId))try{rosterOperationsMetadata_(old.fileId,{trashed:true});}catch(ignore){}}}catch(ignore){}
 }
 function rosterOperationsStorageReport_(raw){
+ if(raw.text===null)raw=rosterOperationsRaw_();
  const parts=raw.manifest?.parts||[],largest=parts.reduce((a,b)=>!a||b.chars>a.chars?b:a,null);
- return {layout:raw.manifest?'split':'single',revision:raw.value.revision,total:raw.text.length,limit:rosterOperationsMaxChars_(),parts:raw.manifest?parts.length:1,largestPart:largest?{name:largest.name,chars:largest.chars}:{name:'Roster operations.json',chars:raw.text.length},storageToken:rosterOperationsStorageToken_(raw)};
+ return {layout:raw.manifest?'split':'single',revision:raw.value.revision,total:raw.text.length,limit:rosterOperationsMaxChars_(),parts:raw.manifest?parts.length:1,largestPart:largest?{name:largest.name,chars:largest.chars}:{name:'Roster operations.json',chars:raw.text.length},storageToken:rosterOperationsStorageToken_(raw),timings:raw.timings||null};
 }
 function rosterOperationsStorageDispatch_(req,c){
  gsisRequireBackendRole_('roster');if(typeof rosterEdgeAssertLegacyWrite_==='function')rosterEdgeAssertLegacyWrite_();const user=rosterOperationsAuthority_(c,req.identity),p=req.input||{},op=p.operation;
@@ -5452,12 +5462,13 @@ function rosterOperationsStorageDispatch_(req,c){
    rosterOperationsPartPlan_(raw.text);
    const folderId=rosterFindFile_(ROSTER_DATA,'Roster operations')||rosterDriveJson_(rosterDriveRequest_('https://www.googleapis.com/drive/v3/files?supportsAllDrives=true&fields=id',{method:'post',contentType:'application/json; charset=UTF-8',payload:JSON.stringify({name:'Roster operations',mimeType:'application/vnd.google-apps.folder',parents:[ROSTER_DATA]})},'operations-folder'),'operations-folder').id;
    if(typeof folderId!=='string'||!folderId)rosterOperationsStorageError_('The relief storage folder could not be created.');
-   const manifest=rosterOperationsSplitCandidate_(raw.text,null,folderId);if(rosterOperationsAssemble_(manifest).text!==raw.text)rosterOperationsStorageError_('Split relief records did not match the original. The original file remains active.');
+   const manifest=rosterOperationsSplitCandidate_(raw.text,null,folderId);if(rosterOperationsAssemble_(manifest,true).text!==raw.text)rosterOperationsStorageError_('Split relief records did not match the original. The original file remains active.');
    const data=JSON.stringify(manifest);if(data.length>rosterOperationsMaxChars_())rosterOperationsStorageError_('The relief storage manifest is too large to save.',507);
-   targetId=rosterCreateFile_(folderId,'manifest.json',Utilities.newBlob(data,'application/json'));if(rosterReadFile_(targetId)!==data||rosterOperationsAssemble_(JSON.parse(rosterReadFile_(targetId))).text!==raw.text)rosterOperationsStorageError_('Split relief records did not match the original. The original file remains active.');
+   targetId=rosterCreateFile_(folderId,'manifest.json',Utilities.newBlob(data,'application/json'));if(rosterReadFile_(targetId)!==data||rosterOperationsAssemble_(JSON.parse(rosterReadFile_(targetId)),true).text!==raw.text)rosterOperationsStorageError_('Split relief records did not match the original. The original file remains active.');
    if(raw.id&&!props_().getProperty('ROSTER_OPERATIONS_FILE'))props_().setProperty('ROSTER_OPERATIONS_FILE',raw.id);
    if(raw.id)rosterOperationsMetadata_(raw.id,{name:'Roster operations (before split '+new Date().toISOString().slice(0,10)+').json'});
   }else{
+   rosterOperationsAssemble_(raw.manifest,true);
    if(raw.text.length>rosterOperationsMaxChars_())rosterOperationsStorageError_('Relief records contain '+raw.text.length+' characters and exceed the single-file ceiling of '+rosterOperationsMaxChars_()+'. Split storage remains active.',409);
    targetId=rosterCreateFile_(ROSTER_DATA,'Roster operations.json',Utilities.newBlob(raw.text,'application/json'));if(rosterReadFile_(targetId)!==raw.text)rosterOperationsStorageError_('The single relief file could not be verified. Split storage remains active.');
   }
@@ -5468,7 +5479,7 @@ function rosterOperationsStorageDispatch_(req,c){
  }finally{deployUnlock_(lock);}
 }
 
-function rosterOperationsManifestRevision_(){if(!rosterOperationsIsSplit_())return null;const id=rosterOperationsActiveFile_();return id?JSON.parse(rosterReadFile_(id)).revision:null;}
+function rosterOperationsManifestRevision_(){if(!rosterOperationsIsSplit_())return null;const id=rosterOperationsActiveFile_();if(rosterOperationsStorageSnapshot_?.id===id&&rosterOperationsStorageSnapshot_.manifest)return rosterOperationsStorageSnapshot_.manifest.revision;return id?JSON.parse(rosterReadFile_(id)).revision:null;}
 
 /* GSIS_ROSTER_OPERATIONS_STORE_END */
 
@@ -8464,7 +8475,7 @@ function gsisNotificationMaintenance_(write){
  try{
   const id=props_().getProperty('ROSTER_OPERATIONS_FILE')||rosterFindFile_(ROSTER_DATA,'Roster operations.json');
   if(!id)throw Error('Roster operations file was not found. Nothing was cleared.');
-  const primary=typeof rosterOperationsRaw_==='function'?rosterOperationsRaw_().value:JSON.parse(rosterReadFile_(id));
+  const primary=typeof rosterOperationsRaw_==='function'?rosterOperationsRaw_(false).value:JSON.parse(rosterReadFile_(id));
   if(primary?.schema!==1||!Number.isInteger(primary.revision)||!Array.isArray(primary.outbox))throw Error('Roster state needs review. Nothing was cleared.');
   const transportId=props_().getProperty('ROSTER_NOTIFICATION_TRANSPORT_FILE')||rosterFindFile_(ROSTER_DATA,'Roster notification transport.json');
   let transport=null;

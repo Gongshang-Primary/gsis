@@ -46,8 +46,40 @@ test('storage report records bounded read timings and conversion keeps whole-sta
  const s=state(),h=fixture(s),r=h.call('storageReport'),split=h.call('splitOperations',r.storageToken,r.revision);
  for(const key of ['manifestReadMs','partsReadMs','assembleMs','serialiseMs','totalMs'])assert(Number.isFinite(split.timings[key])&&split.timings[key]>=0,key);
  const raw=h.read();assert.equal(raw.text,JSON.stringify(s));
- const bad={...raw.manifest,digest:'0'.repeat(64)};assert.throws(()=>h.scope.rosterOperationsAssemble_(bad,true),e=>e.status===503);
+ const bad={...raw.manifest,digest:'0'.repeat(64)};bad.integrityDigest=h.scope.rosterOperationsManifestDigest_(bad);assert.throws(()=>h.scope.rosterOperationsAssemble_(bad,true),e=>e.status===503);
  const active=h.properties.get('ROSTER_OPERATIONS_FILE');h.files.set(active,JSON.stringify(bad));const current=h.call('storageReport');
  assert.throws(()=>h.call('joinOperations',current.storageToken,current.revision),e=>e.status===503);
  assert.equal(h.properties.get('ROSTER_OPERATIONS_FILE'),active);
+});
+
+test('manifest metadata stays bound to verified part contents and old manifests get full verification',()=>{
+ const s=state(),h=fixture(s),r=h.call('storageReport');h.call('splitOperations',r.storageToken,r.revision);
+ const raw=h.read(),id=raw.id,original=JSON.stringify(raw.manifest);
+ for(const change of [
+  m=>{m.revision++;},
+  m=>{const a=m.fields.find(v=>v[0]==='audit'),b=m.fields.find(v=>v[0]==='empty');[a[0],b[0]]=[b[0],a[0]];},
+  m=>{m.parts[0].key='changed';}
+ ]){
+  const m=JSON.parse(original);change(m);h.files.set(id,JSON.stringify(m));assert.throws(()=>h.scope.rosterOperationsRaw_(false),e=>e.status===503);
+ }
+ const legacy=JSON.parse(original);delete legacy.integrityDigest;h.files.set(id,JSON.stringify(legacy));h.hashes.length=0;
+ assert.equal(h.scope.rosterOperationsRaw_(false).text,JSON.stringify(s));assert(h.hashes.includes(JSON.stringify(s)));
+ legacy.digest='0'.repeat(64);h.files.set(id,JSON.stringify(legacy));assert.throws(()=>h.scope.rosterOperationsRaw_(false),e=>e.status===503);
+});
+
+test('storage preview retains the same persisted text before mutable state projections',()=>{
+ const s=state(),h=fixture(s),r=h.call('storageReport');h.call('splitOperations',r.storageToken,r.revision);
+ const current=h.scope.rosterOperationsState_(true,true),raw=h.scope.rosterOperationsStorageSnapshot_;
+ current.audit.push({date:'2026-10-02',id:'unsaved'});const report=h.scope.rosterOperationsStorageReport_(raw);
+ assert.equal(raw.text,JSON.stringify(s));assert.equal(report.total,JSON.stringify(s).length);assert.equal(report.revision,s.revision);
+});
+
+test('synthetic 16M storage benchmark keeps routine reads bounded to manifest and parts',()=>{
+ const s=state();s.audit=Array.from({length:160},(_,i)=>({at:'2026-'+String(1+i%10).padStart(2,'0')+'-01T00:00:00Z',id:'audit'+i,note:'x'.repeat(100000)}));
+ const h=fixture(s),r=h.call('storageReport');h.call('splitOperations',r.storageToken,r.revision);
+ h.reads.length=0;h.hashes.length=0;h.serialised.length=0;const started=Date.now();h.scope.rosterOperationsState_(true);
+ const raw=h.scope.rosterOperationsStorageSnapshot_,elapsedMs=Date.now()-started;
+ assert.equal(h.reads.length,1+raw.manifest.parts.length);assert.equal(h.scope.rosterOperationsManifestRevision_(),s.revision);assert.equal(h.reads.length,1+raw.manifest.parts.length);
+ assert(!h.hashes.includes(JSON.stringify(s)));
+ console.log('SPLIT_STORAGE_BENCHMARK '+JSON.stringify({environment:'Node synthetic in-memory Drive; not live Apps Script',chars:JSON.stringify(s).length,parts:raw.manifest.parts.length,reads:h.reads.length,elapsedMs,timings:raw.timings}));
 });
