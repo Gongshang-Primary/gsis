@@ -1,11 +1,11 @@
 # deploy-siue-by-specialism: SIUE for PE, Art and Music as Relief Settings fields
 
-- Status: approved (owner request 30 Oct 2026, "changelog add to deploy: Relief Settings")
+- Status: implementing on a prepared branch; PR waits for an available queue slot.
 - Owner/model: Codex
 - Reviewer/model: Claude
 - Last updated (Asia/Singapore): 30 Oct 2026 14:30
 - Branch: codex/deploy-siue-by-specialism
-- Base SHA: current main
+- Base SHA: 77ac1007000c7a832e65722415e5165b01ea00e5 (stacked after FAJT and shared release labels).
 - PR: none
 - Files/domains owned: shared/relief.js (settings schema, validate, analyse), Deploy Relief Settings UI (public/relief-ui.js and its section in public/app.js), Roster calculations text where SIUE is shown, generated copies, tests.
 - Out of scope: offload rules, budgets, PD values.
@@ -30,3 +30,7 @@ Relief Settings gets more user-adjustable fields: SIUE (general) plus SIUE for P
 - PE override 0%: a PE specialist's W_i drops by (T + OF × T_avg) × 1.5 and R rises accordingly; non-specialists unchanged. Reproduce two rows of the owner's study (e.g. Choon Hong (PE): S=2 all, PE S=0 → R 34 with study inputs).
 - Mixed modifiers (e.g. "PE, MTL"): PE override applies to the whole term.
 - Invalid entries (negative, text) refused with the existing message style.
+
+## Implementation plan
+
+Model: Codex. Add nullable specialism percentages with read compatibility for old saved settings and a calculation-version refresh guard. Select PE/Art/Music from Subject Modifier or the existing legacy subject field; apply the lowest matching effective percentage to the whole teaching-plus-offload term. Keep default calculation rows unchanged when all overrides inherit. Surface applied overrides in Deploy details and Roster My Calculations. Regenerate bundles; run focused formula/UI checks and the full Linux suite. No merge or deployment.
