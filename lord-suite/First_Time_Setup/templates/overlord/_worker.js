@@ -192,7 +192,7 @@ async function cachedGoogleJwks(forceRefresh = false) {
     const response = await fetchWithTimeout('https://www.googleapis.com/oauth2/v3/certs', { redirect: 'follow' }, 12000);
     if (!response.ok) throw serviceError('Could not retrieve Google verification keys.', { status: 502, retryable: true, code: 'GOOGLE_KEYS' });
     const payload = await response.json();
-    const stored = new Response(JSON.stringify(payload), { headers: { ...referenceBuildHeaders(payload.buildLabel), 'Content-Type': 'application/json', 'Cache-Control': `public, max-age=${JWKS_STALE_SECONDS}`, 'X-OVERLORD-Fetched-At': String(now) } });
+    const stored = new Response(JSON.stringify(payload), { headers: { 'Content-Type': 'application/json', 'Cache-Control': `public, max-age=${JWKS_STALE_SECONDS}`, 'X-OVERLORD-Fetched-At': String(now) } });
     await cache.put(key, stored.clone());
     return payload;
   } catch (error) {
@@ -296,7 +296,7 @@ async function loadReferenceResponse(env, forceRefresh = false, latestOnly = fal
     const { response, payload } = await backendJson(target.toString(), { redirect: 'follow', cache: 'no-store' }, { timeoutMs: 45000, label: 'Reference service' });
     if (!response.ok || !payload.ok) throw serviceError(payload.error || 'Reference service returned an error.', { status: response.status || 502, retryable: RETRYABLE_UPSTREAM_STATUS.has(response.status), code: 'REFERENCE_UPSTREAM' });
     if (forceRefresh && payload.cacheReloaded !== true) throw serviceError('Reload requires the current LORD backend. Update the Apps Script deployment.');
-    const stored = new Response(JSON.stringify(payload), { headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': `public, max-age=${REFERENCE_STALE_SECONDS}`, 'X-OVERLORD-Fetched-At': String(now), ...(forceRefresh ? { 'X-OVERLORD-Reloaded-At': String(Date.now()) } : {}) } });
+    const stored = new Response(JSON.stringify(payload), { headers: { ...referenceBuildHeaders(payload.buildLabel), 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': `public, max-age=${REFERENCE_STALE_SECONDS}`, 'X-OVERLORD-Fetched-At': String(now), ...(forceRefresh ? { 'X-OVERLORD-Reloaded-At': String(Date.now()) } : {}) } });
     // An ordinary read started before a manual reload must not replace it.
     const latest = await cache.match(cacheKey);
     if (forceRefresh || !latest || (Number(latest.headers.get('X-OVERLORD-Reloaded-At') || 0) < now && Number(latest.headers.get('X-OVERLORD-Fetched-At') || 0) <= now)) {
