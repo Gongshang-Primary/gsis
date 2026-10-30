@@ -48,3 +48,7 @@ Local checks: five new formula/ranking/calculation cases pass, including both or
 Two Windows-only build portability changes match row S: write access for ZIP fsync, and POSIX archive member paths.
 
 Windows verification note: the runtime and canonical builds pass. The packaging security test that creates a file symlink cannot run under this Windows account (WinError 1314, required privilege not held). Its assertion is retained. No full-green claim is made until every required check runs in a suitable environment.
+
+## Linux verification
+
+A branch-scoped GitHub Actions job runs the complete existing suite on Linux with pinned official checkout/setup actions, read-only repository permissions, no deployment secrets and the locked Playwright browser. It covers these two task branches only. This avoids changing or skipping the Windows-blocked symlink security test. CI results remain pending until the run completes.
