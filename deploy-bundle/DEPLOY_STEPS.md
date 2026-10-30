@@ -29,7 +29,7 @@ Workers & Pages → the Deploy Pages project → Create deployment → upload `6
 2. Offload tab → Add rule → a new row appears. Fill it in:
    Group / tag: `HAL` · Match field: `Staff tag` · Matching value: `HAL` (pick from the list) · Offload %: `30` · leave the rest blank.
    (Copy the existing BT row: it is the same shape with 20%.)
-3. Teachers tab → the teacher → Employment Modifier → add `HAL` (alone, or alongside an existing value).
+3. Teachers tab → the teacher → Employment Modifier. Full-timers have it blank: enter `HAL`. If it already has a value (e.g. `4/5`), make it `4/5, HAL`.
 4. Save and publish the version as you normally do, so Roster sees it.
 Check: the teacher's Details show offload 20% SH and 30% HAL stacking, (1−0.2)×(1−0.3).
 Never add HAL to anyone before this deploy: the old code cannot read it and would blank R for all staff.
