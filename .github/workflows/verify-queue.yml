@@ -8,6 +8,7 @@ on:
       - codex/roster-peer-release-notify
       - codex/roster-my-relief-r-percent
       - codex/roster-suspended-baseline-view
+      - codex/roster-relief-on-timetable
   workflow_dispatch:
 permissions:
   contents: read

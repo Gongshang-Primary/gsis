@@ -332,7 +332,8 @@ function rosterTimetableDay_(req,c){
  const p=req.input||{},date=GSISRosterOperations.date(p.date||today),index=rosterIndex_(),entry=GSISRoster.active(index.entries,date),model=entry?rosterModel_(entry):null;
  const periods=model?Array.from({length:model.maxPeriod+1},(_,period)=>{const startMinutes=model.timing.startMinutes+period*model.timing.periodMinutes,endMinutes=startMinutes+model.timing.periodMinutes,fmt=m=>String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0');return {period,start:fmt(startMinutes),end:fmt(endMinutes),startMinutes,endMinutes};}):[];
  const state=rosterOperationsPhase_('state-read',()=>rosterOperationsState_(true)),base={id:entry?.id||null,periods,teachers:[]},people=c.rosterPeople.map(person=>({id:String(person.id),active:person.active===true,role:String(person.role||''),mk:String(person.mk||''),appointmentLevel:String(person.appointmentLevel||''),groups:Array.isArray(person.groups)?person.groups:[]}));
- return rosterOperationsPhase_('projection',()=>GSISRosterOperations.timetableDay(state,{today,user,people,days:{[date]:base}},p));
+ const identityState={...state,nameBridges:(state.nameBridges||[]).map(row=>({...row}))},identityWeek=model&&(model.layoutMode==='single-week'?model.single:model.odd),timetableNames=Object.fromEntries((identityWeek?GSISRosterOperations.matchTimetableNames(identityState,c.rosterPeople,identityWeek.blocks):[]).map(row=>[row.person.id,row.timetableName]));
+ return rosterOperationsPhase_('projection',()=>GSISRosterOperations.timetableDay(state,{today,user,people,timetableNames,days:{[date]:base}},p));
 }
 // Optimistic daily commands prepare outside the writer lock. The final merge is
 // still one serialized document commit: separate date locks would lose updates.

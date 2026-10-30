@@ -367,16 +367,19 @@
   if(force||entry?.until<=Date.now()){timetableDays.delete(entry?.sourceKey||key);entry=null;}
   if(!entry){
    const snapshot=timetablePreload?.snapshot(),plan=!force&&snapshot?.phase==='ready'?(timetablePreload.getTimetableStatus?timetablePreload.getTimetableStatus(date):timetablePreload.getPlan(date)):null;
-   const cachedDay=plan?plan.timetableDay:!force&&snapshot?.phase==='ready'&&!plan&&timetablePreload.getBaseline(date)?{date,baselineId,source:'baseline'}:null;
+   const cachedDay=plan?plan.timetableDay:null;
    entry={date,until:0,scopeKey:key};const owned=entry;
    entry.promise=(cachedDay?Promise.resolve(cachedDay):api('operations',{operation:'timetableDay',date},'POST',undefined,{background:true})).then(result=>{if(result.date!==date||result.source==='baseline'&&result.baselineId!==baselineId||!['published','confirmed','baseline'].includes(result.source))throw Error('The timetable source changed. Refresh to check this date.');owned.result=result;owned.until=cachedDay?Infinity:Date.now()+60000;owned.sourceKey=JSON.stringify([key,result.baselineId,result.sourceRevision,result.publicationRevision,result.confirmedRevision]);if(timetableDays.get(key)===owned){timetableDays.delete(key);timetableDays.set(owned.sourceKey,owned);}return result;}).catch(error=>{owned.until=0;throw error;});timetableDays.set(key,entry);while(timetableDays.size>16)timetableDays.delete(timetableDays.keys().next().value);
   }
   try{
    const result=await entry.promise;if(!active())return;
+   base.relief=result.relief||null;delete base.reliefDay;
    base.suspension=result.source==='baseline'&&result.suspension?.status==='needs-reconfirmation'?result.suspension:null;
    if(['published','confirmed'].includes(result.source)){if(!result.periods?.length||!Array.isArray(result.teachers))throw Error('The suspended timetable is incomplete.');const changed=base.effectiveDay!==result;base.effectiveDay=result;if(changed)base.dayModel=RosterExport.dayModel(result);base.dayCheck=result.source;if(!base.model)viewer();else refreshTimetableDay(changed);return;}
    const changed=!!base.effectiveDay;delete base.effectiveDay;delete base.dayModel;base.dayCheck='none';base.calendar={status:'checking'};refreshTimetableDay(changed);
-   try{const checked=await readDate(date,{background:true});if(!active())return;if(checked.modelId!==baselineId)throw Error('The baseline changed. Refresh to check this date.');base.calendar=checked.calendar;refreshTimetableDay();}catch(e){if(e.status===403)throw e;if(active()){base.calendar={available:false,message:'Calendar could not be checked.'};refreshTimetableDay();}}
+   try{const checked=await readDate(date,{background:true});if(!active())return;if(checked.modelId!==baselineId)throw Error('The baseline changed. Refresh to check this date.');base.calendar=checked.calendar;
+    if(base.relief?.rows?.length&&base.model&&(base.model.layoutMode==='single-week'||checked.calendar?.available===true&&['odd','even'].includes(checked.calendar.parity))){const dated=RosterExport.datedBaseline(base.model,date,checked.calendar?.parity);if(dated){base.reliefDay={...dated,relief:base.relief};base.dayModel=RosterExport.dayModel(base.reliefDay);}}
+    refreshTimetableDay(!!base.reliefDay);}catch(e){if(e.status===403)throw e;if(active()){base.calendar={available:false,message:'Calendar could not be checked.'};refreshTimetableDay();}}
   }catch(e){
    if(e.status===403&&epoch===sessionEpoch&&day===date&&page==='Timetable'){$('content').innerHTML='<h2>Timetable</h2><p class="error">'+esc(errorText(e))+' Refresh to verify your access.</p>';return;}
    if(!active()||e.stale)return;base.dayCheck='failed';refreshTimetableDay();
@@ -623,10 +626,10 @@
   input.onkeydown=e=>{if(e.key==='Escape'){close();input.value=value;return;}if(e.key==='ArrowDown'||e.key==='ArrowUp'){e.preventDefault();if(list.hidden)open(true);if(!matches.length)return;position=position<0?(e.key==='ArrowDown'?0:matches.length-1):(position+(e.key==='ArrowDown'?1:-1)+matches.length)%matches.length;list.querySelectorAll('[role=option]').forEach((x,i)=>x.classList.toggle('highlighted',i===position));input.setAttribute('aria-activedescendant','nameOption'+position);list.children[position].scrollIntoView?.({block:'nearest'});}else if(e.key==='Enter'&&!list.hidden){e.preventDefault();choose(position<0?0:position);}};
  }
  function exportPages(type,names,source='current'){
-  const baseline=source==='baseline'||!current.effectiveDay,model=baseline?current.model:current.dayModel;if(!model)return [];const available=[...new Set([...RosterExport.names(model,type),...(!baseline&&current.effectiveDay?.baseline?.periods?.length?RosterExport.names(RosterExport.dayModel(current.effectiveDay.baseline),type):[])])],chosen=names?.filter(name=>available.includes(name));
+  const dated=current.effectiveDay||current.reliefDay,baseline=source==='baseline'||!dated,model=baseline?current.model:current.dayModel;if(!model)return [];const available=baseline?RosterExport.names(model,type):RosterExport.comparisonPages(dated,{type,lastPeriod:cutoff(model)}).map(page=>page.name),chosen=names?.filter(name=>available.includes(name));
   if(chosen&&!chosen.length)return [];
   const options={type,fields:viewFields[type],...(chosen?{names:chosen}:{}),lastPeriod:cutoff(model),timetableName:(current.selected||current.active)?.name||'',dateLabel:source==='baseline'?'Baseline weekly timetable · '+displayDate(day):timetableDayLabel()};
-  return baseline?RosterExport.pages(current.model,options):RosterExport.comparisonPages(current.effectiveDay,options);
+  return baseline?RosterExport.pages(current.model,options):RosterExport.comparisonPages(dated,options);
  }
  function pageHtml(pages){return pages.map(p=>'<section class="week-sheet"><h3>'+esc(p.title)+'</h3>'+(p.subtitle?'<p class="sheet-subtitle">'+esc(p.subtitle)+'</p>':'')+RosterExport.tableHtml(p)+'</section>').join('');}
  async function timetableModel(){
@@ -638,7 +641,7 @@
  function drawTimetable(){
   const holder=$('timetableView');if(!holder)return;
   const source=current.effectiveDay?.source==='confirmed'?'confirmed':'published',sourceTitle=source==='confirmed'?'Confirmed':'Published';
-  const namesFor=type=>[...new Set([...(current.names?.[type]||(current.model?RosterExport.names(current.model,type):[])),...(current.dayModel?RosterExport.names(current.dayModel,type):[])])].sort((a,b)=>a.localeCompare(b,'en',{numeric:true}));
+  const namesFor=type=>[...new Set([...(current.names?.[type]||(current.model?RosterExport.names(current.model,type):[])),...(current.dayModel?RosterExport.names(current.dayModel,type):[]),...((current.effectiveDay||current.reliefDay)?.relief?.rows?.length?RosterExport.comparisonPages(current.effectiveDay||current.reliefDay,{type,lastPeriod:cutoff(current.dayModel||current.model)}).map(page=>page.name):[])])].sort((a,b)=>a.localeCompare(b,'en',{numeric:true}));
   if(timetablePage==='teacher'&&ownTimetableDate===day&&current.effectiveDay){
    const own=current.effectiveDay.teachers.filter(t=>t.staffId===profile.user.staffId);chosenNames.teacher=own.length===1?(own[0].timetableName||own[0].name):'';ownTimetableDate=null;
   }
