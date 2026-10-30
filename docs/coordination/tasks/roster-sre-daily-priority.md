@@ -1,9 +1,9 @@
 # roster-sre-daily-priority: SREs are rostered daily first, not by annual R%
 
-- Status: implementing; focused policy, route and browser checks passed; full suite pending
+- Status: ready for Claude review; merge and deployment pending
 - Owner/model: Codex
 - Reviewer/model: Claude
-- Last updated (Asia/Singapore): 30 Oct 2026 10:55
+- Last updated (Asia/Singapore): 30 Oct 2026 11:14
 - Branch: codex/roster-sre-daily-priority
 - Base SHA: 17fc352e905043c1eb95b441e6f89f622d068006
 - PR: https://github.com/helper-gsps/gsis/pull/14
@@ -95,4 +95,16 @@ The ordinary-only solver cost vector also retains its original shape; SRE priori
 
 Current main d535e294b3f5dfd06f61b1891b86a1c6981ba877 is integrated; it changes only three queue/task documents. Its owner priority makes roster-d1-google-backup the next implementation after this already-open SRE task, ahead of the remaining SRE/FAJT rows. Read-only preparation identified receipt replay, notification transport and R2 object restoration as required switch-back boundaries; no D1 runtime task or authority change is claimed here. Claude's separate PR #15 owns the old test/packaging failures.
 
-Full npm test and LORD results will be recorded before review. No fresh network installation, staging, school sign-in, live data/latency validation or real delivery is claimed. Google remains authoritative. No ROSTER_EDGE_AUTHORITY or live configuration change was made. Rollback uses the prior matched source and bundles; no stored-data migration is required.
+## Final verification and review handoff
+
+The clean full-suite run tested local fb3c295f88f46e49ddd01acbe75b7baf298e5338, exactly matching published source 5d8887816e7a133a9547a3990a2e64f489c1091b at tree a22ee6164e37a5dc04a1ad196d6cd893882ebad4. Both the commit and working tree remained unchanged throughout. Node: **871/876 programs passed**. LORD ran separately after the Node failure and passed **38/38**. All selected program outcomes, command results, source/test hashes, exclusions and later checks are recorded in [the verification record](../review/roster-sre-daily-priority-tests.json).
+
+Five programs failed in that full run. Three reproduce on unchanged 17fc352: package.cjs lacks the historical Q commit, and the two roster098o capture-window fixtures have expired. Claude owns their correction in PR #15. The other two were roster084a-relief-pool.cjs (an external non-SRE manual candidate returned undefined instead of boolean false after SRE metadata became conditional) and subject704-backend.cjs (its assertion still expected the old cache prefix).
+
+After the full run, the only canonical runtime change makes the external-candidate condition explicitly boolean; matching outputs were regenerated. The cache test now expects the intentional source-evidence cache version. Rebuild, all ten affected regression/domain/oracle programs, the separate 100-case exact non-SRE comparison and whitespace verification passed: **13/13 follow-up commands**. The original ranking hash and independent solver oracles are unchanged. No new full-suite run is claimed after those bounded corrections; before/after hashes and every follow-up result are retained in the verification record. Only the three reproduced baseline failures remain unresolved in this branch.
+
+Claude reviews the final exact PR head named in the PR description, including the boolean correction and cache assertion. Song Wee decides merge and deployment. After this task merges, the next implementation is roster-d1-google-backup under the updated owner priority; do not begin overlapping Roster runtime work while this PR is open.
+
+No fresh network installation, six optional historical comparisons, staging, school sign-in, live data/latency validation or real delivery is claimed. Google remains authoritative. No ROSTER_EDGE_AUTHORITY or live configuration change was made.
+
+Rollback requires the prior matched sources/bundles **and a compatible Settings snapshot**. Older runtimes reject the new allocationRuleEnabled.adhocDailyTotal key; retain the current snapshot and restore the prior validated toggle map (or remove only that new toggle through approved recovery) when rolling back. Preserve all relief, receipt and notification records. No stored-record migration or deletion is introduced by this implementation.
