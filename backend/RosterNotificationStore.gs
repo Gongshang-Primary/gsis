@@ -45,6 +45,7 @@ function rosterNotificationMaintenanceSync_(row,intent,generation){
 function rosterNotificationSync_(store,primary){
  const existing=new Map(store.outbox.map(row=>[row.id,row])),source=new Map((primary.outbox||[]).map(row=>[row.id,row]));
  for(const intent of source.values()){
+  if(intent.archiveRef)continue;
   let row=existing.get(intent.id);
   if(!row){row=rosterNotificationCopy_(intent);row.intentDigest=rosterOperationsDigest_(JSON.stringify([row.id,row.recipientId,row.kind,row.date,row.data]));row.consumedIntentRevision=Number(intent.notificationIntentRevision)||0;store.outbox.push(row);existing.set(row.id,row);}
   const generation=Number(intent.notificationIntentRevision)||0;
@@ -103,8 +104,9 @@ function rosterNotificationEnsure_(){
 }
 function rosterNotificationOverlayWith_(state,store){
  if(!store)return state;const jobs=new Map(store.outbox.map(row=>[row.id,row]));
- for(const intent of state.outbox||[]){const delivery=jobs.get(intent.id);if(!delivery)continue;const cancelled=['cancelled','superseded'].includes(intent.status);for(const key of ROSTER_NOTIFICATION_FIELDS_){if(key==='status'&&cancelled)continue;if(key in delivery)intent[key]=rosterNotificationCopy_(delivery[key]);else delete intent[key];}}
- state.smcAlerts=[...(state.smcAlerts||[]).filter(a=>!String(a.key||'').startsWith('delivery:')),...rosterNotificationCopy_(store.smcAlerts)];
+ for(const intent of state.outbox||[]){const delivery=jobs.get(intent.id);if(intent.archiveRef){if(delivery){for(const key of ['status','completedAt','deliveryStatus','deliveryAt','readAt','transportUpdatedAt'])if(key in delivery)intent[key]=rosterNotificationCopy_(delivery[key]);if('error' in delivery)intent.error=String(delivery.error||'').slice(0,500);else delete intent.error;if(delivery.providerError?.code!==undefined)intent.failureCode=delivery.providerError.code;else delete intent.failureCode;}continue;}if(!delivery)continue;const cancelled=['cancelled','superseded'].includes(intent.status);for(const key of ROSTER_NOTIFICATION_FIELDS_){if(key==='status'&&cancelled)continue;if(key in delivery)intent[key]=rosterNotificationCopy_(delivery[key]);else delete intent[key];}}
+ const archived=new Map((state.smcAlerts||[]).filter(a=>a.archiveRef).map(a=>[a.id,a]));
+ state.smcAlerts=[...(state.smcAlerts||[]).filter(a=>!String(a.key||'').startsWith('delivery:')||a.archiveRef),...rosterNotificationCopy_(store.smcAlerts.filter(a=>!archived.has(a.id)))];
  state.deliveryReview=rosterNotificationCopy_(store.deliveryReview);return state;
 }
 function rosterNotificationOverlay_(state){try{return rosterNotificationOverlayWith_(state,rosterNotificationState_());}catch(e){Object.defineProperty(state,'notificationTransportUnavailable',{value:true,enumerable:false,configurable:true});return state;}}

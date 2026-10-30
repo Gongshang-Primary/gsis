@@ -1,11 +1,11 @@
 # roster-archive-cold-output: move old machine output to monthly archive files (keep all records)
 
-- Status: claimed (owner 31 Oct 2026: start row A; pause all other GSiS repository work)
+- Status: implementing; full CI required before opening the PR
 - Owner/model: Codex (builder)
 - Reviewer/model: Claude
-- Last updated (Asia/Singapore): 31 Oct 2026 05:59
+- Last updated (Asia/Singapore): 31 Oct 2026 05:02
 - Branch: codex/roster-archive-cold-output
-- Base SHA: 6eb943f01e5974b33244001040fdb5f66d1ad6a4
+- Base SHA: 9b1fc5aba005b41498cfe08180f66a6739b5016c (includes the claim and a later changelog-only update)
 - PR: none
 - Files/domains owned: backend/RosterOperations.gs (archive write/read, nightly job hook), shared/roster-operations.js (archive selection, compact stubs), Roster Admin storage UI (archive status, open archived item), generated copies, tests.
 - Out of scope: pruning (owner: "cannot prune. need to keep records"); the split-file live layout (#19 is repurposed for the D1 backup, see roster-d1-google-backup.md).
@@ -51,3 +51,27 @@ Model: Codex. Owner explicitly paused other repository work and authorised this 
 The implementation also owns the existing audit-export cleanup and notification-store overlay where needed to prevent deletion or re-expansion of archived data. Google remains authoritative. No live records, configuration, messages, deployment or D1 cutover are authorised by this task.
 
 Receipt replay protection has no general request expiry today. Preserve durable request identities while moving large receipt bodies; do not weaken replay protection to satisfy archival. Use existing folder, lock, storage and scheduled maintenance paths. Tests must cover verified write-before-stub, interrupted retry, permissions, protected data, delivery overlay, audit export and statistics parity.
+
+## Implemented scope
+
+- Shared eligibility rules and compact records; scheduler records leave the main map only after verified archival. Ordinary receipt identities remain for replay protection.
+- Append-only monthly envelopes with original JSON and per-entry/whole-file digests, readback before primary commit, idempotent interrupted retries, Admin browse/read/archive routes and command receipt recovery.
+- One bounded after-school maintenance run per Singapore day, with a cheap successful-day marker; manual runs use the same locked writer.
+- Storage replaces the visible destructive prune controls. Monthly lists, exact-copy view, escaped data, retry states and date-free gateway reads are included.
+- Daily audit exports no longer delete original human records. Delivery overlays preserve compact rows; historical notification reads hydrate only the requested date.
+- No live configuration, messages, school records, authority flags or deployment changed.
+
+Details and rollback constraints: [change note](../changes/2026-10-31-roster-archive-cold-output.md).
+
+## Verification
+
+- `TZ=Asia/Singapore npm run build`: passed, all 18 components; Apps Script syntax gate parsed 86 files.
+- Regression-first checks reproduced missing archive rules, unverified storage, UI and unnecessary Calendar lookup before the respective changes.
+- `tests/roster-archive-rules.cjs`, `tests/roster-archive-storage.cjs`, `tests/roster-archive-cold-output-ui.cjs`, `tests/roster-archive-gateway.mjs`, `tests/roster-archive-accounting.cjs`, `tests/roster-archive-import.cjs`: focused checks, with final combined result recorded at handoff.
+- Full Node/LORD suite: pending GitHub CI on this branch. No local Chromium binary is available; no browser tests have been skipped and counted as passing.
+- D1 import accepts stubs and metadata; monthly archive files remain in Google. No D1 archive-body migration is claimed.
+- Apps Script/Drive staging latency and actual school-sized records have not been tested live.
+
+## Handoff
+
+Only row A is active. PR #19, PR #27 and the other queue rows remain paused. The PR8 automation is disabled. Claude must review the exact published head after full CI passes. No PR or deployment is claimed yet.

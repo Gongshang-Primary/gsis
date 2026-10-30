@@ -1,0 +1,36 @@
+'use strict';
+const assert = require('node:assert/strict');
+const fixture = require('./roster701-fixture.cjs');
+const A = require('../shared/roster-allocation.js');
+const S = require('../shared/roster-statistics.js');
+
+// Archive only machine output around a real absence, assignment and publication.
+const f = fixture();
+f.ctx.minute = 360;
+f.ctx.now = Date.parse(f.date + 'T06:00:00+08:00');
+f.ctx.iso = new Date(f.ctx.now).toISOString();
+A.captureWeek(f.state, f.ctx, f.date);
+f.O.apply(f.state, f.ctx, {operation:'saveAbsence', staffId:'alice', typeId:'mc', date:f.date, periods:[2,3]});
+const demand = f.O.demand(f.ctx, f.state, f.date)[0];
+f.O.apply(f.state, f.ctx, {operation:'assign', date:f.date, staffId:'bob', demandIds:[demand.id]});
+f.O.apply(f.state, f.ctx, {operation:'publish', date:f.date, allocationRevision:f.state.dayRevisions[f.date]});
+f.state.importedRelief.push({id:'prior-relief', staffId:'dora', date:'2026-09-01', status:'completed', origin:'imported', rCost:3});
+const old = '2026-08-20T00:00:00Z';
+f.state.audit.push({id:'machine-audit', date:'2026-08-20', at:old, actor:'system', operation:'workload-review', data:'Evidence '.repeat(400)});
+f.state.outbox.push({id:'machine-message', date:'2026-08-20', kind:'smc_report', recipientId:'alice', status:'sent', createdAt:old, completedAt:old, data:{body:'Report '.repeat(400)}});
+f.state.optimisationRuns.push({id:'machine-run', date:'2026-08-20', at:old, status:'complete', auditExportCaptured:true, decisionEvidence:{details:'Decisions '.repeat(400)}});
+f.ctx.today = '2026-10-31';
+f.ctx.now = Date.parse('2026-10-31T12:00:00+08:00');
+f.ctx.iso = new Date(f.ctx.now).toISOString();
+const report = state => S.project(state, f.ctx, {from:'2026-08-01', to:'2026-10-31'});
+const balances = state => JSON.parse(JSON.stringify([...A.balances(state, f.ctx, f.date)]));
+const annual = state => f.people.map(person => A.annual(state, f.ctx, person.id));
+const before = {report:report(f.state), balances:balances(f.state), annual:annual(f.state)};
+const selection = f.O.archiveColdSelection(f.state, f.ctx);
+assert.equal(selection.items.length, 3);
+const archived = f.O.archiveApplySelection(f.state, selection);
+assert.deepEqual(report(archived), before.report, 'all statistics facts and historical coverage stay equal');
+assert.deepEqual(S.aggregate(report(archived)), S.aggregate(before.report), 'displayed totals stay equal');
+assert.deepEqual(balances(archived), before.balances, 'weekly and annual R balances stay equal');
+assert.deepEqual(annual(archived), before.annual, 'annual R utilisation stays equal');
+console.log('PASS cold archive preserves real absence, publication, statistics and R accounting');

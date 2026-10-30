@@ -4505,10 +4505,72 @@ const next=stapler().effectiveDay(plan,ctx.baselineDays?.[d]||ctx.days[d]);for(c
  function storageReport(state,ctx){
   const s=typeof ctx.storageView==='function'?ctx.storageView(state):state,size=v=>{try{return JSON.stringify(v)?.length||0;}catch{return 0;}},breakdown=(rows,key)=>{const m=new Map();for(const row of rows||[]){const k=String(row?.[key]||'other');m.set(k,(m.get(k)||0)+size(row));}return [...m].sort((a,b)=>b[1]-a[1]).slice(0,8).map(([name,chars])=>({name,chars}));};
   const collections=Object.entries(s).map(([name,value])=>({name,chars:size(value),items:Array.isArray(value)?value.length:value&&typeof value==='object'?Object.keys(value).length:1})).sort((a,b)=>b.chars-a.chars);
-  return {total:collections.reduce((n,c)=>n+c.chars,0),limit:ctx.storageMaxChars||null,collections,audit:breakdown(s.audit,'operation'),outbox:breakdown(s.outbox,'kind')};
+  return {total:collections.reduce((n,c)=>n+c.chars,0),limit:ctx.storageMaxChars||null,collections,audit:breakdown(s.audit,'operation'),outbox:breakdown(s.outbox,'kind'),archive:{months:Object.entries(s.coldArchive?.months||{}).map(([month,row])=>({month,count:row.count||0,characters:row.characters||0})).sort((a,b)=>a.month.localeCompare(b.month)),lastRun:copy(s.coldArchive?.lastRun||null)}};
+ }
+ // Portable cold-output rules. The host writes and verifies each archive before applying these stubs.
+ const COLD_COLLECTIONS=['outbox','receipts','scheduleReceipts','optimisationRuns','audit','smcAlerts'];
+ const COLD_SYSTEM_OPERATIONS=['workload-review','optimise','autoAllocate','scheduledRoster','automatic-release'];
+ function archiveColdSelection(state,ctx){
+  const now=Number(ctx.now),today=date(ctx.today),cutoff=now-30*86400000,max=ctx.maxCharacters===undefined?2000000:Math.min(2000000,Number(ctx.maxCharacters));
+  if(!Number.isFinite(now)||!Number.isFinite(max)||max<0)fail(400,'Invalid archive bounds.');
+  const items=[];let characters=0;
+  const timestamp=value=>typeof value==='number'?value:typeof value==='string'?Date.parse(value):NaN;
+  const validDate=value=>{try{return date(value);}catch{return null;}};
+  const timeKeys=['at','createdAt','completedAt','sentAt','deliveryAt','readAt','failedAt','cancelledAt','supersededAt','resolvedAt','closedAt','reviewedAt','acknowledgedAt','updatedAt','transportUpdatedAt','notificationIntentAt','firstAttemptAt','preparedAt'];
+  const pick=(row,keys)=>Object.fromEntries(keys.filter(key=>row[key]!==undefined).map(key=>[key,copy(row[key])]));
+  for(const collection of COLD_COLLECTIONS){
+   const rows=collection==='scheduleReceipts'?Object.entries(state[collection]||{}):(state[collection]||[]).map(row=>[row?.id,row]),seen=new Set();
+   for(const [id,row] of rows){
+    if(typeof id!=='string'||!id||['__proto__','constructor','prototype'].includes(id)||seen.has(id)||!row||typeof row!=='object'||row.archiveRef)continue;seen.add(id);
+    const times=[...timeKeys.filter(key=>row[key]!==undefined&&row[key]!==null).map(key=>timestamp(row[key])),...(Array.isArray(row.attemptHistory)?row.attemptHistory.flatMap(attempt=>['at','completedAt'].filter(key=>attempt?.[key]!==undefined).map(key=>timestamp(attempt[key]))):[])];
+    if(!times.length||times.some(value=>!Number.isFinite(value)||value>=cutoff))continue;
+    const fallback=new Date(Math.max(...times)+8*3600000).toISOString().slice(0,10),day=validDate(row.date===undefined?(collection==='scheduleReceipts'&&/^20\d\d-\d\d-\d\d/.test(id)?id.slice(0,10):fallback):row.date);
+    if(!day||day>=today||Date.parse(day+'T23:59:59.999+08:00')>=cutoff)continue;
+    const related=[row.result?.date,row.result?.from,row.result?.to,...(Array.isArray(row.dates)?row.dates:[])].filter(value=>value!==undefined);
+    if(related.some(value=>!validDate(value)||value>=today||Date.parse(value+'T23:59:59.999+08:00')>=cutoff))continue;
+    let stub;
+    if(collection==='outbox'){
+     if(!['sent','failed','cancelled','superseded'].includes(row.status)||row.holdReason||row.deliveryStatus==='retry-pending'||row.nextAttemptAt||row.nextEligibleAt)continue;
+     if(row.status==='failed'&&row.retryable!==false&&(row.attempts||0)<3&&!(Number.isFinite(row.expiresAt)&&row.expiresAt<=now))continue;
+     const attempt=row.attemptHistory?.at(-1);if(attempt&&['sending','uncertain','claimed'].includes(attempt.state))continue;if(row.preparedAt&&!['sent','failed','not-sent'].includes(attempt?.state))continue;
+     if(!['completedAt','sentAt','failedAt','cancelledAt','supersededAt','transportUpdatedAt','deliveryAt','readAt'].some(key=>row[key]!==undefined&&row[key]!==null))continue;
+     stub=pick(row,['id','key','kind','recipientId','name','mobile','date','status','createdAt','completedAt','sentAt','deliveryAt','readAt','deliveryStatus','attempts','retryable','expiresAt','requestId','linkIssuedAt','linkExpiresAt','notificationIntentRevision','notificationIntentAction','notificationIntentAt','transportUpdatedAt']);
+     if(row.error)stub.error=String(row.error).slice(0,500);if(row.failureCode!==undefined||row.providerError?.code!==undefined)stub.failureCode=row.failureCode??row.providerError.code;
+    }else if(collection==='receipts')stub=pick(row,['id','actor','digest','at','revision','cancelled','cellMutation']);
+    else if(collection==='scheduleReceipts'){
+     if(row.allocationStatus==='budget'||row.cancelled&&!row.reportComplete)continue;
+     stub=pick(row,['at','report','optimise','allocationStatus','cancelled','reportComplete']);
+    }else if(collection==='optimisationRuns'){
+     if(row.auditExportCaptured!==true||!['complete','completed','bounded','paused','cancelled','skipped','failed'].includes(row.status))continue;
+     stub=pick(row,['id','date','key','at','status','outcome','reason','changed','coverage','uncovered','upperBound','coverageProven','preferencesProven','preferenceSearchNote','decisionEvidenceRef','auditExportCaptured','auditExportVersion']);
+    }else if(collection==='audit'){
+     if(!COLD_SYSTEM_OPERATIONS.includes(row.operation)||row.operation!=='workload-review'&&!['system','automatic','roster-service'].includes(row.actor))continue;
+     stub={...pick(row,['id','date','at','operation','auditExportCaptured','auditExportVersion']),actor:'system'};
+    }else{
+     if(!['resolvedAt','closedAt','reviewedAt','acknowledgedAt'].some(key=>row[key]!==undefined&&row[key]!==null))continue;
+     stub=pick(row,['id','key','date','status','createdAt','resolvedAt','closedAt','reviewedAt','acknowledgedAt','notificationId','origin','recipients']);
+    }
+    const json=JSON.stringify(row),month=day.slice(0,7);stub.archiveRef={month,collection,id};
+    if(characters+json.length>max)continue;
+    characters+=json.length;items.push({collection,id,month,json,stub});
+   }
+  }
+  return {items,characters};
+ }
+ function archiveApplySelection(state,selection){
+  const next={...state},groups=new Map();
+  for(const item of selection.items){if(!COLD_COLLECTIONS.includes(item.collection)||!item.stub?.archiveRef)fail(400,'Invalid archive selection.');if(!groups.has(item.collection))groups.set(item.collection,new Map());const group=groups.get(item.collection);if(group.has(item.id))fail(409,'Archive selection contains a duplicate record.');group.set(item.id,item);}
+  for(const [collection,group] of groups){
+   if(collection==='scheduleReceipts'){
+    next[collection]={...state[collection]};for(const [id,item] of group){if(JSON.stringify(state[collection]?.[id])!==item.json)fail(409,'Roster records changed before archive commit.');delete next[collection][id];}
+   }else{
+    const found=new Set();next[collection]=(state[collection]||[]).map(row=>{const item=group.get(row.id);if(!item)return row;if(found.has(row.id)||JSON.stringify(row)!==item.json)fail(409,'Roster records changed before archive commit.');found.add(row.id);return copy(item.stub);});if(found.size!==group.size)fail(409,'Roster records changed before archive commit.');
+   }
+  }
+  return next;
  }
  function pruneRange(p){const from=date(p.from),to=date(p.to);if(to<from)fail(400,'The end date must follow the start.');return {from,to};}
- function read(s,ctx,p){if(p.operation==='read'&&p.view==='allocationLearning')return allocationLearningView(s,ctx);if(p.operation==='currentDuty'||p.operation==='read'&&p.view==='currentDuty')return currentDuty(s,ctx);operationalSettings(allocation().ensure(s));const op=p.operation;if(op==='teacherDailyUpdate')return teacherDailyUpdate(s,ctx,p);if(op==='nameBridges')return nameBridgesView(s,ctx);if(op==='dailyNotify')return dailyNotifyView(s,ctx,p);if(op==='systemConfig')return systemConfigView(s,ctx);if(op==='dailyEmployment')return dailyEmploymentView(s,ctx,p);if(op==='staplerDates')return staplerDatesView(s,ctx);if(op==='previewRestoreStapler')return previewRestoreStapler(s,ctx,p);if(op==='timetableDay')return timetableDay(s,ctx,p);if(op==='dailyTimetable')return dailyTimetable(s,ctx,p);if(op==='dutyRoster')return dutyRosterView(s,ctx,p);if(op==='stapler')return staplerView(s,ctx,p);if(op==='history')return notificationHistory(s,ctx,p);if(op==='exportDaily')return dailyExport(s,ctx,p);if(op==='allocation'){smc(ctx);return view(s,ctx,{...p,view:'allocation'});}if(op==='health')return healthRead(s,ctx,p);if(op==='accounting'){smc(ctx);return {revision:s.revision,entitlements:copy(s.entitlements),importedRelief:copy(s.importedRelief),profiles:copy(s.accountingProfiles),years:copy(s.accountingYears),corrections:copy(s.reliefCorrections),dutySMC:copy(s.smcDutyRoster),smcPeople:ctx.people.filter(x=>(ctx.smcIds||[]).includes(x.id)).map(({id,name})=>({id,name}))};}if(op==='availability')return availabilityView(s,ctx,p);if(op==='candidates'){
+ function read(s,ctx,p){if(p.operation==='read'&&p.view==='prune'){admin(ctx);return {revision:s.revision,user:ctx.user,storage:storageReport(s,ctx)};}if(p.operation==='read'&&p.view==='allocationLearning')return allocationLearningView(s,ctx);if(p.operation==='currentDuty'||p.operation==='read'&&p.view==='currentDuty')return currentDuty(s,ctx);operationalSettings(allocation().ensure(s));const op=p.operation;if(op==='teacherDailyUpdate')return teacherDailyUpdate(s,ctx,p);if(op==='nameBridges')return nameBridgesView(s,ctx);if(op==='dailyNotify')return dailyNotifyView(s,ctx,p);if(op==='systemConfig')return systemConfigView(s,ctx);if(op==='dailyEmployment')return dailyEmploymentView(s,ctx,p);if(op==='staplerDates')return staplerDatesView(s,ctx);if(op==='previewRestoreStapler')return previewRestoreStapler(s,ctx,p);if(op==='timetableDay')return timetableDay(s,ctx,p);if(op==='dailyTimetable')return dailyTimetable(s,ctx,p);if(op==='dutyRoster')return dutyRosterView(s,ctx,p);if(op==='stapler')return staplerView(s,ctx,p);if(op==='history')return notificationHistory(s,ctx,p);if(op==='exportDaily')return dailyExport(s,ctx,p);if(op==='allocation'){smc(ctx);return view(s,ctx,{...p,view:'allocation'});}if(op==='health')return healthRead(s,ctx,p);if(op==='accounting'){smc(ctx);return {revision:s.revision,entitlements:copy(s.entitlements),importedRelief:copy(s.importedRelief),profiles:copy(s.accountingProfiles),years:copy(s.accountingYears),corrections:copy(s.reliefCorrections),dutySMC:copy(s.smcDutyRoster),smcPeople:ctx.people.filter(x=>(ctx.smcIds||[]).includes(x.id)).map(({id,name})=>({id,name}))};}if(op==='availability')return availabilityView(s,ctx,p);if(op==='candidates'){
   if(p.previewAbsence!==undefined)return previewAbsenceCandidates(s,ctx,p);
   let source;const project=ids=>{const ds=demandChoices(ctx,s).filter(d=>ids.includes(d.id)),combine=ds.length===1&&p.purpose==='mutual'?new Map(allocation().manualRanks(allocation().manualModel(s,ctx,ds[0].date),ds[0]).map(c=>[c.staffId,c.combineAllowed&&!c.peerReserved])):new Map();return candidates(s,ctx,ids,source).map(x=>p.purpose==='mutual'?{...x,available:x.available&&(x.external||!x.warnings.length),combineAllowed:combine.get(x.staffId)===true}:x).map(x=>(ctx.user.smc||ctx.user.admin)&&p.byPeriod!==true?x:{staffId:x.staffId,name:x.name,available:x.available,reasons:x.reasons,external:x.external,combineAllowed:x.combineAllowed===true});};
   if(p.byPeriod===true){
@@ -4530,7 +4592,7 @@ const next=stapler().effectiveDay(plan,ctx.baselineDays?.[d]||ctx.days[d]);for(c
   }
   return {revision:s.revision,candidates:project(p.demandIds||[]),quotaUnits:'periods/week'};
  }if(op==='audit'){if(!(ctx.user.smc||ctx.user.admin))fail(403,'SMC or Admin access is required.');return {revision:s.revision,audit:copy(s.audit.filter(x=>!p.date||x.date===p.date).slice(-500))};}if(op==='prunePreview'){admin(ctx);const r=pruneRange(p);if(r.to>=ctx.today)fail(400,'Prune only past dates.');const selection=pruneSelection(s,r,ctx.now),counts=Object.fromEntries(Object.entries({...selection.lists,...selection.maps}).map(([key,rows])=>[key,rows.length]));return {revision:s.revision,counts,count:Object.values(counts).reduce((a,b)=>a+b,0),storage:storageReport(s,ctx)};}if(op==='externalLink'){smc(ctx);staff(ctx,p.staffId);const d=date(p.date);if(!s.adhoc.some(x=>x.staffId===p.staffId&&x.date===d&&!x.deletedAt))fail(403,'Activate this external teacher for the selected date first.');return {revision:s.revision,capability:ensurePrivateLink(s,ctx,p.staffId,d)};}return view(s,ctx,p);}
- return {shortPublicationSummary,allocationMode,allocationLearningView,communicationState,communicationProjection,acknowledgeCommunication,previewRestoreStapler,mergeSubmittedInstructions,resubmissionIntervals,subtractAbsenceIntervals,absenceDates,absenceStaffIds,cellProvenance,essentialDecisionAudit,schoolAbsencesRange,schoolAbsencesView,currentDuty,manualRecoveryDemands,teacherDailyUpdate,confirmedStaplerSnapshot,confirmedStaplerProjection,mayViewConfirmed,mergeStaplerPlans,staplerPlanPatch,applyStaplerPlanPatch,ensurePrivateLink,cellDecision,cellDecisions,returnAutomatic,dailyNoticeState,publishedContentFingerprint,latestPublications,timetableNotice,pendingSummary,defaultSmcSummaryTimes,normalizeSmcSummaryTimes,smcSummarySlot,summaryAbsences,scheduledSummaryCurrent,staplerPermission,teacherSponsor,dutyEligible,absenceEligible,seedNameBridges,matchTimetableNames,nameBridgesView,readyStaplerPlan,dailyNotifyView,notifyDaily,operationalSettings,normalizeNoReliefSubjects,matchesNoReliefSubject,systemConfigView,dailyEmploymentView,queueDailyEmployment,employmentEmail,staplerDatesView,absentTeacherContact,refreshStaplerNotifications,timetableDay,dailyTimetable,clock,dutyWindow,dutyRosterView,staplerView,staplerApply,composeStaplerContext,publishAudit,recessActiveOn,recessGroups,recessSettingsApply,availabilityView,cellSourceKey,allocationCellView,notificationReadinessView,reportFormView,reportView,inboundMessage,queue,smcAlert,notificationIndex,notificationCurrent,matchingCustom,queueConditional,publicationSummary,recessDemand,recessView,recessApply,recessPeriods,publicDuty,dailyExport,noReliefApply,publishDay,acknowledgePublications,notificationHistory,acknowledgementView,syncLessonInstructions,customApply,customText,primaryLevel,allocationProjection,manualApply,assignmentInstructions,allocation,scheduledTick,dutySMC,healthRead,updateHealthWarnings,releaseAssignment,publicationSnapshot,queuePublication,pendingPublications,initial,validateState,defaults,dates,date,mobile,needsCover,previewAbsence:lessons,availability,demand,candidates,apply,read,view,reconcile,invalidate,READS};
+ return {archiveColdSelection,archiveApplySelection,COLD_COLLECTIONS,COLD_SYSTEM_OPERATIONS,shortPublicationSummary,allocationMode,allocationLearningView,communicationState,communicationProjection,acknowledgeCommunication,previewRestoreStapler,mergeSubmittedInstructions,resubmissionIntervals,subtractAbsenceIntervals,absenceDates,absenceStaffIds,cellProvenance,essentialDecisionAudit,schoolAbsencesRange,schoolAbsencesView,currentDuty,manualRecoveryDemands,teacherDailyUpdate,confirmedStaplerSnapshot,confirmedStaplerProjection,mayViewConfirmed,mergeStaplerPlans,staplerPlanPatch,applyStaplerPlanPatch,ensurePrivateLink,cellDecision,cellDecisions,returnAutomatic,dailyNoticeState,publishedContentFingerprint,latestPublications,timetableNotice,pendingSummary,defaultSmcSummaryTimes,normalizeSmcSummaryTimes,smcSummarySlot,summaryAbsences,scheduledSummaryCurrent,staplerPermission,teacherSponsor,dutyEligible,absenceEligible,seedNameBridges,matchTimetableNames,nameBridgesView,readyStaplerPlan,dailyNotifyView,notifyDaily,operationalSettings,normalizeNoReliefSubjects,matchesNoReliefSubject,systemConfigView,dailyEmploymentView,queueDailyEmployment,employmentEmail,staplerDatesView,absentTeacherContact,refreshStaplerNotifications,timetableDay,dailyTimetable,clock,dutyWindow,dutyRosterView,staplerView,staplerApply,composeStaplerContext,publishAudit,recessActiveOn,recessGroups,recessSettingsApply,availabilityView,cellSourceKey,allocationCellView,notificationReadinessView,reportFormView,reportView,inboundMessage,queue,smcAlert,notificationIndex,notificationCurrent,matchingCustom,queueConditional,publicationSummary,recessDemand,recessView,recessApply,recessPeriods,publicDuty,dailyExport,noReliefApply,publishDay,acknowledgePublications,notificationHistory,acknowledgementView,syncLessonInstructions,customApply,customText,primaryLevel,allocationProjection,manualApply,assignmentInstructions,allocation,scheduledTick,dutySMC,healthRead,updateHealthWarnings,releaseAssignment,publicationSnapshot,queuePublication,pendingPublications,initial,validateState,defaults,dates,date,mobile,needsCover,previewAbsence:lessons,availability,demand,candidates,apply,read,view,reconcile,invalidate,READS};
 })();
 if(typeof module!=='undefined'&&module.exports)module.exports=GSISRosterOperations;
 
@@ -4574,7 +4636,7 @@ function rosterOperationsState_(skipTransport=false){
   const id=props_().getProperty('ROSTER_OPERATIONS_FILE')||rosterFindFile_(ROSTER_DATA,'Roster operations.json');
   if(!id)return GSISRosterOperations.initial();
   phase='operations-read';const raw=rosterReadFile_(id);phase='operations-json';const value=JSON.parse(raw);
-  phase='operations-schema';const state=GSISRosterOperations.validateState(rosterOperationsUnpackPlans_(typeof rosterAllocationAuditUnpack_==='function'?rosterAllocationAuditUnpack_(value):value));return skipTransport!==true&&typeof rosterNotificationOverlay_==='function'?rosterNotificationOverlay_(state):state;
+  phase='operations-schema';const state=GSISRosterOperations.validateState(rosterOperationsUnpackPlans_(typeof rosterAllocationAuditUnpack_==='function'?rosterAllocationAuditUnpack_(value):value));if(typeof rosterColdReceiptsUnpack_==='function')rosterColdReceiptsUnpack_(state);return skipTransport!==true&&typeof rosterNotificationOverlay_==='function'?rosterNotificationOverlay_(state):state;
  }catch(e){if(e.status){e.failurePhase=e.failurePhase||phase;throw e;}throw Object.assign(Error('Relief records could not be read.'),{status:503,failurePhase:e.failurePhase||phase});}
 }
 // Save ceiling for Roster operations.json. Admin may raise it in Script Properties
@@ -4765,7 +4827,7 @@ function rosterOperationsContext_(req,c,state,providedIndex){
  if(p.operation==='sendDailyEmploymentReport'&&state.dailyEmploymentSnapshots?.some(r=>r.date===requested))return recordContext;
  if(p.operation==='scheduledRoster'&&(state.massPublications?.[today]||state.staplerPlans.some(r=>r.date===today&&r.published))&&minute>=GSISRosterOperations.clock(state.dailyEmploymentSettings.time)&&!state.dailyEmploymentAutomatic?.[today])dates.push(today);
  // These views use durable records, not a rebuilt school-wide timetable or quota.
- if(['history','acknowledge','audit','prunePreview','accounting','saveRecessSettings'].includes(p.operation)||p.operation==='read'&&['duties','mine','prune','notificationReadiness'].includes(p.view))return {user,storageMaxChars:p.operation==='prunePreview'?rosterOperationsMaxChars_():undefined,storageView:p.operation==='prunePreview'?rosterOperationsStoredView_:undefined,people:c.rosterPeople.map(p=>({id:String(p.id),name:String(p.name||''),active:p.active===true,mobile:String(p.mobile||'')})),days:{},timetableEntries:rosterOperationsRecordOnly_(p)?[]:rosterIndex_().entries,today,minute,now:now.getTime(),iso:now.toISOString(),uuid:()=>Utilities.getUuid(),notificationsConfigured:p.notificationsReady===true,adminRecipients:[],smcIds:c.rosterSMCIds||[]};
+ if(['history','acknowledge','audit','prunePreview','accounting','saveRecessSettings'].includes(p.operation)||p.operation==='read'&&['duties','mine','prune','notificationReadiness'].includes(p.view))return {user,storageMaxChars:p.operation==='prunePreview'||p.view==='prune'?rosterOperationsMaxChars_():undefined,storageView:p.operation==='prunePreview'||p.view==='prune'?rosterOperationsStoredView_:undefined,people:c.rosterPeople.map(p=>({id:String(p.id),name:String(p.name||''),active:p.active===true,mobile:String(p.mobile||'')})),days:{},timetableEntries:rosterOperationsRecordOnly_(p)?[]:rosterIndex_().entries,today,minute,now:now.getTime(),iso:now.toISOString(),uuid:()=>Utilities.getUuid(),notificationsConfigured:p.notificationsReady===true,adminRecipients:[],smcIds:c.rosterSMCIds||[]};
  if(p.operation==='saveRecess')dates.push(...GSISRosterOperations.dates(p));
  if(p.operation==='moveStapler')dates.push(GSISRosterOperations.date(p.newDate));
  if(p.operation==='saveAbsence'&&!p.id)dates.push(...GSISRosterOperations.absenceDates({...p,date:requested},recordContext));
@@ -4799,7 +4861,7 @@ function rosterOperationsDigest_(p){return Utilities.computeDigest(Utilities.Dig
 function rosterOperationsCommandDigest_(p){const stable={...p};delete stable.calendarByDate;delete stable.trustedNow;delete stable.notificationsReady;delete stable.schedulerAvailable;return rosterOperationsDigest_(stable);}
 function rosterOperationsReceipt_(req,c){
  rosterOperationsAuthority_(c,req.identity);const p=req.input?.command;
- const writes=['reliefBatch','saveAbsence','deleteAbsences','saveInstructions','saveAdhoc','deleteAdhoc','saveTypes','requestMutual','respondMutual','prune','saveNameBridge','deleteNameBridge','notifyDaily','saveSystemConfig','saveDailyEmploymentSettings','sendDailyEmploymentReport','createStapler','importStapler','saveStapler','confirmStapler','publishStapler','resetStapler','requestStapler','decideStapler','renameStapler','moveStapler','deleteStapler','restoreStapler','unassign','saveRecessSettings','saveRecess','deleteRecess','setNoRelief','noRelief','publish','acknowledge','removeAssignment','saveCustomInstruction','deleteCustomInstruction','setCustomInstructionEnabled','assign','combine','undo','optimise','autoAllocate','setDutySMC','importRHistory','verifyRYear','correctRelief','confirmCompleted'];
+ const writes=['archiveColdOutput','reliefBatch','saveAbsence','deleteAbsences','saveInstructions','saveAdhoc','deleteAdhoc','saveTypes','requestMutual','respondMutual','prune','saveNameBridge','deleteNameBridge','notifyDaily','saveSystemConfig','saveDailyEmploymentSettings','sendDailyEmploymentReport','createStapler','importStapler','saveStapler','confirmStapler','publishStapler','resetStapler','requestStapler','decideStapler','renameStapler','moveStapler','deleteStapler','restoreStapler','unassign','saveRecessSettings','saveRecess','deleteRecess','setNoRelief','noRelief','publish','acknowledge','removeAssignment','saveCustomInstruction','deleteCustomInstruction','setCustomInstructionEnabled','assign','combine','undo','optimise','autoAllocate','setDutySMC','importRHistory','verifyRYear','correctRelief','confirmCompleted'];
  if(!p||typeof p!=='object'||Array.isArray(p)||!writes.includes(p.operation)||typeof p.requestId!=='string'||!/^[\w-]{36}$/.test(p.requestId))error_(400,'The original save command is required.');
  const s=rosterOperationsState_(true),receipt=s.receipts.find(r=>r.id===p.requestId);
  if(receipt&&(receipt.actor!==req.identity.email||receipt.digest!==rosterOperationsCommandDigest_(p)))error_(409,'This request ID was used for a different save.');
@@ -5212,6 +5274,7 @@ function rosterOperationsDispatchCore_(req,c){gsisRequireBackendRole_('roster');
  const edge=typeof rosterEdgeMigrationDispatch_==='function'?rosterEdgeMigrationDispatch_(req,c):null;if(edge?.handled)return edge.result;
  if(typeof rosterEdgeAssertLegacyWrite_==='function')rosterEdgeAssertLegacyWrite_();
  const p=req.input||{},op=p.operation||'read',staplerWrite=['createStapler','importStapler','saveStapler','confirmStapler','publishStapler','resetStapler','renameStapler','moveStapler','deleteStapler','restoreStapler'].includes(op);
+ if(['archiveColdOutput','archivedItem','archiveItems'].includes(op))return rosterColdArchiveDispatch_(req,c);
  if(['timetablePreparationManifest','timetablePreparationPart','timetablePreparationCheck'].includes(op))return rosterTimetablePreparationDispatch_(req,c);
  if(p.intake===true&&['saveAbsence','requestMutual'].includes(op))return rosterAbsenceIntakeCapture_(req,c);
  if(op==='receiptStatus'&&p.command?.intake===true)return rosterAbsenceIntakeReceipt_(req,c);
@@ -5230,7 +5293,7 @@ function rosterOperationsDispatchCore_(req,c){gsisRequireBackendRole_('roster');
   const calendar=p.calendarByDate?.[date],allocationReferenceKey=calendar?.date===date&&typeof calendar.schoolDay==='boolean'?rosterOperationsAllocationReference_(s,people,index,p,rosterOperationsQuotaSource_(),ctx.today,[date]):null;
   return {date,user,revision:s.revision,dayRevision:s.dayRevision,dayToken:s.dayToken,allocationChangeKey:s.allocationChangeKey,checkedAt:s.at,allocationReferenceKey,allocationClock:ctx.today+':'+ctx.minute,allocatorRun:run?rosterAllocationRunPublic_(run,receiptState):null};
  }
- if(op==='audit'&&p.date){const user=rosterOperationsAuthority_(c,req.identity);if(!user.smc&&!user.admin)error_(403,'SMC or Admin access is required.');const date=GSISRosterOperations.date(p.date),state=rosterOperationsState_(true),meta=state.allocationAuditExports?.[date];let rows=state.audit.filter(event=>event.date===date);if(meta?.archiveFileId){let evidence;try{evidence=JSON.parse(rosterReadFile_(meta.archiveFileId));if(evidence.schema!==1||evidence.date!==date||!Array.isArray(evidence.audit))throw Error('identity');}catch(error){error_(503,'The archived audit is unavailable. Retry to view the complete history.');}const byId=new Map(evidence.audit.map(event=>[event.id,event]));for(const event of rows)byId.set(event.id,event);rows=[...byId.values()];}return {revision:state.revision,date,audit:rows.sort((a,b)=>String(a.at||'').localeCompare(String(b.at||''))).slice(-500),archived:!!meta?.archiveFileId};}
+ if(op==='audit'&&p.date){const user=rosterOperationsAuthority_(c,req.identity);if(!user.smc&&!user.admin)error_(403,'SMC or Admin access is required.');const date=GSISRosterOperations.date(p.date),state=rosterOperationsState_(true),meta=state.allocationAuditExports?.[date];let rows=state.audit.filter(event=>event.date===date);if(meta?.archiveFileId){let evidence;try{evidence=JSON.parse(rosterReadFile_(meta.archiveFileId));if(evidence.schema!==1||evidence.date!==date||!Array.isArray(evidence.audit))throw Error('identity');}catch(error){error_(503,'The archived audit is unavailable. Retry to view the complete history.');}const byId=new Map(evidence.audit.map(event=>[event.id,event]));for(const event of rows)if(!event.archiveRef||!byId.has(event.id))byId.set(event.id,event);rows=[...byId.values()];}return {revision:state.revision,date,audit:rows.sort((a,b)=>String(a.at||'').localeCompare(String(b.at||''))).slice(-500),archived:!!meta?.archiveFileId};}
  if(op==='receiptStatus')return rosterOperationsReceipt_(req,c);
  if(op==='acknowledgementStatus')return rosterAcknowledgementStatus_(req,c);
  if(op==='acknowledge')return rosterAcknowledgementDispatch_(req,c);
@@ -5262,7 +5325,7 @@ function rosterOperationsDispatchCore_(req,c){gsisRequireBackendRole_('roster');
   return created;
  }const readonly=GSISRosterOperations.READS.includes(op);
  if(op==='externalLink'){const s=rosterOperationsState_(),ctx=rosterOperationsContext_(req,c,s);GSISRosterOperations.read(s,ctx,p);const lock=LockService.getScriptLock();if(!deployLock_(lock,8000))error_(503,'Another save is finishing. Retry this private link request.');try{const latest=rosterOperationsState_(),before=JSON.stringify(latest.privateLinks||{}),result=GSISRosterOperations.read(latest,ctx,p);if(before!==JSON.stringify(latest.privateLinks||{}))rosterOperationsCommit_(latest);return result;}finally{deployUnlock_(lock);}}
- if(readonly){const s=rosterOperationsPhase_('state-read',()=>rosterOperationsState_(rosterOperationsPrimaryRead_(p))),ctx=rosterOperationsPhase_('context',()=>rosterOperationsContext_(req,c,s));if(op==='currentDuty'||op==='read'&&p.view==='currentDuty')return GSISRosterOperations.read(s,ctx,{operation:'currentDuty'});if(op==='candidates'&&p.previewAbsence!==undefined)rosterOperationsPhase_('reconcile',()=>GSISRosterOperations.reconcile(s,ctx));else if(!rosterOperationsRecordOnly_(p)&&op!=='stapler')rosterOperationsPhase_('reconcile',()=>rosterOperationsReadReconcile_(s,ctx));return rosterOperationsReportTransport_(rosterOperationsPlanningAttach_(rosterOperationsAttachDayToken_(rosterOperationsPhase_('projection',()=>GSISRosterOperations.read(s,ctx,{...p,operation:op})),s,ctx,p),ctx.user,p,s,ctx),{...p,operation:op},ctx);}
+ if(readonly){let s=rosterOperationsPhase_('state-read',()=>rosterOperationsState_(rosterOperationsPrimaryRead_(p)));if(typeof rosterColdArchiveDateView_==='function'&&['read','dailyNotify','teacherDailyUpdate','history','exportDaily'].includes(op))s=rosterColdArchiveDateView_(s,p);const ctx=rosterOperationsPhase_('context',()=>rosterOperationsContext_(req,c,s));if(op==='currentDuty'||op==='read'&&p.view==='currentDuty')return GSISRosterOperations.read(s,ctx,{operation:'currentDuty'});if(op==='candidates'&&p.previewAbsence!==undefined)rosterOperationsPhase_('reconcile',()=>GSISRosterOperations.reconcile(s,ctx));else if(!rosterOperationsRecordOnly_(p)&&op!=='stapler')rosterOperationsPhase_('reconcile',()=>rosterOperationsReadReconcile_(s,ctx));return rosterOperationsReportTransport_(rosterOperationsPlanningAttach_(rosterOperationsAttachDayToken_(rosterOperationsPhase_('projection',()=>GSISRosterOperations.read(s,ctx,{...p,operation:op})),s,ctx,p),ctx.user,p,s,ctx),{...p,operation:op},ctx);}
  if(typeof p.requestId!=='string'||! /^[\w-]{36}$/.test(p.requestId))error_(400,'A save request ID is required.');
  // Hash input before taking the lock. Reject stale commands before loading models or quotas.
  const digest=rosterOperationsCommandDigest_(p);
@@ -5562,7 +5625,7 @@ function rosterScheduledDispatch_(req){gsisRequireBackendRole_('roster');
     const references=rosterOperationsReferenceKey_(ctx),dependencies=rosterOperationsDependencies_(base,command,ctx),beforeOutbox=s.outbox.length;
     rosterOperationsClock_(ctx);const preparedClock=ctx.today+':'+ctx.minute;
     rosterOperationsPhase_('prepare-reconcile',()=>rosterOperationsReconcile_(s,ctx));const result=rosterOperationsPhase_('prepare-apply',()=>GSISRosterOperations.scheduledTick(s,ctx,stamp)),allocating=effectiveSlot.optimise&&!result.allocationTimedOut;
-    for(const [key,value] of Object.entries(s.scheduleReceipts))if(Date.parse(value.at)<now-3*86400000)delete s.scheduleReceipts[key];
+    // Scheduled receipts remain durable; the verified cold-output archive owns retention.
     const next=rosterOperationsPackedSnapshot_(s),domainChanged=rosterOperationsDependencies_(base,{},ctx)!==rosterOperationsDependencies_(next,{},ctx);
     if(run)rosterScheduledAllocationBudget_(run,true);
     const lock=LockService.getScriptLock();if(!rosterOperationsPhase_('lock-wait',()=>deployLock_(lock,8000)))error_(503,'Another relief update is finishing. Retry the scheduler tick.');
@@ -7659,12 +7722,17 @@ function rosterAllocationAuditArchive_(snapshot,date,monthFolder){gsisRequireBac
  if(!folder){const response=rosterDriveRequest_('https://www.googleapis.com/drive/v3/files?supportsAllDrives=true&fields=id',{method:'post',contentType:'application/json; charset=UTF-8',payload:JSON.stringify({name:'Evidence',mimeType:'application/vnd.google-apps.folder',parents:[monthFolder]})},'allocation-audit-evidence-folder');folder=rosterDriveJson_(response,'allocation-audit-evidence-folder').id;if(!folder)error_(503,'The allocation evidence folder could not be confirmed.');}
  const meta=snapshot.allocationAuditExports[date],name=date+'.json',id=meta.archiveFileId||rosterFindFile_(folder,name);let previous={audit:[],optimisationRuns:[]};
  if(id){try{previous=JSON.parse(rosterReadFile_(id));if(previous.schema!==1||previous.date!==date||!Array.isArray(previous.audit)||!Array.isArray(previous.optimisationRuns))throw Error('identity');}catch(error){error_(503,'The stored allocation evidence could not be read. It was not overwritten.');}}
- const unique=(old,next)=>{const rows=new Map(old.map(row=>[row.id,row]));for(const row of next){const prior=rows.get(row.id);rows.set(row.id,prior?{...prior,...row,...(!row.decisionEvidence&&prior.decisionEvidence?{decisionEvidence:prior.decisionEvidence}:{})}:row);}return [...rows.values()];};
+ const unique=(old,next)=>{const rows=new Map(old.map(row=>[row.id,row]));for(const row of next){const prior=rows.get(row.id);if(row.archiveRef&&prior)continue;rows.set(row.id,prior?{...prior,...row,...(!row.decisionEvidence&&prior.decisionEvidence?{decisionEvidence:prior.decisionEvidence}:{})}:row);}return [...rows.values()];};
  const evidence={schema:1,date,version:meta.pendingVersion,revision:meta.pendingRevision,audit:unique(previous.audit,snapshot.audit.filter(row=>row.date===date&&row.auditExportCaptured&&!row.auditExportSuppressed)),optimisationRuns:unique(previous.optimisationRuns,snapshot.optimisationRuns.filter(row=>row.date===date&&!row.auditExportSuppressed))};
  const json=JSON.stringify(evidence),saved=id?(rosterDriveRequest_('https://www.googleapis.com/upload/drive/v3/files/'+encodeURIComponent(id)+'?uploadType=media&supportsAllDrives=true&fields=id',{method:'patch',contentType:'application/json; charset=UTF-8',payload:json},'allocation-audit-evidence'),id):rosterCreateFile_(folder,name,Utilities.newBlob(json,'application/json; charset=UTF-8'));
  return {fileId:saved,state:{...snapshot,audit:[...snapshot.audit.filter(row=>row.date!==date),...evidence.audit],optimisationRuns:[...snapshot.optimisationRuns.filter(row=>row.date!==date),...evidence.optimisationRuns]}};
 }
-function rosterAllocationAuditExport_(p){gsisRequireBackendRole_('roster');
+function rosterAllocationAuditExport_(p){
+ const result=rosterAllocationAuditExportCore_(p);
+ if(typeof rosterColdArchiveRun_==='function'&&!result.busy&&!result.deferred)try{result.archive=rosterColdArchiveRun_({manual:false});}catch(error){result.failures.push({archive:true,error:'Cold Roster output archive is pending and will retry.'});}
+ return result;
+}
+function rosterAllocationAuditExportCore_(p){gsisRequireBackendRole_('roster');
  const result={exported:[],pending:0,failures:[]};
  // Optional text exports yield to the live delivery queue. The same execution
  // owner supplies UserLock, so it is not an independent named exporter lock.
@@ -7697,7 +7765,8 @@ function rosterAllocationAuditExport_(p){gsisRequireBackendRole_('roster');
     const saved=fileId?(rosterDriveRequest_('https://www.googleapis.com/upload/drive/v3/files/'+encodeURIComponent(fileId)+'?uploadType=media&supportsAllDrives=true&fields=id',{method:'patch',contentType:'text/plain; charset=UTF-8',payload:text},'allocation-audit-export'),fileId):rosterCreateFile_(folder,name,Utilities.newBlob(text,'text/plain; charset=UTF-8'));
     exportLock.releaseLock();exportHeld=false;
     const lock=LockService.getScriptLock();if(!deployLock_(lock,8000))throw Error('The text was written but its watermark is not yet confirmed.');
-    try{const current=rosterOperationsState_(),row=current.allocationAuditExports?.[date];if(row&&(row.exportedVersion||0)<=watermark.pendingVersion){row.fileId=saved;row.archiveFileId=archive.fileId;row.archiveVersion=watermark.pendingVersion;row.archiveRevision=watermark.pendingRevision;row.exportedVersion=Math.max(row.exportedVersion||0,watermark.pendingVersion);row.exportedRevision=watermark.pendingRevision;row.exportedAt=generatedAt;row.bytes=Utilities.newBlob(text).getBytes?.().length||text.length;delete row.error;const today=new Date(Date.now()+8*3600000).toISOString().slice(0,10);if(date<today){const archived=event=>event.date===date&&event.auditExportCaptured===true&&Number.isSafeInteger(event.auditExportVersion)&&event.auditExportVersion<=row.archiveVersion&&event.auditExportVersion<=row.exportedVersion;current.audit=current.audit.filter(event=>!archived(event));current.optimisationRuns=current.optimisationRuns.filter(event=>!archived(event));}rosterOperationsCommit_(current);}}
+    try{const current=rosterOperationsState_(),row=current.allocationAuditExports?.[date];if(row&&(row.exportedVersion||0)<=watermark.pendingVersion){row.fileId=saved;row.archiveFileId=archive.fileId;row.archiveVersion=watermark.pendingVersion;row.archiveRevision=watermark.pendingRevision;row.exportedVersion=Math.max(row.exportedVersion||0,watermark.pendingVersion);row.exportedRevision=watermark.pendingRevision;row.exportedAt=generatedAt;row.bytes=Utilities.newBlob(text).getBytes?.().length||text.length;delete row.error;// Verified cold-output archival is the only retention step; text export never deletes records.
+ rosterOperationsCommit_(current);}}
     finally{deployUnlock_(lock);}
     result.exported.push({date,revision:watermark.pendingRevision});const latest=rosterOperationsState_().allocationAuditExports?.[date];if(latest&&latest.pendingVersion<=latest.exportedVersion)result.pending--;
    }catch(error){result.failures.push({date,error:'Allocation audit export is pending and will retry.'});}
@@ -8351,6 +8420,7 @@ function rosterNotificationMaintenanceSync_(row,intent,generation){
 function rosterNotificationSync_(store,primary){
  const existing=new Map(store.outbox.map(row=>[row.id,row])),source=new Map((primary.outbox||[]).map(row=>[row.id,row]));
  for(const intent of source.values()){
+  if(intent.archiveRef)continue;
   let row=existing.get(intent.id);
   if(!row){row=rosterNotificationCopy_(intent);row.intentDigest=rosterOperationsDigest_(JSON.stringify([row.id,row.recipientId,row.kind,row.date,row.data]));row.consumedIntentRevision=Number(intent.notificationIntentRevision)||0;store.outbox.push(row);existing.set(row.id,row);}
   const generation=Number(intent.notificationIntentRevision)||0;
@@ -8409,8 +8479,9 @@ function rosterNotificationEnsure_(){
 }
 function rosterNotificationOverlayWith_(state,store){
  if(!store)return state;const jobs=new Map(store.outbox.map(row=>[row.id,row]));
- for(const intent of state.outbox||[]){const delivery=jobs.get(intent.id);if(!delivery)continue;const cancelled=['cancelled','superseded'].includes(intent.status);for(const key of ROSTER_NOTIFICATION_FIELDS_){if(key==='status'&&cancelled)continue;if(key in delivery)intent[key]=rosterNotificationCopy_(delivery[key]);else delete intent[key];}}
- state.smcAlerts=[...(state.smcAlerts||[]).filter(a=>!String(a.key||'').startsWith('delivery:')),...rosterNotificationCopy_(store.smcAlerts)];
+ for(const intent of state.outbox||[]){const delivery=jobs.get(intent.id);if(intent.archiveRef){if(delivery){for(const key of ['status','completedAt','deliveryStatus','deliveryAt','readAt','transportUpdatedAt'])if(key in delivery)intent[key]=rosterNotificationCopy_(delivery[key]);if('error' in delivery)intent.error=String(delivery.error||'').slice(0,500);else delete intent.error;if(delivery.providerError?.code!==undefined)intent.failureCode=delivery.providerError.code;else delete intent.failureCode;}continue;}if(!delivery)continue;const cancelled=['cancelled','superseded'].includes(intent.status);for(const key of ROSTER_NOTIFICATION_FIELDS_){if(key==='status'&&cancelled)continue;if(key in delivery)intent[key]=rosterNotificationCopy_(delivery[key]);else delete intent[key];}}
+ const archived=new Map((state.smcAlerts||[]).filter(a=>a.archiveRef).map(a=>[a.id,a]));
+ state.smcAlerts=[...(state.smcAlerts||[]).filter(a=>!String(a.key||'').startsWith('delivery:')||a.archiveRef),...rosterNotificationCopy_(store.smcAlerts.filter(a=>!archived.has(a.id)))];
  state.deliveryReview=rosterNotificationCopy_(store.deliveryReview);return state;
 }
 function rosterNotificationOverlay_(state){try{return rosterNotificationOverlayWith_(state,rosterNotificationState_());}catch(e){Object.defineProperty(state,'notificationTransportUnavailable',{value:true,enumerable:false,configurable:true});return state;}}
@@ -10404,3 +10475,102 @@ var GSiSRosterImport=(()=>{
 if(typeof module!=='undefined'&&module.exports)module.exports=GSiSRosterImport;
 
 /* GSIS_ROSTER_IMPORT_END */
+
+/* GSIS_ROSTER_COLD_ARCHIVE_BEGIN */
+/* Cold machine output stays in append-only monthly files. The primary commit
+ * follows verified archive readback, so an interrupted run retains duplicates,
+ * never a stub whose original record has not been saved. */
+function rosterColdArchiveRef_(ref){
+ if(!ref||typeof ref!=='object'||Array.isArray(ref)||!/^20\d\d-(0[1-9]|1[0-2])$/.test(ref.month)||!GSISRosterOperations.COLD_COLLECTIONS.includes(ref.collection)||typeof ref.id!=='string'||!ref.id||ref.id.length>300||typeof ref.digest!=='string'||!/^[a-f0-9]{64}$/.test(ref.digest))error_(400,'Choose a valid archived record.');
+ return ref;
+}
+function rosterColdArchiveRead_(month,state){
+ if(!/^20\d\d-(0[1-9]|1[0-2])$/.test(month))error_(400,'Choose a valid archive month.');
+ const id=state.coldArchive?.months?.[month]?.fileId||rosterFindFile_(ROSTER_DATA,'Roster archive '+month+'.json');
+ if(!id)return {id:null,value:{schema:1,month,items:[]}};
+ let value;try{value=JSON.parse(rosterReadFile_(id));if(value?.schema!==1||value.month!==month||!Array.isArray(value.items)||value.digest!==rosterOperationsPlanDigest_(JSON.stringify(value.items)))throw Error('digest');}
+ catch(error){error_(503,'The monthly Roster archive could not be verified. No records were removed.');}
+ return {id,value};
+}
+function rosterColdArchiveItem_(reference,state){
+ const ref=rosterColdArchiveRef_(reference),archive=rosterColdArchiveRead_(ref.month,state||rosterOperationsState_(true));
+ return rosterColdArchiveEntry_(archive.value.items.find(row=>row.collection===ref.collection&&row.id===ref.id&&row.digest===ref.digest),ref);
+}
+function rosterColdArchiveEntry_(entry,ref){
+ /* Each returned item is bound to the verified monthly envelope and its original bytes. */
+ if(!entry||typeof entry.json!=='string'||rosterOperationsPlanDigest_(entry.json)!==entry.digest)error_(503,'The original archived Roster record could not be verified.');
+ let item;try{item=JSON.parse(entry.json);}catch(error){error_(503,'The original archived Roster record could not be read.');}
+ if(!item||typeof item!=='object'||Array.isArray(item)||item.id!==undefined&&item.id!==ref.id)error_(503,'The archived Roster record identity does not match.');
+ return item;
+}
+function rosterColdReceiptsUnpack_(state){
+ for(const row of state.receipts||[]){if(!row.archiveRef||Object.prototype.hasOwnProperty.call(row,'result'))continue;let original;
+  // JSON serialisation and ordinary state reads retain the stub. Only a matched
+  // request replay reads its old result from the verified archive.
+  Object.defineProperty(row,'result',{configurable:true,enumerable:false,get(){if(!original)original=rosterColdArchiveItem_(row.archiveRef,state);return original.result;}});
+ }
+ return state;
+}
+function rosterColdArchiveDateView_(state,p){
+ const date=p.date;
+ if(typeof date!=='string'||!/^20\d\d-\d\d-\d\d$/.test(date))return state;
+ const rows=state.outbox.filter(row=>row.date===date&&row.archiveRef);if(!rows.length)return state;
+ const months=new Map(),originals=new Map();
+ for(const row of rows){const ref=rosterColdArchiveRef_(row.archiveRef);let entries=months.get(ref.month);if(!entries){entries=rosterColdArchiveRead_(ref.month,state).value.items;months.set(ref.month,entries);}const original=rosterColdArchiveEntry_(entries.find(item=>item.collection===ref.collection&&item.id===ref.id&&item.digest===ref.digest),ref),current={...original,...row};
+  // Archived bytes supply the old message body. Live compact fields supply the
+  // latest delivery outcome, including cleared errors after a late callback.
+  for(const key of ['status','completedAt','deliveryStatus','deliveryAt','readAt','transportUpdatedAt','error','failureCode'])if(!(key in row))delete current[key];
+  delete current.providerError;originals.set(row.id,current);}
+ return {...state,outbox:state.outbox.map(row=>originals.get(row.id)||row)};
+}
+function rosterColdArchiveSummary_(state){
+ return {months:Object.entries(state.coldArchive?.months||{}).sort(([a],[b])=>b.localeCompare(a)).map(([month,row])=>({month,count:row.count,characters:row.characters})),lastRun:state.coldArchive?.lastRun||null};
+}
+function rosterColdArchiveWrite_(month,items,state){
+ const archive=rosterColdArchiveRead_(month,state),rows=archive.value.items.slice(),keys=new Set(rows.map(row=>JSON.stringify([row.collection,row.id,row.digest])));
+ for(const item of items){const digest=rosterOperationsPlanDigest_(item.json),key=JSON.stringify([item.collection,item.id,digest]);item.stub.archiveRef={...item.stub.archiveRef,digest};if(keys.has(key))continue;keys.add(key);rows.push({collection:item.collection,id:item.id,digest,json:item.json});}
+ const value={schema:1,month,items:rows,digest:rosterOperationsPlanDigest_(JSON.stringify(rows))},json=JSON.stringify(value);
+ const id=archive.id?(rosterDriveRequest_('https://www.googleapis.com/upload/drive/v3/files/'+encodeURIComponent(archive.id)+'?uploadType=media&supportsAllDrives=true&fields=id',{method:'patch',contentType:'application/json; charset=UTF-8',payload:json},'roster-cold-archive'),archive.id):rosterCreateFile_(ROSTER_DATA,'Roster archive '+month+'.json',Utilities.newBlob(json,'application/json; charset=UTF-8'));
+ const observed=rosterReadFile_(id);if(rosterOperationsPlanDigest_(observed)!==rosterOperationsPlanDigest_(json))error_(503,'The monthly Roster archive write could not be verified. No records were removed.');
+ return {fileId:id,count:rows.length,characters:rows.reduce((sum,row)=>sum+row.json.length,0),digest:value.digest};
+}
+function rosterColdArchiveRun_(options){
+ const now=options.now??Date.now(),at=new Date(now).toISOString(),today=new Date(now+8*3600000).toISOString().slice(0,10),minute=new Date(now+8*3600000).getUTCHours()*60+new Date(now+8*3600000).getUTCMinutes();
+ if(!options.manual&&props_().getProperty('ROSTER_COLD_ARCHIVE_NIGHT')===today)return {skipped:true,reason:'already-checked'};
+ if(!options.manual&&(minute<960||minute>=1440))return {skipped:true,reason:'outside-maintenance-hours'};
+ const lock=LockService.getScriptLock();if(!deployLock_(lock,1000))return {busy:true};let deliveryLock=null,deliveryHeld=false;
+ try{
+  if(typeof rosterNotificationState_==='function'){
+   deliveryLock=LockService.getUserLock();if(!deliveryLock.tryLock(1000))return {busy:true};deliveryHeld=true;
+  }
+  let state=rosterOperationsState_(true);
+  if(typeof rosterNotificationState_==='function'){const delivery=rosterNotificationState_();if(delivery)state=rosterNotificationOverlayWith_(state,delivery);}
+  if(!options.manual&&state.coldArchive?.lastNight===today)return {skipped:true,reason:'already-checked',archive:rosterColdArchiveSummary_(state)};
+  const receipt=options.requestId&&state.receipts.find(row=>row.id===options.requestId);
+  if(receipt){if(receipt.actor!==options.actor||receipt.digest!==(options.digest||'cold-archive-v1'))error_(409,'This request ID was used for a different save.');return {...receipt.result,replayed:true};}
+  const selected=GSISRosterOperations.archiveColdSelection(state,{today,now,maxCharacters:2000000}),months={...(state.coldArchive?.months||{})};
+  for(const month of [...new Set(selected.items.map(item=>item.month))].sort())months[month]=rosterColdArchiveWrite_(month,selected.items.filter(item=>item.month===month),state);
+  const next=GSISRosterOperations.archiveApplySelection(state,selected);
+  next.coldArchive={schema:1,months,lastNight:options.manual?state.coldArchive?.lastNight:today,lastRun:{at,moved:selected.items.length,characters:selected.characters}};
+  next.revision++;
+  const result={revision:next.revision,archive:rosterColdArchiveSummary_(next)};
+  if(options.requestId)next.receipts.push({id:options.requestId,actor:options.actor,digest:options.digest||'cold-archive-v1',at,revision:next.revision,result});
+  rosterOperationsCommit_(next);if(!options.manual)try{props_().setProperty('ROSTER_COLD_ARCHIVE_NIGHT',today);}catch(ignore){}return result;
+ }finally{if(deliveryHeld)deliveryLock.releaseLock();deployUnlock_(lock);}
+}
+function rosterColdArchiveDispatch_(req,c){
+ const user=rosterOperationsAuthority_(c,req.identity);if(!user.admin)error_(403,'Admin access is required to open or move archived Roster records.');
+ const p=req.input||{};
+ if(p.operation==='archiveColdOutput'){
+  if(typeof p.requestId!=='string'||!/^[\w-]{36}$/.test(p.requestId))error_(400,'A save request ID is required.');
+  const result=rosterColdArchiveRun_({manual:true,actor:req.identity.email,requestId:p.requestId,digest:rosterOperationsCommandDigest_(p)});if(result.busy)error_(503,'Another Roster save is finishing. Retry the same archive request.');return result;
+ }
+ const state=rosterOperationsState_(true);
+ if(p.operation==='archivedItem')return {archiveRef:rosterColdArchiveRef_(p.archiveRef),item:rosterColdArchiveItem_(p.archiveRef,state)};
+ const archive=rosterColdArchiveRead_(p.month,state),offset=p.offset===undefined?0:p.offset,limit=p.limit===undefined?50:p.limit;
+ if(!Number.isSafeInteger(offset)||offset<0||!Number.isSafeInteger(limit)||limit<1||limit>50)error_(400,'Choose a valid archive page.');
+ const items=archive.value.items.slice(offset,offset+limit).map(row=>{const ref={month:p.month,collection:row.collection,id:row.id,digest:row.digest},item=rosterColdArchiveEntry_(row,ref);return {id:row.id,collection:row.collection,date:item.date||String(item.at||item.createdAt||'').slice(0,10),kind:item.kind||'',operation:item.operation||'',status:item.status||'',archiveRef:ref};});
+ return {month:p.month,items,nextOffset:offset+limit<archive.value.items.length?offset+limit:null};
+}
+
+/* GSIS_ROSTER_COLD_ARCHIVE_END */

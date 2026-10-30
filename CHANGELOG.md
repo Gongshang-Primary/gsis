@@ -1,3 +1,7 @@
+# Roster cold-output archives — 31 October 2026
+
+Model: Codex. Queue row A moves finished machine output older than 30 days into verified monthly Google archives while retaining every record. Admin Storage offers Archive now and archive browsing. Request replay identities, human audit, pending sends, current/future work and relief accounting remain protected. Daily audit export no longer deletes human history. Full verification and exact-head review are recorded in [the task](docs/coordination/tasks/roster-archive-cold-output.md). Not deployed.
+
 # Daily SRE priority and capacity — 30 October 2026
 
 Model: Codex. Queue row 2b. A verified daily SRE is allocated before annual R preferences, without an R quota. Published Deploy teaching evidence identifies the SRE type. Daily capacity uses Ad hoc relief max periods, initial 10 with an On/Off control, and the existing consecutive limit. Lower daily load then rotation orders daily SREs. Counts remain recorded; displays say Daily roster, no R%. Existing activation, employment restrictions and protected manual/peer work remain enforced. Long-term SRE calculations and FAJT priority remain separate queued tasks. [Task and verification](docs/coordination/tasks/roster-sre-daily-priority.md). Rebased onto current main, preserving the merged HAL fix and test repairs; fresh full verification passes 877/877 Node and 38/38 LORD programs. Not deployed.
