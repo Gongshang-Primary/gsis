@@ -3,11 +3,11 @@
 - Status: approved, priority (owner 30 Oct 2026: "prioritise the list for D1 authoritative for roster")
 - Owner/model: Codex (builder), Claude (architect and reviewer)
 - Reviewer/model: Claude
-- Last updated (Asia/Singapore): 30 Oct 2026 11:00
+- Last updated (Asia/Singapore): 30 Oct 2026 16:30 (split Google files, owner go)
 - Branch: codex/roster-d1-google-backup
 - Base SHA: current main
 - PR: none
-- Files/domains owned: roster-update/public/edge-roster.js and edge-store.js (outbox on commit), a scheduled mirror lane (operations or notification Worker, or the Roster Pages Worker cron), backend/RosterEdgeMigration.gs (new mirror and release operations), Roster edge setup page, tests.
+- Files/domains owned: roster-update/public/edge-roster.js and edge-store.js (outbox on commit), a scheduled mirror lane (operations or notification Worker, or the Roster Pages Worker cron), backend/RosterEdgeMigration.gs (new mirror and release operations), Roster edge setup page, backend/RosterOperations.gs read/commit path (split layout), tests.
 - Out of scope: running the switch (owner, see roster-d1-cutover runbook); LORD/Deploy.
 
 ## Background
@@ -16,15 +16,25 @@
 
 ## Required
 1. **Mirror outbox:** every committed D1 revision for scopes `roster` and `roster-register` is recorded in the same D1 transaction (revision number, time), so nothing can commit without being queued.
-2. **Mirror lane:** a scheduled job (every minute, coalescing) sends the latest committed state to a new Apps Script operation `edgeMirror` that writes Google's `Roster operations.json` and `Roster register.json` (and transport/inbox/intake parts the snapshot owns). It writes only if the incoming D1 revision is newer than the last mirrored revision (stored in Script Properties), using the existing atomic file-commit path. This operation is exempt from the legacy-write fence but accepts only signed Worker calls carrying a D1 revision.
-3. **Size:** reuse PR #8's chunking in reverse (parts, digests, one final commit) so the Worker never holds the whole Roster; stay under the 16,000,000-character operations file cap and report clearly if near it.
+2. **Mirror lane:** a scheduled job (every minute, coalescing) sends the latest committed state to a new Apps Script operation `edgeMirror`. It writes only if the incoming D1 revision is newer than the last mirrored revision (stored in Script Properties). This operation is exempt from the legacy-write fence but accepts only signed Worker calls carrying a D1 revision.
+3. **Split Google files (owner go 30 Oct):** the single `Roster operations.json` is already about 16M characters and grows about 1.5M a day, so one backup file cannot work. The mirror writes a split layout in a `Roster operations` folder:
+   - `manifest.json`: schema, D1 revision, and for each part its file ID, character count and digest. Written last; it is the commit point.
+   - `core.json`: settings, current state and anything not dated.
+   - one file per month for dated collections (day records, audit, outbox history), for example `2026-10.json`. Base the split on the collections `storageReport` (PR #17) shows as largest.
+   - Each part stays under 8M characters; if a month exceeds that, split it again by half-month. Report the largest part on the setup page.
+   - Write only the parts whose digest changed. Old part files are trashed only after the new manifest is saved.
+   - `Roster register.json` and the other snapshot parts follow the same rule if any exceeds 8M.
+   - Reuse PR #8's chunking in reverse so the Worker never holds the whole Roster.
+3b. **Legacy reads the split layout:** `rosterOperationsRead_` and the commit path learn the manifest layout (read manifest, then parts; commit changed parts, then manifest). If no manifest exists, they use the single file as today. This is required for `release`, because the switched-back Google Roster will be larger than one file can hold. Behaviour for users must be the same; add a one-time `splitOperations` Admin operation that converts the current single file (keep the old file, renamed with a date, never deleted).
 4. **Lag visibility:** edge setup page and D1 job health show "Google backup: revision N, X minutes behind". Alert the Admin if behind more than 10 minutes during school hours (threshold from settings, not code).
-5. **Switch back (`release`):** an Admin operation that (a) pauses D1 writes, (b) waits until the mirror reaches the current D1 revision, (c) verifies Google's digest equals D1's, (d) clears the fence property, (e) tells the Admin to set the Pages variable `ROSTER_EDGE_AUTHORITY=legacy`. Refuses if any step cannot be proven.
+5. **Switch back (`release`):** an Admin operation that (a) pauses D1 writes, (b) waits until the mirror reaches the current D1 revision, (c) verifies the manifest digests equal D1's, (d) clears the fence property, (e) tells the Admin to set the Pages variable `ROSTER_EDGE_AUTHORITY=legacy`. Refuses if any step cannot be proven.
 6. Google remains read-only for users while D1 is the record; the mirror is the only writer.
 
 ## Acceptance
 - Unit: each D1 commit creates exactly one outbox entry; a crash between commit and mirror leaves the entry for the next run.
 - Mirror: two quick commits → one coalesced write at the newer revision; an older revision never overwrites a newer one.
 - Production-size fixture (~14 MB): mirror within Worker memory/CPU limits (same method as PR #8 runtime evidence).
-- Release: refuses while lag > 0; after catch-up, Google digest equals D1 digest and legacy writes work again.
+- Release: refuses while lag > 0; after catch-up, the manifest digests equal D1's and legacy writes work again on the split layout.
+- Split: a 30M-character fixture round-trips (write split, read back, byte-identical); a change to one day rewrites only that month's part and the manifest; a crash before the manifest write leaves the previous manifest valid.
+- Legacy without a manifest behaves exactly as today; `splitOperations` keeps the old file.
 - Nothing changes while mode is `legacy` or `imported` (no mirror traffic before activation).
