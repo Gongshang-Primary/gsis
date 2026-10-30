@@ -1,6 +1,6 @@
 # roster-sre-daily-priority: SREs are rostered daily first, not by annual R%
 
-- Status: rebased onto current main; full suite green; ready for renewed Claude review
+- Status: merged (PR #14, 04382dc, 30 Oct 2026)
 - Owner/model: Codex
 - Reviewer/model: Claude
 - Last updated (Asia/Singapore): 30 Oct 2026 14:10
