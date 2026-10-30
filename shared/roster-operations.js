@@ -616,7 +616,7 @@ var GSISRosterOperations=(()=>{
  // Unlike dailyTimetable, this projection never includes private absence or duty details.
  function timetableRelief(s,ctx,d){
   const publication=s.dailyPublicationStates?.[d],privileged=ctx.user?.smc||ctx.user?.admin,knownNames=ctx.timetableNames||{},frozen=(publication?.teachers||[]).flatMap(teacher=>(teacher.rows||[]).filter(row=>row.kind==='relief').map(row=>{
-   const actual=teacher.cells?.[row.period]||[],values=[row.subject,row.className,row.venue,row.groupName],combination=row.combination===true||!!row.subject&&String(actual[0]||'').endsWith(' + '+row.subject),originalLesson=row.originalLesson||(combination?actual.map((value,i)=>values[i]&&String(value).endsWith(' + '+values[i])?String(value).slice(0,-3-String(values[i]).length):value):null);
+   const actual=teacher.cells?.[row.period]||[],values=[row.subject,row.className,row.venue,row.groupName],combination=row.combination===true||!!row.subject&&String(actual[0]||'').endsWith(' + '+row.subject),originalLesson=row.originalLesson||(combination?actual.map((value,i)=>values[i]&&String(value).endsWith(' + '+values[i])?String(value).slice(0,-3-String(values[i]).length):values[i]&&String(value)===String(values[i])?'':value):null);
    return {...row,staffId:teacher.staffId,relieverName:teacher.name,combination,originalLesson};
   }));
   const source=privileged?allocation().effectiveAssignments(s,true).filter(a=>a.date===d&&!a.remove&&!a.noRelief&&!a.invalidCover):publication?frozen:s.assignments.filter(a=>a.date===d&&['published','completed'].includes(a.status)&&!a.publicationWithheldAt&&!a.remove&&!a.noRelief);
@@ -647,7 +647,7 @@ var GSISRosterOperations=(()=>{
   if(plan.date!==d||plan.baselineId!==record.baselineId)fail(409,'The '+source+' timetable identity does not match its saved date.');
   if(!useConfirmed&&(!Number.isSafeInteger(record.publishedRevision)||record.publishedRevision<1||snapshot&&(!Number.isSafeInteger(snapshot.sourceRevision)||snapshot.sourceRevision<0||!Number.isSafeInteger(snapshot.revision)||snapshot.revision<1||snapshot.date!==d||snapshot.baselineId!==record.baselineId||snapshot.staplerRevision!==record.publishedRevision||JSON.stringify(snapshot.periods)!==JSON.stringify(plan.periods))))fail(409,'The timetable publication revision or period timings do not match. Ask SMC to republish.');
   const effective=stapler().effectiveDay(plan,base),deltas=new Map((snapshot?.teachers||[]).map(t=>[t.staffId,t]));
-  const schedule=t=>{const cells=copy((ctx.user?.smc||ctx.user?.admin)?t.cells:deltas.get(t.staffId)?.cells||t.cells);if(cells.length!==plan.periods.length||cells.some(c=>!Array.isArray(c)||c.length!==4||c.some(v=>typeof v!=='string')))fail(409,'The '+source+' timetable cells need review.');for(const cell of cells)if(stapler().isOfflineAbsence(cell[0].replace(/[\r\n\u2028\u2029]/g,' ')))cell[0]='Absent';return {staffId:t.staffId,name:t.name,timetableName:t.timetableName||t.name,cells};};
+  const schedule=t=>{const cells=copy((ctx.user?.smc||ctx.user?.admin)?t.cells:deltas.get(t.staffId)?.cells||t.cells);if(ctx.user?.smc||ctx.user?.admin)for(const absence of s.absences.filter(a=>a.date===d&&a.staffId===t.staffId&&!a.deletedAt))for(const period of allocation().absencePeriods(absence,{periods:plan.periods}))cells[period]=['Absent','','',''];if(cells.length!==plan.periods.length||cells.some(c=>!Array.isArray(c)||c.length!==4||c.some(v=>typeof v!=='string')))fail(409,'The '+source+' timetable cells need review.');for(const cell of cells)if(stapler().isOfflineAbsence(cell[0].replace(/[\r\n\u2028\u2029]/g,' ')))cell[0]='Absent';return {staffId:t.staffId,name:t.name,timetableName:t.timetableName||t.name,cells};};
   const teachers=effective.teachers.map(schedule);if(!(ctx.user?.smc||ctx.user?.admin))for(const t of deltas.values())if(!teachers.some(row=>row.staffId===t.staffId))teachers.push(schedule(t));
    const baseline=timetableBaseline(plan,d);
   return {...identity,source,...(useConfirmed?{sourceRevision:confirmed.revision,confirmedRevision:confirmed.revision,staplerRevision:confirmed.revision,readOnly:true}:{sourceRevision:snapshot?.sourceRevision??record.publishedRevision,publicationRevision:snapshot?.revision??record.publishedRevision,staplerRevision:record.publishedRevision}),periods:copy(plan.periods),teachers,baseline,classes:plan.classes.map(c=>c.name),recesses:(effective.staplerRecesses||[]).map(r=>({className:plan.classes.find(c=>c.id===r.classId)?.name||'',periods:copy(r.periods)}))};
@@ -1391,7 +1391,7 @@ const next=stapler().effectiveDay(plan,ctx.baselineDays?.[d]||ctx.days[d]);for(c
   return rows;
  }
  function queuePeerReleaseNotices(s,ctx,d,selectedId){
-  let queued=0;
+  const outcome={queued:0,reused:0,skipped:0,blocked:0,retried:0};
   for(const request of s.requests.filter(r=>r.date===d&&(!selectedId||[r.staffId,r.recipientId].includes(selectedId)))){
    const released=releasedPeerLessons(s,request);if(!released.length)continue;
    const currentTokens=new Set(released.map(row=>row.releaseToken));
@@ -1399,24 +1399,25 @@ const next=stapler().effectiveDay(plan,ctx.baselineDays?.[d]||ctx.days[d]);for(c
     if(!ctx.people.some(person=>person.id===recipientId))continue;
     const jobs=s.outbox.filter(j=>j.kind==='mutual_override'&&j.recipientId===recipientId&&j.data?.peerRelease===true&&j.data?.peerRequestIds?.includes(request.id));
     for(const job of jobs){
-     const status=dailyDeliveryState(job);if(!['failed','cancelled','blocked'].includes(status)||!job.data.peerReleaseTokens?.length||!job.data.peerReleaseTokens.every(token=>currentTokens.has(token)))continue;
+     const status=dailyDeliveryState(job);if(!job.data.peerReleaseTokens?.length||!job.data.peerReleaseTokens.every(token=>currentTokens.has(token)))continue;
+     if(['sending','uncertain'].includes(status)){outcome.blocked++;continue;}if(['sent','delivered','read'].includes(status)){outcome.skipped++;continue;}if(status==='queued'){outcome.reused++;continue;}if(!['failed','cancelled','blocked'].includes(status))continue;
      allocation().addAudit(s,ctx,'retryPeerReleaseNotification',{date:d,notificationId:job.id,previousStatus:status,previousError:job.error||'',previousProviderError:copy(job.providerError||null)});
      job.status='queued';job.error='';job.retryable=true;job.expiresAt=expiry(ctx,d);job.notificationIntentRevision=(job.notificationIntentRevision||0)+1;job.notificationIntentAt=ctx.iso;
-     for(const key of ['providerError','deliveryStatus','nextAttemptAt','claimId','claimExpiresAt','preparedAt','holdReason','nextEligibleAt'])delete job[key];queued++;
+     for(const key of ['providerError','deliveryStatus','nextAttemptAt','claimId','claimExpiresAt','preparedAt','holdReason','nextEligibleAt'])delete job[key];outcome.retried++;
     }
     const previous=new Set(jobs.filter(j=>!['failed','cancelled','blocked'].includes(dailyDeliveryState(j))).flatMap(j=>j.data.peerReleaseTokens||[]));
     const lessons=released.filter(row=>!previous.has(row.releaseToken));if(!lessons.length)continue;
     const tokens=lessons.map(row=>row.releaseToken),before=s.outbox.length;
     queue(s,ctx,'mutual_override',recipientId,d,{templateKey:'mutual_override',peerRelease:true,peerRequestIds:[request.id],peerReleasedDemandIds:lessons.map(row=>row.id),peerReleaseTokens:tokens,summary:'Your peer relief arrangement has been released. Review the updated timetable in Roster.'},null,'peer-release:'+request.id+':'+recipientId+':'+JSON.stringify(tokens));
-    queued+=s.outbox.length-before;
+    outcome.queued+=s.outbox.length-before;
    }
   }
-  return queued;
+  return outcome;
  }
  function notifyDaily(s,ctx,p){smc(ctx);const d=date(p.date||ctx.today),shadow=communicationState(s,ctx,d),snapshot=shadow.dailyPublicationStates[d],issue=notifyDateIssue(s,ctx,d,snapshot);if(issue)fail(403,issue);if(p.expectedPublicationRevision!==undefined&&p.expectedPublicationRevision!==(s.dailyPublicationStates?.[d]?.revision||0))fail(409,'The published timetable changed. Refresh before notifying.','PUBLICATION_CONFLICT');if(p.staffId&&!snapshot.teachers.some(t=>t.staffId===p.staffId))fail(400,'Choose a teacher with saved timetable changes.');const recipients=new Set(snapshot.teachers.filter(t=>(!p.staffId||t.staffId===p.staffId)&&dailyNoticeState(shadow,d,t.staffId).eligible).map(t=>t.staffId)),result=queueDailyNotices(shadow,ctx,snapshot,recipients);
   for(const id of snapshot.teachers.filter(t=>!p.staffId||t.staffId===p.staffId).map(t=>t.staffId)){const state=dailyNoticeState(shadow,d,id);for(const job of s.outbox)if(job.date===d&&job.recipientId===id&&job.data?.communicationSnapshot&&['queued','blocked','failed'].includes(dailyDeliveryState(job))&&job.data.contentFingerprint!==state.fingerprint){job.status='cancelled';job.error='Superseded by a newer explicit communication.';}}
 
-  const peerReleaseNoticesQueued=queuePeerReleaseNotices(s,ctx,d,p.staffId);allocation().addAudit(s,ctx,'notifyDaily',{date:d,staffIds:[...recipients],peerReleaseNoticesQueued,publicationRevision:s.dailyPublicationStates?.[d]?.revision||0});return {savedIds:[...recipients],...result,peerReleaseNoticesQueued,notificationsQueued:(result.notificationsQueued||0)+peerReleaseNoticesQueued};}
+  const peerOutcome=queuePeerReleaseNotices(s,ctx,d,p.staffId),peerReleaseNoticesQueued=peerOutcome.queued+peerOutcome.reused+peerOutcome.retried;for(const key of ['queued','reused','skipped','blocked','retried'])result.notificationOutcome[key]+=peerOutcome[key];allocation().addAudit(s,ctx,'notifyDaily',{date:d,staffIds:[...recipients],peerReleaseNoticesQueued,publicationRevision:s.dailyPublicationStates?.[d]?.revision||0});return {savedIds:[...recipients],...result,peerReleaseNoticesQueued,notificationsQueued:(result.notificationsQueued||0)+peerReleaseNoticesQueued};}
 
  function publishDay(s,ctx,p){
   smc(ctx);const dateIssue=publishDateIssue(ctx,date(p.date||ctx.today),s);if(dateIssue)fail(403,dateIssue);
