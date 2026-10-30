@@ -46,6 +46,10 @@ jobs:
               print('GSIS_GENERATED_DIFF_CHUNK '+data[i:i+12000])
           print('GSIS_GENERATED_DIFF_END')
           PY
+      - name: Check build labels and response headers
+        run: |
+          node tests/release-build-label-phase2.cjs
+          node tests/release-build-label-headers.cjs
       - name: Check browser fixture portability
         run: |
           node tests/roster084-private-link-reuse-browser.cjs
