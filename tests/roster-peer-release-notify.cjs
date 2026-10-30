@@ -16,3 +16,4 @@ assert.equal(O.queuePeerReleaseNotices(state,ctx,date,'charlie').queued,0,'unrel
 assert.equal(state.requests[0].status,'approved','notification does not rewrite agreement history');
 const draft=fixture();draft.state.requests.push({...state.requests[0],lessons:[state.requests[0].lessons[0]]});draft.state.assignments.push({id:'original',requestId:'peer',demandId:'d2',staffId:'bob',date,period:2,status:'published'},{id:'remove',requestId:'peer',demandId:'d2',staffId:'bob',date,period:2,status:'draft',remove:true,replaces:'original'});assert.equal(O.queuePeerReleaseNotices(draft.state,draft.ctx,date).queued,2,'Notify sees saved removal before Publish');
 console.log('PASS peer release recipients, partial-release history, dedupe, queued outcomes and dispatch revalidation');
+

@@ -12,7 +12,7 @@ const safe=record(safeDate,{name:'Confirmed plan',confirmed:true,confirmedAt,upd
 safe.confirmedPlan=S.create({...f.ctx.days[today],date:safeDate});safe.confirmedRevision=2;f.state.staplerPlans.push(safe);
 const teacher={...f.ctx,user:{staffId:'bob',email:'bob@gsps.edu.sg',smc:false,admin:false}};
 const before=JSON.stringify(f.state),list=O.read(f.state,teacher,{operation:'staplerDates'});
-assert.deepEqual(list.dates.map(r=>r.date).sort(),[today,legacyDate,safeDate],'confirmed dates must be visible even when legacy records have no safe frozen preview');
+assert.deepEqual(list.dates.map(r=>r.date).sort(),[today,legacyDate,draftDate,safeDate],'confirmed dates and neutral upcoming dates remain visible without exposing draft plans');
 assert.equal(list.confirmedAccess,'available');
 for(const date of [today,legacyDate]){
  const row=list.dates.find(r=>r.date===date);
@@ -32,7 +32,8 @@ for(const [name,ctx,access] of [
 }
 {
  const invalid=fixture();invalid.state.staplerPlans.push(record(today,{confirmed:true,confirmedAt:'invalid',updatedAt}));
- assert.deepEqual(O.read(invalid.state,{...invalid.ctx,user:teacher.user},{operation:'staplerDates'}).dates,[],'a malformed legacy confirmation is not evidence of a confirmed date');
+ const neutral=O.read(invalid.state,{...invalid.ctx,user:teacher.user},{operation:'staplerDates'}).dates;
+ assert.equal(neutral.length,1);assert.equal(neutral[0].canListConfirmed,false,'a malformed legacy confirmation is not evidence of a confirmed date');assert.equal(neutral[0].canListUpcoming,true);assert.equal(neutral[0].canViewConfirmed,false);assert.doesNotMatch(JSON.stringify(neutral),/Private renamed draft|PRIVATE_DRAFT_ROOM/);
 }
 
 const dom=new JSDOM('<main></main>',{url:'https://roster.test',runScripts:'dangerously',pretendToBeVisual:true}),w=dom.window,q=s=>w.document.querySelector(s),tick=()=>new Promise(resolve=>setImmediate(resolve));

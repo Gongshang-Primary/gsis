@@ -19,3 +19,4 @@ corrected.state.reliefCorrections.push({assignmentId:old.id,sequence:1,actual:{s
 assert.equal(O.ownAnnualRelief(corrected.state,{...corrected.ctx,user:teacher.user}).completed,1,'actual completion correction survives published cancellation');
 corrected.state.reliefCorrections=[];Object.assign(corrected.state.assignments[0],{actualReviewRequired:true,actualStatusBeforeReplacement:'published'});assert.equal(O.ownAnnualRelief(corrected.state,{...corrected.ctx,user:teacher.user}).spent,1,'pending actual-work review preserves its original accounting source');
 console.log('PASS own published annual relief, completed/committed separation, hidden drafts, scoped identity and unavailable histories');
+
