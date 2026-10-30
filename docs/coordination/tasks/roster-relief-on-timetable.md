@@ -13,5 +13,5 @@
 Ordinary teachers see only frozen published relief. SMC/Admin see saved assignments marked Not yet published where applicable. Read projections expose schedule fields only, never instructions, leave reasons, contacts or workload. Normal-day views use the verified Calendar parity already read by the timetable screen; do not guess odd/even. Screen, PDF and Excel share the dated projection. Existing confirmed/published suspension and original-baseline boundaries remain intact.
 
 ## Verification
-Pending Linux build/full regression suite. No live records, notifications, merge or deployment. No local execution claim.
+Pending a fresh Linux build/full regression suite after fixture repairs. The report-shell browser fixture now supplies the dated baseline response requested before the Calendar read; its former empty fallback failed timetable identity validation and prevented the test from reaching the held Calendar read. This branch also carries the row 13 independent baseline-period fixture correction. No live records, notifications, merge or deployment. No local project execution claim.
 
