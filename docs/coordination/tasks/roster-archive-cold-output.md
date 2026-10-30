@@ -1,12 +1,12 @@
 # roster-archive-cold-output: move old machine output to monthly archive files (keep all records)
 
-- Status: implementing; full CI required before opening the PR
+- Status: review prepared; open the PR only after the current full CI passes
 - Owner/model: Codex (builder)
 - Reviewer/model: Claude
-- Last updated (Asia/Singapore): 31 Oct 2026 05:02
+- Last updated (Asia/Singapore): 31 Oct 2026 05:30
 - Branch: codex/roster-archive-cold-output
-- Base SHA: 9b1fc5aba005b41498cfe08180f66a6739b5016c (includes the claim and a later changelog-only update)
-- PR: none
+- Base SHA: 082dec5ddb34c20275348ac9eaaeba26d64952b3 (latest main integrated; changelog and deployment notes retained)
+- PR: [row A branch pull request](https://github.com/helper-gsps/gsis/pulls?q=is%3Apr+head%3Acodex%2Froster-archive-cold-output)
 - Files/domains owned: backend/RosterOperations.gs (archive write/read, nightly job hook), shared/roster-operations.js (archive selection, compact stubs), Roster Admin storage UI (archive status, open archived item), generated copies, tests.
 - Out of scope: pruning (owner: "cannot prune. need to keep records"); the split-file live layout (#19 is repurposed for the D1 backup, see roster-d1-google-backup.md).
 
@@ -68,10 +68,24 @@ Details and rollback constraints: [change note](../changes/2026-10-31-roster-arc
 - `TZ=Asia/Singapore npm run build`: passed, all 18 components; Apps Script syntax gate parsed 86 files.
 - Regression-first checks reproduced missing archive rules, unverified storage, UI and unnecessary Calendar lookup before the respective changes.
 - `tests/roster-archive-rules.cjs`, `tests/roster-archive-storage.cjs`, `tests/roster-archive-cold-output-ui.cjs`, `tests/roster-archive-gateway.mjs`, `tests/roster-archive-accounting.cjs`, `tests/roster-archive-import.cjs`: focused checks, with final combined result recorded at handoff.
-- Full Node/LORD suite: pending GitHub CI on this branch. No local Chromium binary is available; no browser tests have been skipped and counted as passing.
+- Full Node/LORD suite: the exact current-head result is recorded in the branch CI and PR. The first run and its repairs are recorded below. No local Chromium binary is available; no browser tests have been skipped and counted as passing.
 - D1 import accepts stubs and metadata; monthly archive files remain in Google. No D1 archive-body migration is claimed.
 - Apps Script/Drive staging latency and actual school-sized records have not been tested live.
 
 ## Handoff
 
-Only row A is active. PR #19, PR #27 and the other queue rows remain paused. The PR8 automation is disabled. Claude must review the exact published head after full CI passes. No PR or deployment is claimed yet.
+Only row A is active. PR #19, PR #27 and the other queue rows remain paused. The PR8 automation is disabled. Claude must review the exact published PR head after full CI passes. The PR is the current-head handoff record. No deployment is claimed.
+
+### First full CI run
+
+At source head `c8cce80927832218563ba3787b9032c8d83bc9ed`, GitHub Actions run [41129266049](https://github.com/helper-gsps/gsis/actions/runs/41129266049) passed the 18-component build, browser portability checks, all six archive programs and 888 of 890 Node programs. Two source-pattern assertions failed: `release505-timing.cjs` counted the archive transport UserLock as a planner ScriptLock, and `roster099a-storage-cap.cjs` expected the old preview-only storage ternary. The Node failure prevented the chained LORD suite from running. These failures are retained as evidence, not claimed as passes.
+
+Local final focused run: 16/16 programs passed before those two fixture repairs. Local LORD execution reached its browser test and stopped because this runner has no Chromium binary; it is not a local full-suite pass.
+
+The additional 16 MB synthetic fixture reduced 16,486,779 main-file characters to 2,318,740 across eight batches, each at most 2,000,000 characters. It retained 2,600 exact original records and byte-identical protected school records and pending/uncertain notices. This is synthetic capacity evidence, not measured live Drive throughput.
+
+### Verification repairs and final handoff
+
+The two failing source-pattern assertions were replaced or narrowed without relaxing their behavior contracts. The lock test still checks every planner ScriptLock release; the new archive runtime check verifies lock order and exact release counts on success, save failure and transport contention. The storage test now invokes the real context helper for both Storage and prune preview, checks the configured 20M capacity, verifies stored-form measurements and rejects any history decompression.
+
+Fresh local commands passed: `TZ=Asia/Singapore node tests/release505-timing.cjs`, `TZ=Asia/Singapore node tests/roster099a-storage-cap.cjs`, `TZ=Asia/Singapore node tests/roster-archive-storage.cjs` (11 checks), `TZ=Asia/Singapore node tests/roster-archive-capacity.cjs` and `git diff --check`. The final full CI rerun must pass before the PR opens. Its URL and exact head are recorded in the PR body. No product logic changed after source head `c8cce80927832218563ba3787b9032c8d83bc9ed`; this follow-up retains latest main documentation and adds verification evidence/tests.

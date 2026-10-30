@@ -46,6 +46,19 @@ test('nightly completion prevents later full reads and daytime maintenance does 
  h.scope.rosterOperationsState_=()=>assert.fail('completed maintenance must use cheap day marker');assert.equal(h.scope.rosterColdArchiveRun_({now:h.ctx.now,manual:false}).reason,'already-checked');
  assert.equal(h.scope.rosterColdArchiveRun_({now:Date.parse('2026-11-01T10:00:00+08:00'),manual:false}).reason,'outside-maintenance-hours');
 });
+test('archive success, save failure and transport contention release each acquired lock once',()=>{
+ for(const outcome of ['success','save-failure','transport-busy']){
+  const h=fixture(),script={},releases=[];let userHeld=false,scriptReleases=0,userReleases=0;
+  const acquire=h.scope.deployLock_,unlock=h.scope.deployUnlock_;
+  h.scope.LockService.getScriptLock=()=>script;
+  h.scope.deployLock_=(lock,budget)=>{assert.equal(lock,script);return acquire(lock,budget);};
+  h.scope.deployUnlock_=lock=>{assert.equal(lock,script);assert(h.locked());assert.equal(userHeld,false,'transport releases before the timed ScriptLock wrapper');scriptReleases++;releases.push('script');unlock(lock);};
+  h.scope.rosterNotificationState_=()=>null;
+  h.scope.LockService.getUserLock=()=>({tryLock(){assert(h.locked(),'ScriptLock must precede UserLock');if(outcome==='transport-busy')return false;userHeld=true;return true;},releaseLock(){assert(userHeld);userHeld=false;userReleases++;releases.push('user');}});
+  if(outcome==='save-failure'){h.failMain();assert.throws(h.run,/primary failure/);}else if(outcome==='transport-busy')assert.equal(h.run().busy,true);else h.run();
+  assert.equal(scriptReleases,1,outcome+' releases ScriptLock through deployUnlock_ once');assert.equal(userReleases,outcome==='transport-busy'?0:1,outcome+' releases only the acquired UserLock');assert.equal(h.locked(),false);assert.deepEqual(releases,outcome==='transport-busy'?['script']:['user','script']);
+ }
+});
 test('late delivery updates scalar history without restoring payloads or archived alerts',()=>{
  const h=fixture();h.run();vm.runInContext(fs.readFileSync('backend/RosterNotificationStore.gs','utf8'),h.scope);
  const state=h.state();state.smcAlerts=[{id:'closed',key:'delivery:sent-1',archiveRef:{month:'2026-08',collection:'smcAlerts',id:'closed',digest:'a'.repeat(64)}}];

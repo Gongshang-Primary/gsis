@@ -33,3 +33,5 @@ To stop further automatic archival, remove its maintenance hook while retaining 
 ## Verification
 
 The task record holds the exact commands and final results. Focused checks cover original JSON recovery, protected data and R/statistics parity, replay identities, scheduler expiry, interrupted writes, corruption, authorization, notification overlays, archive UI and D1 import of compact records. The complete Node and LORD suites must pass before the PR opens.
+
+The production-sized synthetic check retained all 2,600 archived records while reducing the main JSON from 16,486,779 to 2,318,740 characters in eight batches. Each batch stayed within 2,000,000 source characters. This is a local capacity check, not a claim about the age mix or latency of live school data.
