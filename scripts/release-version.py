@@ -60,12 +60,17 @@ def stamp(root=ROOT):
         if path.suffix == '.html':
             text = re.sub(r'<meta name="gsis-version" content="[^"]*">', '', text)
             text = re.sub(r'<script src="[^"]*gsis-version\.js[^\"]*"></script>', '', text)
-            folder = next(root / f for f in spec['frontends'].values() if path.is_relative_to(root / f))
-            import os
-            notice_path = os.path.relpath(folder / 'gsis-version.js', path.parent).replace('\\', '/')
+            notice_path = '/gsis-version.js'
             text = re.sub(r'(<head\b[^>]*>)', lambda m: m[1] + '<meta name="gsis-version" content="' + version + '">', text, count=1, flags=re.I)
-            # Referrer and CSP meta policies must be parsed before this request.
-            text = text.replace('</head>', '<script src="' + notice_path + '?v=' + version + '"></script></head>', 1)
+            # Referrer and CSP meta policies precede this request. The Layout
+            # viewer keeps its self-contained inline bootstrap scripts first.
+            notice_tag = '<script src="' + notice_path + '?v=' + version + '"></script>'
+            if path.name == 'external.html':
+                # This async entry point starts its first API read immediately.
+                text = re.sub(r'(<script\b[^>]*src=["\']external\.js[^>]*>)', lambda m: notice_tag + m[1], text, count=1)
+            else:
+                end_tag = '</body>' if path.name == 'landmark.html' else '</head>'
+                text = text.replace(end_tag, notice_tag + end_tag, 1)
             def asset(m):
                 value = m[2]
                 if re.match(r'^(?:[a-z]+:|//|#|data:)', value, re.I): return m[0]
