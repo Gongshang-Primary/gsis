@@ -1,12 +1,12 @@
 # roster-sre-daily-priority: SREs are rostered daily first, not by annual R%
 
-- Status: approved, ready to claim (owner decisions recorded 30 Oct 2026)
+- Status: prepared; runtime ownership waits for PR #13 to merge or an explicit owner handoff
 - Owner/model: Codex
 - Reviewer/model: Claude
 - Last updated (Asia/Singapore): 30 Oct 2026 07:10
 - Branch: codex/roster-sre-daily-priority
-- Base SHA: current main
-- PR: none
+- Base SHA: fd5b0c75248a838a4327f1d9cca2f58e65986502, documentation preparation only
+- PR: preparation draft; final implementation/review head will be recorded after PR #13 integrates
 - User-authorised scope: Song Wee, 30 Oct 2026: "SRE's do not count by accumulated R% but are rostered on a daily basis subject to the business rules of 8 max, no 8 consecutive. they will be priority 1 above annual R%".
 - Files/domains owned: shared/roster-allocation.js (candidate ranking, eligibility limits, balances), shared/relief.js (employment parsing) only if needed, Roster settings UI text, generated copies, tests.
 - Out of scope: quota formula for other staff; FAJT; Deploy figures.
@@ -44,3 +44,29 @@ Ranking (rule 1) applies to daily SREs. Long-term SREs rank with other staff by 
 - Non-SRE allocation results unchanged on existing seeded tests (roster701-r17-solver oracle cases).
 - Manual, protected and peer assignments untouched.
 - SRE rows on R% displays read "Daily roster, no R%".
+
+
+## Codex preparation, 30 October 2026
+
+Owner renewed the instruction to work through the changelog item by item as soon as possible. PR #13 is still open at 13eebf231ee8566cf828c40a6f2293e4fa974f5f, with Claude running its owner-authorised follow-up. Codex reviewed that exact follow-up and posted one reproduced name-resolution finding in comment 6512974388. No edits were made to Claude's branch.
+
+This preparation changes documentation only. It does not claim any runtime files while PR #13 owns the serial Roster domain. The workflow permits documentation preparation in parallel, but only one open task may touch shared Roster code, backend/Code.gs, Roster frontend files or generated backends/Workers. Before implementation, refresh this branch against the actual merge and read any newer owner decisions. At most two PRs stay open.
+
+### Bounded implementation sequence
+
+1. Carry verified published Deploy teaching-period evidence into each Roster teacher projection. Classify SRE type from that evidence, never from a free selected day, a suspended plan or an absent R value. Missing publication/source evidence stays unknown.
+2. Preserve required daily activation and its selected periods. An inactive SRE does not become available merely because its Contacts employment says SRE. Retain identity, absence, clash, restricted-period, weekly employment-cap and manual/peer safeguards.
+3. Add the approved Ad hoc relief max periods setting to the existing workload-rule registry: initial 10, integer 1 to 40, standard On/Off control. Resolve the daily total per teacher so daily SREs use this setting and ordinary/long-term staff retain the existing total. Consecutive limits remain the existing configured rule.
+4. Admit verified daily SRE capacity without an R quota. Enforce the daily and consecutive bounds in eligibility, the flow capacity, branch/forced coverage and final validation. Do not manufacture an R entitlement or change recorded relief costs/history.
+5. Apply daily SRE priority before the configurable annual preferences in both ranked candidates and the whole-allocation cost vector. Among daily SREs, prefer fewer occupied workload periods today, then rotation. Retain maximum coverage and the existing repurposed-duty objective. Non-SRE seeded results must remain unchanged.
+6. Show Daily roster, no R% for verified daily SREs in candidate/accounting, personal calculations and statistics projections. Keep their relief counts. Do not label unknown source data as daily roster. Preserve the current published-view and private-recipient boundaries.
+7. Version/invalidate the affected prepared-input caches so an older quota row without classification evidence cannot be mistaken for fresh evidence. Reuse the existing source reads; do not add per-teacher network calls.
+8. Regenerate all matching canonical copies and run focused policy, route, settings/UI and independent solver-oracle checks. Run the full suite before review; record baseline failures and exclusions separately.
+
+The next queue row, roster-sre-fajt-r-calc, owns the long-term SRE FAJT formula and weekly-ranking substitution. This row prepares the verified type boundary; it must not silently bundle that subsequent implementation or the FAJT group rule. Keep the latest two-type owner decisions above.
+
+### Verification planned
+
+Use synthetic published Deploy metadata to distinguish a free day with weekly teaching from a genuine daily SRE. Cover missing metadata, source/version changes, active versus date-activated staff, a lower-R% ordinary teacher, multiple daily SREs and rotation ties, different configured daily/consecutive limits and their disabled states, absence/restricted periods, protected/manual/peer work, combined lesson blocks and Google/edge parity. Run the existing 70 seeded independent maximum-coverage oracle cases unchanged and verify that personal displays retain counts without inventing R%.
+
+No runtime implementation, build, tests, staging, deployment, provider send, authority switch or live school record mutation is claimed by this preparation.
