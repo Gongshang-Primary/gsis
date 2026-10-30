@@ -5,7 +5,7 @@ f.ctx.people[0].adhocEligible=true;
 f.state.staplerPlans.push({date,name:'PRIVATE draft name',baselineId:'baseline',revision:19,draft});
 const teacher={...f.ctx,user:{staffId:'bob',email:'bob@gsps.edu.sg',smc:false,admin:false}};
 let result=f.O.read(f.state,teacher,{operation:'staplerDates'}),row=result.dates.find(r=>r.date===date);
-assert(row);assert.equal(row.canListUpcoming,true);assert.equal(row.mayEdit,false);assert.equal(row.mayPublish,false);assert.equal(row.draftRevision,0);assert.doesNotMatch(JSON.stringify(result),/PRIVATE draft name|"tiles"|"baselineId"/);
+assert(row);assert.equal(row.canListUpcoming,true);assert.equal(row.mayEdit,false);assert.equal(row.mayPublish,false);assert.equal(row.draftRevision,0);assert.equal(row.baselineId,null);assert.doesNotMatch(JSON.stringify(result),/PRIVATE draft name|"tiles"/);
 assert.equal(f.O.read(f.state,teacher,{operation:'stapler',date}).plan,null,'listing cannot disclose or open an unconfirmed plan');
 assert.equal(f.O.staplerPermission(f.state,teacher,date),false);
 let request=f.O.apply(f.state,teacher,{operation:'requestStapler',date,sponsorId:'alice'});assert.equal(f.state.staplerRequests.length,1);assert.equal(f.O.apply(f.state,teacher,{operation:'requestStapler',date,sponsorId:'alice'}).unchanged,true);assert.equal(f.state.staplerRequests.length,1);
