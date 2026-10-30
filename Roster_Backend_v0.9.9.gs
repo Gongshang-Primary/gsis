@@ -1679,7 +1679,9 @@ var GSISWorkload=(function(){
   const artEL=rows.filter(r=>r.active&&taught(r.teacher.id,'Art')&&taught(r.teacher.id,'EL')).map(r=>r.teacher.id);
   const special={};for(const def of specialists(d)){
    const s=def.subject,label=s==='PHE'?'PE':s;
-   const pool=rows.filter(r=>r.active&&r.rules.eligible&&taught(r.teacher.id,s));
+   // Owner 29 Oct: FAJT staff are supplementary manpower. Demand counts in full; core headcount,
+   // capacity and average exclude them, and their periods show as a separate supplementary line.
+   const teaching=rows.filter(r=>r.active&&r.rules.eligible&&taught(r.teacher.id,s)),pool=teaching.filter(r=>employment(r.teacher)!=='FAJT'),supplementary=teaching.filter(r=>employment(r.teacher)==='FAJT');
    let demand=0,complete=true;
    const provisions=planned.entries.filter(p=>['class','group'].includes(p.kind)&&(p.kind!=='class'||def.demand==='classes')&&(p.subject===s||s==='TL'&&(p.subject==='HTL'||String(groupMap.get(p.target)?.name||'').trim().replace(/\s+/g,' ').toUpperCase()==='CCE TL'))).map(p=>{
     const g=groupMap.get(p.target),c=classRefs.get(p.target)||classCodes.get(p.target);
@@ -1696,11 +1698,13 @@ var GSISWorkload=(function(){
    });
    if(provisions.some(p=>!reportLevels.includes(p.level)))complete=false;
    const capacity=pool.reduce((n,r)=>n+(Number.isFinite(r.rules.retained)?r.rules.retained:0),0),pending=pool.some(r=>r.rules.pending.length||!Number.isFinite(r.rules.retained));
-   const poolIds=new Set(pool.map(r=>r.teacher.id)),assigned=ledger.filter(e=>poolIds.has(e.teacher)&&(e.subject===s||s==='TL'&&(e.subject==='HTL'||String(groupMap.get(e.target)?.name||'').trim().replace(/\s+/g,' ').toUpperCase()==='CCE TL')));
+   const ofSubject=e=>e.subject===s||s==='TL'&&(e.subject==='HTL'||String(groupMap.get(e.target)?.name||'').trim().replace(/\s+/g,' ').toUpperCase()==='CCE TL');
+   const poolIds=new Set(pool.map(r=>r.teacher.id)),assigned=ledger.filter(e=>poolIds.has(e.teacher)&&ofSubject(e));
+   const supplementaryIds=new Set(supplementary.map(r=>r.teacher.id)),supplementaryAssigned=ledger.filter(e=>supplementaryIds.has(e.teacher)&&ofSubject(e)),supplementaryComplete=supplementaryAssigned.every(e=>e.category==='Teaching'&&Number.isFinite(e.periods));
    const assignedComplete=assigned.every(e=>e.category==='Teaching'&&Number.isFinite(e.periods)),assignedPeriods=assignedComplete?assigned.reduce((n,e)=>n+e.periods,0):null;
    const indicator={periods:assignedPeriods,headcount:pool.length,average:assignedComplete&&pool.length?assignedPeriods/pool.length:null,reason:!assignedComplete?'Missing assigned specialist load':!pool.length?'No assigned specialist teachers':''};
-   const individual=Object.fromEntries(pool.map(r=>{const es=assigned.filter(e=>e.teacher===r.teacher.id);return [r.teacher.id,es.every(e=>Number.isFinite(e.periods)&&e.category==='Teaching')?es.reduce((n,e)=>n+e.periods,0):null];}));
-   special[label]={label,subject:s,definition:def,indicator,individual,pool:pool.map(r=>r.teacher.id),capacity:pending?null:capacity,demand,detail,complete,headcount:pool.length,reason:indicator.reason};
+   const individual=Object.fromEntries(teaching.map(r=>{const es=[...assigned,...supplementaryAssigned].filter(e=>e.teacher===r.teacher.id);return [r.teacher.id,es.every(e=>Number.isFinite(e.periods)&&e.category==='Teaching')?es.reduce((n,e)=>n+e.periods,0):null];}));
+   special[label]={label,subject:s,definition:def,indicator,individual,pool:pool.map(r=>r.teacher.id),supplementary:{label:'FAJT supplementary',pool:supplementary.map(r=>r.teacher.id),headcount:supplementary.length,periods:supplementaryComplete?supplementaryAssigned.reduce((n,e)=>n+e.periods,0):null},capacity:pending?null:capacity,demand,detail,complete,headcount:pool.length,reason:indicator.reason};
   }
   for(const row of rows){
    row.capBasis=row.rules.capBasis||'teaching';
@@ -1722,9 +1726,9 @@ var GSISWorkload=(function(){
    row.quota=D!==null&&!row.incomplete&&row.rules.eligible&&!row.targetPending&&Number.isFinite(row.targetRetained)?row.nonTeachingActual+row.targetRetained*(D-row.nonTeachingActual):null;
    row.band=band(row.quota);
    row.status=!row.active?'Inactive':row.employment==='RT'?'No target':row.incomplete||D===null?'Incomplete':row.quota===null?'Target pending':row.total<row.band.lower-1e-9?'Below standard':row.total>row.band.upper+1e-9?'Above standard':'Standard';
-   row.special=Object.values(special).filter(s=>s.pool.includes(row.teacher.id)).map(s=>{
+   row.special=Object.values(special).filter(s=>s.pool.includes(row.teacher.id)||s.supplementary.pool.includes(row.teacher.id)).map(s=>{
     const periods=s.individual[row.teacher.id],average=s.indicator.average;
-    return {...s,periods,average,percentage:Number.isFinite(periods)&&average>0?100*periods/average:null};
+    return {...s,periods,average,supplementary:s.supplementary.pool.includes(row.teacher.id),percentage:Number.isFinite(periods)&&average>0?100*periods/average:null};
    });
    row.modifierWarnings=['PHE','Art','Music'].filter(s=>taught(row.teacher.id,s)&&!tokens(row.teacher).includes(s==='PHE'?'PE':s)).map(s=>'Teaches '+(s==='PHE'?'PE':s)+' but is missing the matching TTb subject modifier');
    row.issues.push(...row.modifierWarnings);
