@@ -4,6 +4,9 @@ const root=require('node:path').resolve(__dirname,'../..'),file=root+'/backend/R
 const canonical=x=>x===null||typeof x!=='object'?JSON.stringify(x):Array.isArray(x)?'['+x.map(canonical).join(',')+']':'{'+Object.keys(x).sort().map(k=>JSON.stringify(k)+':'+canonical(x[k])).join(',')+'}';
 const sha=x=>crypto.createHash('sha256').update(typeof x==='string'?x:canonical(x),'utf8').digest('hex');
 function fixture(options={}){
+ // The backend's fixed fixture day is 2026-10-28; freeze the clock there too, so
+ // capture-window checks do not expire as real time passes.
+ options={at:'2026-10-28T10:00:00+08:00',...options};
  const Clock=options.at?class extends Date{constructor(...args){super(...(args.length?args:[options.at]));}static now(){return Date.parse(options.at);}}:Date;
  const scope={console,Date:Clock,Map,Set,WeakMap,JSON,Number,String,Array,Object,Math,Error};vm.createContext(scope);
  for(const name of ['roster.js','roster-stapler.js','roster-operations.js'])vm.runInContext(fs.readFileSync(root+'/shared/'+name,'utf8'),scope,{filename:name});

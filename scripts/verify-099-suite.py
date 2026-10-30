@@ -57,7 +57,7 @@ def verify_source_provenance(root, metadata, review):
     else:
         assert metadata['sourceState'] == 'working-tree-preview' and metadata['tag'] is None, 'Unexpected preview provenance'
     expected = p.git(root, 'diff', '--binary', p.BASELINE, *([head] if committed else []))
-    assert review.read('CHANGES_FROM_0.9.8q.patch') == expected, 'Parent diff differs from trusted source'
+    assert review.read('CHANGES_FROM_0.9.9_BASELINE.patch') == expected, 'Parent diff differs from trusted source'
     expected_log = p.git(root, 'log', '--format=fuller', p.BASELINE + '..' + head)
     assert review.read('RECENT_COMMITS.txt') == expected_log, 'Recent commit history differs from trusted source'
     return 'trusted-git-commit-tag-and-parent-diff'
@@ -207,7 +207,7 @@ def verify(suite_path, review_path, source_root, preview=False):
                        'operations-worker', 'calendar-job-worker', 'timetable-prep-worker']:
             assert any(n.startswith(folder + '/') for n in source_names), 'Review misses source subsystem: ' + folder
         assert not any(n.endswith('.bundle') for n in review.namelist()), 'Full Git history was not requested'
-        assert {'CHANGES_FROM_0.9.8q.patch', 'RECENT_COMMITS.txt', 'README_REVIEW.md', 'RECOVERY_HISTORY.md'} <= set(review.namelist())
+        assert {'CHANGES_FROM_0.9.9_BASELINE.patch', 'RECENT_COMMITS.txt', 'README_REVIEW.md', 'RECOVERY_HISTORY.md'} <= set(review.namelist())
 
     with zipfile.ZipFile(suite_path) as suite:
         expected_components = p.installation_files(source_root)
