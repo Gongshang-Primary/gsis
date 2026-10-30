@@ -1244,7 +1244,7 @@ var GSISRelief=(function(){
  }
  function employment(teacher){
   const p=teacher.profile||{},raw=String(p['Employment Modifier']||teacher.employment||'').trim();
-  const parts=raw.split(/[,;]\s*/).map(x=>x.trim()).filter(Boolean),known=['4/5','FAJT','BT','UT','TC','SRE','Full time','Full-time','FT','1/1'];
+  const parts=raw.split(/[,;]\s*/).map(x=>x.trim()).filter(Boolean),known=['4/5','FAJT','BT','UT','TC','SRE','HAL','Full time','Full-time','FT','1/1'];
   const fajt=parts.includes('FAJT')||p.Role==='FAJT'||teacher.role==='FAJT';
   const fraction=parts.includes('4/5');
   return parts.some(x=>!known.includes(x))||fajt&&fraction?null:fajt?'FAJT':fraction?'4/5':'Full time';
