@@ -1217,7 +1217,7 @@ var GSISRelief=(function(){
  const record=x=>!!x&&typeof x==='object'&&!Array.isArray(x);
  const nonnegative=x=>typeof x==='number'&&Number.isFinite(x)&&x>=0;
  const model='whole-week-v6';
- function defaults(){return {schema:3,calculationVersion:model,mode:'actual',weeklyPeriods:84,fourFifthsFraction:0.8,fajtWeeklyPeriods:65,timetablePeriods:60,siuePercent:150,blocks:{}};}
+ function defaults(){return {schema:3,calculationVersion:model,mode:'actual',weeklyPeriods:84,fourFifthsFraction:0.8,fajtWeeklyPeriods:65,timetablePeriods:60,siuePercent:150,siuePercentBySpecialism:{PE:null,Art:null,Music:null},blocks:{}};}
  function validate(doc,value){
   const keys=Object.keys(defaults());
   if(!record(value)||Object.keys(value).some(k=>!keys.includes(k))||value.schema!==3||value.calculationVersion!==model||value.mode!=='actual')throw Error('Use the PDF relief model with actual teaching. Refresh older clients before editing rules.');
@@ -1225,10 +1225,14 @@ var GSISRelief=(function(){
   if(value.timetablePeriods>value.weeklyPeriods)throw Error('Timetable periods cannot exceed the full-time weekly budget.');
   if(!nonnegative(value.fourFifthsFraction)||value.fourFifthsFraction<=0||value.fourFifthsFraction>1)throw Error('The part-time budget fraction must be greater than zero and at most one.');
   if(!nonnegative(value.siuePercent)||!Number.isFinite(1+value.siuePercent/100))throw Error('SIUE must be a finite, non-negative percentage.');
+  // Optional SIUE per specialism; null inherits the general SIUE. Older settings omit it.
+  const raw=value.siuePercentBySpecialism===undefined?{}:value.siuePercentBySpecialism,bySpecialism={PE:null,Art:null,Music:null};
+  if(!record(raw)||Object.keys(raw).some(k=>!own(bySpecialism,k)))throw Error('Specialist SIUE applies to PE, Art and Music only.');
+  for(const [k,n] of Object.entries(raw)){if(n!==null&&(!nonnegative(n)||!Number.isFinite(1+n/100)))throw Error('Specialist SIUE must be blank or a finite, non-negative percentage.');bySpecialism[k]=n;}
   if(!record(value.blocks))throw Error('Enter Block periods for teachers in this version.');
   const teachers=new Set((doc.teachers||[]).map(t=>t.id)),blocks={};
   for(const [id,n] of Object.entries(value.blocks)){if(!teachers.has(id)||!nonnegative(n))throw Error('Block periods must be finite, non-negative weekly periods for a teacher in this version.');blocks[id]=n;}
-  return {...value,blocks};
+  return {...value,siuePercentBySpecialism:bySpecialism,blocks};
  }
  // Read compatibility only: never rewrite a version or publication while reading.
  // Timetable/lunch budgets from schema 1/2 are not whole-week work budgets.
@@ -1249,6 +1253,9 @@ var GSISRelief=(function(){
   const fraction=parts.includes('4/5');
   return parts.some(x=>!known.includes(x))||fajt&&fraction?null:fajt?'FAJT':fraction?'4/5':'Full time';
  }
+ // PE, Art and Music specialists come from the Subject Modifier, never from display names.
+ function specialisms(teacher){const p=teacher.profile||{},tokens=String(p['Subject Modifier']||teacher.subject||'').split(/[,;]\s*/).map(x=>x.trim().toUpperCase());return ['PE','Art','Music'].filter(k=>tokens.includes(k.toUpperCase()));}
+ function siueFor(teacher,settings){const set=specialisms(teacher).filter(k=>settings.siuePercentBySpecialism?.[k]!=null);if(!set.length)return {percent:settings.siuePercent,basis:'general'};const k=set.reduce((a,b)=>settings.siuePercentBySpecialism[b]<settings.siuePercentBySpecialism[a]?b:a);return {percent:settings.siuePercentBySpecialism[k],basis:k};}
  function sre(teacher){const p=teacher.profile||{};return String(p['Employment Modifier']||teacher.employment||'').split(/[,;]/).some(v=>v.trim().toUpperCase()==='SRE')||String(p.Role||teacher.role||'').toUpperCase()==='SRE';}
  function offload(rules,catalogue){
   if(!rules?.eligible)return {OF:null,components:[],reason:'Not eligible for teaching.'};
@@ -1294,16 +1301,16 @@ var GSISRelief=(function(){
    if(r.incomplete||r.capIncomplete||![r.Teaching,r.FTT,r.pd,r.duties,r.otherNonTeaching].every(nonnegative))return missing('Workload data is incomplete.');
    if(out.capConfigured&&!nonnegative(out.periodCap))return missing('Weekly period cap needs correction.');
    out.capWorkload=r.FTT+r.Teaching+(out.capBasis==='total'?r.pd+r.duties+r.otherNonTeaching:0);out.capHeadroom=out.periodCap===null?null:Math.max(0,out.periodCap-out.capWorkload);
-   const allowance=of.OF*T_avg,siue=(r.Teaching+allowance)*settings.siuePercent/100;
+   const applied=siueFor(teacher,settings),allowance=of.OF*T_avg,siue=(r.Teaching+allowance)*applied.percent/100;
    // Every captured period enters once; only teaching and its offload allowance receive SIUE.
    const Wi=r.FTT+r.pd+r.duties+r.otherNonTeaching+r.Teaching+allowance+siue,raw=factor*(budget-Wi);
    if(!Number.isFinite(raw)||!nonnegative(Wi))return missing('Relief factors exceed the calculation range.');
-   out.offloadAllowance=allowance;out.siuePeriods=siue;out.Wi=Wi;out.rawQuota=raw;out.normalQuota=Math.floor(Math.max(0,raw));out.quota=Math.floor(Math.max(0,Math.min(raw,out.capHeadroom===null?Infinity:out.capHeadroom)));out.capApplied=out.quota<out.normalQuota;out.remaining=out.quota;
+   out.offloadAllowance=allowance;out.siuePercentApplied=applied.percent;out.siueBasis=applied.basis;out.siuePeriods=siue;out.Wi=Wi;out.rawQuota=raw;out.normalQuota=Math.floor(Math.max(0,raw));out.quota=Math.floor(Math.max(0,Math.min(raw,out.capHeadroom===null?Infinity:out.capHeadroom)));out.capApplied=out.quota<out.normalQuota;out.remaining=out.quota;
    return out;
   });
   return {settings,settingsError,calculationVersion:model,reference,weeklyPeriods:settings.weeklyPeriods,weeklyLunch:0,rows,byTeacher:Object.fromEntries(rows.map(r=>[r.id,r])),issues:rows.filter(r=>r.reason).map(r=>r.name+': '+r.reason)};
  }
- return {defaults,settingsFor,validate,analyse,employment,offload,model};
+ return {defaults,settingsFor,validate,analyse,employment,offload,specialisms,model};
 })();
 function reliefAnalysis_(source){
  // Resolve the same version-owned inputs for snapshots and API output.
@@ -1312,12 +1319,12 @@ function reliefAnalysis_(source){
  d.offload=GSISTeachingRules.migrate(d.offload);
  return GSISRelief.analyse(d,GSISWorkload.analyse(d,t=>GSISTeachingRules.calculate(t,d.offload)));
 }
-function reliefResultRows_(result,details=false){return result.rows.map(r=>({teacherId:r.id,name:r.name,active:r.active,eligible:r.eligible,R:r.quota,available:r.quota!==null,reason:r.quota!==null?null:details?r.reason:!r.active?'Inactive teacher.':!r.eligible?'Not eligible for relief.':'Capacity unavailable. Ask Admin to review.',...(details?{OF:r.OF??null,Ti:r.actualTeaching,breakdown:{employment:r.employment??null,...(r.basisLabel?{basisLabel:r.basisLabel}:{}),teachingVerified:r.teachingVerified===true,FTT:r.FTT,PD:r.pd,duties:r.duties,otherNonTeaching:r.otherNonTeaching,nonTeachingActivities:r.nonTeachingActivities,weeklyBudget:r.weeklyBudget??null,timetableFactor:r.timetableFactor??null,Wi:r.Wi??null,rawR:r.rawQuota,normalR:r.normalQuota,periodCap:r.periodCap,capConfigured:r.capConfigured,capBasis:r.capBasis,capWorkload:r.capWorkload,capHeadroom:r.capHeadroom,capApplied:r.capApplied,offloadAllowance:r.offloadAllowance??null,siuePeriods:r.siuePeriods,offloadComponents:r.offloadComponents||[],available:result.calculationVersion===GSISRelief.model&&r.quota!==null,reason:result.calculationVersion!==GSISRelief.model?'Legacy calculation model.':r.reason||null}}:{})}));}
+function reliefResultRows_(result,details=false){return result.rows.map(r=>({teacherId:r.id,name:r.name,active:r.active,eligible:r.eligible,R:r.quota,available:r.quota!==null,reason:r.quota!==null?null:details?r.reason:!r.active?'Inactive teacher.':!r.eligible?'Not eligible for relief.':'Capacity unavailable. Ask Admin to review.',...(details?{OF:r.OF??null,Ti:r.actualTeaching,breakdown:{employment:r.employment??null,...(r.basisLabel?{basisLabel:r.basisLabel}:{}),teachingVerified:r.teachingVerified===true,FTT:r.FTT,PD:r.pd,duties:r.duties,otherNonTeaching:r.otherNonTeaching,nonTeachingActivities:r.nonTeachingActivities,weeklyBudget:r.weeklyBudget??null,timetableFactor:r.timetableFactor??null,Wi:r.Wi??null,rawR:r.rawQuota,normalR:r.normalQuota,periodCap:r.periodCap,capConfigured:r.capConfigured,capBasis:r.capBasis,capWorkload:r.capWorkload,capHeadroom:r.capHeadroom,capApplied:r.capApplied,offloadAllowance:r.offloadAllowance??null,siuePeriods:r.siuePeriods,siuePercentApplied:r.siuePercentApplied??null,siueBasis:r.siueBasis??null,offloadComponents:r.offloadComponents||[],available:result.calculationVersion===GSISRelief.model&&r.quota!==null,reason:result.calculationVersion!==GSISRelief.model?'Legacy calculation model.':r.reason||null}}:{})}));}
 function reliefAdminDetail_(result){
  return {settings:result.settings,weeklyPeriods:result.weeklyPeriods,weeklyLunch:result.weeklyLunch,settingsError:result.settingsError||null,
   calculationVersion:result.calculationVersion,reference:result.reference,
   formula:'Wi = FTT + PD + duties + other non-teaching + (1 + SIUE / 100) × (Ti + OF × T_avg). Normal raw R = timetable factor × (weekly budget − Wi). R = floor(max(0, min(normal raw R, configured weekly cap − cap-counted workload))). UT caps count all actual workload; other caps count FTT + teaching. No cap leaves normal R unchanged. Roster uses this R quota directly and allocates only into available timetable periods. Timetable blocks indicate non-availability and do not reduce R again.',
-  rows:result.rows.map(r=>({id:r.id,name:r.name,quota:r.quota,offloadPercent:r.offloadPercent,retained:r.retained,OF:r.OF,weeklyBudget:r.weeklyBudget,timetableFactor:r.timetableFactor,Wi:r.Wi,rawR:r.rawQuota,normalR:r.normalQuota,periodCap:r.periodCap,capConfigured:r.capConfigured,capBasis:r.capBasis,capWorkload:r.capWorkload,capHeadroom:r.capHeadroom,capApplied:r.capApplied,offloadComponents:r.offloadComponents,actualTeaching:r.actualTeaching,FTT:r.FTT,pd:r.pd,duties:r.duties,otherNonTeaching:r.otherNonTeaching,nonTeachingActivities:r.nonTeachingActivities,siuePeriods:r.siuePeriods,reason:r.reason||null,legacyBlockPeriods:r.blocks}))};
+  rows:result.rows.map(r=>({id:r.id,name:r.name,quota:r.quota,offloadPercent:r.offloadPercent,retained:r.retained,OF:r.OF,weeklyBudget:r.weeklyBudget,timetableFactor:r.timetableFactor,Wi:r.Wi,rawR:r.rawQuota,normalR:r.normalQuota,periodCap:r.periodCap,capConfigured:r.capConfigured,capBasis:r.capBasis,capWorkload:r.capWorkload,capHeadroom:r.capHeadroom,capApplied:r.capApplied,offloadComponents:r.offloadComponents,actualTeaching:r.actualTeaching,FTT:r.FTT,pd:r.pd,duties:r.duties,otherNonTeaching:r.otherNonTeaching,nonTeachingActivities:r.nonTeachingActivities,siuePeriods:r.siuePeriods,siuePercentApplied:r.siuePercentApplied??null,siueBasis:r.siueBasis??null,reason:r.reason||null,legacyBlockPeriods:r.blocks}))};
 }
 function reliefView_(copy,source,c,calculated){
  const result=calculated||reliefAnalysis_(source);
