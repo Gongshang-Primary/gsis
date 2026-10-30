@@ -8,6 +8,9 @@ const spec=JSON.parse(read('release-installation-manifest.json'));
 for(const folder of Object.values(spec.frontends)){
  const doc=new JSDOM(read(folder+'/index.html')).window.document;
  assert.equal(doc.querySelector('meta[name="gsis-version"]')?.content,version,folder);
+ const notice=doc.querySelector('script[src*="gsis-version.js"]');
+ assert(notice,folder+' notice script');
+ assert.equal(new URL(notice.getAttribute('src'),'https://school.invalid/b/example').pathname,'/gsis-version.js',folder+' deep-link notice URL');
  assert(doc.querySelector('[data-gsis-release]')?.textContent.includes('v'+version),folder+' header label');
  for(const el of doc.querySelectorAll('script[src],link[rel="stylesheet"]')){
   const value=el.getAttribute('src')||el.getAttribute('href');
@@ -16,6 +19,8 @@ for(const folder of Object.values(spec.frontends)){
  }
  assert.equal(read(folder+'/gsis-version.js'),read('shared/release-notice.js'),folder+' notice parity');
 }
+const externalPage=read('roster-update/public/external.html');
+assert(externalPage.indexOf('/gsis-version.js')<externalPage.indexOf('src="external.js'),'private timetable installs the notice before its immediate API read');
 async function notice(body,headers={}){
  const dom=new JSDOM('<meta name="gsis-version" content="'+'0.9.9b'+'"><body><main>usable</main>',{url:'https://school.invalid',runScripts:'outside-only'});
  dom.window.fetch=async()=>new Response(JSON.stringify(body),{headers:{'content-type':'application/json',...headers}});
