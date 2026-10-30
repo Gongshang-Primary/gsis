@@ -351,7 +351,8 @@ var RosterOpsUI = (() => {
   if(!data.publishedAt){chip.textContent='Not published';chip.title='';chip.dataset.state='not-published';return;}
   const date=timestampDate(data.publishedAt);
   if(!Number.isFinite(+date)){chip.textContent='Publication time unavailable';chip.title='';chip.dataset.state='unknown';return;}
-  const changed=Number.isFinite(data.allocationRevision)&&Number.isFinite(data.publishedRevision)&&data.allocationRevision>data.publishedRevision;
+  // The publication counter and allocation revision have different sequences.
+  const changed=(data.publicationPreview?.count||0)>0;
   chip.textContent='Published '+new Intl.DateTimeFormat('en-GB',{timeZone:'Asia/Singapore',hour:'2-digit',minute:'2-digit',hour12:false}).format(date)+(changed?' · changes not yet visible':'');
   chip.title=publicationStamp(data.publishedAt);chip.dataset.state=changed?'changed':'published';
  }
@@ -653,6 +654,7 @@ var RosterOpsUI = (() => {
   finally{if(isLive(s)&&ticket===s.readTicket){s.reading=false;s.cacheVerifying=false;if(!s.busy)hideProgress(s);body.inert=!['Daily Notify','Report Absence'].includes(s.page)&&s.busy&&!s.cellSaving;s.root.setAttribute('aria-busy',String(s.busy));freshness(s);if(s.page==='Report Absence'&&s.formDraft?.submitted&&s.acceptedReportMessage&&!pendingFor(s)&&!$(s,'[data-ops-message]')?.textContent)say(s,s.acceptedReportMessage,s.acceptedReportWithdrawn===true,s.acceptedReportWithdrawn!==true);if(s.page==='Assign Relief'){pendingBanner(s);refreshKnownReference(s);}}}
  }
  async function loadDate(s){
+  updatePublicationChip(s);
   void refreshIntake(s);
   if(restoreDraft(s)){void verifyCachedAllocation(s);return true;}
   s.readTicket++;s.reading=false;s.timetableLoadTicket=(s.timetableLoadTicket||0)+1;s.timetableLoading=false;s.timetableError=false;hideProgress(s);if(['Assign Relief','Report Absence'].includes(s.page)){s.reading=true;s.root.setAttribute('aria-busy','true');freshness(s);}const date=s.date,cached=viewCache.get(cacheKey(s))||(s.page==='Assign Relief'?await cachedAllocation(s):null);if(!isLive(s)||date!==s.date)return false;s.reading=false;
