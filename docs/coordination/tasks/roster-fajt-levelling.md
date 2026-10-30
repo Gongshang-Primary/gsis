@@ -40,3 +40,15 @@ Why points, not a ratio: early in the year all R% are small, and a ratio (e.g. 1
 ## Current claim
 
 Model: Codex. Owner requested the next two changelog items. This task is prepared on a separate branch while PRs #19 and #20 use both open-PR slots. It builds on the unmerged #20 head; no additional PR is opened until the queue permits it. Claude reviews the exact final head. No merge, deployment, live record change or messages are part of this implementation.
+
+## Implementation decisions
+
+Model: Codex. The threshold is recomputed from current annual balances once per allocation run, as defined above; a rebalance uses the stored plan when deciding whether the cohort rule is active. Within that run, marginal annual costs continue distributing new relief among FAJT. A later run or manual projection recomputes the threshold. No per-edge threshold switch or new solver is introduced. Coverage, existing daily SRE priority and hard eligibility rules retain their current order.
+
+System Config reports the same means from persisted annual entitlement and relief records, using the already loaded active timetable identities. It does not start a new Deploy quota or Calendar read. Missing annual entitlements are excluded from means and listed as a count. The rule is Off by default, with 20 points retained as the editable setting.
+
+Implementation plan: regression fixtures for default-Off parity, threshold/margin, multiple FAJT, daily SRE, caps and restrictions; add shared validated rule and cohort snapshot; wire candidate/manual/whole-plan costs; add settings fields and means; regenerate and run focused plus full Linux checks. Branch now builds on the release-version-letter work while both PR slots remain occupied.
+
+## Local verification
+
+Eight new FAJT cases pass. Existing complete-allocation preference oracle (10 checks), allocator/settings (14), SRE formula/ranking (5), daily-SRE (10), suspended rules (15) and settings browser checks pass. All 18 components rebuilt. Full Linux CI pending. No new PR while #19 and #20 use both slots.
