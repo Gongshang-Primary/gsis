@@ -1680,9 +1680,10 @@ const next=stapler().effectiveDay(plan,ctx.baselineDays?.[d]||ctx.days[d]);for(c
   lists.audit=s.audit.filter(prunableAudit);lists.optimisationRuns=s.optimisationRuns.filter(prunableAudit);return {lists,maps};
  }
  // Read-only size of each top-level record collection, for Admin capacity review.
- // Characters approximate the saved JSON; nothing is changed or removed.
- function storageReport(s,ctx){
-  const size=v=>{try{return JSON.stringify(v)?.length||0;}catch{return 0;}},breakdown=(rows,key)=>{const m=new Map();for(const row of rows||[]){const k=String(row?.[key]||'other');m.set(k,(m.get(k)||0)+size(row));}return [...m].sort((a,b)=>b[1]-a[1]).slice(0,8).map(([name,chars])=>({name,chars}));};
+ // Characters approximate the saved JSON; nothing is changed or removed. The
+ // host's storageView supplies the stored (compressed) form, so lazy history is never inflated.
+ function storageReport(state,ctx){
+  const s=typeof ctx.storageView==='function'?ctx.storageView(state):state,size=v=>{try{return JSON.stringify(v)?.length||0;}catch{return 0;}},breakdown=(rows,key)=>{const m=new Map();for(const row of rows||[]){const k=String(row?.[key]||'other');m.set(k,(m.get(k)||0)+size(row));}return [...m].sort((a,b)=>b[1]-a[1]).slice(0,8).map(([name,chars])=>({name,chars}));};
   const collections=Object.entries(s).map(([name,value])=>({name,chars:size(value),items:Array.isArray(value)?value.length:value&&typeof value==='object'?Object.keys(value).length:1})).sort((a,b)=>b.chars-a.chars);
   return {total:collections.reduce((n,c)=>n+c.chars,0),limit:ctx.storageMaxChars||null,collections,audit:breakdown(s.audit,'operation'),outbox:breakdown(s.outbox,'kind')};
  }

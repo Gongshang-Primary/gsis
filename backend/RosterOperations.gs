@@ -41,6 +41,13 @@ function rosterOperationsState_(skipTransport=false){
 // Save ceiling for Roster operations.json. Admin may raise it in Script Properties
 // (ROSTER_OPERATIONS_MAX_CHARS) up to 24,000,000; anything else keeps 16,000,000.
 function rosterOperationsMaxChars_(){let raw=null;try{raw=props_().getProperty('ROSTER_OPERATIONS_MAX_CHARS');}catch(ignore){}const n=Number(raw);return raw&&Number.isInteger(n)&&n>=16000000&&n<=24000000?n:16000000;}
+// Storage report view: swap lazy facades for their stored compressed payloads
+// so measuring never inflates history and matches what the save ceiling checks.
+function rosterOperationsStoredView_(state){
+ const stored=v=>(typeof rosterPlanPacked_!=='undefined'&&rosterPlanPacked_.get(v))||(typeof rosterAuditEvidencePacked_!=='undefined'&&rosterAuditEvidencePacked_.get(v))||v;
+ const plans=list=>list.map(row=>{const r={...row};if(row.draft)r.draft=stored(row.draft);if(row.published)r.published=row.draft&&row.published===row.draft?{encoding:'same-as-draft-v1'}:stored(row.published);if(row.confirmedPlan)r.confirmedPlan=row.draft&&row.confirmedPlan===row.draft?{encoding:'same-as-draft-v1'}:row.published&&row.confirmedPlan===row.published?{encoding:'same-as-published-v1'}:stored(row.confirmedPlan);return r;});
+ const view={...state};if(Array.isArray(state.staplerPlans))view.staplerPlans=plans(state.staplerPlans);if(Array.isArray(state.staplerArchives))view.staplerArchives=plans(state.staplerArchives);if(Array.isArray(state.optimisationRuns))view.optimisationRuns=state.optimisationRuns.map(run=>run.decisionEvidence?{...run,decisionEvidence:stored(run.decisionEvidence)}:run);return view;
+}
 function rosterOperationsCommit_(state,intakeFenceDates=null,intakeFencePeers=false,beforeWrite=null){if(typeof rosterEdgeAssertLegacyWrite_==='function')rosterEdgeAssertLegacyWrite_();gsisRequireBackendRole_('roster');
  if(typeof rosterAllocationAuditCapture_==='function')rosterAllocationAuditCapture_(state);
  const packed=rosterOperationsPackPlans_(state);let data=JSON.stringify(typeof rosterAllocationAuditPack_==='function'?rosterAllocationAuditPack_(packed):packed);
@@ -219,7 +226,7 @@ function rosterOperationsContext_(req,c,state,providedIndex){
  if(p.operation==='sendDailyEmploymentReport'&&state.dailyEmploymentSnapshots?.some(r=>r.date===requested))return recordContext;
  if(p.operation==='scheduledRoster'&&(state.massPublications?.[today]||state.staplerPlans.some(r=>r.date===today&&r.published))&&minute>=GSISRosterOperations.clock(state.dailyEmploymentSettings.time)&&!state.dailyEmploymentAutomatic?.[today])dates.push(today);
  // These views use durable records, not a rebuilt school-wide timetable or quota.
- if(['history','acknowledge','audit','prunePreview','accounting','saveRecessSettings'].includes(p.operation)||p.operation==='read'&&['duties','mine','prune','notificationReadiness'].includes(p.view))return {user,storageMaxChars:p.operation==='prunePreview'?rosterOperationsMaxChars_():undefined,people:c.rosterPeople.map(p=>({id:String(p.id),name:String(p.name||''),active:p.active===true,mobile:String(p.mobile||'')})),days:{},timetableEntries:rosterOperationsRecordOnly_(p)?[]:rosterIndex_().entries,today,minute,now:now.getTime(),iso:now.toISOString(),uuid:()=>Utilities.getUuid(),notificationsConfigured:p.notificationsReady===true,adminRecipients:[],smcIds:c.rosterSMCIds||[]};
+ if(['history','acknowledge','audit','prunePreview','accounting','saveRecessSettings'].includes(p.operation)||p.operation==='read'&&['duties','mine','prune','notificationReadiness'].includes(p.view))return {user,storageMaxChars:p.operation==='prunePreview'?rosterOperationsMaxChars_():undefined,storageView:p.operation==='prunePreview'?rosterOperationsStoredView_:undefined,people:c.rosterPeople.map(p=>({id:String(p.id),name:String(p.name||''),active:p.active===true,mobile:String(p.mobile||'')})),days:{},timetableEntries:rosterOperationsRecordOnly_(p)?[]:rosterIndex_().entries,today,minute,now:now.getTime(),iso:now.toISOString(),uuid:()=>Utilities.getUuid(),notificationsConfigured:p.notificationsReady===true,adminRecipients:[],smcIds:c.rosterSMCIds||[]};
  if(p.operation==='saveRecess')dates.push(...GSISRosterOperations.dates(p));
  if(p.operation==='moveStapler')dates.push(GSISRosterOperations.date(p.newDate));
  if(p.operation==='saveAbsence'&&!p.id)dates.push(...GSISRosterOperations.absenceDates({...p,date:requested},recordContext));
