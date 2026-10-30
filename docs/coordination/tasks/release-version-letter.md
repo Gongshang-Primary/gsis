@@ -1,11 +1,11 @@
 # release-version-letter: one version label (0.9.9b, then c, d …) on every component, plus a mismatch notice
 
-- Status: approved (owner 30 Oct 2026: "for next deploy need to be more vigilant in harmonizing all version numbers to 0.9.9b and advance the alphabet so that frontend user can keep track")
+- Status: implementing (owner 30 Oct 2026: "for next deploy need to be more vigilant in harmonizing all version numbers to 0.9.9b and advance the alphabet so that frontend user can keep track")
 - Owner/model: Codex (builder), Claude (reviewer; Claude also bumps the letter when building each deploy bundle)
 - Reviewer/model: Claude
-- Last updated (Asia/Singapore): 30 Oct 2026 21:40
+- Last updated (Asia/Singapore): 30 Oct 2026 22:20
 - Branch: codex/release-version-letter
-- Base SHA: current main
+- Base SHA: 9393377c644ee977be2573a94afd28280a06c98b
 - PR: none
 - Files/domains owned: scripts/package-099-suite.py (VERSION), version stamps in backends, Roster/Deploy/Contacts/Layout/LORD headers, Worker builds, release tests.
 
@@ -25,3 +25,7 @@
 - Page 0.9.9b against a backend fixture at 0.9.9c shows the notice; equal labels show nothing.
 - Bundle build refuses a repeated label.
 - Full suite green in the main checkout.
+
+## Continuation directive, 30 Oct 2026
+
+Owner: "do not wait for review on completion of changelog items keep on going". Build and test each item, record an exact-head handoff, then continue the next eligible item while review proceeds. Keep one branch per task, the existing PR limit, owner-controlled merges, and explicit production/deployment holds. Pending review alone is not an implementation blocker. Any overlapping pending task is reconciled before integration; do not edit another implementer's branch.
