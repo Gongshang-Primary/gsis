@@ -2,7 +2,7 @@
 const assert=require('node:assert/strict'),fs=require('node:fs'),{JSDOM}=require('jsdom');
 const dom=new JSDOM('<main></main>',{url:'https://roster.test/',runScripts:'outside-only'}),w=dom.window,q=s=>w.document.querySelector(s),flush=()=>new Promise(r=>setImmediate(r)),date='2026-10-22';
 w.eval(fs.readFileSync('roster-update/public/roster-stapler-ui.js','utf8'));
-const writes=[],data={revision:7,dates:[{date,name:'Retained date',mayManage:true}],sponsors:[{id:'sponsor',name:'SMC sponsor'}],sponsorships:[]};
+const writes=[],data={revision:7,dates:[{date,name:'Retained date',mayManage:true,mayEdit:true}],sponsors:[{id:'sponsor',name:'SMC sponsor'}],sponsorships:[]};
 let failDates=false;
 const ctx={container:q('main'),verifiedSession:1,profile:{user:{email:'teacher@test',admin:false,smc:false}},today:()=>date,status(){},api:async(_,input)=>{
  if(input.operation==='staplerDates'){if(failDates)throw Object.assign(Error('Date refresh offline'),{status:503});return structuredClone(data);}

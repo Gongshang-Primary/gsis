@@ -17,3 +17,4 @@ Pending Linux build/full suite. No live notification, merge or deployment. No lo
 
 ## Handoff
 Controller opens a PR when a slot is available; Claude reviews the exact tested head. Row 10 dependency remains isolated.
+
