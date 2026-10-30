@@ -300,6 +300,8 @@ Cloudflare-authoritative timetables (Diagram 1), new allocation rules, and chang
 
 ### Deploy: specialist count excludes FAJT staff
 
+**Status:** built by Claude on branch claude/deploy-specialist-excl-fajt (quiet hours 30 Oct). Not deployed.
+
 **Request (29 Oct 2026):** In Deploy, the specialist count must not include staff whose employment is FAJT.
 
 **Current behaviour (0.9.9a):** `shared/workload.js` builds each specialist subject's pool as every active, eligible teacher who teaches the subject (`const pool=rows.filter(r=>r.active&&r.rules.eligible&&taught(r.teacher.id,s))`, ~line 171). `headcount` is `pool.length` (~lines 190-192), so FAJT teachers are counted. The same pool also feeds `capacity` (FAJT retained ratio 65/84, ~line 209) and the indicator `average` (assigned specialist periods ÷ headcount).
