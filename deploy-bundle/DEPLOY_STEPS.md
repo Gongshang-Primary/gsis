@@ -2,6 +2,7 @@
 
 Deploy when Roster is quiet (after the last period, evening or weekend). About 20 minutes. Do the steps in order.
 Full test suite on this code: 878/878, LORD 38/38 (all green).
+Fixed 30 Oct 22:30: files 3 and 6 are now the release-built zips (worker code bundled). The earlier 3 and 6 failed to deploy on Cloudflare.
 
 ## 1. Roster backend (Apps Script "Roster GSiS")
 1. Open the project → select all code in the main file → paste `1_Roster_Backend.gs` → Save.
