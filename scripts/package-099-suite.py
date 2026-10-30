@@ -226,7 +226,7 @@ def support_files(root):
     for path in sorted((root / 'docs/v099').rglob('*')):
         if path.is_file():
             assert not path.is_symlink(), 'Documentation symlink refused'
-            origins['Docs/' + str(path.relative_to(root / 'docs/v099'))] = str(path.relative_to(root))
+            origins['Docs/' + path.relative_to(root / 'docs/v099').as_posix()] = path.relative_to(root).as_posix()
     for path in [f'docs/GSiS-v{VERSION}-User-Manual.html', f'docs/architecture/GSiS_v{VERSION}_Architecture.html', f'docs/architecture/GSiS_v{VERSION}_Architecture.drawio']:
         if (root / path).is_file(): origins['Docs/' + Path(path).name] = path
     origins.update({

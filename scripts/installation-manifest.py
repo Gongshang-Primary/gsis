@@ -1,6 +1,6 @@
 """One explicit installation inventory, shared by the builder and verifier."""
 import json
-from pathlib import Path, PurePosixPath
+from pathlib import Path
 
 def installation_manifest(root, version):
     spec = json.loads((root / 'release-installation-manifest.json').read_text())
@@ -15,17 +15,17 @@ def installation_manifest(root, version):
     members = {f'{name}_Frontend_v{version}.zip': root / f'{name}_Frontend_v{version}.zip' for name in spec['frontends']}
     members.update({f'{name}_Backend_v{version}.gs': root / f'{name}_Backend_v{version}.gs' for name in spec['backends']})
     for name, source in spec['workers'].items():
-        relative = PurePosixPath(source)
+        relative = Path(source)
         assert name.endswith('_v{version}.txt') and '/' not in name and '\\' not in name
         assert not relative.is_absolute() and '..' not in relative.parts and relative.suffix == '.txt'
         members[name.format(version=version)] = root / relative
     for name in spec['documents']:
-        relative = PurePosixPath(name.format(version=version))
-        assert not relative.is_absolute() and '..' not in relative.parts and '\\' not in str(relative)
+        relative = Path(name.format(version=version))
+        assert not relative.is_absolute() and '..' not in relative.parts and '\\' not in name
         assert str(relative) == 'README.md' or (relative.parts[0] == 'docs' and len(relative.parts) in (2, 3))
-        members[str(relative)] = root / relative
+        members[relative.as_posix()] = root / relative
     for name in spec.get('migrations',[]):
-        relative=PurePosixPath(name)
+        relative=Path(name)
         assert len(relative.parts)==2 and relative.parts[0]=='migrations' and relative.suffix=='.sql'
         assert not relative.is_absolute() and '..' not in relative.parts and '\\' not in name
         members[name]=root/relative

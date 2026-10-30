@@ -46,3 +46,5 @@ To compare weekly headroom with ordinary annual percentages without giving all S
 Local checks: five new formula/ranking/calculation cases pass, including both ordering directions and independence from annual history; the existing daily-SRE, cap, IMP and whole-week formula checks pass. The unchanged manual-ranking check passes. All 18 components build. Full npm test remains pending. No deployment or messages.
 
 Two Windows-only build portability changes match row S: write access for ZIP fsync, and POSIX archive member paths.
+
+Windows verification note: the runtime and canonical builds pass. The packaging security test that creates a file symlink cannot run under this Windows account (WinError 1314, required privilege not held). Its assertion is retained. No full-green claim is made until every required check runs in a suitable environment.
