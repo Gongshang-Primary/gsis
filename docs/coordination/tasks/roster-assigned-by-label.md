@@ -6,8 +6,8 @@
 - Last updated (Asia/Singapore): 2026-10-30T09:05:05.466157+08:00
 - Branch: codex/roster-assigned-by-label
 - Base SHA: 50c5283c3d4c6ad39f31273541cb78d0b35bd4f1
-- Current head SHA: claim commit, then the exact PR head
-- PR: not opened
+- Current head SHA: implementation d8031305e1a593354f7391d055b3b157a57c4ceb; the PR body records the final exact review head, including this documentation handoff
+- PR: https://github.com/helper-gsps/gsis/pull/13
 - User-authorised scope: row 2 of docs/coordination/plans/2026-11-codex-queue.md. Owner approved all logged items on 30 October and directed serial, top-to-bottom implementation with a full suite and Claude review at each exact head.
 - Files/domains owned: shared/roster-operations.js; related Roster display/export code only if needed; generated copies in backend/Code.gs, Roster and Deploy backends, browser domain and notification/operations bundles; focused provenance regression and this task/changelog.
 - Out of scope: allocation rules, quota, publication or notification policy, delivery-time formatting, publication time chip, other queue rows, live records, messages, deployment and ROSTER_EDGE_AUTHORITY.
@@ -51,7 +51,7 @@ No live or staging verification is claimed. The earlier counts above remain hist
 
 ## Review
 
-Claude review pending. Advisory model review is separate from owner approval.
+Claude review pending on PR #13. The PR body names the exact final head; a new commit requires review of that new head. Advisory model review is separate from owner approval.
 
 ## Deployment
 
