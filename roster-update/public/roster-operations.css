@@ -262,3 +262,4 @@
 
 /* Keep saving on the following toolbar row; publication stays an explicit action. */
 .ops-assign-page .ops-day-actions [data-notify-mode=all]{max-width:245px;height:auto;min-height:40px;white-space:normal}.ops-assign-page .ops-freshness [data-save-online]{margin-left:0}.ops-assign-page .ops-day-actions{width:100%;justify-content:flex-end;margin-left:0}.ops-assign-page .ops-freshness{clear:both;margin-top:8px}
+.ops-published-chip:empty{display:none}.ops-published-chip{display:inline-flex;align-items:center;min-height:28px;padding:3px 10px;border-radius:14px;font-size:13px;background:#e9f3f0;color:#245839;border:1px solid #b9d8c7}.ops-published-chip[data-state=none]{background:#eff3f7;color:#506776;border-color:#cfd9e1}.ops-published-chip[data-state=stale]{background:#fff4dc;color:#7a4f0c;border-color:#e3c17a}

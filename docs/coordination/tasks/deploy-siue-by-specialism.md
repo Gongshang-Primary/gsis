@@ -1,7 +1,7 @@
 # deploy-siue-by-specialism: SIUE for PE, Art and Music as Relief Settings fields
 
-- Status: approved (owner request 30 Oct 2026, "changelog add to deploy: Relief Settings")
-- Owner/model: Codex
+- Status: built by Claude on claude/deploy-siue-by-specialism (owner: quiet-hours push, 30 Oct). Approved (owner request 30 Oct 2026, "changelog add to deploy: Relief Settings")
+- Owner/model: Claude (reassigned from Codex)
 - Reviewer/model: Claude
 - Last updated (Asia/Singapore): 30 Oct 2026 14:30
 - Branch: codex/deploy-siue-by-specialism

@@ -1,7 +1,7 @@
 # roster-excel-relief-for-absent: relief cells name the absent teacher in the subject
 
-- Status: proposed (changelog entry; Codex builds after owner go)
-- Owner/model: Codex
+- Status: built by Claude (owner 30 Oct: "work through changelog"); branch claude/roster-excel-relief-for
+- Owner/model: Claude (reassigned from Codex while Codex holds #19/#20)
 - Reviewer/model: Claude
 - Last updated (Asia/Singapore): 30 Oct 2026 06:00
 - Branch: codex/roster-excel-relief-for-absent

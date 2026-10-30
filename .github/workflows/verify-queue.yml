@@ -39,6 +39,11 @@ jobs:
           echo "GSIS_BROWSER_EXECUTABLE=$BROWSER" >> "$GITHUB_ENV"
       - name: Regenerate all 18 components
         run: npm run build
+      - name: Record rebuilt Worker hashes
+        run: |
+          head -n 2 notification-worker/dashboard-worker.mjs
+          head -n 2 operations-worker/dashboard-worker.mjs
+          git diff --stat
       - name: Check committed backend parity
         run: git diff --exit-code -- backend/Code.gs Roster_Backend_v0.9.9.gs Deploy_Backend_v0.9.9.gs
       - name: Check browser fixture portability

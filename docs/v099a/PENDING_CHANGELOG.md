@@ -117,6 +117,8 @@ Cloudflare-authoritative timetables (Diagram 1), new allocation rules, and chang
 
 ### Roster: visible "last published" timestamp on Assign Relief
 
+**Status:** built by Claude on branch claude/roster-small-fixes (owner: "work through changelog", 30 Oct). Not deployed.
+
 **Request (29 Oct 2026):** Assign Relief needs a published timestamp.
 
 **Current behaviour (0.9.9):** The day data already carries `publishedAt` and `publishedRevision` (`shared/roster-operations.js`). Assign Relief shows "Last published …" only inside the transient status message (`roster-update/public/roster-operations-ui.js:346`), so it is easy to miss or replaced by other messages.
@@ -298,6 +300,8 @@ Cloudflare-authoritative timetables (Diagram 1), new allocation rules, and chang
 
 ### Deploy: specialist count excludes FAJT staff
 
+**Status:** built by Claude on branch claude/deploy-specialist-excl-fajt (quiet hours 30 Oct). Not deployed.
+
 **Request (29 Oct 2026):** In Deploy, the specialist count must not include staff whose employment is FAJT.
 
 **Current behaviour (0.9.9a):** `shared/workload.js` builds each specialist subject's pool as every active, eligible teacher who teaches the subject (`const pool=rows.filter(r=>r.active&&r.rules.eligible&&taught(r.teacher.id,s))`, ~line 171). `headcount` is `pool.length` (~lines 190-192), so FAJT teachers are counted. The same pool also feeds `capacity` (FAJT retained ratio 65/84, ~line 209) and the indicator `average` (assigned specialist periods ÷ headcount).
@@ -329,6 +333,21 @@ Cloudflare-authoritative timetables (Diagram 1), new allocation rules, and chang
 
 ### Roster: delivery time shows a raw number
 
+**Status:** built by Claude on branch claude/roster-small-fixes (owner: "work through changelog", 30 Oct). Not deployed.
+
 **Found (29 Oct 2026, same screenshot):** "Delivered 1793228134000 Singapore time." The provider's delivery time is stored as a digit string; `stamp()` (`roster-update/public/roster-operations-ui.js:231`) only formats values that `new Date(value)` understands, so it prints the digits.
 
 **Planned change:** `stamp()` treats a 13-digit string as milliseconds and a 10-digit string as seconds since 1970, then formats as Singapore time (here: 29 Oct 2026, 06:55:34). Add a test for both forms. Check other callers that pass provider timestamps.
+
+### Roster System Config: collapsible teaching group exceptions
+
+**Status:** built by Claude on branch claude/collapsible-group-exceptions (owner go 30 Oct). Not deployed.
+
+**Request (30 Oct 2026):** Make "Teaching group exceptions" in Roster System Config collapsible. Owner screenshot: the list shows every teaching group (1CL1 CCE, 1CL1 CL, 1CL2 CCE …) with two dropdowns each, so the page is very long.
+
+**Planned change:**
+1. Wrap the list (search box and group rows) in a `<details>` block under the existing heading and hint. Collapsed by default.
+2. The summary line shows counts, e.g. "Teaching group exceptions · 3 saved exceptions of 84 groups".
+3. Open automatically when any group has a saved exception that is not "Inherit", or when the search box has text; remember open/closed per browser session.
+4. No change to saved data or allocation. Test: collapsed by default with no exceptions, open with one exception, the search still filters, Save still includes every row.
+Files: roster-update/public/roster-settings-ui.js (section near "Subject families and teaching groups", line ~110).
