@@ -1,15 +1,15 @@
 'use strict';
 const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm'),crypto=require('node:crypto');
 function fixture(value){
- const files=new Map([['single',JSON.stringify(value)]]),names=new Map([['single','Roster operations.json']]),properties=new Map([['ROSTER_OPERATIONS_FILE','single']]),writes=[],trashed=new Set();let sequence=0,fail='',locked=false;
- const scope=vm.createContext({ROSTER_DATA:'folder',GSISRosterOperations:{initial:()=>({schema:1,revision:0}),validateState:s=>s},props_:()=>({getProperty:k=>properties.get(k)||null,setProperty:(k,v)=>properties.set(k,v)}),Utilities:{DigestAlgorithm:{SHA_256:'sha256'},computeDigest:(_,v)=>[...crypto.createHash('sha256').update(v).digest()],newBlob:v=>({text:v}),getUuid:()=>crypto.randomUUID()},gsisRequireBackendRole_:()=>{},rosterEdgeAssertLegacyWrite_:()=>{},error_:(status,message)=>{throw Object.assign(Error(message),{status});},LockService:{getScriptLock:()=>({})},deployLock_:()=>{assert(!locked);locked=true;return true;},deployUnlock_:()=>{locked=false;},rosterOperationsAuthority_:c=>c.user,rosterFindFile_:()=>null,rosterReadFile_:id=>{if(trashed.has(id)||!files.has(id))throw Error('missing file');return files.get(id);},rosterCreateFile_:(folder,name,blob)=>{const id='file'+(++sequence);files.set(id,blob.text);names.set(id,name);writes.push({kind:'create',id,name});return id;},rosterDriveJson_:r=>JSON.parse(r.getContentText()),rosterDriveRequest_:(url,options,operation)=>{
+ const files=new Map([['single',JSON.stringify(value)]]),names=new Map([['single','Roster operations.json']]),properties=new Map([['ROSTER_OPERATIONS_FILE','single']]),writes=[],trashed=new Set(),reads=[],hashes=[],serialised=[];let sequence=0,fail='',locked=false;
+ const scope=vm.createContext({JSON:{parse:JSON.parse,stringify:value=>{serialised.push(value);return JSON.stringify(value);}},ROSTER_DATA:'folder',GSISRosterOperations:{initial:()=>({schema:1,revision:0}),validateState:s=>s},props_:()=>({getProperty:k=>properties.get(k)||null,setProperty:(k,v)=>properties.set(k,v)}),Utilities:{DigestAlgorithm:{SHA_256:'sha256'},computeDigest:(_,v)=>{hashes.push(v);return [...crypto.createHash('sha256').update(v).digest()];},newBlob:v=>({text:v}),getUuid:()=>crypto.randomUUID()},gsisRequireBackendRole_:()=>{},rosterEdgeAssertLegacyWrite_:()=>{},error_:(status,message)=>{throw Object.assign(Error(message),{status});},LockService:{getScriptLock:()=>({})},deployLock_:()=>{assert(!locked);locked=true;return true;},deployUnlock_:()=>{locked=false;},rosterOperationsAuthority_:c=>c.user,rosterFindFile_:()=>null,rosterReadFile_:id=>{reads.push(id);if(trashed.has(id)||!files.has(id))throw Error('missing file');return files.get(id);},rosterCreateFile_:(folder,name,blob)=>{const id='file'+(++sequence);files.set(id,blob.text);names.set(id,name);writes.push({kind:'create',id,name});return id;},rosterDriveJson_:r=>JSON.parse(r.getContentText()),rosterDriveRequest_:(url,options,operation)=>{
   const id=/files\/([^?]+)/.exec(url)?.[1];if(operation==='operations-folder'){const newId='folder'+(++sequence);return {getContentText:()=>JSON.stringify({id:newId})};}
   if(fail===operation){fail='';throw Error('simulated '+operation);}
   writes.push({kind:operation,id});if(options.contentType?.startsWith('application/json')&&operation==='operations-metadata'){const m=JSON.parse(options.payload);if(m.trashed)trashed.add(id);if(m.name)names.set(id,m.name);}else files.set(id,options.payload);
   return {getContentText:()=>JSON.stringify({id})};
  }});
  vm.runInContext(fs.readFileSync('backend/RosterOperations.gs','utf8'),scope);scope.rosterOperationsAuthority_=c=>c.user;scope.rosterOperationsVersionChanged_=()=>{};
- return {scope,files,names,properties,writes,trashed,fail:op=>fail=op,read:()=>scope.rosterOperationsRaw_(),call:(operation,token,revision,requestId=crypto.randomUUID(),admin=true)=>scope.rosterOperationsStorageDispatch_({identity:{email:'admin@example.test'},input:{operation,storageToken:token,revision,requestId}},{user:{admin,email:'admin@example.test'}})};
+ return {scope,files,names,properties,writes,trashed,reads,hashes,serialised,fail:op=>fail=op,read:()=>scope.rosterOperationsRaw_(),call:(operation,token,revision,requestId=crypto.randomUUID(),admin=true)=>scope.rosterOperationsStorageDispatch_({identity:{email:'admin@example.test'},input:{operation,storageToken:token,revision,requestId}},{user:{admin,email:'admin@example.test'}})};
 }
 function state(){return {schema:1,revision:7,settings:{keep:true},audit:[{date:'2026-11-02',id:'later',note:'x'},{date:'2026-10-01',id:'earlier',note:'y'}],byDate:{'2026-11-02':{x:1},'2026-10-01':{x:2}},outbox:[{id:'undated',status:'uncertain',claimId:'keep'}],empty:[]};}
 const test=(name,fn)=>{fn();console.log('PASS',name);};
@@ -33,3 +33,21 @@ test('split state reader preserves the same validated API and revision',()=>{con
 test('lost pointer response replays the verified conversion and the final fence follows part writes',()=>{const h=fixture(state()),report=h.call('storageReport'),requestId=crypto.randomUUID();const props=h.scope.props_,original=props();let lost=true;h.scope.props_=()=>({...original,setProperty:(key,value)=>{original.setProperty(key,value);if(key==='ROSTER_OPERATIONS_FILE'&&value!=='single'&&lost){lost=false;throw Error('lost pointer response');}}});assert.throws(()=>h.call('splitOperations',report.storageToken,report.revision,requestId),/lost pointer/);const saved=h.call('splitOperations',report.storageToken,report.revision,requestId);assert.equal(saved.replayed,true);h.writes.length=0;const next=state();next.audit[0].note='changed';next.revision++;h.scope.rosterOperationsWriteRaw_(JSON.stringify(next),()=>h.writes.push({kind:'source-fence'}));const fence=h.writes.findIndex(w=>w.kind==='source-fence'),manifest=h.writes.findIndex(w=>w.kind==='operations-manifest');assert(fence>h.writes.findIndex(w=>w.kind==='create'));assert.equal(manifest,fence+1);});
 
 test('an oversized single record is rejected with the retained-intake capacity code before Drive writes',()=>{const s=state();s.audit=[{date:'2026-10-01',note:'x'.repeat(17000000)}];const h=fixture(s),r=h.call('storageReport');assert.throws(()=>h.call('splitOperations',r.storageToken,r.revision),e=>e.status===507&&e.code==='ROSTER_STORAGE_CAPACITY');assert.equal(h.writes.length,0);assert.equal(h.read().text,JSON.stringify(s));});
+
+test('routine state read verifies parts without serialising or hashing the whole state',()=>{
+ const s=state(),h=fixture(s),r=h.call('storageReport');h.call('splitOperations',r.storageToken,r.revision);
+ h.hashes.length=0;h.serialised.length=0;h.reads.length=0;
+ const result=h.scope.rosterOperationsState_(true);assert.equal(result.revision,s.revision);
+ assert(!h.hashes.includes(JSON.stringify(s)),'routine read hashed the whole state');
+ assert(!h.serialised.some(value=>value?.schema===1&&value?.revision===s.revision&&value?.audit),'routine read serialised the whole state');
+ const count=h.reads.length;assert.equal(h.scope.rosterOperationsManifestRevision_(),s.revision);assert.equal(h.reads.length,count,'version key read the same manifest twice');
+});
+test('storage report records bounded read timings and conversion keeps whole-state verification',()=>{
+ const s=state(),h=fixture(s),r=h.call('storageReport'),split=h.call('splitOperations',r.storageToken,r.revision);
+ for(const key of ['manifestReadMs','partsReadMs','assembleMs','serialiseMs','totalMs'])assert(Number.isFinite(split.timings[key])&&split.timings[key]>=0,key);
+ const raw=h.read();assert.equal(raw.text,JSON.stringify(s));
+ const bad={...raw.manifest,digest:'0'.repeat(64)};assert.throws(()=>h.scope.rosterOperationsAssemble_(bad,true),e=>e.status===503);
+ const active=h.properties.get('ROSTER_OPERATIONS_FILE');h.files.set(active,JSON.stringify(bad));const current=h.call('storageReport');
+ assert.throws(()=>h.call('joinOperations',current.storageToken,current.revision),e=>e.status===503);
+ assert.equal(h.properties.get('ROSTER_OPERATIONS_FILE'),active);
+});
