@@ -1,11 +1,11 @@
 # roster-fajt-levelling: after SREs, FAJT average R% rises first until it leads the school by a set margin
 
-- Status: approved, ready to claim after roster-sre-daily-priority (same ranking code). Owner clarified 30 Oct 2026: "FAJT average R% to rise first, but once significantly above school-wide R%, start prioritising others".
+- Status: implementing in an isolated branch while completed predecessors await review. Owner clarified 30 Oct 2026: "FAJT average R% to rise first, but once significantly above school-wide R%, start prioritising others".
 - Owner/model: Codex
 - Reviewer/model: Claude
-- Last updated (Asia/Singapore): 30 Oct 2026 07:40
+- Last updated (Asia/Singapore): 30 Oct 2026 22:25
 - Branch: codex/roster-fajt-levelling
-- Base SHA: current main
+- Base SHA: cb8b587c10322b49c3d0e907f3baec3f4bd151a8
 - PR: none
 - User-authorised scope: Song Wee, 30 Oct 2026: "after SRE; then FAJT but balance FAJT R% against all other EOs R%. rule 1: SREs first; rule 2: level up FAJT R% first to be equal with FAJT average R%; rule 3: annual R% levelling across all staff".
 - Files/domains owned: shared/roster-allocation.js (candidate ranking, preferenceRules, balances), Roster settings text, generated copies, tests.
@@ -36,3 +36,7 @@ Why points, not a ratio: early in the year all R% are small, and a ratio (e.g. 1
 - SRE free: SRE still first. FAJT at a Daily workload limit or restricted period: skipped.
 - Settings shows the current FAJT average, school average and whether FAJT priority is active, so SMCs can see why.
 - Fresh deploy with existing settings data: FAJT priority is Off and allocations match the pre-deploy result; switching it On in Settings applies the rule.
+
+## Continuation and dependency
+
+Owner, 30 Oct: "do not wait for review on completion of changelog items keep on going". This task may progress on an isolated branch while review continues. Integrate the SRE FAJT basis from PR #20 at 16624d4de46caf8b3a1547069eea1e6ab9ab24aa before implementation. Reconcile predecessor changes, regenerate bundles and rerun the full suite before a final integration handoff. No merge, deployment, authority change or message send is authorised by this claim. Version-label work remains independently tracked under release-version-letter.
