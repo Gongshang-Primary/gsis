@@ -1,6 +1,6 @@
 # roster-sre-fajt-r-calc: an SRE with a Deploy timetable gets the FAJT R calculation
 
-- Status: approved (owner request 30 Oct 2026); one open point below. Build with or right after roster-sre-daily-priority.
+- Status: approved, ready to claim (owner decisions recorded 30 Oct 2026). Build with or right after roster-sre-daily-priority.
 - Owner/model: Codex
 - Reviewer/model: Claude
 - Last updated (Asia/Singapore): 30 Oct 2026 08:10
@@ -23,11 +23,12 @@
 2. SRE **without** a Deploy timetable: no R calculation; shown as "Daily roster, no R%" (roster-sre-daily-priority).
 3. My Calculations explains which basis applies ("SRE with timetable: FAJT basis").
 
-## Open point for the owner
-Where does a long-term SRE rank? Annual R% is excluded, so options: (a) with daily SREs at rule 1, ordered by weekly R remaining; (b) with other staff, ranked by weekly R remaining instead of annual R%. Proposed: **(b)**, since they have a timetable and a weekly quota like other staff.
+## Owner decision (30 Oct 2026): option B
+A long-term SRE is ranked with other staff (after daily SREs and, when switched on, the FAJT rule), using **weekly R remaining** in place of annual R% utilisation; the remaining tie-breakers are unchanged.
 
 ## Acceptance
 - SRE with Deploy teaching periods: R equals the FAJT formula for the same workload; changing `fajtWeeklyPeriods` changes it.
 - SRE without teaching periods: no R, "Daily roster, no R%".
 - Full time and 4/5 staff unchanged.
 - Long-term SRE: weekly R remaining enforced; annual R% recorded and displayed but ignored by annualUtilisation ranking.
+- Long-term SRE and a teacher both free: the long-term SRE's place is decided by weekly R remaining versus the teacher's annual R% ranking key, as specified in the ranking design; test both orderings.

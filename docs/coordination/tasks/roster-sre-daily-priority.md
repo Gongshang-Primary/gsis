@@ -17,7 +17,7 @@ Type is decided by the published Deploy version, not by a separate flag:
 - **Daily (ad hoc) SRE**: SRE with no timetable in Deploy. Rostered day by day. Daily limit = **new Settings field "Ad hoc relief max periods"** in system config, beside Daily workload limits, with On/Off toggle and 1 to 40 validation; **initial value 10** written as the settings default (owner), not a constant in allocation code. Consecutive limit = the existing "Maximum consecutive periods" setting. No R quota; shown "Daily roster, no R%".
 - **Long-term SRE**: SRE with a timetable in Deploy. Reduced R quota from the FAJT calculation (roster-sre-fajt-r-calc). Their quota applies **per week** (weekly R remaining and caps work as for other staff), but **annual accumulation is not used for their ranking**. Their R value and R% are still recorded and displayed. Daily limits = the existing Daily workload limits settings.
 
-Ranking (rule 1) applies to daily SREs. Long-term SRE ranking: see open point in roster-sre-fajt-r-calc.
+Ranking (rule 1) applies to daily SREs. Long-term SREs rank with other staff by weekly R remaining (owner option B; roster-sre-fajt-r-calc).
 
 ## Rule (original; read with the two types above)
 1. Staff with employment SRE are ranked before every other candidate (priority 1, above "Lower annual R utilisation").
