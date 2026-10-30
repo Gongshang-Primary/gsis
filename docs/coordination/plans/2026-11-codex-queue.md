@@ -2,6 +2,12 @@
 
 Priority update 30 Oct 2026: build roster-operations-split-files (row S) first, then roster-d1-google-backup (row D1), before other rows.
 
+Quiet hours 30 Oct 2026 night (owner: "get as much deployable done as possible"; no bundles until the owner asks).
+- Merged tonight: #20 (2b2), #21 (collapsible TG exceptions), #22 (row 3 Excel), #23 (rows 5 and 6).
+- Claude built: row V phase 1 (#24), row 15b SIUE by specialism (#25).
+- **Codex next, in order:** (1) #19 review fixes (read cost, confirm dialog); (2) row 2c FAJT levelling; (3) row V phase 2 (mismatch notice, Worker version, bundle letter refusal); (4) rows 10 to 14 in order.
+- Main checkout rule: run `npm run build` before `npm test` after every branch switch.
+
 Owner order 30 Oct 2026 evening (owner away from PC; bundle 6bb4844 not yet deployed): open two PRs now.
 1. Row S (split files): build and open the PR, but **do not ask for merge** until the owner has deployed bundle 6bb4844, set ROSTER_OPERATIONS_MAX_CHARS, and sent the Storage screenshot. Claude reviews meanwhile.
 2. Row 2b2 (roster-sre-fajt-r-calc): build, review, merge as normal.
