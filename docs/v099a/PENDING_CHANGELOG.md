@@ -335,6 +335,8 @@ Cloudflare-authoritative timetables (Diagram 1), new allocation rules, and chang
 
 ### Roster System Config: collapsible teaching group exceptions
 
+**Status:** built by Claude on branch claude/collapsible-group-exceptions (owner go 30 Oct). Not deployed.
+
 **Request (30 Oct 2026):** Make "Teaching group exceptions" in Roster System Config collapsible. Owner screenshot: the list shows every teaching group (1CL1 CCE, 1CL1 CL, 1CL2 CCE …) with two dropdowns each, so the page is very long.
 
 **Planned change:**
