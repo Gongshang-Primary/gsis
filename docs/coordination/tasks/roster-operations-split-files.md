@@ -66,3 +66,5 @@ Windows verification note: the runtime and canonical builds pass. The packaging 
 ## Linux verification
 
 A branch-scoped GitHub Actions job runs the complete existing suite on Linux with pinned official checkout/setup actions, read-only repository permissions, no deployment secrets and the locked Playwright browser. It covers these two task branches only. This avoids changing or skipping the Windows-blocked symlink security test. CI results remain pending until the run completes.
+
+Final API review: oversized joinOperations is a 409 conflict, preserving the exact size/ceiling explanation through the existing privacy wrapper. Unexpected server failures remain redacted. The ten storage tests pass and canonical bundles were regenerated after this correction.

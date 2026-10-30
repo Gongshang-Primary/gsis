@@ -5354,7 +5354,7 @@ function rosterPrivateTimetable_(ctx,s,staffId,date){
 
 // Split storage uses immutable parts. Only replacing the manifest commits a save.
 var rosterOperationsStorageSnapshot_=null;
-function rosterOperationsStorageError_(message,status=503){throw Object.assign(Error(message),{status,failurePhase:'operations-storage'});}
+function rosterOperationsStorageError_(message,status=503){throw Object.assign(Error(message),{status,...(status===507?{code:'ROSTER_STORAGE_CAPACITY'}:{}),failurePhase:'operations-storage'});}
 function rosterOperationsActiveFile_(){return props_().getProperty('ROSTER_OPERATIONS_FILE')||rosterFindFile_(ROSTER_DATA,'Roster operations.json');}
 function rosterOperationsStorageToken_(raw){return rosterOperationsPlanDigest_(JSON.stringify([raw.id,raw.text]));}
 function rosterOperationsPartPlan_(text){
@@ -5458,7 +5458,7 @@ function rosterOperationsStorageDispatch_(req,c){
    if(raw.id&&!props_().getProperty('ROSTER_OPERATIONS_FILE'))props_().setProperty('ROSTER_OPERATIONS_FILE',raw.id);
    if(raw.id)rosterOperationsMetadata_(raw.id,{name:'Roster operations (before split '+new Date().toISOString().slice(0,10)+').json'});
   }else{
-   if(raw.text.length>rosterOperationsMaxChars_())rosterOperationsStorageError_('Relief records contain '+raw.text.length+' characters and exceed the single-file ceiling of '+rosterOperationsMaxChars_()+'. Split storage remains active.',507);
+   if(raw.text.length>rosterOperationsMaxChars_())rosterOperationsStorageError_('Relief records contain '+raw.text.length+' characters and exceed the single-file ceiling of '+rosterOperationsMaxChars_()+'. Split storage remains active.',409);
    targetId=rosterCreateFile_(ROSTER_DATA,'Roster operations.json',Utilities.newBlob(raw.text,'application/json'));if(rosterReadFile_(targetId)!==raw.text)rosterOperationsStorageError_('The single relief file could not be verified. Split storage remains active.');
   }
   // Record intent before changing the pointer. A lost response can be replayed
