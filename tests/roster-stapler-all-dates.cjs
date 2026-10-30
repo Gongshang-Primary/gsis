@@ -13,3 +13,4 @@ f.O.apply(f.state,f.ctx,{operation:'decideStapler',date,id:request.savedIds[0],d
 const inactive=fixture();inactive.state.staplerPlans=f.state.staplerPlans;inactive.ctx.people[1].active=false;assert.equal(inactive.O.read(inactive.state,{...inactive.ctx,user:teacher.user},{operation:'staplerDates'}).dates.length,0);
 const unmapped={...inactive.ctx,user:{staffId:'missing',email:'missing@gsps.edu.sg',smc:false,admin:false}};assert.equal(inactive.O.read(inactive.state,unmapped,{operation:'staplerDates'}).dates.length,0);
 console.log('PASS upcoming Stapler date metadata, private draft boundary, sponsor request idempotency and approved access');
+

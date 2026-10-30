@@ -8,8 +8,9 @@ for(const date of [today,future,past,draftDate]){
 }
 const teacher={...f.ctx,user:{staffId:'bob',email:'bob@gsps.edu.sg',smc:false,admin:false}};
 const list=O.read(f.state,teacher,{operation:'staplerDates'});
-assert.deepEqual(list.dates.map(r=>r.date).sort(),[today,future],'active teachers see confirmed today/future dates even when not in that plan');
-assert(list.dates.every(r=>r.canViewConfirmed&&r.status==='Confirmed'&&!r.mayEdit&&!r.mayManage));
+assert.deepEqual(list.dates.map(r=>r.date).sort(),[today,future,draftDate],'active teachers see confirmed dates and upcoming unconfirmed date metadata');
+assert(list.dates.filter(r=>r.canListConfirmed).every(r=>r.canViewConfirmed&&r.status==='Confirmed'&&!r.mayEdit&&!r.mayManage));
+const upcoming=list.dates.find(r=>r.date===draftDate);assert.equal(upcoming.canListUpcoming,true);assert.equal(upcoming.mayEdit,false);assert.equal(upcoming.draftRevision,0);assert.doesNotMatch(JSON.stringify(upcoming),/Suspension|Private draft room/);
 for(const date of [today,future]){
  const view=O.read(f.state,teacher,{operation:'stapler',date});
  assert.equal(view.viewMode,'confirmed');assert.equal(view.canEdit,false);assert.equal(view.canConfirm,false);assert.equal(view.staplerRevision,1);
