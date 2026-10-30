@@ -84,7 +84,7 @@ function compatibleFetchOptions(init, signal) {
 }
 
 function json(data, status = 200, extraHeaders = {}) {
-  return Response.json(data, { status, headers: { 'Cache-Control': 'no-store', 'X-LORD-Worker-Version': '0.9.9', ...extraHeaders } });
+  return Response.json(data, { status, headers: { 'Cache-Control': 'no-store', 'X-LORD-Worker-Version': '0.9.9', ...extraHeaders, ...(typeof data?.buildLabel==='string'&&/^\d+\.\d+\.\d+[a-z]?$/.test(data.buildLabel)?{'X-GSiS-Build-Label':data.buildLabel}:{}) } });
 }
 function b64urlDecode(value) {
   value = value.replace(/-/g, '+').replace(/_/g, '/');
@@ -274,7 +274,7 @@ async function loadReferenceResponse(env, forceRefresh = false, reloadDate = '',
       if (forceRefresh || !latest || (Number(latest.headers.get('X-LORD-Reloaded-At') || 0) < now && Number(latest.headers.get('X-LORD-Fetched-At') || 0) <= now)) {
         await cache.put(cacheKey, stored.clone());
       }
-      return new Response(JSON.stringify(payload), { status: 200, headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'private, no-store', 'X-LORD-Worker-Version': '0.9.9', 'X-LORD-Reference': 'live', 'Server-Timing': `backend;dur=${Math.max(0, Date.now() - backendStartedAt)}` } });
+      return new Response(JSON.stringify(payload), { status: 200, headers: { ...(typeof payload?.buildLabel==='string'&&/^\d+\.\d+\.\d+[a-z]?$/.test(payload.buildLabel)?{'X-GSiS-Build-Label':payload.buildLabel}:{}), 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'private, no-store', 'X-LORD-Worker-Version': '0.9.9', 'X-LORD-Reference': 'live', 'Server-Timing': `backend;dur=${Math.max(0, Date.now() - backendStartedAt)}` } });
     }
     lastError = new Error((payload && payload.error) || 'Reference backend returned an unexpected response.');
   } catch (error) { lastError = error; }

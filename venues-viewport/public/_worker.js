@@ -16,7 +16,7 @@ const VERSION='0.9.9',encoder=new TextEncoder(),decoder=new TextDecoder();
 const READS=new Set(['bootstrap','manifest','piece','bookings','admin']);
 const COMMANDS=new Set(['book','amend','cancel','decide','requestTransfer','decideTransfer','respond','saveVenue','saveRoomOwners','saveRoomMetadata','saveGrant','saveClosure','sync','notificationDecision']);
 const keySets=new Map(),keyFlights=new Map();
-function json(data,status=200){return Response.json(data,{status,headers:{'Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff','Referrer-Policy':'same-origin'}});}
+function json(data,status=200){return Response.json(data,{status,headers:{'Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff',...(typeof data?.buildLabel==='string'&&/^\d+\.\d+\.\d+[a-z]?$/.test(data.buildLabel)?{'X-GSiS-Build-Label':data.buildLabel}:{}),'Referrer-Policy':'same-origin'}});}
 function failure(status,code,error){return json({ok:false,status,code,error},status);}
 function decode(value){if(!/^[A-Za-z0-9_-]+$/.test(value))throw Error('Invalid token');return Uint8Array.from(atob(value.replace(/-/g,'+').replace(/_/g,'/')),c=>c.charCodeAt(0));}
 function config(env){

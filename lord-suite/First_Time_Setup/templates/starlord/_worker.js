@@ -117,7 +117,7 @@ async function loadBoardResponse(request, env) {
     if(payload && payload.ok===false) return json({ok:false,error:'The backend could not produce the booking feed.',code:'BOARD_BACKEND_REJECTED'},502);
     if(!payload || payload.ok!==true || !Array.isArray(payload.bookings)) return json({ok:false,error:'The booking service returned an invalid feed.',code:'BOARD_INVALID_FEED'},502);
     if(forceRefresh && payload.cacheReloaded!==true) return json({ok:false,error:'Reload requires the current LORD backend.',code:'BOARD_BACKEND_VERSION'},502);
-    const headers={'Content-Type':'application/json; charset=utf-8','Cache-Control':'public, max-age=15, s-maxage=30',
+    const headers={...(typeof payload?.buildLabel==='string'&&/^\d+\.\d+\.\d+[a-z]?$/.test(payload.buildLabel)?{'X-GSiS-Build-Label':payload.buildLabel}:{}),'Content-Type':'application/json; charset=utf-8','Cache-Control':'public, max-age=15, s-maxage=30',
       'X-Content-Type-Options':'nosniff','Referrer-Policy':'no-referrer','X-LORD-Fetched-At':String(startedAt),'X-LORD-Worker-Version':'0.9.9',
       'Content-Security-Policy':"default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'none'"};
     if(cache) {
@@ -174,6 +174,7 @@ function json(payload, status = 200) {
   return new Response(JSON.stringify(payload), {
     status,
     headers: {
+      ...(typeof payload?.buildLabel==='string'&&/^\d+\.\d+\.\d+[a-z]?$/.test(payload.buildLabel)?{'X-GSiS-Build-Label':payload.buildLabel}:{}),
       'Content-Type': 'application/json; charset=utf-8',
       'Cache-Control': 'no-store',
       'X-LORD-Worker-Version': '0.9.9',

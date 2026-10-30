@@ -21,10 +21,11 @@ for(const file of ['backend/Code.gs','Contacts_Code.gs','calendar-backend/Code.g
 }
 async function notice(body,url='/api/read',headers={}){
  const dom=new JSDOM('<meta name="gsis-build-label" content="0.9.9b"><body><main>usable</main>',{url:'https://school.invalid',runScripts:'outside-only'});
- dom.window.fetch=async()=>new Response(JSON.stringify(body),{headers:{'content-type':'application/json',...headers}});
+ let clones=0;dom.window.fetch=async()=>{const response=new Response(JSON.stringify(body),{headers:{'content-type':'application/json',...headers}}),clone=response.clone.bind(response);response.clone=()=>{clones++;return clone();};return response;};
  dom.window.eval(source);const response=await dom.window.fetch(url);
  assert.deepEqual(await response.json(),body);
  await new Promise(resolve=>setTimeout(resolve,10));
+ if(headers['X-GSiS-Build-Label'])assert.equal(clones,0,'build header avoids a second JSON parse');
  return dom;
 }
 

@@ -495,7 +495,8 @@ function json(data, status = 200, extraHeaders = {}) {
     'Content-Type': 'application/json; charset=utf-8',
     'Cache-Control': 'no-store',
     'X-Content-Type-Options': 'nosniff',
-    ...extraHeaders
+    ...extraHeaders,
+    ...(typeof data?.buildLabel==='string'&&/^\d+\.\d+\.\d+[a-z]?$/.test(data.buildLabel)?{'X-GSiS-Build-Label':data.buildLabel}:{})
   });
   return new Response(JSON.stringify(data), { status, headers });
 }

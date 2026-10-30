@@ -16,7 +16,7 @@ function gsisApiSecret(env,legacyName){
 /* GSIS_API_SECRET_END */
 // GSiS Deploy: same-origin authenticated gateway. No secrets in browser assets.
 const enc=new TextEncoder();let keys=null,keysAt=0;
-function json(data,status=200){return Response.json(data,{status,headers:{'Cache-Control':'no-store','X-Content-Type-Options':'nosniff','Referrer-Policy':'same-origin'}})}
+function json(data,status=200){return Response.json(data,{status,headers:{'Cache-Control':'no-store','X-Content-Type-Options':'nosniff',...(typeof data?.buildLabel==='string'&&/^\d+\.\d+\.\d+[a-z]?$/.test(data.buildLabel)?{'X-GSiS-Build-Label':data.buildLabel}:{}),'Referrer-Policy':'same-origin'}})}
 function decode(s){if(!/^[A-Za-z0-9_-]+$/.test(s))throw Error('Invalid token');return Uint8Array.from(atob(s.replace(/-/g,'+').replace(/_/g,'/')),c=>c.charCodeAt(0))}
 // Coalesce concurrent key reads. A missing key refreshes once per short cooldown;
 // known keys remain usable and a failed fetch never replaces the last valid set.
