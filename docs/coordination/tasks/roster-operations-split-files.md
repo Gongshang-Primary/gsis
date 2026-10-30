@@ -6,7 +6,7 @@
 - Last updated (Asia/Singapore): 30 Oct 2026 17:00
 - Branch: codex/roster-operations-split-files
 - Base SHA: 6bb4844e5488c9566215f915df04617c9d7d735b
-- PR: none
+- PR: https://github.com/helper-gsps/gsis/pull/19
 - Files/domains owned: backend/RosterOperations.gs (read, commit, new Admin operation), backend/RosterNotificationMaintenance.gs (existing raw reader/writer compatibility), Roster Admin UI and legacy edge routing for conversion, generated backends and Workers, tests, task/plan/changelog evidence.
 - Out of scope: D1 mirror (roster-d1-google-backup.md builds on this); pruning (owner: "cannot prune. need to keep records").
 
@@ -48,3 +48,15 @@ Conversion and join use the existing ScriptLock, verified Admin authority, revis
 ## Current verification and handoff
 
 Implementation not yet verified. Main has Claude's reported 878/878 Node and 38/38 LORD run at #18; Codex independently passed eight focused programs, syntax and byte-identical build there. The new branch must pass fresh regression, crash/retry/concurrency checks and the full suite before review. Plan: docs/superpowers/plans/2026-10-30-roster-operations-split-files.md.
+
+## Owner merge hold, 30 October 2026
+
+The owner explicitly requested both row S and row 2b2 to open now. Keep this PR on hold for merge until bundle 6bb4844 is deployed, ROSTER_OPERATIONS_MAX_CHARS is set and the owner supplies the Storage screenshot. This overrides the default one-open-Roster-task rule for these two bounded branches. Row 2b2 can proceed through normal exact-head review separately.
+
+## Implemented on this branch
+
+Model: Codex. Google remains authoritative. Raw storage now detects an active split manifest and reconstructs the original JSON order. Changed parts are immutable replacements; the manifest commits last. The original file and undo files are retained. Admin conversion requires the current revision, a storage token and a retained request ID. Unknown conversion results can be retried. Notification maintenance uses the same storage path. Version hints include manifest revision.
+
+Local verification: nine fake-Drive cases, the UI retry/Calendar-independence check, storage-cap tests, notification-maintenance tests and version-cache tests passed. npm run build passed with all 18 components regenerated. The build includes two small Windows portability corrections: open ZIPs read/write before fsync and use PurePosixPath for archive member names. Full npm test is running; no full-suite pass or merge readiness is claimed.
+
+Rollback: use Admin Return to one file only when the assembled state fits the configured per-file ceiling. Earlier files remain retained. Failed pre-manifest attempts may leave unreferenced parts; no automated historical-record pruning is included.
