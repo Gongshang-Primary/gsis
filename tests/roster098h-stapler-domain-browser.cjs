@@ -5,8 +5,8 @@ f.ctx.timetableEntries=[{id:'baseline',from:'2026-01-01',to:'2026-12-31'}];
 const plan=S.create({...f.ctx.days[today],date});
 f.state.staplerPlans.push({date,name:'Confirmed suspension',baselineId:'baseline',revision:1,draft:plan,confirmedPlan:plan,confirmedRevision:1,confirmedAt:f.ctx.iso},{date:'2026-10-23',name:'PRIVATE DRAFT',baselineId:'baseline',revision:1,draft:plan});
 const list=f.O.read(f.state,teacher,{operation:'staplerDates'});
-assert.deepEqual(list.dates.map(r=>r.date),[date],'Teacher date list excludes an unrelated unconfirmed draft');
-assert.equal(list.dates[0].mayEdit,false);assert.equal(list.dates[0].canViewConfirmed,true);assert.doesNotMatch(JSON.stringify(list),/PRIVATE DRAFT/);
+assert.deepEqual(list.dates.map(r=>r.date),['2026-10-23',date],'Teacher date list includes neutral upcoming draft metadata');
+assert.equal(list.dates[0].mayEdit,false);assert.equal(list.dates[0].canListUpcoming,true);assert.equal(list.dates.find(r=>r.date===date).canViewConfirmed,true);assert.doesNotMatch(JSON.stringify(list),/PRIVATE DRAFT/);
 const week={days:['Monday','Tuesday','Wednesday','Thursday','Friday'],perDay:2,maxPeriod:1,blocks:['Alice','Bob'].map((name,i)=>({name,cells:Array.from({length:10},()=>[i?'MA':'EL',i?'4B':'4A','Baseline room',''])}))};
 const model=R.validate({layoutMode:'single-week',single:week,timing:{startMinutes:420,periodMinutes:30,normalLastPeriod:1},recesses:[]});
 const day={date,baselineId:'baseline',source:'confirmed',sourceRevision:1,confirmedRevision:1,periods:[{period:0,startMinutes:420,endMinutes:450},{period:1,startMinutes:450,endMinutes:480}],teachers:[{staffId:'alice',name:'Alice',cells:[['EL','4A','ALICE_ROOM',''],['EL','4A','ALICE_ROOM','']]},{staffId:'bob',name:'Bob',cells:[['MA','4B','BOB_SUSPENDED_ROOM',''],['MA','4B','BOB_SUSPENDED_ROOM','']]}],classes:['4A','4B']};
@@ -35,6 +35,7 @@ const day={date,baselineId:'baseline',source:'confirmed',sourceRevision:1,confir
   for(const file of ['shared/roster.js','shared/roster-stapler.js','roster-update/public/roster-export.js','roster-update/public/roster-stapler-ui.js','roster-update/public/roster.js'])await page.addScriptTag({content:fs.readFileSync(file,'utf8')});
   await page.locator('[data-page="Stapler"]').click();await page.locator('[data-confirmed-suspensions]').waitFor();
   assert.equal(await page.locator('[data-confirmed-suspensions] tbody tr').count(),1);
+  assert.equal(await page.locator('[data-upcoming-suspensions] tbody tr').count(),1);assert.doesNotMatch(await page.locator('[data-upcoming-suspensions]').innerText(),/PRIVATE DRAFT/);
   const link=page.locator('[data-own-suspended-date="'+date+'"]');
   assert.equal(await link.count(),1,'Each confirmed teacher date has a direct own timetable shortcut');
   assert.equal(await link.innerText(),'My suspended timetable');

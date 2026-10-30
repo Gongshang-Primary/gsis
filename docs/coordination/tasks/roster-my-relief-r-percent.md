@@ -17,3 +17,4 @@ Pending Linux build and full suite. No local pass claimed, no live writes, messa
 
 ## Handoff
 Task remains on its own branch until the controller opens the PR. Claude reviews the exact final head.
+

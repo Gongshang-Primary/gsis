@@ -22,3 +22,4 @@ Pending. Local shell cannot start because sandbox provisioning fails; Linux CI w
 
 ## Handoff
 No main writes. No PR until an available slot is authorised by the controller. Claude reviews the exact final commit.
+
