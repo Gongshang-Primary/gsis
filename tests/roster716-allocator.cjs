@@ -1,7 +1,7 @@
 'use strict';
 const assert=require('node:assert/strict'),fixture=require('./roster701-fixture.cjs'),A=require('../shared/roster-allocation.js');
 let count=0;const test=(name,fn)=>{fn();count++;console.log('PASS',name);};
-const prefs=A.preferenceRules.map(r=>r.id),allOff=()=>Object.fromEntries([...prefs,'dailyTotal','consecutive'].map(id=>[id,false]));
+const prefs=A.preferenceRules.map(r=>r.id),allOff=()=>Object.fromEntries([...prefs,'dailyTotal','adhocDailyTotal','consecutive'].map(id=>[id,false]));
 function setup(){const f=fixture();Object.assign(f.ctx,{minute:360,now:Date.parse(f.date+'T06:00:00+08:00')});f.ctx.iso=new Date(f.ctx.now).toISOString();for(const t of f.teachers){t.cells=f.blank();t.R=['bob','dora'].includes(t.staffId)?12:0;t.teachingProfile={subjects:[],levels:[]};}A.captureWeek(f.state,f.ctx,f.date);f.state.accountingYears['2026']={verified:true};return f;}
 const row=(f,id='bob')=>f.teachers.find(t=>t.staffId===id),teacher=(f,id='bob')=>A.teacherContext(f.state,f.ctx,f.date).get(id),quota=(f,id,n)=>{row(f,id).R=n;f.state.entitlements.find(e=>e.staffId===id).quota=n;};
 const demand=(p,id='lesson')=>({id,period:p,staffId:'alice',subject:'EL',className:'4A'});
@@ -10,7 +10,7 @@ const teach=(f,ps,id='bob')=>ps.forEach(p=>row(f,id).cells[p]=['EL','4A','',''])
 test('Absent settings default to nine/six and ON; migration moves subject last once and retains saved controls',()=>{
  const f=setup(),old={...f.state.systemConfig,allocationPreferences:['subjectMatch','rotation','levelMatch','annualUtilisation','weeklyRemaining','alternatives'],allocationRuleEnabled:{subjectMatch:false,consecutive:false},maxDailyPeriods:8};delete old.allocationRulesVersion;delete old.maxConsecutivePeriods;f.state.systemConfig=old;f.O.validateState(f.state);
  assert.deepEqual(old.allocationPreferences,['rotation','levelMatch','annualUtilisation','weeklyRemaining','alternatives','subjectMatch']);assert.equal(old.maxDailyPeriods,8);assert.equal(old.maxConsecutivePeriods,6);assert.equal(old.allocationRuleEnabled.subjectMatch,false);assert.equal(old.allocationRuleEnabled.consecutive,false);assert.equal(old.allocationRuleEnabled.dailyTotal,true);
- old.allocationPreferences.reverse();const saved=structuredClone(old);f.O.validateState(f.state);assert.deepEqual(old,saved);assert.deepEqual(A.workloadLimits(),{dailyTotal:9,consecutive:6});
+ old.allocationPreferences.reverse();const saved=structuredClone(old);f.O.validateState(f.state);assert.deepEqual(old,saved);assert.deepEqual(A.workloadLimits(),{dailyTotal:9,adhocDailyTotal:10,consecutive:6});
 });
 test('Every configurable preference can independently change the winner; off removes its score and tie influence',()=>{
  for(const id of prefs){const f=setup();f.state.systemConfig.allocationRuleEnabled=allOff();if(id==='annualUtilisation')f.state.importedRelief.push({id:'past',staffId:'bob',date:'2026-10-06',status:'completed',rCost:2});if(id==='alternatives')row(f,'dora').cells[12]=['PD','','',''];if(id==='weeklyRemaining')quota(f,'bob',1);if(id==='rotation'){f.state.importedRelief.push({id:'turn',staffId:'bob',date:'2026-10-06',status:'completed',rCost:1});f.state.rotationEvents.push({id:'rotation',assignmentId:'turn',year:'2026',sequence:1});}if(id==='subjectMatch')row(f,'dora').teachingProfile.subjects=['el'];if(id==='levelMatch')row(f,'dora').teachingProfile.levels=[4];

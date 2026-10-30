@@ -8,6 +8,7 @@ window.RosterCalculationsUI=(()=>{
  const n=x=>esc(number(x));
  function unmount(){ticket++;}
  function markup(data){
+  if(data.reliefBasis==='daily')return '<section class="personal-calculations"><h2>My Calculations</h2><p>Hi '+esc(data.name)+', <strong>Daily roster, no R%</strong>.</p><p>Your published Deploy record has no teaching periods. Daily relief follows your activated availability and the configured daily and consecutive limits.</p><p>Completed relief: <strong>'+n(data.completion?.completed)+' periods</strong>. Published duties count after their period ends. SMC corrections take precedence.</p><p>No weekly R quota or annual R percentage applies.</p><p class="calculation-caption">As of '+esc(date(data.asOf))+'. '+(data.source?'Published Deploy: '+esc(data.source.name)+', revision '+esc(data.source.revision)+'.':'')+'</p></section>';
   const c=data.calculation,b=c?.breakdown,h=data.completion,available=c?.available===true&&b?.available===true,wi=available?n(b.Wi):'Unavailable',quota=available?n(c.R):'Unavailable',percent=Number.isFinite(h.percentage)?n(h.percentage)+'%':'Unavailable';
   let steps='';
   if(available){

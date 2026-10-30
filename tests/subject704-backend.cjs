@@ -17,7 +17,7 @@ assert.ok(run("subjectAfter704.audit.some(a=>a.action==='setSubjectType'&&a.afte
 assert.ok(run("subjectSaved704.delta.changes.some(x=>JSON.parse(x.key)[0]==='subjectTypes')"));
 assert.equal(run("reliefAffectingDelta_([{key:JSON.stringify(['subjectTypes','EL'])}])"),true);
 assert.deepEqual(plain(run('reliefSource_(subjectAfter704).subjectTypes')),{EL:'tg',RRP:'class'});
-assert.match(run('reliefCacheKey_(book_(),subjectEntry704())'),/^relief086-total-cap:/);
+assert.match(run('reliefCacheKey_(book_(),subjectEntry704())'),/^relief099-sre-teaching:/);
 assert.equal(run('call(\'change\',subjectSavedRequest704).duplicate'),true,'Confirmed retry retains exact receipt');
 assert.throws(()=>run("call('change',{...subjectSavedRequest704,edits:[{operation:'setSubjectType',subject:'EL',expected:null,value:'class'}]})"),e=>e.status===409,'Same receipt cannot alter payload');
 // A stale or invalid later edit rolls back the complete batch, including its earlier edit.
