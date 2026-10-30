@@ -37,7 +37,7 @@ const fixture=require('./roster701-fixture.cjs'),S=require('../shared/roster-sta
   }
   assert.match(text(even,'A1'),/Current saved.*Confirmed.*not yet published/);assert.doesNotMatch(text(even,'A2'),/\[DRAFT\]/);
   assert.equal(text(even,'M6'),'Absent — MC');assert.equal(text(even,'N6'),'EL (absent — MC)');assert.equal(text(even,'P6'),'SCI (absent — MC) [No Relief Needed]');
-  assert.equal(text(even,'N10'),'=HYPERLINK("https://example.test","text") (for Alice)');assert.equal(text(even,'O26'),'EL (for Alice) [Published]');
+  assert.equal(text(even,'N10'),'=HYPERLINK("https://example.test","text") (for Alice)\nAssigned by: Not recorded');assert.equal(text(even,'O26'),'EL (for Alice) [Published]\nAssigned by: Not recorded');
   for(let offset=0;offset<4;offset++){assert.equal(fill(even,'N'+(6+offset)),'FFD9D9D9');assert.equal(fill(even,'N'+(10+offset)),'FFFFC000');assert.equal(fill(even,'O'+(26+offset)),'FFFFC000');assert.equal(fill(even,'M'+(14+offset)),'FFD9D9D9');assert.equal(fill(even,'P'+(14+offset)),'FFDFF3DF');assert.equal(fill(even,'L'+(18+offset)),'FFFFDCE3');assert.equal(fill(even,'L'+(14+offset)),'FFDDEBF7');}
   assert.ok(Number(even.querySelector('row[r="20"]').getAttribute('ht'))>14.25);
   const column=n=>{let s='';for(;n;n=Math.floor((n-1)/26))s=String.fromCharCode(65+(n-1)%26)+s;return s;};

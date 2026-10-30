@@ -1,9 +1,9 @@
 # roster-assigned-by-label: show who assigned relief
 
-- Status: claimed
+- Status: review; full suite completed with three reproduced baseline failures
 - Owner/model: Codex
 - Reviewer/model: Claude
-- Last updated (Asia/Singapore): 30 October 2026, 07:00
+- Last updated (Asia/Singapore): 2026-10-30T09:05:05.466157+08:00
 - Branch: codex/roster-assigned-by-label
 - Base SHA: 50c5283c3d4c6ad39f31273541cb78d0b35bd4f1
 - Current head SHA: claim commit, then the exact PR head
@@ -27,13 +27,27 @@ PR #12 is merged as 50c5283c3d4c6ad39f31273541cb78d0b35bd4f1 after Claude review
 
 ## Decisions and changes
 
-Use the existing origin and assignment actor fields. Read/publication/export projections may gain a derived Assigned By label; authority and allocation writes remain unchanged. Follow canonical builders for every generated copy.
+One shared assignmentBy projection reads origin and the assignment actor. Automatic work shows Auto-allocation, mutual work Peer arrangement, shared-subject combinations Shared subject rule, and manual work the recorded editor. Missing actors show Not recorded. An explicit smc origin takes precedence over stale peer flags.
+
+Daily Notify updates the derived label even when unchanged timetable content reuses its prior rows and notice identity. Published My Relief Duties reads the retained assignment snapshot, so unpublished SMC ownership is not exposed. The teacher table now shows Assigned By. Daily relief, full teacher and Class POV Excel share the label, including unsaved local SMC choices; the existing snapshot/export labels stay intact.
+
+Canonical sources and all generated copies were rebuilt. No assignment origin, publisher, receipt, communication snapshot or saved history is rewritten by a read. Existing saved-day/recipient semantics remain in force.
+
+Automatic approval review rejected the documentation-only main claim because main is reserved for owner merges. Main was not advanced. The claim is published on this feature branch as 4f664707f76a5b536c377e5b2c0067ad93d466f1. The safer feature-branch/PR path is used, as on PR #12.
 
 ## Verification
 
-Not run yet for this task. The exact base tree equals PR #12's reviewed tree 1fb4fd9f5e35d3b5672af95a543e15e5f7c0eb76. Its full Node run reported 871/874 with three baseline failures: package.cjs lacks historical Q, roster098o-preparation-package.cjs and roster098o-timetable-export.cjs have expired capture-window fixtures. LORD passed 38/38. These are historical results, not this task's run.
+Five focused regression cases were first run on unchanged main and all failed for the expected missing-provenance behaviour. They pass after the fix. Existing offline-export verification now also inspects all three real XLSX outputs for the local editor and renders the ordinary teacher table from a published duty. Legacy workbook text expectations include the explicit Not recorded label.
 
-Focused checks, full-suite outcomes and any exclusions will be recorded before review. No live or staging verification is claimed.
+Full suite completed on local commit e2c6f079410f3dff526771e124e09110720371b9, source tree d8f6ade193b51efb1cb8ec999d1908ccc3ebacfa. `TZ=Asia/Singapore npm test` returned 1: 872/875 Node programs passed. The three named failures all reproduce on unchanged merged main 50c5283c3d4c6ad39f31273541cb78d0b35bd4f1. This is not an all-green suite. `package.cjs` lacks historical Q; `roster098o-preparation-package.cjs` and `roster098o-timetable-export.cjs` use expired fixed capture-window fixtures. Later assertions in those programs are not claimed as covered. Six optional historical comparisons were not run.
+
+LORD initially stopped because the browser environment lacked LORD_TEST_CHROMIUM. With that variable set to /tmp/chromium, all 38/38 LORD programs passed. Build passes, including the 85-file Apps Script ES2020 gate; a repeated build leaves product bytes unchanged. The five new regression cases, existing publication/privacy checks, browser notification UI, ordinary teacher table and all three actual XLSX exports pass. [Machine-readable evidence and every Node program outcome](../review/roster-assigned-by-tests.json).
+
+Main advanced to e9e5ccc77c6c9b677450bd5e5f75e747232cc1a3 during testing with only the queue and three new SRE/FAJT task documents. All four are retained byte-for-byte. Product/test blobs still equal the fully tested commit. No new full-suite run is claimed after that documentation integration.
+
+No fresh dependency install, staging, school sign-in, live latency or real delivery check was run. The exact original base tree equals The exact base tree equals PR #12's reviewed tree 1fb4fd9f5e35d3b5672af95a543e15e5f7c0eb76. Its full Node run reported 871/874 with three baseline failures: package.cjs lacks historical Q, roster098o-preparation-package.cjs and roster098o-timetable-export.cjs have expired capture-window fixtures. LORD passed 38/38. These are historical results, not this task's run.
+
+No live or staging verification is claimed. The earlier counts above remain historical evidence, distinct from this task's 872/875 run.
 
 ## Review
 
@@ -45,4 +59,4 @@ Not deployed to staging or production. Google remains authoritative. No configur
 
 ## Handoff
 
-Codex implements this bounded task. Claude reviews the final exact head. Owner decides merge and release. Row 3 remains unclaimed until this serial Roster task is integrated or explicitly handed off. Rollback uses the previous matched source and generated bundles; no data migration is expected.
+Codex implements this bounded task. Claude reviews the final exact head. Owner decides merge and release. Next is the newly inserted row 2b, roster-sre-daily-priority; it remains unclaimed until this serial Roster task is integrated or explicitly handed off. The subsequent SRE-with-timetable and FAJT tasks retain their own recorded decisions and open point. Rollback uses the previous matched source and generated bundles; no data migration is expected.
