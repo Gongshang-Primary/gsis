@@ -26,6 +26,7 @@ Owner (Song Wee, 30 Oct): "it can be all, let codex work while i teach". Claude 
 | 13 | (new) roster-suspended-baseline-view | PENDING_CHANGELOG |
 | 14 | (new) roster-relief-on-timetable | Relief overlay on the teacher's day timetable |
 | 15 | (new) deploy-specialist-count-fajt | PENDING_CHANGELOG owner decision |
+| 15b | deploy-siue-by-specialism.md | Relief Settings: SIUE general plus PE, Art, Music overrides; logic from owner's sensitivity study |
 | 17 | lord-queued-writes.md phase 3 | OVERLORD/STARLORD after a week of phase 2 without double bookings |
 
 Rules: create the task file for a "(new)" row before claiming; keep Google authoritative; no ROSTER_EDGE_AUTHORITY change; regenerate bundles; run the full suite before asking for merge.
