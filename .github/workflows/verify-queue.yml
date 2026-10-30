@@ -7,6 +7,7 @@ on:
       - codex/roster-stapler-all-dates
       - codex/roster-peer-release-notify
       - codex/roster-my-relief-r-percent
+      - codex/roster-suspended-baseline-view
   workflow_dispatch:
 permissions:
   contents: read

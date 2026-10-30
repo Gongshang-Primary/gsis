@@ -623,10 +623,10 @@
   input.onkeydown=e=>{if(e.key==='Escape'){close();input.value=value;return;}if(e.key==='ArrowDown'||e.key==='ArrowUp'){e.preventDefault();if(list.hidden)open(true);if(!matches.length)return;position=position<0?(e.key==='ArrowDown'?0:matches.length-1):(position+(e.key==='ArrowDown'?1:-1)+matches.length)%matches.length;list.querySelectorAll('[role=option]').forEach((x,i)=>x.classList.toggle('highlighted',i===position));input.setAttribute('aria-activedescendant','nameOption'+position);list.children[position].scrollIntoView?.({block:'nearest'});}else if(e.key==='Enter'&&!list.hidden){e.preventDefault();choose(position<0?0:position);}};
  }
  function exportPages(type,names,source='current'){
-  const baseline=source==='baseline'||!current.effectiveDay,model=baseline?current.model:current.dayModel;if(!model)return [];const available=RosterExport.names(model,type),chosen=names?.filter(name=>available.includes(name));
+  const baseline=source==='baseline'||!current.effectiveDay,model=baseline?current.model:current.dayModel;if(!model)return [];const available=[...new Set([...RosterExport.names(model,type),...(!baseline&&current.effectiveDay?.baseline?.periods?.length?RosterExport.names(RosterExport.dayModel(current.effectiveDay.baseline),type):[])])],chosen=names?.filter(name=>available.includes(name));
   if(chosen&&!chosen.length)return [];
   const options={type,fields:viewFields[type],...(chosen?{names:chosen}:{}),lastPeriod:cutoff(model),timetableName:(current.selected||current.active)?.name||'',dateLabel:source==='baseline'?'Baseline weekly timetable · '+displayDate(day):timetableDayLabel()};
-  return baseline?RosterExport.pages(current.model,options):RosterExport.dayPages(current.effectiveDay,options);
+  return baseline?RosterExport.pages(current.model,options):RosterExport.comparisonPages(current.effectiveDay,options);
  }
  function pageHtml(pages){return pages.map(p=>'<section class="week-sheet"><h3>'+esc(p.title)+'</h3>'+(p.subtitle?'<p class="sheet-subtitle">'+esc(p.subtitle)+'</p>':'')+RosterExport.tableHtml(p)+'</section>').join('');}
  async function timetableModel(){

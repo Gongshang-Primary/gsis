@@ -110,3 +110,6 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,su
 #rosterHome:focus-visible{outline:3px solid #fff;outline-offset:3px}
 
 #systemHealthLink{display:inline-flex;align-items:center;justify-content:center;text-decoration:none;box-sizing:border-box}
+
+/* Dated baseline comparisons share a scroll container and fixed row labels. */
+.timetable-grid td.published-overlay{background:#fff4d6}.timetable-grid .ops-change-label{display:block;font-size:11px;color:#6b4d08;font-weight:600}.timetable-grid tbody th{position:sticky;left:0;z-index:1;background:#f3f4f6;min-width:130px}.timetable-grid tbody th,.timetable-grid td{vertical-align:top}
