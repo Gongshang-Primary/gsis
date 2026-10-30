@@ -1,11 +1,11 @@
 # roster-archive-cold-output: move old machine output to monthly archive files (keep all records)
 
-- Status: approved, priority (owner 31 Oct 2026: chose option A; "30 days work")
+- Status: claimed (owner 31 Oct 2026: start row A; pause all other GSiS repository work)
 - Owner/model: Codex (builder)
 - Reviewer/model: Claude
-- Last updated (Asia/Singapore): 31 Oct 2026 05:30
+- Last updated (Asia/Singapore): 31 Oct 2026 05:59
 - Branch: codex/roster-archive-cold-output
-- Base SHA: current main (e2917bc or later)
+- Base SHA: 6eb943f01e5974b33244001040fdb5f66d1ad6a4
 - PR: none
 - Files/domains owned: backend/RosterOperations.gs (archive write/read, nightly job hook), shared/roster-operations.js (archive selection, compact stubs), Roster Admin storage UI (archive status, open archived item), generated copies, tests.
 - Out of scope: pruning (owner: "cannot prune. need to keep records"); the split-file live layout (#19 is repurposed for the D1 backup, see roster-d1-google-backup.md).
@@ -43,3 +43,11 @@ Every request reads and every save rewrites the whole file, so size also makes R
 - Crash after archive write but before main commit: rerun is idempotent, no duplicates in the main file, no loss.
 - Replay of a request inside the replay window still works; outside it, the existing "expired request" behaviour applies.
 - Full suite (Node and LORD) green in the main checkout. Regenerate bundles.
+
+## Claim and implementation boundaries
+
+Model: Codex. Owner explicitly paused other repository work and authorised this task and a PR after the full suite passes. Earlier Codex PRs #19 and #27 remain untouched. The PR8 automation is paused. Claude remains the exact-head reviewer.
+
+The implementation also owns the existing audit-export cleanup and notification-store overlay where needed to prevent deletion or re-expansion of archived data. Google remains authoritative. No live records, configuration, messages, deployment or D1 cutover are authorised by this task.
+
+Receipt replay protection has no general request expiry today. Preserve durable request identities while moving large receipt bodies; do not weaken replay protection to satisfy archival. Use existing folder, lock, storage and scheduled maintenance paths. Tests must cover verified write-before-stub, interrupted retry, permissions, protected data, delivery overlay, audit export and statistics parity.
