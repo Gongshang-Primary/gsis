@@ -5,6 +5,7 @@ on:
       - codex/roster-operations-split-files
       - codex/roster-sre-fajt-r-calc
       - codex/roster-stapler-all-dates
+      - codex/roster-peer-release-notify
   workflow_dispatch:
 permissions:
   contents: read

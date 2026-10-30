@@ -917,7 +917,16 @@ const next=stapler().effectiveDay(plan,ctx.baselineDays?.[d]||ctx.days[d]);for(c
    const r=index.requests.get(j.requestId);if(!r||r.retiredAt||r.status!=='pending'||r.recipientId!==j.recipientId||r.expiresAt<=now)return 'Peer request is no longer pending.';
    Object.assign(data,{templateKey:'mutual_request',requesterName:r.absentName,summary:r.lessons.map(l=>'P'+l.period+' '+l.timeStart+' to '+l.timeEnd+' · '+[l.className,l.subject,l.groupName,l.venue].filter(Boolean).join(' · ')).join('; ')});
   }
-  if(j.kind==='mutual_override'&&Array.isArray(data.peerRequestIds)){
+  if(j.kind==='mutual_override'&&data.peerRelease===true){
+   const request=Array.isArray(data.peerRequestIds)&&data.peerRequestIds.length===1?index.requests.get(data.peerRequestIds[0]):null;
+   if(!request||request.date!==j.date||![request.staffId,request.recipientId].includes(j.recipientId))return 'Peer release is not owned by this recipient.';
+   if(!Array.isArray(data.peerReleasedDemandIds)||!Array.isArray(data.peerReleaseTokens))return 'Peer release has no verified lessons.';
+   const lessons=releasedPeerLessons(s,request).filter(row=>data.peerReleasedDemandIds.includes(row.id)&&data.peerReleaseTokens.includes(row.releaseToken));
+   if(!lessons.length)return 'Peer arrangement is no longer released.';
+   data.summary='Peer arrangement released: '+request.absentName+' and '+request.recipientName+'.\n'+lessons.sort((a,b)=>a.period-b.period).map(row=>'P'+row.period+' · '+row.timeStart+' to '+row.timeEnd+' · '+[row.className,row.subject,row.venue].filter(Boolean).join(' · ')).join('\n')+'\nThese peer duties are no longer assigned. Review the latest timetable in Roster.';
+   data.templateKey='mutual_override';
+  }
+  if(j.kind==='mutual_override'&&data.peerRelease!==true&&Array.isArray(data.peerRequestIds)){
    const requests=data.peerRequestIds.map(id=>index.requests.get(id)).filter(r=>r&&!r.retiredAt&&r.staffId===j.recipientId&&r.date===j.date);
    if(!requests.length)return 'Peer arrangement is not owned by this recipient.';
    const lessons=new Map();for(const r of requests)for(const l of r.lessons||[])lessons.set(l.id,l);
@@ -1321,10 +1330,38 @@ const next=stapler().effectiveDay(plan,ctx.baselineDays?.[d]||ctx.days[d]);for(c
   const old=s.acknowledgements.find(a=>a.staffId===cap.staffId&&a.communicationId===cap.communicationId);if(old)return {savedIds:[]};
   const job=s.outbox.find(j=>j.id===cap.communicationId),row=job.data.communicationSnapshot.teachers[0];s.acknowledgements.push({id:ctx.uuid(),communicationId:cap.communicationId,staffId:cap.staffId,date:cap.date,timetableNoticeId:p.timetableNoticeId,publicationFingerprint:row.fingerprint,publicationRevision:job.data.publicationRevision,attendanceAbsentPeriods:row.absentPeriods||[],at:ctx.iso,by:ctx.user.email});return {savedIds:[p.timetableNoticeId]};
  }
+ function releasedPeerLessons(s,request){
+  if(!request||request.retiredAt)return [];
+  const effective=allocation().effectiveAssignments(s,true),rows=[];
+  for(const lesson of request.lessons||[]){
+   if(effective.some(a=>a.requestId===request.id&&a.demandId===lesson.id&&!a.remove&&!a.noRelief))continue;
+   const original=s.assignments.filter(a=>a.requestId===request.id&&a.demandId===lesson.id&&!a.remove&&!a.noRelief).at(-1);
+   if(!original)continue;
+   const removal=effective.find(a=>a.remove&&a.replaces===original.id);
+   if(!removal&&original.status!=='cancelled')continue;
+   rows.push({...lesson,releaseToken:JSON.stringify([lesson.id,original.id,removal?.id||original.cancelledAt||original.version||original.status])});
+  }
+  return rows;
+ }
+ function queuePeerReleaseNotices(s,ctx,d,selectedId){
+  let queued=0;
+  for(const request of s.requests.filter(r=>r.date===d&&(!selectedId||[r.staffId,r.recipientId].includes(selectedId)))){
+   const released=releasedPeerLessons(s,request);if(!released.length)continue;
+   for(const recipientId of new Set([request.staffId,request.recipientId])){
+    if(!ctx.people.some(person=>person.id===recipientId))continue;
+    const previous=new Set(s.outbox.filter(j=>j.kind==='mutual_override'&&j.recipientId===recipientId&&j.data?.peerRelease===true&&j.data?.peerRequestIds?.includes(request.id)&&j.status!=='cancelled').flatMap(j=>j.data.peerReleaseTokens||[]));
+    const lessons=released.filter(row=>!previous.has(row.releaseToken));if(!lessons.length)continue;
+    const tokens=lessons.map(row=>row.releaseToken),before=s.outbox.length;
+    queue(s,ctx,'mutual_override',recipientId,d,{templateKey:'mutual_override',peerRelease:true,peerRequestIds:[request.id],peerReleasedDemandIds:lessons.map(row=>row.id),peerReleaseTokens:tokens,summary:'Your peer relief arrangement has been released. Review the updated timetable in Roster.'},null,'peer-release:'+request.id+':'+recipientId+':'+JSON.stringify(tokens));
+    queued+=s.outbox.length-before;
+   }
+  }
+  return queued;
+ }
  function notifyDaily(s,ctx,p){smc(ctx);const d=date(p.date||ctx.today),shadow=communicationState(s,ctx,d),snapshot=shadow.dailyPublicationStates[d],issue=notifyDateIssue(s,ctx,d,snapshot);if(issue)fail(403,issue);if(p.expectedPublicationRevision!==undefined&&p.expectedPublicationRevision!==(s.dailyPublicationStates?.[d]?.revision||0))fail(409,'The published timetable changed. Refresh before notifying.','PUBLICATION_CONFLICT');if(p.staffId&&!snapshot.teachers.some(t=>t.staffId===p.staffId))fail(400,'Choose a teacher with saved timetable changes.');const recipients=new Set(snapshot.teachers.filter(t=>(!p.staffId||t.staffId===p.staffId)&&dailyNoticeState(shadow,d,t.staffId).eligible).map(t=>t.staffId)),result=queueDailyNotices(shadow,ctx,snapshot,recipients);
   for(const id of snapshot.teachers.filter(t=>!p.staffId||t.staffId===p.staffId).map(t=>t.staffId)){const state=dailyNoticeState(shadow,d,id);for(const job of s.outbox)if(job.date===d&&job.recipientId===id&&job.data?.communicationSnapshot&&['queued','blocked','failed'].includes(dailyDeliveryState(job))&&job.data.contentFingerprint!==state.fingerprint){job.status='cancelled';job.error='Superseded by a newer explicit communication.';}}
 
-  allocation().addAudit(s,ctx,'notifyDaily',{date:d,staffIds:[...recipients],publicationRevision:s.dailyPublicationStates?.[d]?.revision||0});return {savedIds:[...recipients],...result};}
+  const peerReleaseNoticesQueued=queuePeerReleaseNotices(s,ctx,d,p.staffId);allocation().addAudit(s,ctx,'notifyDaily',{date:d,staffIds:[...recipients],peerReleaseNoticesQueued,publicationRevision:s.dailyPublicationStates?.[d]?.revision||0});return {savedIds:[...recipients],...result,peerReleaseNoticesQueued,notificationsQueued:(result.notificationsQueued||0)+peerReleaseNoticesQueued};}
 
  function publishDay(s,ctx,p){
   smc(ctx);const dateIssue=publishDateIssue(ctx,date(p.date||ctx.today),s);if(dateIssue)fail(403,dateIssue);
@@ -1712,6 +1749,6 @@ const next=stapler().effectiveDay(plan,ctx.baselineDays?.[d]||ctx.days[d]);for(c
   }
   return {revision:s.revision,candidates:project(p.demandIds||[]),quotaUnits:'periods/week'};
  }if(op==='audit'){if(!(ctx.user.smc||ctx.user.admin))fail(403,'SMC or Admin access is required.');return {revision:s.revision,audit:copy(s.audit.filter(x=>!p.date||x.date===p.date).slice(-500))};}if(op==='prunePreview'){admin(ctx);const r=pruneRange(p);if(r.to>=ctx.today)fail(400,'Prune only past dates.');const selection=pruneSelection(s,r,ctx.now),counts=Object.fromEntries(Object.entries({...selection.lists,...selection.maps}).map(([key,rows])=>[key,rows.length]));return {revision:s.revision,counts,count:Object.values(counts).reduce((a,b)=>a+b,0),storage:storageReport(s,ctx)};}if(op==='externalLink'){smc(ctx);staff(ctx,p.staffId);const d=date(p.date);if(!s.adhoc.some(x=>x.staffId===p.staffId&&x.date===d&&!x.deletedAt))fail(403,'Activate this external teacher for the selected date first.');return {revision:s.revision,capability:ensurePrivateLink(s,ctx,p.staffId,d)};}return view(s,ctx,p);}
- return {shortPublicationSummary,allocationMode,allocationLearningView,communicationState,communicationProjection,acknowledgeCommunication,previewRestoreStapler,mergeSubmittedInstructions,resubmissionIntervals,subtractAbsenceIntervals,absenceDates,absenceStaffIds,cellProvenance,essentialDecisionAudit,schoolAbsencesRange,schoolAbsencesView,currentDuty,manualRecoveryDemands,teacherDailyUpdate,confirmedStaplerSnapshot,confirmedStaplerProjection,mayViewConfirmed,mergeStaplerPlans,staplerPlanPatch,applyStaplerPlanPatch,ensurePrivateLink,cellDecision,cellDecisions,returnAutomatic,dailyNoticeState,publishedContentFingerprint,latestPublications,timetableNotice,pendingSummary,defaultSmcSummaryTimes,normalizeSmcSummaryTimes,smcSummarySlot,summaryAbsences,scheduledSummaryCurrent,staplerPermission,teacherSponsor,dutyEligible,absenceEligible,seedNameBridges,matchTimetableNames,nameBridgesView,readyStaplerPlan,dailyNotifyView,notifyDaily,operationalSettings,normalizeNoReliefSubjects,matchesNoReliefSubject,systemConfigView,dailyEmploymentView,queueDailyEmployment,employmentEmail,staplerDatesView,absentTeacherContact,refreshStaplerNotifications,timetableDay,dailyTimetable,clock,dutyWindow,dutyRosterView,staplerView,staplerApply,composeStaplerContext,publishAudit,recessActiveOn,recessGroups,recessSettingsApply,availabilityView,cellSourceKey,allocationCellView,notificationReadinessView,reportFormView,reportView,inboundMessage,queue,smcAlert,notificationIndex,notificationCurrent,matchingCustom,queueConditional,publicationSummary,recessDemand,recessView,recessApply,recessPeriods,publicDuty,dailyExport,noReliefApply,publishDay,acknowledgePublications,notificationHistory,acknowledgementView,syncLessonInstructions,customApply,customText,primaryLevel,allocationProjection,manualApply,assignmentInstructions,allocation,scheduledTick,dutySMC,healthRead,updateHealthWarnings,releaseAssignment,publicationSnapshot,queuePublication,pendingPublications,initial,validateState,defaults,dates,date,mobile,needsCover,previewAbsence:lessons,availability,demand,candidates,apply,read,view,reconcile,invalidate,READS};
+ return {releasedPeerLessons,queuePeerReleaseNotices,shortPublicationSummary,allocationMode,allocationLearningView,communicationState,communicationProjection,acknowledgeCommunication,previewRestoreStapler,mergeSubmittedInstructions,resubmissionIntervals,subtractAbsenceIntervals,absenceDates,absenceStaffIds,cellProvenance,essentialDecisionAudit,schoolAbsencesRange,schoolAbsencesView,currentDuty,manualRecoveryDemands,teacherDailyUpdate,confirmedStaplerSnapshot,confirmedStaplerProjection,mayViewConfirmed,mergeStaplerPlans,staplerPlanPatch,applyStaplerPlanPatch,ensurePrivateLink,cellDecision,cellDecisions,returnAutomatic,dailyNoticeState,publishedContentFingerprint,latestPublications,timetableNotice,pendingSummary,defaultSmcSummaryTimes,normalizeSmcSummaryTimes,smcSummarySlot,summaryAbsences,scheduledSummaryCurrent,staplerPermission,teacherSponsor,dutyEligible,absenceEligible,seedNameBridges,matchTimetableNames,nameBridgesView,readyStaplerPlan,dailyNotifyView,notifyDaily,operationalSettings,normalizeNoReliefSubjects,matchesNoReliefSubject,systemConfigView,dailyEmploymentView,queueDailyEmployment,employmentEmail,staplerDatesView,absentTeacherContact,refreshStaplerNotifications,timetableDay,dailyTimetable,clock,dutyWindow,dutyRosterView,staplerView,staplerApply,composeStaplerContext,publishAudit,recessActiveOn,recessGroups,recessSettingsApply,availabilityView,cellSourceKey,allocationCellView,notificationReadinessView,reportFormView,reportView,inboundMessage,queue,smcAlert,notificationIndex,notificationCurrent,matchingCustom,queueConditional,publicationSummary,recessDemand,recessView,recessApply,recessPeriods,publicDuty,dailyExport,noReliefApply,publishDay,acknowledgePublications,notificationHistory,acknowledgementView,syncLessonInstructions,customApply,customText,primaryLevel,allocationProjection,manualApply,assignmentInstructions,allocation,scheduledTick,dutySMC,healthRead,updateHealthWarnings,releaseAssignment,publicationSnapshot,queuePublication,pendingPublications,initial,validateState,defaults,dates,date,mobile,needsCover,previewAbsence:lessons,availability,demand,candidates,apply,read,view,reconcile,invalidate,READS};
 })();
 if(typeof module!=='undefined'&&module.exports)module.exports=GSISRosterOperations;
