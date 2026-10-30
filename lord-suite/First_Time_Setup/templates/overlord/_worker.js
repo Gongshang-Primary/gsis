@@ -192,7 +192,7 @@ async function cachedGoogleJwks(forceRefresh = false) {
     const response = await fetchWithTimeout('https://www.googleapis.com/oauth2/v3/certs', { redirect: 'follow' }, 12000);
     if (!response.ok) throw serviceError('Could not retrieve Google verification keys.', { status: 502, retryable: true, code: 'GOOGLE_KEYS' });
     const payload = await response.json();
-    const stored = new Response(JSON.stringify(payload), { headers: { 'Content-Type': 'application/json', 'Cache-Control': `public, max-age=${JWKS_STALE_SECONDS}`, 'X-OVERLORD-Fetched-At': String(now) } });
+    const stored = new Response(JSON.stringify(payload), { headers: { ...referenceBuildHeaders(payload.buildLabel), 'Content-Type': 'application/json', 'Cache-Control': `public, max-age=${JWKS_STALE_SECONDS}`, 'X-OVERLORD-Fetched-At': String(now) } });
     await cache.put(key, stored.clone());
     return payload;
   } catch (error) {
@@ -272,6 +272,7 @@ async function proxyReference(env, forceRefresh = false, latestOnly = false) {
   backendUrl(env);
   return coalesceRead(latestOnly ? 'reference:latest' : 'reference', () => loadReferenceResponse(env, forceRefresh, latestOnly), forceRefresh);
 }
+function referenceBuildHeaders(label){return typeof label==='string'&&/^\d+\.\d+\.\d+[a-z]?$/.test(label)?{'X-GSiS-Build-Label':label}:{};}
 async function loadReferenceResponse(env, forceRefresh = false, latestOnly = false) {
   backendUrl(env);
   const cache = caches.default;
@@ -281,7 +282,7 @@ async function loadReferenceResponse(env, forceRefresh = false, latestOnly = fal
   if (cached) {
     const fetchedAt = Number(cached.headers.get('X-OVERLORD-Fetched-At') || 0);
     if (fetchedAt && now - fetchedAt < REFERENCE_FRESH_SECONDS * 1000) {
-      return new Response(await cached.clone().text(), { status: 200, headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'private, no-store', 'X-LORD-Worker-Version': '0.9.9', 'X-OVERLORD-Reference': 'edge-fresh' } });
+      return new Response(await cached.clone().text(), { status: 200, headers: { ...referenceBuildHeaders(cached.headers.get('X-GSiS-Build-Label')), 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'private, no-store', 'X-LORD-Worker-Version': '0.9.9', 'X-OVERLORD-Reference': 'edge-fresh' } });
     }
   }
   const target = new URL(backendUrl(env));
@@ -308,7 +309,7 @@ async function loadReferenceResponse(env, forceRefresh = false, latestOnly = fal
     if (cached) {
       const fallback = await cached.clone().json();
       if (fallback.data) fallback.data = {...fallback.data, referenceReadDelayed:true};
-      return new Response(JSON.stringify(fallback), { status: 200, headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'private, no-store', 'X-LORD-Worker-Version': '0.9.9', 'X-OVERLORD-Reference': 'edge-stale' } });
+      return new Response(JSON.stringify(fallback), { status: 200, headers: { ...referenceBuildHeaders(fallback.buildLabel), 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'private, no-store', 'X-LORD-Worker-Version': '0.9.9', 'X-OVERLORD-Reference': 'edge-stale' } });
     }
     throw error;
   }
@@ -347,7 +348,8 @@ async function proxyTransaction(request, session, env) {
   });
   if (reloading && payload.ok) {
     if (payload.cacheReloaded !== true || !payload.reference) throw serviceError('Reload requires the current LORD backend. Update the Apps Script deployment.');
-    const stored = new Response(JSON.stringify({ ok: true, data: payload.reference }), { headers: { 'Content-Type': 'application/json', 'Cache-Control': `public, max-age=${REFERENCE_STALE_SECONDS}`, 'X-OVERLORD-Fetched-At': String(Date.now()), 'X-OVERLORD-Reloaded-At': String(Date.now()) } });
+    const buildHeaders = referenceBuildHeaders(payload.buildLabel);
+    const stored = new Response(JSON.stringify({ ok: true, data: payload.reference, ...(buildHeaders['X-GSiS-Build-Label'] ? {buildLabel:payload.buildLabel} : {}) }), { headers: { ...buildHeaders, 'Content-Type': 'application/json', 'Cache-Control': `public, max-age=${REFERENCE_STALE_SECONDS}`, 'X-OVERLORD-Fetched-At': String(Date.now()), 'X-OVERLORD-Reloaded-At': String(Date.now()) } });
     await caches.default.put(new Request('https://overlord-reference-cache.local/v1.3'), stored);
   }
   const status = response.ok ? 200 : (RETRYABLE_UPSTREAM_STATUS.has(response.status) ? 502 : response.status);

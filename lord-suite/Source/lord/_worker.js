@@ -235,6 +235,7 @@ async function proxyReference(env, forceRefresh = false, reloadDate = '', latest
   const key = (latestOnly ? 'reference:latest' : 'reference') + (bookingDate ? ':' + bookingDate : '');
   return coalesceRead(key, () => loadReferenceResponse(env, forceRefresh, reloadDate, latestOnly, bookingDate), forceRefresh);
 }
+function referenceBuildHeaders(label){return typeof label==='string'&&/^\d+\.\d+\.\d+[a-z]?$/.test(label)?{'X-GSiS-Build-Label':label}:{};}
 async function loadReferenceResponse(env, forceRefresh = false, reloadDate = '', latestOnly = false, bookingDate = '') {
   backendUrl(env);
   const cache = caches.default;
@@ -244,7 +245,7 @@ async function loadReferenceResponse(env, forceRefresh = false, reloadDate = '',
   if (cached) {
     const fetchedAt = Number(cached.headers.get('X-LORD-Fetched-At') || 0);
     if (fetchedAt && now - fetchedAt < REFERENCE_FRESH_SECONDS * 1000) {
-      return new Response(await cached.clone().text(), { status: 200, headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'private, no-store', 'X-LORD-Worker-Version': '0.9.9', 'X-LORD-Reference': 'edge-fresh' } });
+      return new Response(await cached.clone().text(), { status: 200, headers: { ...referenceBuildHeaders(cached.headers.get('X-GSiS-Build-Label')), 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'private, no-store', 'X-LORD-Worker-Version': '0.9.9', 'X-LORD-Reference': 'edge-fresh' } });
     }
   }
 
@@ -267,8 +268,9 @@ async function loadReferenceResponse(env, forceRefresh = false, reloadDate = '',
     if (response.ok && payload && payload.ok) {
       if (forceRefresh && payload.cacheReloaded !== true) throw new Error('Reload requires the current LORD backend. Update the Apps Script deployment.');
       // A shared reference cache must never retain the selected day's bookings.
-      const storedPayload = { ok: true, generatedAt: payload.generatedAt, data: payload.data };
-      const stored = new Response(JSON.stringify(storedPayload), { headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': `public, max-age=${REFERENCE_STALE_SECONDS}`, 'X-LORD-Fetched-At': String(now), ...(forceRefresh ? { 'X-LORD-Reloaded-At': String(Date.now()) } : {}) } });
+      const buildHeaders = referenceBuildHeaders(payload.buildLabel);
+      const storedPayload = { ok: true, generatedAt: payload.generatedAt, data: payload.data, ...(buildHeaders['X-GSiS-Build-Label'] ? {buildLabel:payload.buildLabel} : {}) };
+      const stored = new Response(JSON.stringify(storedPayload), { headers: { ...buildHeaders, 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': `public, max-age=${REFERENCE_STALE_SECONDS}`, 'X-LORD-Fetched-At': String(now), ...(forceRefresh ? { 'X-LORD-Reloaded-At': String(Date.now()) } : {}) } });
       // An ordinary read started before a manual reload must not replace it.
       const latest = await cache.match(cacheKey);
       if (forceRefresh || !latest || (Number(latest.headers.get('X-LORD-Reloaded-At') || 0) < now && Number(latest.headers.get('X-LORD-Fetched-At') || 0) <= now)) {
@@ -282,7 +284,7 @@ async function loadReferenceResponse(env, forceRefresh = false, reloadDate = '',
   if (forceRefresh) throw lastError || new Error('Could not reload from Sheets.');
   if (!cached) cached = await cache.match(cacheKey);
   if (cached) {
-    return new Response(await cached.clone().text(), { status: 200, headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'private, no-store', 'X-LORD-Worker-Version': '0.9.9', 'X-LORD-Reference': 'edge-stale' } });
+    return new Response(await cached.clone().text(), { status: 200, headers: { ...referenceBuildHeaders(cached.headers.get('X-GSiS-Build-Label')), 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'private, no-store', 'X-LORD-Worker-Version': '0.9.9', 'X-LORD-Reference': 'edge-stale' } });
   }
   throw lastError || new Error('Reference data could not be loaded.');
 }
