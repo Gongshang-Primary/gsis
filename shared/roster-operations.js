@@ -1344,7 +1344,7 @@ const next=stapler().effectiveDay(plan,ctx.baselineDays?.[d]||ctx.days[d]);for(c
   return rows;
  }
  function queuePeerReleaseNotices(s,ctx,d,selectedId){
-  let queued=0;
+  const outcome={queued:0,reused:0,skipped:0,blocked:0,retried:0};
   for(const request of s.requests.filter(r=>r.date===d&&(!selectedId||[r.staffId,r.recipientId].includes(selectedId)))){
    const released=releasedPeerLessons(s,request);if(!released.length)continue;
    const currentTokens=new Set(released.map(row=>row.releaseToken));
@@ -1352,24 +1352,25 @@ const next=stapler().effectiveDay(plan,ctx.baselineDays?.[d]||ctx.days[d]);for(c
     if(!ctx.people.some(person=>person.id===recipientId))continue;
     const jobs=s.outbox.filter(j=>j.kind==='mutual_override'&&j.recipientId===recipientId&&j.data?.peerRelease===true&&j.data?.peerRequestIds?.includes(request.id));
     for(const job of jobs){
-     const status=dailyDeliveryState(job);if(!['failed','cancelled','blocked'].includes(status)||!job.data.peerReleaseTokens?.length||!job.data.peerReleaseTokens.every(token=>currentTokens.has(token)))continue;
+     const status=dailyDeliveryState(job);if(!job.data.peerReleaseTokens?.length||!job.data.peerReleaseTokens.every(token=>currentTokens.has(token)))continue;
+     if(['sending','uncertain'].includes(status)){outcome.blocked++;continue;}if(['sent','delivered','read'].includes(status)){outcome.skipped++;continue;}if(status==='queued'){outcome.reused++;continue;}if(!['failed','cancelled','blocked'].includes(status))continue;
      allocation().addAudit(s,ctx,'retryPeerReleaseNotification',{date:d,notificationId:job.id,previousStatus:status,previousError:job.error||'',previousProviderError:copy(job.providerError||null)});
      job.status='queued';job.error='';job.retryable=true;job.expiresAt=expiry(ctx,d);job.notificationIntentRevision=(job.notificationIntentRevision||0)+1;job.notificationIntentAt=ctx.iso;
-     for(const key of ['providerError','deliveryStatus','nextAttemptAt','claimId','claimExpiresAt','preparedAt','holdReason','nextEligibleAt'])delete job[key];queued++;
+     for(const key of ['providerError','deliveryStatus','nextAttemptAt','claimId','claimExpiresAt','preparedAt','holdReason','nextEligibleAt'])delete job[key];outcome.retried++;
     }
     const previous=new Set(jobs.filter(j=>!['failed','cancelled','blocked'].includes(dailyDeliveryState(j))).flatMap(j=>j.data.peerReleaseTokens||[]));
     const lessons=released.filter(row=>!previous.has(row.releaseToken));if(!lessons.length)continue;
     const tokens=lessons.map(row=>row.releaseToken),before=s.outbox.length;
     queue(s,ctx,'mutual_override',recipientId,d,{templateKey:'mutual_override',peerRelease:true,peerRequestIds:[request.id],peerReleasedDemandIds:lessons.map(row=>row.id),peerReleaseTokens:tokens,summary:'Your peer relief arrangement has been released. Review the updated timetable in Roster.'},null,'peer-release:'+request.id+':'+recipientId+':'+JSON.stringify(tokens));
-    queued+=s.outbox.length-before;
+    outcome.queued+=s.outbox.length-before;
    }
   }
-  return queued;
+  return outcome;
  }
  function notifyDaily(s,ctx,p){smc(ctx);const d=date(p.date||ctx.today),shadow=communicationState(s,ctx,d),snapshot=shadow.dailyPublicationStates[d],issue=notifyDateIssue(s,ctx,d,snapshot);if(issue)fail(403,issue);if(p.expectedPublicationRevision!==undefined&&p.expectedPublicationRevision!==(s.dailyPublicationStates?.[d]?.revision||0))fail(409,'The published timetable changed. Refresh before notifying.','PUBLICATION_CONFLICT');if(p.staffId&&!snapshot.teachers.some(t=>t.staffId===p.staffId))fail(400,'Choose a teacher with saved timetable changes.');const recipients=new Set(snapshot.teachers.filter(t=>(!p.staffId||t.staffId===p.staffId)&&dailyNoticeState(shadow,d,t.staffId).eligible).map(t=>t.staffId)),result=queueDailyNotices(shadow,ctx,snapshot,recipients);
   for(const id of snapshot.teachers.filter(t=>!p.staffId||t.staffId===p.staffId).map(t=>t.staffId)){const state=dailyNoticeState(shadow,d,id);for(const job of s.outbox)if(job.date===d&&job.recipientId===id&&job.data?.communicationSnapshot&&['queued','blocked','failed'].includes(dailyDeliveryState(job))&&job.data.contentFingerprint!==state.fingerprint){job.status='cancelled';job.error='Superseded by a newer explicit communication.';}}
 
-  const peerReleaseNoticesQueued=queuePeerReleaseNotices(s,ctx,d,p.staffId);allocation().addAudit(s,ctx,'notifyDaily',{date:d,staffIds:[...recipients],peerReleaseNoticesQueued,publicationRevision:s.dailyPublicationStates?.[d]?.revision||0});return {savedIds:[...recipients],...result,peerReleaseNoticesQueued,notificationsQueued:(result.notificationsQueued||0)+peerReleaseNoticesQueued};}
+  const peerOutcome=queuePeerReleaseNotices(s,ctx,d,p.staffId),peerReleaseNoticesQueued=peerOutcome.queued+peerOutcome.reused+peerOutcome.retried;for(const key of ['queued','reused','skipped','blocked','retried'])result.notificationOutcome[key]+=peerOutcome[key];allocation().addAudit(s,ctx,'notifyDaily',{date:d,staffIds:[...recipients],peerReleaseNoticesQueued,publicationRevision:s.dailyPublicationStates?.[d]?.revision||0});return {savedIds:[...recipients],...result,peerReleaseNoticesQueued,notificationsQueued:(result.notificationsQueued||0)+peerReleaseNoticesQueued};}
 
  function publishDay(s,ctx,p){
   smc(ctx);const dateIssue=publishDateIssue(ctx,date(p.date||ctx.today),s);if(dateIssue)fail(403,dateIssue);
