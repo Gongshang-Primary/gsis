@@ -128,7 +128,7 @@ window.RosterStaplerExport=(()=>{
     period(a.period);const slot=key(a.staffId,a.period),current=read(a.staffId,a.period),combined=a.combination===true;
     if(absent.has(slot)||covered.has(slot)&&!combined||current.some(Boolean)&&!combined&&!a.repurposedDuty)fail('Relief clashes detected: '+(a.relieverName||a.staffId)+', period '+a.period+'. Review this allocation before exporting.');
     const absentName=a.absentName||[...new Set((a.members||[]).map(m=>m.name).filter(Boolean))].join(', ');
-    const label=(a.subject||'Relief')+(absentName?' (for '+absentName+')':'')+(combined?' [Combined]':'')+(a.repurposedDuty?' [Repurposed recess duty]':'')+(a.status==='completed'?' [Completed]':a.status==='draft'?'':' [Published]')+(a.assignedBy?'\nAssigned by: '+a.assignedBy:'');
+    const label=(a.subject||'Relief')+(absentName?' (for '+absentName+')':'')+(combined?' [Combined]':'')+(a.repurposedDuty?' [Repurposed recess duty]':'')+(a.status==='completed'?' [Completed]':a.status==='draft'?'':' [Published]');
     const next=[label,a.className||'',a.venue||'',a.groupName||''];
     write(a.staffId,a.period,combined?current.map((v,i)=>[v,next[i]].filter(Boolean).join(' + ')):next,'orange');covered.add(slot);
    }
@@ -190,7 +190,7 @@ window.RosterStaplerExport=(()=>{
   const classes=plan.classes.slice().sort((a,b)=>a.name.localeCompare(b.name,'en',{numeric:true})),cards=new Map(),colourRank={clear:0,green:1,pink:2,orange:3};
   const add=(id,p,text,colour)=>{const slot=key(id,p);if(!cards.has(slot))cards.set(slot,[]);cards.get(slot).push({text,colour});};
   const status=a=>a?.status==='completed'?' [Completed]':a&&a.status!=='draft'?' [Published]':'';
-  const cover=(name,a)=>a&&!a.noRelief?(a.relieverName||teachers.get(a.staffId)||a.staffId)+' (for '+name+')'+(a.combination?' [Combined]':'')+(a.repurposedDuty?' [Repurposed recess duty]':'')+status(a)+(a.assignedBy?'\nAssigned by: '+a.assignedBy:''):null;
+  const cover=(name,a)=>a&&!a.noRelief?(a.relieverName||teachers.get(a.staffId)||a.staffId)+' (for '+name+')'+(a.combination?' [Combined]':'')+(a.repurposedDuty?' [Repurposed recess duty]':'')+status(a):null;
   for(const tile of plan.tiles.filter(t=>t.location==='grid')){
    if(tile.kind==='recess'){
     for(const p of window.GSISRosterStapler.tilePeriods(plan,tile))for(const id of tile.classIds){const cls=classes.find(c=>c.id===id);if(!recess.some(({d})=>d.period===p&&norm(d.className)===norm(cls?.name)))add(id,p,['Recess',tile.venue].filter(Boolean).join('\n'),'clear');}

@@ -26,7 +26,7 @@ const fixture=require('./roster701-fixture.cjs'),S=require('../shared/roster-sta
   assert.equal(sheet.querySelector('parsererror'),null);assert.equal(sheet.querySelectorAll('f').length,0,'staff text never becomes spreadsheet formulas');
   assert.equal(text('A5'),'3A');assert.equal(text('A6'),'4A');assert.equal(text('R4'),'P16','full selected day, not only suspension ranges');assert.equal(text('R3'),'15:00\n15:30','time row directly precedes period headings');
   assert.match(text('A1'),/2026-10-14/);assert.match(text('A2'),/Confirmed suspended timetable, not yet published/);assert.match(text('A2'),/Current saved allocations/);
-  assert.equal(text('D6'),'Bob (for Alice)\nAssigned by: Not recorded\nEL\nC1-01');assert.equal(fill('D6'),'FFFFC000');
+  assert.equal(text('D6'),'Bob (for Alice)\nEL\nC1-01');assert.equal(fill('D6'),'FFFFC000');
   assert.equal(text('E6'),'Alice (absent — MC — no relief)\nEL\nC1-01');
   assert.equal(text('F6'),'Alice (absent — MC — unresolved)\nSCI\nLab\nScience group');
   assert.equal(text('G6'),'Alice\nMA\nRoom A','partial absence leaves other periods present');
