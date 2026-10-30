@@ -2,7 +2,9 @@ from pathlib import Path
 import re, subprocess, tempfile, sys, json, hashlib
 
 ROOT=Path(__file__).resolve().parents[1]
-release=json.loads((ROOT.parent/'package.json').read_text())['gsisComponentVersions']
+package=json.loads((ROOT.parent/'package.json').read_text())
+release=package['gsisComponentVersions']
+build_label=package.get('gsisBuildLabel', package['gsisRelease'])
 backend_version=release['lordBackend']
 checks=[]
 def check(name, ok, detail=''):
@@ -67,7 +69,7 @@ for app in ['lord','overlord','starlord']:
 lord_app=(ROOT/'Source/lord/assets/app.js').read_text()
 lord_index=(ROOT/'Source/lord/index.html').read_text()
 lord_worker=(ROOT/'Source/lord/_worker.js').read_text()
-check('LORD title matches the installation manifest',f"<title>LORD v{release['lordFrontend']} |" in lord_index)
+check('LORD title matches the release build label',f"<title>LORD v{build_label} |" in lord_index)
 check('LORD booking-success Collect re-enters authoritative booking selector',lord_app.count("state.mode='loan';loadEligibleBookings();") >= 1)
 check('LORD Collection accessory UI has independent quantities','stylusQuantity' in lord_app and 'headphoneQuantity' in lord_app and 'Quantity collected' in lord_app)
 check('LORD Collection zero accessory quantity needs no photo',"Number(state.loan.stylusQuantity) > 0 && !state.loan.stylusPhotoData" in lord_app and "Number(state.loan.headphoneQuantity) > 0 && !state.loan.headphonePhotoData" in lord_app)
@@ -90,7 +92,7 @@ check('LORD browser retains stable write idempotency','await stableClientRequest
 ov_worker=(ROOT/'Source/overlord/_worker.js').read_text()
 ov_app=(ROOT/'Source/overlord/assets/app.js').read_text()
 ov_index=(ROOT/'Source/overlord/index.html').read_text()
-check('OVERLORD title matches the installation manifest',f"<title>OVERLORD v{release['overlordFrontend']}</title>" in ov_index)
+check('OVERLORD title matches the release build label',f"<title>OVERLORD v{build_label}</title>" in ov_index)
 check('OVERLORD Worker validates upstream JSON','async function backendJson' in ov_worker and 'looksLikeHtml' in ov_worker and 'UPSTREAM_HTML' in ov_worker)
 check('OVERLORD Worker delegates retries to browser','retries: 1' not in ov_worker and 'for (let attempt' not in ov_worker and 'RETRYABLE_UPSTREAM_STATUS' in ov_worker)
 check('OVERLORD Reference edge cache uses v1.3 fresh/stale key','overlord-reference-cache.local/v1.3' in ov_worker and 'REFERENCE_STALE_SECONDS' in ov_worker and "'edge-stale'" in ov_worker)
@@ -102,7 +104,7 @@ check('OVERLORD preserves last-loaded schedule','Live refresh delayed · showing
 check('OVERLORD Booking Editor last-good fallback retained','Live booking refresh is delayed. Showing the last available booking details' in ov_app and 'v1BookingCacheKey' in ov_app)
 
 st_index=(ROOT/'Source/starlord/index.html').read_text()
-check('STARLORD title matches the installation manifest',f"<title>STARLORD v{release['starlordFrontend']} ·" in st_index)
+check('STARLORD title matches the release build label',f"<title>STARLORD v{build_label} ·" in st_index)
 
 # LORD v1.3 reliability/authentication refactor
 check('LORD session lifetime extended to 14 days','const SESSION_SECONDS = 14 * 24 * 60 * 60;' in lord_worker)

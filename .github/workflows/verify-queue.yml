@@ -55,4 +55,4 @@ jobs:
           node tests/stapler-draft-level-recess-browser.cjs
           node tests/stapler098h-recovery-browser.cjs
       - name: Run full regression suite
-        run: npm test
+        run: npm run test:lord && node tests/run.cjs

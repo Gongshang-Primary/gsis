@@ -82,3 +82,8 @@ Source and generated backend copies are committed together. New checks cover rou
 ## Integrated verification
 
 Full Linux run 41120960611 built all 18 components and passed backend parity, all focused storage/UI tests and browser portability checks. The synthetic 16,009,040-character fixture used 12 parts and 13 reads, with 16 ms in-memory Node assembly (not live Apps Script timing). Node suite passed 885/886; only calendar605 expected the old visible version instead of the approved build label. Main b115a5b corrects that assertion. This integration retains that exact fix and the actual builder's two Worker source hashes. Full suite is rerun; no green aggregate is claimed until it completes. LORD did not run after the previous Node failure.
+
+
+## 31 October full-suite follow-up
+
+At source 32121398dfb0252254bb2d3fc464348578859f38, Linux run 41123483638 passed all 886/886 Node programs, all 18 builds, storage/UI regressions and committed backend parity. The following LORD static stage found three stale title expectations: its tests still compared visible frontend titles with protocol component version 0.9.9 while the approved phase-1 labels are 0.9.9b. The tests now require the exact configured gsisBuildLabel, retaining component-version checks for backend protocol text. No product code changes. The same complete suite runs again, with LORD first so another LORD failure does not wait for the Node suite. The merge hold and live measurement gate remain.
