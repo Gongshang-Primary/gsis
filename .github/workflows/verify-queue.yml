@@ -8,6 +8,7 @@ on:
       - codex/roster-fajt-levelling
       - codex/deploy-siue-by-specialism
       - codex/roster-reminder-cheap-check
+      - codex/roster-delivery-time-format
   workflow_dispatch:
 permissions:
   contents: read

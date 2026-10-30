@@ -225,10 +225,15 @@ var RosterOpsUI = (() => {
   return s.ctx.api('operations',{operation:s.page==='Daily Notify'?'dailyNotify':s.page==='Daily Updates'?'teacherDailyUpdate':'read',date:s.date,view:viewKind(s.page,s.tab),...(s.page==='Absences by Date'&&s.tab!=='relief'?{from:s.date,to:s.rangeTo}:{}),...(['Report Absence','Assign Relief'].includes(s.page)?{compact:true}:{}),...(s.page==='Report Absence'?{staffId:s.formDraft?.staffId||s.ctx.profile?.user?.staffId,...(s.formDraft?.staffIds?.length?{staffIds:s.formDraft.staffIds}: {})}:{}),...(s.page==='Manage reported absences'?{scope:'mine'}:{})},'POST',undefined,{background:s.page==='Assign Relief'&&s.data?.date===s.date});
  }
  function pages(profile){const user=profile?.user||profile||{};return defs.filter(d=>!d[4]||d[4]==='teacher'&&!user.smc&&!user.admin||user[d[4]]===true||d[4]==='smc'&&user.admin===true).map(d=>({id:d[0],name:d[0],label:pageLabel(d[0]),title:pageLabel(d[0]),icon:d[1],description:d[2],group:d[3],smc:d[4]==='smc',admin:d[4]==='admin'}));}
- const dateFormat=new Intl.DateTimeFormat('en-GB',{timeZone:'Asia/Singapore',day:'numeric',month:'short',year:'numeric'}),weekdayFormat=new Intl.DateTimeFormat('en-GB',{timeZone:'Asia/Singapore',weekday:'short'}),stampFormat=new Intl.DateTimeFormat('en-GB',{timeZone:'Asia/Singapore',day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit',hour12:false});
+ const dateFormat=new Intl.DateTimeFormat('en-GB',{timeZone:'Asia/Singapore',day:'numeric',month:'short',year:'numeric'}),weekdayFormat=new Intl.DateTimeFormat('en-GB',{timeZone:'Asia/Singapore',weekday:'short'}),stampFormat=new Intl.DateTimeFormat('en-GB',{timeZone:'Asia/Singapore',day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false});
  function dateText(value){if(!/^\d{4}-\d\d-\d\d$/.test(value||''))return String(value||'');const d=new Date(value+'T12:00:00+08:00');return dateFormat.format(d)+' ('+weekdayFormat.format(d)+')';}
- function publicationStamp(value){const d=new Date(value);return Number.isFinite(+d)?new Intl.DateTimeFormat('en-GB',{timeZone:'Asia/Singapore',day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false}).format(d)+' SGT':String(value||'');}
- function stamp(value){const d=new Date(value);return Number.isFinite(+d)?stampFormat.format(d):String(value||'');}
+ function timestampDate(value){
+  if(value===null||value===undefined||value==='')return new Date(NaN);
+  const raw=typeof value==='string'?value.trim():value;
+  return new Date(typeof raw==='string'&&/^\d{10}$/.test(raw)?Number(raw)*1000:typeof raw==='string'&&/^\d{13}$/.test(raw)?Number(raw):raw);
+ }
+ function publicationStamp(value){const d=timestampDate(value);return Number.isFinite(+d)?new Intl.DateTimeFormat('en-GB',{timeZone:'Asia/Singapore',day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false}).format(d)+' SGT':String(value||'');}
+ function stamp(value){const d=timestampDate(value);return Number.isFinite(+d)?stampFormat.format(d):String(value||'');}
  const singaporeToday=()=>new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Singapore',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
  const draftQueues=new Map(),draftCopy=value=>JSON.parse(JSON.stringify(value)),draftKey=s=>s.owner+'|'+s.date;
  const allocationAuthorityPending=s=>s.page==='Assign Relief'&&!!(s.cachedPreview||s.cacheVerifying||s.allocationUnverified||s.allocationNeedsRefresh);
