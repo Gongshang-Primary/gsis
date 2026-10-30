@@ -15,15 +15,19 @@
 - `employment()` in shared/relief.js (~line 33) knows `SRE` as a modifier but returns `'FAJT'` only for FAJT, `'4/5'` for 4/5, else `'Full time'`. So **an SRE today gets the Full time R calculation** (budget `weeklyPeriods`, factor `timetablePeriods/weeklyPeriods`).
 - FAJT calculation: budget `fajtWeeklyPeriods`, factor 1 (~lines 67-68).
 
-## Required
+## Required (owner, 30 Oct 2026: two SRE types)
+- Long-term SRE = SRE with a Deploy timetable: reduced R quota via the FAJT calculation; applied per week; annual accumulation not used for ranking; R and R% still recorded and shown.
+- Daily SRE = no Deploy timetable: no R; see roster-sre-daily-priority.
+
 1. SRE **with** a timetable in the published Deploy version (one or more teaching periods in their Deploy row): R calculation uses the FAJT budget and factor, from the same settings fields (`fajtWeeklyPeriods`). No numbers in code.
 2. SRE **without** a Deploy timetable: no R calculation; shown as "Daily roster, no R%" (roster-sre-daily-priority).
 3. My Calculations explains which basis applies ("SRE with timetable: FAJT basis").
 
 ## Open point for the owner
-In Roster allocation, does an SRE with a timetable still go first as an SRE (rule 1), or join the FAJT group (rule 2, ships Off) and be levelled by R% with FAJT staff? Proposed: **SRE with a timetable joins the FAJT group**, since it now has a real R%; SRE without a timetable stays rule 1.
+Where does a long-term SRE rank? Annual R% is excluded, so options: (a) with daily SREs at rule 1, ordered by weekly R remaining; (b) with other staff, ranked by weekly R remaining instead of annual R%. Proposed: **(b)**, since they have a timetable and a weekly quota like other staff.
 
 ## Acceptance
 - SRE with Deploy teaching periods: R equals the FAJT formula for the same workload; changing `fajtWeeklyPeriods` changes it.
 - SRE without teaching periods: no R, "Daily roster, no R%".
 - Full time and 4/5 staff unchanged.
+- Long-term SRE: weekly R remaining enforced; annual R% recorded and displayed but ignored by annualUtilisation ranking.

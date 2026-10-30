@@ -11,7 +11,15 @@
 - Files/domains owned: shared/roster-allocation.js (candidate ranking, eligibility limits, balances), shared/relief.js (employment parsing) only if needed, Roster settings UI text, generated copies, tests.
 - Out of scope: quota formula for other staff; FAJT; Deploy figures.
 
-## Rule
+
+## Two SRE types (owner, 30 Oct 2026; supersedes earlier limit notes where they differ)
+Type is decided by the published Deploy version, not by a separate flag:
+- **Daily (ad hoc) SRE**: SRE with no timetable in Deploy. Rostered day by day. Daily limit = **new Settings field "Ad hoc relief max periods"** in system config, beside Daily workload limits, with On/Off toggle and 1 to 40 validation; **initial value 10** written as the settings default (owner), not a constant in allocation code. Consecutive limit = the existing "Maximum consecutive periods" setting. No R quota; shown "Daily roster, no R%".
+- **Long-term SRE**: SRE with a timetable in Deploy. Reduced R quota from the FAJT calculation (roster-sre-fajt-r-calc). Their quota applies **per week** (weekly R remaining and caps work as for other staff), but **annual accumulation is not used for their ranking**. Their R value and R% are still recorded and displayed. Daily limits = the existing Daily workload limits settings.
+
+Ranking (rule 1) applies to daily SREs. Long-term SRE ranking: see open point in roster-sre-fajt-r-calc.
+
+## Rule (original; read with the two types above)
 1. Staff with employment SRE are ranked before every other candidate (priority 1, above "Lower annual R utilisation").
 2. SREs are not ranked or balanced by annual R%, weekly R remaining or R entitlement. Their relief does not need an R quota.
 3. Daily limits for an SRE: the **existing** Settings → Daily workload limits, unchanged: "Maximum total daily periods" (`maxDailyPeriods`) and "Maximum consecutive periods" (`maxConsecutivePeriods`) in `workloadRules`, which already count lessons, relief and invigilation once per period for every teacher (roster-settings-ui.js ~line 125). No new setting and no numbers in code. The owner sets the values in Settings (owner intent: 8 a day; consecutive per the existing setting). Since SREs usually have no timetabled lessons, the daily total is in practice their relief count.
@@ -26,7 +34,7 @@
 
 ## Owner decisions (30 Oct 2026)
 - Ships On: the SRE rule applies from deploy (unlike roster-fajt-levelling, which ships Off).
-- SREs use the same Daily workload limits settings as all staff; no separate SRE values.
+- Superseded for daily SREs: they use the new "Ad hoc relief max periods" setting (initial 10); consecutive still the existing setting. Long-term SREs use the existing Daily workload limits.
 - R% displays show SREs as "Daily roster, no R%" (My Calculations, annual balances, statistics).
 
 ## Acceptance
