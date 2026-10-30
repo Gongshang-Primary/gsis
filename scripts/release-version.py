@@ -66,8 +66,8 @@ def stamp(root=ROOT):
             # viewer keeps its self-contained inline bootstrap scripts first.
             notice_tag = '<script src="' + notice_path + '?v=' + version + '"></script>'
             if path.name == 'external.html':
-                # This async entry point starts its first API read immediately.
-                text = re.sub(r'(<script\b[^>]*src=["\']external\.js[^>]*>)', lambda m: notice_tag + m[1], text, count=1)
+                # Wrap fetch before CSS can block scripts or the async API read starts.
+                text = re.sub(r'(<link\b[^>]*rel=["\']stylesheet["\'][^>]*>)', lambda m: notice_tag + m[1], text, count=1)
             else:
                 end_tag = '</body>' if path.name == 'landmark.html' else '</head>'
                 text = text.replace(end_tag, notice_tag + end_tag, 1)

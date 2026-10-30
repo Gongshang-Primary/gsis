@@ -46,5 +46,6 @@ jobs:
           node tests/stapler-draft-excel-export-browser.cjs
           node tests/stapler-draft-level-recess-browser.cjs
           node tests/stapler098h-recovery-browser.cjs
+          node tests/roster-external-prominent-ack-browser.cjs
       - name: Run full regression suite
         run: npm test
