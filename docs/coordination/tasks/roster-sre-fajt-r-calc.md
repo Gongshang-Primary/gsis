@@ -1,11 +1,11 @@
 # roster-sre-fajt-r-calc: an SRE with a Deploy timetable gets the FAJT R calculation
 
-- Status: approved, ready to claim (owner decisions recorded 30 Oct 2026). Build with or right after roster-sre-daily-priority.
+- Status: implementing, separately from the merge-held row S by explicit owner instruction on 30 October 2026.
 - Owner/model: Codex
 - Reviewer/model: Claude
 - Last updated (Asia/Singapore): 30 Oct 2026 08:10
 - Branch: codex/roster-sre-fajt-r-calc
-- Base SHA: current main
+- Base SHA: 135b8a55fe027975facca29cbebeea5700f42e8e
 - PR: none
 - User-authorised scope: Song Wee, 30 Oct 2026: "SRE follows FAJT R calculation if their timetable is present in deploy".
 - Files/domains owned: shared/relief.js (`employment()`, budget/factor), shared/workload.js only if it classifies employment, Roster ranking in shared/roster-allocation.js if the open point requires, generated Deploy/Roster copies, tests.
@@ -32,3 +32,7 @@ A long-term SRE is ranked with other staff (after daily SREs and, when switched 
 - Full time and 4/5 staff unchanged.
 - Long-term SRE: weekly R remaining enforced; annual R% recorded and displayed but ignored by annualUtilisation ranking.
 - Long-term SRE and a teacher both free: the long-term SRE's place is decided by weekly R remaining versus the teacher's annual R% ranking key, as specified in the ranking design; test both orderings.
+
+## Claim and handoff
+
+Model: Codex. The owner explicitly requested row S and row 2b2 as separate PRs now. This is the second bounded branch; row S retains its merge hold. No authority change, messages, live records or deployment. Claude reviews the exact head before owner merge.
