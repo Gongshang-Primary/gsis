@@ -228,7 +228,8 @@ var RosterOpsUI = (() => {
  const dateFormat=new Intl.DateTimeFormat('en-GB',{timeZone:'Asia/Singapore',day:'numeric',month:'short',year:'numeric'}),weekdayFormat=new Intl.DateTimeFormat('en-GB',{timeZone:'Asia/Singapore',weekday:'short'}),stampFormat=new Intl.DateTimeFormat('en-GB',{timeZone:'Asia/Singapore',day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit',hour12:false});
  function dateText(value){if(!/^\d{4}-\d\d-\d\d$/.test(value||''))return String(value||'');const d=new Date(value+'T12:00:00+08:00');return dateFormat.format(d)+' ('+weekdayFormat.format(d)+')';}
  function publicationStamp(value){const d=new Date(value);return Number.isFinite(+d)?new Intl.DateTimeFormat('en-GB',{timeZone:'Asia/Singapore',day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false}).format(d)+' SGT':String(value||'');}
- function stamp(value){const d=new Date(value);return Number.isFinite(+d)?stampFormat.format(d):String(value||'');}
+ // Provider times can arrive as digit strings: 13 digits are milliseconds, 10 are seconds.
+ function stamp(value){const digits=typeof value==='string'&&/^\d{10}(\d{3})?$/.test(value.trim())?Number(value.trim())*(value.trim().length===10?1000:1):null,d=new Date(digits??value);return Number.isFinite(+d)?stampFormat.format(d):String(value||'');}
  const singaporeToday=()=>new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Singapore',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
  const draftQueues=new Map(),draftCopy=value=>JSON.parse(JSON.stringify(value)),draftKey=s=>s.owner+'|'+s.date;
  const allocationAuthorityPending=s=>s.page==='Assign Relief'&&!!(s.cachedPreview||s.cacheVerifying||s.allocationUnverified||s.allocationNeedsRefresh);
@@ -343,7 +344,16 @@ var RosterOpsUI = (() => {
   const hint=$(s,'[data-publish-hint]'),reason=s.data?.date===s.date?publishUnavailable(s):'Wait for records for the selected date.',recipients=new Map(notifyTeachers(s.data).map(t=>[t.staffId,t]));
   for(const button of $$(s,'[data-publish-relief]'))button.disabled=s.busy||!!pendingFor(s)||!!reason;
   for(const button of $$(s,'[data-notify-all],[data-notify-teacher]')){const teacher=recipients.get(button.dataset.notifyTeacher),noRecipient=!!button.dataset.notifyTeacher&&!teacher,blocked=teacher?.canNotify===false;button.disabled=s.busy||!!pendingFor(s,'notifyDaily')||s.data?.date!==s.date||s.data?.canNotify===false||noRecipient||blocked;button.title=s.data?.notifyBlockedReason||(noRecipient?'This teacher has no published timetable changes or pending correction.':blocked?teacher.notifyBlockedReason||'Review this notification’s delivery status before sending again.':'');}
-  if(hint)hint.textContent=(draftWork(draftFor(s))?'Local changes stay on this device until Save to online. Let teachers see releases only saved online arrangements.':reason||'Let teachers see applies to '+dateText(s.date)+'. Send WhatsApp communicates saved arrangements separately.')+(s.page==='Assign Relief'&&s.data?.publishedAt?' Last published '+publicationStamp(s.data.publishedAt)+(s.data.publishedRevision!==undefined?' · revision '+s.data.publishedRevision:'')+'.':'');
+  if(hint)hint.textContent=(draftWork(draftFor(s))?'Local changes stay on this device until Save to online. Let teachers see releases only saved online arrangements.':reason||'Let teachers see applies to '+dateText(s.date)+'. Send WhatsApp communicates saved arrangements separately.');
+  updatePublishedChip(s);
+ }
+ // Persistent publication state for Assign Relief: time only, amber when saved changes are not yet visible.
+ const chipTime=new Intl.DateTimeFormat('en-GB',{timeZone:'Asia/Singapore',hour:'2-digit',minute:'2-digit',hour12:false});
+ function updatePublishedChip(s){
+  const chip=$(s,'[data-published-chip]');if(!chip)return;const d=s.data?.date===s.date?s.data:null,at=d?.publishedAt?new Date(d.publishedAt):null,known=at&&Number.isFinite(+at);
+  const stale=known&&Number.isInteger(d.allocationRevision)&&Number.isInteger(d.publishedRevision)&&d.allocationRevision>d.publishedRevision;
+  chip.textContent=!d?'':known?'Published '+chipTime.format(at)+(stale?' · changes not yet visible':''):'Not published';
+  chip.title=known?publicationStamp(d.publishedAt):'';chip.dataset.state=!d?'':known?(stale?'stale':'current'):'none';
  }
  const minutes=v=>typeof v==='number'?v:String(v||'00:00').split(':').reduce((a,n)=>a*60+Number(n),0);
  function range(values){const ps=[...new Set(values||[])].sort((a,b)=>a-b),runs=[];for(const p of ps){const last=runs.at(-1);if(last&&p===last[1]+1)last[1]=p;else runs.push([p,p]);}return runs.map(([a,b])=>a===b?'P'+a:'P'+a+'–P'+b).join(', ');}
@@ -1280,7 +1290,7 @@ var RosterOpsUI = (() => {
   const demands=new Map(s.data.demands.map(d=>[d.id,d])),rows=(s.data.allocationModel?.assignments||s.data.assignments).filter(a=>a.date===undefined||a.date===s.date).filter(a=>!a.remove&&!['cancelled','invalidated'].includes(a.status)).map(a=>({...demands.get(a.demandId),...a}));
   const columns=[{key:'date',label:'Date',value:a=>dateText(a.date||s.date)},{key:'name',label:'Absentee',value:a=>a.name||person(s,a.absentId||a.absentStaffId).name},{key:'period',label:'Period',value:a=>'P'+a.period},{key:'reliever',label:'Relief teacher',value:a=>a.noRelief?'No Relief Needed':a.relieverName||person(s,a.staffId).name},{key:'className',label:'Class / TG',value:a=>[a.className,a.groupName].filter(Boolean).join(' / ')},{key:'venue',label:'Venue',value:a=>a.venue||''},{key:'status',label:'Status',value:a=>a.status==='published'?'Published':a.status==='completed'?'Completed':'Draft'}];
   const uncovered=s.data.demands.filter(d=>!d.noReliefRequired&&!validAllocationFor(s,d.id)).length,drafts=rows.filter(a=>a.status==='draft').length;
-  area.innerHTML=publicationChangesHtml(s)+'<div class="ops-relief-toolbar"><strong>'+uncovered+' unassigned periods</strong><span>'+drafts+' unpublished entries</span><button type="button" data-publish-relief class="primary"'+(publishUnavailable(s)?' disabled':'')+'>Let teachers see</button><span data-export-slot></span></div><p class="hint" data-publish-hint></p><div data-relief-review></div>';
+  area.innerHTML=publicationChangesHtml(s)+'<div class="ops-relief-toolbar"><strong>'+uncovered+' unassigned periods</strong><span>'+drafts+' unpublished entries</span><span class="ops-published-chip" data-published-chip></span><button type="button" data-publish-relief class="primary"'+(publishUnavailable(s)?' disabled':'')+'>Let teachers see</button><span data-export-slot></span></div><p class="hint" data-publish-hint></p><div data-relief-review></div>';
   const table=area.querySelector('[data-relief-review]');renderTable(s,table,rows,columns,{name:'Relief Assignments',numbered:true,columnFilters:false});table.querySelector('[data-table-excel]').remove();
   updatePublish(s);area.querySelector('[data-publish-relief]').onclick=()=>publishFromWorkspace(s);installReliefExport(s,area.querySelector('[data-export-slot]'));
  }

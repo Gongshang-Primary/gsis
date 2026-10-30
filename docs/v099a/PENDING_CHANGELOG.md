@@ -117,6 +117,8 @@ Cloudflare-authoritative timetables (Diagram 1), new allocation rules, and chang
 
 ### Roster: visible "last published" timestamp on Assign Relief
 
+**Status:** built by Claude on branch claude/roster-small-fixes (owner: "work through changelog", 30 Oct). Not deployed.
+
 **Request (29 Oct 2026):** Assign Relief needs a published timestamp.
 
 **Current behaviour (0.9.9):** The day data already carries `publishedAt` and `publishedRevision` (`shared/roster-operations.js`). Assign Relief shows "Last published …" only inside the transient status message (`roster-update/public/roster-operations-ui.js:346`), so it is easy to miss or replaced by other messages.
@@ -328,6 +330,8 @@ Cloudflare-authoritative timetables (Diagram 1), new allocation rules, and chang
 4. Test: automatic, SMC-edited automatic, manual and peer rows each show the right label.
 
 ### Roster: delivery time shows a raw number
+
+**Status:** built by Claude on branch claude/roster-small-fixes (owner: "work through changelog", 30 Oct). Not deployed.
 
 **Found (29 Oct 2026, same screenshot):** "Delivered 1793228134000 Singapore time." The provider's delivery time is stored as a digit string; `stamp()` (`roster-update/public/roster-operations-ui.js:231`) only formats values that `new Date(value)` understands, so it prints the digits.
 
