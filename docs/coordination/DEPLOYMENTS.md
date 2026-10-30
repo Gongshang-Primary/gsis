@@ -2,6 +2,18 @@
 
 What is live, when it changed and how to roll back. Record every production deployment and every live setting change. "Reported" means stated by the owner; "verified" means checked by a model with the evidence named.
 
+## 31 Oct 2026 ~05:00 SGT: v0.9.9b (main 6eb943f), reported by owner
+
+Bundle `deploy/2026-10-31-v0.9.9b` (branch, folder `deploy-bundle`; SHA256SUMS inside). Deployed: Roster backend, Deploy backend, Roster frontend, gsis-roster-notifications, gsis-operations, Deploy frontend. Not deployed: optional label-only zips for Contacts, Layout, Calendar, LORD, OVERLORD, STARLORD, Venues (still show v0.9.9).
+- Owner checks (31 Oct): header v0.9.9b, System Config loads, published chip, SIUE fields, LORD and Calendar load: all yes. All 12 held absence reports retried and cleared.
+- Live setting: Apps Script "Roster GSiS" Script Property `ROSTER_OPERATIONS_MAX_CHARS=24000000` (set 31 Oct ~04:30; an earlier entry in Cloudflare variables has no effect).
+- D1 job health 05:09 (verified by Claude): intake, allocation, notifications, inbox, webhook idle since ~05:03. peer-mail still fails each minute (changelog entry 31 Oct).
+- Storage report 04:47: 16,079,661 of 24,000,000 characters.
+- Rollback: Apps Script previous versions; Pages and Workers previous deployments (30 Oct bundle 6bb4844).
+
+## 30 Oct 2026 evening: bundle 6bb4844 (v0.9.9a label), reported by owner
+Backends and Workers deployed first; the first two frontend uploads failed (raw-folder zips with unbundled `_worker.js`). Replaced by release-built zips the same evening and deployed. Lesson: frontend zips come only from the release build.
+
 ## Current production (best known, 29 Oct 2026 05:30 SGT)
 
 Eighteen production components. "Reported" = stated by the owner; "verified" = checked by a model with the named evidence.
