@@ -29,3 +29,5 @@ Owner (Song Wee, 30 Oct): "it can be all, let codex work while i teach". Claude 
 | 17 | lord-queued-writes.md phase 3 | OVERLORD/STARLORD after a week of phase 2 without double bookings |
 
 Rules: create the task file for a "(new)" row before claiming; keep Google authoritative; no ROSTER_EDGE_AUTHORITY change; regenerate bundles; run the full suite before asking for merge.
+
+Test baseline from 30 Oct 2026 (PR #15): `npm test` is fully green (875/875, LORD 38/38) when run in the main checkout with TZ=Asia/Singapore and ROSTER_TEST_CHROMIUM set. Any failure is now real. Runs in a git worktree lack ignored release zips and fail three packaging tests; do not treat those as baseline.
