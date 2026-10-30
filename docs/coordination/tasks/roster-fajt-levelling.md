@@ -48,3 +48,7 @@ Model: Codex. Owner assigned row 2c on 31 Oct 2026. The previous prepared branch
 Scope: shared/roster-allocation.js, shared/roster-operations.js, backend/RosterOperations.gs, roster-update/public/roster-settings-ui.js, their deterministic generated copies, focused tests and the existing branch-scoped Linux verification workflow. No R quota formula changes, messages, deployment, or production authority changes.
 
 The local shell and browser execution tools are unavailable in this session. No local build or test execution is claimed. Linux CI will build before the full suite. Any generated Worker differences will be retained and applied before final review; CI results and exact heads will be recorded.
+
+## 31 October source handoff
+
+Model: Codex. Isolated implementation on codex/roster-fajt-levelling-review, based on main 4a4001c. Only the FAJT source/test changes were transplanted from the earlier prepared branch. Current SIUE settings, specialist counts and collapsible exception controls are retained. Canonical code and deterministic backend/browser copies are included; the actual Linux builder will supply the remaining Worker outputs. Full suite and exact-head review pending. No merge or deployment.

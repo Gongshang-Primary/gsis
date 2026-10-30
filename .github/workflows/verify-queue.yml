@@ -4,6 +4,7 @@ on:
     branches:
       - codex/roster-operations-split-files
       - codex/roster-sre-fajt-r-calc
+      - codex/roster-fajt-levelling-review
   workflow_dispatch:
 permissions:
   contents: read
@@ -35,6 +36,13 @@ jobs:
           echo "GSIS_BROWSER_EXECUTABLE=$BROWSER" >> "$GITHUB_ENV"
       - name: Regenerate all 18 components
         run: npm run build
+      - name: Capture regenerated source diff
+        run: |
+          node - <<'NODE'
+          const {execFileSync}=require('node:child_process');
+          const patch=execFileSync('git',['diff','--binary','--no-ext-diff'],{maxBuffer:50*1024*1024}).toString('base64');
+          for(let at=0;at<patch.length;at+=6000)console.log('GSIS_GENERATED_PATCH '+patch.slice(at,at+6000));
+          NODE
       - name: Check browser fixture portability
         run: |
           node tests/roster084-private-link-reuse-browser.cjs
