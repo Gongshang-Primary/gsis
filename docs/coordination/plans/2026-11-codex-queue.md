@@ -5,6 +5,7 @@ Priority update 30 Oct 2026: build roster-operations-split-files (row S) first, 
 Owner order 30 Oct 2026 evening (owner away from PC; bundle 6bb4844 not yet deployed): open two PRs now.
 1. Row S (split files): build and open the PR, but **do not ask for merge** until the owner has deployed bundle 6bb4844, set ROSTER_OPERATIONS_MAX_CHARS, and sent the Storage screenshot. Claude reviews meanwhile.
 2. Row 2b2 (roster-sre-fajt-r-calc): build, review, merge as normal.
+3. Row V (release-version-letter): small; merge before the next deploy bundle so it ships as v0.9.9b. May take the second PR slot after 2b2.
 Then, as each merges: 2c, 15b, rows 4 to 6, then 7, 8, 8b. Row D1 waits for row S to merge. The deploy bundle is fixed files; merges to main do not change it.
 
 Owner (Song Wee, 30 Oct): "it can be all, let codex work while i teach". Claude reviews every PR at its exact head; owner merges and deploys. Work top to bottom, at most two open PRs at a time. Each task file holds its own background.
@@ -13,6 +14,7 @@ Owner (Song Wee, 30 Oct): "it can be all, let codex work while i teach". Claude 
 |---|---|---|
 | 1 | roster-relief-auto-complete.md | R% shows 0 for everyone today |
 | 2 | (new) roster-assigned-by-label | PENDING_CHANGELOG "Assigned By shows the auto-allocator" |
+| **V** | release-version-letter.md | Owner 30 Oct: one label v0.9.9b on every component, letter advances each deploy, mismatch notice. Before next bundle. |
 | **S** | roster-operations-split-files.md | **Owner 30 Oct: first.** Removes the 16M cap on Google before D1. Own PR. Hold merge until bundle 6bb4844 is deployed and the Storage screenshot is in. |
 | **D1** | roster-d1-google-backup.md | **Owner priority 30 Oct: D1 as Roster record.** Next after the SRE work already in progress. Claude writes roster-d1-cutover-runbook.md in parallel. |
 | 2b | roster-sre-daily-priority.md | PR #14: daily SRE priority; approved Ad hoc relief max periods setting (initial 10), existing consecutive limit, no R%. Latest task decisions supersede the earlier no-new-setting note. |
