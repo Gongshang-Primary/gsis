@@ -248,7 +248,7 @@ def support_files(root):
     mapping = {source: destination for destination, source in origins.items()}
     # Prefer the canonical Docs copy over its additional Worker-side alias.
     mapping['docs/v099/WORKERS_INVENTORY.md'] = 'Docs/WORKERS_INVENTORY.md'
-    return {destination: relocate_document_links(read_required(root, source, 'setup dependency'), source, destination, mapping)
+    return {destination: relocate_document_links(release_labels['release_document'](read_required(root, source, 'setup dependency'), VERSION), source, destination, mapping)
             for destination, source in origins.items()}
 
 

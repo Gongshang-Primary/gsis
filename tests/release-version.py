@@ -21,6 +21,11 @@ class ReleaseVersionTests(unittest.TestCase):
             with self.assertRaisesRegex(AssertionError, 'header'):
                 helper['check_frontend'](folder, '0.9.9b')
 
+    def test_installation_copies_name_full_label_but_preserve_shadow_version(self):
+        helper = runpy.run_path(str(ROOT / 'scripts/release-version.py'))
+        text = b'Roster_Backend_v0.9.9.gs GSiS_Operations_Worker_v0.9.9.txt GSiS_v0.9.9_Timetable_Preparation.zip'
+        self.assertEqual(helper['release_document'](text, '0.9.9b'), b'Roster_Backend_v0.9.9b.gs GSiS_Operations_Worker_v0.9.9b.txt GSiS_v0.9.9_Timetable_Preparation.zip')
+
     def test_repeat_and_skipped_letter_are_refused(self):
         if not (ROOT / 'scripts/release-version.py').is_file(): self.skipTest('helper not implemented')
         helper = runpy.run_path(str(ROOT / 'scripts/release-version.py'))

@@ -77,6 +77,15 @@ def stamp(root=ROOT):
     return version
 
 
+def release_document(data, version):
+    """Keep source history intact while installation copies name current artifacts."""
+    text = data.decode('utf-8')
+    family = re.sub(r'[a-z]$', '', version)
+    names = r'(?:Contacts|Deploy|Roster|Calendar|LORD|OVERLORD|STARLORD|Layout|Venues)_(?:Frontend|Backend)|Roster_Notification_Worker|GSiS_Operations_Worker|GSiS_Calendar_Job_Worker'
+    text = re.sub(r'\b(' + names + r')_v' + re.escape(family) + r'[a-z]?(?=\.(?:gs|zip|txt)\b)', lambda m: m[1] + '_v' + version, text)
+    return text.encode('utf-8')
+
+
 def check_frontend(folder, version):
     text = (folder / 'index.html').read_text()
     assert '<meta name="gsis-version" content="' + version + '">' in text, str(folder) + ' page label'

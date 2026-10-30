@@ -11,7 +11,7 @@ if(/^0[.]9[.]9[a-z]?$/.test(version)){
  assert.equal(settings.gsisSeparatePackages.length,1);assert.equal(settings.gsisSeparatePackages[0].name,'GSiS_v0.9.9_Timetable_Preparation.zip');assert.equal(settings.gsisSeparatePackages[0].productionInstallation,false);
  assert(/Production Roster remains Google-first/.test(readme));assert(/separate administrator-only timetable preparation package/.test(readme));
  assert(readme.includes('CALENDAR_SYNC_CONTINUE=false'));assert(readme.includes('default-off'));assert(readme.includes('explicit enablement'));
- for(const product of ['Contacts','Deploy','Roster','Calendar','LORD','Venues'])assert(guide.includes(product+'_Backend_v'+version+'.gs'),'Matched backend guidance '+product);
+ for(const product of ['Contacts','Deploy','Roster','Calendar','LORD','Venues'])assert(guide.includes(product+'_Backend_v'+version.replace(/[a-z]$/, '')+'.gs'),'Matched backend guidance '+product);
  assert(!readme.includes('## Historical v0.9.7 installation handbook'),'Do not restore obsolete migration instructions');
  console.log('PASS 0.9.9 entry point: current guides, eighteen matched components, Google Roster authority, separate shadow preparation and explicit optional push enablement');
 }else if(version==='0.9.8q'){

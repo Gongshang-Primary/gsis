@@ -219,7 +219,7 @@ for name,folder in frontend_spec.items():
 # installation ZIP. Runtime dependencies remain inside their frontend ZIPs.
 package=root/f'GSiS_v{version}_Deployment.zip'
 installation,members=installation_manifest(root,version)
-files={name:path.read_bytes() for name,path in members.items()}
+files={name:(runpy.run_path(str(root/'scripts/release-version.py'))['release_document'](path.read_bytes(),version) if path.suffix in {'.md','.html'} else path.read_bytes()) for name,path in members.items()}
 try:
  commit=subprocess.check_output(['git','rev-parse','HEAD'],cwd=root,text=True,stderr=subprocess.DEVNULL).strip()
  # Only release inputs determine provenance; unrelated local review files do not.
