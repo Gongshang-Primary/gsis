@@ -1102,7 +1102,7 @@ function rosterPrivateTimetable_(ctx,s,staffId,date){
 
 // Split storage uses immutable parts. Only replacing the manifest commits a save.
 var rosterOperationsStorageSnapshot_=null;
-function rosterOperationsStorageError_(message,status=503){throw Object.assign(Error(message),{status,failurePhase:'operations-storage'});}
+function rosterOperationsStorageError_(message,status=503){throw Object.assign(Error(message),{status,...(status===507?{code:'ROSTER_STORAGE_CAPACITY'}:{}),failurePhase:'operations-storage'});}
 function rosterOperationsActiveFile_(){return props_().getProperty('ROSTER_OPERATIONS_FILE')||rosterFindFile_(ROSTER_DATA,'Roster operations.json');}
 function rosterOperationsStorageToken_(raw){return rosterOperationsPlanDigest_(JSON.stringify([raw.id,raw.text]));}
 function rosterOperationsPartPlan_(text){
