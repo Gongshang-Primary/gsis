@@ -1,11 +1,11 @@
 # roster-fajt-levelling: after SREs, FAJT average R% rises first until it leads the school by a set margin
 
-- Status: implementing in an isolated branch while completed predecessors await review. Owner clarified 30 Oct 2026: "FAJT average R% to rise first, but once significantly above school-wide R%, start prioritising others".
+- Status: implementing the reviewed FAJT-only change on current main.
 - Owner/model: Codex
 - Reviewer/model: Claude
-- Last updated (Asia/Singapore): 30 Oct 2026 22:25
-- Branch: codex/roster-fajt-levelling
-- Base SHA: cb8b587c10322b49c3d0e907f3baec3f4bd151a8
+- Last updated (Asia/Singapore): 31 Oct 2026
+- Branch: codex/roster-fajt-levelling-review
+- Base SHA: e196f80978ebfa0c237312fe0cb42cb2029a02e0
 - PR: none
 - User-authorised scope: Song Wee, 30 Oct 2026: "after SRE; then FAJT but balance FAJT R% against all other EOs R%. rule 1: SREs first; rule 2: level up FAJT R% first to be equal with FAJT average R%; rule 3: annual R% levelling across all staff".
 - Files/domains owned: shared/roster-allocation.js (candidate ranking, preferenceRules, balances), Roster settings text, generated copies, tests.
@@ -40,3 +40,11 @@ Why points, not a ratio: early in the year all R% are small, and a ratio (e.g. 1
 ## Continuation and dependency
 
 Owner, 30 Oct: "do not wait for review on completion of changelog items keep on going". This task may progress on an isolated branch while review continues. Integrate the SRE FAJT basis from PR #20 at 16624d4de46caf8b3a1547069eea1e6ab9ab24aa before implementation. Reconcile predecessor changes, regenerate bundles and rerun the full suite before a final integration handoff. No merge, deployment, authority change or message send is authorised by this claim. Version-label work remains independently tracked under release-version-letter.
+
+## Current bounded continuation
+
+Model: Codex. Owner assigned row 2c on 31 Oct 2026. The previous prepared branch includes unrelated version-label work, so this continuation applies only FAJT policy, Settings, context and regression changes onto current main. Claude's version-label and specialist changes remain independent. The earlier branch is retained.
+
+Scope: shared/roster-allocation.js, shared/roster-operations.js, backend/RosterOperations.gs, roster-update/public/roster-settings-ui.js, their deterministic generated copies, focused tests and the existing branch-scoped Linux verification workflow. No R quota formula changes, messages, deployment, or production authority changes.
+
+The local shell and browser execution tools are unavailable in this session. No local build or test execution is claimed. Linux CI will build before the full suite. Any generated Worker differences will be retained and applied before final review; CI results and exact heads will be recorded.
