@@ -1,0 +1,18 @@
+{
+  "tests/release-build-label-phase2.cjs": [
+    {
+      "before": "(async()=>{\n require('child_process')",
+      "after": "\nfunction controlledNotice(){\n const dom=new JSDOM('<meta name=\"gsis-build-label\" content=\"0.9.9b\"><body><main>usable</main>',{url:'https://school.invalid',runScripts:'outside-only'}),pending=[];\n dom.window.fetch=input=>new Promise(resolve=>pending.push({input,resolve}));\n dom.window.eval(source);\n const respond=(index,body)=>pending[index].resolve(new Response(JSON.stringify(body),{headers:{'content-type':'application/json'}}));\n return {dom,pending,respond};\n}\nconst tick=()=>new Promise(resolve=>setTimeout(resolve,10));\nasync function checkNoticeOrdering(){\n const c=controlledNotice();\n const first=c.dom.window.fetch('/api/roster'),second=c.dom.window.fetch('/api/roster');\n c.respond(1,{ok:true,buildLabel:'0.9.9b'});await second;await tick();\n c.respond(0,{ok:true,buildLabel:'0.9.9c'});await first;await tick();\n assert(!c.dom.window.document.querySelector('#gsis-version-notice'),'older mismatch response cannot override the newer matching response');\n const third=c.dom.window.fetch('/api/roster');c.respond(2,{ok:true,buildLabel:'0.9.9c'});await third;await tick();\n const other=c.dom.window.fetch('/api/contacts');c.respond(3,{ok:true,buildLabel:'0.9.9b'});await other;await tick();\n assert(c.dom.window.document.querySelector('#gsis-version-notice'),'matching Contacts cannot clear a Roster mismatch');\n const fourth=c.dom.window.fetch('/api/roster');c.respond(4,{ok:true,buildLabel:'0.9.9b'});await fourth;await tick();\n assert(!c.dom.window.document.querySelector('#gsis-version-notice'),'matching response from the same endpoint clears its mismatch');\n const beforeBody=controlledNotice();beforeBody.dom.window.document.body.remove();\n const read=beforeBody.dom.window.fetch('/api/roster');beforeBody.respond(0,{ok:true,buildLabel:'0.9.9c'});await read;await tick();\n const body=beforeBody.dom.window.document.createElement('body');beforeBody.dom.window.document.documentElement.append(body);\n beforeBody.dom.window.document.dispatchEvent(new beforeBody.dom.window.Event('DOMContentLoaded'));await tick();\n assert(beforeBody.dom.window.document.querySelector('#gsis-version-notice'),'early mismatch survives until document.body exists');\n}\n\n(async()=>{\n await checkNoticeOrdering();\n require('child_process')"
+    }
+  ],
+  "scripts/verify-099-suite.py": [
+    {
+      "before": "    expected_inventory = set(component_names) | set(support) | {'REVIEW_SOURCE.json', 'MANIFEST.json', 'Timetable_Preparation/' + p.PREPARATION_NAME}\n    assert set(suite.namelist()) == expected_inventory, 'Installation/support inventory differs'",
+      "after": "    expected_inventory = set(component_names) | set(support) | {'REVIEW_SOURCE.json', 'MANIFEST.json', 'Timetable_Preparation/' + p.PREPARATION_NAME}\n    metadata = json.loads(suite.read('MANIFEST.json'))\n    if metadata.get('buildLabel'):\n        label, commit = metadata['buildLabel'], metadata['sourceCommit']\n        expected_inventory.update({'COMMIT.txt', 'DEPLOY_STEPS.md'})\n        assert suite.read('COMMIT.txt') == (label + '\\n' + commit + '\\n').encode(), 'Bundle commit label differs'\n        assert suite.read('DEPLOY_STEPS.md').startswith(('# Deploy GSiS v' + label + '\\n').encode()), 'Deployment guide label differs'\n    assert set(suite.namelist()) == expected_inventory, 'Installation/support inventory differs'"
+    },
+    {
+      "before": "'componentVersions', 'tag', 'baseline']:",
+      "after": "'componentVersions', 'tag', 'baseline', 'buildLabel']:"
+    }
+  ]
+}
