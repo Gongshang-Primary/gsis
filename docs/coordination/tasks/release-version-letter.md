@@ -39,3 +39,5 @@ Numeric npm metadata, workbook schemas, historical release documentation and the
 Verified locally: full 18-component build; page/header/asset parity; optional Worker health; mismatch/equal/invalid response fixtures; header-tamper detection; repeated/skipped letter rejection and z owner gate. Windows packaging tests cannot create the symlink fixture; complete validation runs in Linux CI. Exact final head and CI are recorded in the branch handoff after completion.
 
 Browser correction: the first CI run caught the new script loading before the private page referrer policy. The shared script now loads at the end of head after policy meta tags; the unchanged private-link test passes locally.
+
+Review correction: an independent read-only review found that recording the last bundle dirtied the tagged source checkout. Final verification now permits only the expected regular ledger file update, compares the archived ledger to its tagged Git blob, and still rejects changed product files or an incorrect ledger. The real-Git regression failed before this fix and now passes.
