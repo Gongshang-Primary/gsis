@@ -112,13 +112,13 @@ function harness({interrupt = false} = {}) {
         DigestAlgorithm: {SHA_256: 'sha256'}, Charset: {UTF_8: 'utf8'}},
       rosterOperationsDigest_: value => { const raw = JSON.stringify(value); cost('cpu', Buffer.byteLength(raw)); return hash(raw); },
       rosterFolder_: () => ({}), rosterReadFile_: read,
-      rosterFindFile_: (_folder, name) => [...files].find(([, file]) => file.name === name)?.[0] || null,
-      rosterCreateFile_: (_folder, name, content) => {
+      rosterFindFile_: (_folder, name) => { assert.equal(locks, 0); cost('read', 100); return name === 'Roster import files' ? 'import-folder' : [...files].find(([, file]) => file.name === name)?.[0] || null; },
+      rosterCreateFile_: (folder, name, content) => {
         writable();
         const bytes = Buffer.from(content.getBytes());
-        if (locks) assert.equal(captures, 1, 'only the initial frozen snapshot may be written under production locks');
+        assert.equal(locks, 0, 'all uploads release both production locks'); assert.equal(folder, 'import-folder');
         cost('write', bytes.length); const id = 'created-' + (++uploads);
-        files.set(id, {name, bytes}); revisions.set(id + '|revision-1', Buffer.from(bytes));
+        files.set(id, {name, parents: [folder], bytes}); revisions.set(id + '|revision-1', Buffer.from(bytes));
         sourceWrites.push({id, name, locked: locks > 0});
         // Durable bytes survive termination. Any catch/finally storage writes
         // are refused, then a fresh VM starts from these exact durable maps.
@@ -154,7 +154,7 @@ function harness({interrupt = false} = {}) {
               const start = Number(range[1]), end = Number(range[2]); body = bytes.subarray(start, end + 1);
               status = 206; headers = {'Content-Range': `bytes ${start}-${end}/${bytes.length}`};
             } else body = bytes;
-          } else body = Buffer.from(JSON.stringify({id, size: String(file.bytes.length), parents: ['private-folder'], trashed: false, version: '1', headRevisionId: 'revision-1'}));
+          } else body = Buffer.from(JSON.stringify({id, size: String(file.bytes.length), parents: file.parents || ['private-folder'], trashed: false, version: '1', headRevisionId: 'revision-1'}));
         }
         cost('read', body.length);
         return {getResponseCode: () => status, getAllHeaders: () => headers,
@@ -253,7 +253,7 @@ function prepare({reload = false, changeLive = false, interrupt = false} = {}) {
     assert.equal(metadata.archiveObject.digest, h.originalArchiveDigests[date], 'capture retains the original immutable audit bytes');
   }
   assert(!Object.keys(h.stats().fileReads).some(id => id.endsWith('-new')), 'later archive pointers never enter the frozen source');
-  assert(h.sourceWrites.filter(write => write.locked).length <= 1, 'only snapshot storage holds production locks');
+  assert.equal(h.sourceWrites.filter(write => write.locked).length, 0, 'snapshot upload does not hold production locks');
   const names = h.sourceWrites.map(write => write.name);
   assert.equal(new Set(names).size, names.length, 'lost uploads reuse verified named files instead of creating duplicates');
   assert.equal(h.stats().pinnedRevisions, 0, 'capture does not perform one revision pin call per historical archive');

@@ -1,0 +1,14 @@
+'use strict';
+const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm'),crypto=require('node:crypto');
+const files=new Map(),properties=new Map();let writes=0;
+const scope={JSON,Utilities:{DigestAlgorithm:{SHA_256:'sha256'},computeDigest:(_,v)=>[...crypto.createHash('sha256').update(v).digest()]},rosterReadFile_:id=>files.get(id),props_:()=>({setProperty:(k,v)=>properties.set(k,v)}),rosterOperationsCommandDigest_:v=>crypto.createHash('sha256').update(JSON.stringify(v)).digest('hex')};
+vm.createContext(scope);vm.runInContext(fs.readFileSync('backend/RosterNativeStorage.gs','utf8'),scope);
+files.set('single',JSON.stringify({revision:1,days:[]}));assert.equal(scope.rosterNativeSplitWrite_('single',{revision:2},'pointer'),false);assert.equal(writes,0,'Google single layout is never converted');
+files.set('split',JSON.stringify({format:'gsis-roster-operations-split-v1',folderId:'private'}));
+scope.rosterSplitPrepareDocument_=(value,options)=>{assert.equal(options.previousId,'split');return {commit:()=>{writes++;return 'next';},cleanup:()=>assert.fail('old reader files must remain retained')};};
+assert.equal(scope.rosterNativeSplitWrite_('split',{revision:2},'pointer'),'next');assert.equal(properties.get('pointer'),'next');
+const command={operation:'saveAbsence',requestId:'id',staffId:'T',calendarCache:{ignored:true}},stable={operation:'saveAbsence',requestId:'id',staffId:'T'};
+const sorted=Object.fromEntries(Object.keys(stable).sort().map(k=>[k,stable[k]])),digest=crypto.createHash('sha256').update(JSON.stringify(sorted)).digest('hex'),receipt={actor:'teacher',edgeDigest:digest,digest};
+assert(scope.rosterNativeReceiptMatches_(receipt,command,'teacher'));assert(!scope.rosterNativeReceiptMatches_(receipt,{...command,staffId:'other'},'teacher'));assert(!scope.rosterNativeReceiptMatches_(receipt,command,'other'));
+assert(scope.rosterNativeReceiptMatches_({actor:'teacher',digest:scope.rosterOperationsCommandDigest_(stable)},stable,'teacher'));
+console.log('PASS native split continuation and tagged D1 receipt replay, no live conversion, no old-reader deletion');

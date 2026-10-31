@@ -69,18 +69,20 @@ module.exports = function harness({uploadFailure = false, killPhase = null} = {}
     rosterOperationsDigest_: value => { const raw = JSON.stringify(value); cost(Buffer.byteLength(raw)); return hash(raw); },
     rosterIndex_: () => ({schema: 1, revision: 1, entries: [], receipts: []}),
     rosterFolder_: () => ({}),
+    rosterFindFile_: (_folder, name) => name === 'Roster import files' ? 'import-folder' : null,
     rosterReadFile_: id => {
       const file = files.get(id); assert(file, 'missing file ' + id);
       if (id === 'operations') { assert.equal(locks, 2); captures++; } else assert.equal(locks, 0, 'batch reads must release both production locks');
       clock += 5000; elapsed += 5000; cost(file.bytes.length); return file.bytes.toString('utf8');
     },
-    rosterCreateFile_: (_folder, name, content) => {
+    rosterCreateFile_: (folder, name, content) => {
       const bytes = Buffer.from(content.getBytes());
       writes.push({name, locks, bytes: bytes.length});
+      assert.equal(folder, 'import-folder', 'new imports use the dedicated private child folder');
       if (uploadFailure && name.endsWith('source.json')) throw Object.assign(Error('Drive upload unavailable'), {status: 503});
       assert.equal(locks, 0, 'all frozen source and part uploads must release both production locks');
       clock += 5000; elapsed += 5000; cost(bytes.length);
-      const id = 'file-' + (++serial); files.set(id, {name, bytes}); return id;
+      const id = 'file-' + (++serial); files.set(id, {name, bytes, parents: [folder]}); return id;
     },
     rosterDriveJson_: response => JSON.parse(response.getContentText()),
     rosterDriveRequest_: (url, options = {}) => {
@@ -96,7 +98,7 @@ module.exports = function harness({uploadFailure = false, killPhase = null} = {}
           const range = /bytes=(\d+)-(\d+)/.exec(options.headers?.Range || '');
           if (range) { const start = +range[1], end = +range[2]; bytes = file.bytes.subarray(start, end + 1); status = 206; headers = {'Content-Range': `bytes ${start}-${end}/${file.bytes.length}`}; }
           else bytes = file.bytes;
-        } else bytes = Buffer.from(JSON.stringify({id, size: String(file.bytes.length), parents: ['private'], trashed: false}));
+        } else bytes = Buffer.from(JSON.stringify({id, size: String(file.bytes.length), parents: file.parents || ['private'], trashed: false}));
       }
       clock += 5000; elapsed += 5000; cost(bytes.length);
       return {getResponseCode: () => status, getAllHeaders: () => headers, getContent: () => new Uint8Array(bytes), getContentText: () => bytes.toString('utf8')};

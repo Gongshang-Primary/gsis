@@ -14,7 +14,7 @@ function rosterNotificationOwner_(){
 function rosterNotificationFile_(){return props_().getProperty('ROSTER_NOTIFICATION_TRANSPORT_FILE')||rosterFindFile_(ROSTER_DATA,'Roster notification transport.json');}
 function rosterNotificationState_(){
  const id=rosterNotificationFile_();if(!id)return null;
- let state;try{state=JSON.parse(rosterReadFile_(id));}catch(e){error_(503,'Notification delivery records could not be read.');}
+ let state;try{state=JSON.parse(typeof rosterNativeRead_==='function'?rosterNativeRead_(id):rosterReadFile_(id));}catch(e){error_(503,'Notification delivery records could not be read.');}
  if(state?.schema!==1||!Array.isArray(state.outbox)||!Array.isArray(state.deliveryEvents)||!Array.isArray(state.smcAlerts)||!state.owner?.email||!state.owner?.scriptId)error_(503,'Notification delivery records need administrator review.');
  return state;
 }
@@ -22,8 +22,9 @@ function rosterNotificationCheckOwner_(state){const owner=rosterNotificationOwne
 function rosterNotificationLock_(knownState){rosterNotificationCheckOwner_(knownState===undefined?rosterNotificationState_():knownState);return LockService.getUserLock();}
 function rosterNotificationCommit_(state){if(typeof rosterEdgeAssertLegacyWrite_==='function')rosterEdgeAssertLegacyWrite_();
  gsisRequireBackendRole_('roster');rosterNotificationCheckOwner_(state);state.revision=(state.revision||0)+1;
- const data=JSON.stringify(state);if(data.length>12000000)error_(507,'Notification delivery records are full. Ask Admin to archive old delivery records.');
  const stored=props_().getProperty('ROSTER_NOTIFICATION_TRANSPORT_FILE'),id=stored||rosterNotificationFile_();
+ if(typeof rosterNativeSplitWrite_==='function'&&rosterNativeSplitWrite_(id,state,'ROSTER_NOTIFICATION_TRANSPORT_FILE'))return;
+ const data=JSON.stringify(state);if(data.length>12000000)error_(507,'Notification delivery records are full. Ask Admin to archive old delivery records.');
  const saved=id?(rosterDriveRequest_('https://www.googleapis.com/upload/drive/v3/files/'+encodeURIComponent(id)+'?uploadType=media&supportsAllDrives=true&fields=id',{method:'patch',contentType:'application/json; charset=UTF-8',payload:data},'notification-commit'),id):rosterCreateFile_(ROSTER_DATA,'Roster notification transport.json',Utilities.newBlob(data,'application/json'));
  if(!stored)props_().setProperty('ROSTER_NOTIFICATION_TRANSPORT_FILE',saved);
 }

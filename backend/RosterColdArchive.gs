@@ -9,7 +9,7 @@ function rosterColdArchiveRead_(month,state){
  if(!/^20\d\d-(0[1-9]|1[0-2])$/.test(month))error_(400,'Choose a valid archive month.');
  const id=state.coldArchive?.months?.[month]?.fileId||rosterFindFile_(ROSTER_DATA,'Roster archive '+month+'.json');
  if(!id)return {id:null,value:{schema:1,month,items:[]}};
- let value;try{value=JSON.parse(rosterReadFile_(id));if(value?.schema!==1||value.month!==month||!Array.isArray(value.items)||value.digest!==rosterOperationsPlanDigest_(JSON.stringify(value.items)))throw Error('digest');}
+ let value;try{value=JSON.parse(typeof rosterNativeRead_==='function'?rosterNativeRead_(id):rosterReadFile_(id));if(value?.schema!==1||value.month!==month||!Array.isArray(value.items)||value.digest!==rosterOperationsPlanDigest_(JSON.stringify(value.items)))throw Error('digest');}
  catch(error){error_(503,'The monthly Roster archive could not be verified. No records were removed.');}
  return {id,value};
 }
@@ -51,8 +51,9 @@ function rosterColdArchiveWrite_(month,items,state){
  const archive=rosterColdArchiveRead_(month,state),rows=archive.value.items.slice(),keys=new Set(rows.map(row=>JSON.stringify([row.collection,row.id,row.digest])));
  for(const item of items){const digest=rosterOperationsPlanDigest_(item.json),key=JSON.stringify([item.collection,item.id,digest]);item.stub.archiveRef={...item.stub.archiveRef,digest};if(keys.has(key))continue;keys.add(key);rows.push({collection:item.collection,id:item.id,digest,json:item.json});}
  const value={schema:1,month,items:rows,digest:rosterOperationsPlanDigest_(JSON.stringify(rows))},json=JSON.stringify(value);
- const id=archive.id?(rosterDriveRequest_('https://www.googleapis.com/upload/drive/v3/files/'+encodeURIComponent(archive.id)+'?uploadType=media&supportsAllDrives=true&fields=id',{method:'patch',contentType:'application/json; charset=UTF-8',payload:json},'roster-cold-archive'),archive.id):rosterCreateFile_(ROSTER_DATA,'Roster archive '+month+'.json',Utilities.newBlob(json,'application/json; charset=UTF-8'));
- const observed=rosterReadFile_(id);if(rosterOperationsPlanDigest_(observed)!==rosterOperationsPlanDigest_(json))error_(503,'The monthly Roster archive write could not be verified. No records were removed.');
+ const splitId=typeof rosterNativeSplitWrite_==='function'&&rosterNativeSplitWrite_(archive.id,value);
+ const id=splitId|| (archive.id?(rosterDriveRequest_('https://www.googleapis.com/upload/drive/v3/files/'+encodeURIComponent(archive.id)+'?uploadType=media&supportsAllDrives=true&fields=id',{method:'patch',contentType:'application/json; charset=UTF-8',payload:json},'roster-cold-archive'),archive.id):rosterCreateFile_(ROSTER_DATA,'Roster archive '+month+'.json',Utilities.newBlob(json,'application/json; charset=UTF-8')));
+ const observed=typeof rosterNativeRead_==='function'?rosterNativeRead_(id):rosterReadFile_(id);if(rosterOperationsPlanDigest_(observed)!==rosterOperationsPlanDigest_(json))error_(503,'The monthly Roster archive write could not be verified. No records were removed.');
  return {fileId:id,count:rows.length,characters:rows.reduce((sum,row)=>sum+row.json.length,0),digest:value.digest};
 }
 function rosterColdArchiveRun_(options){

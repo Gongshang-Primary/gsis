@@ -7,9 +7,9 @@ import {fileURLToPath,pathToFileURL} from 'node:url';
 // lanes remain active while retained migration data is never hydrated or changed.
 const root=path.resolve(process.env.GSIS_TEST_ROOT||fileURLToPath(new URL('..',import.meta.url)));
 const moduleAt=name=>import(pathToFileURL(path.join(root,name)).href);
-const [{default:worker},{GSiSEdgeStore},{GSISRosterOperations:O},gateway]=await Promise.all([
+const [{default:worker},{GSiSEdgeStore},{GSISRosterOperations:O},gateway,{resolveRosterAuthorityEnvironment}]=await Promise.all([
  moduleAt('notification-worker/index.js'),moduleAt('roster-update/public/edge-store.js'),
- moduleAt('roster-update/public/edge-roster-domain.js'),moduleAt('roster-update/public/_worker.js')
+ moduleAt('roster-update/public/edge-roster-domain.js'),moduleAt('roster-update/public/_worker.js'),moduleAt('shared/roster-recovery-profile.js')
 ]);
 
 function database(){
@@ -71,6 +71,10 @@ try{
   ROSTER_SERVICE_SECRET:'s'.repeat(40),CALENDAR_APPS_SCRIPT_URL:'https://script.google.com/macros/s/calendar-fixture/exec',CALENDAR_PROXY_SECRET:'c'.repeat(40),CALENDAR_BACKGROUND_SYNC:'false',
   WHATSAPP_ENABLED:'true',WHATSAPP_DURABLE_INGRESS:'true',WHATSAPP_PHONE_NUMBER_ID:'123456789',WHATSAPP_ACCOUNT_ID:'123456789',WHATSAPP_TEMPLATE_ACCOUNT_ID:'123456789',WHATSAPP_API_VERSION:'v22.0',
   WHATSAPP_ACCESS_TOKEN:'a'.repeat(40),WHATSAPP_APP_SECRET:'b'.repeat(40),EXTERNAL_LINK_SECRET:'e'.repeat(40),WHATSAPP_VERIFY_TOKEN:'v'.repeat(40),CONTACTS_PUBLIC_URL:'https://contacts.gsps.edu.sg/',WHATSAPP_TEMPLATES_JSON:'{}'};
+ // Generic historical Store fixtures do not prove a coordinated Roster cutover.
+ // Reject that incomplete D1 selection, then measure explicitly selected Google recovery.
+ await assert.rejects(resolveRosterAuthorityEnvironment(env),error=>error.code==='ROSTER_AUTHORITY_UNVERIFIED');
+ const recoveryEnv={...env,ROSTER_EDGE_AUTHORITY:'legacy'};
  globalThis.fetch=async(input,init)=>{
   const url=String(input),request=JSON.parse(init.body);networkCalls.push(url);
   if(url===env.CALENDAR_APPS_SCRIPT_URL){const dates=request.payload.dates||[request.payload.date],values=dates.map(date=>({date,schoolDay:true,parity:'odd'}));return Response.json({ok:true,result:request.action==='rosterDates'?{dates:values}:values[0]});}
@@ -85,7 +89,7 @@ try{
   const logs={info:[],warn:[],error:[]},pending=[];
   console.info=(...args)=>logs.info.push(args.join(' '));console.warn=(...args)=>logs.warn.push(args.join(' '));console.error=(...args)=>logs.error.push(args.join(' '));
   db.start();
-  await worker.scheduled({cron:'* * * * *',scheduledTime:now},env,{waitUntil(promise){pending.push(promise);}});
+  await worker.scheduled({cron:'* * * * *',scheduledTime:now},recoveryEnv,{waitUntil(promise){pending.push(promise);}});
   await Promise.all(pending);
   const measured=db.stop();console.info=realInfo;console.warn=realWarn;console.error=realError;
   const summary={pass:pass+1,historyBytes,queries:measured.queries,rows:measured.rows,bytes:measured.bytes,maxRows:measured.maxRows,broadRosterLoads:measured.broadRosterLoads,r2Gets:objectCalls.gets,r2Puts:objectCalls.puts,externalCalls:networkCalls.length,errors:logs.error,warnings:logs.warn};

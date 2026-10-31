@@ -1,7 +1,7 @@
 import rosterGateway,{rosterBackend,serviceBackend,absenceTransportRoute,assertAbsenceTransportReady,forwardAbsenceTransport,receivedReportWorkDue} from '../roster-update/public/_worker.js';
 import deployGateway,{deployBackend} from '../public/_worker.js';
 import {runDeployHandoffs} from '../public/edge-deploy.js';
-import {readEdgeRosterReferences} from '../roster-update/public/edge-roster.js';
+import {readEdgeRosterReferences,readRosterMirrorStatus} from '../roster-update/public/edge-roster.js';
 import {verifyBackendEnvelope,backendDomainEnv,permittedRelayPath} from '../shared/backend-service.js';
 import {assertRecoveryWritable,readRecoveryState,recordRecoveryCheckpoint} from '../shared/edge-recovery.js';
 import {readSystemHealth} from '../shared/edge-health.js';
@@ -51,10 +51,10 @@ async function health(env,command){
  if(input.operation==='retryBackgroundJob')await retryBackgroundJob(env,{kind:input.kind,expectedGeneration:input.expectedGeneration},actor);
  else if(input.operation==='recordRecoveryCheckpoint')await recordRecoveryCheckpoint(env,{...(Object.hasOwn(input,'reason')?{reason:input.reason}:{}),...(Object.hasOwn(input,'label')?{label:input.label}:{})},actor);
  else if(input.operation!=='read')fail(400,'GSIS_HEALTH_INPUT','Choose a supported health operation.');
- const [data,background,recovery]=await Promise.all([readSystemHealth(env),readBackgroundJobs(env),readRecoveryState(env)]);
+ const [data,background,recovery,googleBackup]=await Promise.all([readSystemHealth(env),readBackgroundJobs(env),readRecoveryState(env),readRosterMirrorStatus(env)]);
  const cache=await import('../roster-update/public/edge-timetable-cache.js');
  const timetables=cache.readTimetableCacheHealth?await cache.readTimetableCacheHealth(env):{available:false};
- return {ok:true,data:{...data,background,recovery,timetables}};
+ return {ok:true,data:{...data,background,recovery,timetables,googleBackup}};
 }
 async function afterCommit(env,domain,action,input,result){
  if(!result?.ok||result.data?.replayed===true||result.data?.duplicate===true)return;
