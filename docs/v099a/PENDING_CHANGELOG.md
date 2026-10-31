@@ -363,3 +363,32 @@ Files: roster-update/public/roster-settings-ui.js (section near "Subject familie
 4. Test: job with only reviewed uncertain messages records idle/success; with one unreviewed, records failure.
 
 **Scope:** peer-mail job in the notification Worker and `backend/RosterPeerMail.gs`. Not deployed.
+
+### Roster: a teacher made inactive in Contacts must not be available in Roster (owner priority, next PR)
+
+**Request (31 Oct 2026):** "if i make a teacher inactive on contacts-viewport, said teacher should not be available anymore on roster. priority next PR."
+
+**Current behaviour (source reading, to confirm by reproduction):** Contacts sends `active: r.Active==='Y'` per person (`backend/Contacts_Code_with_Deploy_API.gs` `rosterContactPerson_`). Roster's automatic allocation already skips inactive teachers (`shared/roster-allocation.js`: optimiser filter `t.person.active`, reason "No active verified timetable"), but `reliefCandidateEligible` itself does not check `active`, inactive teachers still appear as unavailable rows in candidate and colleague lists, and some views list every `rosterPeople` entry. The Contacts directory may also be cached in Roster (Apps Script cache, edge directory cache, browser preload), so a change can take time to appear.
+
+**Planned change:**
+1. Inactive (`Active` not `Y`) teachers are excluded from: relief candidate lists (manual and colleague/peer pickers), auto-allocation and Auto-fill blanks, Report Absence teacher pickers, Manage Ad-hoc pickers, Daily Notify recipients and SMC/Admin role lists. They are not shown as "unavailable" rows; they are absent.
+2. Existing records stay: past absences, assignments, R history and notifications for that teacher remain visible in history, exports and statistics, labelled "(inactive)" where shown.
+3. A teacher made inactive with future relief already assigned: show an SMC warning on Assign Relief for each affected date ("Assigned teacher is now inactive") and treat the cover as needing review; never silently remove it.
+4. Propagation: after Contacts saves, Roster reflects the change on the next refresh; document the maximum delay and clear any directory cache on the Contacts change (or cap its age at 5 minutes).
+5. Tests: inactive teacher absent from each picker and from allocation; historical rows retained; future assignment flagged; reactivation restores availability.
+
+**Scope:** shared/roster-allocation.js, shared/roster-operations.js views, Roster UI pickers, Roster directory cache, tests. Not deployed.
+
+### Contacts: Edit Info filter by part of the TTb name
+
+**Request (31 Oct 2026):** "partial text filter search by TTb name in contacts: edit info".
+
+**Current behaviour:** Contacts → Edit Info (`contacts-update/public/index.html` `#data`, `renderData` in `contacts-update/public/app.js`) shows the whole staff grid with no filter.
+
+**Planned change:**
+1. A "Find by TTb name" text box in the Edit Info toolbar. Typing filters rows whose TTb Name contains the text, case-insensitive (NFKC, spaces collapsed). Clearing shows all rows.
+2. Filtering only hides rows: unsaved edits in hidden rows are kept and saved; "+ row" still works; Save, Reload and Recalculate act on all rows as today.
+3. Show "Showing N of M staff". Esc clears the box.
+4. Test: filter "tan" shows only matching TTb names; an edit made, filtered away and saved is still saved.
+
+**Scope:** contacts-update/public/app.js and index.html only. Not deployed.

@@ -6,7 +6,8 @@ Quiet hours 30 Oct 2026 night (owner: "get as much deployable done as possible";
 - Merged tonight: #20 (2b2), #21 (collapsible TG exceptions), #22 (row 3 Excel), #23 (rows 5 and 6).
 - Claude built: row V phase 1 (#24), row 15b SIUE by specialism (#25).
 - **31 Oct 05:30 owner decision: option A first.** Codex next is **row A, roster-archive-cold-output.md** (archive machine output older than 30 days; keep all records). #19 is repurposed as the D1 backup format: do not enable split on live data.
-- **Codex next, in order:** (0) row A; (1) #19 review fixes (read cost, confirm dialog), for the D1 backup use; (2) row 2c FAJT levelling; (3) row V phase 2 (mismatch notice, Worker version, bundle letter refusal); (4) rows 10 to 14 in order.
+- **31 Oct 10:10 owner priority:** next PR is **row I, inactive in Contacts = unavailable in Roster** (PENDING_CHANGELOG entry 31 Oct). Then row C, Contacts Edit Info TTb filter (small). Row A merged as PR #28 and deployed in v0.9.9c.
+- **Codex next, in order:** (0) row I; (0b) row C; (1) #19 review fixes (read cost, confirm dialog), for the D1 backup use; (2) row 2c FAJT levelling; (3) row V phase 2 (mismatch notice, Worker version, bundle letter refusal); (4) rows 10 to 14 in order.
 - Main checkout rule: run `npm run build` before `npm test` after every branch switch.
 
 Owner order 30 Oct 2026 evening (owner away from PC; bundle 6bb4844 not yet deployed): open two PRs now.
