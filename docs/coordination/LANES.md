@@ -41,7 +41,8 @@ Any job that touches files in two lanes belongs to the stricter lane (R before D
 ## Current assignments (update on every change)
 | Job | Lane | Model | Status |
 |---|---|---|---|
-| R2: D1 import capture saves packed state | R | Codex | Top priority, not started (31 Oct 15:25) |
+| R2: D1 import capture saves packed state | R | Codex | Merged #34, deployed v0.9.9e |
+| F: cutover freeze before snapshot | R | Codex | **Top priority** (1 Nov 04:05) |
 | Row I: inactive Contacts staff unavailable in Roster (#30) | R | Codex | Draft, paused behind R2 |
 | #29: weekly R checkpoint plus FAJT levelling | R | Codex | Draft, paused |
 | Row P: peer-mail health fix | R | Codex | Queued after I |
