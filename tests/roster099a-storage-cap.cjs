@@ -40,5 +40,15 @@ test('storage report measures the stored compressed form and never inflates hist
  assert.equal(decodes,0,'measuring never decompresses history');
  assert(Math.abs(report.total-saved.length)<saved.length*0.02,`report ${report.total} matches saved ${saved.length}`);
  assert.equal(report.collections.reduce((n,c)=>n+c.chars,0),report.total);
- assert.match(fs.readFileSync('backend/RosterOperations.gs','utf8'),/storageView:p\.operation==='prunePreview'\?rosterOperationsStoredView_/,'the real context supplies the stored view');
+ Object.assign(scope,{GSISRosterOperations:f.O,props_:()=>({getProperty:key=>key==='ROSTER_OPERATIONS_MAX_CHARS'?'20000000':null}),rosterIndex_:()=>assert.fail('storage reads do not need the timetable index')});
+ scope.Utilities.formatDate=(_,zone,format)=>{assert.equal(zone,'Asia/Singapore');return format==='yyyy-MM-dd'?f.date:format==='HH'?'08':'00';};
+ const contacts={user:{rosterAdmin:true,rosterSMC:true,rosterStaffId:'alice'},rosterPeople:f.people,rosterSMCIds:['alice']};
+ for(const input of [{operation:'prunePreview',from:'2026-01-01',to:'2026-01-01'},{operation:'read',view:'prune'}]){
+  const state=scope.rosterAllocationAuditUnpack_(scope.rosterOperationsUnpackPlans_(JSON.parse(saved))),context=scope.rosterOperationsContext_({input,identity:{email:'alice@gsps.edu.sg'}},contacts,state);
+  assert.equal(context.storageView,scope.rosterOperationsStoredView_,'the real '+input.operation+' context supplies the stored view');
+  assert.equal(context.storageMaxChars,20000000,'the real '+input.operation+' context supplies the configured capacity');
+  decodes=0;const actual=f.O.read(state,context,input).storage;
+  assert.equal(decodes,0,'the real '+input.operation+' context measures without decompressing history');
+  assert(Math.abs(actual.total-saved.length)<saved.length*0.02,'the real '+input.operation+' context measures the saved form');
+ }
 });

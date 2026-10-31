@@ -4,6 +4,7 @@ on:
     branches:
       - codex/roster-operations-split-files
       - codex/roster-sre-fajt-r-calc
+      - codex/roster-archive-cold-output
   workflow_dispatch:
 permissions:
   contents: read
