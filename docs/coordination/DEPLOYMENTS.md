@@ -2,6 +2,13 @@
 
 What is live, when it changed and how to roll back. Record every production deployment and every live setting change. "Reported" means stated by the owner; "verified" means checked by a model with the evidence named.
 
+## 31 Oct 2026 10:07 SGT: v0.9.9c (main ef037a2), reported by owner
+
+Bundle `deploy/2026-10-31-v0.9.9c`. Deployed the same six components as v0.9.9b (Roster and Deploy backends and frontends, both Workers). Adds nightly cold-output archive (PR #28).
+- Owner checks (31 Oct): Roster and Deploy headers v0.9.9c; Prune records now Storage with Archive now; Assign Relief, System Config, LORD and Calendar load.
+- **Rollback constraint:** after the first archive run (first evening 16:00 to 24:00 after deploy, i.e. 31 Oct evening), never roll the Roster backend back to v0.9.9b or earlier; it cannot read archived items.
+- D1 job health 10:07 (verified by Claude): last hour only peer-mail (known, 46), one webhook and one notifications timeout before the deploy.
+
 ## 31 Oct 2026 ~05:00 SGT: v0.9.9b (main 6eb943f), reported by owner
 
 Bundle `deploy/2026-10-31-v0.9.9b` (branch, folder `deploy-bundle`; SHA256SUMS inside). Deployed: Roster backend, Deploy backend, Roster frontend, gsis-roster-notifications, gsis-operations, Deploy frontend. Not deployed: optional label-only zips for Contacts, Layout, Calendar, LORD, OVERLORD, STARLORD, Venues (still show v0.9.9).

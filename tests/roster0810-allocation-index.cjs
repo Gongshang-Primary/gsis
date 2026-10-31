@@ -5,14 +5,16 @@ let reads=0;const assignments=Array.from({length:1800},(_,i)=>{const staffId=i%2
 const model={...template,teachers,assignments},dem={id:'d1',staffId:'alice',period:2,date:f.date,subject:'EL',className:'3A',venue:'Room',groupName:''};
 const rows=A.manualRanks(model,dem),digest=crypto.createHash('sha256').update(JSON.stringify(rows)).digest('hex');
 console.log(JSON.stringify({assignmentStaffIdReads:reads,teachers:teachers.length,assignments:assignments.length,resultDigest:digest}));
-// Revision F adds explicit workload policy metadata. Ordinary-day ranking and
+// Workload policy and FAJT membership are explicit metadata. Ordinary-day ranking and
 // balances still match the original pre-index fixture byte for byte.
 assert(rows.every(row=>row.workloadIgnored===false),'ordinary days retain workload policy');
-const legacyDigest=crypto.createHash('sha256').update(JSON.stringify(rows.map(({workloadIgnored,...row})=>row))).digest('hex');
-assert.equal(legacyDigest,'f30ab7e077567cb1515045f95c7c69e3cf06bbe84d4ff373549cd374b69e2edb','ranking fields other than the declared workload policy metadata match the pre-index fixture byte for byte');
+assert(rows.every(row=>row.fajt===false),'ordinary staff retain non-FAJT membership');
+const legacyDigest=crypto.createHash('sha256').update(JSON.stringify(rows.map(({workloadIgnored,fajt,...row})=>row))).digest('hex');
+assert.equal(legacyDigest,'f30ab7e077567cb1515045f95c7c69e3cf06bbe84d4ff373549cd374b69e2edb','ranking fields other than the declared workload policy and FAJT metadata match the pre-index fixture byte for byte');
 assert(reads<assignments.length*10,'candidate ranking must index assignments once instead of rescanning every teacher');
 assert.equal(rows.length,teachers.length);assert.deepEqual(rows.map(r=>r.rank),Array.from({length:180},(_,i)=>i+1));
 // Aggregate costs must keep alias identities and exclude invalid cover exactly.
 const next=assignments.filter((_,i)=>i%2===0),before=structuredClone(model),projected=A.withManualAssignments(model,next);
 for(const t of projected.teachers){const old=before.teachers.find(row=>row.id===t.id),ids=new Set(old.aliasIds),cost=rows=>rows.filter(a=>ids.has(a.staffId)&&!a.invalidCover).reduce((n,a)=>n+A.cost(a),0),delta=cost(next)-cost(before.assignments);assert.equal(t.balance.weeklyUsed,old.balance.weeklyUsed+delta);}
 console.log('PASS indexed candidate ranking and alias cost aggregation preserve ranking shape and balances.');
+

@@ -83,3 +83,13 @@ For the Cloudflare option, publish-time snapshots need durable delivery/retry an
 ### Next action and coordination
 
 Resolve the storage route before product implementation. Recheck active Roster claims, especially PR #27, which edits the same allocation/accounting domain. Existing implementation deferment is unchanged. No tests run for this documentation-only revision; source review is not a runtime pass.
+
+
+
+## Combined implementation started 31 October 2026
+
+Owner: "reconcile/combine PR27 and 29 and start on it". This supersedes the prior implementation deferment. PR #29 is the combined branch; the original #27 history is retained as a parent of the integration commit. Current main is retained, including cold archives. The recommended current Google-first route is used; a separate Cloudflare quota store remains with the D1 migration.
+
+Implemented so far: FAJT priority/settings from #27; existing-ledger Sunday capture, frozen weekly R, cumulative horizon, cutoff provenance, safe prior-R fallback, pending retries, and scheduler/Calendar wiring. Local focused tests pass. Full release build and suite pending CI because this runtime has only a selected source checkout. No deployment, authority change or messages.
+
+Remaining gate: complete CI, reconcile generated output, run review and report exact head.

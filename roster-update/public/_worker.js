@@ -1462,7 +1462,9 @@ export async function scheduledRoster(env,scheduledTime=Date.now()){
  // its due-work preflight. Do not fetch the legacy Calendar adapter on idle ticks.
  if(edgeRosterEnabled(env)){const result=await serviceBackend(env,{operation:'scheduledRoster',date,scheduledTime,notificationsReady:notificationStatus(env).ready});if(!result.ok)throw rosterScheduledFailure(result);return result.data;}
  // The Calendar service is read-only and separately authenticated by its proxy secret.
- const calendarByDate=await calendarDates(env,date===today?[today]:[today,date],null);
+ const dayOfWeek=new Date(today+'T12:00:00Z').getUTCDay(),monday=new Date(Date.parse(today+'T12:00:00Z')+((dayOfWeek===0?(minute>=960?1:-6):1-dayOfWeek)*86400000)).toISOString().slice(0,10);
+ const dates=[...new Set([today,date,...Array.from({length:5},(_,n)=>new Date(Date.parse(monday+'T12:00:00Z')+n*86400000).toISOString().slice(0,10))])];
+ const calendarByDate=await calendarDates(env,dates,null);
  const result=await serviceBackend(env,{operation:'scheduledRoster',date,dates:Object.keys(calendarByDate),calendarByDate,scheduledTime,notificationsReady:notificationStatus(env).ready});
  if(!result.ok)throw rosterScheduledFailure(result);return result.data;
 }
@@ -1652,3 +1654,4 @@ export async function resolveAbsenceTransport(env,who,{requestId,reason,all=fals
 }
 
 /* GSIS_ROSTER_ABSENCE_TRANSPORT_END */
+

@@ -5,6 +5,7 @@ on:
       - codex/roster-operations-split-files
       - codex/roster-sre-fajt-r-calc
       - codex/roster-archive-cold-output
+      - codex/roster-weekly-quota-snapshot
   workflow_dispatch:
 permissions:
   contents: read
@@ -36,6 +37,12 @@ jobs:
           echo "GSIS_BROWSER_EXECUTABLE=$BROWSER" >> "$GITHUB_ENV"
       - name: Regenerate all 18 components
         run: npm run build
+      - name: Save generated-source patch
+        run: git diff --binary --no-ext-diff > /tmp/gsis-generated.patch
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: gsis-generated-source
+          path: /tmp/gsis-generated.patch
       - name: Check browser fixture portability
         run: |
           node tests/roster084-private-link-reuse-browser.cjs
@@ -46,3 +53,4 @@ jobs:
           node tests/stapler098h-recovery-browser.cjs
       - name: Run full regression suite
         run: npm test
+
