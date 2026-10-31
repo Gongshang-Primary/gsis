@@ -260,7 +260,7 @@ async function quietModeRoute(req,env,u){
   return json({ok:true,data:input.action==='on'?await startQuietMode(env.GSIS_JOBS,who.email):await endQuietMode(env.GSIS_JOBS,who.email,'manual')});
  }catch(error){return json({ok:false,error:error.status&&error.status<500?error.message:'Quiet mode could not be confirmed.'},error.status||503);}
 }
-const D1_PREPARE_OPERATIONS=new Set(['status','import','export']);
+const D1_PREPARE_OPERATIONS=new Set(['status','import','export','restart']);
 async function d1PrepareAllows(req,env){
  if(env.ROSTER_D1_PREPARE!=='import'||req.method!=='POST')return false;
  try{const input=JSON.parse(await req.clone().text());return D1_PREPARE_OPERATIONS.has(input?.operation);}catch{return false;}
@@ -272,8 +272,8 @@ export default {async fetch(req,env,ctx){
  // Migration is deliberately absent from the restoration release. In
  // particular, an old dashboard binding must not reactivate a second writer.
  // 0.9.9a D1 preparation: ROSTER_D1_PREPARE=import reopens only read and copy
- // controls. Activation, restart, pause and resume stay closed, so Google
- // remains the only writer and users keep the Google route.
+ // controls plus the guarded abandonment of an incomplete import. Activation,
+ // pause and resume stay closed, so Google remains the only writer.
  if(u.pathname==='/api/edge/migration'&&!(await d1PrepareAllows(req,env)))return json({ok:false,code:'RECOVERY_MIGRATION_DISABLED',error:'Migration is disabled in this Roster restoration release.'},404);
  if(u.pathname==='/api/venues-source')return json({ok:false,code:'RECOVERY_VENUES_SUSPENDED',error:'Venue occupancy export is paused during Roster recovery.'},503);
  if(u.pathname==='/api/system-health')return systemHealthRoute(req,env);

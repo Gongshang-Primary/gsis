@@ -1,0 +1,17 @@
+'use strict';
+const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm'),crypto=require('node:crypto');
+const h=require('./roster701-adapter.cjs')(),hash=raw=>crypto.createHash('sha256').update(raw).digest('hex'),files=new Map();let created=0;
+vm.runInContext(fs.readFileSync('backend/RosterAuditExport.gs','utf8'),h.scope);
+const old={schema:1,date:h.date,version:1,revision:8,audit:[{id:'old',date:h.date,operation:'assign',auditExportCaptured:true}],optimisationRuns:[]};
+files.set('legacy',{name:h.date+'.json',raw:JSON.stringify(old)});const original=files.get('legacy').raw;
+h.scope.rosterFindFile_=(_,name)=>name==='Evidence'?'evidence':[...files].find(([,file])=>file.name===name)?.[0]||'';
+h.scope.rosterReadFile_=id=>{assert(files.has(id));return files.get(id).raw;};h.scope.Utilities.newBlob=raw=>({raw});
+h.scope.rosterCreateFile_=(_,name,blob)=>{assert.equal(h.locked(),false);const id='evidence-'+(++created);files.set(id,{name,raw:blob.raw});return id;};
+h.scope.rosterDriveRequest_=()=>assert.fail('evidence JSON must never be overwritten');
+const state=h.state();state.allocationAuditExports={};state.allocationAuditExports[h.date]={pendingVersion:2,pendingRevision:12,archiveFileId:'legacy'};state.audit=[{id:'new',date:h.date,operation:'assign',auditExportCaptured:true}];
+const first=h.scope.rosterAllocationAuditArchive_(state,h.date,'month');assert.notEqual(first.fileId,'legacy');assert.equal(files.get('legacy').raw,original);assert.equal(first.digest,hash(files.get(first.fileId).raw));assert.match(files.get(first.fileId).name,new RegExp('^'+h.date+'-'+first.digest+'\\.json$'));assert.equal(JSON.parse(files.get(first.fileId).raw).audit.length,2);
+const replay=h.scope.rosterAllocationAuditArchive_(state,h.date,'month');assert.equal(replay.fileId,first.fileId);assert.equal(created,1,'lost watermark retries reuse the verified immutable file');
+state.allocationAuditExports[h.date]={pendingVersion:3,pendingRevision:13,archiveFileId:first.fileId,archiveDigest:first.digest};state.audit.push({id:'correction',date:h.date,operation:'unassign',auditExportCaptured:true});const firstBytes=files.get(first.fileId).raw;
+const second=h.scope.rosterAllocationAuditArchive_(state,h.date,'month');assert.notEqual(second.fileId,first.fileId);assert.equal(files.get('legacy').raw,original);assert.equal(files.get(first.fileId).raw,firstBytes);assert.equal(JSON.parse(files.get(second.fileId).raw).audit.length,3);
+files.get(first.fileId).raw+=' ';assert.throws(()=>h.scope.rosterAllocationAuditArchive_(state,h.date,'month'),/stored allocation evidence could not be read/,'digest mismatch cannot silently merge different source bytes');
+console.log('PASS immutable audit writer: new IDs, preserved legacy bytes, digest-named retries and corruption refusal.');

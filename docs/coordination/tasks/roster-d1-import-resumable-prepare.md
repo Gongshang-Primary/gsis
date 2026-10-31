@@ -1,13 +1,13 @@
 # roster-d1-import-resumable-prepare: split D1 import preparation into steps under the Apps Script limit
 
-- Status: claimed; implementation planning and baseline verification in progress. **Top priority** by owner 31 Oct 2026.
+- Status: implementation complete; validation and exact-head review tracked in PR #32.
 - Owner/model: Codex (builder)
 - Reviewer/model: Claude
 - Last updated (Asia/Singapore): 31 Oct 2026 12:35
 - Branch: codex/roster-d1-import-resumable-prepare
 - Base SHA: 66983af9644a8d1f6095d6a93acffe2ba88f4d57
-- PR: none
-- Files/domains owned: backend/RosterEdgeMigration.gs (export manifest/part/resume), shared/roster-import.js (freeze in batches, progress), roster-update/public/edge-roster.js and edge-setup UI (step progress, timing), generated copies, tests.
+- PR: https://github.com/helper-gsps/gsis/pull/32 (closed during implementation; reopen only after the full suite is green)
+- Files/domains owned: backend/RosterEdgeMigration.gs (export manifest/part/resume), backend/RosterAuditExport.gs (immutable evidence files), shared/roster-import.js (freeze in batches, progress), roster-update/public/edge-roster.js and edge-setup UI (step progress, timing), generated copies, tests.
 - Out of scope: activation, fencing, D1 authority; the Google-backup task.
 
 ## Evidence (31 Oct 2026 owner rehearsal)
@@ -35,11 +35,29 @@ Reference 6f550ae7-a19c-4087-9900-501c3ac8e2c1; D1 session created 12:14:00 SGT,
 ## After merge
 Owner deploys, then reruns the rehearsal import on a quiet day (explicit restart with a new request ID). Claude checks D1 against Google.
 
-## Implementation rulings
+## Implementation rulings (31 October)
 
-- D1 coordinates preparation-step leases and accepted checkpoint pointers only. Production Roster stays Google-first; no authority flag changes.
-- A successful step releases its lease immediately. A timed-out call retains a lease through the Apps Script execution horizon; stale results cannot advance the D1 cursor.
-- Immutable Drive checkpoints hold large part maps. Script Properties retain only a small session locator. Finalization writes metadata, not a concatenated container.
-- Mutable audit archives require pinned Drive revisions. Frozen snapshot reads never substitute current archive bytes.
-- Native object compression and whole-scope identity/digest preparation are isolated stages, then part uploads are bounded. The production-size fixture must prove the simulated per-call budget. Live Drive latency remains a rehearsal gate.
-- Row I is paused at local checkpoint 24594853c5b621cf929e16fe27e9dfe09bc0c329. Its remote draft #30 is claim-only; no completed implementation or CI pass is claimed there.
+- D1 controls preparation-step leases and accepted checkpoints only. Google remains the production Roster authority.
+- Each successful step releases its lease. A timed-out execution keeps a lease through the Apps Script execution horizon; stale responses cannot advance the checkpoint.
+- Private Drive checkpoints hold large part maps. Script Properties retain a small locator. Finalization writes metadata, not one large container.
+- Investigation found allocation-audit JSON was overwritten in place. The matched backend will write immutable versioned audit JSON instead, retaining old files and using the existing archiveFileId reference. This removes unbounded revision-pinning work from the snapshot lock. Human-readable text exports keep their existing behavior.
+- Snapshot capture performs only current-state/reference capture, digesting and one frozen-source write under production locks. Model/archive bodies are read in later steps.
+- Native object preparation and global record identity/digest calculation are isolated from bounded part uploads. Preserve Store.encode global identities and the existing import manifest format. The budget fixture measures these stages separately; live Apps Script/Drive timing remains an owner rehearsal gate.
+- Restart atomically resets only a permitted D1 import before idempotent Google descriptor cleanup. Cleanup failure remains explicit and retries the same identity. Activation remains blocked by the production recovery gateway.
+- Row I is paused at local checkpoint 24594853c5b621cf929e16fe27e9dfe09bc0c329. Its remote draft contains the claim only. Rows I, C and P wait until rows R and D1 are merged.
+
+## Local verification in progress
+
+The production-size test uses exactly 16,080,000 operations characters, 12 models and 16 audit archives. It produces 149 identical parts over 105 preparation steps. It survives 179 simulated post-upload terminations with the same final manifest and part bytes. Maximum simulated call cost is 96,998 ms uninterrupted and 107,123 ms when resumed. These are deterministic simulated I/O costs, not live Apps Script measurements.
+
+Deployment gate: install the resumable exporter and immutable audit writer together; let any old preparation or audit-export execution finish before the owner starts the rehearsal. Do not roll back a live v2 preparation to code that cannot read its checkpoints. Source and checkpoint files remain evidence on cancellation.
+
+Full Node/LORD verification and Claude exact-head review remain required before merge. No deployment or authority change was performed. The claim-only PR is closed until full verification passes.
+
+## Handoff and verification
+
+`TZ=Asia/Singapore npm run build` rebuilt all 18 components. The 18 focused import, immutable-audit, recovery, preparation-control and UI programs pass. The full Node and LORD suite runs through the repository Actions workflow against the exact branch head, with the real Git history and browser. No unavailable local browser or packaging-history check is counted as passing.
+
+Independent review corrected checkpoint-source anchoring and restart cleanup races. Cleanup status and its original reset ID now survive reload, and a second tab cannot start another import until cleanup is confirmed. Historical records, captured source files, checkpoints, parts and receipts remain retained.
+
+Production authority is unchanged. The implementation adds no automatic activation or deployment. After row R is reviewed and owner-merged, row D1 owns backup and switch-back work. I, C and P remain paused until both D1 rows merge.
