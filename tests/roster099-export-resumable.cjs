@@ -70,4 +70,14 @@ function harness(){
  const h=harness();delete h.snapshot.state.allocationAuditExports['2026-10-29'].archiveDigest;const first=h.call(h.input);h.files.get('audit').bytes=Buffer.from(JSON.stringify({schema:1,date:'2026-10-29',version:2,revision:4,audit:[]}));
  assert.throws(()=>h.finish(first),e=>e.status===503&&/version changed/.test(e.message),'legacy version metadata also rejects later evidence');
 }
-console.log('PASS resumable export: frozen capture, immutable audit, immutable checkpoint replay, lost uploads, tamper refusal and retained restart.');
+// An older preparing export has no v2 checkpoint. Polls must still reach its
+// original recovery path until the old lease expires or its upload is found.
+{
+ const h=harness(),binding=h.scope.rosterEdgeExportBindingV2_({identity:{email:'admin@example.test'},input:h.input});
+ h.properties.set('ROSTER_EDGE_EXPORT:'+binding.sessionId,JSON.stringify({...binding,state:'preparing',sourceDigest:'a'.repeat(64),leaseUntil:600000}));
+ const first=h.call(h.input);assert(first.preparing);assert.equal(first.preparation,undefined);
+ const second=h.call({...h.input,preparation:{ordinal:1,checkpoint:null}});assert(second.preparing);assert.equal(h.stats().captures,0,'legacy polling never captures replacement source');
+ h.advance();h.scope.rosterEdgeExportFind_=()=>null;
+ const expired=h.call({...h.input,preparation:{ordinal:2,checkpoint:null}});assert(expired.preparationFailed);assert(expired.requiresRestart);assert.equal(h.stats().locks,0);
+}
+console.log('PASS resumable export: frozen capture, immutable audit, immutable checkpoint replay, lost uploads, tamper refusal, retained restart and legacy polling.');

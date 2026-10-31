@@ -9721,8 +9721,9 @@ function rosterEdgeExportWorkHeaderV2_(binding,work){
  const raw=rosterEdgeExportRange_(work.fileId,9,work.headerBytes,work.totalBytes);if(rosterEdgeExportHash_(raw)!==work.headerDigest)error_(503,'The preparation work header failed verification.');const value=JSON.parse(raw);if(value.schema!==ROSTER_EXPORT_V2||value.actor!==binding.actor||value.requestId!==binding.requestId||value.sessionId!==binding.sessionId||!Array.isArray(value.partMetadata)||value.partMetadata.length!==work.parts)error_(409,'The work file belongs to another preparation.');return value;
 }
 function rosterEdgeExportManifestV2_(req){
- const binding=rosterEdgeExportBindingV2_(req),step=rosterEdgeExportPreparation_(req.input),started=Date.now();if(rosterEdgeExportAbandoned_(binding))error_(409,'This preparation was abandoned. Start with a new request ID.');
+ const binding=rosterEdgeExportBindingV2_(req),started=Date.now();if(rosterEdgeExportAbandoned_(binding))error_(409,'This preparation was abandoned. Start with a new request ID.');
  const existing=rosterEdgeExportDescriptor_(binding);if(existing&&existing.schema!==2){const input={...req.input};delete input.preparation;return rosterEdgeExportManifestLegacy_({...req,input});}
+ const step=rosterEdgeExportPreparation_(req.input);
  const recovered=rosterEdgeExportRecoveredCheckpoint_(binding,step);if(recovered){rosterEdgeExportAssertCheckpointV2_(binding,recovered.checkpoint,existing);return rosterEdgeExportReplyV2_(recovered.checkpoint,recovered.ref);}
  let checkpoint;
  if(step.ordinal===0){

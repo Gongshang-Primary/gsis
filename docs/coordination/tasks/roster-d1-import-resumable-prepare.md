@@ -62,4 +62,8 @@ The first complete CI run at `bc47d2b97d8769a0e0a0473c5961a9e47d7668f0` rebuilt 
 
 Independent review corrected checkpoint-source anchoring and restart cleanup races. Cleanup status and its original reset ID now survive reload, and a second tab cannot start another import until cleanup is confirmed. Historical records, captured source files, checkpoints, parts and receipts remain retained.
 
+Further source review found that the new checkpoint validator ran before legacy-session detection. An existing preparing v1 export could complete its first poll but fail every later poll without a v2 checkpoint. A regression reproduced the HTTP 400 before repair; legacy sessions now enter their original recovery path before v2 validation, including expiry to an explicit restart requirement. New v2 sessions retain checkpoint validation.
+
+The active branch claim and closed PR #32 remain the ownership record. An attempted claim-only update to main was rejected by automatic approval review because main changes require owner merge. No main ref was changed; this branch continues under the owner's explicit Row R assignment.
+
 Production authority is unchanged. The implementation adds no automatic activation or deployment. After row R is reviewed and owner-merged, row D1 owns backup and switch-back work. I, C and P remain paused until both D1 rows merge.
