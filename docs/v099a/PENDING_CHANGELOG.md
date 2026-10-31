@@ -354,6 +354,8 @@ Files: roster-update/public/roster-settings-ui.js (section near "Subject familie
 
 ### Roster: peer email job reports failure every minute for already-reviewed messages
 
+**Status:** approved (owner 31 Oct: "2 go"). Queue row P.
+
 **Found (30 Oct 2026, D1 job health; still present after the v0.9.9b deploy, 31 Oct 05:09):** `peer-mail` records `JOB_FAILED` (and some `TIMEOUT`) every minute since at least 30 Oct 18:00, with counts `{pending:0, sent:0, uncertain:2, reviewedUncertain:2}`. The two uncertain messages were already reviewed, yet each run counts them as a failure. No message is lost; the noise hides real failures in System Health.
 
 **Planned change:**
