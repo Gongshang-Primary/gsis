@@ -1,11 +1,11 @@
 # roster-d1-google-backup: once D1 is the Roster record, keep Google as a live backup and allow a safe switch back
 
-- Status: approved, priority (owner 30 Oct 2026: "prioritise the list for D1 authoritative for roster")
+- Status: claimed; implementation in progress. Owner authorised Row D1 on 31 Oct 2026.
 - Owner/model: Codex (builder), Claude (architect and reviewer)
 - Reviewer/model: Claude
-- Last updated (Asia/Singapore): 30 Oct 2026 16:30 (split Google files, owner go)
+- Last updated (Asia/Singapore): 31 Oct 2026 14:00
 - Branch: codex/roster-d1-google-backup
-- Base SHA: current main
+- Base SHA: 396546d0546293cdb9e682fe3b282257e2495df8
 - PR: none
 - Files/domains owned: roster-update/public/edge-roster.js and edge-store.js (outbox on commit), a scheduled mirror lane (operations or notification Worker, or the Roster Pages Worker cron), backend/RosterEdgeMigration.gs (new mirror and release operations), Roster edge setup page, backend/RosterOperations.gs read/commit path (split layout), tests.
 - Out of scope: running the switch (owner, see roster-d1-cutover runbook); LORD/Deploy.
@@ -38,3 +38,12 @@
 - Split: a 30M-character fixture round-trips (write split, read back, byte-identical); a change to one day rewrites only that month's part and the manifest; a crash before the manifest write leaves the previous manifest valid.
 - Legacy without a manifest behaves exactly as today; `splitOperations` keeps the old file.
 - Nothing changes while mode is `legacy` or `imported` (no mirror traffic before activation).
+
+## Owner scope and implementation contract (31 October)
+
+- Fold PR #19's split read/write implementation into this task; do not activate split storage while Google is authoritative.
+- Mirror an immutable generation of both operational scopes, their receipts and native object references. Record revisions transactionally, coalesce mirror work, and publish a complete Google generation only after verification.
+- Release quiesces and pauses all D1 writers, requires exact revision/digest catch-up, installs verified native pointers, then clears the Google fence. No live switch or configuration change is authorised in this task.
+- Include #32 follow-ups: release script/notification locks before source upload; keep source/checkpoint/part files in a Roster import files child folder.
+- #29 and #30 remain paused. Canonical code and generated copies, offline fixtures, System Health and edge setup are in scope. Claude reviews the exact head; owner merges.
+- Claim is published on this task branch because automatic approval review previously rejected direct main claim updates. No PR is opened before the full Node and LORD suite passes.
