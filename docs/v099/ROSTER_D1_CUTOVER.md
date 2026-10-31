@@ -32,7 +32,7 @@ Do nothing in Roster until Claude replies. Claude compares D1 with the frozen Go
 
 ## 3. Set the D1 switch in Cloudflare (10 minutes, before activation)
 Safe now: it has no effect until step 4.
-1. **Roster Pages project (gsps-roster)** → Settings → Variables and Secrets → Production → add `ROSTER_EDGE_AUTHORITY` = `d1` (type Text) → Save. Then Deployments → latest production deployment → **⋯ → Retry deployment** (this applies the variable).
+1. **Roster Pages project (gsps-roster)** → Settings → Variables and Secrets → Production → add `ROSTER_EDGE_AUTHORITY` = `d1` (type Text) → Save. Then apply it with a new deployment: Deployments → latest production deployment → **⋯ → Retry deployment**; if that option is missing, Create deployment → upload the v0.9.9e `3_Roster_Frontend.zip` again → Production.
 2. **Worker gsis-roster-notifications** → Settings → Variables and Secrets → add `ROSTER_EDGE_AUTHORITY` = `d1` → Deploy.
 3. **Worker gsis-operations** → same.
 4. Roster still works on Google: open Assign Relief once to confirm. Tell Claude "step 3 done".
