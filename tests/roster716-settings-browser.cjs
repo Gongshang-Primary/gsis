@@ -21,4 +21,3 @@ const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('n
   console.log('PASS real Chromium: nine independent controls, numeric validation, local edits, save/reload and priority retention, narrow viewport, SMC read-only, Admin-only write guard.');
  }finally{await browser.close();}
 })().catch(e=>{console.error(e);process.exitCode=1;});
-

@@ -1,11 +1,12 @@
+import {dispatchQuotaSnapshot as runQuotaSnapshotJob,readQuotaCheckpointEvidence,readQuotaSnapshotStatus} from '../../shared/roster-quota-job.js';
 import {recoveryTimetableSnapshot} from './roster-recovery-timetable-cache.js';
 import {dispatchEdgeDeliveryReview,edgeDeliveryReportRead,edgeDeliveryReviewBackend} from './edge-notification-review.js';
-import {edgeRosterEnabled,edgeRosterService,edgeRosterBackend,edgeRosterMigration,readEdgeRosterReferences} from './edge-roster.js';
+import {edgeRosterEnabled,edgeRosterService,edgeRosterBackend,edgeRosterMigration,readEdgeRosterReferences,mirrorEdgeRoster,readRosterMirrorStatus} from './edge-roster.js';
 import {edgeNotificationService,edgeInboxBackend,supportsEdgeNotificationOperation,dispatchEdgePeerMail,dispatchEdgeEmploymentMail,reserveEdgeWhatsAppSend,recordEdgeWhatsAppThrottle,edgeDispatchHasWork} from './edge-notifications.js';
 import {backendAvailable,callOperationalBackend,forwardOperationalRequest} from '../../shared/backend-service.js';
 import {assertRecoveryWritable} from '../../shared/edge-recovery.js';
 import {readSystemHealth,safeHealthError} from '../../shared/edge-health.js';
-import {rosterRecoveryEnvironment} from '../../shared/roster-recovery-profile.js';
+import {rosterRecoveryEnvironment,resolveRosterAuthorityEnvironment} from '../../shared/roster-recovery-profile.js';
 import {readQuietMode,startQuietMode,endQuietMode,endQuietModeSession,QUIET_END_OPERATIONS} from '../../shared/roster-quiet-mode.js';
 /* GSIS_API_SECRET_BEGIN */
 // First-party API credentials share one operator-selected setting. Browser
@@ -254,29 +255,32 @@ async function quietModeRoute(req,env,u){
   if(req.method!=='POST'||req.headers.get('Origin')!==u.origin)return json({ok:false,error:'Same-origin POST required'},403);
   let input;try{input=await req.json();}catch{return json({ok:false,error:'Invalid request'},400);}
   if(!['on','off'].includes(input?.action))return json({ok:false,error:'Choose on or off.'},400);
-  const auth=(await backend(rosterRecoveryEnvironment(env),'rosterOperations',{operation:'read',view:'intake',scope:'mine'},who,crypto.randomUUID())).result;
+  const auth=(await backend((typeof resolveRosterAuthorityEnvironment==='function'?await resolveRosterAuthorityEnvironment(env):rosterRecoveryEnvironment(env)),'rosterOperations',{operation:'read',view:'intake',scope:'mine'},who,crypto.randomUUID())).result;
   if(!auth?.ok)return json({ok:false,error:'Current school authority could not be confirmed.'},[401,403].includes(auth?.status)?403:503);
   if(auth.data?.user?.smc!==true&&auth.data?.user?.admin!==true)return json({ok:false,error:'SMC or Admin access is required.'},403);
   return json({ok:true,data:input.action==='on'?await startQuietMode(env.GSIS_JOBS,who.email):await endQuietMode(env.GSIS_JOBS,who.email,'manual')});
  }catch(error){return json({ok:false,error:error.status&&error.status<500?error.message:'Quiet mode could not be confirmed.'},error.status||503);}
 }
-const D1_PREPARE_OPERATIONS=new Set(['status','import','export']);
+const D1_PREPARE_OPERATIONS=new Set(['status','import','export','restart']);
 async function d1PrepareAllows(req,env){
  if(env.ROSTER_D1_PREPARE!=='import'||req.method!=='POST')return false;
  try{const input=JSON.parse(await req.clone().text());return D1_PREPARE_OPERATIONS.has(input?.operation);}catch{return false;}
 }
 export default {async fetch(req,env,ctx){
  const u=new URL(req.url);
- env={...rosterRecoveryEnvironment(env),GSIS_REQUEST_ORIGIN:u.origin};
+ if(u.pathname==='/api/venues-source')return json({ok:false,code:'RECOVERY_VENUES_SUSPENDED',error:'Venue occupancy export is paused during Roster recovery.'},503);
+ // Health validates the caller and current Google role before reading any D1 ownership metadata.
+ if(u.pathname==='/api/system-health')return systemHealthRoute(req,{...rosterRecoveryEnvironment(env),GSIS_REQUEST_ORIGIN:u.origin},env);
+ try{env={...(typeof resolveRosterAuthorityEnvironment==='function'?await resolveRosterAuthorityEnvironment(env):rosterRecoveryEnvironment(env)),GSIS_REQUEST_ORIGIN:u.origin};}
+ catch(error){return json({ok:false,code:error.code||'ROSTER_AUTHORITY_UNVERIFIED',error:error.message},error.status||503);}
  if(u.pathname.startsWith('/api/')&&!['/api/session','/api/logout'].includes(u.pathname))try{gsisApiSecret(env,'BRIDGE_SECRET');}catch(error){return json({ok:false,code:error.code,error:error.message},503);}
  // Migration is deliberately absent from the restoration release. In
  // particular, an old dashboard binding must not reactivate a second writer.
  // 0.9.9a D1 preparation: ROSTER_D1_PREPARE=import reopens only read and copy
- // controls. Activation, restart, pause and resume stay closed, so Google
- // remains the only writer and users keep the Google route.
- if(u.pathname==='/api/edge/migration'&&!(await d1PrepareAllows(req,env)))return json({ok:false,code:'RECOVERY_MIGRATION_DISABLED',error:'Migration is disabled in this Roster restoration release.'},404);
+ // controls plus the guarded abandonment of an incomplete import. Activation,
+ // pause and resume stay closed, so Google remains the only writer.
+ if(u.pathname==='/api/edge/migration'&&!edgeRosterEnabled(env)&&!(await d1PrepareAllows(req,env)))return json({ok:false,code:'RECOVERY_MIGRATION_DISABLED',error:'Migration is disabled in this Roster restoration release.'},404);
  if(u.pathname==='/api/venues-source')return json({ok:false,code:'RECOVERY_VENUES_SUSPENDED',error:'Venue occupancy export is paused during Roster recovery.'},503);
- if(u.pathname==='/api/system-health')return systemHealthRoute(req,env);
  if(u.pathname.startsWith('/api/')&&!['/api/config','/api/session'].includes(u.pathname)){try{assertRecoveryWritable(env);}catch(error){return json({ok:false,code:error.code,error:error.message},503);}}
  if(u.pathname==='/api/venues-source'||/^\/api\/whatsapp\/(?:media|reports)\//.test(u.pathname)){try{const delegated=await forwardOperationalRequest(req,env,'roster');if(delegated!==undefined)return delegated;}catch(error){return json({ok:false,code:error.code,error:error.status<500?error.message:'The operational service could not be confirmed.'},error.status||503);}}
  if(u.pathname==='/api/whatsapp/webhook')return whatsappWebhook(req,env,ctx);
@@ -315,6 +319,7 @@ export default {async fetch(req,env,ctx){
    try{const stage=Date.now();input=await trustedOperationsInput(input,env,who,calendarOutput);calendarMs=Date.now()-stage;}catch(error){return json({ok:false,error:error.message},400)}
    const quietEnds=Object.hasOwn(QUIET_END_OPERATIONS,input.operation),quietSession=quietEnds?await readQuietMode(env.GSIS_JOBS,requestStarted).then(q=>q.active&&q.startedAt<=requestStarted?q.startedAt:0).catch(()=>0):0;
    const value=input.operation==='timetableBatch'&&!edgeRosterEnabled(env)&&!backendAvailable(env)?await timetableSnapshot(env,input,who,traceId):await backend(env,action,input,who,traceId);backendMs=value.backendMs;
+   value.result=await reconcileInactiveReplacements(env,input,value.result,who,traceId);
    // A confirmed publish or WhatsApp send ends quiet mode on the server, not in the browser.
    // Only work done now ends it: a replayed receipt (a retry, or a request from an
    // earlier session) ends nothing, and only the session active when this request
@@ -388,7 +393,7 @@ export async function readSession(req,env){
  return {email:data.email,subject:data.subject,expiresAt:data.expires};
 }
 async function requestIdentity(req,env){const auth=req.headers.get('Authorization');if(auth){if(!auth.startsWith('Bearer ')||auth.length>16000)throw Error('Invalid identity');return identity(auth.slice(7),env.GOOGLE_CLIENT_ID)}return readSession(req,env)}
-export async function systemHealthRoute(req,env){
+export async function systemHealthRoute(req,env,authorityEnv=env){
  const origin=new URL(req.url).origin;
  if(req.method!=='POST'||req.headers.get('Origin')!==origin)return json({ok:false,error:'Same-origin POST required.'},403);
  let who;try{who=await requestIdentity(req,env);}catch{return json({ok:false,error:'Sign in with your school account.'},401);}
@@ -398,23 +403,26 @@ export async function systemHealthRoute(req,env){
   if(['peerMailReview','reviewPeerMail'].includes(input.operation)){
    // The backend verifies current Admin authority under its notification lock.
    // This separate command cannot route into the retired operational authority.
-   const result=(await backend(rosterRecoveryEnvironment(env),'rosterOperations',input,who,crypto.randomUUID())).result;
+   const result=(await backend(env,'rosterOperations',input,who,crypto.randomUUID())).result;
    if(!result?.ok)return json({ok:false,...safeHealthError(result),error:[401,403].includes(result?.status)?'Current Admin access is required.':'Colleague email review could not be confirmed. Retry the same action.'},[401,403].includes(result?.status)?403:result?.status||503);
    return json(result);
   }
   const result=await callOperationalBackend({...env,GSIS_REQUEST_ORIGIN:origin},'health',{input,identity:who});
   if(result===undefined){
+   env={...rosterRecoveryEnvironment(env),GSIS_REQUEST_ORIGIN:origin};
    if(input.operation!=='read')return json({ok:false,code:'RECOVERY_HEALTH_READ_ONLY',error:'Recovery health supports status reads only.'},400);
    // A fresh signed Google request checks current Contacts authority on every
    // read. Browser role claims and old D1 authority are never trusted.
-   const auth=(await backend(rosterRecoveryEnvironment(env),'rosterOperations',{operation:'read',view:'intake',scope:'mine'},who,crypto.randomUUID())).result;
+   const authInput=authorityEnv.ROSTER_EDGE_AUTHORITY==='d1'?{operation:'edgeHealthAuthority'}:{operation:'read',view:'intake',scope:'mine'};
+   const auth=(await backend(env,'rosterOperations',authInput,who,crypto.randomUUID())).result;
    if(!auth?.ok)return json({ok:false,...safeHealthError(auth),error:'Current school authority could not be confirmed.'},[401,403].includes(auth?.status)?403:503);
    if(auth.data?.user?.smc!==true&&auth.data?.user?.admin!==true)return json({ok:false,error:'SMC or Admin access is required.'},403);
-   const snapshot=await readSystemHealth(env,{jobsOnly:true}),jobs=new Set(['allocation','notifications','received-reports','inbox','webhook','peer-mail','r2-cleanup','audit-export']);
+   const statusEnv=typeof resolveRosterAuthorityEnvironment==='function'?await resolveRosterAuthorityEnvironment(authorityEnv):env;
+   const snapshot={...await readSystemHealth(statusEnv,{jobsOnly:true}),googleBackup:await readRosterMirrorStatus(statusEnv),quotaSnapshot:await readQuotaSnapshotStatus(statusEnv).catch(()=>({configured:true,available:false,status:'missing',lastCode:'QUOTA_SNAPSHOT_STORAGE'}))},jobs=new Set(['quota-snapshot','google-backup','allocation','notifications','received-reports','inbox','webhook','peer-mail','r2-cleanup','audit-export']);
    snapshot.jobs=snapshot.jobs.filter(row=>jobs.has(row.job));snapshot.recentFailures=snapshot.recentFailures.filter(row=>jobs.has(row.job));
    const reports={available:false,transportAvailable:false,href:'/'};let peerMailReviewAllowed=false;
    try{
-    const review=(await backend(rosterRecoveryEnvironment(env),'rosterOperations',{operation:'read',view:'intake'},who,crypto.randomUUID())).result;
+    const review=(await backend(env,'rosterOperations',{operation:'read',view:'intake'},who,crypto.randomUUID())).result;
     if([401,403].includes(review?.status)||review?.ok&&review.data?.user?.smc!==true&&review.data?.user?.admin!==true)return json({ok:false,error:'Current SMC or Admin access is required.'},403);
     if(review?.ok&&(review.data?.user?.smc===true||review.data?.user?.admin===true)){
      peerMailReviewAllowed=review.data.user.admin===true;
@@ -501,6 +509,7 @@ async function statisticsCalendar(env,who,year){
  const value=await response.json();if(!response.ok||!value.ok||!Array.isArray(value.data?.terms)||!Array.isArray(value.data?.semesters))throw Error('School calendar periods could not be loaded.');return value.data;
 }
 export async function trustedOperationsInput(input,env,who,calendarOutput={},now=Date.now()){
+ const {inactiveReconcileDates,...browserInput}=input;input=browserInput;
  if(edgeRosterEnabled(env)){const safe={...input};for(const key of ['calendarByDate','calendarCache','calendar','capability','identity','service','trustedIntakeAt','trustedNow','pendingTransportDates'])delete safe[key];return safe;}
  if(typeof input.operation!=='string'||!/^[A-Za-z][A-Za-z0-9]{0,63}$/.test(input.operation))throw Error('Choose a valid Roster operation.');
  // Preparation has a narrow read-only contract and no Calendar dependency.
@@ -521,6 +530,34 @@ export async function trustedOperationsInput(input,env,who,calendarOutput={},now
  const calendarByDate=cached?Object.fromEntries(wanted.map(date=>[date,cached.calendarByDate[date]||{available:false}])):Object.assign({},...await Promise.all(Array.from({length:Math.ceil(dates.length/62)},(_,i)=>calendarDates(env,dates.slice(i*62,(i+1)*62),who))));
  if(!intake&&['saveAbsence','saveInstructions'].includes(input.operation)){const selected=operationDates(input,true);if(selected.length>62){const unavailable=selected.find(date=>calendarByDate[date]?.available!==true);if(unavailable)throw Error(calendarByDate[unavailable]?.message||'Calendar must verify every selected date before reporting or updating an absence longer than 62 days.');}}
  const safe={...input,calendarByDate,trustedNow:now,schedulerAvailable:env.ROSTER_AUTOMATION_ENABLED==='true',notificationsReady:notificationStatus(env).ready};delete safe.calendarCache;delete safe.calendar;delete safe.capability;delete safe.identity;delete safe.service;delete safe.trustedIntakeAt;delete safe.pendingTransportDates;if(intake&&env.ROSTER_PUBLIC_ORIGIN)safe.publicOrigin=publicOrigin(env);return safe;
+}
+
+// Most requests need no extra source read. Only pending inactive-teacher duties
+// request their missing Calendar dates, followed by one reconciliation-only read.
+// A completed save is never replayed or reported as failed by this maintenance.
+export async function reconcileInactiveReplacements(env,input,result,who,traceId,service=false){
+ if(!result?.ok||!result.data||!Array.isArray(result.data.inactiveReplacementDates))return result;
+ const pending=result.data.inactiveReplacementDates;delete result.data.inactiveReplacementDates;
+ if(edgeRosterEnabled(env)||!pending.length)return result;
+ const dates=[...new Set(pending)];
+ if(dates.length>366||dates.some(date=>!validDate(date))){result.data.inactiveReconciliationPending=true;return result;}
+ const missing=dates.filter(date=>input.calendarByDate?.[date]?.available!==true);
+ if(!missing.length)return result;
+ try{
+  const calendar={...input.calendarByDate};
+  for(let offset=0;offset<missing.length;offset+=62)Object.assign(calendar,await calendarDates(env,missing.slice(offset,offset+62),who));
+  const ready=missing.filter(date=>calendar[date]?.available===true);
+  if(!ready.length){result.data.inactiveReconciliationPending=true;return result;}
+  const followInput={...(service||input.operation==='read'?input:{operation:'read',view:'reportForm',date:ready[0],notificationsReady:input.notificationsReady,schedulerAvailable:input.schedulerAvailable}),inactiveReconcileDates:ready,calendarByDate:calendar};
+  const follow=service?await serviceBackend(env,followInput):(await backend(env,'rosterOperations',followInput,who,traceId)).result;
+  if(!follow?.ok){result.data.inactiveReconciliationPending=true;return result;}
+  if(follow.data)delete follow.data.inactiveReplacementDates;
+  const queued=Number(result.data.notificationsQueued||0)+Number(follow.data?.notificationsQueued||0);
+  if(!service&&input.operation==='read')result=follow;
+  if(queued)result.data.notificationsQueued=queued;
+  if(ready.length<missing.length)result.data.inactiveReconciliationPending=true;
+  return result;
+ }catch(_){result.data.inactiveReconciliationPending=true;return result;}
 }
 
 function configuredSecret(secret){return typeof secret==='string'&&secret.length>=32}
@@ -1454,18 +1491,22 @@ function rosterScheduledFailure(result){
  const counts={};for(const key of ['pendingCaptureCount','pendingPeerCount'])if(Number.isSafeInteger(result?.[key])&&result[key]>=0)counts[key]=result[key];
  return Object.assign(Error('Scheduled Roster operation could not be confirmed. Check its safe code and receipt status.'),{...safeHealthError(result),status:Number.isInteger(result?.status)?result.status:503,...counts});
 }
+export async function dispatchQuotaSnapshot(env){return runQuotaSnapshotJob(env);}
 export async function scheduledRoster(env,scheduledTime=Date.now()){
  if(env.ROSTER_AUTOMATION_ENABLED!=='true')return {enabled:false};
  const sg=new Date(scheduledTime+8*3600000).toISOString(),minute=+sg.slice(11,13)*60+ +sg.slice(14,16),today=sg.slice(0,10),date=minute>=960?new Date(Date.parse(today+'T12:00:00Z')+86400000).toISOString().slice(0,10):today;
  const pending=await pendingAbsenceTransport(env,[date]);if(pending.pendingCaptureCount||pending.pendingPeerCount)throw rosterScheduledFailure({status:409,code:'ABSENCE_TRANSPORT_PENDING',...pending});
  // D1's scheduler verifies its persisted Calendar/Contacts references after
  // its due-work preflight. Do not fetch the legacy Calendar adapter on idle ticks.
- if(edgeRosterEnabled(env)){const result=await serviceBackend(env,{operation:'scheduledRoster',date,scheduledTime,notificationsReady:notificationStatus(env).ready});if(!result.ok)throw rosterScheduledFailure(result);return result.data;}
- // The Calendar service is read-only and separately authenticated by its proxy secret.
  const dayOfWeek=new Date(today+'T12:00:00Z').getUTCDay(),monday=new Date(Date.parse(today+'T12:00:00Z')+((dayOfWeek===0?(minute>=960?1:-6):1-dayOfWeek)*86400000)).toISOString().slice(0,10);
- const dates=[...new Set([today,date,...Array.from({length:5},(_,n)=>new Date(Date.parse(monday+'T12:00:00Z')+n*86400000).toISOString().slice(0,10))])];
- const calendarByDate=await calendarDates(env,dates,null);
- const result=await serviceBackend(env,{operation:'scheduledRoster',date,dates:Object.keys(calendarByDate),calendarByDate,scheduledTime,notificationsReady:notificationStatus(env).ready});
+ const weekdays=Array.from({length:5},(_,n)=>new Date(Date.parse(monday+'T12:00:00Z')+n*86400000).toISOString().slice(0,10));
+ const schoolDates=calendar=>weekdays.filter(day=>calendar?.[day]?.available===true&&calendar[day].schoolDay===true);
+ if(edgeRosterEnabled(env)){const references=await readEdgeRosterReferences(env,{allowExpired:true}),quotaCheckpointEvidence=await readQuotaCheckpointEvidence(env,{today,minute,now:scheduledTime,schoolDates:schoolDates(references.calendarByDate)});const result=await serviceBackend(env,{operation:'scheduledRoster',date,scheduledTime,quotaCheckpointEvidence,notificationsReady:notificationStatus(env).ready});if(!result.ok)throw rosterScheduledFailure(result);return result.data;}
+ // The Calendar service is read-only and separately authenticated by its proxy secret.
+ const dates=[...new Set([today,date,...weekdays])];
+ const calendarByDate=await calendarDates(env,dates,null),quotaCheckpointEvidence=await readQuotaCheckpointEvidence(env,{today,minute,now:scheduledTime,schoolDates:schoolDates(calendarByDate)});
+ const input={operation:'scheduledRoster',date,dates:Object.keys(calendarByDate),calendarByDate,scheduledTime,quotaCheckpointEvidence,notificationsReady:notificationStatus(env).ready};
+ const result=await reconcileInactiveReplacements(env,input,await serviceBackend(env,input),null,crypto.randomUUID(),true);
  if(!result.ok)throw rosterScheduledFailure(result);return result.data;
 }
 
@@ -1526,6 +1567,8 @@ export const ABSENCE_TRANSPORT_SCHEMA_SQL=`CREATE TABLE IF NOT EXISTS gsis_absen
  PRIMARY KEY(namespace,actor,request_id)
 )`;
 const absenceTransportSchemas_=new WeakMap();
+const absenceMirrorControlSQL_="CREATE TABLE IF NOT EXISTS gsis_roster_mirror_control(id INTEGER PRIMARY KEY CHECK(id=1),epoch INTEGER NOT NULL DEFAULT 1,phase TEXT NOT NULL DEFAULT 'normal' CHECK(phase IN ('normal','quiescing','paused','released')),release_request TEXT NOT NULL DEFAULT '',transport_revision INTEGER NOT NULL DEFAULT 0,updated_at INTEGER NOT NULL DEFAULT 0)";
+const absenceMirrorGate_ = "NOT EXISTS(SELECT 1 FROM gsis_roster_mirror_control WHERE id=1 AND phase<>'normal')";
 function absenceTransportError_(status,code,message){return Object.assign(Error(message),{status,code});}
 function absenceTransportInvalid_(){throw absenceTransportError_(400,'INVALID_ABSENCE_CAPTURE','Supply a valid absence report or colleague request.');}
 const absenceTransportObject_=value=>value&&typeof value==='object'&&!Array.isArray(value);
@@ -1549,7 +1592,7 @@ async function absenceTransportContext_(env){
  if(!env.GSIS_JOBS)return null;const db=env.GSIS_JOBS;if(typeof db.prepare!=='function')throw absenceTransportError_(503,'ABSENCE_TRANSPORT_CONFIG','Configure durable Roster storage.');
  const config=absenceTransportScope_(env),namespace=await absenceTransportHash_(JSON.stringify([config.backend,config.origin]));
  if(!absenceTransportSchemas_.has(db)){const prepare=(async()=>{for(const sql of [ABSENCE_TRANSPORT_SCHEMA_SQL,'CREATE INDEX IF NOT EXISTS gsis_absence_transport_due ON gsis_absence_transport(namespace,state,available_at,accepted_at)']){const result=await db.prepare(sql).run();if(result.success===false)throw Error('schema');}})().catch(()=>{absenceTransportSchemas_.delete(db);throw absenceTransportError_(503,'ABSENCE_TRANSPORT_STORAGE','Durable capture is unavailable. Retry the same report.');});absenceTransportSchemas_.set(db,prepare);}
- await absenceTransportSchemas_.get(db);return {db,namespace,...config};
+ await absenceTransportSchemas_.get(db);if(env.ROSTER_EDGE_AUTHORITY==='d1'){await db.prepare(absenceMirrorControlSQL_).run();await db.prepare('INSERT OR IGNORE INTO gsis_roster_mirror_control(id) VALUES(1)').run();}return {db,namespace,...config,edge:env.ROSTER_EDGE_AUTHORITY==='d1'};
 }
 function absenceTransportCommand_(input,origin){
  if(!absenceTransportObject_(input)||!['saveAbsence','requestMutual'].includes(input.operation)||input.intake!==true||typeof input.requestId!=='string'||! /^[a-f\d]{8}-(?:[a-f\d]{4}-){3}[a-f\d]{12}$/i.test(input.requestId))absenceTransportInvalid_();
@@ -1590,7 +1633,7 @@ async function absenceTransportFind_(context,actor,requestId){return context.db.
 function absenceTransportReceiptValue_(row){const peers=row.operation==='requestMutual'||!!JSON.parse(row.command).ownArrangementsByStaffDate;return {accepted:true,intakeReceipt:true,receiptOnly:true,requestId:row.request_id,acceptedAt:row.accepted_at,intakeState:['needsReview','withdrawn'].includes(row.state)?row.state:'pending',transportState:row.state,absenceApplied:false,savedIds:[],peerState:peers?'pending':'none',mutualRequestIds:[],reasonCode:row.last_code||null,affectedDates:JSON.parse(row.dates),...(row.state==='withdrawn'?{resolution:{at:row.resolved_at,by:row.resolved_by,reason:row.resolution_reason}}:{})};}
 export async function captureAbsenceTransport(env,who,input){
  const context=await absenceTransportContext_(env);if(!context)return null;const identity=absenceTransportIdentity_(who),{command,dates}=absenceTransportCommand_(input,context.origin),encoded=JSON.stringify(command),digest=await absenceTransportHash_(JSON.stringify(absenceTransportStable_(command))),now=Date.now();
- let writeFailed=false;try{const insert=context.db.prepare('INSERT OR IGNORE INTO gsis_absence_transport (namespace,actor,request_id,command,identity,digest,accepted_at,dates,operation,available_at) VALUES (?,?,?,?,?,?,?,?,?,?)').bind(context.namespace,identity.email,command.requestId,encoded,JSON.stringify(identity),digest,new Date(now).toISOString(),JSON.stringify(dates),command.operation,now);const results=env.ROSTER_EDGE_AUTHORITY==='d1'?await context.db.batch([insert,context.db.prepare("UPDATE gsis_edge_heads SET revision=revision+1,updated_at=? WHERE scope='roster' AND mode='active' AND changes()=1").bind(now)]):[await insert.run()];writeFailed=results.some(result=>result.success===false);}catch{writeFailed=true;}
+ let writeFailed=false;try{const insert=context.db.prepare('INSERT OR IGNORE INTO gsis_absence_transport (namespace,actor,request_id,command,identity,digest,accepted_at,dates,operation,available_at) '+(context.edge?'SELECT ?,?,?,?,?,?,?,?,?,? WHERE '+absenceMirrorGate_:'VALUES (?,?,?,?,?,?,?,?,?,?)')).bind(context.namespace,identity.email,command.requestId,encoded,JSON.stringify(identity),digest,new Date(now).toISOString(),JSON.stringify(dates),command.operation,now);const results=env.ROSTER_EDGE_AUTHORITY==='d1'?await context.db.batch([insert,context.db.prepare("UPDATE gsis_edge_heads SET revision=revision+1,updated_at=? WHERE scope='roster' AND mode='active' AND changes()=1").bind(now)]):[await insert.run()];writeFailed=results.some(result=>result.success===false);}catch{writeFailed=true;}
  // An acknowledgement can be lost after commit. A primary read confirms only
  // the immutable command actually stored; never mint a replacement request ID.
  let row;try{row=await absenceTransportFind_(context,identity.email,command.requestId);}catch{throw absenceTransportError_(503,'ABSENCE_CAPTURE_UNCONFIRMED','Capture could not be confirmed. Retry the same report.');}
@@ -1609,7 +1652,7 @@ export async function dispatchAbsenceTransport(env,{limit=2,budgetMs=55000,concu
  // Reserve one total slot per lane, then claim immediately before forwarding.
  // No lane preclaims a batch that could expire while waiting behind slow I/O.
  const lane=async()=>{while(reservations<count&&Date.now()<until){reservations++;
-  const now=Date.now(),claimId=crypto.randomUUID(),claimed=await context.db.prepare("UPDATE gsis_absence_transport SET state='claimed',claim_id=?,lease_until=?,attempts=attempts+1 WHERE rowid IN (SELECT rowid FROM gsis_absence_transport WHERE namespace=? AND ((state='queued' AND available_at<=?) OR (state='claimed' AND lease_until<=?)) ORDER BY accepted_at,request_id LIMIT 1) RETURNING *").bind(claimId,now+90000,context.namespace,now,now).all();if(claimed.success===false)throw absenceTransportError_(503,'ABSENCE_TRANSPORT_STORAGE','Durable delivery is unavailable.');const row=claimed.results?.[0];if(!row)return;summary.claimed++;
+  const now=Date.now(),claimId=crypto.randomUUID(),claimed=await context.db.prepare("UPDATE gsis_absence_transport SET state='claimed',claim_id=?,lease_until=?,attempts=attempts+1 WHERE rowid IN (SELECT rowid FROM gsis_absence_transport WHERE namespace=? AND ((state='queued' AND available_at<=?) OR (state='claimed' AND lease_until<=?)) ORDER BY accepted_at,request_id LIMIT 1)"+(context.edge?' AND '+absenceMirrorGate_:'')+" RETURNING *").bind(claimId,now+90000,context.namespace,now,now).all();if(claimed.success===false)throw absenceTransportError_(503,'ABSENCE_TRANSPORT_STORAGE','Durable delivery is unavailable.');const row=claimed.results?.[0];if(!row)return;summary.claimed++;
   let outcome;try{outcome=absenceTransportBackendResult_(await capture(JSON.parse(row.command),JSON.parse(row.identity),{acceptedAt:row.accepted_at}),row.request_id);}catch(error){const deterministic=error?.code!=='BACKEND_AUTHENTICATION'&&[400,403,404,409,413,422].includes(error?.status);outcome={deterministic,code:deterministic?'BACKEND_REJECTED_'+error.status:'BACKEND_RETRY'};}
   const state=outcome.forwarded?'forwarded':outcome.deterministic?'needsReview':'queued',delay=Math.min(300000,5000*2**Math.min(6,row.attempts-1)),settled=await context.db.prepare('UPDATE gsis_absence_transport SET state=?,claim_id=NULL,lease_until=0,available_at=?,last_code=?,forwarded_at=? WHERE namespace=? AND actor=? AND request_id=? AND state=\'claimed\' AND claim_id=? AND lease_until>?').bind(state,Date.now()+delay,outcome.forwarded?null:outcome.code,outcome.forwarded?new Date().toISOString():null,context.namespace,row.actor,row.request_id,claimId,Date.now()).run();
   if(settled.success===false)throw absenceTransportError_(503,'ABSENCE_TRANSPORT_STORAGE','Delivery remains recoverable in durable storage.');if(settled.meta?.changes)summary[outcome.forwarded?'forwarded':outcome.deterministic?'needsReview':'pending']++;
@@ -1655,3 +1698,4 @@ export async function resolveAbsenceTransport(env,who,{requestId,reason,all=fals
 
 /* GSIS_ROSTER_ABSENCE_TRANSPORT_END */
 
+export async function dispatchGoogleBackup(env){const result=await mirrorEdgeRoster(env);if(result.enabled===false)return result;const status=await readRosterMirrorStatus(env);return {...result,pending:status.pending,failed:status.behindThreshold?1:0,code:status.behindThreshold?'ROSTER_MIRROR_LAG':status.pending?'ROSTER_MIRROR_PENDING':'OK'};}

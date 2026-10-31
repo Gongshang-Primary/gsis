@@ -58,4 +58,3 @@ test('Settings and allocation exclude the same conflicting Contacts identities',
  const expected=A.fajtStatus(A.teacherContext(f.state,f.ctx,f.date),f.state.systemConfig),actual=f.O.view(f.state,f.ctx,{view:'systemConfig'}).fajtLevelling;
  assert.equal(expected.schoolMean,10);assert.deepEqual(actual,expected);
 });
-

@@ -20,6 +20,14 @@ const clone=x=>JSON.parse(JSON.stringify(x)),calculations=new Map(),encoder=new 
 const fail=(status,message,code)=>{throw Object.assign(new Error(message),{status,code});};
 const storeFor=env=>{if(!env.GSIS_JOBS)fail(503,'Bind the shared GSIS_JOBS D1 database.','DEPLOY_EDGE_CONFIG');return GSiSEdgeStore.open(env.GSIS_JOBS,'deploy');};
 export const edgeDeployEnabled=env=>String(env.DEPLOY_EDGE_AUTHORITY||'').toLowerCase()==='d1';
+// The persisted authority head also serves Roster's internal readers. The
+// frontend routing flag cannot turn an active or paused D1 record back to Google.
+export async function edgeDeployQuotaUsesD1(env){
+ if(!env.GSIS_JOBS){if(edgeDeployEnabled(env))fail(503,'The active Deploy source binding is unavailable.','QUOTA_SNAPSHOT_SOURCE');return false;}
+ const head=await storeFor(env).head();if(head.mode==='active')return true;
+ if(!edgeDeployEnabled(env)&&['legacy','imported'].includes(head.mode))return false;
+ fail(503,'Published Deploy authority is paused or is not active.','QUOTA_SNAPSHOT_SOURCE');
+}
 const commandDigest=(action,input)=>GSiSEdgeStore.digest({action,input});
 async function signed(url,secret,body){
  if(!/^https:\/\/script\.google\.com\/macros\/s\/[^/]+\/exec$/.test(url||'')||typeof secret!=='string'||secret.length<32)fail(503,'Configure the signed Google integration endpoint.','DEPLOY_EDGE_CONFIG');
@@ -204,6 +212,7 @@ function normaliseLegacy(value){
  for(const en of state.index.versions){en.store='d1';delete en.lastDelta;}
  if(state.index.published){state.index.published.edgePublished=true;state.index.published.store='d1';delete state.index.published.lastDelta;}
  state.index.venuePublications=(state.index.venuePublications||[]).map(en=>({...en,store:'d1',edgePublished:true,lastDelta:null}));
+ state.index.quotaPublications=(state.index.quotaPublications||[]).map(en=>({...en,store:'d1',edgePublished:true,lastDelta:null}));
  return state;
 }
 async function loadPublication(store,input={},attempt=0){
@@ -220,9 +229,23 @@ export async function edgeDeployPublishedReferences(env,input={}){
  if(!entry)fail(404,'Published Deploy version is unavailable.');return {entry,document:readDocument(state,entry),edgeRevision:loaded.revision,source:references.find(ref=>ref.commit===entry.commit)};
 }
 export async function edgeDeployRosterReference(env,dates){
+ if(!await edgeDeployQuotaUsesD1(env)){
+  const date=Array.isArray(dates)&&dates.length?dates[0]:new Date(Date.now()+8*3600000).toISOString().slice(0,10),input={manifest:true,date},manifest=await edgeDeployQuotaSource(env,input),source=manifest.expectedSource;
+  if(!source)fail(503,'No published Deploy quota covers this school date.','QUOTA_SNAPSHOT_SOURCE');
+  const value=await edgeDeployQuotaSource(env,{versionId:source.versionId,revision:source.revision,commit:source.commit}),after=await edgeDeployQuotaSource(env,input);
+  if(!after.expectedSource||['versionId','revision','commit','calculationVersion'].some(key=>after.expectedSource[key]!==source[key]))fail(409,'Deploy publication changed while reading its safety reference. Retry.','QUOTA_SNAPSHOT_CHANGED');
+  return value;
+ }
  const ref=await edgeDeployPublishedReferences(env),state=knownState({index:{versions:[],published:ref.entry,venuePublications:[ref.entry],revision:ref.entry.revision},publications:{}});
  // Canonical relief model consumes an immutable publication document.
  return {...createDeployDomain({state,identity:{email:'internal'},sha256:sha256Bytes,calculations,integration:()=>fail(503,'Unexpected integration')}).rosterReference(ref.document,ref.entry),edgeRevision:ref.edgeRevision};
+}
+// Internal signed producer for the separately retried Roster quota mirror.
+export async function edgeDeployQuotaSource(env,input={}){
+ if(!await edgeDeployQuotaUsesD1(env))return signed(env.DEPLOY_APPS_SCRIPT_URL||env.APPS_SCRIPT_URL,gsisApiSecret(env,'DEPLOY_BRIDGE_SECRET')||gsisApiSecret(env,'BRIDGE_SECRET'),{action:'deployEdge',service:'gsis-roster-quota-v1',input:{...input,operation:'quotaSnapshot'}});
+ const loaded=await loadPublication(storeFor(env),{...input,manifest:input.manifest===true});if(loaded.mode!=='active')fail(503,'Published Deploy authority is not active.','QUOTA_SNAPSHOT_SOURCE');
+ const state=knownState(loaded.state),model=createDeployDomain({state,identity:{email:'internal'},sha256:sha256Bytes,calculations,integration:()=>fail(503,'Unexpected integration')});
+ return clone(model.quotaSource(input));
 }
 // Internal school-service helper; the Roster caller must derive staffId from its verified identity.
 // The result contains one teacher's calculation and aggregate reference numbers only.
@@ -243,6 +266,7 @@ export async function edgeDeployService(request,env,ctx){
   else if(path==='/api/lord-source'){if(command.action!=='lordService'||command.service!=='gsis-lord-v1'||command.source!=='deploy')fail(401,'Invalid LORD source request.');action='lordService';}
   else {if(command.service!=='gsis-deploy-edge-v1')fail(401,'Invalid Deploy service request.');action=command.action;}
   if(action==='retryHandoffs'){await runDeployHandoffs(env);return Response.json({ok:true,data:{processed:true}},{headers:{'Cache-Control':'no-store'}});}
+  if(action==='quotaSnapshot'){const data=await edgeDeployQuotaSource({...env,DEPLOY_EDGE_AUTHORITY:'d1'},command.input||{});return Response.json({ok:true,data},{headers:{'Cache-Control':'no-store'}});}
   if(!['venuesSource','lordService','active','publicCampus','rosterReference'].includes(action))fail(403,'This service is read-only.');
   const input=command.input||{},store=storeFor(env),loaded=await loadPublication(store,{...input,manifest:action==='venuesSource'&&input.operation==='manifest'});if(loaded.mode!=='active')fail(503,'Deploy edge authority is not active.');const state=knownState(loaded.state),responses=new Map();if(['venuesSource','lordService','publicCampus'].includes(action))responses.set(JSON.stringify(['layout','registry',{},'internal-service']),await physicalRegistry(env,true));const model=domain(state,{email:'internal-service'},responses,env);let data;
   if(action==='venuesSource')data=model.venuesService(input);else if(action==='lordService')data=model.lordService(input);else if(action==='rosterReference'){const en=state.index.published;if(!en)fail(404,'No published Deploy version.');data=model.rosterReference(readDocument(state,en),en);}else if(action==='active'){const en=state.index.published;data=en?model.active(readDocument(state,en),state.index):{activeVersionId:null,revision:state.index.revision,assignments:[],workloads:[]};}else{const en=state.index.published;if(en){const projected=model.publicCampus(readDocument(state,en),en),cursor=en.commit+':'+projected.registryRevision;data=input.since===cursor?{unchanged:true,cursor}:{...projected,cursor};}else data={venues:[],classes:[],groups:[],cursor:'empty'};}

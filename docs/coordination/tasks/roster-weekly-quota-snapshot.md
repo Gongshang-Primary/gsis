@@ -1,17 +1,21 @@
 # roster-weekly-quota-snapshot: Sunday quota checkpoint
 
-- Status: proposed; documentation-only draft PR. Implementation explicitly deferred by owner until model switch.
-- Owner/model: Codex, future implementation; no active product-code claim.
+- Status: implemented locally as combined PR #29; exact-head full CI and owner merge remain required.
+- Owner/model: Codex.
 - Reviewer/model: Claude, exact implementation head after the full suite passes.
 - Last updated (Asia/Singapore): 31 October 2026.
 - Branch: codex/roster-weekly-quota-snapshot
-- Base SHA: branch created from current main on 31 October 2026; rebase/reconcile before implementation.
+- Base SHA: local #30 integration `015ea49`, including main `1284af8`; remote ancestry is preserved when publishing.
 - Current head SHA: see PR head.
 - PR: this branch's draft PR.
-- User-authorised scope: open this PR and record requirements only; do not implement yet.
-- Files/domains owned now: this task document only.
-- Future implementation domains: Deploy publication, shared Cloudflare quota snapshot, Roster weekly quota ledger and allocation checkpoint; exact canonical/generated files must be claimed after overlap review.
+- User-authorised scope: owner resumed implementation of PRs #30 and #29, including the accepted Cloudflare snapshot source.
+- Files/domains owned now: see roster-combined-weekly-quota.md for the bounded implementation and current verification gates.
+- Implementation domains: Deploy publication, shared Cloudflare quota snapshot, Roster weekly quota ledger and allocation checkpoint, health and focused tests.
 - Out of scope: other queue items, production authority cutover, deployment, live records, messages, automatic merge, administrator-selected effective dates.
+
+## Current implementation, 31 October 2026
+
+The combined implementation in `roster-combined-weekly-quota.md` supersedes the earlier preparation-only and Google-only notes below. Owner option B is implemented: immutable published Cloudflare snapshots feed the existing weekly entitlement ledger. Current main v0.9.9e and PR #30 at `f7e0022` are retained. All 18 components rebuild; focused publication, source-authority, checkpoint, health, FAJT and inactive-staff checks pass. Full Node/LORD CI on the eventual remote head remains the readiness gate. The earlier implementation deferment no longer applies. Nothing is deployed or activated.
 
 ## Owner decisions
 

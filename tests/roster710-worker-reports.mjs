@@ -38,7 +38,7 @@ for(const flag of ['true','false',undefined]){
  let release,reportCalls=0,settled=false;
  const gate=new Promise(resolve=>{release=resolve;}),background=[],errors=[];
  const scope=vm.createContext({Response,crypto:globalThis.crypto,rosterRecoveryEnvironment,assertRecoveryWritable,safeHealthError,console:{info(){},error:value=>errors.push(JSON.parse(value))},edgeRosterEnabled:()=>false,
-  dispatchNotifications:async()=>({sent:0}),dispatchInboxPending:async()=>({}),dispatchAllocationAudit:async()=>({}),
+  dispatchNotifications:async()=>({sent:0}),dispatchInboxPending:async()=>({}),dispatchAllocationAudit:async()=>({}),dispatchQuotaSnapshot:async()=>({idle:true}),
   dispatchReceivedReports:async()=>({hasMore:false}),dispatchPeerMail:async()=>({sent:0}),dispatchDeliveryReviewReports:async()=>({}),
   scheduledRoster:async()=>({notificationsQueued:0}),dispatchDailyEmploymentReports:async()=>{reportCalls++;await gate;return {sent:1};}
  });

@@ -1,0 +1,12 @@
+import assert from 'node:assert/strict';
+import {DatabaseSync} from 'node:sqlite';
+import {recordJobHealth,readSystemHealth,safeHealthError} from '../shared/edge-health.js';
+const sql=new DatabaseSync(':memory:'),db={prepare(query){const make=(args=[])=>({bind(...next){return make(next);},async all(){return {success:true,results:sql.prepare(query).all(...args)};},async first(){return sql.prepare(query).get(...args)||null;},async run(){return {success:true,meta:{changes:sql.prepare(query).run(...args).changes}};}});return make();},async batch(statements){sql.exec('BEGIN');try{const result=[];for(const statement of statements)result.push(await statement.run());sql.exec('COMMIT');return result;}catch(error){sql.exec('ROLLBACK');throw error;}}};
+const codes=['QUOTA_SNAPSHOT_PENDING','QUOTA_SNAPSHOT_SOURCE','QUOTA_SNAPSHOT_STORAGE','QUOTA_SNAPSHOT_INVALID','QUOTA_SNAPSHOT_CONFLICT','QUOTA_SNAPSHOT_CORRUPT','QUOTA_SNAPSHOT_MISSING','QUOTA_SNAPSHOT_STALE','QUOTA_CHECKPOINT_PENDING','QUOTA_CHECKPOINT_FALLBACK'];
+for(const code of [...codes,'ROSTER_MIRROR_VERIFY','ROSTER_MIRROR_LAG','PEER_MAIL_REVIEW_CONFLICT','AUDIT_EXPORT_PENDING','ALLOCATION_CUTOFF'])assert.equal(safeHealthError({code,message:'PRIVATE_ERROR',rows:[{id:'PRIVATE_STAFF'}]}).code,code);
+const now=Date.now(),env={GSIS_JOBS:db};
+for(let i=0;i<codes.length;i++)await recordJobHealth(env,{job:'quota-snapshot',status:'failure',code:codes[i],now:now+i,finishedAt:now+i,counts:{pending:1,staff:'PRIVATE_STAFF'},payload:{id:'PRIVATE_STAFF'},message:'PRIVATE_ERROR'});
+const data=await readSystemHealth(env,{jobsOnly:true,now:now+codes.length});assert.equal(data.jobs.length,1);assert.equal(data.jobs[0].job,'quota-snapshot');assert.equal(data.jobs[0].code,codes.at(-1));assert.equal(data.recentFailures.length,codes.length);assert.deepEqual(new Set(data.recentFailures.map(row=>row.code)),new Set(codes));
+assert(!JSON.stringify([data,sql.prepare('SELECT * FROM gsis_job_health').all(),sql.prepare('SELECT * FROM gsis_job_health_history').all()]).includes('PRIVATE_'));
+assert.equal(safeHealthError({code:'PRIVATE_CODE'}).code,'UNKNOWN_ERROR');
+console.log('PASS R snapshot job health: accepted job/codes, preserved earlier codes, safe aggregate storage and retained history.');

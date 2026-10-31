@@ -112,4 +112,3 @@ test('duplicate same-slot scheduler delivery cannot replace an in-flight allocat
  const result=h.scope.rosterScheduledDispatch_(request);assert.equal(result.run.coverage,2);assert.equal(h.state().assignments.length,2);assert.equal(Object.values(h.state().scheduleReceipts)[0].optimise,true);assert.equal(h.row().state,'completed');assert.equal(h.calls.writes,1);
 });
 console.log('PASS '+checks+' allocator lifecycle regressions.');
-

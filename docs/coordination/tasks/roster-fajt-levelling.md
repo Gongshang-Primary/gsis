@@ -1,12 +1,12 @@
 # roster-fajt-levelling: after SREs, FAJT average R% rises first until it leads the school by a set margin
 
-- Status: implementing the reviewed FAJT-only change on current main.
+- Status: implemented locally within combined PR #29; full verification and exact-head Claude review remain required.
 - Owner/model: Codex
 - Reviewer/model: Claude
 - Last updated (Asia/Singapore): 31 Oct 2026
-- Branch: codex/roster-fajt-levelling-review
-- Base SHA: e196f80978ebfa0c237312fe0cb42cb2029a02e0
-- PR: none
+- Branch: codex/roster-weekly-quota-snapshot
+- Base SHA: see roster-combined-weekly-quota.md for the current #30/main integration.
+- PR: #29, incorporating #27.
 - User-authorised scope: Song Wee, 30 Oct 2026: "after SRE; then FAJT but balance FAJT R% against all other EOs R%. rule 1: SREs first; rule 2: level up FAJT R% first to be equal with FAJT average R%; rule 3: annual R% levelling across all staff".
 - Files/domains owned: shared/roster-allocation.js (candidate ranking, preferenceRules, balances), Roster settings text, generated copies, tests.
 - Out of scope: R quota formula; Deploy specialist counts (separate task); SRE rule itself.

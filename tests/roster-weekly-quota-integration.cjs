@@ -2,7 +2,7 @@
 const test=require('node:test'),assert=require('node:assert/strict'),fixture=require('./roster701-fixture.cjs'),A=require('../shared/roster-allocation');
 function setup(){
  const f=fixture(),week='2026-11-02';Object.assign(f.ctx,{today:'2026-11-01',minute:960,now:Date.parse('2026-11-01T16:00:00+08:00'),iso:'2026-11-01T08:00:00.000Z',quotaRequested:true,quotaCheckpointDue:true,service:true});
- f.ctx.days=Object.fromEntries(Array.from({length:5},(_,i)=>[A.addDays(week,i),{id:'baseline',schoolDay:true,verified:true,parity:'odd',periods:f.ctx.days[f.date].periods,teachers:f.teachers,quotaSource:{weeklyCheckpoint:true,publishedAt:'2026-10-31T08:00:00Z',versionId:'v1'}}]));return {...f,week};
+ f.ctx.days=Object.fromEntries(Array.from({length:5},(_,i)=>[A.addDays(week,i),{id:'baseline',schoolDay:true,verified:true,parity:'odd',periods:f.ctx.days[f.date].periods,teachers:f.teachers,quotaSource:{service:'deploy',weeklyCheckpoint:true,publishedAt:'2026-10-31T08:00:00Z',versionId:'v1',revision:1,commit:'one',calculationVersion:'model-one'}}]));f.ctx.quotaCheckpointEvidence={...A.quotaCheckpoint(f.ctx),verified:true,source:f.ctx.days[week].quotaSource,rows:f.teachers.map(t=>({id:t.staffId,R:t.R}))};return {...f,week};
 }
 test('allocation and health projections cannot record a checkpoint in live state',()=>{
  for(const operation of ['allocation','health']){const f=setup(),before=JSON.stringify(f.state.quotaCheckpoints);f.O.read(f.state,f.ctx,{operation,date:f.week});assert.equal(f.state.entitlements.length,0);assert.equal(JSON.stringify(f.state.quotaCheckpoints),before);}

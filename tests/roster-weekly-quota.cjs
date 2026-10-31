@@ -5,7 +5,8 @@ function setup(time='2026-11-01T16:00:00+08:00'){
  const f=fixture(),now=Date.parse(time),sg=new Date(now+8*3600000).toISOString();
  Object.assign(f.ctx,{now,iso:new Date(now).toISOString(),today:sg.slice(0,10),minute:Number(sg.slice(11,13))*60+Number(sg.slice(14,16)),quotaRequested:true});
  f.ctx.days={};f.teachers.forEach(t=>{t.R=5;t.cells=f.blank();});
- for(let n=0;n<5;n++)f.ctx.days[A.addDays(week,n)]={id:'baseline',parity:'odd',schoolDay:true,verified:true,periods:[{period:0}],teachers:f.teachers,quotaSource:{weeklyCheckpoint:true,publishedAt,versionId:'v1',commit:'one'}};
+ for(let n=0;n<5;n++)f.ctx.days[A.addDays(week,n)]={id:'baseline',parity:'odd',schoolDay:true,verified:true,periods:[{period:0}],teachers:f.teachers,quotaSource:{service:'deploy',weeklyCheckpoint:true,publishedAt,versionId:'v1',revision:1,commit:'one',calculationVersion:'model-one'}};
+ const target=A.quotaCheckpoint(f.ctx);f.ctx.quotaCheckpointEvidence={...target,verified:true,source:f.ctx.days[week].quotaSource,rows:f.teachers.map(t=>({id:t.staffId,get R(){return t.R;}}))};
  return f;
 }
 test('Sunday checkpoint advances at 16:00 Singapore and never during Saturday',()=>{
@@ -29,12 +30,12 @@ test('holiday Monday uses a verified Tuesday, while an entirely closed week earn
 test('missing Calendar proof stays pending and is retried',()=>{
  const f=setup();for(const day of Object.values(f.ctx.days))day.verified=false;
  assert.equal(A.captureQuotaCheckpoint(f.state,f.ctx).status,'pending');assert.equal(f.state.entitlements.length,0);
- f.ctx.days['2026-11-03'].verified=true;assert.equal(A.captureQuotaCheckpoint(f.state,f.ctx).status,'ready');assert.equal(f.state.entitlements.length,4);
+ f.ctx.days['2026-11-03'].verified=true;f.ctx.now+=3600000;f.ctx.iso=new Date(f.ctx.now).toISOString();assert.equal(A.captureQuotaCheckpoint(f.state,f.ctx).status,'ready');assert.equal(f.state.entitlements.length,4);
 });
 test('post-cutoff source retains each prior verified R and reports the fallback',()=>{
  const f=setup();f.state.entitlements=f.people.map(p=>({staffId:p.id,week:'2026-10-26',year:'2026',quota:7,mode:'observed',source:{versionId:'old'}}));
  for(const day of Object.values(f.ctx.days))day.quotaSource.publishedAt='2026-11-01T16:01:00+08:00';
- const r=A.captureQuotaCheckpoint(f.state,f.ctx);assert.equal(r.status,'ready');assert.equal(r.fallback,4);
+ const r=A.captureQuotaCheckpoint(f.state,f.ctx);assert.equal(r.status,'pending');assert.equal(r.fallback,4);
  assert.equal(A.weekQuota(f.state,f.ctx,'bob',week).quota,7);assert.match(f.state.entitlements.find(x=>x.staffId==='bob'&&x.week===week).fallbackReason,/cutoff|publication/i);
 });
 test('no pre-cutoff source or prior R remains unknown instead of silently using new R',()=>{
@@ -72,7 +73,7 @@ test('existing observed quota becomes the frozen planning R under checkpoint sem
 test('the following Sunday captures the newer R without changing the previous week',()=>{
  const f=setup();A.captureQuotaCheckpoint(f.state,f.ctx);
  const g=setup('2026-11-08T16:00:00+08:00');g.ctx.days=Object.fromEntries(Object.entries(g.ctx.days).map(([d,day])=>[A.addDays(d,7),{...day,quotaSource:{...day.quotaSource,publishedAt:'2026-11-04T10:00:00+08:00'}}]));
- g.teachers.forEach(t=>t.R=3);A.captureQuotaCheckpoint(f.state,g.ctx);
+ g.ctx.quotaCheckpointEvidence.source=g.ctx.days['2026-11-09'].quotaSource;g.teachers.forEach(t=>t.R=3);A.captureQuotaCheckpoint(f.state,g.ctx);
  assert.equal(A.weekQuota(f.state,g.ctx,'bob','2026-11-09').quota,3);
  assert.equal(f.state.entitlements.find(r=>r.staffId==='bob'&&r.week===week).quota,5);
 });

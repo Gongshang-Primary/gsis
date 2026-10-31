@@ -29,13 +29,14 @@ function rosterOperationsPackPlans_(state,prepareTimetables=true){
  let preparedBytes=0;const rows=(list,prepare=false)=>(list||[]).map(row=>{const packed={...row},draft=row.draft?pack(row.draft,row.revision):null,published=row.published?row.published===row.draft?draft:pack(row.published,row.publishedRevision??row.revision):null;if(draft)packed.draft=draft;if(published)packed.published=draft&&published.data===draft.data?{encoding:'same-as-draft-v1'}:published;if(row.confirmedPlan){const confirmed=row.confirmedPlan===row.draft?draft:row.confirmedPlan===row.published?published:pack(row.confirmedPlan,row.confirmedRevision??row.revision);packed.confirmedPlan=draft&&confirmed.data===draft.data?{encoding:'same-as-draft-v1'}:published&&confirmed.data===published.data?{encoding:'same-as-published-v1'}:confirmed;}if(prepare&&typeof rosterTimetablePreparePlan_==='function')try{const ready=rosterTimetablePreparePlan_(state,row,packed),size=ready?JSON.stringify(ready).length:0;if(ready&&preparedBytes+size<=2000000){packed.timetablePackage=ready;preparedBytes+=size;}else delete packed.timetablePackage;}catch(_){delete packed.timetablePackage;}else delete packed.timetablePackage;
   return packed;});return {...state,staplerPlans:rows(state.staplerPlans,prepareTimetables),staplerArchives:rows(state.staplerArchives)};
 }
+var rosterOperationsStorageSources_=new WeakMap();
 /* One operational document commits absence, relief, audit and notification intent together. */
 function rosterOperationsState_(skipTransport=false){
  let phase='operations-location';try{
   const id=props_().getProperty('ROSTER_OPERATIONS_FILE')||rosterFindFile_(ROSTER_DATA,'Roster operations.json');
   if(!id)return GSISRosterOperations.initial();
-  phase='operations-read';const raw=rosterReadFile_(id);phase='operations-json';const value=JSON.parse(raw);
-  phase='operations-schema';const state=GSISRosterOperations.validateState(rosterOperationsUnpackPlans_(typeof rosterAllocationAuditUnpack_==='function'?rosterAllocationAuditUnpack_(value):value));if(typeof rosterColdReceiptsUnpack_==='function')rosterColdReceiptsUnpack_(state);return skipTransport!==true&&typeof rosterNotificationOverlay_==='function'?rosterNotificationOverlay_(state):state;
+  phase='operations-read';const source=rosterOperationsStoredRead_(id),value=source.value;
+  phase='operations-schema';const state=GSISRosterOperations.validateState(rosterOperationsUnpackPlans_(typeof rosterAllocationAuditUnpack_==='function'?rosterAllocationAuditUnpack_(value):value));rosterOperationsStorageSources_.set(state,source);if(typeof rosterColdReceiptsUnpack_==='function')rosterColdReceiptsUnpack_(state);return skipTransport!==true&&typeof rosterNotificationOverlay_==='function'?rosterNotificationOverlay_(state):state;
  }catch(e){if(e.status){e.failurePhase=e.failurePhase||phase;throw e;}throw Object.assign(Error('Relief records could not be read.'),{status:503,failurePhase:e.failurePhase||phase});}
 }
 // Save ceiling for Roster operations.json. Admin may raise it in Script Properties
@@ -48,7 +49,7 @@ function rosterOperationsStoredView_(state){
  const plans=list=>list.map(row=>{const r={...row};if(row.draft)r.draft=stored(row.draft);if(row.published)r.published=row.draft&&row.published===row.draft?{encoding:'same-as-draft-v1'}:stored(row.published);if(row.confirmedPlan)r.confirmedPlan=row.draft&&row.confirmedPlan===row.draft?{encoding:'same-as-draft-v1'}:row.published&&row.confirmedPlan===row.published?{encoding:'same-as-published-v1'}:stored(row.confirmedPlan);return r;});
  const view={...state};if(Array.isArray(state.staplerPlans))view.staplerPlans=plans(state.staplerPlans);if(Array.isArray(state.staplerArchives))view.staplerArchives=plans(state.staplerArchives);if(Array.isArray(state.optimisationRuns))view.optimisationRuns=state.optimisationRuns.map(run=>run.decisionEvidence?{...run,decisionEvidence:stored(run.decisionEvidence)}:run);return view;
 }
-function rosterOperationsCommit_(state,intakeFenceDates=null,intakeFencePeers=false,beforeWrite=null){if(typeof rosterEdgeAssertLegacyWrite_==='function')rosterEdgeAssertLegacyWrite_();gsisRequireBackendRole_('roster');
+function rosterOperationsCommit_(state,intakeFenceDates=null,intakeFencePeers=false,beforeWrite=null,inactiveRepairDates=[]){if(typeof rosterEdgeAssertLegacyWrite_==='function')rosterEdgeAssertLegacyWrite_();gsisRequireBackendRole_('roster');
  if(typeof rosterAllocationAuditCapture_==='function')rosterAllocationAuditCapture_(state);
  const packed=rosterOperationsPackPlans_(state);let data=JSON.stringify(typeof rosterAllocationAuditPack_==='function'?rosterAllocationAuditPack_(packed):packed);
  // A derived read package must never consume the last space needed to save
@@ -57,25 +58,36 @@ function rosterOperationsCommit_(state,intakeFenceDates=null,intakeFencePeers=fa
  // Existing Google document only: bounded emergency headroom preserves every
  // record while the retained intake can finish. The 12M derived-cache fallback
  // above stays first; no new storage format, authority or automatic pruning.
- if(data.length>rosterOperationsMaxChars_())throw Object.assign(Error('Relief records are full. Ask Admin to review storage capacity before retrying this same report.'),{status:507,code:'ROSTER_STORAGE_CAPACITY'});
+ const stored=props_().getProperty('ROSTER_OPERATIONS_FILE'),id=stored||rosterFindFile_(ROSTER_DATA,'Roster operations.json'),source=rosterOperationsStorageSources_.get(state),root=id?(source?.id===id?source.manifest:JSON.parse(rosterReadFile_(id))):null,split=root?.format==='gsis-roster-operations-split-v1';
+ if(!split&&data.length>rosterOperationsMaxChars_())throw Object.assign(Error('Relief records are full. Ask Admin to review storage capacity before retrying this same report.'),{status:507,code:'ROSTER_STORAGE_CAPACITY'});
+ const prepared=split?rosterSplitPrepareDocument_(JSON.parse(data),{folderId:root.folderId,previousId:id}):null;
  const batchTicket=typeof rosterTimetableBatchCommitBegin_==='function'?rosterTimetableBatchCommitBegin_(state):null,venueTicket=typeof rosterVenuesBegin_==='function'?rosterVenuesBegin_('operations',state):null;
  const write=()=>{
- const stored=props_().getProperty('ROSTER_OPERATIONS_FILE'),id=stored||rosterFindFile_(ROSTER_DATA,'Roster operations.json');
  // External preparation and file lookup can cross a period start. The allocator
  // rechecks its trusted clock inside the final write closure, never from input.
  // A failed hint-version update after a successful write must not preserve a
  // stale no-work hint. Fence hint readers before submitting any source write.
  props_().setProperty('ROSTER_SCHEDULE_DIRTY','1');
- if(beforeWrite)beforeWrite();
- const saved=id?(rosterDriveRequest_('https://www.googleapis.com/upload/drive/v3/files/'+encodeURIComponent(id)+'?uploadType=media&supportsAllDrives=true&fields=id',{method:'patch',contentType:'application/json; charset=UTF-8',payload:data},'operations-commit'),id):rosterCreateFile_(ROSTER_DATA,'Roster operations.json',Utilities.newBlob(data,'application/json'));
- if(!stored)props_().setProperty('ROSTER_OPERATIONS_FILE',saved);
+ const finalCheck=()=>{if(prepared&&(props_().getProperty('ROSTER_OPERATIONS_FILE')||id)!==id)throw Object.assign(Error('Roster storage changed. Retry against the latest saved state.'),{status:409});if(beforeWrite)beforeWrite();};
+ if(!prepared)finalCheck();
+ const saved=prepared?prepared.commit(finalCheck):id?(rosterDriveRequest_('https://www.googleapis.com/upload/drive/v3/files/'+encodeURIComponent(id)+'?uploadType=media&supportsAllDrives=true&fields=id',{method:'patch',contentType:'application/json; charset=UTF-8',payload:data},'operations-commit'),id):rosterCreateFile_(ROSTER_DATA,'Roster operations.json',Utilities.newBlob(data,'application/json'));
+ if(prepared||!stored)props_().setProperty('ROSTER_OPERATIONS_FILE',saved);
  };
  // Keep remote Venues exchanges outside the intake lock. If the final fence
  // stops this write, the derived pending marker prevents stale reuse until the
  // next successful source commit repairs it, as with any interrupted save.
- try{if(intakeFenceDates&&typeof rosterAbsenceIntakeCommitFence_==='function')rosterAbsenceIntakeCommitFence_(intakeFenceDates,write,intakeFencePeers);else write();}finally{rosterOperationsVersionChanged_();}
+ // Inactive cleanup can repair future dates unrelated to the requested date.
+ // Fence only ready replacements; deferred cleanup can still retire the duty.
+ const repairDates=[...new Set(inactiveRepairDates||[])],fenceDates=repairDates.length?[...new Set([...(intakeFenceDates||[]),...repairDates])]:intakeFenceDates;
+ const guardedWrite=()=>{if(repairDates.length&&typeof rosterAbsenceIntakeGate_==='function')rosterAbsenceIntakeGate_(repairDates,true);return write();};
+ try{if(fenceDates&&typeof rosterAbsenceIntakeCommitFence_==='function')rosterAbsenceIntakeCommitFence_(fenceDates,guardedWrite,intakeFencePeers);else guardedWrite();}finally{rosterOperationsVersionChanged_();}
  if(typeof rosterTimetableBatchCommitEnd_==='function')rosterTimetableBatchCommitEnd_(batchTicket);
  if(typeof rosterVenuesEnd_==='function')rosterVenuesEnd_(venueTicket);
+}
+function rosterOperationsStoredRead_(id){
+ for(let attempt=0;attempt<2;attempt++){
+  try{return rosterSplitReadDocument_(id,false,false);}catch(error){const current=props_().getProperty('ROSTER_OPERATIONS_FILE')||id;if(attempt||current===id)throw error;id=current;}
+ }
 }
 // Immutable report timetable transport is separate from fresh absence/receipt data.
 // ScriptCache is optional: eviction regenerates bytes; unavailable compression
@@ -199,6 +211,7 @@ function rosterOperationsContext_(req,c,state,providedIndex){
   return {user,people,days:{},timetableEntries:(providedIndex||rosterIndex_()).entries,today,minute,now:now.getTime(),iso:now.toISOString(),uuid:()=>Utilities.getUuid(),smcIds:c.rosterSMCIds||[],...(projected?{staplerSponsors:c.rosterDates.sponsors}:{})};
  }
  const requested=GSISRosterOperations.date(p.date||today),dates=[requested,...(Array.isArray(p.dates)?p.dates:[])];if(p.actualDate)dates.push(GSISRosterOperations.date(p.actualDate));
+ if(p.operation==='scheduledRoster'){const week=GSISRosterAllocation.quotaCheckpoint({today,minute,now:now.getTime()}).week;for(let n=0;n<5;n++)dates.push(GSISRosterAllocation.addDays(week,n));}
  const people=rosterOperationsPeople_(c),contactsDuty={available:Array.isArray(c.rosterSMCIds),staffIds:(c.rosterSMCIds||[]).filter(id=>people.some(t=>t.id===id&&GSISRosterOperations.dutyEligible(t))),source:{kind:'Contacts'}};
  GSISRosterOperations.seedNameBridges(state,people);const recordContext={calendarDatesVerified:Object.entries(p.calendarByDate||{}).filter(([date,value])=>value?.date===date&&value.available===true).map(([date])=>date),user,people,days:{},timetableEntries:[],dutySources:{[requested]:contactsDuty},today,minute,now:now.getTime(),iso:now.toISOString(),uuid:()=>Utilities.getUuid(),notificationsConfigured:p.notificationsReady===true,adminRecipients:[],smcIds:c.rosterSMCIds||[]};
  if(p.view==='reportForm'&&(p.operation||'read')==='read')return recordContext;
@@ -234,11 +247,12 @@ function rosterOperationsContext_(req,c,state,providedIndex){
  // Existing saved plans supply their own editor data. Reopening needs current
  // baseline identity/timing and authority; Save and Confirm still rebuild quotas.
  const savedRead=p.operation==='stapler'&&GSISRosterOperations.staplerPermission(state,recordContext,requested)?state.staplerPlans.find(r=>r.date===requested):null,savedReadPlan=savedRead?.draft||savedRead?.published;
- const unique=[...new Set(dates)],index=providedIndex||rosterIndex_(),models={},modelIdentities={},cellMutation=rosterOperationsCellMutation_(p,state),quotaRequested=!savedReadPlan&&!cellMutation&&rosterOperationsNeedsQuota_(p),quotaSource=allocationRead?rosterOperationsQuotaSource_():null,allocationReferenceKey=allocationRead?rosterOperationsAllocationReference_(state,people,index,p,quotaSource,today,unique):null,cached=allocationRead?rosterOperationsAllocationBaseline_(allocationReferenceKey):null;
+ const inactiveDates=GSISRosterOperations.inactiveAssignmentDates(state,recordContext);dates.push(...inactiveDates);
+ const unique=[...new Set(dates)],index=providedIndex||rosterIndex_(),models={},modelIdentities={},cellMutation=rosterOperationsCellMutation_(p,state),quotaRequested=!savedReadPlan&&!cellMutation&&(rosterOperationsNeedsQuota_(p)||inactiveDates.length>0),quotaSource=allocationRead?rosterOperationsQuotaSource_():null,allocationReferenceKey=allocationRead?rosterOperationsAllocationReference_(state,people,index,p,quotaSource,today,unique):null,cached=allocationRead?rosterOperationsAllocationBaseline_(allocationReferenceKey):null;
  if(cached&&quotaSource.entry)reliefGuard_(quotaSource.book,quotaSource.index,quotaSource.entry);
  const quota=quotaRequested&&!cached?rosterOperationsPhase_('quota',()=>rosterOperationsQuota_(unique,quotaSource)):{from:'',to:'',rows:[]};
  let subjectCatalogueLoaded=false;
- const compact=p.operation==='read'&&p.compact===true&&['report','entry'].includes(p.view),targetId=(user.smc||user.admin)?(p.staffId||state.absences.find(a=>a.id===(p.absenceId||p.id))?.staffId||user.staffId):user.staffId,targetIds=new Set(compact&&p.staffIds!==undefined?GSISRosterOperations.absenceStaffIds(recordContext,p):[targetId]);
+ const compact=!inactiveDates.length&&p.operation==='read'&&p.compact===true&&['report','entry'].includes(p.view),targetId=(user.smc||user.admin)?(p.staffId||state.absences.find(a=>a.id===(p.absenceId||p.id))?.staffId||user.staffId):user.staffId,targetIds=new Set(compact&&p.staffIds!==undefined?GSISRosterOperations.absenceStaffIds(recordContext,p):[targetId]);
 
  const quotaById=new Map(quota.rows.map(r=>[r.id,r]));
  const classCatalogues={},days=cached?cached.days:{};for(const d of cached?[]:unique){const entry=GSISRoster.active(index.entries,d);if(!entry){days[d]={id:null,parity:null,verified:true,schoolDay:false,warning:'No timetable is in force on this date.',periods:[],teachers:[]};continue;}
@@ -263,7 +277,7 @@ function rosterOperationsReceipt_(req,c){
  const writes=['archiveColdOutput','reliefBatch','saveAbsence','deleteAbsences','saveInstructions','saveAdhoc','deleteAdhoc','saveTypes','requestMutual','respondMutual','prune','saveNameBridge','deleteNameBridge','notifyDaily','saveSystemConfig','saveDailyEmploymentSettings','sendDailyEmploymentReport','createStapler','importStapler','saveStapler','confirmStapler','publishStapler','resetStapler','requestStapler','decideStapler','renameStapler','moveStapler','deleteStapler','restoreStapler','unassign','saveRecessSettings','saveRecess','deleteRecess','setNoRelief','noRelief','publish','acknowledge','removeAssignment','saveCustomInstruction','deleteCustomInstruction','setCustomInstructionEnabled','assign','combine','undo','optimise','autoAllocate','setDutySMC','importRHistory','verifyRYear','correctRelief','confirmCompleted'];
  if(!p||typeof p!=='object'||Array.isArray(p)||!writes.includes(p.operation)||typeof p.requestId!=='string'||!/^[\w-]{36}$/.test(p.requestId))error_(400,'The original save command is required.');
  const s=rosterOperationsState_(true),receipt=s.receipts.find(r=>r.id===p.requestId);
- if(receipt&&(receipt.actor!==req.identity.email||receipt.digest!==rosterOperationsCommandDigest_(p)))error_(409,'This request ID was used for a different save.');
+ if(receipt&&(typeof rosterNativeReceiptMatches_==='function'?!rosterNativeReceiptMatches_(receipt,p,req.identity.email):receipt.actor!==req.identity.email||receipt.digest!==rosterOperationsCommandDigest_(p)))error_(409,'This request ID was used for a different save.');
  if(receipt?.cancelled)return {accepted:false,cancelled:true,confirmation:'cancelled',requestId:p.requestId,currentRevision:s.revision};
  // Absence of a receipt can also mean the original request is still running.
  // This read never cancels it or authorises a replacement request ID.
@@ -292,7 +306,7 @@ function rosterAcknowledgementDispatch_(req,c){
  let state,result,receipt,replayed=false;
  try{
   state=rosterOperationsPhase_('acknowledgement-state',()=>rosterOperationsState_());receipt=state.receipts.find(r=>r.id===p.requestId);
-  if(receipt){if(receipt.actor!==req.identity.email||receipt.digest!==digest)error_(409,'This request ID was used for a different save.');result=receipt.result;replayed=true;}
+  if(receipt){if(typeof rosterNativeReceiptMatches_==='function'?!rosterNativeReceiptMatches_(receipt,p,req.identity.email):receipt.actor!==req.identity.email||receipt.digest!==digest)error_(409,'This request ID was used for a different save.');result=receipt.result;replayed=true;}
   else{
    rosterOperationsClock_(ctx);result=rosterOperationsPhase_('acknowledgement-apply',()=>GSISRosterOperations.acknowledgePublications(state,ctx,{...p,date}));
    const acknowledgedAt=state.acknowledgements.filter(a=>a.staffId===ctx.user.staffId&&(p.timetableNoticeId?a.timetableNoticeId===p.timetableNoticeId:(p.snapshotIds||[]).includes(a.snapshotId))).map(a=>a.at).sort().at(-1)||null;
@@ -519,12 +533,12 @@ function rosterAbsenceDispatch_(req,c){gsisRequireBackendRole_('roster');
     const lock=LockService.getScriptLock();if(!rosterOperationsPhase_('lock-wait',()=>deployLock_(lock,8000)))error_(503,'Another save is finishing. Retry the same save.');
     try{
      state=rosterOperationsPhase_('absence-commit-state',()=>rosterOperationsState_());receipt=state.receipts.find(r=>r.id===p.requestId);
-     if(receipt){if(receipt.actor!==req.identity.email||receipt.digest!==digest)error_(409,'This request ID was used for a different save.');result=receipt.result;replayed=true;}
+     if(receipt){if(typeof rosterNativeReceiptMatches_==='function'?!rosterNativeReceiptMatches_(receipt,p,req.identity.email):receipt.actor!==req.identity.email||receipt.digest!==digest)error_(409,'This request ID was used for a different save.');result=receipt.result;replayed=true;}
      else{
       rosterOperationsPreparedCheck_(state,ctx,p,req.intakeProjection===true);
       if(rosterOperationsReferenceStamp_(ctx)!==references)throw Object.assign(Error('Timetable sources changed during attendance preparation.'),{status:409,code:'PREPARED_RETRY',reasonCode:'TIMETABLE_MANIFEST_CHANGED'});
       if(rosterAbsenceContextKey_(state,ctx)!==contextKey)throw Object.assign(Error('Attendance context changed during preparation.'),{status:409,code:'PREPARED_RETRY',reasonCode:'ABSENCE_CONTEXT_CHANGED'});
-      const preparedToday=ctx.today;rosterOperationsClock_(ctx);if(preparedToday!==ctx.today)throw Object.assign(Error('The school date changed during attendance preparation.'),{status:409,code:'PREPARED_RETRY',reasonCode:'SCHOOL_DATE_CHANGED'});
+      const preparedToday=ctx.today;rosterOperationsClock_(ctx);rosterOperationsGuardInactive_(state,ctx);if(preparedToday!==ctx.today)throw Object.assign(Error('The school date changed during attendance preparation.'),{status:409,code:'PREPARED_RETRY',reasonCode:'SCHOOL_DATE_CHANGED'});
       if(req.intakeAcceptedAt&&p.operation==='saveAbsence'){ctx.reportedAt=req.intakeAcceptedAt;ctx.reportToday=new Date(Date.parse(req.intakeAcceptedAt)+8*3600000).toISOString().slice(0,10);ctx.attendanceOnly=req.intakeProjection===true;ctx.resubmission=req.intakeProjection===true&&!p.id;ctx.reportSequence=req.intakeSequence||0;if(req.intakeOverlapChoice){if(req.intakeOverlapChoice.token!==rosterAbsenceOverlapKey_(state,p))rosterOperationsConflict_('ABSENCE_SHORTER_CONFIRMATION','Saved absence details changed. Review the shorter report again.');ctx.resubmissionChoice=req.intakeOverlapChoice.value;}}
       if(req.intakeInstructionSource){rosterAbsenceIntakeInstructionCheck_(state,ctx,p,req.intakeInstructionSource);ctx.intakeInstructions=true;ctx.reportedAt=req.intakeAcceptedAt;ctx.reportSequence=req.intakeSequence||0;}
       GSISRosterOperations.seedNameBridges(state,ctx.people);
@@ -539,7 +553,7 @@ function rosterAbsenceDispatch_(req,c){gsisRequireBackendRole_('roster');
       if(!attendanceProjection&&!peerProjection)GSISRosterOperations.refreshStaplerNotifications(state,ctx,before);notificationsQueued=state.outbox.length-before;state.revision++;
       receipt={id:p.requestId,actor:req.identity.email,digest,result,at:ctx.iso,revision:state.revision};state.receipts.push(receipt);
       if(typeof rosterAllocationAuditAccepted_==='function')rosterAllocationAuditAccepted_(state,auditBefore,ctx,p);
-      rosterOperationsPhase_('absence-commit',()=>rosterOperationsCommit_(state));
+      rosterOperationsPhase_('absence-commit',()=>rosterOperationsCommit_(state,null,false,null,ctx.inactiveRepairFenceDates));
      }
     }finally{deployUnlock_(lock);}
    }
@@ -562,7 +576,7 @@ function rosterOperationsPublicationAcknowledgement_(state,ctx,p,result,revision
 function rosterOperationsPublishDispatch_(req,c){gsisRequireBackendRole_('roster');
  const p=req.input||{},digest=rosterOperationsCommandDigest_(p);
  if(typeof p.requestId!=='string'||!/^[\w-]{36}$/.test(p.requestId))error_(400,'A save request ID is required.');
- const accepted=(state,receipt,replayed=false)=>{if(receipt.actor!==req.identity.email||receipt.digest!==digest)error_(409,'This request ID was used for a different save.');rosterOperationsAuthority_(c,req.identity);const legacy=receipt.result?.publicationAcknowledgement!==true;return {...receipt.result,...(legacy?{publicationAcknowledgement:true,visibilityPublished:true,requestId:p.requestId,date:p.date||new Date(Date.parse(receipt.at)+8*3600000).toISOString().slice(0,10),revision:receipt.revision,acceptedRevision:receipt.revision,publishedAt:receipt.at,refreshRequired:true}:{}),currentRevision:state.revision,...(replayed?{replayed:true}:{})};};
+ const accepted=(state,receipt,replayed=false)=>{if(typeof rosterNativeReceiptMatches_==='function'?!rosterNativeReceiptMatches_(receipt,p,req.identity.email):receipt.actor!==req.identity.email||receipt.digest!==digest)error_(409,'This request ID was used for a different save.');rosterOperationsAuthority_(c,req.identity);const legacy=receipt.result?.publicationAcknowledgement!==true;return {...receipt.result,...(legacy?{publicationAcknowledgement:true,visibilityPublished:true,requestId:p.requestId,date:p.date||new Date(Date.parse(receipt.at)+8*3600000).toISOString().slice(0,10),revision:receipt.revision,acceptedRevision:receipt.revision,publishedAt:receipt.at,refreshRequired:true}:{}),currentRevision:state.revision,...(replayed?{replayed:true}:{})};};
  for(let attempt=0;attempt<2;attempt++){
   // Exact confirmation needs only the primary receipt, even when Calendar,
   // timetable preparation or notification delivery records are unavailable.
@@ -601,11 +615,11 @@ function rosterOperationsPreparedCore_(req,c){gsisRequireBackendRole_('roster');
   try{
    if(req.allocationRun)rosterAllocationRunStage_(req.allocationRun,attempt?'Planning inputs changed; recalculating against current records.':'Calculating available relief while retaining manual choices.');
    const references=rosterOperationsReferenceKey_(ctx),dependencies=rosterOperationsDependencies_(base,p,ctx),before=s.outbox.length;
+   rosterOperationsClock_(ctx);rosterOperationsGuardInactive_(s,ctx);const preparedClock=ctx.today+':'+ctx.minute;
    if(op==='reliefBatch')ctx.draftBatch=true;
    if(!rosterOperationsRecordOnly_(p))rosterOperationsPhase_('prepare-reconcile',()=>rosterOperationsReconcile_(s,ctx));
    if(op==='publish'&&p.notifyMode!==undefined)s.outbox.splice(before);
    if(!['publish','notifyDaily'].includes(op))for(const d of Object.keys(ctx.days)){GSISRosterAllocation.initialiseHistory(s,ctx,d);GSISRosterAllocation.captureWeek(s,ctx,d);}
-   rosterOperationsClock_(ctx);const preparedClock=ctx.today+':'+ctx.minute;
    // Scope validation above replaces only the broad global counter. Domain
    // validation still runs against this complete authoritative working state.
    const merge=rosterOperationsBatchMerge_(s,ctx,p),result=rosterOperationsPhase_('prepare-apply',()=>merge.changes&&!merge.command.commands.length?{savedIds:[]}:GSISRosterOperations.apply(s,ctx,{...merge.command,revision:s.revision}));
@@ -616,7 +630,7 @@ function rosterOperationsPreparedCore_(req,c){gsisRequireBackendRole_('roster');
    let committed,replayed=false;
    try{
     const current=rosterOperationsPhase_('commit-state',()=>rosterOperationsState_()),receipt=current.receipts.find(r=>r.id===p.requestId);
-    if(receipt){if(receipt.actor!==req.identity.email||receipt.digest!==digest)error_(409,'This request ID was used for a different save.');if(receipt.cancelled)rosterAllocationRunCancellation_();old=receipt;committed=current;replayed=true;}
+    if(receipt){if(typeof rosterNativeReceiptMatches_==='function'?!rosterNativeReceiptMatches_(receipt,p,req.identity.email):receipt.actor!==req.identity.email||receipt.digest!==digest)error_(409,'This request ID was used for a different save.');if(receipt.cancelled)rosterAllocationRunCancellation_();old=receipt;committed=current;replayed=true;}
     else{
      rosterOperationsPreparedCheck_(current,ctx,p);
      if(['autoAllocate','optimise'].includes(op)&&typeof rosterAbsenceIntakeGate_==='function')rosterAbsenceIntakeGate_([p.date||ctx.today],['autoAllocate','optimise'].includes(op));
@@ -626,11 +640,11 @@ function rosterOperationsPreparedCore_(req,c){gsisRequireBackendRole_('roster');
      // sourceRevision is a document marker, not the publication conflict token.
      const publicationDate=p.date||ctx.today;if(op==='publish'&&merged.dailyPublicationStates?.[publicationDate])merged.dailyPublicationStates[publicationDate].sourceRevision=merged.revision;
      merged.receipts.push({id:p.requestId,actor:req.identity.email,digest,result,at:ctx.iso,revision:merged.revision});
-     committed=GSISRosterOperations.validateState(rosterOperationsUnpackPlans_(merged));if(typeof rosterAllocationAuditAccepted_==='function')rosterAllocationAuditAccepted_(committed,current,ctx,p);rosterOperationsPhase_('commit',()=>rosterOperationsCommit_(committed,['autoAllocate','optimise'].includes(op)?[p.date||ctx.today]:null,['autoAllocate','optimise'].includes(op),['autoAllocate','optimise'].includes(op)?()=>{const checkClock=()=>{const writeClock={};rosterOperationsClock_(writeClock);if(writeClock.today+':'+writeClock.minute!==preparedClock)rosterOperationsConflict_('PREPARED_RETRY','The school-day clock changed before writing.');};checkClock();if(req.allocationRun)rosterAllocationRunBeforeCommit_(req.allocationRun,checkClock);}:null));if(req.allocationRun)rosterAllocationRunComplete_(req.allocationRun,committed);
+     committed=GSISRosterOperations.validateState(rosterOperationsUnpackPlans_(merged));if(typeof rosterAllocationAuditAccepted_==='function')rosterAllocationAuditAccepted_(committed,current,ctx,p);rosterOperationsPhase_('commit',()=>rosterOperationsCommit_(committed,['autoAllocate','optimise'].includes(op)?[p.date||ctx.today]:null,['autoAllocate','optimise'].includes(op),['autoAllocate','optimise'].includes(op)?()=>{const checkClock=()=>{const writeClock={};rosterOperationsClock_(writeClock);if(writeClock.today+':'+writeClock.minute!==preparedClock)rosterOperationsConflict_('PREPARED_RETRY','The school-day clock changed before writing.');};checkClock();if(req.allocationRun)rosterAllocationRunBeforeCommit_(req.allocationRun,checkClock);}:null,ctx.inactiveRepairFenceDates));if(req.allocationRun)rosterAllocationRunComplete_(req.allocationRun,committed);
     }
    }finally{deployUnlock_(lock);}
    const response={...rosterOperationsPhase_('projection',()=>GSISRosterOperations.view(committed,GSISRosterOperations.composeStaplerContext(committed,ctx),p)),...(replayed?old.result:result),...(replayed?{replayed:true}:{notificationsQueued:result.notificationsQueued??queued}),...(op==='reliefBatch'?{acceptedRevision:committed.receipts.find(r=>r.id===p.requestId).revision,requestId:p.requestId}:{})};
-   return rosterOperationsAttachDayToken_(response,committed,ctx,p);
+   return rosterOperationsInactiveResult_(rosterOperationsAttachDayToken_(response,committed,ctx,p),committed,ctx);
   }catch(e){if(e.code!=='PREPARED_RETRY')throw e;if(attempt===1)error_(503,'Planning inputs changed while saving. Your request is retained; retry the same save.');}
  }
 }
@@ -708,8 +722,8 @@ function rosterOperationsDispatchCore_(req,c){gsisRequireBackendRole_('roster');
  if(['acquireStaplerLock','renewStaplerLock','releaseStaplerLock'].includes(op))return rosterStaplerLeaseDispatch_(req,c);
  if(p.view==='notificationReadiness'||op==='saveRecessSettings'){const user=rosterOperationsAuthority_(c,req.identity);if(!user.smc&&!user.admin)error_(403,'SMC or Admin access is required.');}
  if(op==='directory'){
-  rosterOperationsAuthority_(c,req.identity);const date=GSISRosterOperations.date(p.date||rosterToday_()),activated=new Set(rosterOperationsState_(true).adhoc.filter(a=>!a.deletedAt&&a.date===date).map(a=>a.staffId));
-  return {date,people:c.rosterPeople.filter(p=>p.active===true||activated.has(p.id)).map(p=>({id:String(p.id),name:String(p.name||'')}))};
+  rosterOperationsAuthority_(c,req.identity);const date=GSISRosterOperations.date(p.date||rosterToday_());
+  return {date,people:c.rosterPeople.filter(p=>p.active===true).map(p=>({id:String(p.id),name:String(p.name||'')}))};
  }
  if(op==='contactCreate'){
   const user=rosterOperationsAuthority_(c,req.identity);if(!user.smc&&!user.admin)error_(403,'SMC or Admin access is required.');
@@ -724,7 +738,7 @@ function rosterOperationsDispatchCore_(req,c){gsisRequireBackendRole_('roster');
   return created;
  }const readonly=GSISRosterOperations.READS.includes(op);
  if(op==='externalLink'){const s=rosterOperationsState_(),ctx=rosterOperationsContext_(req,c,s);GSISRosterOperations.read(s,ctx,p);const lock=LockService.getScriptLock();if(!deployLock_(lock,8000))error_(503,'Another save is finishing. Retry this private link request.');try{const latest=rosterOperationsState_(),before=JSON.stringify(latest.privateLinks||{}),result=GSISRosterOperations.read(latest,ctx,p);if(before!==JSON.stringify(latest.privateLinks||{}))rosterOperationsCommit_(latest);return result;}finally{deployUnlock_(lock);}}
- if(readonly){let s=rosterOperationsPhase_('state-read',()=>rosterOperationsState_(rosterOperationsPrimaryRead_(p)));if(typeof rosterColdArchiveDateView_==='function'&&['read','dailyNotify','teacherDailyUpdate','history','exportDaily'].includes(op))s=rosterColdArchiveDateView_(s,p);const ctx=rosterOperationsPhase_('context',()=>rosterOperationsContext_(req,c,s));if(op==='currentDuty'||op==='read'&&p.view==='currentDuty')return GSISRosterOperations.read(s,ctx,{operation:'currentDuty'});if(op==='candidates'&&p.previewAbsence!==undefined)rosterOperationsPhase_('reconcile',()=>GSISRosterOperations.reconcile(s,ctx));else if(!rosterOperationsRecordOnly_(p)&&op!=='stapler')rosterOperationsPhase_('reconcile',()=>rosterOperationsReadReconcile_(s,ctx));return rosterOperationsReportTransport_(rosterOperationsPlanningAttach_(rosterOperationsAttachDayToken_(rosterOperationsPhase_('projection',()=>GSISRosterOperations.read(s,ctx,{...p,operation:op})),s,ctx,p),ctx.user,p,s,ctx),{...p,operation:op},ctx);}
+ if(readonly){let s=rosterOperationsPhase_('state-read',()=>rosterOperationsState_(rosterOperationsPrimaryRead_(p)));if(typeof rosterColdArchiveDateView_==='function'&&['read','dailyNotify','teacherDailyUpdate','history','exportDaily'].includes(op))s=rosterColdArchiveDateView_(s,p);const ctx=rosterOperationsPhase_('context',()=>rosterOperationsInactiveContext_(req,c,s,rosterOperationsContext_(req,c,s)));if(rosterOperationsRecordOnly_(p)||op==='stapler')rosterOperationsPhase_('inactive-reconcile',()=>rosterOperationsReadInactive_(s,ctx));if(op==='currentDuty'||op==='read'&&p.view==='currentDuty')return rosterOperationsInactiveResult_(GSISRosterOperations.read(s,ctx,{operation:'currentDuty'}),s,ctx);if(op==='candidates'&&p.previewAbsence!==undefined)rosterOperationsPhase_('reconcile',()=>GSISRosterOperations.reconcile(s,ctx));else if(!rosterOperationsRecordOnly_(p)&&op!=='stapler')rosterOperationsPhase_('reconcile',()=>rosterOperationsReadReconcile_(s,ctx));return rosterOperationsInactiveResult_(rosterOperationsReportTransport_(rosterOperationsPlanningAttach_(rosterOperationsAttachDayToken_(rosterOperationsPhase_('projection',()=>GSISRosterOperations.read(s,ctx,{...p,operation:op})),s,ctx,p),ctx.user,p,s,ctx),{...p,operation:op},ctx),s,ctx);}
  if(typeof p.requestId!=='string'||! /^[\w-]{36}$/.test(p.requestId))error_(400,'A save request ID is required.');
  // Hash input before taking the lock. Reject stale commands before loading models or quotas.
  const digest=rosterOperationsCommandDigest_(p);
@@ -750,18 +764,16 @@ function rosterOperationsDispatchCore_(req,c){gsisRequireBackendRole_('roster');
    if(deletionScoped)rosterOperationsDeletionCheck_(s,p);
    if(settingsScoped){if(typeof p.expectedSettingsToken!=='string'||! /^[a-f0-9]{64}$/.test(p.expectedSettingsToken))error_(400,'Reload report settings before saving.');if(p.expectedSettingsToken!==rosterOperationsSettingsToken_(s))rosterOperationsConflict_('SETTINGS_CONFLICT','Report recipient settings changed. Review the saved settings before saving your changes.');}
    if(!Number.isSafeInteger(p.revision)||p.revision<0||p.revision>s.revision||p.revision!==s.revision&&!newAbsence&&!staplerWrite&&!settingsScoped&&!instructionScoped&&!deletionScoped)error_(409,'Relief records changed. Refresh before saving.');
-   ctx=rosterOperationsPhase_('context',()=>rosterOperationsContext_(req,c,s));if(staplerWrite&&p.leaseSessionId)rosterStaplerLeaseAssert_(GSISRosterOperations.date(p.date),ctx.user,p);if(op==='reliefBatch')ctx.draftBatch=true;cellMutation=ctx.cellMutation===true;const before=s.outbox.length,refreshRequired=cellMutation&&s.assignments.some(a=>p.demandIds.includes(a.demandId)&&a.status==='draft'&&!a.noRelief);
+   ctx=rosterOperationsPhase_('context',()=>rosterOperationsContext_(req,c,s));rosterOperationsClock_(ctx);rosterOperationsGuardInactive_(s,ctx);if(staplerWrite&&p.leaseSessionId)rosterStaplerLeaseAssert_(GSISRosterOperations.date(p.date),ctx.user,p);if(op==='reliefBatch')ctx.draftBatch=true;cellMutation=ctx.cellMutation===true;const before=s.outbox.length,refreshRequired=cellMutation&&s.assignments.some(a=>p.demandIds.includes(a.demandId)&&a.status==='draft'&&!a.noRelief);
    if(cellMutation&&!rosterOperationsCellSource_(s,ctx,p))error_(409,'The timetable or confirmed Stapler plan changed. Refresh before saving.');
    if(!cellMutation&&!rosterOperationsRecordOnly_(p))rosterOperationsPhase_('reconcile',()=>rosterOperationsReconcile_(s,ctx));if(['saveStapler','confirmStapler','publishStapler'].includes(op)||op==='publish'&&p.notifyMode!==undefined)s.outbox.splice(before);if(!cellMutation)for(const d of Object.keys(ctx.days)){GSISRosterAllocation.initialiseHistory(s,ctx,d);GSISRosterAllocation.captureWeek(s,ctx,d);}
-   // Slow reference reads can cross midnight or a period start. Validate against the clock inside this write lock.
-   if(['reliefBatch','publish','publishStapler','setNoRelief','noRelief','unassign','deleteAbsences'].includes(op)){const stamp=Date.now(),sg=new Date(stamp+8*3600000);Object.assign(ctx,{now:stamp,iso:new Date(stamp).toISOString(),today:sg.toISOString().slice(0,10),minute:sg.getUTCHours()*60+sg.getUTCMinutes()});}
    const leaseTransitions=p.leaseSessionId&&['moveStapler','deleteStapler'].includes(op)?rosterStaplerLeaseTransitions_(p,ctx.user):null;
    result=rosterOperationsPhase_('apply',()=>GSISRosterOperations.apply(s,ctx,{...p,operation:op}));if(refreshRequired)result={...result,refreshRequired:true};if(leaseTransitions)result={...result,leaseTransitions};if(!cellMutation&&op!=='reliefBatch'&&!['saveStapler','confirmStapler','publishStapler'].includes(op)&&!(op==='publish'&&p.notifyMode!==undefined))GSISRosterOperations.refreshStaplerNotifications(s,ctx,before);s.revision++;
    if(op==='saveAbsence'&&p.includeMutualCandidates===true&&!s.absences.some(a=>result.savedIds.includes(a.id)&&a.date===(p.date||ctx.today)))error_(400,'Choose a saved absence date for colleague arrangements.');
    s.receipts.push({id:p.requestId,actor:req.identity.email,digest,result,at:ctx.iso,revision:s.revision,...(cellMutation?{cellMutation:true}:{})});
    // Surgical logical changes, one durable document replacement: no false claim of partial Drive I/O.
    if(typeof rosterAllocationAuditAccepted_==='function')rosterAllocationAuditAccepted_(s,auditBefore,ctx,p);
-   rosterOperationsPhase_('commit',()=>rosterOperationsCommit_(s));notificationsQueued=s.outbox.length-before;
+   rosterOperationsPhase_('commit',()=>rosterOperationsCommit_(s,null,false,null,ctx.inactiveRepairFenceDates));notificationsQueued=s.outbox.length-before;
   }
   if(p.leaseSessionId&&['confirmStapler','publishStapler'].includes(op))rosterStaplerLeaseReleaseCommitted_(GSISRosterOperations.date(p.date),rosterOperationsAuthority_(c,req.identity),p);
   if(result.leaseTransitions)rosterStaplerLeaseFinishTransitions_(result.leaseTransitions,rosterOperationsAuthority_(c,req.identity));
@@ -773,21 +785,62 @@ function rosterOperationsDispatchCore_(req,c){gsisRequireBackendRole_('roster');
  // Receipt metadata describes the accepted command, not the current plan. A
  // later save or restore must not inherit an older revision/confirmed flag.
  const response={...(op==='reliefBatch'?{acceptedRevision:s.receipts.find(receipt=>receipt.id===p.requestId)?.revision,requestId:p.requestId}:{}),...projection,...publicResult,...(replayed&&staplerWrite?{...projection,acceptedResult:publicResult,acceptedRevision:s.receipts.find(receipt=>receipt.id===p.requestId)?.revision}:{}),...(replayed?{replayed:true}:{notificationsQueued:result.notificationsQueued??notificationsQueued})};
- return rosterOperationsPlanningAttach_(rosterOperationsAttachDayToken_(rosterOperationsSavedCandidates_(response,s,ctx,p,result),s,ctx,p),ctx.user,p,s,ctx);
+ return rosterOperationsInactiveResult_(rosterOperationsPlanningAttach_(rosterOperationsAttachDayToken_(rosterOperationsSavedCandidates_(response,s,ctx,p,result),s,ctx,p),ctx.user,p,s,ctx),s,ctx);
 }
 
+// Pending attendance must settle before allocating replacement cover. Keep the
+// immutable dated context on this request so locked rechecks can restore it.
+function rosterOperationsGuardInactive_(s,ctx){
+ const dates=GSISRosterOperations.inactiveAssignmentDates(s,ctx);ctx.inactiveRepairFenceDates=[];
+ if(!dates.length||typeof rosterAbsenceIntakePending_!=='function')return ctx;
+ const pending=rosterAbsenceIntakePending_(dates),blocked=new Set([...(pending.blockedDates||[]),...(pending.peerBlockedDates||[])]),unlocated=(pending.pendingCaptureCount||pending.pendingPeerCount)&&!blocked.size;
+ ctx.inactiveRepairBaselineDays=ctx.inactiveRepairBaselineDays||{};
+ for(const date of dates){const day=ctx.inactiveRepairBaselineDays[date]||ctx.days?.[date];if(!day)continue;ctx.inactiveRepairBaselineDays[date]=day;
+  if(unlocated||blocked.has(date))ctx.days[date]={...day,verified:false};
+  else{ctx.days[date]=day;if(day.verified===true&&day.schoolDay===true&&ctx.quotaRequested!==false)ctx.inactiveRepairFenceDates.push(date);}
+ }
+ return ctx;
+}
 function rosterOperationsReconcile_(s,ctx){
+ // Context loading may cross a period boundary before any caller reconciles.
+ rosterOperationsClock_(ctx);rosterOperationsGuardInactive_(s,ctx);
  let changed=false;const beforeOutbox=s.outbox.length;
  for(const plan of s.staplerPlans||[]){if(!(plan.confirmed||plan.published)||plan.date<ctx.today)continue;const active=GSISRoster.active(ctx.timetableEntries,plan.date);if(active?.id===plan.baselineId)continue;for(const row of s.importedRelief.filter(a=>a.origin==='stapler'&&a.date===plan.date&&['draft','published'].includes(a.status))){row.status='cancelled';row.cancellationReason='The active baseline timetable changed.';changed=true;}for(const job of s.outbox.filter(j=>j.kind==='stapler_timetable'&&j.date===plan.date&&['queued','blocked'].includes(j.status))){job.status='cancelled';job.error='The active baseline timetable changed.';changed=true;}}
  for(const a of s.assignments){if(a.date<ctx.today||!['draft','published'].includes(a.status))continue;const active=GSISRoster.active(ctx.timetableEntries,a.date);if(!active||active.id!==a.timetableId){changed=GSISRosterOperations.invalidate(s,ctx,a,'The effective timetable changed. Review and reassign this lesson.')||changed;}}
  for(const r of s.requests){if(r.status!=='pending'||r.date<ctx.today)continue;const active=GSISRoster.active(ctx.timetableEntries,r.date);if(!active||r.lessons.some(l=>l.timetableId!==active.id)){r.status='cancelled';r.reason='The effective timetable changed.';r.updatedAt=ctx.iso;changed=true;}}
  changed=GSISRosterOperations.reconcile(s,ctx)||changed;if(changed)GSISRosterOperations.refreshStaplerNotifications(s,ctx,beforeOutbox);return changed;
 }
+// The gateway supplies verified Calendar context only after this date-only
+// response identifies pending work. Recheck against current records on retry.
+function rosterOperationsInactiveResult_(result,s,ctx){
+ const dates=GSISRosterOperations.inactiveAssignmentDates(s,ctx).filter(date=>ctx.days?.[date]?.verified!==true);
+ return dates.length?{...result,inactiveReplacementDates:dates}:result;
+}
+function rosterOperationsInactiveContext_(req,c,s,ctx){
+ const requested=req.input?.inactiveReconcileDates;
+ if(!Array.isArray(requested)||!requested.length)return ctx;
+ if(requested.length>366||requested.some(d=>typeof d!=='string'))error_(400,'Invalid inactive relief dates.');
+ const wanted=new Set(requested),dates=GSISRosterOperations.inactiveAssignmentDates(s,ctx).filter(d=>wanted.has(d));
+ if(!dates.length)return ctx;
+ const input={...req.input,operation:'availability',view:undefined,compact:false,date:dates[0],dates};delete input.inactiveReconcileDates;
+ return rosterOperationsContext_({...req,input},c,s);
+}
+// Record-only views still retire unstarted inactive duties. They do not need
+// a school-wide timetable; missing dated inputs leave replacement work pending.
+function rosterOperationsReadInactive_(s,ctx){
+ if(!GSISRosterOperations.inactiveAssignmentDates(s,ctx).length)return;
+ rosterOperationsGuardInactive_(s,ctx);if(!GSISRosterOperations.reconcileInactiveTeachers(s,ctx))return;
+ const lock=LockService.getScriptLock();if(!deployLock_(lock,5000))error_(503,'Relief assignments are being reconciled. Retry.');
+ try{const current=rosterOperationsState_();if(current.revision!==s.revision)error_(409,'Relief records changed. Refresh.');rosterOperationsClock_(ctx);rosterOperationsGuardInactive_(current,ctx);
+  if(GSISRosterOperations.reconcileInactiveTeachers(current,ctx)){current.revision++;rosterOperationsCommit_(current,null,false,null,ctx.inactiveRepairFenceDates);}
+  Object.assign(s,current);
+ }finally{deployUnlock_(lock);}
+}
 function rosterOperationsReadReconcile_(s,ctx){
  if(!rosterOperationsReconcile_(s,ctx))return;
  const lock=LockService.getScriptLock();if(!deployLock_(lock,5000))error_(503,'Relief assignments are being reconciled. Retry.');
- try{const current=rosterOperationsState_();if(current.revision!==s.revision)error_(409,'Relief records changed. Refresh.');
-  if(rosterOperationsReconcile_(current,ctx)){current.revision++;current.audit.push({id:ctx.uuid(),date:ctx.today,at:ctx.iso,actor:'system',operation:'reconcile',ids:current.assignments.filter(a=>a.updatedAt===ctx.iso&&a.status==='invalidated').map(a=>a.id)});rosterOperationsCommit_(current);}
+ try{const current=rosterOperationsState_();if(current.revision!==s.revision)error_(409,'Relief records changed. Refresh.');rosterOperationsClock_(ctx);
+  if(rosterOperationsReconcile_(current,ctx)){current.revision++;current.audit.push({id:ctx.uuid(),date:ctx.today,at:ctx.iso,actor:'system',operation:'reconcile',ids:current.assignments.filter(a=>a.updatedAt===ctx.iso&&a.status==='invalidated').map(a=>a.id)});rosterOperationsCommit_(current,null,false,null,ctx.inactiveRepairFenceDates);}
   Object.assign(s,current);
  }finally{deployUnlock_(lock);}
 }
@@ -811,6 +864,7 @@ function rosterPrivateRead_(p){
  return {timetableNotice:notice,linkExpiresAt:cap.expiresAt,pendingNotices:GSISRosterOperations.acknowledgementView(s,ctx).filter(v=>v.date===cap.date&&(!published||ids.has(v.id))),history:GSISRosterOperations.notificationHistory(s,ctx,{limit:100}).history.filter(v=>v.date===cap.date),date:cap.date,timetable:rosterPrivateTimetable_(ctx,s,cap.staffId,cap.date),overlay:GSISRosterOperations.dailyTimetable(s,ctx,{date:cap.date}),duties:rows.map(GSISRosterOperations.publicDuty),changes:published?snapshots.filter(v=>v.kind==='cancelled').map(v=>GSISRosterOperations.publicDuty(v.assignment)):s.assignments.filter(a=>a.staffId===cap.staffId&&a.date===cap.date&&a.publishedAt&&['cancelled','invalidated'].includes(a.status)).map(GSISRosterOperations.publicDuty),arrangements:published?[...GSISRosterOperations.latestPublications(s).values()].filter(v=>v.date===cap.date&&v.kind!=='cancelled'&&v.assignment.absentId===cap.staffId&&!v.assignment.remove).map(v=>GSISRosterOperations.publicDuty({...v.assignment,instructions:v.instructions,customInstructions:v.customInstructions})):s.assignments.filter(a=>a.absentId===cap.staffId&&a.date===cap.date&&a.status==='published'&&!a.remove).map(GSISRosterOperations.publicDuty),request:mutual||null};
 }
 function rosterServiceDispatch_(req){gsisRequireBackendRole_('roster');
+ const mirror=typeof rosterMirrorDispatch_==='function'?rosterMirrorDispatch_(req,true):null;if(mirror?.handled)return mirror.result;
  const edgeMail=typeof rosterEdgeMailDispatch_==='function'?rosterEdgeMailDispatch_(req):null;if(edgeMail?.handled)return edgeMail.result;
  const edge=typeof rosterEdgeServiceMigrationDispatch_==='function'?rosterEdgeServiceMigrationDispatch_(req):null;if(edge?.handled)return edge.result;
  if(typeof rosterEdgeAssertLegacyWrite_==='function')rosterEdgeAssertLegacyWrite_();
@@ -833,7 +887,7 @@ function rosterServiceDispatch_(req){gsisRequireBackendRole_('roster');
   try{currentContacts.rosterPendingAbsenceDates=[...new Set([...(typeof rosterAbsenceIntakePending_==='function'?rosterAbsenceIntakePending_().blockedDates:[]),...(Array.isArray(p.pendingTransportDates)?p.pendingTransportDates:[])])];}catch(_){currentContacts.rosterAbsenceIntakeUnavailable=true;}
  }
  const lock=LockService.getScriptLock();if(!deployLock_(lock,8000))error_(503,'Another relief update is running. Retry.');
- try{const s=rosterOperationsState_(),now=Date.now(),iso=new Date(now).toISOString();let result={},changed=false,domainChanged=false;
+ try{const s=rosterOperationsState_(),now=Date.now(),iso=new Date(now).toISOString();let result={},changed=false,domainChanged=false,inactiveRepairDates=[];
   if(op==='inboundMessage'){
    const fresh=currentContacts,ctx={now,iso,today:new Date(now+8*3600000).toISOString().slice(0,10),service:true,inboxMode:p.inboxMode===true,people:fresh.rosterPeople,urgentSMCIds:p.inboxMode===true?rosterInboxDuty_(fresh,now,s):fresh.rosterUrgentSMCIds||[],user:{email:'whatsapp-webhook'},uuid:()=>Utilities.getUuid()};
    result=GSISRosterOperations.inboundMessage(s,ctx,p);changed=!result.duplicate;
@@ -908,9 +962,9 @@ function rosterServiceDispatch_(req){gsisRequireBackendRole_('roster');
     const ctx={now,iso,today:new Date(now+8*3600000).toISOString().slice(0,10),days:{},uuid:()=>Utilities.getUuid(),user:{staffId:cap.staffId,email:'external:'+cap.staffId,smc:false,admin:false}};
     result=cap.communicationId?GSISRosterOperations.acknowledgeCommunication(s,ctx,cap,p):GSISRosterOperations.acknowledgePublications(s,ctx,{snapshotIds:ids,...(p.timetableNoticeId!==undefined?{timetableNoticeId:p.timetableNoticeId}:{}),date:cap.date});changed=result.savedIds.length>0;domainChanged=changed;result.acknowledged={timetableNoticeId:p.timetableNoticeId||null,snapshotIds:ids,acknowledgedAt:s.acknowledgements.find(a=>a.staffId===cap.staffId&&(p.timetableNoticeId?a.timetableNoticeId===p.timetableNoticeId:ids.includes(a.snapshotId)))?.at||iso};result.publicationRevision=s.dailyPublicationStates?.[cap.date]?.revision||null;
    }
-   else{if(cap.purpose!=='mutual'||!cap.requestId||p.id&&p.id!==cap.requestId)error_(403,'This private link cannot approve relief.');const r=s.requests.find(r=>r.id===cap.requestId&&r.recipientId===cap.staffId&&r.date===cap.date);if(!r)error_(403,'This private request is unavailable.');if(['approved','rejected'].includes(r.status)){if(['approve','reject'].includes(p.decision)&&r.status===(p.decision==='approve'?'approved':'rejected')&&String(r.reason||'')===String(p.reason||'').trim())return {recorded:true,replayed:true,status:r.status};error_(409,'A different response has already been recorded.');}const service=rosterServiceContacts_(),ctx=rosterOperationsContext_({identity:service.identity,input:{...p,date:cap.date}},service.c,s);ctx.user={staffId:cap.staffId,email:'external:'+cap.staffId,smc:false,admin:false};const beforeOutbox=s.outbox.length;GSISRosterOperations.apply(s,ctx,{operation:'respondMutual',id:cap.requestId,date:cap.date,decision:p.decision,reason:p.reason||''});GSISRosterOperations.refreshStaplerNotifications(s,ctx,beforeOutbox);changed=true;domainChanged=true;result={recorded:true,status:r.status};}
+   else{if(cap.purpose!=='mutual'||!cap.requestId||p.id&&p.id!==cap.requestId)error_(403,'This private link cannot approve relief.');const r=s.requests.find(r=>r.id===cap.requestId&&r.recipientId===cap.staffId&&r.date===cap.date);if(!r)error_(403,'This private request is unavailable.');if(['approved','rejected'].includes(r.status)){if(['approve','reject'].includes(p.decision)&&r.status===(p.decision==='approve'?'approved':'rejected')&&String(r.reason||'')===String(p.reason||'').trim())return {recorded:true,replayed:true,status:r.status};error_(409,'A different response has already been recorded.');}const service=rosterServiceContacts_(),ctx=rosterOperationsContext_({identity:service.identity,input:{...p,date:cap.date}},service.c,s);ctx.user={staffId:cap.staffId,email:'external:'+cap.staffId,smc:false,admin:false};rosterOperationsClock_(ctx);rosterOperationsGuardInactive_(s,ctx);inactiveRepairDates=ctx.inactiveRepairFenceDates;const beforeOutbox=s.outbox.length;GSISRosterOperations.apply(s,ctx,{operation:'respondMutual',id:cap.requestId,date:cap.date,decision:p.decision,reason:p.reason||''});GSISRosterOperations.refreshStaplerNotifications(s,ctx,beforeOutbox);changed=true;domainChanged=true;result={recorded:true,status:r.status};}
   }
-  if(changed){if(domainChanged)s.revision++;rosterOperationsCommit_(s);}return result;
+  if(changed){if(domainChanged)s.revision++;rosterOperationsCommit_(s,null,false,null,inactiveRepairDates);}return result;
  }finally{deployUnlock_(lock);}
 }
 
@@ -980,12 +1034,8 @@ function rosterDailyEmploymentMailDispatch_(input={}){gsisRequireBackendRole_('r
  }
  return remaining>0?outcome:{...outcome,blocked:1,reason:'The Apps Script daily email quota is exhausted; queued reports will retry later.'};
 }
-function rosterQuotaCheckpointDue_(s,clock){
- const target=GSISRosterAllocation.quotaCheckpoint(clock),receipt=s.quotaCheckpoints?.[target.week];
- if(receipt?.status==='ready')return false;
- const at=Date.parse(receipt?.at),now=Number.isFinite(clock.now)?clock.now:Date.parse(clock.today+'T00:00:00+08:00')+(clock.minute||0)*60000;
- return !Number.isFinite(at)||now-at>=3600000;
-}
+function rosterQuotaCheckpointDue_(s,clock){return GSISRosterAllocation.quotaCheckpointDue(s,clock);}
+
 function rosterQuotaCheckpointHint_(){try{return JSON.parse(props_().getProperty('ROSTER_SCHEDULE_HINT')||'{}');}catch(_){return {};}}
 function rosterScheduledIdle_(s,slot,today){
  if(rosterQuotaCheckpointDue_(s,{today,minute:slot.minute,now:slot.stamp}))return null;
@@ -1003,7 +1053,7 @@ function rosterScheduledHintWrite_(s,version){
 }
 function rosterScheduledFastSkip_(slot,gate,today){
  if(rosterQuotaCheckpointDue_(rosterQuotaCheckpointHint_(),{today,minute:slot.minute,now:slot.stamp}))return null;
- try{const raw=props_().getProperty('ROSTER_SCHEDULE_HINT'),hint=raw&&JSON.parse(raw);if(!hint||hint.schema!==1||!hint.version||props_().getProperty('ROSTER_SCHEDULE_DIRTY')||hint.version!==props_().getProperty('ROSTER_VERSION_HINT')||Date.now()<hint.at||Date.now()-hint.at>=15*60000)return null;
+ try{const raw=props_().getProperty('ROSTER_SCHEDULE_HINT'),hint=raw&&JSON.parse(raw);if(!hint||hint.schema!==1||!hint.version||props_().getProperty('ROSTER_SCHEDULE_DIRTY')||hint.version!==props_().getProperty('ROSTER_VERSION_HINT')||Date.now()<hint.at||Date.now()-hint.at>=5*60000)return null;
  const phase=slot.minute>=960?'evening':slot.minute<390?'morning':null,time=String(Math.floor(slot.minute/60)).padStart(2,'0')+':'+String(slot.minute%60).padStart(2,'0');
  if([389,390].includes(slot.minute)||phase&&hint.times?.[phase]?.includes(time)||hint.noticeDates.includes(today)||gate.allocate&&hint.enabled)return null;
  return {idle:true,allocationSkipped:true,...(gate.allocationStopped?{allocationStopped:true}:{}),...(gate.allocationInProgress?{allocationInProgress:true}:{}),...(!hint.enabled?{allocationPaused:true}:{})};
@@ -1012,26 +1062,35 @@ function rosterScheduledFastSkip_(slot,gate,today){
 function rosterScheduledDispatch_(req){gsisRequireBackendRole_('roster');
  const p=req.input||{},stamp=p.scheduledTime,started=Date.now();if(!Number.isFinite(stamp)||stamp>started+60000||started-stamp>120000)error_(400,'Scheduled tick is stale.');
  const slot={...GSISRosterAllocation.schedule(stamp),stamp},today=new Date(started+8*3600000).toISOString().slice(0,10),tracked=typeof rosterScheduledAllocationGate_==='function';
+ if(Array.isArray(p.inactiveReconcileDates)&&p.inactiveReconcileDates.length){
+  const fresh=rosterServiceContacts_(),s=rosterOperationsState_(),base={people:rosterOperationsPeople_(fresh.c),today,minute:GSISRosterAllocation.schedule(started).minute,days:{},now:started,iso:new Date(started).toISOString(),uuid:()=>Utilities.getUuid(),user:{email:'roster-service',smc:true,admin:false}},ctx=rosterOperationsInactiveContext_({identity:fresh.identity,input:p},fresh.c,s,base);
+  ctx.user=base.user;ctx.service=true;rosterOperationsReadInactive_(s,ctx);
+  return rosterOperationsInactiveResult_({revision:s.revision,inactiveReconciled:true},s,ctx);
+ }
+
  if(tracked)rosterScheduledAllocationRecover_(slot);const gate=tracked?rosterScheduledAllocationGate_(slot):{allocate:slot.optimise};
  if(tracked&&slot.allocationKey){const visible=rosterAllocationRunRead_(slot.date);if(visible?.scheduleKey===slot.allocationKey&&(visible.tickKey||visible.scheduleKey)===slot.key){if(visible.state==='completed'&&!rosterQuotaCheckpointDue_(rosterQuotaCheckpointHint_(),{today,minute:slot.minute,now:slot.stamp}))return {replayed:true,allocationSkipped:true};if(gate.allocationInProgress)throw Object.assign(Error('An allocator is already running for this date.'),{status:409,code:'ALLOCATION_IN_PROGRESS'});}}
  const fast=rosterScheduledFastSkip_(slot,gate,today);if(fast)return fast;
  const execute=(run,reportOnly=false)=>{
-  if(typeof rosterAbsenceIntakeGate_==='function')rosterAbsenceIntakeGate_([slot.date],!!run||slot.optimise&&!reportOnly);
-  const version=props_().getProperty('ROSTER_VERSION_HINT');let initial=rosterOperationsState_();rosterScheduledHintWrite_(initial,version);
+  const version=props_().getProperty('ROSTER_VERSION_HINT');let initial=rosterOperationsState_();
   if(run&&rosterAllocationRunAccepted_(run,initial)&&!rosterQuotaCheckpointDue_(initial,{today,minute:slot.minute,now:slot.stamp})){rosterAllocationRunLocked_(()=>rosterAllocationRunComplete_(run,initial));return {replayed:true};}
   if(typeof rosterAllocationAuditEnsureDay_==='function')initial=rosterAllocationAuditEnsureDay_(initial,p.calendarByDate,today);
-  const effectiveSlot={...slot,optimise:!reportOnly&&(!!run||slot.optimise)},preflight=rosterScheduledIdle_(initial,effectiveSlot,today);if(preflight)return {...preflight,...(reportOnly?{allocationSkipped:true,...(gate.allocationStopped?{allocationStopped:true}:{})}:{})};
-  const fresh=rosterServiceContacts_();
+  const effectiveSlot={...slot,optimise:!reportOnly&&(!!run||slot.optimise)},preflight=rosterScheduledIdle_(initial,effectiveSlot,today),idleResult=()=>({...preflight,...(reportOnly?{allocationSkipped:true,...(gate.allocationStopped?{allocationStopped:true}:{})}:{})});
+  const potential=initial.assignments.some(a=>a.date>=today&&(!a.noRelief&&!a.remove&&['draft','published'].includes(a.status)||a.inactiveReplacementPending))||initial.requests.some(r=>r.date>=today&&['pending','approved'].includes(r.status));
+  if(preflight&&!potential){rosterScheduledHintWrite_(initial,version);return idleResult();}
+  const fresh=rosterServiceContacts_(),inactiveContext={people:fresh.c.rosterPeople,today,minute:slot.minute,days:{}},inactiveDates=GSISRosterOperations.inactiveAssignmentDates(initial,inactiveContext);rosterScheduledHintWrite_(initial,version);
+  if(preflight&&!inactiveDates.length)return idleResult();
+  if(typeof rosterAbsenceIntakeGate_==='function')rosterAbsenceIntakeGate_([slot.date],!!run||slot.optimise&&!reportOnly);
   for(let attempt=0;attempt<2;attempt++){
    const now=Date.now();if(now-stamp>120000)error_(400,'Scheduled tick is stale.');
-   const s=rosterOperationsPhase_('prepare-state',()=>rosterOperationsState_()),today=new Date(now+8*3600000).toISOString().slice(0,10),idle=rosterScheduledIdle_(s,effectiveSlot,today);if(idle)return idle;
+   const s=rosterOperationsPhase_('prepare-state',()=>rosterOperationsState_()),today=new Date(now+8*3600000).toISOString().slice(0,10),idle=rosterScheduledIdle_(s,effectiveSlot,today);if(idle&&!GSISRosterOperations.inactiveAssignmentDates(s,{...inactiveContext,today}).length)return idle;
    const base=rosterOperationsPackedSnapshot_(s),ctx=rosterOperationsPhase_('prepare-context',()=>rosterOperationsContext_({identity:fresh.identity,input:{...p,operation:'scheduledRoster',date:slot.date}},fresh.c,s));
-   ctx.user={staffId:null,email:'roster-service',smc:true,admin:false};ctx.service=true;ctx.quotaCheckpointDue=rosterQuotaCheckpointDue_(s,ctx);ctx.skipScheduledAllocation=reportOnly;ctx.scheduledAllocationKey=run?.scheduleKey||slot.allocationKey||slot.key;ctx.scheduledAllocationRetry=!!run&&!slot.optimise;if(run)ctx.allocationBudgetCheck=()=>rosterScheduledAllocationBudget_(run);
+   ctx.user={staffId:null,email:'roster-service',smc:true,admin:false};ctx.service=true;ctx.quotaCheckpointDue=rosterQuotaCheckpointDue_(s,ctx);ctx.quotaCheckpointEvidence=p.quotaCheckpointEvidence;ctx.skipScheduledAllocation=reportOnly;ctx.scheduledAllocationKey=run?.scheduleKey||slot.allocationKey||slot.key;ctx.scheduledAllocationRetry=!!run&&!slot.optimise;if(run)ctx.allocationBudgetCheck=()=>rosterScheduledAllocationBudget_(run);
    const command={...p,operation:'scheduledRoster',date:slot.date};
    try{
     if(run)rosterAllocationRunStage_(run,attempt?'Planning inputs changed; recalculating against current records.':'Calculating scheduled relief while retaining manual choices.');
     const references=rosterOperationsReferenceKey_(ctx),dependencies=rosterOperationsDependencies_(base,command,ctx),beforeOutbox=s.outbox.length;
-    rosterOperationsClock_(ctx);const preparedClock=ctx.today+':'+ctx.minute;
+    rosterOperationsClock_(ctx);rosterOperationsGuardInactive_(s,ctx);const preparedClock=ctx.today+':'+ctx.minute;
     rosterOperationsPhase_('prepare-reconcile',()=>rosterOperationsReconcile_(s,ctx));const result=rosterOperationsPhase_('prepare-apply',()=>GSISRosterOperations.scheduledTick(s,ctx,stamp)),allocating=effectiveSlot.optimise&&!result.allocationTimedOut;
     // Scheduled receipts remain durable; the verified cold-output archive owns retention.
     const next=rosterOperationsPackedSnapshot_(s),domainChanged=rosterOperationsDependencies_(base,{},ctx)!==rosterOperationsDependencies_(next,{},ctx);
@@ -1044,8 +1103,8 @@ function rosterScheduledDispatch_(req){gsisRequireBackendRole_('roster');
      checkClock();if(rosterOperationsReferenceStamp_(ctx)!==references||rosterOperationsDependencies_(rosterOperationsPackPlans_(current),command,ctx)!==dependencies)rosterOperationsConflict_('PREPARED_RETRY','Planning inputs changed during allocation.');
      const merged=rosterOperationsMergePrepared_(base,next,rosterOperationsPackedSnapshot_(current));merged.revision=current.revision+(domainChanged?1:0);
      const committed=GSISRosterOperations.validateState(rosterOperationsUnpackPlans_(merged));if(typeof rosterAllocationAuditAccepted_==='function')rosterAllocationAuditAccepted_(committed,current,ctx,{scheduleKey:run?.scheduleKey||slot.key});
-     rosterOperationsPhase_('commit',()=>rosterOperationsCommit_(committed,[slot.date],allocating,()=>{checkClock();if(run)rosterAllocationRunBeforeCommit_(run,checkClock);}));if(run)rosterAllocationRunComplete_(run,committed);rosterScheduledHintWrite_(committed,props_().getProperty('ROSTER_VERSION_HINT'));
-     return {...result,revision:committed.revision,notificationsQueued:s.outbox.length-beforeOutbox};
+     rosterOperationsPhase_('commit',()=>rosterOperationsCommit_(committed,[slot.date],allocating,()=>{checkClock();if(run)rosterAllocationRunBeforeCommit_(run,checkClock);},ctx.inactiveRepairFenceDates));if(run)rosterAllocationRunComplete_(run,committed);rosterScheduledHintWrite_(committed,props_().getProperty('ROSTER_VERSION_HINT'));
+     return rosterOperationsInactiveResult_({...result,revision:committed.revision,notificationsQueued:s.outbox.length-beforeOutbox},committed,ctx);
     }finally{deployUnlock_(lock);}
    }catch(e){if(e.code!=='PREPARED_RETRY')throw e;if(attempt===1)error_(503,'Planning inputs changed during allocation. Retry this scheduler tick.');}
   }
@@ -1095,7 +1154,7 @@ function rosterNotificationEligible_(s,j,now,fresh,index,allowed){
  if(j.kind==='contact_review'&&!(fresh.rosterAdminIds||[]).includes(j.recipientId))return 'Recipient is no longer a Contacts Admin.';
  if(j.data.audience==='duty-smc'){const row=s.smcDutyRoster.find(r=>r.date===j.date);if(!GSISRosterOperations.dutyEligible(person)||!(fresh.rosterSMCIds||[]).includes(j.recipientId)||!row?.staffIds.includes(j.recipientId)||!GSISRosterOperations.dutyWindow(row,j.date,now))return 'Recipient is no longer on relief duty for this time window.';}
  if(j.data.audience==='urgent-smc'&&!(fresh.rosterUrgentSMCIds||[]).includes(j.recipientId))return 'Recipient is no longer eligible for urgent staff messages.';
- if(!person.active&&!s.adhoc.some(a=>a.staffId===j.recipientId&&a.date===j.date&&!a.deletedAt))return 'Recipient is inactive and is not engaged for the selected date.';
+ if(person.active!==true)return 'Recipient is inactive in Contacts.';
  j.mobile=GSISRosterOperations.mobile(person.mobile);j.name=person.name;j.external=person.active!==true;
  if(!/^\d{8,15}$/.test(j.mobile))return 'Recipient mobile number is missing or invalid. Contact the teacher directly.';
  // Explicit Notify actions and proven emergency-absence events bypass quiet hours.
@@ -1114,3 +1173,110 @@ function rosterPrivateTimetable_(ctx,s,staffId,date){
  return {monday,name:teacher?.name||ctx.people.find(t=>t.id===staffId)?.name||'',periods:daily.periods,perDay:daily.periods.length,baseline:teacher?.weekCells||[],duties,daily,...(daily.unavailableReason?{unavailableReason:daily.unavailableReason}:{})};
 }
 
+// Shared with PR #19: immutable core/monthly parts and manifest-last commits.
+function rosterSplitStorageError_(message,status=503){throw Object.assign(Error(message),{status,...(status===507?{code:'ROSTER_STORAGE_CAPACITY'}:{}),failurePhase:'operations-storage'});}
+function rosterSplitPartPlan_(text){
+ const state=JSON.parse(text),fields=[],buckets=new Map([['core',[]]]),limit=8000000;
+ if(!state||typeof state!=='object'||Array.isArray(state)||state.revision!==undefined&&(!Number.isSafeInteger(state.revision)||state.revision<0))rosterSplitStorageError_('The native document is invalid.');
+ let oversized=false;
+ const dated=(key,value)=>{const d=/^\d{4}-\d{2}-\d{2}$/.test(key)?key:typeof value?.date==='string'?value.date:typeof value?.at==='string'?value.at.slice(0,10):'';return /^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/.test(d)?d:'';};
+ const add=(entry,date)=>{const key=date?date.slice(0,7):'core',json=JSON.stringify(entry);if(json.length+25>limit)oversized=true;if(!buckets.has(key))buckets.set(key,[]);buckets.get(key).push({entry,date,json});};
+ for(const [name,value] of Object.entries(state)){
+  const type=Array.isArray(value)?'array':value&&typeof value==='object'?'object':'value',field=fields.length;fields.push([name,type]);
+  if(name==='revision')continue;
+  if(type==='value')add([field,-1,null,value],'');
+  else for(const [index,key] of Object.keys(value).entries())add([field,index,type==='array'?null:key,value[key]],dated(type==='object'?key:'',value[key]));
+ }
+ if(oversized)return rosterSplitFragmentPlan_(text,state.revision??0,fields);
+ const parts=[],serial=rows=>'{'+'"schema":1,"entries":['+rows.map(r=>r.json).join(',')+']}',target=8000000;
+ const emit=(key,rows)=>{const data=serial(rows);if(data.length>limit)rosterSplitStorageError_('One group of relief records is too large to save. Ask Admin to review storage capacity.',507);parts.push({key,name:key+'.json',data,chars:data.length,digest:rosterOperationsPlanDigest_(data)});};
+ const pages=(key,rows)=>{let page=[],size=25,index=0;const flush=()=>{emit(index?key+'-'+(index+1):key,page);index++;page=[];size=25;};for(const row of rows){if(row.json.length+25>limit)rosterSplitStorageError_('One relief record is too large to save. Ask Admin to review storage capacity.',507);if(page.length&&size+row.json.length+1>target)flush();page.push(row);size+=row.json.length+1;}if(page.length||!index)flush();};
+ for(const [key,rows] of buckets){
+  if(key==='core'){pages(key,rows);continue;}
+  if(serial(rows).length<=target){emit(key,rows);continue;}
+  for(const [label,half] of [['01',rows.filter(r=>Number(r.date.slice(8))<=15)],['16',rows.filter(r=>Number(r.date.slice(8))>15)]])if(half.length)pages(key+'-'+label,half);
+ }
+ return {schema:1,format:'gsis-roster-operations-split-v1',revision:state.revision??0,fields,chars:text.length,digest:rosterOperationsPlanDigest_(text),parts};
+}
+function rosterSplitFragmentPlan_(text,revision,fields){
+ // A valid R2 object may contain one field larger than a Drive part. Retain
+ // its exact JSON as bounded fragments instead of narrowing the object limit.
+ const parts=[],size=1048576;let offset=0;
+ while(offset<text.length){let end=Math.min(text.length,offset+size);if(end<text.length&&/[\uD800-\uDBFF]/.test(text[end-1])&&/[\uDC00-\uDFFF]/.test(text[end]))end--;
+  const ordinal=parts.length,key=ordinal?'fragment-'+String(ordinal).padStart(6,'0'):'core',data=JSON.stringify({schema:1,encoding:'json-fragment-v1',ordinal,text:text.slice(offset,end)});parts.push({key,name:key+'.json',data,chars:data.length,digest:rosterOperationsPlanDigest_(data)});offset=end;
+ }
+ return {schema:1,format:'gsis-roster-operations-split-v1',encoding:'json-fragments-v1',revision,fields,chars:text.length,digest:rosterOperationsPlanDigest_(text),parts};
+}
+function rosterSplitManifestDigest_(manifest){return rosterOperationsPlanDigest_(JSON.stringify([manifest.schema,manifest.format,manifest.revision,manifest.fields,manifest.chars,manifest.digest,manifest.folderId,manifest.parts,...(manifest.encoding?[manifest.encoding]:[])]));}
+function rosterSplitAssemble_(manifest,verifyWhole=false,includeText=true){
+ const started=Date.now();let partsReadMs=0;
+ const fail=()=>rosterSplitStorageError_('Split relief records failed verification. Keep the saved files and ask Admin to check storage.');
+ if(manifest?.schema!==1||manifest.format!=='gsis-roster-operations-split-v1'||!Number.isSafeInteger(manifest.revision)||manifest.revision<0||!Array.isArray(manifest.fields)||!Array.isArray(manifest.parts)||!manifest.parts.length)fail();
+ // Earlier split manifests have no metadata digest, so retain their complete
+ // verification until the next successful write upgrades the manifest.
+ if(manifest.integrityDigest!==undefined){if(!/^[a-f0-9]{64}$/.test(manifest.integrityDigest)||rosterSplitManifestDigest_(manifest)!==manifest.integrityDigest)fail();}else verifyWhole=true;
+ if(manifest.encoding==='json-fragments-v1')return rosterSplitAssembleFragments_(manifest,includeText);
+ if(manifest.encoding!==undefined)fail();
+ const fields=manifest.fields,entries=fields.map(()=>[]),seen=new Set();
+ for(const field of fields){if(!Array.isArray(field)||field.length!==2||typeof field[0]!=='string'||seen.has(field[0])||!['array','object','value'].includes(field[1]))fail();seen.add(field[0]);}
+ const ids=new Set(),keys=new Set();for(const part of manifest.parts){
+  if(typeof part.fileId!=='string'||!part.fileId||ids.has(part.fileId)||keys.has(part.key)||!Number.isSafeInteger(part.chars)||part.chars<1||part.chars>8000000||! /^[a-f0-9]{64}$/.test(part.digest||''))fail();ids.add(part.fileId);keys.add(part.key);
+  const readStarted=Date.now(),data=rosterReadFile_(part.fileId);partsReadMs+=Date.now()-readStarted;if(data.length!==part.chars||rosterOperationsPlanDigest_(data)!==part.digest)fail();const parsed=JSON.parse(data);if(parsed.schema!==1||!Array.isArray(parsed.entries))fail();
+  for(const row of parsed.entries){if(!Array.isArray(row)||row.length!==4||!Number.isInteger(row[0])||!entries[row[0]]||!Number.isInteger(row[1]))fail();entries[row[0]].push(row);}
+ }
+ if(!keys.has('core'))fail();const value={};
+ fields.forEach(([name,type],field)=>{let result;if(name==='revision'){if(type!=='value'||entries[field].length)fail();result=manifest.revision;}
+  else if(type==='value'){if(entries[field].length!==1||entries[field][0][1]!==-1)fail();result=entries[field][0][3];}
+  else{result=type==='array'?[]:{};const names=new Set();entries[field].sort((a,b)=>a[1]-b[1]).forEach((row,index)=>{if(row[1]!==index||type==='object'&&(typeof row[2]!=='string'||names.has(row[2])))fail();if(type==='array')result.push(row[3]);else{names.add(row[2]);Object.defineProperty(result,row[2],{value:row[3],writable:true,enumerable:true,configurable:true});}});}
+  Object.defineProperty(value,name,{value:result,writable:true,enumerable:true,configurable:true});
+ });
+ const assembledAt=Date.now(),text=includeText||verifyWhole?JSON.stringify(value):null,serialisedAt=Date.now();
+ // Parts are verified on every read. Verify the complete byte stream only at
+ // conversion boundaries; normal state reads do not re-serialise all history.
+ if(verifyWhole&&(text.length!==manifest.chars||rosterOperationsPlanDigest_(text)!==manifest.digest))fail();
+ return {value,text,timings:{partsReadMs,assembleMs:assembledAt-started-partsReadMs,serialiseMs:serialisedAt-assembledAt}};
+}
+function rosterSplitAssembleFragments_(manifest,includeText){
+ const started=Date.now(),seen=new Set(),fragments=[],fail=()=>rosterSplitStorageError_('Split native JSON fragments failed verification. Keep the saved files and ask Admin to check storage.');
+ for(const [ordinal,part]of manifest.parts.entries()){
+  const key=ordinal?'fragment-'+String(ordinal).padStart(6,'0'):'core';
+  if(part.key!==key||part.name!==key+'.json'||typeof part.fileId!=='string'||!part.fileId||seen.has(part.fileId)||!Number.isSafeInteger(part.chars)||part.chars<2||part.chars>8000000)fail();seen.add(part.fileId);
+  const raw=rosterReadFile_(part.fileId);if(raw.length!==part.chars||rosterOperationsPlanDigest_(raw)!==part.digest)fail();let fragment;try{fragment=JSON.parse(raw);}catch(error){fail();}
+  if(fragment.schema!==1||fragment.encoding!=='json-fragment-v1'||fragment.ordinal!==ordinal||typeof fragment.text!=='string'||!fragment.text.length||fragment.text.length>1048576)fail();fragments.push(fragment.text);
+ }
+ const text=fragments.join('');if(text.length!==manifest.chars||rosterOperationsPlanDigest_(text)!==manifest.digest)fail();let value;try{value=JSON.parse(text);}catch(error){fail();}
+ if(!value||typeof value!=='object'||Array.isArray(value)||(value.revision??0)!==manifest.revision||JSON.stringify(Object.entries(value).map(([name,item])=>[name,Array.isArray(item)?'array':item&&typeof item==='object'?'object':'value']))!==JSON.stringify(manifest.fields))fail();
+ return {value,text:includeText?text:null,timings:{partsReadMs:Date.now()-started,assembleMs:0,serialiseMs:0}};
+}
+
+function rosterSplitReadDocument_(id,verifyWhole=false,includeText=true){
+ const raw=rosterReadFile_(id),root=JSON.parse(raw);
+ if(root?.format!=='gsis-roster-operations-split-v1')return {id,value:root,text:includeText?raw:null,manifest:null};
+ return {id,...rosterSplitAssemble_(root,verifyWhole,includeText),manifest:root};
+}
+function rosterSplitPrepareDocument_(value,options){
+ const {folderId,previousId,name='manifest.json'}=options||{};
+ if(typeof folderId!=='string'||!folderId||typeof name!=='string'||!name)rosterSplitStorageError_('A private native-document folder is required.');
+ // PR #19 format and ordinal reconstruction are shared by native writes and
+ // the D1 backup. Preflight bounds every part before any external mutation.
+ const text=JSON.stringify(value),plan=rosterSplitPartPlan_(text);
+ let prior=null,priorRaw=null;if(previousId){priorRaw=rosterReadFile_(previousId);prior=JSON.parse(priorRaw);if(prior.format!=='gsis-roster-operations-split-v1')rosterSplitStorageError_('The previous backup manifest is invalid.');rosterSplitAssemble_(prior,false,false);}
+ const previous=new Map((prior?.parts||[]).map(part=>[part.key,part])),parts=[];
+ for(const part of plan.parts){const old=previous.get(part.key);if(old?.digest===part.digest&&old.chars===part.chars){parts.push(old);continue;}
+  const fileId=rosterCreateFile_(folderId,part.name,Utilities.newBlob(part.data,'application/json; charset=UTF-8'));
+  if(rosterReadFile_(fileId)!==part.data)rosterSplitStorageError_('A new native-document part could not be verified.');
+  const {data,...descriptor}=part;parts.push({...descriptor,fileId});
+ }
+ const manifest={...plan,folderId,parts};manifest.integrityDigest=rosterSplitManifestDigest_(manifest);
+ let rootId=null,committed=false;
+ return {manifest,get id(){return rootId;},commit(beforeWrite){
+  if(committed)return rootId;
+  if(previousId&&rosterReadFile_(previousId)!==priorRaw)throw Object.assign(Error('The previous document changed. Retry against its current manifest.'),{status:409});
+  if(beforeWrite)beforeWrite();
+  const encoded=JSON.stringify(manifest);rootId=rosterCreateFile_(folderId,name,Utilities.newBlob(encoded,'application/json; charset=UTF-8'));
+  if(rosterReadFile_(rootId)!==encoded)rosterSplitStorageError_('The new native-document manifest could not be verified.');committed=true;return rootId;
+ },cleanup(){
+  if(!committed||!prior)return;const live=new Set(parts.map(part=>part.fileId));
+  for(const old of prior.parts)if(!live.has(old.fileId))try{rosterDriveRequest_('https://www.googleapis.com/drive/v3/files/'+encodeURIComponent(old.fileId)+'?supportsAllDrives=true&fields=id',{method:'patch',contentType:'application/json',payload:JSON.stringify({trashed:true})},'native-document-retire');}catch(ignore){}
+ }};
+}

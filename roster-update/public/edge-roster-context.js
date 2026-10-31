@@ -92,6 +92,7 @@ function rosterOperationsContext_(req,c,state,providedIndex){
   return {user,people,days:{},timetableEntries:(providedIndex||rosterIndex_()).entries,today,minute,now:now.getTime(),iso:now.toISOString(),uuid:()=>crypto.randomUUID(),smcIds:c.rosterSMCIds||[],...(projected?{staplerSponsors:c.rosterDates.sponsors}:{})};
  }
  const requested=GSISRosterOperations.date(p.date||today),dates=[requested,...(Array.isArray(p.dates)?p.dates:[])];if(p.actualDate)dates.push(GSISRosterOperations.date(p.actualDate));
+ if(p.operation==='scheduledRoster'){const week=GSISRosterAllocation.quotaCheckpoint({today,minute,now:now.getTime()}).week;for(let n=0;n<5;n++)dates.push(GSISRosterAllocation.addDays(week,n));}
  const people=rosterOperationsPeople_(c),contactsDuty={available:Array.isArray(c.rosterSMCIds),staffIds:(c.rosterSMCIds||[]).filter(id=>people.some(t=>t.id===id&&GSISRosterOperations.dutyEligible(t))),source:{kind:'Contacts'}};
  GSISRosterOperations.seedNameBridges(state,people);const recordContext={calendarDatesVerified:Object.entries(p.calendarByDate||{}).filter(([date,value])=>value?.date===date&&value.available===true).map(([date])=>date),user,people,days:{},timetableEntries:[],dutySources:{[requested]:contactsDuty},today,minute,now:now.getTime(),iso:now.toISOString(),uuid:()=>crypto.randomUUID(),notificationsConfigured:p.notificationsReady===true,adminRecipients:[],smcIds:c.rosterSMCIds||[]};
  if(p.view==='reportForm'&&(p.operation||'read')==='read')return recordContext;
@@ -126,11 +127,12 @@ function rosterOperationsContext_(req,c,state,providedIndex){
  // Existing saved plans supply their own editor data. Reopening needs current
  // baseline identity/timing and authority; Save and Confirm still rebuild quotas.
  const savedRead=p.operation==='stapler'&&GSISRosterOperations.staplerPermission(state,recordContext,requested)?state.staplerPlans.find(r=>r.date===requested):null,savedReadPlan=savedRead?.draft||savedRead?.published;
- const unique=[...new Set(dates)],index=providedIndex||rosterIndex_(),models={},modelIdentities={},cellMutation=rosterOperationsCellMutation_(p,state),quotaRequested=!savedReadPlan&&!cellMutation&&rosterOperationsNeedsQuota_(p),quotaSource=allocationRead?rosterOperationsQuotaSource_():null,allocationReferenceKey=allocationRead?rosterOperationsAllocationReference_(state,people,index,p,quotaSource,today,unique):null,cached=allocationRead?rosterOperationsAllocationBaseline_(allocationReferenceKey):null;
+ const inactiveDates=GSISRosterOperations.inactiveAssignmentDates(state,recordContext);dates.push(...inactiveDates);
+ const unique=[...new Set(dates)],index=providedIndex||rosterIndex_(),models={},modelIdentities={},cellMutation=rosterOperationsCellMutation_(p,state),quotaRequested=!savedReadPlan&&!cellMutation&&(rosterOperationsNeedsQuota_(p)||inactiveDates.length>0),quotaSource=allocationRead?rosterOperationsQuotaSource_():null,allocationReferenceKey=allocationRead?rosterOperationsAllocationReference_(state,people,index,p,quotaSource,today,unique):null,cached=allocationRead?rosterOperationsAllocationBaseline_(allocationReferenceKey):null;
  if(cached&&quotaSource.entry)reliefGuard_(quotaSource.book,quotaSource.index,quotaSource.entry);
  const quota=quotaRequested&&!cached?rosterOperationsPhase_('quota',()=>rosterOperationsQuota_(unique,quotaSource)):{from:'',to:'',rows:[]};
  let subjectCatalogueLoaded=false;
- const compact=p.operation==='read'&&p.compact===true&&['report','entry'].includes(p.view),targetId=(user.smc||user.admin)?(p.staffId||state.absences.find(a=>a.id===(p.absenceId||p.id))?.staffId||user.staffId):user.staffId,targetIds=new Set(compact&&p.staffIds!==undefined?GSISRosterOperations.absenceStaffIds(recordContext,p):[targetId]);
+ const compact=!inactiveDates.length&&p.operation==='read'&&p.compact===true&&['report','entry'].includes(p.view),targetId=(user.smc||user.admin)?(p.staffId||state.absences.find(a=>a.id===(p.absenceId||p.id))?.staffId||user.staffId):user.staffId,targetIds=new Set(compact&&p.staffIds!==undefined?GSISRosterOperations.absenceStaffIds(recordContext,p):[targetId]);
 
  const quotaById=new Map(quota.rows.map(r=>[r.id,r]));
  const classCatalogues={},days=cached?cached.days:{};for(const d of cached?[]:unique){const entry=GSISRoster.active(index.entries,d);if(!entry){days[d]={id:null,parity:null,verified:true,schoolDay:false,warning:'No timetable is in force on this date.',periods:[],teachers:[]};continue;}
@@ -163,4 +165,3 @@ export function edgeRosterNeedsQuota(p){
  return ['reliefBatch','assign','candidates','availability','publish','dailyNotify','notifyDaily','requestMutual','respondMutual','allocation','health','accounting','optimise','autoAllocate','scheduledRoster','combine','undo','unassign','setNoRelief','saveRecess','deleteRecess','sendDailyEmploymentReport'].includes(op);
 }
 // Ordinary draft removals are atomic cell edits. Published/replacement/corrected cover retains the full pipeline.
-

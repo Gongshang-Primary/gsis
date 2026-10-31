@@ -1,11 +1,11 @@
 import {runRecoveryTimetableCleanup} from '../roster-update/public/roster-recovery-timetable-cache.js';
 import {recordJobHealth,safeHealthError} from '../shared/edge-health.js';
 import {assertRecoveryWritable} from '../shared/edge-recovery.js';
-import {rosterRecoveryEnvironment} from '../shared/roster-recovery-profile.js';
+import {rosterRecoveryEnvironment,resolveRosterAuthorityEnvironment} from '../shared/roster-recovery-profile.js';
 import {readQuietMode} from '../shared/roster-quiet-mode.js';
 // Test harnesses load this file with its imports removed; treat quiet mode as off there.
 const quietMode=(db,at)=>typeof readQuietMode==='function'?readQuietMode(db,at):Promise.resolve({active:false});
-import {dispatchNotifications,scheduledRoster,diagnoseNotificationConnections,dispatchInboxPending,dispatchWebhookJobs,dispatchReceivedReports,dispatchPeerMail,dispatchAllocationAudit} from '../roster-update/public/_worker.js';
+import {dispatchNotifications,scheduledRoster,diagnoseNotificationConnections,dispatchInboxPending,dispatchWebhookJobs,dispatchReceivedReports,dispatchPeerMail,dispatchAllocationAudit,dispatchGoogleBackup,dispatchQuotaSnapshot} from '../roster-update/public/_worker.js';
 /* GSIS_API_SECRET_BEGIN */
 // First-party API credentials share one operator-selected setting. Browser
 // sessions, private relief links and third-party credentials stay independent.
@@ -42,9 +42,9 @@ async function stage(env,job,event,work,{scheduledTime}={}){
   writable(env);const result=await work(),data=result?.data||result,summary=safeSummary(data);
   if(result?.ok===false||data?.failures?.length)throw Object.assign(Error('Job failed'),{...safeError(result),status:result.status});
   const measured=Object.entries(summary).filter(([key,value])=>typeof value==='number'&&!['readyAt','backendCalls','reviewedUncertain'].includes(key));
-  const failed=!!(data?.quotaPending||data?.quotaFallback||data?.prepareFailures||data?.resultFailures||data?.failed||data?.uncertain||data?.unconfirmed||summary.needsReview||summary.deferred||summary.retrying||summary.blocked),idle=!data?.hasMore&&!data?.pending&&(data?.idle===true||data?.state==='idle'||measured.length>0&&measured.every(([,value])=>value===0));
+  const failed=!!(data?.quotaPending||data?.quotaFallback||data?.prepareFailures||data?.resultFailures||data?.failed||data?.uncertain||data?.unconfirmed||summary.needsReview||summary.deferred||summary.retrying||summary.blocked||data?.quotaPending===true),idle=!data?.hasMore&&!data?.pending&&(data?.idle===true||data?.state==='idle'||measured.length>0&&measured.every(([,value])=>value===0));
   const status=failed?'failure':data?.configured===false||data?.enabled===false||data?.skipped===true?'skipped':idle?'idle':'success';
-  const detail=failed&&data?.failure?safeError(data.failure):{},outcomeCode=data?.code?safeError(data).code:'UNKNOWN_ERROR';
+  const detail=failed&&data?.failure?safeError(data.failure):failed&&data?.quotaPending===true?safeError(data):{},outcomeCode=data?.code?safeError(data).code:'UNKNOWN_ERROR';
   await record({status,...detail,code:failed?(detail.code&&detail.code!=='UNKNOWN_ERROR'?detail.code:'JOB_FAILED'):outcomeCode!=='UNKNOWN_ERROR'?outcomeCode:status==='idle'?'IDLE':status==='skipped'?'SKIPPED':'OK',finishedAt:Date.now(),counts:summary});
   if(event)console.info(JSON.stringify({event,...(scheduledTime?{scheduledTime}:{}),...summary,...detail}));
   return result;
@@ -64,7 +64,7 @@ function settleMessages(batch,messages,action,options){
 }
 export default {
  async scheduled(event,env,ctx){
-  env=rosterRecoveryEnvironment(env);
+  env=(typeof resolveRosterAuthorityEnvironment==='function'?await resolveRosterAuthorityEnvironment(env):rosterRecoveryEnvironment(env));
   ctx.waitUntil((async()=>{
    try{writable(env);}catch(error){console.error(JSON.stringify({event:'roster-scheduled-paused',...safeError(error)}));return;}
    if(env.WHATSAPP_DIAGNOSTICS_ENABLED==='true'){
@@ -84,6 +84,8 @@ export default {
     if(quiet.active)return;
     await run('audit-export','roster-allocation-audit',()=>dispatchAllocationAudit(env));return;
    }
+   const backup=typeof dispatchGoogleBackup==='function'?run('google-backup','roster-google-backup',()=>dispatchGoogleBackup(env)):Promise.resolve();
+   const quota=run('quota-snapshot','roster-quota-snapshot',()=>dispatchQuotaSnapshot(env));
    const send=()=>run('notifications','roster-notification-dispatch',()=>dispatchNotifications(env));
    // Independent notice and human inbox work can progress during slow planning.
    // The backend still gates each affected date on all pending attendance.
@@ -101,11 +103,11 @@ export default {
     // Reuse the same durable outbox. Never reconstruct or reset provider claims.
     if(result?.notificationsQueued>0||receiptResult?.intake?.notificationsQueued>0){await notifications;await send();}
    })();
-   await Promise.all([received,notifications,inbox,ingress,peerMail,planning]);
+   await Promise.all([backup,quota,received,notifications,inbox,ingress,peerMail,planning]);
   })());
  },
  async queue(batch,env){
-  env=rosterRecoveryEnvironment(env);
+  env=(typeof resolveRosterAuthorityEnvironment==='function'?await resolveRosterAuthorityEnvironment(env):rosterRecoveryEnvironment(env));
   try{writable(env);}catch(error){console.error(JSON.stringify({event:'roster-queue-paused',...safeError(error)}));batch.retryAll({delaySeconds:300});return;}
   const supported=batch.messages.filter(message=>message.body?.purpose==='gsis-notification-wake-v1'),unsupported=batch.messages.filter(message=>message.body?.purpose!=='gsis-notification-wake-v1');
   if(unsupported.length){
@@ -126,7 +128,7 @@ export default {
   }else settleMessages(batch,supported,'ack');
  },
  async fetch(req,env){
-  env=rosterRecoveryEnvironment(env);
+  env=(typeof resolveRosterAuthorityEnvironment==='function'?await resolveRosterAuthorityEnvironment(env):rosterRecoveryEnvironment(env));
   if(new URL(req.url).pathname!=='/dispatch'||req.method!=='POST')return new Response('Not found',{status:404,headers:{'Cache-Control':'no-store'}});
   try{writable(env);}catch{return Response.json({ok:false,error:'Background work is paused for recovery.'},{status:503,headers:{'Cache-Control':'no-store'}});}
   let serviceSecret;try{serviceSecret=gsisApiSecret(env,'ROSTER_SERVICE_SECRET');}catch(error){return Response.json({ok:false,code:error.code,error:error.message},{status:503,headers:{'Cache-Control':'no-store'}});}
@@ -142,4 +144,3 @@ export default {
   }catch{return Response.json({ok:false,error:'Notification wake was not accepted.'},{status:403,headers:{'Cache-Control':'no-store'}});}
  }
 };
-

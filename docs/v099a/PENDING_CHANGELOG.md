@@ -354,6 +354,8 @@ Files: roster-update/public/roster-settings-ui.js (section near "Subject familie
 
 ### Roster: peer email job reports failure every minute for already-reviewed messages
 
+**Status:** approved (owner 31 Oct: "2 go"). Queue row P.
+
 **Found (30 Oct 2026, D1 job health; still present after the v0.9.9b deploy, 31 Oct 05:09):** `peer-mail` records `JOB_FAILED` (and some `TIMEOUT`) every minute since at least 30 Oct 18:00, with counts `{pending:0, sent:0, uncertain:2, reviewedUncertain:2}`. The two uncertain messages were already reviewed, yet each run counts them as a failure. No message is lost; the noise hides real failures in System Health.
 
 **Planned change:**
@@ -373,7 +375,12 @@ Files: roster-update/public/roster-settings-ui.js (section near "Subject familie
 **Planned change:**
 1. Inactive (`Active` not `Y`) teachers are excluded from: relief candidate lists (manual and colleague/peer pickers), auto-allocation and Auto-fill blanks, Report Absence teacher pickers, Manage Ad-hoc pickers, Daily Notify recipients and SMC/Admin role lists. They are not shown as "unavailable" rows; they are absent.
 2. Existing records stay: past absences, assignments, R history and notifications for that teacher remain visible in history, exports and statistics, labelled "(inactive)" where shown.
-3. A teacher made inactive with future relief already assigned: show an SMC warning on Assign Relief for each affected date ("Assigned teacher is now inactive") and treat the cover as needing review; never silently remove it.
+3. **Owner decision 31 Oct (1B):** a teacher made inactive with future relief already assigned: Roster removes those assignments automatically and re-runs auto-allocation for the freed periods.
+   - Scope: only periods not yet started (today's later periods and future dates). Started or completed duties stay as history.
+   - Protected work is not overridden by the re-run: other teachers' manual SMC choices and peer arrangements stay.
+   - Each removal writes an audit entry ("Removed: teacher inactive in Contacts") and shows on Assign Relief for that date.
+   - If the day was already published, the new allocation follows the normal publish and notify flow (SMC sees "changes not yet visible"; replacement teachers are notified when published). The inactive teacher receives no message.
+   - If no replacement is found, the period shows UNASSIGNED with an SMC alert.
 4. Propagation: after Contacts saves, Roster reflects the change on the next refresh; document the maximum delay and clear any directory cache on the Contacts change (or cap its age at 5 minutes).
 5. Tests: inactive teacher absent from each picker and from allocation; historical rows retained; future assignment flagged; reactivation restores availability.
 
@@ -392,3 +399,16 @@ Files: roster-update/public/roster-settings-ui.js (section near "Subject familie
 4. Test: filter "tan" shows only matching TTb names; an edit made, filtered away and saved is still saved.
 
 **Scope:** contacts-update/public/app.js and index.html only. Not deployed.
+
+### Roster D1 import: preparation exceeds the Apps Script 6-minute limit on the real file
+
+**Found (31 Oct 2026, owner rehearsal import, reference 6f550ae7-a19c-4087-9900-501c3ac8e2c1):** session created 12:14:00 SGT, stayed `preparing`, marked `failed` 12:24:23 after the 10-minute lease ("The frozen source is incomplete"). `rosterEdgeExportManifest_` runs in one Apps Script execution: read the 16.08M operations file and references, validate, read every model file and allocation audit archive, gzip and hash all parts, then upload one container file. On the real data this exceeds the 6-minute execution limit, so the run is killed before it can record failure. While it ran, Roster showed "temporarily unavailable" to the owner (Apps Script busy). D1 heads stayed legacy; Google unaffected.
+
+**Planned change:**
+1. Split preparation into resumable steps, each well under 6 minutes: (a) snapshot and digest under the lock; (b) freeze parts in batches, writing each part file and recording progress in the descriptor; (c) write the manifest last. Each page poll advances one step.
+2. Do not hold the user/notification lock longer than the snapshot read.
+3. Record timing per step in the descriptor and show it on edge-setup.
+4. Test with a production-size fixture (16M state plus model and archive files) under a simulated 6-minute budget per call.
+5. Clean up the failed session's two D1 import locks on explicit restart (existing path); retain evidence.
+
+**Owner 31 Oct:** top priority for Codex; task `roster-d1-import-resumable-prepare.md` (queue row R). Do not retry the import until it is built and deployed.

@@ -37,6 +37,13 @@ test('pending checkpoint retries once its one-hour retry interval has elapsed',(
  assert.equal(due.context.rosterQuotaCheckpointDue_(s,{...due.clock,minute:1020}),true);
 });
 
+test('Monday first allocation gets one final retry even after a recent hourly attempt',()=>{
+ const deadline=Date.parse(week+'T05:30:00+08:00'),h=harness(deadline),receipt={status:'pending',at:new Date(deadline-30*60000).toISOString(),retryUntil:new Date(deadline).toISOString()};
+ assert.equal(h.context.rosterQuotaCheckpointDue_(state(receipt),{today:week,minute:330,now:deadline}),true);
+ receipt.retryStopped=true;
+ assert.equal(h.context.rosterQuotaCheckpointDue_(state(receipt),{today:week,minute:331,now:deadline+60000}),false);
+});
+
 test('a fast-skip hint cannot bypass a missing or due quota checkpoint',()=>{
  for(const receipt of [undefined,{status:'pending',at:new Date(at-3600000).toISOString()}]){
   const h=harness(),hint={schema:1,version:'revision-1',at,enabled:false,times:{evening:[],morning:[]},noticeDates:[],quotaCheckpoints:receipt?{[week]:receipt}:{}};
@@ -61,10 +68,11 @@ test('Sunday 15:59 remains in the current accounting week',()=>{
 test('the scheduled Worker requests every weekday for the Sunday checkpoint',async()=>{
  const source=fs.readFileSync(path.join(root,'roster-update/public/_worker.js'),'utf8'),start=source.indexOf('export async function scheduledRoster('),end=source.indexOf('\n// Called only',start);
  assert(start>=0&&end>start,'scheduled entry point is available');let requested,command;
- const context={Date,Set,GSISRosterAllocation:A,pendingAbsenceTransport:async()=>({pendingCaptureCount:0,pendingPeerCount:0}),edgeRosterEnabled:()=>false,notificationStatus:()=>({ready:false}),calendarDates:async(_env,dates)=>{requested=dates;return Object.fromEntries(dates.map(date=>[date,{date,schoolDay:true,parity:'odd',available:true}]));},serviceBackend:async(_env,value)=>{command=value;return {ok:true,data:{idle:true}};},rosterScheduledFailure:r=>Error(JSON.stringify(r))};
+ const context={Date,Set,crypto:{randomUUID:()=> 'test-request'},GSISRosterAllocation:A,readQuotaCheckpointEvidence:async()=>({week,cutoff:at,verified:false,reason:'QUOTA_SNAPSHOT_MISSING'}),reconcileInactiveReplacements:async(_env,_input,result)=>result,pendingAbsenceTransport:async()=>({pendingCaptureCount:0,pendingPeerCount:0}),edgeRosterEnabled:()=>false,notificationStatus:()=>({ready:false}),calendarDates:async(_env,dates)=>{requested=dates;return Object.fromEntries(dates.map(date=>[date,{date,schoolDay:true,parity:'odd',available:true}]));},serviceBackend:async(_env,value)=>{command=value;return {ok:true,data:{idle:true}};},rosterScheduledFailure:r=>Error(JSON.stringify(r))};
  vm.createContext(context);vm.runInContext(source.slice(start,end).replace('export async function','async function'),context);
  await context.scheduledRoster({ROSTER_AUTOMATION_ENABLED:'true'},at);
  for(let n=0;n<5;n++)assert(requested.includes(A.addDays(week,n)),'missing weekday '+n);
  assert(requested.includes(sunday),'today remains available for notification work');
  assert.deepEqual([...command.dates].sort(),[...requested].sort());
+ assert.equal(command.quotaCheckpointEvidence.week,week,'only the authenticated scheduler attaches snapshot evidence');
 });
