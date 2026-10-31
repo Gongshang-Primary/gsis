@@ -269,7 +269,7 @@ export default {async fetch(req,env,ctx){
  const u=new URL(req.url);
  if(u.pathname==='/api/venues-source')return json({ok:false,code:'RECOVERY_VENUES_SUSPENDED',error:'Venue occupancy export is paused during Roster recovery.'},503);
  // Health validates the caller and current Google role before reading any D1 ownership metadata.
- if(u.pathname==='/api/system-health')return systemHealthRoute(req,{...env,GSIS_REQUEST_ORIGIN:u.origin});
+ if(u.pathname==='/api/system-health')return systemHealthRoute(req,{...rosterRecoveryEnvironment(env),GSIS_REQUEST_ORIGIN:u.origin},env);
  try{env={...(typeof resolveRosterAuthorityEnvironment==='function'?await resolveRosterAuthorityEnvironment(env):rosterRecoveryEnvironment(env)),GSIS_REQUEST_ORIGIN:u.origin};}
  catch(error){return json({ok:false,code:error.code||'ROSTER_AUTHORITY_UNVERIFIED',error:error.message},error.status||503);}
  if(u.pathname.startsWith('/api/')&&!['/api/session','/api/logout'].includes(u.pathname))try{gsisApiSecret(env,'BRIDGE_SECRET');}catch(error){return json({ok:false,code:error.code,error:error.message},503);}
@@ -391,13 +391,12 @@ export async function readSession(req,env){
  return {email:data.email,subject:data.subject,expiresAt:data.expires};
 }
 async function requestIdentity(req,env){const auth=req.headers.get('Authorization');if(auth){if(!auth.startsWith('Bearer ')||auth.length>16000)throw Error('Invalid identity');return identity(auth.slice(7),env.GOOGLE_CLIENT_ID)}return readSession(req,env)}
-export async function systemHealthRoute(req,env){
+export async function systemHealthRoute(req,env,authorityEnv=env){
  const origin=new URL(req.url).origin;
  if(req.method!=='POST'||req.headers.get('Origin')!==origin)return json({ok:false,error:'Same-origin POST required.'},403);
  let who;try{who=await requestIdentity(req,env);}catch{return json({ok:false,error:'Sign in with your school account.'},401);}
  const raw=await req.text();if(enc.encode(raw).byteLength>4000)return json({ok:false,error:'Request too large.'},413);
  let input;try{input=JSON.parse(raw);if(!input||Array.isArray(input)||typeof input!=='object'||!['read','retryBackgroundJob','recordRecoveryCheckpoint','peerMailReview','reviewPeerMail'].includes(input.operation))throw Error();}catch{return json({ok:false,error:'Choose a supported health operation.'},400);}
- const authorityEnv=env;env={...rosterRecoveryEnvironment(env),GSIS_REQUEST_ORIGIN:origin};
  try{
   if(['peerMailReview','reviewPeerMail'].includes(input.operation)){
    // The backend verifies current Admin authority under its notification lock.
@@ -408,6 +407,7 @@ export async function systemHealthRoute(req,env){
   }
   const result=await callOperationalBackend({...env,GSIS_REQUEST_ORIGIN:origin},'health',{input,identity:who});
   if(result===undefined){
+   env={...rosterRecoveryEnvironment(env),GSIS_REQUEST_ORIGIN:origin};
    if(input.operation!=='read')return json({ok:false,code:'RECOVERY_HEALTH_READ_ONLY',error:'Recovery health supports status reads only.'},400);
    // A fresh signed Google request checks current Contacts authority on every
    // read. Browser role claims and old D1 authority are never trusted.

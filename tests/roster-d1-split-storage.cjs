@@ -14,6 +14,7 @@ function fixture(){
   error_:(status,message)=>{throw Object.assign(Error(message),{status});}
  });
  vm.runInContext(fs.readFileSync('backend/RosterOperations.gs','utf8'),scope);
+ vm.runInContext(fs.readFileSync('backend/RosterNativeStorage.gs','utf8'),scope);
  const roster=fs.readFileSync('backend/Roster.gs','utf8');vm.runInContext(roster.slice(roster.indexOf('function rosterIndex_(){'),roster.indexOf('function rosterPublic_(')),scope);
  return {scope,files,events,properties,fail:name=>failName=name,read:id=>scope.rosterSplitReadDocument_(id,true).value,
   write:(value,previousId)=>{const prepared=scope.rosterSplitPrepareDocument_(value,{folderId:'backup',previousId,name:'manifest.json'});return {prepared,id:prepared.commit()};}};

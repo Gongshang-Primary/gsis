@@ -79,3 +79,7 @@ CI corrections preserve the fail-closed D1 proof gate and make Google recovery e
 Corrected-head local validation: all 18 components rebuilt, 88 Apps Script files parsed, and eight focused programs passed (the five CI failures, fenced health authority, authority-profile proof and mirror UI). The 14M native restoration integration also passed after the storage-reader change.
 
 The local LORD runner passed its non-browser groups before stopping at its Playwright check because no browser is installed here. This is not a full LORD pass; the complete browser-equipped CI run remains required.
+
+The next full run at `63a471c2f7dd0b4eb1f2fcb8c6239330a6f5c38e` reported 904/906 Node programs; LORD again did not run. Its two failures exposed an explicit private-health-helper compatibility regression and a split-register fixture that omitted the native reader module. The correction keeps the public entry on authenticated Google/D1 status while retaining explicit private helper delegation, and loads the same native reader in the split fixture as production. Existing gateway and split-storage assertions pass unchanged.
+
+After that correction, all 18 components rebuilt and 26 broader non-browser D1, gateway, storage and recovery programs passed, including the 14M mirror and 30M split fixtures. The 27th local program required the unavailable Chromium executable; it remains a CI check, not a claimed pass.
