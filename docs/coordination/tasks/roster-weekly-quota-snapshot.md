@@ -49,3 +49,37 @@ Wait for owner to switch model and explicitly resume. Then read current main, co
 ## Deployment
 
 Not deployed. No configuration or production authority changes.
+
+
+## 31 October source review after Claude's plan comments
+
+Model: Codex. Read-only source review; no product implementation started. Owner request: "check PR see what you can work on".
+
+### Confirmed existing behaviour
+
+- `shared/roster-allocation.js:captureWeek` already stores one `entitlements` row per staffId/week/year, with Deploy provenance. Reuse this ledger; do not create a second cumulative ledger.
+- `captureWeek` currently permits only the current week. It cannot record next Monday on Sunday without an explicit checkpoint path. Preserve the ordinary no-backfill restriction.
+- `weekQuota` deliberately reads current Deploy R for current/future planning even if an observed entitlement exists. Freezing the denominator alone therefore does not freeze allocation R. The implementation must use the checkpoint quota consistently for weekly planning while retaining live employment/cap and absence safety checks.
+- `annual` and `balances` currently include entitlements only through `monday(ctx.today)`. On Sunday they exclude the coming week's row. Update the defined accounting horizon at the checkpoint so the Sunday's first Monday allocation sees the credited denominator. Do not change historical totals.
+- `backend/RosterOperations.gs:rosterOperationsQuota_` and `backend/Relief.gs:reliefRosterQuota_` use the published Deploy document with guarded, versioned calculation caches. Production Google-first Roster does not require a second HTTP hop through the Deploy webpage.
+- `roster-update/public/_worker.js:scheduledRoster` already chooses tomorrow after 16:00 and sends Calendar context to the authenticated backend. Extend the existing scheduled route rather than add an unrelated scheduler.
+
+### Concrete regression cases to add during implementation
+
+1. Publish policy R=5 before Sunday 16:00, capture the coming week, then publish R=3 on Wednesday: that week's entitlement AND allocation R remain 5; next week's checkpoint uses 3.
+2. On Sunday immediately before/after 16:00, next week's denominator is excluded/included as specified; the first Monday allocation uses the post-checkpoint total.
+3. Repeat or race checkpoint requests: exactly one credit per teacher/week/year through the existing transaction/lock.
+4. Monday is a holiday but Tuesday is a verified school day: capture the school week using verified eligible context; a fully non-school week earns no quota.
+5. Preserve whole-week extended leave, service-date, daily-roster SRE and FAJT/SRE classification rules.
+6. Verify missed checkpoint/retry semantics against a publication arriving after the cutoff. Never silently substitute a later publication as though it existed at Sunday 16:00.
+7. Keep current employment caps, inactive-staff exclusions, absence constraints, manual/peer assignments and completed duties intact.
+
+### Architecture decision still open
+
+The owner requested shared Cloudflare R storage. Claude recommends first scheduling the existing Google-authoritative ledger and deferring the independent Cloudflare snapshot to the D1 migration. These are different delivery scopes; this review does not silently choose between them.
+
+For the Cloudflare option, publish-time snapshots need durable delivery/retry and historical publication selection at the Sunday cutoff. A "latest R" row alone cannot guarantee the rule after a missed checkpoint. For the smaller current-route option, reuse the existing published source and ledger, and explicitly document the remaining snapshot/catch-up limitation.
+
+### Next action and coordination
+
+Resolve the storage route before product implementation. Recheck active Roster claims, especially PR #27, which edits the same allocation/accounting domain. Existing implementation deferment is unchanged. No tests run for this documentation-only revision; source review is not a runtime pass.
