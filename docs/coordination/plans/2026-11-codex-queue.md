@@ -14,6 +14,7 @@ Quiet hours 30 Oct 2026 night (owner: "get as much deployable done as possible";
 - **31 Oct 12:35 TOP PRIORITY (owner):** row R, `roster-d1-import-resumable-prepare.md`: split D1 import preparation into steps under the Apps Script limit (rehearsal import failed 12:24). Build this before every other row.
 - **31 Oct 10:10 owner priority:** next PR is **row I, inactive in Contacts = unavailable in Roster** (PENDING_CHANGELOG entry 31 Oct). Then row C, Contacts Edit Info TTb filter (small). Row A merged as PR #28 and deployed in v0.9.9c.
 - **Codex next, in order:** (00) row R; (00b) row D1; (0) row I (owner 1B: remove the inactive teacher's not-yet-started duties and re-allocate); (0b) row C; (0c) row P, peer-mail health fix (owner go 31 Oct); (1) #19 review fixes (read cost, confirm dialog), for the D1 backup use; (2) row 2c FAJT levelling; (3) row V phase 2 (mismatch notice, Worker version, bundle letter refusal); (4) rows 10 to 14 in order.
+- **31 Oct owner continuation:** Row R merged as PR #32 (`396546d`). Row D1 includes the two import follow-ups and folds in #19 split storage. After opening a green Row D1 PR, Codex continues #19 cleanup, #30, then #29 without waiting for Claude review; owner still merges. No deployment or authority change.
 - Main checkout rule: run `npm run build` before `npm test` after every branch switch.
 
 Owner order 30 Oct 2026 evening (owner away from PC; bundle 6bb4844 not yet deployed): open two PRs now.
@@ -50,6 +51,7 @@ Owner (Song Wee, 30 Oct): "it can be all, let codex work while i teach". Claude 
 | 15 | (new) deploy-specialist-count-fajt | PENDING_CHANGELOG owner decision |
 | 15b | deploy-siue-by-specialism.md | Relief Settings: SIUE general plus PE, Art, Music overrides; logic from owner's sensitivity study |
 | 17 | lord-queued-writes.md phase 3 | OVERLORD/STARLORD after a week of phase 2 without double bookings |
+| 99 | d1-first-new-modules.md | Design rule, lowest priority (owner 31 Oct). Apply when designing new modules; no code now. |
 
 Rules: create the task file for a "(new)" row before claiming; keep Google authoritative; no ROSTER_EDGE_AUTHORITY change; regenerate bundles; run the full suite before asking for merge.
 

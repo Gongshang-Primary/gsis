@@ -1,9 +1,9 @@
 # roster-d1-google-backup: once D1 is the Roster record, keep Google as a live backup and allow a safe switch back
 
-- Status: claimed; implementation in progress. Owner authorised Row D1 on 31 Oct 2026.
+- Status: implemented; full Node/LORD verification pending at the published head.
 - Owner/model: Codex (builder), Claude (architect and reviewer)
 - Reviewer/model: Claude
-- Last updated (Asia/Singapore): 31 Oct 2026 14:00
+- Last updated (Asia/Singapore): 31 Oct 2026 13:55
 - Branch: codex/roster-d1-google-backup
 - Base SHA: 396546d0546293cdb9e682fe3b282257e2495df8
 - PR: none
@@ -47,3 +47,25 @@
 - Include #32 follow-ups: release script/notification locks before source upload; keep source/checkpoint/part files in a Roster import files child folder.
 - #29 and #30 remain paused. Canonical code and generated copies, offline fixtures, System Health and edge setup are in scope. Claude reviews the exact head; owner merges.
 - Claim is published on this task branch because automatic approval review previously rejected direct main claim updates. No PR is opened before the full Node and LORD suite passes.
+
+## Implementation decisions
+
+- PR #19 is folded into this row. Native Google operations and register readers recognize its manifest/core/monthly format; single files remain single while Google is authoritative. Oversized individual JSON entries use a verified fragment extension, preserving exact ordering and bytes.
+- A transactional revision outbox and immutable D1 generation cover both operational scopes, receipts and durable report transport. Bounded pages are copied to private Google staging, with immutable models, audit objects and source workbooks copied separately. A complete generation manifest is the commit point.
+- The Worker never loads the complete Roster. Google materializes one native document/part stage per call. Old D1 staging rows are culled only after newer verified generations exist; current and recent proofs remain retained.
+- Switch-back stops new work, waits for existing work, pauses both D1 scopes, verifies the final generation and installs all native pointers before clearing the Google fence. Failed preflight resumes D1; a lost final acknowledgement reuses the original release identity. No release operation was run against live services.
+- Existing stale D1 environment flags remain insufficient to change routing. A read-only primary check must prove both imported scopes, their stored roots and matching activation history before the D1 route is admitted. Google remains the selected record in the current legacy/imported state.
+- Both #32 follow-ups are included: production locks end before the frozen source upload, and new import files use the private `Roster import files` child folder. Existing root-folder captures remain readable.
+- Native restoration retains provider uncertainty, SMC/peer choices, inbox data, planning leases, command receipts and source workbooks. Release refuses unresolved transport or peer/instruction work that cannot safely be handed over.
+
+## Verification and handoff gate
+
+Local first integration rebuilt all 18 components. Focused storage, mirror-core, client, backend, native replay and UI checks passed. Production-size checks exercise 30M-character split documents, a 14M-character mirror and the 16M-character import fixture. Real workerd/D1 measurements are recorded under `docs/coordination/review/roster-d1-mirror-runtime.json`.
+
+Full Node and LORD verification is still pending. The PR will be opened only after both pass at the exact published head. Browser-dependent checks run in repository CI; no browser installation or live deployment was used here.
+
+Owner's follow-up order: after this PR is ready, continue #19 cleanup, #30 and #29 without waiting for Claude's review. Each retains its own branch/review and owner merge decision.
+
+Final local checks: 13 focused compatibility/integration programs passed, plus the 14M end-to-end native restoration fixture. The fresh workerd/D1 run processed 15,290,116 source bytes in 40 pages, sampled 71,901,074 bytes peak isolate memory, and 144.498 ms maximum sampled CPU. These are synthetic local runtime measurements; live Google timing remains an owner rehearsal gate.
+
+Integrated current main `5c202c0bcaffcfccb06b656802907771762ae01f`, preserving the v0.9.9d label update and new D1 design rule. Implementation and verification remain scoped to this Row D1 PR.

@@ -29,7 +29,7 @@ function rosterDriveFailure_(detail){
  const error=Object.assign(new Error(message),{status:503,rosterDrive:detail});throw error;
 }
 function rosterDriveRequest_(url,options,operation){
- if(typeof rosterEdgeAssertLegacyWrite_==='function'&&String(options?.method||'get').toLowerCase()!=='get')rosterEdgeAssertLegacyWrite_();
+ if(typeof rosterEdgeAssertLegacyWrite_==='function'&&String(options?.method||'get').toLowerCase()!=='get'&&!(typeof rosterMirrorWriteAllowed_==='function'&&rosterMirrorWriteAllowed_()))rosterEdgeAssertLegacyWrite_();
  if(!['get','head'].includes(String(options?.method||'get').toLowerCase()))gsisRequireBackendRole_('roster');
  const started=Date.now(),detail={operation,httpStatus:null,reasons:[]};
  let token,response;
@@ -71,7 +71,7 @@ function rosterFindFile_(folderId,name){
  return '';
 }
 function rosterReadFile_(id){return rosterDriveRequest_('https://www.googleapis.com/drive/v3/files/'+encodeURIComponent(id)+'?supportsAllDrives=true&alt=media',{},'file-read').getContentText();}
-function rosterCreateFile_(folderId,name,blob){if(typeof rosterEdgeAssertLegacyWrite_==='function')rosterEdgeAssertLegacyWrite_();gsisRequireBackendRole_('roster');
+function rosterCreateFile_(folderId,name,blob){if(typeof rosterEdgeAssertLegacyWrite_==='function'&&!(typeof rosterMirrorWriteAllowed_==='function'&&rosterMirrorWriteAllowed_()))rosterEdgeAssertLegacyWrite_();gsisRequireBackendRole_('roster');
  const bytes=blob.getBytes(),mimeType=blob.getContentType()||'application/octet-stream';
  const start=rosterDriveRequest_('https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable&supportsAllDrives=true&fields=id',{method:'post',contentType:'application/json; charset=UTF-8',headers:{'X-Upload-Content-Type':mimeType,'X-Upload-Content-Length':String(bytes.length)},payload:JSON.stringify({name,parents:[folderId],mimeType})},'upload-start');
  const headers=start.getAllHeaders(),key=Object.keys(headers).find(x=>x.toLowerCase()==='location'),location=key&&headers[key];
@@ -196,7 +196,7 @@ function rosterIndex_(){
  rosterStage_('register-location');let id=props_().getProperty('ROSTER_INDEX_FILE');
  if(!id){rosterStage_('register-discovery');id=rosterFindFile_(ROSTER_DATA,'Roster register.json');}
  let x={schema:1,revision:0,entries:[],receipts:[]};
- if(id){rosterStage_('register-read');const raw=rosterReadFile_(id);rosterStage_('register-json');x=JSON.parse(raw);rosterStage_('register-schema');if(x.schema!==1||!Array.isArray(x.entries)||!Number.isInteger(x.revision))error_(503,'Roster register needs review.');}
+ if(id){rosterStage_('register-read');x=typeof rosterSplitReadDocument_==='function'?rosterSplitReadDocument_(id,false,false).value:JSON.parse(rosterReadFile_(id));rosterStage_('register-schema');if(x.schema!==1||!Array.isArray(x.entries)||!Number.isInteger(x.revision))error_(503,'Roster register needs review.');}
  if(typeof deployTrace_!=='undefined'&&deployTrace_?.rosterDiagnostic)deployTrace_.rosterSummary={...(deployTrace_.rosterSummary||{}),registerFound:!!id,revision:x.revision,timetables:x.entries.length};
  rosterStage_('register-ready');return x;
 }
@@ -204,9 +204,11 @@ function rosterCommit_(index){if(typeof rosterEdgeAssertLegacyWrite_==='function
  const data=JSON.stringify(index),storedId=props_().getProperty('ROSTER_INDEX_FILE');
  const venueTicket=typeof rosterVenuesBegin_==='function'?rosterVenuesBegin_('index',index):null;
  let id=storedId||rosterFindFile_(ROSTER_DATA,'Roster register.json');
- if(id)rosterDriveRequest_('https://www.googleapis.com/upload/drive/v3/files/'+encodeURIComponent(id)+'?uploadType=media&supportsAllDrives=true&fields=id',{method:'patch',contentType:'application/json; charset=UTF-8',payload:data},'register-update');
+ const root=id?JSON.parse(rosterReadFile_(id)):null,split=root?.format==='gsis-roster-operations-split-v1';
+ if(split){const previousId=id,prepared=rosterSplitPrepareDocument_(index,{folderId:root.folderId,previousId});id=prepared.commit(()=>{if((props_().getProperty('ROSTER_INDEX_FILE')||previousId)!==previousId)throw Object.assign(Error('Roster register changed. Retry against the latest saved state.'),{status:409});});}
+ else if(id)rosterDriveRequest_('https://www.googleapis.com/upload/drive/v3/files/'+encodeURIComponent(id)+'?uploadType=media&supportsAllDrives=true&fields=id',{method:'patch',contentType:'application/json; charset=UTF-8',payload:data},'register-update');
  else id=rosterCreateFile_(ROSTER_DATA,'Roster register.json',Utilities.newBlob(data,'application/json'));
- if(!storedId)props_().setProperty('ROSTER_INDEX_FILE',id);
+ if(split||!storedId)props_().setProperty('ROSTER_INDEX_FILE',id);
  if(typeof rosterVenuesEnd_==='function')rosterVenuesEnd_(venueTicket);
 }
 function rosterPublic_(entry){if(!entry)return null;const {id,name,from,to,priority,pruned,teacherCount,layoutMode,createdBy,createdAt}=entry;return {id,name,from,to,priority,pruned,teacherCount,layoutMode,createdBy,createdAt};}
@@ -217,7 +219,7 @@ function rosterModel_(entry){
  // are still read fresh; each cache hit parses a new object for this request.
  const key='gsis-roster-model:v1:'+entry.id+':'+entry.modelFile;
  try{const cached=CacheService.getScriptCache().get(key);if(cached)return GSISRoster.validate(JSON.parse(Utilities.ungzip(Utilities.newBlob(Utilities.base64Decode(cached),'application/x-gzip','roster-model.json.gz')).getDataAsString()));}catch(ignore){}
- rosterStage_('timetable-read');const raw=rosterReadFile_(entry.modelFile);
+ rosterStage_('timetable-read');const raw=typeof rosterNativeRead_==='function'?rosterNativeRead_(entry.modelFile):rosterReadFile_(entry.modelFile);
  rosterStage_('timetable-json');const parsed=JSON.parse(raw);rosterStage_('timetable-validation');const model=GSISRoster.validate(parsed);
  try{const packed=Utilities.base64Encode(Utilities.gzip(Utilities.newBlob(JSON.stringify(model),'application/json')).getBytes());if(packed.length<90000)CacheService.getScriptCache().put(key,packed,21600);}catch(ignore){}
  return model;
@@ -231,7 +233,7 @@ function rosterModelFile_(model){
 function rosterModelPart_(entry){
  const key='gsis-roster-prepared-model:v1:'+entry.id+':'+entry.modelFile;
  try{const hit=JSON.parse(CacheService.getScriptCache().get(key)||'null');if(rosterTimetablePartValid_(hit))return hit;}catch(_){}
- const raw=JSON.parse(rosterReadFile_(entry.modelFile)),{timetablePackage,...primary}=raw,part=rosterTimetablePartValid_(timetablePackage)&&timetablePackage.key===rosterOperationsPlanDigest_(JSON.stringify(primary))?timetablePackage:rosterTimetablePart_(GSISRoster.validate(primary));
+ const raw=JSON.parse(typeof rosterNativeRead_==='function'?rosterNativeRead_(entry.modelFile):rosterReadFile_(entry.modelFile)),{timetablePackage,...primary}=raw,part=rosterTimetablePartValid_(timetablePackage)&&timetablePackage.key===rosterOperationsPlanDigest_(JSON.stringify(primary))?timetablePackage:rosterTimetablePart_(GSISRoster.validate(primary));
  try{const value=JSON.stringify(part);if(value.length<90000)CacheService.getScriptCache().put(key,value,21600);}catch(_){}
  return part;
 }
@@ -305,7 +307,7 @@ function rosterDispatch_(req,c){gsisRequireBackendRole_('roster');
  rosterStage_('roster-save-lock');const lock=LockService.getScriptLock();if(!deployLock_(lock,5000))error_(503,'Another save is running. Retry this save.');
  try{
   const index=rosterIndex_(),digest=Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256,JSON.stringify(p)).map(b=>('0'+((b+256)%256).toString(16)).slice(-2)).join('');
-  const receipt=(index.receipts||[]).find(r=>r.id===p.requestId);if(receipt){if(receipt.digest!==digest||receipt.actor!==req.identity.email)error_(409,'Request ID was already used. Refresh before editing.');return {...rosterStatus_(index,day,manager),savedId:receipt.savedId,replayed:true};}
+  const receipt=(index.receipts||[]).find(r=>r.id===p.requestId);if(receipt){if(receipt.edgeDigest?(typeof rosterNativeReceiptMatches_!=='function'||!rosterNativeReceiptMatches_(receipt,p,req.identity.email)):(receipt.digest!==digest||receipt.actor!==req.identity.email))error_(409,'Request ID was already used. Refresh before editing.');return {...rosterStatus_(index,day,manager),savedId:receipt.savedId,replayed:true};}
   if(p.revision!==index.revision)error_(409,'Timetable list changed. Refresh before saving.');
   let entry;
   if(action==='rosterUpload'){

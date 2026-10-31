@@ -9,7 +9,7 @@ function fixture(failCleanup=false){
  const cleaner={Date,TextEncoder,crypto:globalThis.crypto,assertRecoveryWritable:()=>{}};vm.runInNewContext(fs.readFileSync('roster-update/public/roster-recovery-timetable-cache.js','utf8').replace(/^import .*;$/gm,'').replace(/export async function /g,'async function '),cleaner);
  scope.runRecoveryTimetableCleanup=async(env,options)=>{calls.push({name:'cleanup',options});assert.equal(env.ROSTER_EDGE_AUTHORITY,'legacy');if(failCleanup)throw Error('private provider detail');return cleaner.runRecoveryTimetableCleanup(env,options);};
  const source=fs.readFileSync('notification-worker/index.js','utf8').replace(/^import .*;\s*$/gm,'').replace('export default','globalThis.worker=');
- vm.createContext(scope);vm.runInContext(fs.readFileSync('shared/roster-recovery-profile.js','utf8').replace('export function ','function '),scope);vm.runInContext(source,scope);
+ vm.createContext(scope);vm.runInContext(fs.readFileSync('shared/roster-recovery-profile.js','utf8').replace(/^export (?=(?:async )?function )/gm,''),scope);vm.runInContext(source,scope);
  return {calls,logs,errors,async run(cron){await scope.worker.scheduled({cron,scheduledTime:Date.parse('2026-10-26T18:15:00Z')},{ROSTER_EDGE_AUTHORITY:'d1',ROSTER_AUTOMATION_ENABLED:'true'},{waitUntil:task=>background.push(task)});await Promise.all(background);}};
 }
 (async()=>{

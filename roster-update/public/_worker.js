@@ -1,11 +1,11 @@
 import {recoveryTimetableSnapshot} from './roster-recovery-timetable-cache.js';
 import {dispatchEdgeDeliveryReview,edgeDeliveryReportRead,edgeDeliveryReviewBackend} from './edge-notification-review.js';
-import {edgeRosterEnabled,edgeRosterService,edgeRosterBackend,edgeRosterMigration,readEdgeRosterReferences} from './edge-roster.js';
+import {edgeRosterEnabled,edgeRosterService,edgeRosterBackend,edgeRosterMigration,readEdgeRosterReferences,mirrorEdgeRoster,readRosterMirrorStatus} from './edge-roster.js';
 import {edgeNotificationService,edgeInboxBackend,supportsEdgeNotificationOperation,dispatchEdgePeerMail,dispatchEdgeEmploymentMail,reserveEdgeWhatsAppSend,recordEdgeWhatsAppThrottle,edgeDispatchHasWork} from './edge-notifications.js';
 import {backendAvailable,callOperationalBackend,forwardOperationalRequest} from '../../shared/backend-service.js';
 import {assertRecoveryWritable} from '../../shared/edge-recovery.js';
 import {readSystemHealth,safeHealthError} from '../../shared/edge-health.js';
-import {rosterRecoveryEnvironment} from '../../shared/roster-recovery-profile.js';
+import {rosterRecoveryEnvironment,resolveRosterAuthorityEnvironment} from '../../shared/roster-recovery-profile.js';
 import {readQuietMode,startQuietMode,endQuietMode,endQuietModeSession,QUIET_END_OPERATIONS} from '../../shared/roster-quiet-mode.js';
 /* GSIS_API_SECRET_BEGIN */
 // First-party API credentials share one operator-selected setting. Browser
@@ -254,7 +254,7 @@ async function quietModeRoute(req,env,u){
   if(req.method!=='POST'||req.headers.get('Origin')!==u.origin)return json({ok:false,error:'Same-origin POST required'},403);
   let input;try{input=await req.json();}catch{return json({ok:false,error:'Invalid request'},400);}
   if(!['on','off'].includes(input?.action))return json({ok:false,error:'Choose on or off.'},400);
-  const auth=(await backend(rosterRecoveryEnvironment(env),'rosterOperations',{operation:'read',view:'intake',scope:'mine'},who,crypto.randomUUID())).result;
+  const auth=(await backend((typeof resolveRosterAuthorityEnvironment==='function'?await resolveRosterAuthorityEnvironment(env):rosterRecoveryEnvironment(env)),'rosterOperations',{operation:'read',view:'intake',scope:'mine'},who,crypto.randomUUID())).result;
   if(!auth?.ok)return json({ok:false,error:'Current school authority could not be confirmed.'},[401,403].includes(auth?.status)?403:503);
   if(auth.data?.user?.smc!==true&&auth.data?.user?.admin!==true)return json({ok:false,error:'SMC or Admin access is required.'},403);
   return json({ok:true,data:input.action==='on'?await startQuietMode(env.GSIS_JOBS,who.email):await endQuietMode(env.GSIS_JOBS,who.email,'manual')});
@@ -267,14 +267,16 @@ async function d1PrepareAllows(req,env){
 }
 export default {async fetch(req,env,ctx){
  const u=new URL(req.url);
- env={...rosterRecoveryEnvironment(env),GSIS_REQUEST_ORIGIN:u.origin};
+ if(u.pathname==='/api/venues-source')return json({ok:false,code:'RECOVERY_VENUES_SUSPENDED',error:'Venue occupancy export is paused during Roster recovery.'},503);
+ try{env={...(typeof resolveRosterAuthorityEnvironment==='function'?await resolveRosterAuthorityEnvironment(env):rosterRecoveryEnvironment(env)),GSIS_REQUEST_ORIGIN:u.origin};}
+ catch(error){return json({ok:false,code:error.code||'ROSTER_AUTHORITY_UNVERIFIED',error:error.message},error.status||503);}
  if(u.pathname.startsWith('/api/')&&!['/api/session','/api/logout'].includes(u.pathname))try{gsisApiSecret(env,'BRIDGE_SECRET');}catch(error){return json({ok:false,code:error.code,error:error.message},503);}
  // Migration is deliberately absent from the restoration release. In
  // particular, an old dashboard binding must not reactivate a second writer.
  // 0.9.9a D1 preparation: ROSTER_D1_PREPARE=import reopens only read and copy
  // controls plus the guarded abandonment of an incomplete import. Activation,
  // pause and resume stay closed, so Google remains the only writer.
- if(u.pathname==='/api/edge/migration'&&!(await d1PrepareAllows(req,env)))return json({ok:false,code:'RECOVERY_MIGRATION_DISABLED',error:'Migration is disabled in this Roster restoration release.'},404);
+ if(u.pathname==='/api/edge/migration'&&!edgeRosterEnabled(env)&&!(await d1PrepareAllows(req,env)))return json({ok:false,code:'RECOVERY_MIGRATION_DISABLED',error:'Migration is disabled in this Roster restoration release.'},404);
  if(u.pathname==='/api/venues-source')return json({ok:false,code:'RECOVERY_VENUES_SUSPENDED',error:'Venue occupancy export is paused during Roster recovery.'},503);
  if(u.pathname==='/api/system-health')return systemHealthRoute(req,env);
  if(u.pathname.startsWith('/api/')&&!['/api/config','/api/session'].includes(u.pathname)){try{assertRecoveryWritable(env);}catch(error){return json({ok:false,code:error.code,error:error.message},503);}}
@@ -398,7 +400,7 @@ export async function systemHealthRoute(req,env){
   if(['peerMailReview','reviewPeerMail'].includes(input.operation)){
    // The backend verifies current Admin authority under its notification lock.
    // This separate command cannot route into the retired operational authority.
-   const result=(await backend(rosterRecoveryEnvironment(env),'rosterOperations',input,who,crypto.randomUUID())).result;
+   const result=(await backend((typeof resolveRosterAuthorityEnvironment==='function'?await resolveRosterAuthorityEnvironment(env):rosterRecoveryEnvironment(env)),'rosterOperations',input,who,crypto.randomUUID())).result;
    if(!result?.ok)return json({ok:false,...safeHealthError(result),error:[401,403].includes(result?.status)?'Current Admin access is required.':'Colleague email review could not be confirmed. Retry the same action.'},[401,403].includes(result?.status)?403:result?.status||503);
    return json(result);
   }
@@ -407,14 +409,14 @@ export async function systemHealthRoute(req,env){
    if(input.operation!=='read')return json({ok:false,code:'RECOVERY_HEALTH_READ_ONLY',error:'Recovery health supports status reads only.'},400);
    // A fresh signed Google request checks current Contacts authority on every
    // read. Browser role claims and old D1 authority are never trusted.
-   const auth=(await backend(rosterRecoveryEnvironment(env),'rosterOperations',{operation:'read',view:'intake',scope:'mine'},who,crypto.randomUUID())).result;
+   const auth=(await backend((typeof resolveRosterAuthorityEnvironment==='function'?await resolveRosterAuthorityEnvironment(env):rosterRecoveryEnvironment(env)),'rosterOperations',{operation:'read',view:'intake',scope:'mine'},who,crypto.randomUUID())).result;
    if(!auth?.ok)return json({ok:false,...safeHealthError(auth),error:'Current school authority could not be confirmed.'},[401,403].includes(auth?.status)?403:503);
    if(auth.data?.user?.smc!==true&&auth.data?.user?.admin!==true)return json({ok:false,error:'SMC or Admin access is required.'},403);
-   const snapshot=await readSystemHealth(env,{jobsOnly:true}),jobs=new Set(['allocation','notifications','received-reports','inbox','webhook','peer-mail','r2-cleanup','audit-export']);
+   const snapshot={...await readSystemHealth(env,{jobsOnly:true}),googleBackup:await readRosterMirrorStatus(env)},jobs=new Set(['google-backup','allocation','notifications','received-reports','inbox','webhook','peer-mail','r2-cleanup','audit-export']);
    snapshot.jobs=snapshot.jobs.filter(row=>jobs.has(row.job));snapshot.recentFailures=snapshot.recentFailures.filter(row=>jobs.has(row.job));
    const reports={available:false,transportAvailable:false,href:'/'};let peerMailReviewAllowed=false;
    try{
-    const review=(await backend(rosterRecoveryEnvironment(env),'rosterOperations',{operation:'read',view:'intake'},who,crypto.randomUUID())).result;
+    const review=(await backend((typeof resolveRosterAuthorityEnvironment==='function'?await resolveRosterAuthorityEnvironment(env):rosterRecoveryEnvironment(env)),'rosterOperations',{operation:'read',view:'intake'},who,crypto.randomUUID())).result;
     if([401,403].includes(review?.status)||review?.ok&&review.data?.user?.smc!==true&&review.data?.user?.admin!==true)return json({ok:false,error:'Current SMC or Admin access is required.'},403);
     if(review?.ok&&(review.data?.user?.smc===true||review.data?.user?.admin===true)){
      peerMailReviewAllowed=review.data.user.admin===true;
@@ -1524,6 +1526,8 @@ export const ABSENCE_TRANSPORT_SCHEMA_SQL=`CREATE TABLE IF NOT EXISTS gsis_absen
  PRIMARY KEY(namespace,actor,request_id)
 )`;
 const absenceTransportSchemas_=new WeakMap();
+const absenceMirrorControlSQL_="CREATE TABLE IF NOT EXISTS gsis_roster_mirror_control(id INTEGER PRIMARY KEY CHECK(id=1),epoch INTEGER NOT NULL DEFAULT 1,phase TEXT NOT NULL DEFAULT 'normal' CHECK(phase IN ('normal','quiescing','paused','released')),release_request TEXT NOT NULL DEFAULT '',transport_revision INTEGER NOT NULL DEFAULT 0,updated_at INTEGER NOT NULL DEFAULT 0)";
+const absenceMirrorGate_ = "NOT EXISTS(SELECT 1 FROM gsis_roster_mirror_control WHERE id=1 AND phase<>'normal')";
 function absenceTransportError_(status,code,message){return Object.assign(Error(message),{status,code});}
 function absenceTransportInvalid_(){throw absenceTransportError_(400,'INVALID_ABSENCE_CAPTURE','Supply a valid absence report or colleague request.');}
 const absenceTransportObject_=value=>value&&typeof value==='object'&&!Array.isArray(value);
@@ -1547,7 +1551,7 @@ async function absenceTransportContext_(env){
  if(!env.GSIS_JOBS)return null;const db=env.GSIS_JOBS;if(typeof db.prepare!=='function')throw absenceTransportError_(503,'ABSENCE_TRANSPORT_CONFIG','Configure durable Roster storage.');
  const config=absenceTransportScope_(env),namespace=await absenceTransportHash_(JSON.stringify([config.backend,config.origin]));
  if(!absenceTransportSchemas_.has(db)){const prepare=(async()=>{for(const sql of [ABSENCE_TRANSPORT_SCHEMA_SQL,'CREATE INDEX IF NOT EXISTS gsis_absence_transport_due ON gsis_absence_transport(namespace,state,available_at,accepted_at)']){const result=await db.prepare(sql).run();if(result.success===false)throw Error('schema');}})().catch(()=>{absenceTransportSchemas_.delete(db);throw absenceTransportError_(503,'ABSENCE_TRANSPORT_STORAGE','Durable capture is unavailable. Retry the same report.');});absenceTransportSchemas_.set(db,prepare);}
- await absenceTransportSchemas_.get(db);return {db,namespace,...config};
+ await absenceTransportSchemas_.get(db);if(env.ROSTER_EDGE_AUTHORITY==='d1'){await db.prepare(absenceMirrorControlSQL_).run();await db.prepare('INSERT OR IGNORE INTO gsis_roster_mirror_control(id) VALUES(1)').run();}return {db,namespace,...config,edge:env.ROSTER_EDGE_AUTHORITY==='d1'};
 }
 function absenceTransportCommand_(input,origin){
  if(!absenceTransportObject_(input)||!['saveAbsence','requestMutual'].includes(input.operation)||input.intake!==true||typeof input.requestId!=='string'||! /^[a-f\d]{8}-(?:[a-f\d]{4}-){3}[a-f\d]{12}$/i.test(input.requestId))absenceTransportInvalid_();
@@ -1588,7 +1592,7 @@ async function absenceTransportFind_(context,actor,requestId){return context.db.
 function absenceTransportReceiptValue_(row){const peers=row.operation==='requestMutual'||!!JSON.parse(row.command).ownArrangementsByStaffDate;return {accepted:true,intakeReceipt:true,receiptOnly:true,requestId:row.request_id,acceptedAt:row.accepted_at,intakeState:['needsReview','withdrawn'].includes(row.state)?row.state:'pending',transportState:row.state,absenceApplied:false,savedIds:[],peerState:peers?'pending':'none',mutualRequestIds:[],reasonCode:row.last_code||null,affectedDates:JSON.parse(row.dates),...(row.state==='withdrawn'?{resolution:{at:row.resolved_at,by:row.resolved_by,reason:row.resolution_reason}}:{})};}
 export async function captureAbsenceTransport(env,who,input){
  const context=await absenceTransportContext_(env);if(!context)return null;const identity=absenceTransportIdentity_(who),{command,dates}=absenceTransportCommand_(input,context.origin),encoded=JSON.stringify(command),digest=await absenceTransportHash_(JSON.stringify(absenceTransportStable_(command))),now=Date.now();
- let writeFailed=false;try{const insert=context.db.prepare('INSERT OR IGNORE INTO gsis_absence_transport (namespace,actor,request_id,command,identity,digest,accepted_at,dates,operation,available_at) VALUES (?,?,?,?,?,?,?,?,?,?)').bind(context.namespace,identity.email,command.requestId,encoded,JSON.stringify(identity),digest,new Date(now).toISOString(),JSON.stringify(dates),command.operation,now);const results=env.ROSTER_EDGE_AUTHORITY==='d1'?await context.db.batch([insert,context.db.prepare("UPDATE gsis_edge_heads SET revision=revision+1,updated_at=? WHERE scope='roster' AND mode='active' AND changes()=1").bind(now)]):[await insert.run()];writeFailed=results.some(result=>result.success===false);}catch{writeFailed=true;}
+ let writeFailed=false;try{const insert=context.db.prepare('INSERT OR IGNORE INTO gsis_absence_transport (namespace,actor,request_id,command,identity,digest,accepted_at,dates,operation,available_at) '+(context.edge?'SELECT ?,?,?,?,?,?,?,?,?,? WHERE '+absenceMirrorGate_:'VALUES (?,?,?,?,?,?,?,?,?,?)')).bind(context.namespace,identity.email,command.requestId,encoded,JSON.stringify(identity),digest,new Date(now).toISOString(),JSON.stringify(dates),command.operation,now);const results=env.ROSTER_EDGE_AUTHORITY==='d1'?await context.db.batch([insert,context.db.prepare("UPDATE gsis_edge_heads SET revision=revision+1,updated_at=? WHERE scope='roster' AND mode='active' AND changes()=1").bind(now)]):[await insert.run()];writeFailed=results.some(result=>result.success===false);}catch{writeFailed=true;}
  // An acknowledgement can be lost after commit. A primary read confirms only
  // the immutable command actually stored; never mint a replacement request ID.
  let row;try{row=await absenceTransportFind_(context,identity.email,command.requestId);}catch{throw absenceTransportError_(503,'ABSENCE_CAPTURE_UNCONFIRMED','Capture could not be confirmed. Retry the same report.');}
@@ -1607,7 +1611,7 @@ export async function dispatchAbsenceTransport(env,{limit=2,budgetMs=55000,concu
  // Reserve one total slot per lane, then claim immediately before forwarding.
  // No lane preclaims a batch that could expire while waiting behind slow I/O.
  const lane=async()=>{while(reservations<count&&Date.now()<until){reservations++;
-  const now=Date.now(),claimId=crypto.randomUUID(),claimed=await context.db.prepare("UPDATE gsis_absence_transport SET state='claimed',claim_id=?,lease_until=?,attempts=attempts+1 WHERE rowid IN (SELECT rowid FROM gsis_absence_transport WHERE namespace=? AND ((state='queued' AND available_at<=?) OR (state='claimed' AND lease_until<=?)) ORDER BY accepted_at,request_id LIMIT 1) RETURNING *").bind(claimId,now+90000,context.namespace,now,now).all();if(claimed.success===false)throw absenceTransportError_(503,'ABSENCE_TRANSPORT_STORAGE','Durable delivery is unavailable.');const row=claimed.results?.[0];if(!row)return;summary.claimed++;
+  const now=Date.now(),claimId=crypto.randomUUID(),claimed=await context.db.prepare("UPDATE gsis_absence_transport SET state='claimed',claim_id=?,lease_until=?,attempts=attempts+1 WHERE rowid IN (SELECT rowid FROM gsis_absence_transport WHERE namespace=? AND ((state='queued' AND available_at<=?) OR (state='claimed' AND lease_until<=?)) ORDER BY accepted_at,request_id LIMIT 1)"+(context.edge?' AND '+absenceMirrorGate_:'')+" RETURNING *").bind(claimId,now+90000,context.namespace,now,now).all();if(claimed.success===false)throw absenceTransportError_(503,'ABSENCE_TRANSPORT_STORAGE','Durable delivery is unavailable.');const row=claimed.results?.[0];if(!row)return;summary.claimed++;
   let outcome;try{outcome=absenceTransportBackendResult_(await capture(JSON.parse(row.command),JSON.parse(row.identity),{acceptedAt:row.accepted_at}),row.request_id);}catch(error){const deterministic=error?.code!=='BACKEND_AUTHENTICATION'&&[400,403,404,409,413,422].includes(error?.status);outcome={deterministic,code:deterministic?'BACKEND_REJECTED_'+error.status:'BACKEND_RETRY'};}
   const state=outcome.forwarded?'forwarded':outcome.deterministic?'needsReview':'queued',delay=Math.min(300000,5000*2**Math.min(6,row.attempts-1)),settled=await context.db.prepare('UPDATE gsis_absence_transport SET state=?,claim_id=NULL,lease_until=0,available_at=?,last_code=?,forwarded_at=? WHERE namespace=? AND actor=? AND request_id=? AND state=\'claimed\' AND claim_id=? AND lease_until>?').bind(state,Date.now()+delay,outcome.forwarded?null:outcome.code,outcome.forwarded?new Date().toISOString():null,context.namespace,row.actor,row.request_id,claimId,Date.now()).run();
   if(settled.success===false)throw absenceTransportError_(503,'ABSENCE_TRANSPORT_STORAGE','Delivery remains recoverable in durable storage.');if(settled.meta?.changes)summary[outcome.forwarded?'forwarded':outcome.deterministic?'needsReview':'pending']++;
@@ -1652,3 +1656,5 @@ export async function resolveAbsenceTransport(env,who,{requestId,reason,all=fals
 }
 
 /* GSIS_ROSTER_ABSENCE_TRANSPORT_END */
+
+export async function dispatchGoogleBackup(env){const result=await mirrorEdgeRoster(env);if(result.enabled===false)return result;const status=await readRosterMirrorStatus(env);return {...result,pending:status.pending,failed:status.behindThreshold?1:0,code:status.behindThreshold?'ROSTER_MIRROR_LAG':status.pending?'ROSTER_MIRROR_PENDING':'OK'};}
