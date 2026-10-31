@@ -2744,7 +2744,7 @@ function rosterModelResponse_(entry,p){const known=Array.isArray(p.knownModelIds
 function rosterFile_(folderId,name,blob){return rosterFindFile_(folderId,name)||rosterCreateFile_(folderId,name,blob);}
 function rosterInput_(fn){try{return fn()}catch(e){error_(400,e.message)}}
 function rosterDispatch_(req,c){gsisRequireBackendRole_('roster');
- if(!['edgeExport','edgeExportManifest','edgeExportPart','edgeModel','edgeFence','edgeReferences','edgeContactCreate','edgeAudit'].includes(req.input?.operation)&&typeof rosterEdgeAssertLegacyWrite_==='function')rosterEdgeAssertLegacyWrite_();
+ if(!['edgeExport','edgeExportManifest','edgeExportPart','edgeModel','edgeFence','edgeReferences','edgeContactCreate','edgeAudit'].includes(req.input?.operation)&&!(req.action==='rosterOperations'&&req.input?.operation==='edgeHealthAuthority')&&typeof rosterEdgeAssertLegacyWrite_==='function')rosterEdgeAssertLegacyWrite_();
  if(typeof c?.user?.rosterSMC!=='boolean'){
   if(typeof deployTrace_!=='undefined'&&deployTrace_)deployTrace_.phase='contacts-authority';
   error_(503,'Contacts did not return verified Roster authority. Update the existing Contacts web app deployment.');
