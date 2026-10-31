@@ -17,10 +17,14 @@ test('minute receipts remain distinct while allocation retries keep the last act
  const s=t=>A.schedule(Date.parse('2026-10-14T'+t+':00+08:00'));
  assert.equal(s('06:01').allocationKey,s('06:00').key);assert.notEqual(s('06:01').key,s('06:00').key);assert.equal(s('06:14').allocationKey,s('06:00').key);assert.equal(s('06:15').allocationKey,s('06:15').key);assert.equal(s('05:44').allocationKey,s('05:30').key);assert.equal(s('06:30').allocationKey,null);assert.equal(s('16:29').allocationKey,s('16:00').key);assert.equal(s('16:00').date,'2026-10-15');assert.equal(s('06:01').optimise,false);
 });
-test('successful slot skips later minutes before any operational read, intake gate or writer lock',()=>{
- const h=setup();assert.equal(h.tick().run.status,'complete');const before=h.counts();h.scope.rosterAbsenceIntakeGate_=()=>{throw Error('completed slot must not enter intake');};
- for(let n=1;n<10;n++){h.at('06:'+String(n).padStart(2,'0')+':00');assert.equal(h.tick().allocationSkipped,true);}
- assert.deepEqual(h.counts(),before);assert.equal(h.state().optimisationRuns.length,1);
+test('successful slot stays cheap and refreshes inactive eligibility after five minutes without replay',()=>{
+ const h=setup();assert.equal(h.tick().run.status,'complete');const before=h.counts();h.scope.rosterAbsenceIntakeGate_=()=>{throw Error('completed idle slot must not enter intake');};
+ let contacts=0;const fresh=h.scope.rosterServiceContacts_;h.scope.rosterServiceContacts_=()=>{contacts++;return fresh();};
+ for(let n=1;n<5;n++){h.at('06:'+String(n).padStart(2,'0')+':00');assert.equal(h.tick().allocationSkipped,true);}
+ assert.deepEqual(h.counts(),before);assert.equal(contacts,0);
+ h.at('06:05:00');assert.equal(h.tick().allocationSkipped,true);const refreshed=h.counts();assert.equal(contacts,1);assert.equal(refreshed.reads,before.reads+1);assert.equal(refreshed.contexts,before.contexts);assert.equal(refreshed.locks,before.locks);assert.equal(refreshed.writes,before.writes);
+ for(let n=6;n<10;n++){h.at('06:'+String(n).padStart(2,'0')+':00');assert.equal(h.tick().allocationSkipped,true);}
+ assert.deepEqual(h.counts(),refreshed);assert.equal(h.state().optimisationRuns.length,1);
 });
 test('ten minute ticks after hard terminations consume two durable attempts then show a stopped state',()=>{
  const h=setup(),settle=h.scope.rosterAllocationRunLocked_;let attempts=0,terminated=false;

@@ -16,9 +16,10 @@ function fixture({paused=false,paid=false,failPlanning=false,failReceived=false,
   if(name==='dispatchReceivedReports'&&failReceived)throw Object.assign(Error('Private received report'),{status:503});
   return stageResults[name]||{ok:true,claimed:0,processed:0};
  };
- const db={prepare(){throw Error('The fixture must not execute migrated D1 queries');}};
+ // Existing ownership metadata is read once before stale dashboard flags are ignored.
+ const db={prepare(query){assert.match(query,/FROM gsis_edge_heads h/,'only read ownership metadata; never claim migrated jobs');return {async all(){return {success:true,results:[]};}};}};
  const env={GSIS_JOBS:db,ROSTER_EDGE_AUTHORITY:'d1',DEPLOY_EDGE_AUTHORITY:'d1',GSIS_BACKGROUND_JOBS:paid?'true':'false',GSIS_RECOVERY_MODE:paused?'true':undefined,GSIS_BACKEND_REQUIRED:'true',GSIS_BACKEND:{fetch(){assert.fail('Private migration binding must be ignored');}}};
- vm.runInNewContext(fs.readFileSync('shared/roster-recovery-profile.js','utf8').replace('export function ','function ')+'\n'+fs.readFileSync('notification-worker/index.js','utf8').replace(/^import .*;\s*$/gm,'').replace('export default','globalThis.worker='),scope);
+ vm.runInNewContext(fs.readFileSync('shared/roster-recovery-profile.js','utf8').replace(/^export (?=(?:async )?function )/gm,'')+'\n'+fs.readFileSync('notification-worker/index.js','utf8').replace(/^import .*;\s*$/gm,'').replace('export default','globalThis.worker='),scope);
  return {calls,events,health,queued,profiles,env,worker:scope.worker,async scheduled(cron='* * * * *'){await scope.worker.scheduled({cron,scheduledTime:Date.now()},env,{waitUntil:p=>background.push(p)});await Promise.all(background);}};
 }
 function batch(purposes){const actions=[];return {actions,messages:purposes.map((purpose,index)=>({body:{purpose,kind:'notifications'},ack(){actions.push({index,action:'ack'});},retry(options){actions.push({index,action:'retry',delaySeconds:options.delaySeconds});}})),ackAll(){actions.push({action:'ackAll'});},retryAll(options){actions.push({action:'retryAll',delaySeconds:options.delaySeconds});}};}

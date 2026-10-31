@@ -1,6 +1,6 @@
 # roster-inactive-teacher: inactive Contacts staff unavailable in Roster
 
-- Status: claimed; resuming after Row D1 is ready for review.
+- Status: implemented; full Node/LORD verification pending. Row D1 is ready for review in PR #33.
 - Owner/model: Codex.
 - Reviewer/model: Claude, exact final verified head.
 - Last updated (Asia/Singapore): 31 October 2026.
@@ -24,4 +24,13 @@
 The latest explicit continuation instruction supersedes the older queue pause and open-PR count for these sequenced, separately reviewed rows. The Row D1 implementation stays frozen for Claude's exact-head review. Claim is published on the task branch because direct main claim updates were rejected by automatic approval review earlier in this session.
 
 ## Verification
-Pending implementation. No deployment or live authority change.
+The earlier canonical Row I implementation is integrated onto Row D1. All 18 components rebuilt, 88 Apps Script files parsed, and 30 focused programs passed, including the 14M mirror round-trip with inactive repair metadata. The new D1 suite passed 21 cases covering freshness, concurrent refresh replies, transport races, clock boundaries, quiesce and normal mirrored commits. Domain, Google backend, gateway and UI checks retain started duties and published originals; peer-only reservations are also covered. The browser-only ad hoc check and full Node/LORD gate run in CI. No deployment or live authority change.
+
+## Implementation decisions
+
+- Eligibility is checked from Contacts at allocation, picker and final notification boundaries. Ad hoc engagement does not override inactive status. Existing identities remain available for historical display.
+- Inactive repair removes only unstarted cover, clears its manual/peer reservation and refills only those freed demands. Published originals remain stored; replacement drafts require the normal publication step.
+- Google and D1 record-only reads also discover repair work. Pending attendance or peer processing defers replacement without discarding the inactive-duty removal. Google uses its existing intake commit lock; D1 compares the transport revision in the same transaction as the Roster write.
+- Contacts freshness is capped at five minutes. The D1 refresh updates components using revision checks so a delayed reply cannot replace newer Contacts or Calendar data.
+- Normal D1 commits retain receipt identities and enter the existing mirror outbox. Release quiescence blocks repair writes. Inactive repair and alert metadata round-trip through the split Google backup.
+- Configuration and rollback: no live setting, binding, authority flag or deployment changes. The owner controls deployment and can revert this source change; stored historical duties and publication snapshots remain retained.

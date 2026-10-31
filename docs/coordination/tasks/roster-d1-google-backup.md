@@ -1,11 +1,11 @@
 # roster-d1-google-backup: once D1 is the Roster record, keep Google as a live backup and allow a safe switch back
 
-- Status: approved, priority (owner 30 Oct 2026: "prioritise the list for D1 authoritative for roster")
+- Status: implemented; full Node/LORD verification pending at the published head.
 - Owner/model: Codex (builder), Claude (architect and reviewer)
 - Reviewer/model: Claude
-- Last updated (Asia/Singapore): 30 Oct 2026 16:30 (split Google files, owner go)
+- Last updated (Asia/Singapore): 31 Oct 2026 13:55
 - Branch: codex/roster-d1-google-backup
-- Base SHA: current main
+- Base SHA: 396546d0546293cdb9e682fe3b282257e2495df8
 - PR: none
 - Files/domains owned: roster-update/public/edge-roster.js and edge-store.js (outbox on commit), a scheduled mirror lane (operations or notification Worker, or the Roster Pages Worker cron), backend/RosterEdgeMigration.gs (new mirror and release operations), Roster edge setup page, backend/RosterOperations.gs read/commit path (split layout), tests.
 - Out of scope: running the switch (owner, see roster-d1-cutover runbook); LORD/Deploy.
@@ -38,3 +38,48 @@
 - Split: a 30M-character fixture round-trips (write split, read back, byte-identical); a change to one day rewrites only that month's part and the manifest; a crash before the manifest write leaves the previous manifest valid.
 - Legacy without a manifest behaves exactly as today; `splitOperations` keeps the old file.
 - Nothing changes while mode is `legacy` or `imported` (no mirror traffic before activation).
+
+## Owner scope and implementation contract (31 October)
+
+- Fold PR #19's split read/write implementation into this task; do not activate split storage while Google is authoritative.
+- Mirror an immutable generation of both operational scopes, their receipts and native object references. Record revisions transactionally, coalesce mirror work, and publish a complete Google generation only after verification.
+- Release quiesces and pauses all D1 writers, requires exact revision/digest catch-up, installs verified native pointers, then clears the Google fence. No live switch or configuration change is authorised in this task.
+- Include #32 follow-ups: release script/notification locks before source upload; keep source/checkpoint/part files in a Roster import files child folder.
+- #29 and #30 stay outside this row and resume after its green PR is ready, per the owner's latest continuation order. Canonical code and generated copies, offline fixtures, System Health and edge setup are in scope. Claude reviews the exact head; owner merges.
+- Claim is published on this task branch because automatic approval review previously rejected direct main claim updates. No PR is opened before the full Node and LORD suite passes.
+
+## Implementation decisions
+
+- PR #19 is folded into this row. Native Google operations and register readers recognize its manifest/core/monthly format; single files remain single while Google is authoritative. Oversized individual JSON entries use a verified fragment extension, preserving exact ordering and bytes.
+- A transactional revision outbox and immutable D1 generation cover both operational scopes, receipts and durable report transport. Bounded pages are copied to private Google staging, with immutable models, audit objects and source workbooks copied separately. A complete generation manifest is the commit point.
+- The Worker never loads the complete Roster. Google materializes one native document/part stage per call. Old D1 staging rows are culled only after newer verified generations exist; current and recent proofs remain retained.
+- Switch-back stops new work, waits for existing work, pauses both D1 scopes, verifies the final generation and installs all native pointers before clearing the Google fence. Failed preflight resumes D1; a lost final acknowledgement reuses the original release identity. No release operation was run against live services.
+- Existing stale D1 environment flags remain insufficient to change routing. A read-only primary check must prove both imported scopes, their stored roots and matching activation history before the D1 route is admitted. Google remains the selected record in the current legacy/imported state.
+- Both #32 follow-ups are included: production locks end before the frozen source upload, and new import files use the private `Roster import files` child folder. Existing root-folder captures remain readable.
+- Native restoration retains provider uncertainty, SMC/peer choices, inbox data, planning leases, command receipts and source workbooks. Release refuses unresolved transport or peer/instruction work that cannot safely be handed over.
+
+## Verification and handoff gate
+
+Local first integration rebuilt all 18 components. Focused storage, mirror-core, client, backend, native replay and UI checks passed. Production-size checks exercise 30M-character split documents, a 14M-character mirror and the 16M-character import fixture. Real workerd/D1 measurements are recorded under `docs/coordination/review/roster-d1-mirror-runtime.json`.
+
+Full Node and LORD verification is still pending. The PR will be opened only after both pass at the exact published head. Browser-dependent checks run in repository CI; no browser installation or live deployment was used here.
+
+Owner's follow-up order: after this PR is ready, continue #19 cleanup, #30 and #29 without waiting for Claude's review. Each retains its own branch/review and owner merge decision.
+
+Final local checks: 13 focused compatibility/integration programs passed, plus the 14M end-to-end native restoration fixture. The fresh workerd/D1 run processed 15,290,116 source bytes in 40 pages, sampled 71,901,074 bytes peak isolate memory, and 144.498 ms maximum sampled CPU. These are synthetic local runtime measurements; live Google timing remains an owner rehearsal gate.
+
+Integrated current main `5c202c0bcaffcfccb06b656802907771762ae01f`, preserving the v0.9.9d label update and new D1 design rule. Implementation and verification remain scoped to this Row D1 PR.
+
+Full CI at `40a80eae169a0b5807fa6b3bcdaf8cf2a16b6be5` rebuilt all 18 components and passed browser portability checks, then reported 900/905 Node scripts. LORD did not run because Node failed. The five failures cover idle authority fixtures, health authentication ordering, a prepared-write storage fixture, and legacy register diagnostics. This failed evidence is retained; the PR gate remains a fresh complete green run after correction.
+
+Preserved main `18a29d16a3426fd57c45a3e8341f84d44559c9f0`, which records the owner's v0.9.9d deployment and upcoming import rehearsal. This D1 backup implementation remains undeployed.
+
+CI corrections preserve the fail-closed D1 proof gate and make Google recovery explicit in the two retained-history idle fixtures. System Health now validates the caller before any D1 metadata read and uses a fresh, read-only Contacts authority projection that remains available behind the Google write fence. Native register/timetable readers again distinguish source-read, JSON and split-part failures. Focused checks cover revoked roles, a real fenced D1 health read and the unchanged native switch-back round trip. Full-suite rerun pending at the corrected head.
+
+Corrected-head local validation: all 18 components rebuilt, 88 Apps Script files parsed, and eight focused programs passed (the five CI failures, fenced health authority, authority-profile proof and mirror UI). The 14M native restoration integration also passed after the storage-reader change.
+
+The local LORD runner passed its non-browser groups before stopping at its Playwright check because no browser is installed here. This is not a full LORD pass; the complete browser-equipped CI run remains required.
+
+The next full run at `63a471c2f7dd0b4eb1f2fcb8c6239330a6f5c38e` reported 904/906 Node programs; LORD again did not run. Its two failures exposed an explicit private-health-helper compatibility regression and a split-register fixture that omitted the native reader module. The correction keeps the public entry on authenticated Google/D1 status while retaining explicit private helper delegation, and loads the same native reader in the split fixture as production. Existing gateway and split-storage assertions pass unchanged.
+
+After that correction, all 18 components rebuilt and 26 broader non-browser D1, gateway, storage and recovery programs passed, including the 14M mirror and 30M split fixtures. The 27th local program required the unavailable Chromium executable; it remains a CI check, not a claimed pass.

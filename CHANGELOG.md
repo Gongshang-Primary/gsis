@@ -1,3 +1,19 @@
+## Pending: inactive Contacts staff in Roster (Model: Codex)
+
+Inactive staff are unavailable for new relief, ad hoc engagement, peer choices and notification delivery. Owner option 1B removes their duties that have not started and refills only the freed lessons, while retaining started/past duties, other staff's protected cover and original publications. Pending peer requests are included even before they create an assignment. Reactivation restores eligibility.
+
+The same repair runs through Google and D1's guarded commit paths, with fresh Contacts data and deferred replacement when timetable, quota or attendance evidence is unavailable. D1 repair metadata remains readable after Google backup and switch-back. No authority change, activation or deployment is included. Verification and exact-head review remain in [the task](docs/coordination/tasks/roster-inactive-teacher.md).
+
+## Pending: D1 Google backup and verified switch-back (Model: Codex)
+
+Roster D1 revisions now queue immutable Google backup generations in the PR #19 split format, with native readers/writers for restoration, command receipts and object/source workbook preservation. Setup and System Health show backup lag. Switch-back requires paused, caught-up and digest-verified evidence. Google remains authoritative until a separately verified owner cutover; no deployment or live flag change is included.
+
+Import preparation releases production locks before upload and places new source/checkpoint/part files in a private subfolder while retaining old captures.
+
+# Resumable D1 import preparation — 31 October 2026
+
+Model: Codex. Queue row R replaces one long preparation call with a frozen snapshot, bounded preparation steps, immutable part files and a final manifest. D1 leases serialize steps and retain uncertain outcomes; retries use the same source and checkpoint. The setup page shows step progress and timing. Failed imports retain evidence and support an explicit, resumable restart. Allocation audit JSON now uses immutable versions so later exports cannot change a captured import source. Google remains authoritative; no activation, deployment or live data change is included. See [the task and verification](docs/coordination/tasks/roster-d1-import-resumable-prepare.md).
+
 # Roster cold-output archives — 31 October 2026
 
 Model: Codex. Queue row A moves finished machine output older than 30 days into verified monthly Google archives while retaining every record. Admin Storage offers Archive now and archive browsing. Request replay identities, human audit, pending sends, current/future work and relief accounting remain protected. Daily audit export no longer deletes human history. Full verification and exact-head review are recorded in [the task](docs/coordination/tasks/roster-archive-cold-output.md). Not deployed.

@@ -66,14 +66,14 @@ function gsisNotificationMaintenance_(write){
  try{
   const id=props_().getProperty('ROSTER_OPERATIONS_FILE')||rosterFindFile_(ROSTER_DATA,'Roster operations.json');
   if(!id)throw Error('Roster operations file was not found. Nothing was cleared.');
-  const primary=JSON.parse(rosterReadFile_(id));
+  const primary=typeof rosterSplitReadDocument_==='function'?rosterSplitReadDocument_(id,false,false).value:JSON.parse(rosterReadFile_(id));
   if(primary?.schema!==1||!Number.isInteger(primary.revision)||!Array.isArray(primary.outbox))throw Error('Roster state needs review. Nothing was cleared.');
   const transportId=props_().getProperty('ROSTER_NOTIFICATION_TRANSPORT_FILE')||rosterFindFile_(ROSTER_DATA,'Roster notification transport.json');
   let transport=null;
   if(transportId){
    if(typeof rosterNotificationCheckOwner_!=='function')throw Error('A separate transport exists. Use this function in the v0.8.7 Roster owner. Nothing was cleared.');
    user=LockService.getUserLock();if(!deployLock_(user,8000)){user=null;throw Error('Notification delivery is settling. Run this same function again. Nothing was cleared.');}
-   transport=JSON.parse(rosterReadFile_(transportId));rosterNotificationCheckOwner_(transport);
+   transport=typeof rosterSplitReadDocument_==='function'?rosterSplitReadDocument_(transportId,false,false).value:JSON.parse(rosterReadFile_(transportId));rosterNotificationCheckOwner_(transport);
    if(transport?.schema!==1||!Array.isArray(transport.outbox))throw Error('Notification transport needs review. Nothing was cleared.');
    // Include intents accepted since the last sender tick without changing the
    // stored transport until the owning locks and both reads have succeeded.
@@ -91,7 +91,8 @@ function gsisNotificationMaintenance_(write){
    if(primary.notificationMaintenance.length>100)primary.notificationMaintenance=primary.notificationMaintenance.slice(-100);
    // Primary cancellation commits first. If transport commit fails, rerunning
    // is safe; sync also carries these cancellations into the transport store.
-   rosterDriveRequest_('https://www.googleapis.com/upload/drive/v3/files/'+encodeURIComponent(id)+'?uploadType=media&supportsAllDrives=true&fields=id',{method:'patch',contentType:'application/json; charset=UTF-8',payload:JSON.stringify(primary)},'notification-maintenance');
+   if(typeof rosterOperationsCommit_==='function')rosterOperationsCommit_(primary);
+   else rosterDriveRequest_('https://www.googleapis.com/upload/drive/v3/files/'+encodeURIComponent(id)+'?uploadType=media&supportsAllDrives=true&fields=id',{method:'patch',contentType:'application/json; charset=UTF-8',payload:JSON.stringify(primary)},'notification-maintenance');
    if(transport)rosterNotificationCommit_(transport);
   }
   const result={readOnly:!write,before,...(cleared?{cleared}:{}),after:gsisNotificationMaintenanceCounts_(transport||primary),operationsRevision:primary.revision,messagesSent:0,deliveryHistoryPreserved:true,privateLinksPreserved:true,note:'Already submitted messages and emails cannot be recalled. Future new notification jobs and new failures remain enabled.'};

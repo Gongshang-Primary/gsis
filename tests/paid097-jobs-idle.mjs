@@ -7,9 +7,9 @@ import {fileURLToPath,pathToFileURL} from 'node:url';
 // trigger migrated jobs or hydrate records. Keep explicit helper probe coverage.
 const root=path.resolve(process.env.GSIS_TEST_ROOT||fileURLToPath(new URL('..',import.meta.url)));
 const moduleAt=name=>import(pathToFileURL(path.join(root,name)).href);
-const [{default:worker},{GSiSEdgeStore},{GSISRosterOperations:O},gateway,{edgeDispatchHasWork},{isEdgeTimetableRefreshDue}]=await Promise.all([
+const [{default:worker},{GSiSEdgeStore},{GSISRosterOperations:O},gateway,{edgeDispatchHasWork},{isEdgeTimetableRefreshDue},{resolveRosterAuthorityEnvironment}]=await Promise.all([
  moduleAt('notification-worker/index.js'),moduleAt('roster-update/public/edge-store.js'),
- moduleAt('roster-update/public/edge-roster-domain.js'),moduleAt('roster-update/public/_worker.js'),moduleAt('roster-update/public/edge-notifications.js'),moduleAt('roster-update/public/edge-timetable-cache.js')
+ moduleAt('roster-update/public/edge-roster-domain.js'),moduleAt('roster-update/public/_worker.js'),moduleAt('roster-update/public/edge-notifications.js'),moduleAt('roster-update/public/edge-timetable-cache.js'),moduleAt('shared/roster-recovery-profile.js')
 ]);
 
 function database(){
@@ -75,6 +75,10 @@ try{
  // The migration helpers remain independently usable by their original
  // private service. Their idle probes must still avoid loading retained state.
  db.start();assert.equal(await edgeDispatchHasWork(env,'notifications'),false);assert.equal(await edgeDispatchHasWork(env,'peerMail'),false);assert.equal(await isEdgeTimetableRefreshDue(env,{now}),false);assert.equal(await gateway.receivedReportWorkDue(env,{now}),false);const probes=db.stop();assert.equal(probes.broadRosterLoads,0);assert(probes.bytes<65536);assert.deepEqual(queueCalls,[]);assert.equal(objectCalls.gets,0);
+ // Generic historical Store fixtures do not prove a coordinated Roster cutover.
+ // Reject that incomplete D1 selection, then measure explicitly selected Google recovery.
+ await assert.rejects(resolveRosterAuthorityEnvironment(env),error=>error.code==='ROSTER_AUTHORITY_UNVERIFIED');
+ const recoveryEnv={...env,ROSTER_EDGE_AUTHORITY:'legacy'};
  globalThis.fetch=async(input,init)=>{
   const url=String(input),request=JSON.parse(init.body);networkCalls.push(url);
   if(url===env.CALENDAR_APPS_SCRIPT_URL){const dates=request.payload.dates||[request.payload.date],values=dates.map(date=>({date,schoolDay:true,parity:'odd'}));return Response.json({ok:true,result:request.action==='rosterDates'?{dates:values}:values[0]});}
@@ -90,7 +94,7 @@ try{
   const logs={info:[],warn:[],error:[]},pending=[];
   console.info=(...args)=>logs.info.push(args.join(' '));console.warn=(...args)=>logs.warn.push(args.join(' '));console.error=(...args)=>logs.error.push(args.join(' '));
   db.start();
-  await worker.scheduled({cron:'* * * * *',scheduledTime:now},env,{waitUntil(promise){pending.push(promise);}});
+  await worker.scheduled({cron:'* * * * *',scheduledTime:now},recoveryEnv,{waitUntil(promise){pending.push(promise);}});
   await Promise.all(pending);
   const measured=db.stop();console.info=realInfo;console.warn=realWarn;console.error=realError;
   const summary={pass:pass+1,historyBytes,queries:measured.queries,rows:measured.rows,bytes:measured.bytes,maxRows:measured.maxRows,broadRosterLoads:measured.broadRosterLoads,r2Gets:objectCalls.gets,r2Puts:objectCalls.puts,externalCalls:networkCalls.length,queueWakes:queueCalls.length,errors:logs.error,warnings:logs.warn};
@@ -117,10 +121,10 @@ try{
   const {startQuietMode}=await moduleAt('shared/roster-quiet-mode.js');
   now=Date.parse(today+'T06:50:00+08:00');await startQuietMode(db,'smc@gsps.edu.sg',now);
   serviceCalls.length=0;const pending=[],quietLogs=[];console.info=(...args)=>quietLogs.push(args.join(' '));
-  await worker.scheduled({cron:'* * * * *',scheduledTime:now},env,{waitUntil(promise){pending.push(promise);}});await Promise.all(pending);console.info=realInfo;
+  await worker.scheduled({cron:'* * * * *',scheduledTime:now},recoveryEnv,{waitUntil(promise){pending.push(promise);}});await Promise.all(pending);console.info=realInfo;
   assert.deepEqual([...serviceCalls].sort(),['claimNotifications','inboxPendingDispatch','nextAbsenceIntake'],'quiet mode keeps absence intake, WhatsApp and inbox; skips peer mail and scheduled allocation');
   serviceCalls.length=0;const auditPending=[];
-  await worker.scheduled({cron:'2-57/5 * * * *',scheduledTime:now},env,{waitUntil(promise){auditPending.push(promise);}});await Promise.all(auditPending);
+  await worker.scheduled({cron:'2-57/5 * * * *',scheduledTime:now},recoveryEnv,{waitUntil(promise){auditPending.push(promise);}});await Promise.all(auditPending);
   assert.deepEqual(serviceCalls,[],'quiet mode skips the audit export lane');
  }
  // Quiet mode switched on while the received-report drain runs still stops
@@ -130,7 +134,7 @@ try{
   now=Date.parse(today+'T06:52:00+08:00');await endQuietMode(db,'smc@gsps.edu.sg','manual',now);
   onService=async operation=>{if(operation==='nextAbsenceIntake')await startQuietMode(db,'smc@gsps.edu.sg',now);};
   serviceCalls.length=0;const pending=[];console.info=()=>{};
-  await worker.scheduled({cron:'* * * * *',scheduledTime:now},env,{waitUntil(promise){pending.push(promise);}});await Promise.all(pending);console.info=realInfo;onService=null;
+  await worker.scheduled({cron:'* * * * *',scheduledTime:now},recoveryEnv,{waitUntil(promise){pending.push(promise);}});await Promise.all(pending);console.info=realInfo;onService=null;
   assert(serviceCalls.includes('nextAbsenceIntake'),'the received-report drain ran');
   assert(!serviceCalls.includes('scheduledRoster')&&!serviceCalls.includes('sendPeerMail'),'quiet mode enabled mid-tick stops deferred allocation and peer mail: '+JSON.stringify(serviceCalls));
  }

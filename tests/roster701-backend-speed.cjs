@@ -33,7 +33,9 @@ const blob=value=>{const bytes=Buffer.isBuffer(value)?value:typeof value==='stri
 // published quota calculation or incidental allocation projection.
 {
  const {O,state,ctx,date}=fixture();state.absences.push({id:'own',staffId:'alice',name:'Alice',date,periods:[2],deletedAt:null},{id:'other',staffId:'bob',name:'Bob',date,periods:[3]});ctx.people.push({id:'inactive',name:'Inactive',active:false,mobile:'80000000'});
- const scope=vm.createContext({GSISRosterOperations:O,GSISRoster:R,Utilities:{formatDate:(_,tz,format)=>format==='yyyy-MM-dd'?date:format==='HH'?'08':'00',getUuid:()=> 'uuid'},rosterIndex_:()=>({entries:[]}),rosterModel_:()=>{throw Error('A list view must not read a timetable');},book_:()=>{throw Error('A list view must not read Deploy quotas');}});
+ // Reconciliation refreshes its server clock; keep this fixture before P2 starts.
+ const BackendDate=class extends Date{static now(){return Date.parse(date+'T06:00:00+08:00');}};
+ const scope=vm.createContext({Date:BackendDate,GSISRosterOperations:O,GSISRoster:R,Utilities:{formatDate:(_,tz,format)=>format==='yyyy-MM-dd'?date:format==='HH'?'08':'00',getUuid:()=> 'uuid'},rosterIndex_:()=>({entries:[]}),rosterModel_:()=>{throw Error('A list view must not read a timetable');},book_:()=>{throw Error('A list view must not read Deploy quotas');}});
  vm.runInContext(fs.readFileSync('backend/RosterOperations.gs','utf8'),scope);
  require('./load-stapler-leases.cjs')(scope);
  for(const input of [{operation:'read',view:'mine'},{operation:'read',view:'prune'},{operation:'audit'},{operation:'accounting'}]){
@@ -42,7 +44,7 @@ const blob=value=>{const bytes=Buffer.isBuffer(value)?value:typeof value==='stri
  }
  assert.equal(scope.rosterOperationsNeedsQuota_({operation:'read',view:'entry'}),false,'entry display does not calculate quota; candidate and mutation paths validate it separately');
  const teacherView=O.view(state,{...ctx,user:{...ctx.user,smc:false,admin:false}},{date,view:'mine'});assert(!teacherView.people.some(p=>p.id==='inactive'),'personal list does not disclose inactive directory entries');
- state.adhoc.push({id:'active-today',staffId:'inactive',date,periods:[2]});assert(O.view(state,{...ctx,user:{...ctx.user,smc:false}},{date,view:'mine'}).people.some(p=>p.id==='inactive'),'daily activated external teachers retain the original disclosure contract');
+ state.adhoc.push({id:'active-today',staffId:'inactive',date,periods:[2]});assert(!O.view(state,{...ctx,user:{...ctx.user,smc:false,admin:false}},{date,view:'mine'}).people.some(p=>p.id==='inactive'),'daily activation cannot bypass Contacts inactivity');
  // An omitted day is unknown, never an assertion that all lessons vanished.
  const live=fixture();live.ctx.minute=360;live.ctx.timetableEntries=[{id:'baseline',from:'2026-01-01',to:'2026-12-31'}];
  O.apply(live.state,live.ctx,{operation:'saveAbsence',staffId:'alice',typeId:'mc',date,periods:[2]});

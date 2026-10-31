@@ -5,10 +5,10 @@ import {loadEdgeRoster,mutateEdgeRoster,buildEdgeRosterContext} from './edge-ros
 import {GSISRosterOperations,GSISRosterInbox,GSiSEdgeNotifications} from './edge-roster-domain.js';
 const transportOps=new Set(['claimNotifications','prepareNotification','prepareNotifications','notificationResult','notificationResults','notificationDelivery','notificationDeliveryBatch']);
 const inboxOps={inboxIngest:'ingest',inboxReplyPrepare:'prepare',inboxReplyResult:'replyResult',inboxDelivery:'delivery',inboxAlertPrepare:'alertPrepare',inboxAlertResult:'alertResult',inboxPendingDispatch:'pending'};
-const receiptOps=new Set(['notificationResult','notificationResults','notificationDelivery','notificationDeliveryBatch','inboxReplyResult','inboxAlertResult','inboxDelivery','inboundReplyResult']);
+const receiptOps=new Set(['notificationResult','notificationResults','notificationDelivery','notificationDeliveryBatch','inboxReplyResult','inboxAlertResult','inboxDelivery','inboundReplyResult','settlePeerMail','settleEmploymentMail']);
 const fail=(status,message)=>{throw Object.assign(new Error(message),{status});};
 const clone=value=>JSON.parse(JSON.stringify(value));
-const service=(env,input,apply,needsContext=true)=>mutateEdgeRoster(env,{actor:'roster-service',requestId:crypto.randomUUID(),command:input,needsContext,domainChanged:false,apply});
+const service=(env,input,apply,needsContext=true)=>mutateEdgeRoster(env,{actor:'roster-service',requestId:crypto.randomUUID(),command:input,needsContext,domainChanged:false,allowDuringQuiesce:receiptOps.has(input.operation),apply});
 // Match the retry/normalization rules in GSiSEdgeNotifications.retry. Completed
 // failures still need work if their durable escalation has never been recorded.
 const notificationNonRetryable=`(${['MISSING_OR_INVALID_TEMPLATE_FIELD','NOTIFICATION_CONTENT_EXCEEDS','INVALID_TEMPLATE','TEMPLATE_CONTRACT','FINAL_RUN','STALE_COUNTDOWN','STALE_TIMETABLE','INVALID_OR_EXPIRED_NOTIFICATION'].map(prefix=>`COALESCE(json_extract(r.value_json,'$.error'),'') GLOB '${prefix}*'`).join(' OR ')} OR COALESCE(COALESCE(json_extract(r.value_json,'$.providerError.code'),CASE WHEN json_extract(r.value_json,'$.error') GLOB 'META_[0-9]*' AND substr(json_extract(r.value_json,'$.error'),6) NOT GLOB '*[^0-9]*' THEN CAST(substr(json_extract(r.value_json,'$.error'),6) AS INTEGER) END) IN (100,131008,131009,132000,132001,132005,132007,132012,132015,132016,132018),0))`;

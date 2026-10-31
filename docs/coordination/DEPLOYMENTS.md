@@ -2,6 +2,14 @@
 
 What is live, when it changed and how to roll back. Record every production deployment and every live setting change. "Reported" means stated by the owner; "verified" means checked by a model with the evidence named.
 
+## 31 Oct 2026 14:06 SGT: v0.9.9d (main 5c202c0), reported by owner
+
+Bundle `deploy/2026-10-31-v0.9.9d`. Same six components. Adds resumable D1 import preparation (PR #32) and immutable allocation audit versions.
+- Owner checks: Roster and Deploy headers v0.9.9d; Assign Relief, System Config, Storage, LORD, Calendar load.
+- D1 job health 14:06 (verified by Claude): all jobs idle; only peer-mail (known) and one webhook failure in the last 45 minutes.
+- Rollback constraint: once a v0.9.9d import starts, keep the Roster backend at v0.9.9d or later.
+- Next: owner rehearsal import (explicit restart of the failed 31 Oct session).
+
 ## 31 Oct 2026 10:07 SGT: v0.9.9c (main ef037a2), reported by owner
 
 Bundle `deploy/2026-10-31-v0.9.9c`. Deployed the same six components as v0.9.9b (Roster and Deploy backends and frontends, both Workers). Adds nightly cold-output archive (PR #28).

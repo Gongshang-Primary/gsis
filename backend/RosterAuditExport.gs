@@ -83,12 +83,13 @@ function rosterAllocationAuditFolder_(date){gsisRequireBackendRole_('roster');
  }
  return parent;
 }
+function rosterAllocationAuditDigest_(raw){return Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256,raw).map(value=>(value&255).toString(16).padStart(2,'0')).join('');}
 function rosterAllocationAuditArchive_(snapshot,date,monthFolder){gsisRequireBackendRole_('roster');
  if(!rosterAllocationAuditEnabled_(snapshot,date))return {disabled:true,state:snapshot};
  let folder=rosterFindFile_(monthFolder,'Evidence');
  if(!folder){const response=rosterDriveRequest_('https://www.googleapis.com/drive/v3/files?supportsAllDrives=true&fields=id',{method:'post',contentType:'application/json; charset=UTF-8',payload:JSON.stringify({name:'Evidence',mimeType:'application/vnd.google-apps.folder',parents:[monthFolder]})},'allocation-audit-evidence-folder');folder=rosterDriveJson_(response,'allocation-audit-evidence-folder').id;if(!folder)error_(503,'The allocation evidence folder could not be confirmed.');}
- const meta=snapshot.allocationAuditExports[date],name=date+'.json',id=meta.archiveFileId||rosterFindFile_(folder,name);let previous={audit:[],optimisationRuns:[]};
- if(id){try{previous=JSON.parse(rosterReadFile_(id));if(previous.schema!==1||previous.date!==date||!Array.isArray(previous.audit)||!Array.isArray(previous.optimisationRuns))throw Error('identity');}catch(error){error_(503,'The stored allocation evidence could not be read. It was not overwritten.');}}
+ const meta=snapshot.allocationAuditExports[date],id=meta.archiveFileId||rosterFindFile_(folder,date+'.json');let previous={audit:[],optimisationRuns:[]},previousRaw=null;
+ if(id){try{previousRaw=typeof rosterNativeRead_==='function'?rosterNativeRead_(id):rosterReadFile_(id);if(meta.archiveDigest&&rosterAllocationAuditDigest_(previousRaw)!==meta.archiveDigest)throw Error('digest');previous=JSON.parse(previousRaw);if(previous.schema!==1||previous.date!==date||!Array.isArray(previous.audit)||!Array.isArray(previous.optimisationRuns))throw Error('identity');}catch(error){error_(503,'The stored allocation evidence could not be read. It was not overwritten.');}}
  // Read each required month once for this selected day's derived export.
  // Ordinary Roster reads retain compact stubs and do not enter this path.
  const months=new Map(),hydrate=row=>{
@@ -99,8 +100,12 @@ function rosterAllocationAuditArchive_(snapshot,date,monthFolder){gsisRequireBac
  };
  const unique=(old,next)=>{const rows=new Map(old.map(row=>[row.id,hydrate(row)]));for(const source of next){const prior=rows.get(source.id);if(source.archiveRef&&prior)continue;const row=hydrate(source);rows.set(row.id,prior?{...prior,...row,...(!row.decisionEvidence&&prior.decisionEvidence?{decisionEvidence:prior.decisionEvidence}:{})}:row);}return [...rows.values()];};
  const evidence={schema:1,date,version:meta.pendingVersion,revision:meta.pendingRevision,audit:unique(previous.audit,snapshot.audit.filter(row=>row.date===date&&row.auditExportCaptured&&!row.auditExportSuppressed)),optimisationRuns:unique(previous.optimisationRuns,snapshot.optimisationRuns.filter(row=>row.date===date&&!row.auditExportSuppressed))};
- const json=JSON.stringify(evidence),saved=id?(rosterDriveRequest_('https://www.googleapis.com/upload/drive/v3/files/'+encodeURIComponent(id)+'?uploadType=media&supportsAllDrives=true&fields=id',{method:'patch',contentType:'application/json; charset=UTF-8',payload:json},'allocation-audit-evidence'),id):rosterCreateFile_(folder,name,Utilities.newBlob(json,'application/json; charset=UTF-8'));
- return {fileId:saved,state:{...snapshot,audit:[...snapshot.audit.filter(row=>row.date!==date),...evidence.audit],optimisationRuns:[...snapshot.optimisationRuns.filter(row=>row.date!==date),...evidence.optimisationRuns]}};
+ const json=JSON.stringify(evidence),digest=rosterAllocationAuditDigest_(json),name=date+'-'+digest+'.json';
+ // Evidence IDs are immutable. A new export never rewrites a captured file.
+ let saved=previousRaw===json?id:rosterFindFile_(folder,name);
+ if(saved&&saved!==id&&rosterAllocationAuditDigest_(rosterReadFile_(saved))!==digest)error_(503,'The immutable allocation evidence failed verification.');
+ if(!saved)saved=rosterCreateFile_(folder,name,Utilities.newBlob(json,'application/json; charset=UTF-8'));
+ return {fileId:saved,digest,state:{...snapshot,audit:[...snapshot.audit.filter(row=>row.date!==date),...evidence.audit],optimisationRuns:[...snapshot.optimisationRuns.filter(row=>row.date!==date),...evidence.optimisationRuns]}};
 }
 function rosterAllocationAuditExport_(p){
  const result=rosterAllocationAuditExportCore_(p);
@@ -140,7 +145,7 @@ function rosterAllocationAuditExportCore_(p){gsisRequireBackendRole_('roster');
     const saved=fileId?(rosterDriveRequest_('https://www.googleapis.com/upload/drive/v3/files/'+encodeURIComponent(fileId)+'?uploadType=media&supportsAllDrives=true&fields=id',{method:'patch',contentType:'text/plain; charset=UTF-8',payload:text},'allocation-audit-export'),fileId):rosterCreateFile_(folder,name,Utilities.newBlob(text,'text/plain; charset=UTF-8'));
     exportLock.releaseLock();exportHeld=false;
     const lock=LockService.getScriptLock();if(!deployLock_(lock,8000))throw Error('The text was written but its watermark is not yet confirmed.');
-    try{const current=rosterOperationsState_(),row=current.allocationAuditExports?.[date];if(row&&(row.exportedVersion||0)<=watermark.pendingVersion){row.fileId=saved;row.archiveFileId=archive.fileId;row.archiveVersion=watermark.pendingVersion;row.archiveRevision=watermark.pendingRevision;row.exportedVersion=Math.max(row.exportedVersion||0,watermark.pendingVersion);row.exportedRevision=watermark.pendingRevision;row.exportedAt=generatedAt;row.bytes=Utilities.newBlob(text).getBytes?.().length||text.length;delete row.error;// Verified cold-output archival is the only retention step; text export never deletes records.
+    try{const current=rosterOperationsState_(),row=current.allocationAuditExports?.[date];if(row&&(row.exportedVersion||0)<=watermark.pendingVersion){row.fileId=saved;row.archiveFileId=archive.fileId;if(archive.digest)row.archiveDigest=archive.digest;else delete row.archiveDigest;row.archiveVersion=watermark.pendingVersion;row.archiveRevision=watermark.pendingRevision;row.exportedVersion=Math.max(row.exportedVersion||0,watermark.pendingVersion);row.exportedRevision=watermark.pendingRevision;row.exportedAt=generatedAt;row.bytes=Utilities.newBlob(text).getBytes?.().length||text.length;delete row.error;// Verified cold-output archival is the only retention step; text export never deletes records.
  rosterOperationsCommit_(current);}}
     finally{deployUnlock_(lock);}
     result.exported.push({date,revision:watermark.pendingRevision});const latest=rosterOperationsState_().allocationAuditExports?.[date];if(latest&&latest.pendingVersion<=latest.exportedVersion)result.pending--;
