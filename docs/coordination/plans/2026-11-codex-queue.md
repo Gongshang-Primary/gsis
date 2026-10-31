@@ -2,6 +2,8 @@
 
 Priority update 30 Oct 2026: build roster-operations-split-files (row S) first, then roster-d1-google-backup (row D1), before other rows.
 
+**31 Oct owner override: Follow-up R2 is the sole implementation priority.** Pause row D1 / PR #33, #30, #29 and other ChatGPT work. Build `roster-d1-import-packed-capture.md` from current main as a separate PR. Full Node and LORD must pass before opening it. Claude reviews the exact head; owner merges. Do not restart the rehearsal import until R2 is merged and deployed.
+
 Quiet hours 30 Oct 2026 night (owner: "get as much deployable done as possible"; no bundles until the owner asks).
 - Merged tonight: #20 (2b2), #21 (collapsible TG exceptions), #22 (row 3 Excel), #23 (rows 5 and 6).
 - Claude built: row V phase 1 (#24), row 15b SIUE by specialism (#25).
