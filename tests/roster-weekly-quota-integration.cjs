@@ -12,3 +12,8 @@ test('signed scheduler credits an empty week while automatic allocation is pause
  const result=f.O.scheduledTick(f.state,f.ctx,f.ctx.now);assert.equal(result.quotaCheckpoint.status,'ready');assert.equal(f.state.entitlements.length,4);assert.equal(f.state.quotaCheckpoints[f.week].status,'ready');
  const count=f.state.entitlements.length;f.O.scheduledTick(f.state,f.ctx,f.ctx.now);assert.equal(f.state.entitlements.length,count);
 });
+
+test('a pending cutoff reports a health diagnostic without inventing quota',()=>{
+ const f=setup();for(const day of Object.values(f.ctx.days))day.quotaSource.publishedAt='2026-11-01T09:00:00Z';f.ctx.skipScheduledAllocation=true;
+ const result=f.O.scheduledTick(f.state,f.ctx,f.ctx.now);assert.equal(result.quotaPending,true);assert.equal(result.code,'QUOTA_CHECKPOINT_PENDING');assert.equal(f.state.entitlements.length,0);
+});

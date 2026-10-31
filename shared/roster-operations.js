@@ -1048,7 +1048,7 @@ const next=stapler().effectiveDay(plan,ctx.baselineDays?.[d]||ctx.days[d]);for(c
   }}
   const report=queueDailyEmployment(s,ctx,ctx.today),allocated=!skipAllocation&&allocationSlot&&s.systemConfig.scheduledAllocationEnabled;
   s.scheduleReceipts[key]={...(key===allocationKey?cancellation:null),at:ctx.iso,report:window,optimise:allocated,...(cancellation&&key===allocationKey?{reportComplete:true}:{}),...(result.allocationTimedOut?{allocationStatus:'budget'}:allocated?{allocationStatus:'complete'}:{})};
-  if(key!==allocationKey&&(allocated||result.allocationTimedOut))s.scheduleReceipts[allocationKey]={...s.scheduleReceipts[allocationKey],at:ctx.iso,optimise:allocated,allocationStatus:result.allocationTimedOut?'budget':'complete'};return {...result,...report,...(quota?{quotaCheckpoint:quota}:{})};
+  if(key!==allocationKey&&(allocated||result.allocationTimedOut))s.scheduleReceipts[allocationKey]={...s.scheduleReceipts[allocationKey],at:ctx.iso,optimise:allocated,allocationStatus:result.allocationTimedOut?'budget':'complete'};return {...result,...report,...(quota?{quotaCheckpoint:quota,quotaPending:quota.status==='pending',quotaFallback:quota.fallback,...(quota.status==='pending'?{code:'QUOTA_CHECKPOINT_PENDING'}:quota.fallback?{code:'QUOTA_CHECKPOINT_FALLBACK'}:{})}:{})};
  }
 
  // A human assigner shows as a name: the timetable (TTb) name, then the Contacts

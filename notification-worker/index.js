@@ -24,7 +24,7 @@ function gsisApiSecret(env,legacyName){
 // Existing send/automation/diagnostic/pause flags retain their meanings.
 function writable(env){assertRecoveryWritable(env);}
 function safeError(error){return safeHealthError(error);}
-const summaryKeys=['configured','enabled','idle','hasMore','claimed','sent','failed','uncertain','reviewedUncertain','cancelled','prepareFailures','resultFailures','batches','backendCalls','processed','pending','exported','queued','applied','deferred','scanned','deleted','protected','candidates','removed','completed','retried','parked','readyAt','pendingCaptureCount','pendingPeerCount','notificationsQueued','forwarded','needsReview','replies','alerts','retrying','blocked','unconfirmed'];
+const summaryKeys=['quotaPending','quotaFallback','configured','enabled','idle','hasMore','claimed','sent','failed','uncertain','reviewedUncertain','cancelled','prepareFailures','resultFailures','batches','backendCalls','processed','pending','exported','queued','applied','deferred','scanned','deleted','protected','candidates','removed','completed','retried','parked','readyAt','pendingCaptureCount','pendingPeerCount','notificationsQueued','forwarded','needsReview','replies','alerts','retrying','blocked','unconfirmed'];
 function safeSummary(result){
  const summary=Object.fromEntries(summaryKeys.filter(key=>typeof result?.[key]==='boolean'||Number.isFinite(result?.[key])&&result[key]>=0).map(key=>[key,result[key]]));
  // Received-report work reports its two processing stages separately. Retain
@@ -42,7 +42,7 @@ async function stage(env,job,event,work,{scheduledTime}={}){
   writable(env);const result=await work(),data=result?.data||result,summary=safeSummary(data);
   if(result?.ok===false||data?.failures?.length)throw Object.assign(Error('Job failed'),{...safeError(result),status:result.status});
   const measured=Object.entries(summary).filter(([key,value])=>typeof value==='number'&&!['readyAt','backendCalls','reviewedUncertain'].includes(key));
-  const failed=!!(data?.prepareFailures||data?.resultFailures||data?.failed||data?.uncertain||data?.unconfirmed||summary.needsReview||summary.deferred||summary.retrying||summary.blocked),idle=!data?.hasMore&&!data?.pending&&(data?.idle===true||data?.state==='idle'||measured.length>0&&measured.every(([,value])=>value===0));
+  const failed=!!(data?.quotaPending||data?.quotaFallback||data?.prepareFailures||data?.resultFailures||data?.failed||data?.uncertain||data?.unconfirmed||summary.needsReview||summary.deferred||summary.retrying||summary.blocked),idle=!data?.hasMore&&!data?.pending&&(data?.idle===true||data?.state==='idle'||measured.length>0&&measured.every(([,value])=>value===0));
   const status=failed?'failure':data?.configured===false||data?.enabled===false||data?.skipped===true?'skipped':idle?'idle':'success';
   const detail=failed&&data?.failure?safeError(data.failure):{},outcomeCode=data?.code?safeError(data).code:'UNKNOWN_ERROR';
   await record({status,...detail,code:failed?(detail.code&&detail.code!=='UNKNOWN_ERROR'?detail.code:'JOB_FAILED'):outcomeCode!=='UNKNOWN_ERROR'?outcomeCode:status==='idle'?'IDLE':status==='skipped'?'SKIPPED':'OK',finishedAt:Date.now(),counts:summary});
@@ -142,3 +142,4 @@ export default {
   }catch{return Response.json({ok:false,error:'Notification wake was not accepted.'},{status:403,headers:{'Cache-Control':'no-store'}});}
  }
 };
+
