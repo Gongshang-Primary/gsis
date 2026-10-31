@@ -1,3 +1,0 @@
-feat(contacts): Edit Info filter by part of the TTb name
-
-Model: Gemini
