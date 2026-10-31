@@ -10106,7 +10106,9 @@ function rosterEdgeExportCaptureV2_(binding){
   if(descriptor.state==='failed')return descriptor;
   if(descriptor.sourceFileId)return descriptor;
   if(descriptor.sourceHash){for(const file of rosterEdgeExportFilesNamed_(descriptor.sourceName))if(Number(file.size)===descriptor.sourceBytes){try{rosterEdgeExportPrivateText_({fileId:file.id,digest:descriptor.sourceHash});return {...descriptor,sourceFileId:file.id};}catch(error){if(error.status!==503)throw error;}}}
-  error_(503,'The captured source upload has an unknown outcome. Retry this same preparation step; never recapture under this identity.');
+  // A retry owns the next D1 step lease after the previous execution horizon.
+  // With no recoverable source bytes, retain this identity and require restart.
+  descriptor={...descriptor,state:'failed',failedAt:Date.now()};rosterEdgeExportSave_(descriptor);return descriptor;
  }
  const script=LockService.getScriptLock();if(!deployLock_(script,8000))error_(503,'A Roster save is finishing. Retry the same import.');let user,uploadStarted=false;
  try{

@@ -80,4 +80,13 @@ function harness(){
  h.advance();h.scope.rosterEdgeExportFind_=()=>null;
  const expired=h.call({...h.input,preparation:{ordinal:2,checkpoint:null}});assert(expired.preparationFailed);assert(expired.requiresRestart);assert.equal(h.stats().locks,0);
 }
+// After the step lease expires, a capture with no uploaded source cannot be
+// resumed from live data. Expose a terminal restart instead of endless retries.
+for(const afterHash of [false,true]){
+ const h=harness(),binding=h.scope.rosterEdgeExportBindingV2_({identity:{email:'admin@example.test'},input:h.input});
+ const descriptor={schema:2,...binding,state:'capturing',createdAt:1,sourceName:'missing-source.json',...(afterHash?{sourceHash:'a'.repeat(64),sourceBytes:10}:{})};
+ h.properties.set('ROSTER_EDGE_EXPORT:'+binding.sessionId,JSON.stringify(descriptor));
+ const failed=h.call(h.input);assert(failed.preparationFailed);assert(failed.requiresRestart);assert.equal(h.stats().captures,0);assert.equal(h.stats().uploads,0);
+ assert.equal(JSON.parse(h.properties.get('ROSTER_EDGE_EXPORT:'+binding.sessionId)).state,'failed');assert(h.call(h.input).requiresRestart);
+}
 console.log('PASS resumable export: frozen capture, immutable audit, immutable checkpoint replay, lost uploads, tamper refusal, retained restart and legacy polling.');
