@@ -18,7 +18,7 @@ function rosterEdgeReferences_(c,adminVerified){
  return {contacts,adminVerified:adminVerified===true,contactsSource:rosterOperationsDigest_(contacts),checkedAt:new Date().toISOString()};
 }
 function rosterEdgeMigrationDispatch_(req,c){
- const p=req.input||{},op=p.operation;if(!['edgeExport','edgeExportManifest','edgeExportPart','edgeModel','edgeFence','edgeReferences','edgeContactCreate','edgeAudit','edgeExportAbandon'].includes(op))return null;if(op==='edgeContactCreate'){if(!c?.user?.rosterSMC&&!c?.user?.rosterAdmin)error_(403,'SMC or Admin access is required.');}else rosterEdgeAdmin_(c);
+ const p=req.input||{},op=p.operation;if(op==='edgeHealthAuthority')return {handled:true,result:{user:rosterOperationsAuthority_(c,req.identity)}};if(!['edgeExport','edgeExportManifest','edgeExportPart','edgeModel','edgeFence','edgeReferences','edgeContactCreate','edgeAudit','edgeExportAbandon'].includes(op))return null;if(op==='edgeContactCreate'){if(!c?.user?.rosterSMC&&!c?.user?.rosterAdmin)error_(403,'SMC or Admin access is required.');}else rosterEdgeAdmin_(c);
  if(op==='edgeExportManifest')return {handled:true,result:rosterEdgeExportManifest_(req)};
  if(op==='edgeExportPart')return {handled:true,result:rosterEdgeExportPart_(req)};
  if(op==='edgeExportAbandon')return {handled:true,result:rosterEdgeExportAbandon_(req)};
@@ -57,15 +57,14 @@ function rosterEdgeExportRange_(id,offset,bytes,total){
 }
 function rosterEdgeExportHeader_(descriptor,fileId){
  const metadata=rosterDriveJson_(rosterDriveRequest_('https://www.googleapis.com/drive/v3/files/'+encodeURIComponent(fileId)+'?supportsAllDrives=true&fields=id,size,parents,trashed',{},'immutable-export-metadata'),'immutable-export-metadata');
- if(Number(metadata.size)!==descriptor.totalBytes||metadata.trashed||!metadata.parents?.includes(ROSTER_DATA))error_(503,'The immutable export container length or private folder changed.');
+ if(Number(metadata.size)!==descriptor.totalBytes||metadata.trashed||!rosterEdgeExportPrivateParent_(metadata.parents))error_(503,'The immutable export container length or private folder changed.');
  const prefix=rosterEdgeExportRange_(fileId,0,9,descriptor.totalBytes);if(!/^\d{8}\n$/.test(prefix)||Number(prefix.slice(0,8))!==descriptor.headerBytes||descriptor.headerBytes>GSiSRosterImport.MAX_MANIFEST_BYTES+200)error_(503,'The immutable export header is invalid.');
  const header=JSON.parse(rosterEdgeExportRange_(fileId,9,descriptor.headerBytes,descriptor.totalBytes)),manifest=header.manifest;
  GSiSRosterImport.validateManifest(manifest);if(rosterEdgeExportHash_(JSON.stringify(manifest))!==descriptor.manifestDigest||header.manifestDigest!==descriptor.manifestDigest||manifest.sourceDigest!==descriptor.sourceDigest||manifest.sessionId!==descriptor.sessionId||manifest.actor!==descriptor.actor||manifest.requestId!==descriptor.requestId||9+descriptor.headerBytes+manifest.totalBytes!==descriptor.totalBytes)error_(503,'The immutable export header does not match the frozen source.');return header;
 }
 function rosterEdgeExportFind_(descriptor){
- const folder=rosterFolder_(ROSTER_DATA),quote=value=>String(value).replace(/\\/g,'\\\\').replace(/'/g,"\\'"),query="'"+quote(ROSTER_DATA)+"' in parents and name = '"+quote(descriptor.name)+"' and trashed = false",url='https://www.googleapis.com/drive/v3/files?supportsAllDrives=true&includeItemsFromAllDrives=true&pageSize=20&fields='+encodeURIComponent('files(id,size),nextPageToken,incompleteSearch')+'&q='+encodeURIComponent(query)+(folder.driveId?'&corpora=drive&driveId='+encodeURIComponent(folder.driveId):'&corpora=user'),result=rosterDriveJson_(rosterDriveRequest_(url,{},'immutable-export-recovery'),'immutable-export-recovery');
- if(!Array.isArray(result.files)||result.nextPageToken||result.incompleteSearch||result.files.length>20)error_(503,'The immutable export recovery listing is incomplete.');const verified=[];
- for(const file of result.files){if(Number(file.size)!==descriptor.totalBytes)continue;try{const header=rosterEdgeExportHeader_(descriptor,file.id);verified.push({id:file.id,header});}catch(error){if(error.status!==503)throw error;}}
+ const files=rosterEdgeExportFilesNamed_(descriptor.name);if(files.length>20)error_(503,'The immutable export recovery listing is incomplete.');const verified=[];
+ for(const file of files){if(Number(file.size)!==descriptor.totalBytes)continue;try{const header=rosterEdgeExportHeader_(descriptor,file.id);verified.push({id:file.id,header});}catch(error){if(error.status!==503)throw error;}}
  if(verified.length>1)error_(409,'More than one verified export container exists. Retain this session for administrator review.');return verified[0]||null;
 }
 function rosterEdgeExportReply_(descriptor,header){return {adminVerified:true,sessionId:descriptor.sessionId,requestId:descriptor.requestId,sourceDigest:descriptor.sourceDigest,...(descriptor.state==='ready'?{manifest:header.manifest,manifestDigest:descriptor.manifestDigest}:descriptor.state==='failed'?{preparationFailed:true,requiresRestart:true,message:'The frozen bytes are incomplete or unavailable. Retain this session and restart with a new request ID.'}:{preparing:true,retryAfterMs:2000})};}
@@ -107,7 +106,7 @@ function rosterEdgeExportManifestLegacy_(req){
   snapshot.state=GSISRosterOperations.validateState(snapshot.state);
   const frozen=GSiSRosterImport.freeze(snapshot,binding,{hash:rosterEdgeExportHash_,gzip:value=>Utilities.gzip(Utilities.newBlob(value,'application/json')).getBytes(),base64:bytes=>Utilities.base64Encode(bytes),readModel:entry=>GSISRoster.validate(rosterEdgeExportObject_(entry.modelFile)),readArchive:(date,id)=>{const archive=rosterEdgeExportObject_(id);if(archive.schema!==1||archive.date!==date||!Array.isArray(archive.audit))error_(503,'The captured allocation audit archive is invalid.');return archive;}}),header=JSON.stringify({manifest:frozen.manifest,manifestDigest:frozen.manifestDigest}),headerBytes=Utilities.newBlob(header).getBytes().length;
   Object.assign(descriptor,{manifestDigest:frozen.manifestDigest,headerBytes,totalBytes:9+headerBytes+frozen.manifest.totalBytes});rosterEdgeExportSave_(descriptor);
-  const container=String(headerBytes).padStart(8,'0')+'\n'+header+frozen.parts.join('');uploadStarted=true;const fileId=rosterCreateFile_(ROSTER_DATA,descriptor.name,Utilities.newBlob(container,'application/octet-stream')),verified=rosterEdgeExportHeader_(descriptor,fileId);
+  const container=String(headerBytes).padStart(8,'0')+'\n'+header+frozen.parts.join('');uploadStarted=true;const fileId=rosterCreateFile_(rosterEdgeExportImportFolder_(true),descriptor.name,Utilities.newBlob(container,'application/octet-stream')),verified=rosterEdgeExportHeader_(descriptor,fileId);
   Object.assign(descriptor,{state:'ready',fileId});rosterEdgeExportSave_(descriptor);return rosterEdgeExportReply_(descriptor,verified);
  }catch(error){if(!uploadStarted){descriptor.state='failed';rosterEdgeExportSave_(descriptor);}throw error;}
 }
@@ -129,22 +128,30 @@ function rosterEdgeExportPreparation_(p){
  const ref=value.checkpoint;if(value.ordinal===0){if(ref!==null)error_(400,'The first preparation step cannot select a checkpoint.');}
  else if(!ref||typeof ref.fileId!=='string'||!ref.fileId||! /^[a-f0-9]{64}$/.test(ref.digest||'')||Object.keys(ref).some(key=>!['fileId','digest'].includes(key)))error_(400,'A verified preparation checkpoint is required.');return value;
 }
+var rosterEdgeExportImportFolderId_='';
+function rosterEdgeExportImportFolder_(create=false){
+ if(rosterEdgeExportImportFolderId_)return rosterEdgeExportImportFolderId_;
+ let id=rosterFindFile_(ROSTER_DATA,'Roster import files');
+ if(!id&&create){const response=rosterDriveRequest_('https://www.googleapis.com/drive/v3/files?supportsAllDrives=true&fields=id',{method:'post',contentType:'application/json; charset=UTF-8',payload:JSON.stringify({name:'Roster import files',mimeType:'application/vnd.google-apps.folder',parents:[ROSTER_DATA]})},'import-folder-create');id=rosterDriveJson_(response,'import-folder-create').id;if(typeof id!=='string'||!id)error_(503,'The import folder could not be confirmed.');}
+ if(id){rosterFolder_(id);rosterEdgeExportImportFolderId_=id;}return id||'';
+}
+function rosterEdgeExportPrivateParent_(parents){return Array.isArray(parents)&&(parents.includes(ROSTER_DATA)||parents.includes(rosterEdgeExportImportFolder_(false)));}
 function rosterEdgeExportPrivateMeta_(id){
  const metadata=rosterDriveJson_(rosterDriveRequest_('https://www.googleapis.com/drive/v3/files/'+encodeURIComponent(id)+'?supportsAllDrives=true&fields=id,size,parents,trashed',{},'export-file-metadata'),'export-file-metadata');
- if(metadata.trashed||!metadata.parents?.includes(ROSTER_DATA)||!Number.isSafeInteger(Number(metadata.size))||Number(metadata.size)<1||Number(metadata.size)>67108864)error_(503,'The private preparation file is unavailable or exceeds its size bound.');return metadata;
+ if(metadata.trashed||!rosterEdgeExportPrivateParent_(metadata.parents)||!Number.isSafeInteger(Number(metadata.size))||Number(metadata.size)<1||Number(metadata.size)>67108864)error_(503,'The private preparation file is unavailable or exceeds its size bound.');return metadata;
 }
 function rosterEdgeExportPrivateText_(ref,maxBytes=67108864){
  const meta=rosterEdgeExportPrivateMeta_(ref.fileId);if(Number(meta.size)>maxBytes)error_(413,'The preparation checkpoint exceeds its size bound.');
  const raw=rosterReadFile_(ref.fileId);if(Utilities.newBlob(raw).getBytes().length!==Number(meta.size)||rosterEdgeExportHash_(raw)!==ref.digest)error_(503,'The private preparation file failed verification.');return raw;
 }
 function rosterEdgeExportFilesNamed_(name){
- const folder=rosterFolder_(ROSTER_DATA),quote=value=>String(value).replace(/\\/g,'\\\\').replace(/'/g,"\\'"),query="'"+quote(ROSTER_DATA)+"' in parents and name = '"+quote(name)+"' and trashed = false",url='https://www.googleapis.com/drive/v3/files?supportsAllDrives=true&includeItemsFromAllDrives=true&pageSize=100&fields='+encodeURIComponent('files(id,name,size),nextPageToken,incompleteSearch')+'&q='+encodeURIComponent(query)+(folder.driveId?'&corpora=drive&driveId='+encodeURIComponent(folder.driveId):'&corpora=user');
+ const folder=rosterFolder_(ROSTER_DATA),quote=value=>String(value).replace(/\\/g,'\\\\').replace(/'/g,"\\'"),child=rosterEdgeExportImportFolder_(false),parents=[ROSTER_DATA,...(child?[child]:[])],query='('+parents.map(id=>"'"+quote(id)+"' in parents").join(' or ')+") and name = '"+quote(name)+"' and trashed = false",url='https://www.googleapis.com/drive/v3/files?supportsAllDrives=true&includeItemsFromAllDrives=true&pageSize=100&fields='+encodeURIComponent('files(id,name,size),nextPageToken,incompleteSearch')+'&q='+encodeURIComponent(query)+(folder.driveId?'&corpora=drive&driveId='+encodeURIComponent(folder.driveId):'&corpora=user');
  const value=rosterDriveJson_(rosterDriveRequest_(url,{},'export-file-recovery'),'export-file-recovery');if(!Array.isArray(value.files)||value.nextPageToken||value.incompleteSearch)error_(503,'The preparation recovery listing is incomplete.');return value.files.filter(file=>!file.name||file.name===name).sort((a,b)=>String(a.id).localeCompare(String(b.id)));
 }
 function rosterEdgeExportCreateImmutable_(name,raw,type='application/json'){
  const digest=rosterEdgeExportHash_(raw),bytes=Utilities.newBlob(raw).getBytes().length;
  for(const file of rosterEdgeExportFilesNamed_(name)){if(Number(file.size)!==bytes)continue;try{rosterEdgeExportPrivateText_({fileId:file.id,digest});return {fileId:file.id,digest};}catch(error){if(error.status!==503)throw error;}}
- const fileId=rosterCreateFile_(ROSTER_DATA,name,Utilities.newBlob(raw,type));return {fileId,digest};
+ const fileId=rosterCreateFile_(rosterEdgeExportImportFolder_(true),name,Utilities.newBlob(raw,type));return {fileId,digest};
 }
 function rosterEdgeExportCheckpointName_(binding,ordinal){return 'Roster import '+binding.sessionId+' checkpoint '+String(ordinal).padStart(5,'0')+'.json';}
 function rosterEdgeExportReadCheckpoint_(binding,ref){
@@ -189,19 +196,21 @@ function rosterEdgeExportCaptureV2_(binding){
   // With no recoverable source bytes, retain this identity and require restart.
   descriptor={...descriptor,state:'failed',failedAt:Date.now()};rosterEdgeExportSave_(descriptor);return descriptor;
  }
- const script=LockService.getScriptLock();if(!deployLock_(script,8000))error_(503,'A Roster save is finishing. Retry the same import.');let user,uploadStarted=false;
+ const folderId=rosterEdgeExportImportFolder_(true),script=LockService.getScriptLock();if(!deployLock_(script,8000))error_(503,'A Roster save is finishing. Retry the same import.');let user,raw,envelope;
  try{
   descriptor=rosterEdgeExportDescriptor_(binding);if(descriptor)return descriptor;
   const retained=new Set(Object.keys(props_().getProperties()).filter(key=>key.startsWith('ROSTER_EDGE_EXPORT:')||key.startsWith('ROSTER_EDGE_EXPORT_ABANDONED:')).map(key=>key.slice(key.indexOf(':')+1)));
   if(retained.size>=GSiSRosterImport.MAX_RETAINED_SESSIONS)error_(409,'Preparation has eight retained sessions. Reviewed archival and cleanup are required before a new capture; existing sessions remain resumable.');
   rosterEdgeAssertLegacyWrite_();user=typeof rosterNotificationLock_==='function'?rosterNotificationLock_():LockService.getUserLock();if(!deployLock_(user,8000))error_(503,'Notification delivery is finishing. Retry the same import.');
   descriptor={schema:2,...binding,state:'capturing',createdAt:Date.now(),sourceName:'Roster import '+binding.sessionId+' source.json'};rosterEdgeExportSave_(descriptor);
-  const snapshot=rosterEdgeSnapshot_(),envelope={schema:ROSTER_EXPORT_V2,...binding,sourceDigest:snapshot.sourceDigest,snapshot};
-  const raw=JSON.stringify(envelope);Object.assign(descriptor,{sourceDigest:snapshot.sourceDigest,sourceHash:rosterEdgeExportHash_(raw),sourceBytes:Utilities.newBlob(raw).getBytes().length,jobs:GSiSRosterImport.objectJobs(snapshot).length});if(descriptor.sourceBytes>67108864)error_(413,'The frozen source exceeds its 64 MiB bound.');rosterEdgeExportSave_(descriptor);
-  // The source JSON is the one upload that stays under the capture lock. It
-  // contains all mutable records and pinned references needed by later steps.
-  uploadStarted=true;descriptor.sourceFileId=rosterCreateFile_(ROSTER_DATA,descriptor.sourceName,Utilities.newBlob(raw,'application/json'));descriptor.state='captured';rosterEdgeExportSave_(descriptor);return {...descriptor,catalogue:rosterEdgeExportCatalogueV2_(envelope)};
- }catch(error){if(descriptor&&!uploadStarted){descriptor.state='failed';rosterEdgeExportSave_(descriptor);}throw error;}finally{if(user)deployUnlock_(user);deployUnlock_(script);}
+  const snapshot=rosterEdgeSnapshot_();envelope={schema:ROSTER_EXPORT_V2,...binding,sourceDigest:snapshot.sourceDigest,snapshot};
+  raw=JSON.stringify(envelope);Object.assign(descriptor,{sourceDigest:snapshot.sourceDigest,sourceHash:rosterEdgeExportHash_(raw),sourceBytes:Utilities.newBlob(raw).getBytes().length,jobs:GSiSRosterImport.objectJobs(snapshot).length});if(descriptor.sourceBytes>67108864)error_(413,'The frozen source exceeds its 64 MiB bound.');rosterEdgeExportSave_(descriptor);
+ }catch(error){if(descriptor){descriptor.state='failed';rosterEdgeExportSave_(descriptor);}throw error;}finally{if(user)deployUnlock_(user);deployUnlock_(script);}
+ // The snapshot bytes and hash are pinned. Slow Drive upload does not hold
+ // either live writer lock, and a lost acknowledgement reuses these bytes.
+ descriptor.sourceFileId=rosterCreateFile_(folderId,descriptor.sourceName,Utilities.newBlob(raw,'application/json'));
+ if(rosterEdgeExportAbandoned_(binding))error_(409,'This preparation was abandoned. Its uploaded source remains retained.');
+ descriptor.state='captured';rosterEdgeExportSave_(descriptor);return {...descriptor,catalogue:rosterEdgeExportCatalogueV2_(envelope)};
 }
 function rosterEdgeExportCatalogueV2_(envelope){
  return {jobs:GSiSRosterImport.objectJobs(envelope.snapshot),modelEntries:envelope.snapshot.index.entries||[],auditFiles:Object.fromEntries(Object.entries(envelope.snapshot.state.allocationAuditExports||{}).filter(([,value])=>value.archiveFileId).map(([date,value])=>[date,{archiveFileId:value.archiveFileId,...(value.archiveDigest?{archiveDigest:value.archiveDigest}:{}),...(value.archiveVersion!==undefined?{archiveVersion:value.archiveVersion}:{}),...(value.archiveRevision!==undefined?{archiveRevision:value.archiveRevision}:{})}]))};

@@ -6,6 +6,7 @@ on:
       - codex/roster-sre-fajt-r-calc
       - codex/roster-archive-cold-output
       - codex/roster-d1-import-resumable-prepare
+      - codex/roster-d1-google-backup
   workflow_dispatch:
 permissions:
   contents: read

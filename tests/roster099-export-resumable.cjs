@@ -9,13 +9,13 @@ function harness(){
  files.set('model',{name:'model',bytes:Buffer.from(JSON.stringify(model))});files.set('audit',{name:'audit',bytes:Buffer.from(JSON.stringify(archive)),revision:'r1',revisions:{r1:Buffer.from(JSON.stringify(archive))}});
  const blob=(value,type='application/json')=>{const b=Buffer.from(value);return {getBytes:()=>[...b],getDataAsString:()=>b.toString(),getContentType:()=>type};};
  const response=(body,status=200,headers={})=>{const b=Buffer.isBuffer(body)?body:Buffer.from(JSON.stringify(body));return {getResponseCode:()=>status,getAllHeaders:()=>headers,getContent:()=>[...b],getContentText:()=>b.toString()};};
- const scope={Date:class extends Date{constructor(...args){super(...(args.length?args:[now]));}static now(){return now;}},console,GSiSRosterImport:Import,GSiSEdgeStore:Store,ROSTER_DATA:'private',GSISRoster:{validate:v=>v},GSISRosterOperations:{validateState:v=>v,date:v=>v},Utilities:{newBlob:blob,gzip:b=>blob(zlib.gzipSync(Buffer.from(b.getBytes()))),base64Encode:b=>Buffer.from(b).toString('base64'),computeDigest:(_,value)=>[...crypto.createHash('sha256').update(Buffer.from(value)).digest()],DigestAlgorithm:{SHA_256:'sha256'}},props_:()=>({getProperty:k=>properties.get(k)||null,setProperty:(k,v)=>{assert(Buffer.byteLength(v)<9000);properties.set(k,v);},deleteProperty:k=>properties.delete(k),getProperties:()=>Object.fromEntries(properties)}),LockService:{getScriptLock:()=>({}),getUserLock:()=>({})},deployLock_:()=>{locks++;return true;},deployUnlock_:()=>{assert(locks>0);locks--;},error_:(status,message)=>{throw Object.assign(Error(message),{status});},rosterFolder_:()=>({}),rosterReadFile_:id=>{assert.equal(locks,0);assert(files.has(id));return files.get(id).bytes.toString();},rosterCreateFile_:(_folder,name,b)=>{assert(locks===0||name.endsWith('source.json'),'only source snapshot upload may hold production locks');const id='output-'+(++uploads);files.set(id,{name,bytes:Buffer.from(b.getBytes())});if(loseName&&name.includes(loseName)){loseName=null;throw Error('lost upload acknowledgement');}return id;},rosterDriveJson_:r=>JSON.parse(r.getContentText()),rosterDriveRequest_:(url,options={})=>{
+ const scope={Date:class extends Date{constructor(...args){super(...(args.length?args:[now]));}static now(){return now;}},console,GSiSRosterImport:Import,GSiSEdgeStore:Store,ROSTER_DATA:'private',GSISRoster:{validate:v=>v},GSISRosterOperations:{validateState:v=>v,date:v=>v},Utilities:{newBlob:blob,gzip:b=>blob(zlib.gzipSync(Buffer.from(b.getBytes()))),base64Encode:b=>Buffer.from(b).toString('base64'),computeDigest:(_,value)=>[...crypto.createHash('sha256').update(Buffer.from(value)).digest()],DigestAlgorithm:{SHA_256:'sha256'}},props_:()=>({getProperty:k=>properties.get(k)||null,setProperty:(k,v)=>{assert(Buffer.byteLength(v)<9000);properties.set(k,v);},deleteProperty:k=>properties.delete(k),getProperties:()=>Object.fromEntries(properties)}),LockService:{getScriptLock:()=>({}),getUserLock:()=>({})},deployLock_:()=>{locks++;return true;},deployUnlock_:()=>{assert(locks>0);locks--;},error_:(status,message)=>{throw Object.assign(Error(message),{status});},rosterFolder_:()=>({}),rosterFindFile_:(_folder,name)=>name==='Roster import files'?'import-folder':null,rosterReadFile_:id=>{assert.equal(locks,0);assert(files.has(id));return files.get(id).bytes.toString();},rosterCreateFile_:(folder,name,b)=>{assert.equal(locks,0,'all import uploads release both production locks');assert.equal(folder,'import-folder','new import files use the dedicated child folder');const id='output-'+(++uploads);files.set(id,{name,parents:[folder],bytes:Buffer.from(b.getBytes())});if(loseName&&name.includes(loseName)){loseName=null;throw Error('lost upload acknowledgement');}return id;},rosterDriveJson_:r=>JSON.parse(r.getContentText()),rosterDriveRequest_:(url,options={})=>{
   const u=new URL(url),path=u.pathname.split('/'),isRevision=path.includes('revisions'),id=decodeURIComponent(isRevision?path[path.indexOf('files')+1]:path.at(-1));
   if(u.pathname.endsWith('/files')){assert.equal(locks,0);const name=/name = '([^']+)'/.exec(u.searchParams.get('q')||'')?.[1];return response({files:[...files].filter(([,f])=>!name||f.name===name).map(([id,f])=>({id,name:f.name,size:String(f.bytes.length)}))});}
   const file=files.get(id);assert(file,'missing '+id);
   if(isRevision){const revision=path.at(-1);if(options.method==='patch'){assert(locks>0,'pin during capture');assert.equal(JSON.parse(options.payload).keepForever,true);pinned.push(id+':'+revision);return response({id:revision,keepForever:true});}assert.equal(locks,0);assert(pinned.includes(id+':'+revision));return response(file.revisions[revision]);}
   if(u.searchParams.get('alt')==='media'){assert.equal(locks,0);const range=/bytes=(\d+)-(\d+)/.exec(options.headers?.Range||'');if(range){const a=+range[1],b=+range[2];return response(file.bytes.subarray(a,b+1),206,{'Content-Range':`bytes ${a}-${b}/${file.bytes.length}`});}return response(file.bytes);}
-  assert(locks===0||u.searchParams.get('fields').includes('headRevisionId'));return response({id,size:String(file.bytes.length),parents:['private'],trashed:false,headRevisionId:file.revision});
+  assert(locks===0||u.searchParams.get('fields').includes('headRevisionId'));return response({id,size:String(file.bytes.length),parents:file.parents||['private'],trashed:false,headRevisionId:file.revision});
  }};
  vm.createContext(scope);vm.runInContext(fs.readFileSync('backend/RosterEdgeMigration.gs','utf8'),scope);scope.rosterEdgeSnapshot_=()=>{assert.equal(locks,2);captures++;const value=copy(snapshot);return {...value,sourceDigest:hash(JSON.stringify(value))};};
  const input={operation:'edgeExportManifest',requestId:'request',preparation:{ordinal:0,checkpoint:null}};
@@ -102,3 +102,47 @@ for(const afterHash of [false,true]){
  assert.equal(JSON.parse(h.properties.get('ROSTER_EDGE_EXPORT:'+binding.sessionId)).state,'failed');assert(h.call(h.input).requiresRestart);
 }
 console.log('PASS resumable export: frozen capture, immutable audit, immutable checkpoint replay, lost uploads, tamper refusal, retained restart and legacy polling.');
+// A missing import subfolder is created outside the live writer locks, then
+// every newly-created source/checkpoint/part inherits that private folder.
+{
+ const h=harness(),drive=h.scope.rosterDriveRequest_;let createdFolder=0;
+ h.scope.rosterFindFile_=()=>null;
+ h.scope.rosterDriveRequest_=(url,options={})=>{
+  if(options.method==='post'){
+   assert.equal(h.stats().locks,0);const metadata=JSON.parse(options.payload);
+   assert.deepEqual(metadata,{name:'Roster import files',mimeType:'application/vnd.google-apps.folder',parents:['private']});createdFolder++;
+   return {getContentText:()=>JSON.stringify({id:'import-folder'})};
+  }
+  return drive(url,options);
+ };
+ const first=h.call(h.input);assert.equal(createdFolder,1);assert(first.preparing);
+ assert([...h.files.values()].filter(file=>file.name.startsWith('Roster import ')).every(file=>file.parents?.[0]==='import-folder'));
+}
+// Live saves may proceed during upload; those changes cannot enter the pinned
+// JSON, even before the initial source upload acknowledgement reaches us.
+{
+ const h=harness(),upload=h.scope.rosterCreateFile_,original=h.snapshot.state.rows[0].text;
+ h.scope.rosterCreateFile_=(folder,name,blob)=>{if(name.endsWith('source.json'))h.snapshot.state.rows[0].text='concurrent save during upload';return upload(folder,name,blob);};
+ const first=h.call(h.input),source=[...h.files.values()].find(file=>file.name.endsWith('source.json'));
+ assert.equal(JSON.parse(source.bytes).snapshot.state.rows[0].text,original);assert.equal(h.stats().locks,0);assert(h.finish(first).manifest);
+}
+// Existing root-folder checkpoints stay readable; unrelated private files do
+// not become selectable merely because their bytes have a matching digest.
+{
+ const h=harness(),first=h.call(h.input);
+ for(const file of h.files.values())if(file.name.startsWith('Roster import '))file.parents=['private'];
+ assert(h.finish(first).manifest);
+ h.files.set('outside',{name:'outside',parents:['unrelated-folder'],bytes:Buffer.from('{}')});
+ assert.throws(()=>h.scope.rosterEdgeExportPrivateText_({fileId:'outside',digest:hash('{}')}),error=>error.status===503);
+}
+console.log('PASS unlocked source upload, private import subfolder, pinned in-memory source and legacy root-folder compatibility.');
+
+// Restart can now run while an unlocked source upload is in flight. A late
+// upload keeps its evidence but must not recreate the abandoned descriptor.
+{
+ const h=harness(),upload=h.scope.rosterCreateFile_;let sessionId;
+ h.scope.rosterCreateFile_=(folder,name,blob)=>{if(name.endsWith('source.json')){sessionId=JSON.parse(blob.getDataAsString()).sessionId;assert(h.call({operation:'edgeExportAbandon',requestId:'request',resetRequestId:'during-upload'}).abandoned);}return upload(folder,name,blob);};
+ assert.throws(()=>h.call(h.input),error=>error.status===409&&/abandoned/.test(error.message));
+ assert.equal(h.properties.has('ROSTER_EDGE_EXPORT:'+sessionId),false);assert(h.properties.has('ROSTER_EDGE_EXPORT_ABANDONED:'+sessionId));
+ assert([...h.files.values()].some(file=>file.name.endsWith('source.json')),'late source upload remains retained evidence');
+}

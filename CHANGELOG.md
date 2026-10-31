@@ -1,3 +1,9 @@
+## Pending: D1 Google backup and verified switch-back (Model: Codex)
+
+Roster D1 revisions now queue immutable Google backup generations in the PR #19 split format, with native readers/writers for restoration, command receipts and object/source workbook preservation. Setup and System Health show backup lag. Switch-back requires paused, caught-up and digest-verified evidence. Google remains authoritative until a separately verified owner cutover; no deployment or live flag change is included.
+
+Import preparation releases production locks before upload and places new source/checkpoint/part files in a private subfolder while retaining old captures.
+
 # Resumable D1 import preparation — 31 October 2026
 
 Model: Codex. Queue row R replaces one long preparation call with a frozen snapshot, bounded preparation steps, immutable part files and a final manifest. D1 leases serialize steps and retain uncertain outcomes; retries use the same source and checkpoint. The setup page shows step progress and timing. Failed imports retain evidence and support an explicit, resumable restart. Allocation audit JSON now uses immutable versions so later exports cannot change a captured import source. Google remains authoritative; no activation, deployment or live data change is included. See [the task and verification](docs/coordination/tasks/roster-d1-import-resumable-prepare.md).

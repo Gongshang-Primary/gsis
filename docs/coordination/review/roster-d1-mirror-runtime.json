@@ -1,0 +1,324 @@
+{
+  "runtime": "local workerd via miniflare 4.20260730.0",
+  "fixtureBytes": 15290116,
+  "recordCount": 5009,
+  "receiptCount": 2,
+  "steps": 40,
+  "transferredBytes": 16345243,
+  "maximumBridgeBytes": 418878,
+  "bundleSha256": "197cb39c40a43a4e2faa00b0cd2437918a75fd36d2fa3792fd217d8416c6b00f",
+  "sampledPeakIsolateBytes": 71901074,
+  "maximumSampledCpuMs": 144.498,
+  "maximumWallMs": 149.71995900000184,
+  "measurements": [
+    {
+      "label": "freeze",
+      "wallMs": 149.71995900000184,
+      "sampledActiveMs": 144.498,
+      "requestPeakBytes": 1043777,
+      "samples": 90
+    },
+    {
+      "label": "page-1",
+      "wallMs": 101.81066599999758,
+      "sampledActiveMs": 88.861,
+      "requestPeakBytes": 23370575,
+      "samples": 276
+    },
+    {
+      "label": "page-2",
+      "wallMs": 74.28963899999508,
+      "sampledActiveMs": 70.272,
+      "requestPeakBytes": 24646348,
+      "samples": 216
+    },
+    {
+      "label": "page-3",
+      "wallMs": 79.8435890000037,
+      "sampledActiveMs": 78.539,
+      "requestPeakBytes": 37329311,
+      "samples": 247
+    },
+    {
+      "label": "page-4",
+      "wallMs": 74.8325410000034,
+      "sampledActiveMs": 54.506,
+      "requestPeakBytes": 37329311,
+      "samples": 195
+    },
+    {
+      "label": "page-5",
+      "wallMs": 77.75374300000112,
+      "sampledActiveMs": 68.203,
+      "requestPeakBytes": 37275425,
+      "samples": 233
+    },
+    {
+      "label": "page-6",
+      "wallMs": 74.13613199999963,
+      "sampledActiveMs": 53.949,
+      "requestPeakBytes": 61010154,
+      "samples": 197
+    },
+    {
+      "label": "page-7",
+      "wallMs": 72.9855349999998,
+      "sampledActiveMs": 70.051,
+      "requestPeakBytes": 65668523,
+      "samples": 211
+    },
+    {
+      "label": "page-8",
+      "wallMs": 75.11897699999827,
+      "sampledActiveMs": 71.815,
+      "requestPeakBytes": 48939265,
+      "samples": 210
+    },
+    {
+      "label": "page-9",
+      "wallMs": 79.78059400000348,
+      "sampledActiveMs": 49.648,
+      "requestPeakBytes": 63699480,
+      "samples": 193
+    },
+    {
+      "label": "page-10",
+      "wallMs": 73.96087700000498,
+      "sampledActiveMs": 72.309,
+      "requestPeakBytes": 68360465,
+      "samples": 177
+    },
+    {
+      "label": "page-11",
+      "wallMs": 71.56979899999715,
+      "sampledActiveMs": 64.805,
+      "requestPeakBytes": 59046377,
+      "samples": 191
+    },
+    {
+      "label": "page-12",
+      "wallMs": 69.35520000000542,
+      "sampledActiveMs": 67.597,
+      "requestPeakBytes": 43492678,
+      "samples": 208
+    },
+    {
+      "label": "page-13",
+      "wallMs": 68.84790200000134,
+      "sampledActiveMs": 67.464,
+      "requestPeakBytes": 64940661,
+      "samples": 170
+    },
+    {
+      "label": "page-14",
+      "wallMs": 68.79909399999451,
+      "sampledActiveMs": 62.806,
+      "requestPeakBytes": 69601642,
+      "samples": 201
+    },
+    {
+      "label": "page-15",
+      "wallMs": 74.51200799999788,
+      "sampledActiveMs": 53.625,
+      "requestPeakBytes": 60154881,
+      "samples": 199
+    },
+    {
+      "label": "page-16",
+      "wallMs": 73.42496699999901,
+      "sampledActiveMs": 71.21,
+      "requestPeakBytes": 44817395,
+      "samples": 197
+    },
+    {
+      "label": "page-17",
+      "wallMs": 67.44429400000081,
+      "sampledActiveMs": 64.516,
+      "requestPeakBytes": 66106677,
+      "samples": 190
+    },
+    {
+      "label": "page-18",
+      "wallMs": 70.25596599999699,
+      "sampledActiveMs": 52.487,
+      "requestPeakBytes": 70765814,
+      "samples": 191
+    },
+    {
+      "label": "page-19",
+      "wallMs": 70.06126400000358,
+      "sampledActiveMs": 58.817,
+      "requestPeakBytes": 53829739,
+      "samples": 193
+    },
+    {
+      "label": "page-20",
+      "wallMs": 76.79215000000113,
+      "sampledActiveMs": 67.5,
+      "requestPeakBytes": 42610793,
+      "samples": 201
+    },
+    {
+      "label": "page-21",
+      "wallMs": 69.30059899999469,
+      "sampledActiveMs": 67.668,
+      "requestPeakBytes": 67243357,
+      "samples": 179
+    },
+    {
+      "label": "page-22",
+      "wallMs": 69.6381459999975,
+      "sampledActiveMs": 68.006,
+      "requestPeakBytes": 71901074,
+      "samples": 178
+    },
+    {
+      "label": "page-23",
+      "wallMs": 69.17919500000426,
+      "sampledActiveMs": 65.468,
+      "requestPeakBytes": 55155929,
+      "samples": 193
+    },
+    {
+      "label": "page-24",
+      "wallMs": 67.56323200000043,
+      "sampledActiveMs": 62.646,
+      "requestPeakBytes": 43847094,
+      "samples": 194
+    },
+    {
+      "label": "page-25",
+      "wallMs": 74.96455499999865,
+      "sampledActiveMs": 67.401,
+      "requestPeakBytes": 32905327,
+      "samples": 227
+    },
+    {
+      "label": "page-26",
+      "wallMs": 70.43951799999923,
+      "sampledActiveMs": 67.019,
+      "requestPeakBytes": 46110325,
+      "samples": 197
+    },
+    {
+      "label": "page-27",
+      "wallMs": 68.03731600000174,
+      "sampledActiveMs": 65.672,
+      "requestPeakBytes": 50773570,
+      "samples": 206
+    },
+    {
+      "label": "page-28",
+      "wallMs": 75.69954100000177,
+      "sampledActiveMs": 49.751,
+      "requestPeakBytes": 33031654,
+      "samples": 189
+    },
+    {
+      "label": "page-29",
+      "wallMs": 65.85812699999951,
+      "sampledActiveMs": 46.881,
+      "requestPeakBytes": 50913875,
+      "samples": 182
+    },
+    {
+      "label": "page-30",
+      "wallMs": 65.97834199999488,
+      "sampledActiveMs": 64.067,
+      "requestPeakBytes": 55573872,
+      "samples": 182
+    },
+    {
+      "label": "page-31",
+      "wallMs": 68.79070499999943,
+      "sampledActiveMs": 64.568,
+      "requestPeakBytes": 38908331,
+      "samples": 187
+    },
+    {
+      "label": "page-32",
+      "wallMs": 70.51445599999715,
+      "sampledActiveMs": 66.837,
+      "requestPeakBytes": 27733816,
+      "samples": 188
+    },
+    {
+      "label": "page-33",
+      "wallMs": 60.02149600000121,
+      "sampledActiveMs": 57.944,
+      "requestPeakBytes": 49070483,
+      "samples": 162
+    },
+    {
+      "label": "page-34",
+      "wallMs": 56.82000700000208,
+      "sampledActiveMs": 43.457,
+      "requestPeakBytes": 53733160,
+      "samples": 155
+    },
+    {
+      "label": "page-35",
+      "wallMs": 50.39831499999855,
+      "sampledActiveMs": 47.28,
+      "requestPeakBytes": 54755676,
+      "samples": 132
+    },
+    {
+      "label": "page-36",
+      "wallMs": 59.64349200000288,
+      "sampledActiveMs": 55.392,
+      "requestPeakBytes": 59416905,
+      "samples": 139
+    },
+    {
+      "label": "page-37",
+      "wallMs": 37.88144400000601,
+      "sampledActiveMs": 30.366,
+      "requestPeakBytes": 39376920,
+      "samples": 89
+    },
+    {
+      "label": "page-38",
+      "wallMs": 35.4794419999962,
+      "sampledActiveMs": 34.462,
+      "requestPeakBytes": 55446915,
+      "samples": 83
+    },
+    {
+      "label": "page-39",
+      "wallMs": 32.438921000000846,
+      "sampledActiveMs": 30.601,
+      "requestPeakBytes": 60106024,
+      "samples": 72
+    },
+    {
+      "label": "page-40",
+      "wallMs": 15.078617999999551,
+      "sampledActiveMs": 12.623,
+      "requestPeakBytes": 11497817,
+      "samples": 15
+    },
+    {
+      "label": "finish",
+      "wallMs": 9.819643000002543,
+      "sampledActiveMs": 8.746,
+      "requestPeakBytes": 11572029,
+      "samples": 10
+    },
+    {
+      "label": "status",
+      "wallMs": 5.860821999995096,
+      "sampledActiveMs": 3.299,
+      "requestPeakBytes": 11610673,
+      "samples": 7
+    },
+    {
+      "label": "next-generation",
+      "wallMs": 101.38747399999556,
+      "sampledActiveMs": 100.017,
+      "requestPeakBytes": 11677868,
+      "samples": 13
+    }
+  ],
+  "boundaries": "Synthetic real workerd/D1 run. Google is a local digest-verifying endpoint double, not Apps Script. Fixture seeding is outside measured isolate. CPU is inspector sampling; memory is sampled V8+embedder+backing storage, not process RSS. Live Google timing, account CPU tier, R2-object conversion and production acceptance are not certified. No deployment, live authority change or real messages."
+}

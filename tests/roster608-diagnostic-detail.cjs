@@ -91,6 +91,8 @@ for(const [options,action,phase] of [
  [{registerRaw:register,registerError:'Permission denied'},'rosterProfile','register-read'],
  [{registerRaw:'{"schema":'},'rosterProfile','register-json'],
  [{registerRaw:JSON.stringify({schema:2,revision:0,entries:[]})},'rosterProfile','register-schema'],
+ [{registerRaw:JSON.stringify({schema:1,format:'gsis-roster-operations-split-v1',revision:0,fields:[],parts:[]})},'rosterProfile','register-parts'],
+ [{registerRaw:register,modelRaw:JSON.stringify({schema:1,format:'gsis-roster-operations-split-v1',revision:0,fields:[],parts:[]})},'rosterRead','timetable-parts'],
  [{registerRaw:register,modelError:'Permission denied'},'rosterRead','timetable-read'],
  [{registerRaw:register,modelRaw:'{"layoutMode":'},'rosterRead','timetable-json'],
  [{registerRaw:register,modelRaw:'{}'},'rosterRead','timetable-validation']

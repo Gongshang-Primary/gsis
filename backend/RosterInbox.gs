@@ -3,17 +3,18 @@ function rosterInboxState_() {
   const id = props_().getProperty('ROSTER_INBOX_FILE') || rosterFindFile_(ROSTER_DATA, 'Roster WhatsApp Inbox.json');
   if (!id) return GSISRosterInbox.initial();
   try {
-    return GSISRosterInbox.validate(JSON.parse(rosterReadFile_(id)));
+    return GSISRosterInbox.validate(JSON.parse(typeof rosterNativeRead_==='function'?rosterNativeRead_(id):rosterReadFile_(id)));
   } catch (e) {
     if (e.status) throw e;
     error_(503, 'WhatsApp Inbox records could not be read.');
   }
 }
 function rosterInboxCommit_(state) {if(typeof rosterEdgeAssertLegacyWrite_==='function')rosterEdgeAssertLegacyWrite_();gsisRequireBackendRole_('roster');
-  const data = JSON.stringify(state);
-  if (data.length > 8000000) error_(507, 'WhatsApp Inbox records are full. Ask Admin to archive them before continuing.');
   const stored = props_().getProperty('ROSTER_INBOX_FILE'),
     id = stored || rosterFindFile_(ROSTER_DATA, 'Roster WhatsApp Inbox.json');
+  if(typeof rosterNativeSplitWrite_==='function'&&rosterNativeSplitWrite_(id,state,'ROSTER_INBOX_FILE'))return;
+  const data = JSON.stringify(state);
+  if (data.length > 8000000) error_(507, 'WhatsApp Inbox records are full. Ask Admin to archive them before continuing.');
   const saved = id ? (rosterDriveRequest_('https://www.googleapis.com/upload/drive/v3/files/' + encodeURIComponent(id) + '?uploadType=media&supportsAllDrives=true&fields=id', {
     method: 'patch',
     contentType: 'application/json; charset=UTF-8',

@@ -14,7 +14,7 @@ function host(overrides={}){
   scheduledRoster:async()=>{calls.push('allocate');return {notificationsQueued:0};},
   dispatchDailyEmploymentReports:async()=>{calls.push('mail');},
   diagnoseNotificationConnections:async()=>{calls.push('diagnostics');return {readOnly:true};},...overrides});
- vm.runInContext(fs.readFileSync('shared/roster-recovery-profile.js','utf8').replace('export function ','function '),scope);vm.runInContext(code,scope);
+ vm.runInContext(fs.readFileSync('shared/roster-recovery-profile.js','utf8').replace(/^export (?=(?:async )?function )/gm,''),scope);vm.runInContext(code,scope);
  return {scope,calls,errors,background,run:async(env={ROSTER_AUTOMATION_ENABLED:'true'})=>{await scope.worker.scheduled({scheduledTime:123},env,{waitUntil:p=>background.push(p)});await new Promise(setImmediate);}};
 }
 (async()=>{

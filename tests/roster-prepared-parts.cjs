@@ -3,7 +3,11 @@ const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('nod
 const {harness,decode}=require('./roster097-batch-backend.cjs');
 const copy=x=>JSON.parse(JSON.stringify(x)),hash=x=>crypto.createHash('sha256').update(x).digest('hex');
 function prepared(){
- const h=harness();let unpacks=0;h.scope.rosterOperationsState_=()=>h.state;h.scope.rosterOperationsPhase_=(_,fn)=>fn();h.scope.Utilities.base64Decode=x=>[...Buffer.from(x,'base64')];h.scope.Utilities.ungzip=b=>{unpacks++;return h.scope.Utilities.newBlob(zlib.gunzipSync(Buffer.from(b.getBytes())));};
+ const h=harness();
+ // The direct commit cases start with an existing single-file Google document.
+ // Real state reads also attach its storage metadata before a later write.
+ h.scope.rosterReadFile_=id=>{assert.equal(id,'operations');return '{"schema":1,"revision":0}';};
+ let unpacks=0;h.scope.rosterOperationsState_=()=>h.state;h.scope.rosterOperationsPhase_=(_,fn)=>fn();h.scope.Utilities.base64Decode=x=>[...Buffer.from(x,'base64')];h.scope.Utilities.ungzip=b=>{unpacks++;return h.scope.Utilities.newBlob(zlib.gunzipSync(Buffer.from(b.getBytes())));};
  const periodsKey=h.scope.rosterOperationsPlanDigest_(JSON.stringify(h.scope.rosterTimetableBatchPeriods_(h.model)));for(const entry of h.index.entries)entry.preparedTimings={modelFile:entry.modelFile,key:periodsKey};
  let packs=0;const gzip=h.scope.Utilities.gzip;h.scope.Utilities.gzip=b=>{packs++;return gzip(b)};
  return {...h,packs:()=>packs,unpacks:()=>unpacks,save(){const packed=h.scope.rosterOperationsPackPlans_(h.state);Object.assign(h.state,copy(packed));Object.assign(h.state,h.scope.rosterOperationsUnpackPlans_(h.state));h.scope.rosterTimetableBatchCommitEnd_(h.scope.rosterTimetableBatchCommitBegin_(h.state));return packed;}};

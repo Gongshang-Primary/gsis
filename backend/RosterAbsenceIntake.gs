@@ -13,7 +13,7 @@ function rosterAbsenceIntakeCheckOwner_(state){const owner=rosterAbsenceIntakeOw
 function rosterAbsenceIntakeFile_(){return props_().getProperty('ROSTER_ABSENCE_INTAKE_FILE')||rosterFindFile_(ROSTER_DATA,'Roster absence intake.json');}
 function rosterAbsenceIntakeState_(){
  const id=rosterAbsenceIntakeFile_();if(!id)return {schema:1,owner:rosterAbsenceIntakeOwner_(),revision:0,sequence:0,entries:[]};
- let state;try{state=JSON.parse(rosterReadFile_(id));}catch(_){error_(503,'Absence intake could not be read. Retry the same report.');}
+ let state;try{state=JSON.parse(typeof rosterNativeRead_==='function'?rosterNativeRead_(id):rosterReadFile_(id));}catch(_){error_(503,'Absence intake could not be read. Retry the same report.');}
  if(state?.schema!==1||!Number.isSafeInteger(state.revision)||!Number.isSafeInteger(state.sequence)||!Array.isArray(state.entries)||state.entries.length>12000)error_(503,'Absence intake records need administrator review.');
  const ids=new Set();for(const row of state.entries){if(!row||typeof row.id!=='string'||ids.has(row.id)||!Number.isSafeInteger(row.sequence)||row.sequence<1||row.sequence>state.sequence||typeof row.actor!=='string'||typeof row.digest!=='string'||!Array.isArray(row.dates)||!['pending','applied','needsReview','withdrawn'].includes(row.state))error_(503,'Absence intake records need administrator review.');ids.add(row.id);}
  rosterAbsenceIntakeCheckOwner_(state);return state;
@@ -23,8 +23,9 @@ function rosterAbsenceIntakeCommit_(state){if(typeof rosterEdgeAssertLegacyWrite
  // Keep unresolved commands. Old terminal entries retain their receipt identity
  // after their private recovery payload is compacted; a late retry stays safe.
  const cutoff=Date.now()-180*86400000;for(const row of state.entries)if(row.state==='applied'&&Date.parse(row.completedAt||row.acceptedAt)<cutoff){delete row.command;delete row.identity;delete row.claimId;delete row.claimExpiresAt;}
- const text=JSON.stringify(state);if(text.length>10000000||state.entries.length>12000)error_(507,'Absence intake is full. Ask Admin to archive completed reports.');
  const stored=props_().getProperty('ROSTER_ABSENCE_INTAKE_FILE'),id=stored||rosterAbsenceIntakeFile_();
+ if(typeof rosterNativeSplitWrite_==='function'&&rosterNativeSplitWrite_(id,state,'ROSTER_ABSENCE_INTAKE_FILE'))return;
+ const text=JSON.stringify(state);if(text.length>10000000||state.entries.length>12000)error_(507,'Absence intake is full. Ask Admin to archive completed reports.');
  const saved=id?(rosterDriveRequest_('https://www.googleapis.com/upload/drive/v3/files/'+encodeURIComponent(id)+'?uploadType=media&supportsAllDrives=true&fields=id',{method:'patch',contentType:'application/json; charset=UTF-8',payload:text},'absence-intake-commit'),id):rosterCreateFile_(ROSTER_DATA,'Roster absence intake.json',Utilities.newBlob(text,'application/json'));
  if(!stored)props_().setProperty('ROSTER_ABSENCE_INTAKE_FILE',saved);
 }
