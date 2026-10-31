@@ -29,5 +29,7 @@ if(process.env.GSIS_RUN_HISTORICAL_BENCHMARKS!=='1'){
  for(const [file,baseline] of Object.entries(comparisons))console.log(file,'HISTORICAL COMPARISON NOT RUN:',baseline,'— current behavior assertions remain selected.');
 }
 const files=readdirSync(__dirname).filter(n=>/\.(cjs|mjs)$/.test(n)&&!['run.cjs','dom-helper.cjs','preview-server.cjs','roster701-fixture.cjs','import708-fixture.cjs','roster701-adapter.cjs','roster701-operations-speed-browser.cjs','load-stapler-leases.cjs','load-backend-role.cjs'].includes(n)&&!historical[n]);
-let failed=0;for(const f of files){const r=spawnSync(process.execPath,[path.join(__dirname,f)],{encoding:'utf8',timeout:45000});console.log(f,r.status===0?'PASS':'FAIL');if(r.status!==0){failed++;console.log(r.stdout,r.stderr);}}
+// Production-size end-to-end programs need longer than the default per-program limit.
+const slow=new Map([['roster-d1-mirror-integration.mjs',180000]]);
+let failed=0;for(const f of files){const r=spawnSync(process.execPath,[path.join(__dirname,f)],{encoding:'utf8',timeout:slow.get(f)||45000});console.log(f,r.status===0?'PASS':'FAIL');if(r.status!==0){failed++;console.log(r.stdout,r.stderr);}}
 console.log(`${files.length-failed}/${files.length} current scripts passed`);process.exitCode=failed?1:0;
