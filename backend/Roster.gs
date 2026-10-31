@@ -196,7 +196,7 @@ function rosterIndex_(){
  rosterStage_('register-location');let id=props_().getProperty('ROSTER_INDEX_FILE');
  if(!id){rosterStage_('register-discovery');id=rosterFindFile_(ROSTER_DATA,'Roster register.json');}
  let x={schema:1,revision:0,entries:[],receipts:[]};
- if(id){rosterStage_('register-read');x=typeof rosterSplitReadDocument_==='function'?rosterSplitReadDocument_(id,false,false).value:JSON.parse(rosterReadFile_(id));rosterStage_('register-schema');if(x.schema!==1||!Array.isArray(x.entries)||!Number.isInteger(x.revision))error_(503,'Roster register needs review.');}
+ if(id){rosterStage_('register-read');const raw=typeof rosterNativeRead_==='function'?rosterNativeRead_(id,{json:'register-json',parts:'register-parts'}):rosterReadFile_(id);rosterStage_('register-json');x=JSON.parse(raw);rosterStage_('register-schema');if(x.schema!==1||!Array.isArray(x.entries)||!Number.isInteger(x.revision))error_(503,'Roster register needs review.');}
  if(typeof deployTrace_!=='undefined'&&deployTrace_?.rosterDiagnostic)deployTrace_.rosterSummary={...(deployTrace_.rosterSummary||{}),registerFound:!!id,revision:x.revision,timetables:x.entries.length};
  rosterStage_('register-ready');return x;
 }
@@ -219,7 +219,7 @@ function rosterModel_(entry){
  // are still read fresh; each cache hit parses a new object for this request.
  const key='gsis-roster-model:v1:'+entry.id+':'+entry.modelFile;
  try{const cached=CacheService.getScriptCache().get(key);if(cached)return GSISRoster.validate(JSON.parse(Utilities.ungzip(Utilities.newBlob(Utilities.base64Decode(cached),'application/x-gzip','roster-model.json.gz')).getDataAsString()));}catch(ignore){}
- rosterStage_('timetable-read');const raw=typeof rosterNativeRead_==='function'?rosterNativeRead_(entry.modelFile):rosterReadFile_(entry.modelFile);
+ rosterStage_('timetable-read');const raw=typeof rosterNativeRead_==='function'?rosterNativeRead_(entry.modelFile,{json:'timetable-json',parts:'timetable-parts'}):rosterReadFile_(entry.modelFile);
  rosterStage_('timetable-json');const parsed=JSON.parse(raw);rosterStage_('timetable-validation');const model=GSISRoster.validate(parsed);
  try{const packed=Utilities.base64Encode(Utilities.gzip(Utilities.newBlob(JSON.stringify(model),'application/json')).getBytes());if(packed.length<90000)CacheService.getScriptCache().put(key,packed,21600);}catch(ignore){}
  return model;

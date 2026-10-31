@@ -268,6 +268,8 @@ async function d1PrepareAllows(req,env){
 export default {async fetch(req,env,ctx){
  const u=new URL(req.url);
  if(u.pathname==='/api/venues-source')return json({ok:false,code:'RECOVERY_VENUES_SUSPENDED',error:'Venue occupancy export is paused during Roster recovery.'},503);
+ // Health validates the caller and current Google role before reading any D1 ownership metadata.
+ if(u.pathname==='/api/system-health')return systemHealthRoute(req,{...env,GSIS_REQUEST_ORIGIN:u.origin});
  try{env={...(typeof resolveRosterAuthorityEnvironment==='function'?await resolveRosterAuthorityEnvironment(env):rosterRecoveryEnvironment(env)),GSIS_REQUEST_ORIGIN:u.origin};}
  catch(error){return json({ok:false,code:error.code||'ROSTER_AUTHORITY_UNVERIFIED',error:error.message},error.status||503);}
  if(u.pathname.startsWith('/api/')&&!['/api/session','/api/logout'].includes(u.pathname))try{gsisApiSecret(env,'BRIDGE_SECRET');}catch(error){return json({ok:false,code:error.code,error:error.message},503);}
@@ -278,7 +280,6 @@ export default {async fetch(req,env,ctx){
  // pause and resume stay closed, so Google remains the only writer.
  if(u.pathname==='/api/edge/migration'&&!edgeRosterEnabled(env)&&!(await d1PrepareAllows(req,env)))return json({ok:false,code:'RECOVERY_MIGRATION_DISABLED',error:'Migration is disabled in this Roster restoration release.'},404);
  if(u.pathname==='/api/venues-source')return json({ok:false,code:'RECOVERY_VENUES_SUSPENDED',error:'Venue occupancy export is paused during Roster recovery.'},503);
- if(u.pathname==='/api/system-health')return systemHealthRoute(req,env);
  if(u.pathname.startsWith('/api/')&&!['/api/config','/api/session'].includes(u.pathname)){try{assertRecoveryWritable(env);}catch(error){return json({ok:false,code:error.code,error:error.message},503);}}
  if(u.pathname==='/api/venues-source'||/^\/api\/whatsapp\/(?:media|reports)\//.test(u.pathname)){try{const delegated=await forwardOperationalRequest(req,env,'roster');if(delegated!==undefined)return delegated;}catch(error){return json({ok:false,code:error.code,error:error.status<500?error.message:'The operational service could not be confirmed.'},error.status||503);}}
  if(u.pathname==='/api/whatsapp/webhook')return whatsappWebhook(req,env,ctx);
@@ -396,11 +397,12 @@ export async function systemHealthRoute(req,env){
  let who;try{who=await requestIdentity(req,env);}catch{return json({ok:false,error:'Sign in with your school account.'},401);}
  const raw=await req.text();if(enc.encode(raw).byteLength>4000)return json({ok:false,error:'Request too large.'},413);
  let input;try{input=JSON.parse(raw);if(!input||Array.isArray(input)||typeof input!=='object'||!['read','retryBackgroundJob','recordRecoveryCheckpoint','peerMailReview','reviewPeerMail'].includes(input.operation))throw Error();}catch{return json({ok:false,error:'Choose a supported health operation.'},400);}
+ const authorityEnv=env;env={...rosterRecoveryEnvironment(env),GSIS_REQUEST_ORIGIN:origin};
  try{
   if(['peerMailReview','reviewPeerMail'].includes(input.operation)){
    // The backend verifies current Admin authority under its notification lock.
    // This separate command cannot route into the retired operational authority.
-   const result=(await backend((typeof resolveRosterAuthorityEnvironment==='function'?await resolveRosterAuthorityEnvironment(env):rosterRecoveryEnvironment(env)),'rosterOperations',input,who,crypto.randomUUID())).result;
+   const result=(await backend(env,'rosterOperations',input,who,crypto.randomUUID())).result;
    if(!result?.ok)return json({ok:false,...safeHealthError(result),error:[401,403].includes(result?.status)?'Current Admin access is required.':'Colleague email review could not be confirmed. Retry the same action.'},[401,403].includes(result?.status)?403:result?.status||503);
    return json(result);
   }
@@ -409,14 +411,16 @@ export async function systemHealthRoute(req,env){
    if(input.operation!=='read')return json({ok:false,code:'RECOVERY_HEALTH_READ_ONLY',error:'Recovery health supports status reads only.'},400);
    // A fresh signed Google request checks current Contacts authority on every
    // read. Browser role claims and old D1 authority are never trusted.
-   const auth=(await backend((typeof resolveRosterAuthorityEnvironment==='function'?await resolveRosterAuthorityEnvironment(env):rosterRecoveryEnvironment(env)),'rosterOperations',{operation:'read',view:'intake',scope:'mine'},who,crypto.randomUUID())).result;
+   const authInput=authorityEnv.ROSTER_EDGE_AUTHORITY==='d1'?{operation:'edgeHealthAuthority'}:{operation:'read',view:'intake',scope:'mine'};
+   const auth=(await backend(env,'rosterOperations',authInput,who,crypto.randomUUID())).result;
    if(!auth?.ok)return json({ok:false,...safeHealthError(auth),error:'Current school authority could not be confirmed.'},[401,403].includes(auth?.status)?403:503);
    if(auth.data?.user?.smc!==true&&auth.data?.user?.admin!==true)return json({ok:false,error:'SMC or Admin access is required.'},403);
-   const snapshot={...await readSystemHealth(env,{jobsOnly:true}),googleBackup:await readRosterMirrorStatus(env)},jobs=new Set(['google-backup','allocation','notifications','received-reports','inbox','webhook','peer-mail','r2-cleanup','audit-export']);
+   const statusEnv=typeof resolveRosterAuthorityEnvironment==='function'?await resolveRosterAuthorityEnvironment(authorityEnv):env;
+   const snapshot={...await readSystemHealth(statusEnv,{jobsOnly:true}),googleBackup:await readRosterMirrorStatus(statusEnv)},jobs=new Set(['google-backup','allocation','notifications','received-reports','inbox','webhook','peer-mail','r2-cleanup','audit-export']);
    snapshot.jobs=snapshot.jobs.filter(row=>jobs.has(row.job));snapshot.recentFailures=snapshot.recentFailures.filter(row=>jobs.has(row.job));
    const reports={available:false,transportAvailable:false,href:'/'};let peerMailReviewAllowed=false;
    try{
-    const review=(await backend((typeof resolveRosterAuthorityEnvironment==='function'?await resolveRosterAuthorityEnvironment(env):rosterRecoveryEnvironment(env)),'rosterOperations',{operation:'read',view:'intake'},who,crypto.randomUUID())).result;
+    const review=(await backend(env,'rosterOperations',{operation:'read',view:'intake'},who,crypto.randomUUID())).result;
     if([401,403].includes(review?.status)||review?.ok&&review.data?.user?.smc!==true&&review.data?.user?.admin!==true)return json({ok:false,error:'Current SMC or Admin access is required.'},403);
     if(review?.ok&&(review.data?.user?.smc===true||review.data?.user?.admin===true)){
      peerMailReviewAllowed=review.data.user.admin===true;

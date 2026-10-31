@@ -2682,7 +2682,7 @@ function rosterIndex_(){
  rosterStage_('register-location');let id=props_().getProperty('ROSTER_INDEX_FILE');
  if(!id){rosterStage_('register-discovery');id=rosterFindFile_(ROSTER_DATA,'Roster register.json');}
  let x={schema:1,revision:0,entries:[],receipts:[]};
- if(id){rosterStage_('register-read');x=typeof rosterSplitReadDocument_==='function'?rosterSplitReadDocument_(id,false,false).value:JSON.parse(rosterReadFile_(id));rosterStage_('register-schema');if(x.schema!==1||!Array.isArray(x.entries)||!Number.isInteger(x.revision))error_(503,'Roster register needs review.');}
+ if(id){rosterStage_('register-read');const raw=typeof rosterNativeRead_==='function'?rosterNativeRead_(id,{json:'register-json',parts:'register-parts'}):rosterReadFile_(id);rosterStage_('register-json');x=JSON.parse(raw);rosterStage_('register-schema');if(x.schema!==1||!Array.isArray(x.entries)||!Number.isInteger(x.revision))error_(503,'Roster register needs review.');}
  if(typeof deployTrace_!=='undefined'&&deployTrace_?.rosterDiagnostic)deployTrace_.rosterSummary={...(deployTrace_.rosterSummary||{}),registerFound:!!id,revision:x.revision,timetables:x.entries.length};
  rosterStage_('register-ready');return x;
 }
@@ -2705,7 +2705,7 @@ function rosterModel_(entry){
  // are still read fresh; each cache hit parses a new object for this request.
  const key='gsis-roster-model:v1:'+entry.id+':'+entry.modelFile;
  try{const cached=CacheService.getScriptCache().get(key);if(cached)return GSISRoster.validate(JSON.parse(Utilities.ungzip(Utilities.newBlob(Utilities.base64Decode(cached),'application/x-gzip','roster-model.json.gz')).getDataAsString()));}catch(ignore){}
- rosterStage_('timetable-read');const raw=typeof rosterNativeRead_==='function'?rosterNativeRead_(entry.modelFile):rosterReadFile_(entry.modelFile);
+ rosterStage_('timetable-read');const raw=typeof rosterNativeRead_==='function'?rosterNativeRead_(entry.modelFile,{json:'timetable-json',parts:'timetable-parts'}):rosterReadFile_(entry.modelFile);
  rosterStage_('timetable-json');const parsed=JSON.parse(raw);rosterStage_('timetable-validation');const model=GSISRoster.validate(parsed);
  try{const packed=Utilities.base64Encode(Utilities.gzip(Utilities.newBlob(JSON.stringify(model),'application/json')).getBytes());if(packed.length<90000)CacheService.getScriptCache().put(key,packed,21600);}catch(ignore){}
  return model;
@@ -10067,7 +10067,7 @@ function rosterEdgeReferences_(c,adminVerified){
  return {contacts,adminVerified:adminVerified===true,contactsSource:rosterOperationsDigest_(contacts),checkedAt:new Date().toISOString()};
 }
 function rosterEdgeMigrationDispatch_(req,c){
- const p=req.input||{},op=p.operation;if(!['edgeExport','edgeExportManifest','edgeExportPart','edgeModel','edgeFence','edgeReferences','edgeContactCreate','edgeAudit','edgeExportAbandon'].includes(op))return null;if(op==='edgeContactCreate'){if(!c?.user?.rosterSMC&&!c?.user?.rosterAdmin)error_(403,'SMC or Admin access is required.');}else rosterEdgeAdmin_(c);
+ const p=req.input||{},op=p.operation;if(op==='edgeHealthAuthority')return {handled:true,result:{user:rosterOperationsAuthority_(c,req.identity)}};if(!['edgeExport','edgeExportManifest','edgeExportPart','edgeModel','edgeFence','edgeReferences','edgeContactCreate','edgeAudit','edgeExportAbandon'].includes(op))return null;if(op==='edgeContactCreate'){if(!c?.user?.rosterSMC&&!c?.user?.rosterAdmin)error_(403,'SMC or Admin access is required.');}else rosterEdgeAdmin_(c);
  if(op==='edgeExportManifest')return {handled:true,result:rosterEdgeExportManifest_(req)};
  if(op==='edgeExportPart')return {handled:true,result:rosterEdgeExportPart_(req)};
  if(op==='edgeExportAbandon')return {handled:true,result:rosterEdgeExportAbandon_(req)};
@@ -11120,9 +11120,12 @@ function rosterMirrorDispatch_(req,serviceVerified=false){
 /* GSIS_ROSTER_NATIVE_STORAGE_BEGIN */
 /* Native readers follow an installed split manifest only. These helpers never
  * convert a live single document or select a backup as a fallback. */
-function rosterNativeRead_(id){
- if(typeof rosterSplitReadDocument_==='function'){const read=rosterSplitReadDocument_(id);return read.text??JSON.stringify(read.value);}
- return rosterReadFile_(id);
+function rosterNativeRead_(id,stages){
+ const raw=rosterReadFile_(id);if(typeof rosterSplitAssemble_!=='function')return raw;
+ // Callers keep source I/O, JSON parsing and split-part verification distinct.
+ if(stages?.json)rosterStage_(stages.json);const root=JSON.parse(raw);
+ if(root?.format!=='gsis-roster-operations-split-v1')return raw;
+ if(stages?.parts)rosterStage_(stages.parts);return JSON.stringify(rosterSplitAssemble_(root,false,false).value);
 }
 function rosterNativeSplitWrite_(id,value,property){
  if(!id||typeof rosterSplitPrepareDocument_!=='function')return false;

@@ -18,7 +18,7 @@ function rosterEdgeReferences_(c,adminVerified){
  return {contacts,adminVerified:adminVerified===true,contactsSource:rosterOperationsDigest_(contacts),checkedAt:new Date().toISOString()};
 }
 function rosterEdgeMigrationDispatch_(req,c){
- const p=req.input||{},op=p.operation;if(!['edgeExport','edgeExportManifest','edgeExportPart','edgeModel','edgeFence','edgeReferences','edgeContactCreate','edgeAudit','edgeExportAbandon'].includes(op))return null;if(op==='edgeContactCreate'){if(!c?.user?.rosterSMC&&!c?.user?.rosterAdmin)error_(403,'SMC or Admin access is required.');}else rosterEdgeAdmin_(c);
+ const p=req.input||{},op=p.operation;if(op==='edgeHealthAuthority')return {handled:true,result:{user:rosterOperationsAuthority_(c,req.identity)}};if(!['edgeExport','edgeExportManifest','edgeExportPart','edgeModel','edgeFence','edgeReferences','edgeContactCreate','edgeAudit','edgeExportAbandon'].includes(op))return null;if(op==='edgeContactCreate'){if(!c?.user?.rosterSMC&&!c?.user?.rosterAdmin)error_(403,'SMC or Admin access is required.');}else rosterEdgeAdmin_(c);
  if(op==='edgeExportManifest')return {handled:true,result:rosterEdgeExportManifest_(req)};
  if(op==='edgeExportPart')return {handled:true,result:rosterEdgeExportPart_(req)};
  if(op==='edgeExportAbandon')return {handled:true,result:rosterEdgeExportAbandon_(req)};

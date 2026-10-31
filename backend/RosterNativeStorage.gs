@@ -1,8 +1,11 @@
 /* Native readers follow an installed split manifest only. These helpers never
  * convert a live single document or select a backup as a fallback. */
-function rosterNativeRead_(id){
- if(typeof rosterSplitReadDocument_==='function'){const read=rosterSplitReadDocument_(id);return read.text??JSON.stringify(read.value);}
- return rosterReadFile_(id);
+function rosterNativeRead_(id,stages){
+ const raw=rosterReadFile_(id);if(typeof rosterSplitAssemble_!=='function')return raw;
+ // Callers keep source I/O, JSON parsing and split-part verification distinct.
+ if(stages?.json)rosterStage_(stages.json);const root=JSON.parse(raw);
+ if(root?.format!=='gsis-roster-operations-split-v1')return raw;
+ if(stages?.parts)rosterStage_(stages.parts);return JSON.stringify(rosterSplitAssemble_(root,false,false).value);
 }
 function rosterNativeSplitWrite_(id,value,property){
  if(!id||typeof rosterSplitPrepareDocument_!=='function')return false;

@@ -45,7 +45,7 @@
 - Mirror an immutable generation of both operational scopes, their receipts and native object references. Record revisions transactionally, coalesce mirror work, and publish a complete Google generation only after verification.
 - Release quiesces and pauses all D1 writers, requires exact revision/digest catch-up, installs verified native pointers, then clears the Google fence. No live switch or configuration change is authorised in this task.
 - Include #32 follow-ups: release script/notification locks before source upload; keep source/checkpoint/part files in a Roster import files child folder.
-- #29 and #30 remain paused. Canonical code and generated copies, offline fixtures, System Health and edge setup are in scope. Claude reviews the exact head; owner merges.
+- #29 and #30 stay outside this row and resume after its green PR is ready, per the owner's latest continuation order. Canonical code and generated copies, offline fixtures, System Health and edge setup are in scope. Claude reviews the exact head; owner merges.
 - Claim is published on this task branch because automatic approval review previously rejected direct main claim updates. No PR is opened before the full Node and LORD suite passes.
 
 ## Implementation decisions
@@ -69,3 +69,13 @@ Owner's follow-up order: after this PR is ready, continue #19 cleanup, #30 and #
 Final local checks: 13 focused compatibility/integration programs passed, plus the 14M end-to-end native restoration fixture. The fresh workerd/D1 run processed 15,290,116 source bytes in 40 pages, sampled 71,901,074 bytes peak isolate memory, and 144.498 ms maximum sampled CPU. These are synthetic local runtime measurements; live Google timing remains an owner rehearsal gate.
 
 Integrated current main `5c202c0bcaffcfccb06b656802907771762ae01f`, preserving the v0.9.9d label update and new D1 design rule. Implementation and verification remain scoped to this Row D1 PR.
+
+Full CI at `40a80eae169a0b5807fa6b3bcdaf8cf2a16b6be5` rebuilt all 18 components and passed browser portability checks, then reported 900/905 Node scripts. LORD did not run because Node failed. The five failures cover idle authority fixtures, health authentication ordering, a prepared-write storage fixture, and legacy register diagnostics. This failed evidence is retained; the PR gate remains a fresh complete green run after correction.
+
+Preserved main `18a29d16a3426fd57c45a3e8341f84d44559c9f0`, which records the owner's v0.9.9d deployment and upcoming import rehearsal. This D1 backup implementation remains undeployed.
+
+CI corrections preserve the fail-closed D1 proof gate and make Google recovery explicit in the two retained-history idle fixtures. System Health now validates the caller before any D1 metadata read and uses a fresh, read-only Contacts authority projection that remains available behind the Google write fence. Native register/timetable readers again distinguish source-read, JSON and split-part failures. Focused checks cover revoked roles, a real fenced D1 health read and the unchanged native switch-back round trip. Full-suite rerun pending at the corrected head.
+
+Corrected-head local validation: all 18 components rebuilt, 88 Apps Script files parsed, and eight focused programs passed (the five CI failures, fenced health authority, authority-profile proof and mirror UI). The 14M native restoration integration also passed after the storage-reader change.
+
+The local LORD runner passed its non-browser groups before stopping at its Playwright check because no browser is installed here. This is not a full LORD pass; the complete browser-equipped CI run remains required.
