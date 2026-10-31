@@ -373,7 +373,12 @@ Files: roster-update/public/roster-settings-ui.js (section near "Subject familie
 **Planned change:**
 1. Inactive (`Active` not `Y`) teachers are excluded from: relief candidate lists (manual and colleague/peer pickers), auto-allocation and Auto-fill blanks, Report Absence teacher pickers, Manage Ad-hoc pickers, Daily Notify recipients and SMC/Admin role lists. They are not shown as "unavailable" rows; they are absent.
 2. Existing records stay: past absences, assignments, R history and notifications for that teacher remain visible in history, exports and statistics, labelled "(inactive)" where shown.
-3. A teacher made inactive with future relief already assigned: show an SMC warning on Assign Relief for each affected date ("Assigned teacher is now inactive") and treat the cover as needing review; never silently remove it.
+3. **Owner decision 31 Oct (1B):** a teacher made inactive with future relief already assigned: Roster removes those assignments automatically and re-runs auto-allocation for the freed periods.
+   - Scope: only periods not yet started (today's later periods and future dates). Started or completed duties stay as history.
+   - Protected work is not overridden by the re-run: other teachers' manual SMC choices and peer arrangements stay.
+   - Each removal writes an audit entry ("Removed: teacher inactive in Contacts") and shows on Assign Relief for that date.
+   - If the day was already published, the new allocation follows the normal publish and notify flow (SMC sees "changes not yet visible"; replacement teachers are notified when published). The inactive teacher receives no message.
+   - If no replacement is found, the period shows UNASSIGNED with an SMC alert.
 4. Propagation: after Contacts saves, Roster reflects the change on the next refresh; document the maximum delay and clear any directory cache on the Contacts change (or cap its age at 5 minutes).
 5. Tests: inactive teacher absent from each picker and from allocation; historical rows retained; future assignment flagged; reactivation restores availability.
 
