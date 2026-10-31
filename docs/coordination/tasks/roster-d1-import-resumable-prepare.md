@@ -54,6 +54,8 @@ Deployment gate: install the resumable exporter and immutable audit writer toget
 
 Full Node/LORD verification and Claude exact-head review remain required before merge. No deployment or authority change was performed. The claim-only PR is closed until full verification passes.
 
+The first complete CI run at `bc47d2b97d8769a0e0a0473c5961a9e47d7668f0` rebuilt all components and passed 896 of 897 Node scripts. The remaining legacy migration test did not emulate the now-required signed `edgeExportAbandon` acknowledgement. Its restart fixture is updated to exercise that acknowledgement and its session/reset bindings; the production cleanup guard remains enforced. LORD was not reached in that failed run. The final exact-head rerun and its result are recorded in PR #32.
+
 ## Handoff and verification
 
 `TZ=Asia/Singapore npm run build` rebuilt all 18 components. The 18 focused import, immutable-audit, recovery, preparation-control and UI programs pass. The full Node and LORD suite runs through the repository Actions workflow against the exact branch head, with the real Git history and browser. No unavailable local browser or packaging-history check is counted as passing.
