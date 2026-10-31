@@ -3,7 +3,7 @@ const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('nod
 const fixture=require('./roster701-fixture.cjs');
 const source=fs.readFileSync('roster-update/public/roster-operations-ui.js','utf8');
 const clone=value=>JSON.parse(JSON.stringify(value));
-async function setup({ordinary=false,inactiveOwn=false}={}){
+async function setup({ordinary=false,inactiveOwn=false,realPeople=false}={}){
  const f=fixture(),dom=new JSDOM('<main id="content"></main>',{url:'https://roster.test',runScripts:'outside-only',pretendToBeVisual:true}),w=dom.window;
  w.HTMLElement.prototype.scrollIntoView=function(){};w.confirm=()=>true;w.structuredClone=structuredClone;
  const NativeDate=w.Date;w.Date=class extends NativeDate{constructor(...args){super(...(args.length?args:[f.ctx.now]));}static now(){return f.ctx.now;}};
@@ -19,7 +19,7 @@ async function setup({ordinary=false,inactiveOwn=false}={}){
    return {saved:true,person:clone(created),revision:f.state.revision};
   }
   if(p.operation==='saveAdhoc')throw Error('Inactive contact must not be activated');
-  const view=f.O.view(f.state,f.ctx,p);view.people=clone(f.people);return clone(view);
+  const view=f.O.view(f.state,f.ctx,p);if(!realPeople)view.people=clone(f.people);return clone(view);
  }};
  vm.runInContext(source.replace('return {pages,render,unmount,','return {__test:{notifyTeachers,person},pages,render,unmount,'),dom.getInternalVMContext());
  const q=selector=>w.document.querySelector(selector),input=(selector,value)=>{q(selector).value=value;q(selector).dispatchEvent(new w.Event('input',{bubbles:true}));};
@@ -27,6 +27,17 @@ async function setup({ordinary=false,inactiveOwn=false}={}){
  return {f,w,dom,ctx,calls,q,input,wait,failNextCreation(){failCreation=true;},close(){w.RosterOpsUI.unmount();w.close();}};
 }
 (async()=>{
+ {
+  const h=await setup({realPeople:true});try{
+   await h.w.RosterOpsUI.render('Manage Ad-hoc relief',h.ctx);h.q('[data-add-contact]').click();h.input('[name=name]','External Known');
+   assert.equal(h.q('[name=mobile]').value,'','exact name matching does not depend on a mobile number');
+   assert.match(h.q('[data-duplicate-matches]').textContent,/External Known \(SRE\) \(inactive\)/,'real read projection includes the historical display suffix');
+   assert.equal(h.q('[data-create-contact]').disabled,true,'the inactive display suffix must not hide an exact TTb identity');
+   assert.equal(h.q('[data-distinct-label]').hidden,true,'an exact identity cannot be confirmed as a different person');
+   assert.equal(h.q('[data-reuse-contact=ext]'),null,'an inactive duplicate waits for activation in Contacts');
+   assert.equal(h.f.people.find(p=>p.id==='ext').name,'External Known (SRE)','matching never changes the stored Contacts name');
+  }finally{h.close();}
+ }
  {
   const h=await setup({ordinary:true,inactiveOwn:true});try{
    await h.w.RosterOpsUI.render('Report Absence',h.ctx);

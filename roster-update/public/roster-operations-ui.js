@@ -1607,8 +1607,10 @@ var RosterOpsUI = (() => {
   const ttb=()=>{const name=form.elements.name.value.trim(),modifier=form.elements.employment.value.trim()||'SRE';return name?(name.toLowerCase().endsWith('('+modifier.toLowerCase()+')')?name:name+' ('+modifier+')'):'';};
   const show=()=>{
    const mobile=normalMobile(form.elements.mobile.value),name=ttb();el.querySelector('[data-ttb-preview]').textContent=name||'Enter a name';
-   const matches=serverMatches||s.data.people.filter(p=>mobile&&normalMobile(p.mobile)===mobile||canonical(name)===canonical(p.name)||nameSimilarity(form.elements.name.value,p.name)>=.7).map(p=>({...p,match:mobile&&normalMobile(p.mobile)===mobile?'mobile':canonical(name)===canonical(p.name)?'ttbName':'similar'}));
-   const exact=matches.filter(p=>['mobile','timetableName','ttbName','nameExact'].includes(p.match)||canonical(p.name)===canonical(name));const conflict=new Set(exact.map(p=>p.id)).size>1,blocked=exact.length>0;
+   // Historical reads append this display suffix; Contacts identities stay unchanged.
+   const sameName=p=>canonical(name)===canonical(p.name)||p.active===false&&canonical(name)===canonical(String(p.name||'').replace(/ \(inactive\)$/,''));
+   const matches=serverMatches||s.data.people.filter(p=>mobile&&normalMobile(p.mobile)===mobile||sameName(p)||nameSimilarity(form.elements.name.value,p.name)>=.7).map(p=>({...p,match:mobile&&normalMobile(p.mobile)===mobile?'mobile':sameName(p)?'ttbName':'similar'}));
+   const exact=matches.filter(p=>['mobile','timetableName','ttbName','nameExact'].includes(p.match)||sameName(p));const conflict=new Set(exact.map(p=>p.id)).size>1,blocked=exact.length>0;
    box.innerHTML=(conflict?'<p class="error">The name and mobile identify different records. Correct them before continuing.</p>':'')+(matches.length?'<h4>Existing contacts</h4>'+matches.map(p=>'<div class="ops-duplicate"><div><strong>'+esc(p.name)+'</strong><span>'+esc(p.mobile||'No mobile')+' · '+esc(p.active?'Already active in the system':'Inactive')+'</span><small>'+esc(['mobile','timetableName','ttbName','nameExact'].includes(p.match)?'This identity already exists. A duplicate cannot be added.':'Similar name: check before adding.')+'</small></div>'+(p.active===false?'<small>Activate this contact in <a href="https://contacts.gsps.edu.sg" target="_blank" rel="noopener">Contacts</a> before selecting relief periods.</small>':'')+'</div>').join(''):'');
    el.querySelector('[data-distinct-label]').hidden=!matches.length||blocked;el.querySelector('[data-create-contact]').disabled=blocked;
    return {matches,blocked};

@@ -18,3 +18,6 @@ Owner: "policy update in deploy must update R but not retrospectively". A publis
 
 ## 31 Oct 2026: weekly R source (PR #29)
 Owner chose 3B: on publication Deploy writes calculated R to a versioned Cloudflare snapshot; Roster reads it at the Sunday 16:00 checkpoint. Claude's recorded caution: the snapshot is a second copy that can fail or lag independently of Google, so the checkpoint must verify the snapshot's Deploy publication id and revision, expose failure in System Health, and keep last week's verified R (never zero) if the snapshot is missing or stale.
+
+## 31 Oct 2026: Gemini joins; Claude coordinates
+Owner: "add gemini to agents, be coordinator of jobs and lanes." Gemini is a builder in isolated lanes (pilot: Contacts row C). Claude assigns jobs and lanes in LANES.md, writes prompts for the owner, and reviews every PR at its exact head. Codex keeps the Roster core and D1 lane. The owner still merges and deploys.

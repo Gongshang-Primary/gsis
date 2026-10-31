@@ -1,0 +1,24 @@
+const assert=require('node:assert/strict'),crypto=require('node:crypto');
+const Import=require('../shared/roster-import.js'),database=require('./helpers/chunked-import-db.cjs');
+const hash=value=>crypto.createHash('sha256').update(value).digest('hex');
+const binding={actor:'admin@example.test',requestId:'failure-reason',sessionId:hash('failure-reason')};
+(async()=>{
+ const db=database(),store=Import.open(db,binding);await store.reserve();const claim=await store.claimPreparation();
+ const reason={status:503,message:'The source upload was not acknowledged.',phase:'capture-upload',elapsed:41335};
+ await store.recordPreparationFailure(claim,reason);
+ let visible=await Import.open(db,binding).progress();assert.deepEqual(visible.failureReason,reason);assert.equal(visible.lastPhase,reason.phase);
+ assert.equal(visible.state,'preparing','uncertain transport failures retain the capture lease and remain resumable');
+ assert.equal((await store.preparationStatus()).busy,true);
+ db.sql.prepare('UPDATE gsis_roster_import_preparation SET lease_until=? WHERE session_id=?').run(Date.now()-1,binding.sessionId);
+ const takeover=await store.claimPreparation();assert(takeover.owned);
+ await store.recordPreparationFailure(claim,{...reason,message:'Stale failure must not replace current evidence.'});
+ assert.deepEqual((await store.progress()).failureReason,reason,'stale requests cannot replace failure evidence');
+ const failure={adminVerified:true,sessionId:binding.sessionId,requestId:binding.requestId,preparationFailed:true,requiresRestart:true,failureReason:{...reason,message:'The captured source file is missing.'},lastPhase:reason.phase};
+ await store.commitPreparation(takeover,failure);await store.failPreparation();
+ visible=await Import.open(db,binding).progress();assert.equal(visible.state,'failed');assert.deepEqual(visible.failureReason,failure.failureReason);assert.equal(visible.lastPhase,reason.phase);
+ assert.deepEqual((await store.evidence()).session.failureReason,failure.failureReason,'downloaded evidence includes the durable reason');
+ assert(!JSON.stringify(visible).includes('claim_token'),'progress keeps internal lease evidence private');
+ const second=Import.open(database(),{...binding,requestId:'invalid',sessionId:hash('invalid')});await second.reserve();const own=await second.claimPreparation();
+ await assert.rejects(second.commitPreparation(own,{...failure,sessionId:hash('invalid'),requestId:'invalid',failureReason:{...reason,message:'x'.repeat(801)}}),e=>e.code==='ROSTER_IMPORT_PREPARATION_RESULT');
+ console.log('PASS import failure reasons: retained transport lease, stale response fence, failed-session reload and evidence.');
+})().catch(e=>{console.error(e);process.exitCode=1;});

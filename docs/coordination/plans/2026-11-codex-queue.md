@@ -2,10 +2,13 @@
 
 Priority update 30 Oct 2026: build roster-operations-split-files (row S) first, then roster-d1-google-backup (row D1), before other rows.
 
+**31 Oct owner override: Follow-up R2 is the sole implementation priority.** PR #33 is merged as `eb2bcd4`. Pause #30, #29 and other ChatGPT work. Build `roster-d1-import-packed-capture.md` from current main as a separate PR. Full Node and LORD must pass before opening it. Claude reviews the exact head; owner merges. Do not restart the rehearsal import until R2 is merged and deployed.
+
 Quiet hours 30 Oct 2026 night (owner: "get as much deployable done as possible"; no bundles until the owner asks).
 - Merged tonight: #20 (2b2), #21 (collapsible TG exceptions), #22 (row 3 Excel), #23 (rows 5 and 6).
 - Claude built: row V phase 1 (#24), row 15b SIUE by specialism (#25).
 - **31 Oct 05:30 owner decision: option A first.** Codex next is **row A, roster-archive-cold-output.md** (archive machine output older than 30 days; keep all records). #19 is repurposed as the D1 backup format: do not enable split on live data.
+- **31 Oct 15:25 TOP PRIORITY: row R2** (capture serialises packed state; record failure reasons). Rehearsal 2 failed at capture (41 s). See the R2 section in roster-d1-import-resumable-prepare.md. Pause row D1 work only if R2 needs the same files; otherwise R2 first, then continue D1.
 - **31 Oct 12:50 OWNER ORDER: D1 first ("switch to D1 asap").** Codex works only the D1 path until the switch, in this order:
   1. **Row R** `roster-d1-import-resumable-prepare.md` (import fits the Apps Script limit).
   2. **Row D1** `roster-d1-google-backup.md` (Google backup in split files plus switch-back; reuse #19's split read/write code as the backup format, do not enable split on live data).

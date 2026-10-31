@@ -71,3 +71,18 @@ Candidate verification failures remain retryable: a transient Drive read is not 
 The active branch claim and closed PR #32 remain the ownership record. An attempted claim-only update to main was rejected by automatic approval review because main changes require owner merge. No main ref was changed; this branch continues under the owner's explicit Row R assignment.
 
 Production authority is unchanged. The implementation adds no automatic activation or deployment. After row R is reviewed and owner-merged, row D1 owns backup and switch-back work. I, C and P remain paused until both D1 rows merge.
+
+## Follow-up R2 (owner 31 Oct 2026, top priority): capture fails on real data
+
+**Evidence (v0.9.9d live, rehearsal 2):** request 38201eec-4a7e-48f0-a211-a2b4792a5f73, session e604c542651362aa6d506ff5bd6fe1da8690a313e1472b64cab6aafcbbb03e33. Step 0 claimed 15:03:48 SGT; Apps Script Executions shows that doPost **Failed after 41.335 s** (not a 6-minute timeout). Lease expired 15:10:48; the 15:15 retry found no source file (Drive search: none named "Roster import e604c542…") and failed the session ("The frozen source is incomplete").
+
+**Probable cause (Claude, from source; error text not available):** `rosterEdgeSnapshot_` uses `rosterOperationsState_(true)`, whose Stapler plans, Stapler archives and allocation decision evidence are lazy facades over compressed payloads. `rosterEdgeExportCaptureV2_` then runs `JSON.stringify(envelope)`, which inflates every facade (measured 40 to 44 times on a full-school-day fixture, PR #17 review). Real data has 10 plans (1.09M packed) and 9 archives (0.76M packed), so the source can exceed the 64 MiB bound or Apps Script memory.
+
+**Required:**
+1. Capture serialises the **stored (packed) representation**: reuse `rosterOperationsStoredView_` (PR #18) or `rosterOperationsPackPlans_` plus `rosterAllocationAuditPack_`, so the source file is about the size of the operations file plus transport, inbox and leases.
+2. Later batch steps decompress packed plans and evidence only for the part they build (if D1 needs expanded objects), each within the step budget.
+3. Every failure records `failureReason` (status, message, phase, elapsed) in the descriptor and D1 session; edge-setup shows it. A killed execution records the last phase reached.
+4. Test fixture: production-shaped state with 10 compressed full-school-day Stapler plans, 9 archives and compressed audit evidence; assert source bytes stay within 1.5 times the packed operations size and the capture completes under the simulated budget.
+5. Capture releases production locks before the source upload (from the #32 review).
+
+**Interim:** do not restart the import until R2 is merged and deployed.

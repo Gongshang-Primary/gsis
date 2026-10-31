@@ -4,6 +4,10 @@ Inactive staff are unavailable for new relief, ad hoc engagement, peer choices a
 
 The same repair runs through Google and D1's guarded commit paths, with fresh Contacts data and deferred replacement when timetable, quota or attendance evidence is unavailable. D1 repair metadata remains readable after Google backup and switch-back. No authority change, activation or deployment is included. Verification and exact-head review remain in [the task](docs/coordination/tasks/roster-inactive-teacher.md).
 
+# Packed D1 import capture, Follow-up R2, 31 October 2026
+
+Model: Codex. Snapshot digesting and frozen-source serialization retain stored compressed Stapler plans and allocation evidence. Later steps expand only the selected plan; D1 retains compressed audit evidence and verifies it when a dated consumer needs it. Roster and notification locks release before source upload. Google descriptors and D1 sessions retain bounded failure details, and edge setup shows the failed phase and elapsed time. A production-shaped regression reproduces the old 92.53 MB expansion from 1.46 MB stored data; fixed capture writes 1.46 MB without decompression. See [the R2 task](docs/coordination/tasks/roster-d1-import-packed-capture.md). No deployment or authority change. After deployment, explicitly restart imports prepared before R2 because the source digest now describes stored bytes.
+
 ## Pending: D1 Google backup and verified switch-back (Model: Codex)
 
 Roster D1 revisions now queue immutable Google backup generations in the PR #19 split format, with native readers/writers for restoration, command receipts and object/source workbook preservation. Setup and System Health show backup lag. Switch-back requires paused, caught-up and digest-verified evidence. Google remains authoritative until a separately verified owner cutover; no deployment or live flag change is included.

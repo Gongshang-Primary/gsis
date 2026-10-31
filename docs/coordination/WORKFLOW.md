@@ -1,6 +1,6 @@
-# Two-model coordination
+# Model coordination (Codex, Gemini, Claude)
 
-Repository: helper-gsps/gsis. Owner and release decision: Song Wee. Models: Codex and Claude. Neither model is permanently the lead. The assigned implementer owns one task; the other reviews.
+Repository: helper-gsps/gsis. Owner and release decision: Song Wee. Models: Codex and Gemini (builders) and Claude (coordinator of jobs and lanes, architect and reviewer; owner directive 31 Oct 2026). Lanes and current assignments are in LANES.md. The assigned implementer owns one task; Claude reviews. Codex may review Claude's own PRs.
 
 ## Owner directives come first
 Song Wee's explicit instructions override the defaults in this file. Durable ones are recorded, dated, in OWNER_DIRECTIVES.md; read it at the start of every session. If a directive conflicts with this file, follow the directive and note the conflict in the task record.
@@ -13,9 +13,10 @@ Song Wee's explicit instructions override the defaults in this file. Durable one
 5. If scopes overlap, stop the overlapping work. Use the same implementer, narrow the scopes, or obtain an explicit handoff. A stale timestamp is not permission to take over.
 
 ## Implement
-- Label every commit and PR description with `Model: Claude` or `Model: Codex`. Both models share one GitHub identity, so the label is the only attribution.
+- Label every commit and PR description with `Model: Claude`, `Model: Codex` or `Model: Gemini`. All models share one GitHub identity, so the label is the only attribution.
+- Work only inside the lane assigned in LANES.md. A change that needs another lane's files stops and goes back to the coordinator.
 - Roster domain work is serial: only one open task may touch `shared/roster-*.js`, `backend/Code.gs`, `roster-update/public/` or the generated Roster/Deploy backends and Worker bundles at a time. Calendar, documentation and other products can run in parallel.
-- One task, one branch, one implementer. Use codex/<task-id> or claude/<task-id> and separate clones/worktrees.
+- One task, one branch, one implementer. Use codex/<task-id>, gemini/<task-id> or claude/<task-id> and separate clones/worktrees.
 - The reviewer does not edit the implementer's branch. Send findings for the implementer to fix. Transfer ownership explicitly before another model edits it.
 - Edit canonical sources and regenerate copies with the repository builders. Shared domain files, generated bundles, package metadata and release assembly count as overlapping scope even when UI files differ.
 - Keep changes bounded. Do not combine Calendar fixes and Roster migration in one PR. Preserve Google-first Roster authority.
