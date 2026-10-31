@@ -1,11 +1,11 @@
 # roster-d1-import-resumable-prepare: split D1 import preparation into steps under the Apps Script limit
 
-- Status: approved, **top priority** (owner 31 Oct 2026: "log for codex, re-prioritise as top priority")
+- Status: claimed; implementation planning and baseline verification in progress. **Top priority** by owner 31 Oct 2026.
 - Owner/model: Codex (builder)
 - Reviewer/model: Claude
 - Last updated (Asia/Singapore): 31 Oct 2026 12:35
 - Branch: codex/roster-d1-import-resumable-prepare
-- Base SHA: current main
+- Base SHA: 66983af9644a8d1f6095d6a93acffe2ba88f4d57
 - PR: none
 - Files/domains owned: backend/RosterEdgeMigration.gs (export manifest/part/resume), shared/roster-import.js (freeze in batches, progress), roster-update/public/edge-roster.js and edge-setup UI (step progress, timing), generated copies, tests.
 - Out of scope: activation, fencing, D1 authority; the Google-backup task.
@@ -34,3 +34,12 @@ Reference 6f550ae7-a19c-4087-9900-501c3ac8e2c1; D1 session created 12:14:00 SGT,
 
 ## After merge
 Owner deploys, then reruns the rehearsal import on a quiet day (explicit restart with a new request ID). Claude checks D1 against Google.
+
+## Implementation rulings
+
+- D1 coordinates preparation-step leases and accepted checkpoint pointers only. Production Roster stays Google-first; no authority flag changes.
+- A successful step releases its lease immediately. A timed-out call retains a lease through the Apps Script execution horizon; stale results cannot advance the D1 cursor.
+- Immutable Drive checkpoints hold large part maps. Script Properties retain only a small session locator. Finalization writes metadata, not a concatenated container.
+- Mutable audit archives require pinned Drive revisions. Frozen snapshot reads never substitute current archive bytes.
+- Native object compression and whole-scope identity/digest preparation are isolated stages, then part uploads are bounded. The production-size fixture must prove the simulated per-call budget. Live Drive latency remains a rehearsal gate.
+- Row I is paused at local checkpoint 24594853c5b621cf929e16fe27e9dfe09bc0c329. Its remote draft #30 is claim-only; no completed implementation or CI pass is claimed there.
