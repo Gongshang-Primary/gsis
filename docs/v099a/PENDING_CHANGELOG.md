@@ -411,4 +411,4 @@ Files: roster-update/public/roster-settings-ui.js (section near "Subject familie
 4. Test with a production-size fixture (16M state plus model and archive files) under a simulated 6-minute budget per call.
 5. Clean up the failed session's two D1 import locks on explicit restart (existing path); retain evidence.
 
-**Interim (Claude recommendation, owner to confirm):** do not retry the import until this is built, or until the nightly archive has reduced the file substantially.
+**Owner 31 Oct:** top priority for Codex; task `roster-d1-import-resumable-prepare.md` (queue row R). Do not retry the import until it is built and deployed.
