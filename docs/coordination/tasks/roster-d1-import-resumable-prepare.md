@@ -66,6 +66,8 @@ Further source review found that the new checkpoint validator ran before legacy-
 
 A hard termination before snapshot upload can leave only a capturing descriptor. Once the prior execution's D1 lease has elapsed, a retry searches for the frozen source and, if none exists, records a failed preparation requiring explicit restart. Tests reproduce missing source both before and after hash persistence. No retry reads live data under the old identity; uploaded sources with lost acknowledgements still recover normally.
 
+Candidate verification failures remain retryable: a transient Drive read is not proof that the source is absent. The regression injects a 503 after a lost upload acknowledgement, confirms the descriptor is retained, then completes from the original uploaded source without another capture.
+
 The active branch claim and closed PR #32 remain the ownership record. An attempted claim-only update to main was rejected by automatic approval review because main changes require owner merge. No main ref was changed; this branch continues under the owner's explicit Row R assignment.
 
 Production authority is unchanged. The implementation adds no automatic activation or deployment. After row R is reviewed and owner-merged, row D1 owns backup and switch-back work. I, C and P remain paused until both D1 rows merge.

@@ -35,6 +35,18 @@ function harness(){
  const h=harness();h.lose('source.json');assert.throws(()=>h.call(h.input),/lost upload/);const ready=h.finish();assert(ready.manifest);assert.equal(h.stats().captures,1,'unknown capture upload cannot reread live state');
 }
 {
+ const h=harness();h.lose('source.json');assert.throws(()=>h.call(h.input),/lost upload/);h.advance();
+ const read=h.scope.rosterEdgeExportPrivateText_;let failRead=true;
+ h.scope.rosterEdgeExportPrivateText_=(ref,...args)=>{
+  if(failRead&&h.files.get(ref.fileId)?.name.endsWith('source.json')){failRead=false;throw Object.assign(Error('temporary Drive read failure'),{status:503});}
+  return read(ref,...args);
+ };
+ assert.throws(()=>h.call(h.input),error=>error.status===503&&/temporary Drive/.test(error.message));
+ const descriptor=JSON.parse([...h.properties.entries()].find(([key])=>key.startsWith('ROSTER_EDGE_EXPORT:'))[1]);
+ assert.equal(descriptor.state,'capturing','an unreadable candidate does not prove the frozen source is missing');
+ assert(h.finish().manifest,'the next poll recovers the same uploaded source');assert.equal(h.stats().captures,1);assert.equal(h.stats().locks,0);
+}
+{
  const h=harness(),first=h.call(h.input);h.lose('work');const next={...h.input,preparation:first.preparation};assert.throws(()=>h.call(next),/lost upload/);const ready=h.finish(h.call(next));assert.equal(h.stats().captures,1);assert(ready.manifest);
 }
 {

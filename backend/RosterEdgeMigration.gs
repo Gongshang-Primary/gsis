@@ -181,7 +181,10 @@ function rosterEdgeExportCaptureV2_(binding){
  let descriptor=rosterEdgeExportDescriptor_(binding);if(descriptor){
   if(descriptor.state==='failed')return descriptor;
   if(descriptor.sourceFileId)return descriptor;
-  if(descriptor.sourceHash){for(const file of rosterEdgeExportFilesNamed_(descriptor.sourceName))if(Number(file.size)===descriptor.sourceBytes){try{rosterEdgeExportPrivateText_({fileId:file.id,digest:descriptor.sourceHash});return {...descriptor,sourceFileId:file.id};}catch(error){if(error.status!==503)throw error;}}}
+  let verificationError;
+  if(descriptor.sourceHash){for(const file of rosterEdgeExportFilesNamed_(descriptor.sourceName))if(Number(file.size)===descriptor.sourceBytes){try{rosterEdgeExportPrivateText_({fileId:file.id,digest:descriptor.sourceHash});return {...descriptor,sourceFileId:file.id};}catch(error){if(error.status!==503)throw error;verificationError=error;}}}
+  // An unreadable candidate is not evidence that the captured source is absent.
+  if(verificationError)throw verificationError;
   // A retry owns the next D1 step lease after the previous execution horizon.
   // With no recoverable source bytes, retain this identity and require restart.
   descriptor={...descriptor,state:'failed',failedAt:Date.now()};rosterEdgeExportSave_(descriptor);return descriptor;
