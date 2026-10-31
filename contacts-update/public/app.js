@@ -158,9 +158,9 @@ const newContactIds=new Set();
 $('addContactRow').onclick=()=>{if(!contactDataEditable()||dataLoading||dataSaving||dataRequest)return;const id='contact-'+crypto.randomUUID(),row={id,values:contactData.fields.map(()=>''),computed:contactData.fields.map(f=>['TTb Name','EO Appt Level'].includes(f))};contactData.rows.unshift(row);newContactIds.add(id);const i=contactData.fields.indexOf('Active');dataEdits.set(id+'|'+i,{id,field:'Active',expected:'',value:'Y'});if($('ttbFilter'))$('ttbFilter').value='';renderData();$('dataGrid').querySelector('[data-person="'+id+'"][data-field="'+contactData.fields.indexOf('Basic Name')+'"]')?.focus();};
 function renderData(){
  if(!contactData||!privileged())return;
- const filterText=($('ttbFilter')?.value||'').trim().toLowerCase();
+ const filterText=($('ttbFilter')?.value||'').normalize('NFKC').replace(/\s+/g,' ').trim().toLowerCase();
  let visibleRows=contactData.rows;
- if(filterText){const ttbIndex=contactData.fields.indexOf('TTb Name');if(ttbIndex>=0)visibleRows=contactData.rows.filter(r=>{const val=dataEdits.get(r.id+'|'+ttbIndex)?.value??r.values[ttbIndex];return String(val||'').toLowerCase().includes(filterText)});}
+ if(filterText){const ttbIndex=contactData.fields.indexOf('TTb Name');if(ttbIndex>=0)visibleRows=contactData.rows.filter(r=>{const val=dataEdits.get(r.id+'|'+ttbIndex)?.value??r.values[ttbIndex];return String(val||'').normalize('NFKC').replace(/\s+/g,' ').toLowerCase().includes(filterText)});}
  const renderDataData={...contactData,rows:visibleRows};
  renderStaffGrid('dataGrid',renderDataData,dataEdits,()=>{renderDataStatus()},dataLoading||dataSaving||!!dataRequest||!contactDataEditable());syncContactDataControls();
  renderDataStatus();
@@ -206,15 +206,14 @@ async function loadContactData(force=false){
   contactData=result;acceptContactViewState(result);
   if(contactDataEditable())$('dataGrid').querySelectorAll('[data-can-edit="true"]').forEach(input=>{if(input.tagName==='SELECT')input.disabled=false;else input.readOnly=false});
   progress.value=progress.max;
-  renderData();
   $('dataStatus').textContent='Ready · '+result.rows.length+' contacts · loaded in '+((Date.now()-started)/1000).toFixed(1)+'s'+(result.editable?'':' · read-only access');
  }catch(e){if(valid()){contactData=null;$('dataStatus').textContent=friendlyFailure(e)+' Showing read-only data. Use Reload to retry.';if(e.code==='CONTACTS_RECOVERY_REQUIRED')await showContactRecovery();}}
- finally{clearInterval(timer);dataFlight=null;dataLoading=false;if(token===credential&&state?.user.email===owner){progress.hidden=true;$('dataGrid').setAttribute('aria-busy','false');syncContactDataControls();}window.GSISTableRefresh?.();}})();
+ finally{clearInterval(timer);dataFlight=null;dataLoading=false;if(token===credential&&state?.user.email===owner){progress.hidden=true;$('dataGrid').setAttribute('aria-busy','false');syncContactDataControls();renderData();}window.GSISTableRefresh?.();}})();
  return dataFlight;
 }
 
 if($('ttbFilter')){
- $('ttbFilter').addEventListener('input',()=>renderData());
+ let filterDebounce;$('ttbFilter').addEventListener('input',()=>{clearTimeout(filterDebounce);filterDebounce=setTimeout(()=>renderData(),150);});
  $('ttbFilter').addEventListener('keydown',e=>{if(e.key==='Escape'){e.preventDefault();$('ttbFilter').value='';renderData();}});
 }
 $('reloadData').onclick=()=>{if(dataSaving||dataRequest){notice('Confirm the pending save with Retry Save changes before reloading.');return;}if(hasContactDrafts()&&!confirm('Discard unsaved data cells and load saved values?'))return;dataEdits.clear();if(contactData)contactData.rows=contactData.rows.filter(r=>!newContactIds.has(r.id));newContactIds.clear();dataRequest=null;loadContactData(true)};
