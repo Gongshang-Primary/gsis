@@ -399,3 +399,16 @@ Files: roster-update/public/roster-settings-ui.js (section near "Subject familie
 4. Test: filter "tan" shows only matching TTb names; an edit made, filtered away and saved is still saved.
 
 **Scope:** contacts-update/public/app.js and index.html only. Not deployed.
+
+### Roster D1 import: preparation exceeds the Apps Script 6-minute limit on the real file
+
+**Found (31 Oct 2026, owner rehearsal import, reference 6f550ae7-a19c-4087-9900-501c3ac8e2c1):** session created 12:14:00 SGT, stayed `preparing`, marked `failed` 12:24:23 after the 10-minute lease ("The frozen source is incomplete"). `rosterEdgeExportManifest_` runs in one Apps Script execution: read the 16.08M operations file and references, validate, read every model file and allocation audit archive, gzip and hash all parts, then upload one container file. On the real data this exceeds the 6-minute execution limit, so the run is killed before it can record failure. While it ran, Roster showed "temporarily unavailable" to the owner (Apps Script busy). D1 heads stayed legacy; Google unaffected.
+
+**Planned change:**
+1. Split preparation into resumable steps, each well under 6 minutes: (a) snapshot and digest under the lock; (b) freeze parts in batches, writing each part file and recording progress in the descriptor; (c) write the manifest last. Each page poll advances one step.
+2. Do not hold the user/notification lock longer than the snapshot read.
+3. Record timing per step in the descriptor and show it on edge-setup.
+4. Test with a production-size fixture (16M state plus model and archive files) under a simulated 6-minute budget per call.
+5. Clean up the failed session's two D1 import locks on explicit restart (existing path); retain evidence.
+
+**Interim:** do not retry the import until this is built, or until the nightly archive has reduced the file substantially. Owner: wait (31 Oct).
