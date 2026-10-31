@@ -12,3 +12,6 @@ Song Wee's standing instructions. They override WORKFLOW.md defaults. Newest fir
 | 29 Oct 2026 | Latest absence submission overwrites automatically (implemented in fc0abb9). | Roster policy |
 | 29 Oct 2026 | Publication timestamp shows time only, no publisher name. | Roster UI |
 | 28 Oct 2026 | Staging may use real (official, non-sensitive) staff data. | Staging |
+
+## 31 Oct 2026: Deploy policy changes and R
+Owner: "policy update in deploy must update R but not retrospectively". A published Deploy policy change applies to Roster R from the next weekly checkpoint (Sunday 16:00 for the coming week, PR #29). Captured weeks, past entitlement, cumulative R% history and completed duties never change. Unpublished drafts never reach Roster.
