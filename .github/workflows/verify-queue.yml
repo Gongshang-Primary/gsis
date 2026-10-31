@@ -2,11 +2,9 @@ name: Verify GSiS queue changes
 on:
   push:
     branches:
-      - codex/roster-operations-split-files
-      - codex/roster-sre-fajt-r-calc
-      - codex/roster-archive-cold-output
-      - codex/roster-d1-import-resumable-prepare
-      - codex/roster-d1-google-backup
+      - 'codex/**'
+      - 'gemini/**'
+      - 'claude/**'
   workflow_dispatch:
 permissions:
   contents: read
