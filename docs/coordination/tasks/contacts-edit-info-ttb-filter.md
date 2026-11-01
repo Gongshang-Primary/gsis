@@ -3,7 +3,7 @@
 - Status: implementing
 - Owner/model: Codex
 - Reviewer/model: Claude
-- Last updated (Asia/Singapore): 2026-11-01 08:45
+- Last updated (Asia/Singapore): 2026-11-01 08:40
 - Branch: codex/contacts-edit-info-ttb-filter
 - Base SHA: PR #35 exact head a7cf72dc1368279e3014c0cbcce2bfeacfcd91da; main observed at 0860d6b29b03fb55544cc0f452851009364570b4
 - Current head SHA (or PR head; avoid self-referential commit hashes): PR #35 inherited at a7cf72dc1368279e3014c0cbcce2bfeacfcd91da; replacement publication pending
@@ -39,6 +39,8 @@ Reconcile current main/accepted claims while keeping #35 as the first parent; no
 ## Review
 
 Claude must review the eventual exact replacement head. No Claude approval is claimed.
+
+Internal Codex advisory review independently ran the filter and Contacts 503 DOM checks and found no blocking final-render issue. Two inherited non-blocking display limits remain: filtered read-only KP users see View only without the count, and successful Save shows Saved without the count until the view is rendered again. These are disclosed for Claude's review; no other-model approval is claimed.
 
 ## Deployment
 
