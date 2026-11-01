@@ -3,10 +3,10 @@
 - Status: implementing
 - Owner/model: Codex
 - Reviewer/model: Claude
-- Last updated (Asia/Singapore): 2026-11-01 08:40
+- Last updated (Asia/Singapore): 2026-11-01 09:06
 - Branch: codex/contacts-edit-info-ttb-filter
 - Base SHA: PR #35 exact head a7cf72dc1368279e3014c0cbcce2bfeacfcd91da; main observed at 0860d6b29b03fb55544cc0f452851009364570b4
-- Current head SHA (or PR head; avoid self-referential commit hashes): PR #35 inherited at a7cf72dc1368279e3014c0cbcce2bfeacfcd91da; replacement publication pending
+- Current head SHA (or PR head; avoid self-referential commit hashes): inherited #35 at a7cf72dc1368279e3014c0cbcce2bfeacfcd91da; failed candidate 7d87e59d121420699f34d0db6dea7a4c10216f6e; Ready-status correction publication pending
 - PR: replacement for https://github.com/helper-gsps/gsis/pull/35, to be opened after the complete gate is green
 - User-authorised scope: owner transferred Row C from Gemini to Codex; start from #35 latest exact head, resolve Claude's three blocking review items, and open a replacement PR that supersedes #35.
 - Files/domains owned: contacts-update/public/app.js, contacts-update/public/index.html, tests/contacts-edit-info-filter.cjs, this task record.
@@ -35,12 +35,14 @@ Reconcile current main/accepted claims while keeping #35 as the first parent; no
 - Targeted checks passed: tests/contacts-edit-info-filter.cjs, tests/contacts-data-loading.cjs, tests/contacts410-save-ui.cjs, tests/contacts502-ui.cjs and tests/contacts503-ui.cjs, all with TZ=Asia/Singapore.
 - TZ=Asia/Singapore npm run test:lord: attempted; stopped at tests/gsis098h-background-ui.cjs because Chromium is absent. Earlier checks ran, but this is not a complete LORD pass.
 - Final local npm test was started after the reconciled build; browser-dependent scripts fail because Chromium is absent. The existing codex/** push workflow must complete the full Node and LORD suite on the exact published head before opening the replacement PR; its body will record the actual run and SHA.
+- Failed candidate evidence retained: https://github.com/helper-gsps/gsis/actions/runs/41257824948 at 7d87e59d121420699f34d0db6dea7a4c10216f6e. Build and six browser-portability checks passed; Node passed 910/912. tests/release18-loading.cjs and tests/review04-background-contacts.cjs failed because the final render replaced the existing unfiltered Ready completion message with Up to date. LORD did not execute after Node failed. No PR was opened for that candidate.
+- Correct the Contacts final render to preserve the load result message when unfiltered, while retaining the active filter's matching count after loading clears. Add Ready completion feedback to the new DOM regression. Both existing status regressions and the new assertion were observed failing, then passed after correction; the loading, immutable-save, 502 and 503 checks also passed. No existing tests were changed or weakened. Rebuild and repeat the complete exact-head gate before opening the replacement PR.
 
 ## Review
 
 Claude must review the eventual exact replacement head. No Claude approval is claimed.
 
-Internal Codex advisory review independently ran the filter and Contacts 503 DOM checks and found no blocking final-render issue. Two inherited non-blocking display limits remain: filtered read-only KP users see View only without the count, and successful Save shows Saved without the count until the view is rendered again. These are disclosed for Claude's review; no other-model approval is claimed.
+Internal Codex advisory review independently ran the filter and Contacts 503 DOM checks and found no blocking final-render issue. Follow-up advisory review of the Ready-status correction independently passed tests/release18-loading.cjs, tests/review04-background-contacts.cjs and tests/contacts-edit-info-filter.cjs, with no blocking finding. Two inherited non-blocking display limits remain: filtered read-only KP users see View only without the count, and successful Save shows Saved without the count until the view is rendered again. These are disclosed for Claude's review; no other-model approval is claimed.
 
 ## Deployment
 

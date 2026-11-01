@@ -63,6 +63,7 @@ const assert = require('node:assert/strict'), fs = require('node:fs'), vm = requ
     $('[data-page="data"]').click();
     await wait(() => $('#dataGrid').getAttribute('aria-busy') === 'false', 'Initial load should finish');
     assert.equal(rows().length, 3);
+    assert.match($('#dataStatus').textContent, /Ready · 3/, 'Unfiltered loading should retain its completion status');
     assert.equal(cell('alice', 1).readOnly, false, 'Admin cells should be editable after loading');
     assert.equal(cell('alice', 0).readOnly, true, 'Computed TTb names should remain read-only');
     assert.equal(cell('alice', 3).disabled, false, 'Editable selects should unlock too');

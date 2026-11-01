@@ -208,7 +208,10 @@ async function loadContactData(force=false){
   progress.value=progress.max;
   $('dataStatus').textContent='Ready · '+result.rows.length+' contacts · loaded in '+((Date.now()-started)/1000).toFixed(1)+'s'+(result.editable?'':' · read-only access');
  }catch(e){if(valid()){contactData=null;$('dataStatus').textContent=friendlyFailure(e)+' Showing read-only data. Use Reload to retry.';if(e.code==='CONTACTS_RECOVERY_REQUIRED')await showContactRecovery();}}
- finally{clearInterval(timer);dataFlight=null;dataLoading=false;if(token===credential&&state?.user.email===owner){progress.hidden=true;$('dataGrid').setAttribute('aria-busy','false');syncContactDataControls();renderData();}window.GSISTableRefresh?.();}})();
+ finally{clearInterval(timer);dataFlight=null;dataLoading=false;if(token===credential&&state?.user.email===owner){progress.hidden=true;$('dataGrid').setAttribute('aria-busy','false');syncContactDataControls();
+  const message=$('dataStatus').textContent;renderData();
+  if(!($('ttbFilter')?.value||'').trim())$('dataStatus').textContent=message;
+ }window.GSISTableRefresh?.();}})();
  return dataFlight;
 }
 
