@@ -1,11 +1,11 @@
 # roster-d1-cutover-freeze: freeze Google writers before the cutover snapshot, so activation cannot miss
 
-- Status: approved, **top priority for the D1 path** (owner 1 Nov 2026 04:00 chose option A: finish the rehearsal, then build the freeze before cutover)
+- Status: implementing, top priority. Owner assigned all open work to Codex on 1 November 2026.
 - Owner/model: Codex (builder)
 - Reviewer/model: Claude
 - Last updated (Asia/Singapore): 1 Nov 2026 04:05
 - Branch: codex/roster-d1-cutover-freeze
-- Base SHA: current main
+- Base SHA: 0627ba5613cf04badfc89156f34d32ba24a0c14a
 - PR: none
 - Lane: R (Roster core and D1), serial.
 
@@ -31,3 +31,11 @@
 - Cancel freeze restores normal writes.
 - Activation after a frozen import succeeds; activation after an unfrozen, changed source still refuses (existing safety).
 - Full suite (Node and LORD) green in the main checkout.
+
+## Owner execution order, 1 November 2026
+
+Codex implements F first, then rebases #30, then #29, then row P. Lane C takeover of #35 may run independently. The existing #30 and #29 drafts are temporarily closed, preserving their branches, to enforce one open lane-R PR. Claude reviews exact heads; the owner merges. No deployment, actual freeze, live authority change, school-data write or provider message is authorised by implementation testing.
+
+Owned scope: Roster Apps Script writer guards and migration controls, Worker background-job/status integration, edge setup and System Health, behavioral tests and generated backend/Worker copies. The cutover runbook handoff remains with Claude after F merges, as assigned in LANES.md.
+
+Verification gate: run npm run build before npm test after each branch switch; require the full Node and LORD suites green at the final remote head before opening the F PR. Current task head and evidence are recorded in the PR.
