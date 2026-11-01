@@ -2746,7 +2746,7 @@ function rosterModelResponse_(entry,p){const known=Array.isArray(p.knownModelIds
 function rosterFile_(folderId,name,blob){return rosterFindFile_(folderId,name)||rosterCreateFile_(folderId,name,blob);}
 function rosterInput_(fn){try{return fn()}catch(e){error_(400,e.message)}}
 function rosterDispatch_(req,c){gsisRequireBackendRole_('roster');
- if(!['edgeFreeze','edgeUnfreeze','edgeExport','edgeExportManifest','edgeExportPart','edgeExportAbandon','edgeModel','edgeFence','edgeReferences','edgeContactCreate','edgeAudit'].includes(req.input?.operation)&&!(req.action==='rosterOperations'&&req.input?.operation==='edgeHealthAuthority')&&typeof rosterEdgeAssertLegacyWrite_==='function')rosterEdgeAssertLegacyWrite_();
+ if(!['edgeFreeze','edgeUnfreeze','edgeExport','edgeExportManifest','edgeExportPart','edgeExportAbandon','edgeModel','edgeFence','edgeDrift','edgeReferences','edgeContactCreate','edgeAudit'].includes(req.input?.operation)&&!(req.action==='rosterOperations'&&req.input?.operation==='edgeHealthAuthority')&&typeof rosterEdgeAssertLegacyWrite_==='function')rosterEdgeAssertLegacyWrite_();
  if(typeof c?.user?.rosterSMC!=='boolean'){
   if(typeof deployTrace_!=='undefined'&&deployTrace_)deployTrace_.phase='contacts-authority';
   error_(503,'Contacts did not return verified Roster authority. Update the existing Contacts web app deployment.');
@@ -10109,13 +10109,16 @@ function rosterEdgeSnapshot_(){
  const state=rosterOperationsState_(true),transport=typeof rosterNotificationState_==='function'?rosterNotificationState_():null,index=rosterIndex_();
  if(transport){rosterNotificationOverlayWith_(state,transport);state.notificationTransport={};for(const key of ['cooldownUntil','cooldowns','leases','readyBatches','unmatchedReceipts','senderPacing','providerBackoff','retryAfter'])if(transport[key]!==undefined)state.notificationTransport[key]=transport[key];state.peerMail=transport.peerMail||[];state.deliveryEvents=transport.deliveryEvents||state.deliveryEvents;}
  if(typeof rosterInboxState_==='function'){const inbox=rosterInboxState_();state.inbox={schema:inbox.schema,revision:inbox.revision};for(const key of ['threads','messages','audit','receipts','deliveryEvents','alerts'])state['inbox'+key.charAt(0).toUpperCase()+key.slice(1)]=inbox[key]||[];}
- const properties=props_().getProperties();state.edgeStaplerLeases={};for(const key of Object.keys(properties))if(key.startsWith('ROSTER_STAPLER_LEASE:')){const date=key.slice('ROSTER_STAPLER_LEASE:'.length);try{state.edgeStaplerLeases[date]=JSON.parse(properties[key]);}catch(error){error_(503,'A dated planning lease is malformed. Repair it before migration.');}}
+ const properties=props_().getProperties();state.edgeStaplerLeases={};// Sort: getProperties() order is not stable between executions; the digest must not depend on it.
+ for(const key of Object.keys(properties).sort())if(key.startsWith('ROSTER_STAPLER_LEASE:')){const date=key.slice('ROSTER_STAPLER_LEASE:'.length);try{state.edgeStaplerLeases[date]=JSON.parse(properties[key]);}catch(error){error_(503,'A dated planning lease is malformed. Repair it before migration.');}}
  if(typeof rosterAbsenceIntakePending_==='function'){const pending=rosterAbsenceIntakePending_();if(pending?.blockedDates?.length)error_(409,'Finish the captured absence queue before exporting Roster authority. Unresolved report dates: '+pending.blockedDates.join(', ')+'. Resolve them in Manage school-wide absences.');}
  // Include all mutable writer domains, not merely the relief document counter.
  // Hash and freeze the stored view: serializing lazy facades expands every
  // historical plan and audit payload before the first upload can begin.
  const value={schema:1,state:typeof rosterOperationsStoredView_==='function'?rosterOperationsStoredView_(state):state,index};return {...value,sourceDigest:rosterOperationsDigest_(value)};
 }
+// Short-lived metadata (3-minute editor leases) that activation may tolerate when nothing else changed.
+const ROSTER_EDGE_EPHEMERAL_PARTS_=['edgeStaplerLeases'];
 function rosterEdgeSnapshotParts_(snapshot){
  const parts={};for(const key of Object.keys(snapshot.state))parts[key]=rosterOperationsDigest_(snapshot.state[key]).slice(0,16);parts.index=rosterOperationsDigest_(snapshot.index).slice(0,16);return parts;
 }
@@ -10149,9 +10152,13 @@ function rosterEdgeMigrationDispatch_(req,c){
  if(op==='edgeModel'){/* 0.9.9a: uploaded model files are immutable and each upload has a new ID; read the register only. Activation still re-checks the exact source digest under the writer fence. */if(typeof p.modelFile!=='string'||!p.modelFile)error_(400,'Reload the Roster import page and import again.');const entry=rosterIndex_().entries.find(row=>row.id===p.id);if(!entry)error_(404,'Baseline model not found.');if(entry.modelFile!==p.modelFile)error_(409,'A timetable model changed during import. Import again.');return {handled:true,result:{id:entry.id,model:rosterModel_(entry)}};}
  const script=LockService.getScriptLock();if(!deployLock_(script,8000))error_(503,'A Roster save is finishing. Retry migration.');let user;
  try{user=typeof rosterNotificationLock_==='function'?rosterNotificationLock_():LockService.getUserLock();if(!deployLock_(user,8000))error_(503,'Notification delivery is finishing. Retry migration.');const snapshot=rosterEdgeSnapshot_();if(op==='edgeExport'){rosterEdgeRememberSnapshotParts_(snapshot);if(typeof rosterAllocationAuditUnpack_==='function')rosterAllocationAuditUnpack_(snapshot.state);if(typeof rosterOperationsUnpackPlans_==='function')rosterOperationsUnpackPlans_(snapshot.state);return {handled:true,result:{...snapshot,adminVerified:true}};}
-  if(typeof p.sourceDigest!=='string'||p.sourceDigest!==snapshot.sourceDigest){const changed=rosterEdgeChangedParts_(snapshot,p.sourceDigest);error_(409,'The imported snapshot is no longer current. Legacy writers remain enabled; migrate the latest source before cutover.'+(changed?.length?' Changed since the snapshot: '+changed.join(', ')+'.':''));}
-  props_().setProperties({ROSTER_EDGE_AUTHORITY:'d1',ROSTER_EDGE_SOURCE_DIGEST:snapshot.sourceDigest,ROSTER_EDGE_FENCED_AT:new Date().toISOString()});
-  return {handled:true,result:{legacyWritesDisabled:true,sourceDigest:snapshot.sourceDigest,adminVerified:true,cutoverFreeze:rosterCutoverStatus_()}};
+  // Owner ruling 2 Nov 2026: only short-lived editing locks may differ. Every other part must
+  // match the imported snapshot's stored per-part fingerprints; without them the full digest decides.
+  let tolerated=[];
+  if(typeof p.sourceDigest!=='string'||!/^[a-f0-9]{64}$/.test(p.sourceDigest))error_(409,'The imported snapshot is no longer current. Legacy writers remain enabled; migrate the latest source before cutover.');
+  if(p.sourceDigest!==snapshot.sourceDigest){const changed=rosterEdgeChangedParts_(snapshot,p.sourceDigest);if(!(Array.isArray(changed)&&changed.length&&changed.every(part=>ROSTER_EDGE_EPHEMERAL_PARTS_.includes(part))))error_(409,'The imported snapshot is no longer current. Legacy writers remain enabled; migrate the latest source before cutover.'+(changed?.length?' Changed since the snapshot: '+changed.join(', ')+'.':''));tolerated=changed;}
+  props_().setProperties({ROSTER_EDGE_AUTHORITY:'d1',ROSTER_EDGE_SOURCE_DIGEST:p.sourceDigest,ROSTER_EDGE_FENCED_AT:new Date().toISOString(),...(tolerated.length?{ROSTER_EDGE_FENCE_TOLERATED:JSON.stringify({parts:tolerated,currentDigest:snapshot.sourceDigest,at:new Date().toISOString()})}:{})});
+  return {handled:true,result:{legacyWritesDisabled:true,sourceDigest:p.sourceDigest,toleratedParts:tolerated,adminVerified:true,cutoverFreeze:rosterCutoverStatus_()}};
  }finally{if(user)deployUnlock_(user);deployUnlock_(script);}
 }
 function rosterEdgeServiceMigrationDispatch_(req){
