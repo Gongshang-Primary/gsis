@@ -26,6 +26,7 @@ function fixture(options={}){
   if(p.operation==='edgeReferences')return Response.json({ok:true,data:{adminVerified:admin,contacts:{rosterPeople:[],rosterSMCIds:[],rosterAdminIds:[]}}});
   if(p.operation==='edgeExportManifest'){
    assert.equal(p.sessionId,sessionId);assert.equal(p.requestId,requestId);
+   if(options.failureReason)return Response.json({ok:false,status:503,error:'Roster is temporarily unavailable.',failureReason:options.failureReason});
    const ordinal=p.preparation?.ordinal;assert(Number.isInteger(ordinal));assert(ordinal===0?p.preparation.checkpoint===null:p.preparation.checkpoint.fileId===checkpoint(ordinal).fileId);
    const result=step(ordinal);
    if(options.holdFirst&&!held){held=true;await new Promise(resolve=>{release=resolve;});}
@@ -62,9 +63,14 @@ try{
 
  const timeout=fixture();timeout.lose();await assert.rejects(timeout.import(),/lost preparation response/);
  assert.equal((await timeout.store.preparationStatus()).busy,true,'ambiguous timeout retains its lease');
+ const timeoutReason=(await timeout.status()).importSession.failureReason;assert.equal(timeoutReason.message,'lost preparation response');assert.equal(timeoutReason.phase,'capture');assert.equal(timeoutReason.status,503);
  await timeout.import();assert.equal(timeout.manifestCalls().length,1,'retry waits while the previous execution could still run');
  now+=Import.PREPARATION_LEASE_MS+1;await timeout.import();assert.deepEqual(timeout.manifestCalls().map(p=>p.preparation.ordinal),[0,0]);
  assert.equal((await timeout.store.preparationStatus()).ordinal,1,'expired lease repeats only the uncommitted batch');
+ assert.equal((await timeout.status()).importSession.failureReason,undefined,'a successful retry clears the earlier attempt failure');
+
+ const failureReason={status:413,message:'The frozen source exceeds the capture bound.',phase:'capture-serialize',elapsed:41335},diagnostic=fixture({failureReason});
+ await assert.rejects(diagnostic.import(),/capture-serialize/);assert.deepEqual((await diagnostic.status()).importSession.failureReason,failureReason);assert.equal((await diagnostic.store.preparationStatus()).busy,true,'backend failures retain the lease until the execution horizon');
 
  const late=fixture({holdFirst:true}),old=late.import();while(!late.isHeld())await new Promise(setImmediate);
  now+=Import.PREPARATION_LEASE_MS+1;await late.import();late.release();await assert.rejects(old,e=>e.code==='ROSTER_IMPORT_PREPARATION_STALE');

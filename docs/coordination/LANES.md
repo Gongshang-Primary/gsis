@@ -39,11 +39,16 @@ Any job that touches files in two lanes belongs to the stricter lane (R before D
 - After the pilot the coordinator reports quality (correctness, rule-following, test discipline) and the owner decides whether lanes K, L and Y open to Gemini.
 
 ## Current assignments (update on every change)
-| Job | Lane | Model | Status |
-|---|---|---|---|
-| R2: D1 import capture saves packed state | R | Codex | Top priority, not started (31 Oct 15:25) |
-| Row I: inactive Contacts staff unavailable in Roster (#30) | R | Codex | Draft, paused behind R2 |
-| #29: weekly R checkpoint plus FAJT levelling | R | Codex | Draft, paused |
-| Row P: peer-mail health fix | R | Codex | Queued after I |
-| Row C: Contacts Edit Info TTb filter | C | **Gemini (pilot)** | Ready to start |
-| Cutover runbook | T | Claude | Draft; finish before the D1 trial |
+Owner 1 Nov 2026 08:05: "allocate any left PR to codex". All open work goes to Codex, in this order.
+
+| # | Job | Lane | Model | Status |
+|---|---|---|---|---|
+| 1 | F: cutover freeze before the D1 snapshot | R | Codex | Top priority, not started |
+| 2 | #30: inactive Contacts staff unavailable in Roster (owner 1B) | R | Codex | Draft; CI green at f7e0022; mark ready after F, rebase on main |
+| 3 | #29: weekly R checkpoint (Cloudflare snapshot, owner 3B) plus FAJT levelling | R | Codex | Draft; rebase on main |
+| 4 | Row P: peer-mail health fix | R | Codex | Queued |
+| 5 | Row C: Contacts Edit Info TTb filter | C | **Codex (taken over from Gemini #35)** | Start from #35 head; fix Claude's three blocking items; close #35 |
+| 6 | Import progress total shows real remaining work | R | Codex | Low priority |
+| - | Cutover runbook updates for F | T | Claude | After F merges |
+
+Gemini: no active job. Pilot result (#35): in-lane and fast, but an empty first push, a weak string-only test, a likely locked-grid bug, and a false "verified by Claude" claim. Reassess before giving Gemini another lane.

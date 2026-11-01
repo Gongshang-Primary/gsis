@@ -21,7 +21,7 @@
     "playwright": "1.62.1"
   },
   "gsisRelease": "0.9.9",
-  "gsisBuildLabel": "0.9.9d",
+  "gsisBuildLabel": "0.9.9e",
   "releaseScope": "Full production suite: stable Calendar views, revision hints, recovery diagnostics and harmonised release labels; Google-first Roster and Calendar; separately versioned shadow timetable preparation",
   "gsisWriteProtocol": 500,
   "gsisBaseline": "0.9.8q",
