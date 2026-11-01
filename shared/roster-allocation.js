@@ -235,7 +235,14 @@ var GSISRosterAllocation = (() => {
     if(old?.status==='ready'||old?.retryStopped===true){applicability();return {...old,captured:0};}
     // Ordinary allocation has no trusted source-attempt result. It may update
     // existing applicability, but cannot declare a source outage or freeze R.
-    if(proof===undefined){applicability();return {...checkpoint,status:'pending',captured:0,fallback:old?.fallback||0};}
+    if(proof===undefined){
+      applicability();const pending={...old,...checkpoint,status:'pending',captured:0,fallback:old?.fallback||0,retryNow:false,retryStopped:now>=retryUntil,at:ctx.iso,reason:'The scheduler did not supply checkpoint evidence.'};
+      // A signed scheduler still records its bounded attempt. Without this,
+      // accepted ticks remain perpetually due and cannot replay their receipt.
+      // Ordinary callers cannot make an attempt or freeze fallback quota.
+      if(ctx.service===true&&ctx.quotaCheckpointDue===true)s.quotaCheckpoints[week]=pending;
+      return pending;
+    }
     const firstSchoolDate=schoolDates[0],calendarPrefix=firstSchoolDate&&dates.filter(d=>d<=firstSchoolDate).every(d=>ctx.days[d]?.verified===true&&typeof ctx.days[d]?.schoolDay==='boolean');
     if(proof.week!==week||proof.cutoff!==cutoff||firstSchoolDate&&(!calendarPrefix||proof.schoolDate!==firstSchoolDate)){
       // Proof selection and the final Calendar must identify the same first

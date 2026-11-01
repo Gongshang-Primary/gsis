@@ -88,3 +88,12 @@ test('an unresolved Calendar stops at the final Monday checkpoint and cannot cap
  f.ctx.now+=3600000;f.ctx.iso=new Date(f.ctx.now).toISOString();f.ctx.days[week].verified=true;
  assert.equal(A.quotaCheckpointDue(f.state,f.ctx),false);A.captureQuotaCheckpoint(f.state,f.ctx);assert.equal(f.state.entitlements.length,0,'resolving the Calendar after cutoff cannot backfill R');
 });
+
+test('a signed scheduler missing proof records a bounded attempt without freezing R',()=>{
+ const f=setup();previous(f);delete f.ctx.quotaCheckpointEvidence;
+ const first=A.captureQuotaCheckpoint(f.state,f.ctx);assert.equal(first.status,'pending');assert.equal(first.retryStopped,false);assert(!f.state.entitlements.some(row=>row.week===week));assert.equal(A.quotaCheckpointDue(f.state,f.ctx),false);
+ f.ctx.now+=3600000;f.ctx.iso=new Date(f.ctx.now).toISOString();assert.equal(A.quotaCheckpointDue(f.state,f.ctx),true);
+ f.ctx.now=Date.parse(week+'T05:30:00+08:00');f.ctx.today=week;f.ctx.minute=330;f.ctx.iso=new Date(f.ctx.now).toISOString();
+ A.captureQuotaCheckpoint(f.state,f.ctx);assert.equal(A.quotaCheckpointDue(f.state,f.ctx),false);assert.equal(f.state.entitlements.filter(row=>row.week===week).length,0);
+ const ordinary=setup();delete ordinary.ctx.quotaCheckpointEvidence;ordinary.ctx.service=false;ordinary.ctx.quotaCheckpointDue=false;A.captureWeek(ordinary.state,ordinary.ctx,week);assert.deepEqual(ordinary.state.quotaCheckpoints,{});
+});
