@@ -1,0 +1,15 @@
+{
+  // Preparation only: preserve existing installation settings; no deployment is implied.
+  "name": "gsis-lord-jobs",
+  "main": "worker.mjs",
+  "compatibility_date": "2026-10-01",
+  "workers_dev": false,
+  "vars": {
+    "LORD_QUEUE_ENABLED": "false",
+    "LORD_QUEUE_DISPATCH": "false",
+    "LORD_BACKEND_URL": "https://script.google.com/macros/s/REPLACE_EXISTING_DEPLOYMENT/exec"
+  },
+  "d1_databases": [{"binding":"LORD_JOBS_DB","database_name":"gsis-lord-jobs","database_id":"REPLACE_DEDICATED_D1_ID"}],
+  "triggers": {"crons":["* * * * *"]}
+  // Set the existing first-party GSIS_SECRET as a Worker secret.
+}

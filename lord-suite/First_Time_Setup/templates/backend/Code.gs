@@ -528,6 +528,8 @@ function doPost(e) {
     metrics.action = requestActionForLog_(action, 'POST');
     requireProxySecret_(request.proxySecret);
 
+    if (action === 'queuecommand') return jsonResponse_(lordQueueCommand_(request));
+
     if (action === 'backgroundpreview' || action === 'backgroundapply') return jsonResponse_({ok:true,result:backgroundCommand_(request,action === 'backgroundapply')});
     if (action === 'backgroundack') return jsonResponse_({ok:true,result:acknowledgeBackgroundWarning_(request)});
 
@@ -6769,20 +6771,19 @@ function notificationPreferences_(request) {
   var contact = requireStaffContact_(request), config = whatsAppConfig_();
   return { enabled: contactHasConsent_(contact), schoolManaged: schoolWhatsAppAgreement_(), mobileAvailable: Boolean(contact.mobile),
     maskedMobile: contact.mobile ? '•••• ' + contact.mobile.slice(-4) : '',
-    serviceEnabled: Boolean(config.ready && config.teacherEnabled), teacher: contact.name };
+    serviceEnabled: Boolean(config.ready && config.teacherEnabled), teacher: contact.name, decisionRevision:lordQueuePreferenceRevision_(contact.email) };
 }
-function saveNotificationPreferences_(request) {
+function saveNotificationPreferences_(request, queueBinding) {
   var contact = requireStaffContact_(request);
   if (schoolWhatsAppAgreement_()) throw new Error('LORD operational WhatsApp notifications are managed under the school agreement.');
   if (typeof request.enabled !== 'boolean') throw new Error('Choose whether to receive WhatsApp notifications.');
   if (request.enabled && (!contact.mobile || request.consentConfirmed !== true)) throw new Error('Confirm your agreement and ask an administrator to add your mobile in Contacts column F.');
-  var current = teacherConsent_(contact.email), phoneHash = hashBookingValue_(contact.mobile, '');
-  if (!current || current.enabled !== request.enabled || current.phoneHash !== phoneHash) {
-    var writes = [];
-    queueEventRow_(writes, [Utilities.getUuid(), '', 'WHATSAPP_TEACHER_CONSENT', new Date(), contact.email,
-      JSON.stringify({ email: contact.email, enabled: request.enabled, phoneHash: phoneHash, authSub: request.authSub })]);
-    commitSurgicalUpdates_(writes);
-  }
+  // A successful direct save records a decision even when the value repeats:
+  // it must fence an older queued opposite choice.
+  var phoneHash = hashBookingValue_(contact.mobile, ''), writes = [];
+  queueEventRow_(writes, [queueBinding ? queueBinding.eventId : Utilities.getUuid(), '', 'WHATSAPP_TEACHER_CONSENT', new Date(), contact.email,
+    JSON.stringify({ email: contact.email, enabled: request.enabled, phoneHash: phoneHash, authSub: request.authSub, queue: queueBinding || null })]);
+  commitSurgicalUpdates_(writes);
   return notificationPreferences_(request);
 }
 function ownedBookingRow_(request) {
@@ -7389,4 +7390,93 @@ function gsisCustomLabel_(value,max) {
   if (typeof value!=='string' || !value.trim() || value.trim().length>max || /[\x00-\x1f]/.test(value)) throw gsisError_('GSIS_REFERENCE_INVALID','Enter a short activity or purpose name.');
   var name=value.trim();
   return name;
+}
+
+
+/* LORD queue phase 1: D1 owns the queue. Existing Google preference decision
+ * events supply exact application evidence; no job/status store is created here.
+ * No booking, loan, photo or provider-send executor is admitted in this phase. */
+function lordQueueCanonical_(value) {
+  if (value === null || typeof value !== 'object') return JSON.stringify(value);
+  if (Array.isArray(value)) return '[' + value.map(lordQueueCanonical_).join(',') + ']';
+  return '{' + Object.keys(value).sort().map(function(key) { return JSON.stringify(key) + ':' + lordQueueCanonical_(value[key]); }).join(',') + '}';
+}
+function lordQueueHash_(value) { return evidenceDigest_(lordQueueCanonical_(value)); }
+function lordQueuePreferenceRevision_(email) {
+  var rows = eventRowsOfType_('WHATSAPP_TEACHER_CONSENT').filter(function(row) { return eventPayload_(row).email === email; });
+  return rows.length ? String(rows[rows.length - 1][0]) : 'NONE';
+}
+function lordQueueExact_(value, keys) {
+  if (!value || typeof value !== 'object' || Array.isArray(value) || Object.keys(value).some(function(key) { return keys.indexOf(key) < 0; })) throw new Error('Unexpected LORD queue input.');
+}
+function lordQueueCommand_(request) {
+  try {
+    if (request.purpose !== 'lord-mutation-job-v1') throw new Error('Invalid LORD queue purpose.');
+    // A normal browser transaction proxy also knows the first-party secret.
+    // Require the service's mode/body signature so that route cannot impersonate
+    // another actor or inject backup records. Replays bind the same operation.
+    var signed = {};
+    Object.keys(request).forEach(function(key) { if (['action','proxySecret','serviceSignature'].indexOf(key) < 0) signed[key] = request[key]; });
+    if (!Number.isFinite(request.serviceTimestamp) || Math.abs(Date.now() - request.serviceTimestamp) > 60000 || !/^[a-f0-9]{64}$/.test(request.serviceSignature || '')) throw new Error('Invalid or expired LORD queue service signature.');
+    var signature = Utilities.computeHmacSha256Signature(lordQueueCanonical_(signed), LORD_CONFIG.PROXY_SECRET).map(function(b) { return ('0' + ((b + 256) % 256).toString(16)).slice(-2); }).join('');
+    var diff = 0; for (var n = 0; n < 64; n++) diff |= signature.charCodeAt(n) ^ request.serviceSignature.charCodeAt(n);
+    if (diff) throw new Error('Invalid LORD queue service signature.');
+    if (request.mode === 'backup') return {ok:true,result:lordQueueBackup_(request)};
+    if (['execute','status'].indexOf(request.mode) < 0) throw new Error('Unsupported LORD queue mode.');
+    lordQueueExact_(request.actor, ['email','sub']);
+    if (typeof request.actor.sub !== 'string' || !request.actor.sub || request.actor.sub.length > 200 || !/^[-a-z0-9._+]+@gsps\.edu\.sg$/.test(request.actor.email || '')) throw new Error('A verified school actor is required.');
+    lordQueueExact_(request.operation, ['action','payload']);
+    if (request.operation.action !== 'notificationPreferences') throw new Error('Unsupported LORD phase 1 operation.');
+    lordQueueExact_(request.operation.payload, ['enabled','consentConfirmed','expectedRevision']);
+    if (typeof request.operation.payload.enabled !== 'boolean' || typeof request.operation.payload.consentConfirmed !== 'boolean' || typeof request.operation.payload.expectedRevision !== 'string' || !request.operation.payload.expectedRevision || request.operation.payload.expectedRevision.length > 150 || /[\x00-\x1f]/.test(request.operation.payload.expectedRevision)) throw new Error('Explicit preference and consent values are required.');
+    if (!/^\d{13}-[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i.test(request.jobId || '')) throw new Error('Invalid LORD queue operation identity.');
+    var hash = lordQueueHash_({actor:request.actor,action:request.operation.action,payload:request.operation.payload});
+    if (hash !== request.payloadHash) throw new Error('LORD queue payload binding does not match.');
+    var p = {authEmail:request.actor.email,authSub:request.actor.sub,authIdentityType:'GSPS',enabled:request.operation.payload.enabled,consentConfirmed:request.operation.payload.consentConfirmed};
+    return {ok:true,result:withWriteLock_(function() {
+      // Check current contact permission under the same lock as the decision.
+      delete executionContext_().teacherConsents;
+      delete executionContext_().adminContacts;
+      requireStaffContact_(p);
+      var eventId = 'LQ-' + evidenceDigest_(request.jobId), row = eventRowById_(eventId);
+      if (row) {
+        var evidence = eventPayload_(row), binding = evidence.queue;
+        if (!binding || binding.jobId !== request.jobId || binding.payloadHash !== hash || binding.actor !== request.actor.sub || evidence.email !== request.actor.email) throw new Error('LORD operation identity was already used for different details.');
+        return {state:'APPLIED',jobId:request.jobId,payloadHash:hash,result:{enabled:evidence.enabled}};
+      }
+      // Absence of evidence cannot prove a delayed earlier execute will not arrive.
+      if (request.mode === 'status') return {state:'UNKNOWN',jobId:request.jobId,payloadHash:hash};
+      if (request.operation.payload.expectedRevision !== lordQueuePreferenceRevision_(request.actor.email)) throw new Error('The Google notification preference changed. Review the current choice before submitting another.');
+      if (schoolWhatsAppAgreement_()) throw new Error('LORD operational WhatsApp notifications are managed under the school agreement.');
+      if (p.enabled && (!requireStaffContact_(p).mobile || p.consentConfirmed !== true)) throw new Error('Confirm your agreement and add a mobile in Contacts.');
+      // Never execute a newly delivered command beyond the admission window.
+      if (Math.abs(Date.now() - Number(request.jobId.slice(0,13))) > 86400000) throw new Error('LORD queue operation is too old to execute. Reconcile its original receipt.');
+      executionContext_().historicalCommit = true;
+      saveNotificationPreferences_(p, {eventId:eventId,jobId:request.jobId,payloadHash:hash,actor:request.actor.sub});
+      return {state:'APPLIED',jobId:request.jobId,payloadHash:hash,result:{enabled:p.enabled}};
+    })};
+  } catch (error) {
+    var uncertain = Boolean(executionContext_().commitAttempted);
+    return {ok:false,code:uncertain ? 'UNKNOWN_OUTCOME' : 'QUEUE_REJECTED',error:uncertain ? 'Google application outcome is uncertain. Check the original operation.' : getErrorMessage_(error),status:uncertain ? 503 : 409,definite:!uncertain};
+  }
+}
+function lordQueueBackup_(request) {
+  var record = request.record;
+  if (!record || record.schema !== 1 || record.authority !== 'D1' || !/^\d{13}-[a-f0-9-]{36}$/i.test(record.jobId || '') || !Number.isInteger(record.version) || record.version < 1 || utf8Bytes_(JSON.stringify(record)) > 24000 || lordQueueHash_(record) !== request.digest) throw new Error('Invalid D1 LORD backup record.');
+  var folderId = PropertiesService.getScriptProperties().getProperty('LORD_QUEUE_BACKUP_FOLDER_ID');
+  if (!folderId) throw new Error('Configure a private LORD_QUEUE_BACKUP_FOLDER_ID.');
+  // Immutable name/content is the backup retry identity. This is a D1 copy,
+  // never an execution receipt or input to an automatic authority switch.
+  return withWriteLock_(function() {
+    var folder = DriveApp.getFolderById(folderId), name = 'LORD-job-' + record.jobId + '-v' + record.version + '.json';
+    var files = folder.getFilesByName(name), file;
+    if (files.hasNext()) {
+      file = files.next();
+      var existing = JSON.parse(file.getBlob().getDataAsString());
+      if (lordQueueHash_(existing) !== request.digest || files.hasNext()) throw new Error('LORD backup identity/content conflict requires reconciliation.');
+    } else file = folder.createFile(name, JSON.stringify(record,null,2), 'application/json');
+    // Verify stored content before permitting a D1 backup checkpoint or expiry.
+    if (lordQueueHash_(JSON.parse(file.getBlob().getDataAsString())) !== request.digest) throw new Error('LORD backup verification failed.');
+    return {jobId:record.jobId,version:record.version,digest:request.digest,fileId:file.getId()};
+  });
 }

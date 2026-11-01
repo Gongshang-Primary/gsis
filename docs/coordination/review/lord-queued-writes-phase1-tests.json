@@ -1,0 +1,449 @@
+{
+  "model": "Codex",
+  "base": "bb8d72d5c08925fe56b0131eee674a66a630a2d5",
+  "scope": "LORD queued writes phase 1; local preparation only",
+  "build": {
+    "command": "TZ=Asia/Singapore npm run build",
+    "exitCode": 0
+  },
+  "focused": [
+    {
+      "command": "TZ=Asia/Singapore node tests/lord-queued-writes.mjs",
+      "exitCode": 0
+    },
+    {
+      "command": "TZ=Asia/Singapore node tests/lord-queue-gateway.mjs",
+      "exitCode": 0
+    },
+    {
+      "command": "TZ=Asia/Singapore node tests/lord-queue-integration.mjs",
+      "exitCode": 0
+    },
+    {
+      "command": "TZ=Asia/Singapore node lord-suite/tests/queued-writes.cjs",
+      "exitCode": 0
+    },
+    {
+      "command": "TZ=Asia/Singapore node lord-suite/tests/run_frontend_141_checks.cjs",
+      "exitCode": 0
+    },
+    {
+      "command": "TZ=Asia/Singapore node tests/gsis098g-secret-edge.cjs",
+      "exitCode": 0
+    },
+    {
+      "command": "TZ=Asia/Singapore node tests/gsis098g-backend-secret.cjs",
+      "exitCode": 0
+    },
+    {
+      "command": "TZ=Asia/Singapore node tests/gsis098h-secret-diagnostics.cjs",
+      "exitCode": 0
+    },
+    {
+      "command": "TZ=Asia/Singapore node tests/lord-source-bridges.cjs",
+      "exitCode": 0
+    },
+    {
+      "command": "TZ=Asia/Singapore node tests/lord091a-component-patch.cjs",
+      "exitCode": 0
+    }
+  ],
+  "lordPrograms": {
+    "passed": 36,
+    "failed": 3,
+    "results": [
+      {
+        "command": [
+          "python3",
+          "tests/run_static_checks.py"
+        ],
+        "exitCode": 0
+      },
+      {
+        "command": [
+          "python3",
+          "tests/run_setup_checks.py"
+        ],
+        "exitCode": 0
+      },
+      {
+        "command": [
+          "node",
+          "tests/queued-writes.cjs"
+        ],
+        "exitCode": 0
+      },
+      {
+        "command": [
+          "node",
+          "tests/run_behavior_checks.cjs"
+        ],
+        "exitCode": 0
+      },
+      {
+        "command": [
+          "node",
+          "tests/run_image_checks.cjs"
+        ],
+        "exitCode": 0
+      },
+      {
+        "command": [
+          "node",
+          "tests/run_reload_checks.cjs"
+        ],
+        "exitCode": 0
+      },
+      {
+        "command": [
+          "node",
+          "tests/run_admin_whatsapp_checks.cjs"
+        ],
+        "exitCode": 0
+      },
+      {
+        "command": [
+          "node",
+          "tests/run_backend_settings_checks.cjs"
+        ],
+        "exitCode": 0
+      },
+      {
+        "command": [
+          "node",
+          "tests/gsis098g-shared-secret.cjs"
+        ],
+        "exitCode": 0
+      },
+      {
+        "command": [
+          "node",
+          "tests/run_worker_config_checks.cjs"
+        ],
+        "exitCode": 0
+      },
+      {
+        "command": [
+          "node",
+          "tests/run_backend_131_checks.cjs"
+        ],
+        "exitCode": 0
+      },
+      {
+        "command": [
+          "node",
+          "tests/run_backend_14_checks.cjs"
+        ],
+        "exitCode": 0
+      },
+      {
+        "command": [
+          "node",
+          "tests/run_property_policy_checks.cjs"
+        ],
+        "exitCode": 0
+      },
+      {
+        "command": [
+          "node",
+          "tests/run_maintenance_status_checks.cjs"
+        ],
+        "exitCode": 0
+      },
+      {
+        "command": [
+          "node",
+          "tests/gsis098h-background-work.cjs"
+        ],
+        "exitCode": 0
+      },
+      {
+        "command": [
+          "node",
+          "tests/gsis098h-background-ui.cjs"
+        ],
+        "exitCode": 1
+      },
+      {
+        "command": [
+          "node",
+          "tests/run_booking_speed_checks.cjs"
+        ],
+        "exitCode": 0
+      },
+      {
+        "command": [
+          "node",
+          "tests/run_evidence_upload_checks.cjs"
+        ],
+        "exitCode": 0
+      },
+      {
+        "command": [
+          "node",
+          "tests/run_frontend_14_checks.cjs"
+        ],
+        "exitCode": 0
+      },
+      {
+        "command": [
+          "node",
+          "tests/run_frontend_141_checks.cjs"
+        ],
+        "exitCode": 0
+      },
+      {
+        "command": [
+          "node",
+          "tests/starlord-refresh.cjs"
+        ],
+        "exitCode": 0
+      },
+      {
+        "command": [
+          "node",
+          "tests/run_refactor_checks.cjs"
+        ],
+        "exitCode": 0
+      },
+      {
+        "command": [
+          "node",
+          "tests/run_v18_checks.cjs"
+        ],
+        "exitCode": 0
+      },
+      {
+        "command": [
+          "node",
+          "tests/run_v18_frontend_checks.cjs"
+        ],
+        "exitCode": 0
+      },
+      {
+        "command": [
+          "node",
+          "tests/run_school_agreement_checks.cjs"
+        ],
+        "exitCode": 0
+      },
+      {
+        "command": [
+          "node",
+          "tests/run_school_frontend_checks.cjs"
+        ],
+        "exitCode": 0
+      },
+      {
+        "command": [
+          "node",
+          "tests/run_v17_checks.cjs"
+        ],
+        "exitCode": 0
+      },
+      {
+        "command": [
+          "node",
+          "tests/run_v17_operations.cjs"
+        ],
+        "exitCode": 0
+      },
+      {
+        "command": [
+          "node",
+          "tests/review_compatibility.cjs"
+        ],
+        "exitCode": 0
+      },
+      {
+        "command": [
+          "node",
+          "tests/run_reload_browser_checks.cjs"
+        ],
+        "exitCode": 0
+      },
+      {
+        "command": [
+          "node",
+          "tests/run_gsis_bridge_checks.cjs"
+        ],
+        "exitCode": 0
+      },
+      {
+        "command": [
+          "node",
+          "tests/gsis098d-sync-contention.cjs"
+        ],
+        "exitCode": 0
+      },
+      {
+        "command": [
+          "node",
+          "tests/run_gsis_contract_checks.cjs"
+        ],
+        "exitCode": 0
+      },
+      {
+        "command": [
+          "node",
+          "tests/gsis-independent-identity-review.cjs"
+        ],
+        "exitCode": 0
+      },
+      {
+        "command": [
+          "node",
+          "tests/gsis-reference-ui-browser.cjs"
+        ],
+        "exitCode": 1
+      },
+      {
+        "command": [
+          "node",
+          "tests/gsis-direct-entry.cjs"
+        ],
+        "exitCode": 0
+      },
+      {
+        "command": [
+          "node",
+          "tests/booking-remarks-return-browser.cjs"
+        ],
+        "exitCode": 1
+      },
+      {
+        "command": [
+          "node",
+          "tests/booking-open-checks.cjs"
+        ],
+        "exitCode": 0
+      },
+      {
+        "command": [
+          "node",
+          "tests/lord-admin-booking-recovery.cjs"
+        ],
+        "exitCode": 0
+      }
+    ],
+    "method": "All current LORD runner programs independently executed, preserving assertions; normal runner stops on first unavailable browser. Three browser failures are not passes."
+  },
+  "broadNodeAttempt": {
+    "command": "TZ=Asia/Singapore npm test",
+    "status": "running at evidence checkpoint; started from base, implementation proceeded concurrently, not an exact-final-tree verification",
+    "observedCompleted": 718,
+    "observedFailed": [
+      "absence080a-save-shortcut.cjs",
+      "absence718d-flow.cjs",
+      "asc0810-browser.cjs",
+      "baseline710-browser.cjs",
+      "calendar-stable-view-browser.cjs",
+      "calendar0810-birthday-responsive.cjs",
+      "calendar099-change-browser.cjs",
+      "contacts083-vcard-browser.cjs",
+      "contacts084-http-browser.cjs",
+      "deploy085-tg-review-browser.cjs",
+      "import708-browser.cjs",
+      "package.cjs",
+      "paid097-receipts-browser.cjs",
+      "release082-notify-ack-dashboard-browser.cjs",
+      "release082-teacher-daily-browser.cjs",
+      "release082-timetable-stacked-browser.cjs",
+      "release083-confirmed-suspensions-browser.cjs",
+      "release084-absence-browser.cjs",
+      "release084-confirmed-dates-browser.cjs",
+      "release084-ip-focus-browser.cjs",
+      "release084-report-transport-browser.cjs",
+      "release086-deploy-version-browser.cjs",
+      "release708-ui-browser.cjs",
+      "roster-absence-year-browser.cjs",
+      "roster-draft-absence-instructions-browser.cjs",
+      "roster-draft-auto-retry-browser.cjs",
+      "roster-draft-baseline-cache-browser.cjs",
+      "roster-draft-cell-save-browser.cjs",
+      "roster-draft-health-chart-browser.cjs",
+      "roster-external-prominent-ack-browser.cjs",
+      "roster-inbox-browser.cjs",
+      "roster-prepared-parts-browser.cjs",
+      "roster-report-picker-browser.cjs",
+      "roster080-batch-browser.cjs",
+      "roster081-day-ownership-browser.cjs",
+      "roster0811-cache-storage-browser.cjs",
+      "roster0811-school-absences-browser.cjs",
+      "roster0811-timetable-redraw-browser.cjs",
+      "roster0812-allocation-monitor-browser.cjs",
+      "roster082-email-settings-recovery-browser.cjs",
+      "roster082-inbox-images-browser.cjs",
+      "roster082-notify-performance-browser.cjs",
+      "roster082-notify-ui-browser.cjs",
+      "roster082-private-actions-browser.cjs",
+      "roster083-no-relief-ui-browser.cjs",
+      "roster083-notify-ack-browser.cjs",
+      "roster083-subject-settings-browser.cjs",
+      "roster084-consecutive-settings-browser.cjs",
+      "roster084-notify-status-browser.cjs",
+      "roster084-private-link-reuse-browser.cjs",
+      "roster085b-custom-toggle-browser.cjs",
+      "roster086-home-duty-browser.cjs",
+      "roster086-report-loading-browser.cjs",
+      "roster086a-confirmation-ui-browser.cjs",
+      "roster087-acknowledgement-ui.cjs",
+      "roster087-cache-storage-browser.cjs",
+      "roster087-shell-routing-browser.cjs",
+      "roster087-statistics-ui.cjs",
+      "roster088-notify-refresh-browser.cjs",
+      "roster089-cache-concurrency-browser.cjs",
+      "roster089-cache-storage-browser.cjs",
+      "roster089-receipt-refresh-browser.cjs",
+      "roster089a-home-timetable-browser.cjs",
+      "roster09-absence-selector-browser.cjs",
+      "roster09-batch-absence-browser.cjs",
+      "roster09-report-outcome-browser.cjs",
+      "roster090-mutual-grid-browser.cjs",
+      "roster093-allocation-cache-browser.cjs",
+      "roster093a-fast-report-browser.cjs",
+      "roster093a-local-report-browser.cjs",
+      "roster093b-peer-ui.cjs",
+      "roster096-absence-coverage-browser.cjs",
+      "roster097-batch-lifecycle-browser.cjs",
+      "roster097-batch-shell.cjs",
+      "roster098a-intake-flush-browser.cjs",
+      "roster098c-planner-shell.cjs",
+      "roster098d-choice-browser.cjs",
+      "roster098e-allocation-browser.cjs",
+      "roster098h-communication-display.cjs",
+      "roster098h-publication-ui.cjs",
+      "roster098h-stapler-domain-browser.cjs",
+      "roster098j-ui.cjs"
+    ],
+    "limitations": [
+      "Chromium unavailable locally",
+      "historical Git ancestry/comparison inputs unavailable locally",
+      "Root must run full Node/LORD CI against exact final remote tree"
+    ]
+  },
+  "review": {
+    "reviewedHead": "54f0cad11987606d64c2a0d18e8ed3d780f20a99",
+    "type": "fresh read-only internal review, does not replace Claude exact-head review",
+    "findingsFixedRedGreen": [
+      "Contacts revocation while awaiting writer lock",
+      "client timestamp skew bypassing preference conflict fence",
+      "newer successful direct no-op preference failing to fence queued opposite choice"
+    ],
+    "additionalRuling": "No authorize-before-enqueue Google roundtrip; bind caller-observed decisionRevision from existing preference GET as payload expectedRevision."
+  },
+  "sourceSha256": {
+    "lord-job-worker/worker.mjs": "a1eeccaa099b62a5c2b5c61b92b0847e8db53d1ac14e9a92627aadfcddf23a22",
+    "lord-job-worker/schema.sql": "6c64ce7a57dfe965f36e1ecf1e9baa3707dba563b281bbc109bf5ff6892c5112",
+    "lord-suite/Source/backend/Code.gs": "9fc5dc7e36dff4d0440c8a67bc63f850a158fbf27aeae5d138eb57cf74216dc9",
+    "lord-suite/Source/lord/_worker.js": "70085587644af601ac9b1fbda645904466a2a05aa130fa34ef20ab55391b640d",
+    "tests/lord-queued-writes.mjs": "dd0ab728889a244d537521e5ec7dddefaaeba866272d50dda6a379e738c45908",
+    "tests/lord-queue-gateway.mjs": "56c9a4e4fa9e3432f869e844dfe029c5fa584cc666b58d9f97b146bd97ce009f",
+    "tests/lord-queue-integration.mjs": "b58fdd7ab52c8b1f74173d65b47e188912683849277db94f0ee4bbbde2af0974",
+    "lord-suite/tests/queued-writes.cjs": "f88f8e84de6b4243fa63d59d4c5a9b65cc98db8608c32ade02d5d815215719c6",
+    "lord-suite/tests/run_frontend_141_checks.cjs": "85f9db5585c36ae5a4f1c2d787e9ce77968c978f0358b16eb00849f13c5613b7"
+  },
+  "deployed": false,
+  "liveRecordsChanged": false,
+  "providerSends": false
+}

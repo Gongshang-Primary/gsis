@@ -342,6 +342,47 @@ async function proxyTransaction(request, session, env) {
   return json(payload, response.ok ? 200 : 502, { 'Server-Timing': `backend;dur=${Math.max(0, Date.now() - backendStartedAt)}` });
 }
 
+// Optional phase-1 queue API; existing transaction/UI paths stay independent.
+async function proxyJob(request, session, env) {
+  if (!session) return json({ok:false,error:'Authentication required.'},401);
+  if (session.identityType === 'RELIEF' || !session.sub || !/^[-a-z0-9._+]+@gsps\.edu\.sg$/.test(session.email || '')) return json({ok:false,error:'School sign-in is required.'},403);
+  const url = new URL(request.url);
+  let input;
+  if (request.method === 'POST') {
+    if (request.headers.get('Origin') !== url.origin) return json({ok:false,error:'Same-origin request required.'},403);
+    if (url.pathname !== '/api/jobs') return json({ok:false,error:'Method not allowed.'},405);
+    if (Number(request.headers.get('Content-Length') || 0) > 8000) return json({ok:false,error:'Queue request too large.'},413);
+    const reader = request.body?.getReader();
+    const chunks = []; let bytes = 0;
+    if (reader) {
+      while (true) {
+        const {value,done} = await reader.read(); if (done) break;
+        bytes += value.byteLength;
+        if (bytes > 8000) { await reader.cancel(); return json({ok:false,error:'Queue request too large.'},413); }
+        chunks.push(value);
+      }
+    }
+    const raw = new Uint8Array(bytes); let offset = 0;
+    for (const chunk of chunks) { raw.set(chunk,offset); offset += chunk.byteLength; }
+    input = JSON.parse(new TextDecoder().decode(raw));
+    if (!input || !['enqueue','check'].includes(input.kind)) return json({ok:false,error:'Unsupported queue command.'},400);
+    if (input.kind === 'enqueue' && env.LORD_QUEUE_ENABLED !== 'true') return json({ok:false,error:'LORD queue admission is paused.',definite:true},503);
+  } else if (request.method === 'GET') {
+    input = url.pathname === '/api/jobs' ? {kind:'list',...(url.searchParams.has('cursor')?{cursor:url.searchParams.get('cursor')}:{})} : {kind:'status',jobId:decodeURIComponent(url.pathname.slice('/api/jobs/'.length))};
+  } else return json({ok:false,error:'Method not allowed.'},405);
+  if (!env.LORD_JOBS?.fetch) return json({ok:false,error:'The optional LORD jobs service is not configured.',definite:true},503);
+  const payload = JSON.stringify({purpose:'lord-job-gateway-v1',timestamp:Date.now(),nonce:crypto.randomUUID(),actor:{sub:session.sub,email:session.email},input});
+  const signature = Array.from(b64urlDecode(await hmac(payload,gsisApiSecret(env,'LORD_PROXY_SECRET'))),b=>b.toString(16).padStart(2,'0')).join('');
+  try {
+    const response = await env.LORD_JOBS.fetch(new Request('https://lord-jobs.internal/commands',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({payload,signature}),signal:AbortSignal.timeout(10000)}));
+    const result = await response.json();
+    if (!result || typeof result.ok !== 'boolean') throw Error('Unreadable queue receipt.');
+    return json(result,response.status);
+  } catch {
+    return json({ok:false,code:'QUEUE_OUTCOME_UNKNOWN',error:'Queue outcome is uncertain. Check or retry the SAME operation identity.',definite:false},503);
+  }
+}
+
 export default {
   async fetch(request, env) {
     try {
@@ -381,6 +422,7 @@ export default {
       }
       if (url.pathname === '/api/auth/logout' && request.method === 'POST') return json({ ok: true }, 200, { 'Set-Cookie': `${COOKIE_NAME}=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Lax` });
       const session = await readSession(request, env);
+      if (url.pathname === '/api/jobs' || url.pathname.startsWith('/api/jobs/')) return await proxyJob(request,session,env);
       if (url.pathname === '/api/reference') {
         if (!session) return json({ ok: false, error: 'Authentication required.' }, 401);
         if (request.method !== 'GET') return json({ ok: false, error: 'Method not allowed.' }, 405);
