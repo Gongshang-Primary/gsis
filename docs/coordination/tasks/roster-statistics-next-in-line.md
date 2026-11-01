@@ -25,3 +25,7 @@ A table of teachers by cumulative R% done, ascending by default: least done at t
 
 ## Verification / Review / Deployment
 Not started.
+
+## Related display fix (owner screenshot, 1 Nov ~20:30, v0.9.9g)
+"Learn about Auto Allocation → My Calculations" reads "your relief quota R = 0 and your cumulative relief done is **Unavailable**". Cause: `roster-update/public/roster-calculations.js` shows `h.percentage`, which is done ÷ accumulated quota; with quota 0 it is not finite, so the text falls back to "Unavailable". The data is correct (completed 0 periods, quota 0); the wording is wrong.
+Fix: when the accumulated quota is 0, show "0 periods done; no relief quota recorded, so no percentage" (or the done count) instead of "Unavailable". Use the same rule in the R% table (staff with no quota excluded or shown as "no quota"). Display only; no data change. Lane R, after the cutover.
