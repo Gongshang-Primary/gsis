@@ -39,16 +39,18 @@ Any job that touches files in two lanes belongs to the stricter lane (R before D
 - After the pilot the coordinator reports quality (correctness, rule-following, test discipline) and the owner decides whether lanes K, L and Y open to Gemini.
 
 ## Current assignments (update on every change)
-Owner 1 Nov 2026 08:05: "allocate any left PR to codex". All open work goes to Codex, in this order.
+Owner 1 Nov 2026 08:05: "allocate any left PR to codex". All open work goes to Codex, in this order. Updated 1 Nov 19:10 after the first cutover attempt refused activation.
 
 | # | Job | Lane | Model | Status |
 |---|---|---|---|---|
-| 1 | F: cutover freeze before the D1 snapshot | R | Codex | Top priority, not started |
-| 2 | #30: inactive Contacts staff unavailable in Roster (owner 1B) | R | Codex | Draft; CI green at f7e0022; mark ready after F, rebase on main |
-| 3 | #29: weekly R checkpoint (Cloudflare snapshot, owner 3B) plus FAJT levelling | R | Codex | Draft; rebase on main |
-| 4 | Row P: peer-mail health fix | R | Codex | Queued |
-| 5 | Row C: Contacts Edit Info TTb filter | C | **Codex (taken over from Gemini #35)** | Start from #35 head; fix Claude's three blocking items; close #35 |
-| 6 | Import progress total shows real remaining work | R | Codex | Low priority |
+| 1 | G: cutover diagnostics (name drift on refusal, drift check, auto-retry) `tasks/roster-cutover-diagnostics.md` | R | Codex | **Top priority**, owner 1 Nov 19:00; small separate PR |
+| 2 | #38 inactive Contacts staff (1B) | R | Codex | Reviewed, no blockers; merge held until after Monday's first busy period on D1 |
+| 3 | #40 weekly R snapshot plus FAJT levelling (3B) | R | Codex | CI green; Claude full review pending; held |
+| 4 | #41 peer-mail health (row P) | R | Codex | One question open (store under D1 authority); held |
+| 5 | #42 import progress totals | R | Codex | No blockers; held; rebase chain #38, #40, #41, #42 serially after Monday |
+| 6 | #43 Calendar row 9 | K | Codex | Reviewed, no blockers; owner may merge |
+| 7 | #44 LORD queued writes phase 1 | L | Codex | Reviewed, no blockers; owner may merge |
+| 8 | Close the freeze gap for webhooks; top-up import; drop short-lived state from the digest (items 1, 4, 5) | R | Codex | Next after G; needs Claude design note first |
 | - | Cutover runbook updates for F | T | Claude | After F merges |
 
 Gemini: no active job. Pilot result (#35): in-lane and fast, but an empty first push, a weak string-only test, a likely locked-grid bug, and a false "verified by Claude" claim. Reassess before giving Gemini another lane.
