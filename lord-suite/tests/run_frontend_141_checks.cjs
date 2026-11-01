@@ -109,7 +109,8 @@ const propertyContract=require('./property_policy_contract_changes.cjs');
         if(['getOverlordBookings_','getOverlordMovements_','getOverlordTrolleyMap_','getStarlordBoardData_','getStarlordSessionMap_'].includes(key))continue;
         if(require('./evidence_contract_changes.cjs').changed.includes(key)||require('./booking_speed_contract_changes.cjs').changed.includes(key)||propertyContract.changed.includes(key)||settingsContract.changed.includes(key)||require('./v17_allowed_changes.cjs').includes(key)||require('./v18_contract_changes.cjs').changed.includes(key)||require('./gsis_contract_changes.cjs').changed.includes(key))continue;
         const actual=current[key].toString();
-        assert.equal(key==='doGet'?actual.replace('LORD Suite Backend v1.7','LORD Suite Backend v1.4'):actual,previous[key].toString(),key+' behavior changed');
+        const expected=['jsonResponse_','referenceJsonResponse_'].includes(key)?previous[key].toString().replace('function '+key+'(payload) {','function '+key+'(payload) {\n  payload.gsisBuildLabel=GSIS_BUILD_LABEL;'):previous[key].toString();
+        assert.equal(key==='doGet'?actual.replace('LORD Suite Backend v1.7','LORD Suite Backend v1.4'):actual,expected,key+' behavior changed');
       }else{
         const old=settingsContract.value(previous,key),now=settingsContract.value(current,key);propertyContract.compareConfig(key,old,now);
         if(key==='LORD_CONFIG'){assert.equal(now.VERSION,componentVersions.lordBackend);now.VERSION=old.VERSION;now.RELEASE_CHANNEL=old.RELEASE_CHANNEL;}
@@ -121,6 +122,8 @@ const propertyContract=require('./property_policy_contract_changes.cjs');
     // run_school_agreement_checks.cjs, rather than introduced by GSiS integration.
     const v181Additions=['enableLORDSchoolWhatsAppAgreement','schoolWhatsAppAgreement_'];
     assert.deepEqual(Object.keys(current).filter(k=>!Object.hasOwn(previous,k)).sort(),additions.concat(require('./evidence_contract_changes.cjs').added,require('./booking_speed_contract_changes.cjs').added,propertyContract.added,settingsContract.added,v181Additions,require('./v18_contract_changes.cjs').added,require('./gsis_contract_changes.cjs').added).sort());
+    current.ContentService={MimeType:{JSON:'json'},createTextOutput:text=>({text,setMimeType(){return this;}})};
+    for(const name of ['jsonResponse_','referenceJsonResponse_'])for(const payload of [{ok:true,data:{saved:true,requestId:'retained'}},{ok:false,error:'Retain failure',code:'UNKNOWN_OUTCOME'}])assert.deepEqual(JSON.parse(current[name]({...payload}).text),{...payload,gsisBuildLabel:require('../../package.json').gsisBuildLabel},'only the required build metadata may change the original response');
     const marker={checked:true};current.selfTestLORDV1=()=>marker;current.inspectLORDV1Configuration=()=>marker;
     assert.equal(current.selfTestLORDV15(),marker);assert.equal(current.inspectLORDV15Configuration(),marker);assert.equal(current.selfTestLORDV16(),marker);assert.equal(current.inspectLORDV16Configuration(),marker);
     const services='Source/backend/appsscript.services.fragment.json';

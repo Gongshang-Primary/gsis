@@ -6,6 +6,10 @@ const root=path.resolve(__dirname,'..'),source=fs.readFileSync(root+'/backend/Co
 function sourceFunction(name){const node=acorn.parse(source,{ecmaVersion:2020}).body.find(n=>n.type==='FunctionDeclaration'&&n.id.name===name);assert(node,'Missing production function '+name);return source.slice(node.start,node.end);}
 function browserExport(options={}){
  const f=fixture({at:'2026-10-28T02:17:35.892Z'}),rawResults=[],wireResults=[],blobs=[],calls=[],logs=[];
+ // The extracted production serializer uses its actual generated build constant.
+ const buildConstant=acorn.parse(source,{ecmaVersion:2020}).body.find(node=>node.type==='VariableDeclaration'&&node.declarations.some(item=>item.id.name==='GSIS_BUILD_LABEL'));
+ assert(buildConstant,'Missing production build constant');vm.runInContext(source.slice(buildConstant.start,buildConstant.end),f.scope);
+ assert.equal(vm.runInContext('GSIS_BUILD_LABEL',f.scope),require('../package.json').gsisBuildLabel);
  // Preserve a domain value called "timing" inside the hashed native bytes.
  f.models.fileA.single.blocks[0].cells[0][0]='timing';
  Object.assign(f.scope,{deployTrace_:{backendVersion:productionVersion,diagnosticBuild:productionVersion+'-roster-diag1',requestId:'11111111-2222-3333-4444-555555555555',started:Date.now(),phases:{source:8},contacts:[{timing:{backendVersion:'contacts-test'}}],action:'rosterOperations'},deployResponseIO_:()=>({reads:3}),rosterStage_:()=>{},rosterDiagnostic_:()=>{},console:{info:value=>logs.push(JSON.parse(value))},ContentService:{MimeType:{JSON:'application/json'},createTextOutput:value=>({setMimeType(){return this;},getContent:()=>value})}});
