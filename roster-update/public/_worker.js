@@ -1,6 +1,6 @@
 import {recoveryTimetableSnapshot} from './roster-recovery-timetable-cache.js';
 import {dispatchEdgeDeliveryReview,edgeDeliveryReportRead,edgeDeliveryReviewBackend} from './edge-notification-review.js';
-import {edgeRosterEnabled,edgeRosterService,edgeRosterBackend,edgeRosterMigration,readEdgeRosterReferences,mirrorEdgeRoster,readRosterMirrorStatus} from './edge-roster.js';
+import {edgeRosterEnabled,edgeRosterService,edgeRosterBackend,edgeRosterMigration,readEdgeRosterReferences,refreshEdgeRosterReferences,mirrorEdgeRoster,readRosterMirrorStatus} from './edge-roster.js';
 import {edgeNotificationService,edgeInboxBackend,supportsEdgeNotificationOperation,dispatchEdgePeerMail,dispatchEdgeEmploymentMail,reserveEdgeWhatsAppSend,recordEdgeWhatsAppThrottle,edgeDispatchHasWork} from './edge-notifications.js';
 import {backendAvailable,callOperationalBackend,forwardOperationalRequest} from '../../shared/backend-service.js';
 import {assertRecoveryWritable} from '../../shared/edge-recovery.js';
@@ -1663,4 +1663,8 @@ export async function resolveAbsenceTransport(env,who,{requestId,reason,all=fals
 
 /* GSIS_ROSTER_ABSENCE_TRANSPORT_END */
 
+// Live 2 Nov 2026: D1 trusts Contacts permissions for at most ROSTER_AUTHORITY_MAX_AGE_SECONDS (15 min);
+// nothing refreshed them on a schedule, so every Roster read failed with ROSTER_AUTHORITY_STALE.
+// The minute lane calls this; refreshEdgeRosterReferences skips when checked under two minutes ago.
+export async function dispatchReferencesRefresh(env){if(!edgeRosterEnabled(env))return {skipped:true,reason:'google-authoritative'};const result=await refreshEdgeRosterReferences(env);return {...result,idle:result?.refreshed!==true};}
 export async function dispatchGoogleBackup(env){const result=await mirrorEdgeRoster(env);if(result.enabled===false)return result;const status=await readRosterMirrorStatus(env);return {...result,pending:status.pending,failed:status.behindThreshold?1:0,code:status.behindThreshold?'ROSTER_MIRROR_LAG':status.pending?'ROSTER_MIRROR_PENDING':'OK'};}
