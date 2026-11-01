@@ -12,12 +12,19 @@ concurrency:
   group: gsis-verify-${{ github.ref }}
   cancel-in-progress: true
 jobs:
-  full-suite:
+  regression-shards:
+    name: Regression shard ${{ matrix.shard }}/4
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
     env:
       TZ: Asia/Singapore
       CI: 'true'
+      GSIS_TEST_SHARD_INDEX: ${{ matrix.shard }}
+      GSIS_TEST_SHARD_TOTAL: '4'
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -26,12 +33,21 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: '24'
+          cache: npm
+          cache-dependency-path: package-lock.json
       - name: Install locked dependencies
         run: npm ci
+      - name: Cache locked Playwright browsers
+        uses: actions/cache@0400d5f644dc74513175e3cd8d07132dd4860809 # v4.2.4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-${{ runner.arch }}-playwright-${{ hashFiles('package-lock.json') }}
       - name: Prepare test browser
         run: |
+          # Always install OS dependencies and repair missing binaries, even on cache hits.
           node node_modules/playwright/cli.js install --with-deps chromium
           BROWSER=$(node -p "require('playwright').chromium.executablePath()")
+          test -x "$BROWSER"
           echo "ROSTER_TEST_CHROMIUM=$BROWSER" >> "$GITHUB_ENV"
           echo "GSIS_BROWSER_EXECUTABLE=$BROWSER" >> "$GITHUB_ENV"
       - name: Regenerate all 18 components
@@ -44,5 +60,20 @@ jobs:
           node tests/stapler-draft-excel-export-browser.cjs
           node tests/stapler-draft-level-recess-browser.cjs
           node tests/stapler098h-recovery-browser.cjs
-      - name: Run full regression suite
+      - name: Run regression shard and all LORD checks
         run: npm test
+  # Preserve the existing required check. Failed, cancelled or skipped shards stay red.
+  full-suite:
+    needs: regression-shards
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Require every regression shard
+        env:
+          SHARD_RESULT: ${{ needs.regression-shards.result }}
+        run: |
+          if [ "$SHARD_RESULT" != 'success' ]; then
+            echo "Regression shards did not all succeed: $SHARD_RESULT" >&2
+            exit 1
+          fi
