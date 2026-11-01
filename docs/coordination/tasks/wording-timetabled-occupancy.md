@@ -1,7 +1,8 @@
 # wording-timetabled-occupancy: "individual (timetabled) workload" → "individual (timetabled) occupancy" (changelog)
 
-- Status: proposed (owner changelog, 1 Nov 2026 ~21:00); scope confirmed; not authorised to build
-- Owner/model: unassigned (Codex when authorised)
+- Status: authorised (owner 1 Nov ~21:25: "let codex work on it after it is done with current work"); queued after rows 9 and 10; merge held per lane R rule
+- Owner/model: Codex
+- Branch: codex/wording-timetabled-occupancy
 - Reviewer/model: Claude
 - Lanes: D (Deploy) and R (Roster); wording only; serial with lane R; after the D1 cutover
 

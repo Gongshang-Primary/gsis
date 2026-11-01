@@ -53,6 +53,7 @@ Owner 1 Nov 2026 08:05: "allocate any left PR to codex". All open work goes to C
 | 8 | Close the freeze gap for webhooks; top-up import; drop short-lived state from the digest (items 1, 4, 5) | R | Codex | Next after G; needs Claude design note first |
 | 9 | Relief count shows 0 for a teacher who did relief; quota-0 wording `tasks/roster-relief-count-investigation.md` | R | Codex | Authorised 1 Nov 20:45; merge held |
 | 10 | Statistics table "Cumulative percentage of relief done R%" `tasks/roster-statistics-next-in-line.md` | R | Codex | Authorised 1 Nov 20:45; after or with row 9; merge held |
+| 11 | Wording: "individual occupancy" terms in Deploy and Roster `tasks/wording-timetabled-occupancy.md` | D+R | Codex | Authorised 1 Nov 21:25; start after rows 9 and 10; merge held |
 | - | Cutover runbook updates for F | T | Claude | After F merges |
 
 Gemini: no active job. Pilot result (#35): in-lane and fast, but an empty first push, a weak string-only test, a likely locked-grid bug, and a false "verified by Claude" claim. Reassess before giving Gemini another lane.
