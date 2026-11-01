@@ -29,5 +29,8 @@ A test harness that activates D1 on a realistic fixture and then runs, at t+0 an
 ### R5: review Claude's hotfix PRs #49 (lease order, tolerance, drift during freeze) and #50 (references refresh, raw error log)
 Advisory review; owner merges.
 
+### R6: peer-mail health only, split from #41 (owner handed to Codex 2 Nov ~05:35)
+New PR from main with only the peer-mail health commits of #41 (521dede, 9099f2e, dbef7ec and the idle/lock changes), without #38 inactive-staff or #40 weekly-R/FAJT. Answer Claude's open question with a test (where peer-mail health writes under D1 authority; the fence must never cause a repeating failure or a resend). Keep #41 open. Target merged by 17:00 for tonight's bundle.
+
 ## Not in scope today
 Drift-check import stall (logged in roster-cutover-diagnostics.md), #38/#40-#48 (held).
