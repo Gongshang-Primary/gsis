@@ -347,7 +347,11 @@ function rosterEdgeExportPart_(req){
  GSiSRosterImport.validateManifest(checkpoint.manifest);const part=checkpoint.manifest.parts.find(p=>p.id===req.input.partId),file=part&&checkpoint.partFiles[part.id];if(!part||!file||file.digest!==part.digest||file.bytes!==part.bytes)error_(404,'The immutable export part is not in this session.');const payload=rosterEdgeExportPrivateText_(file,GSiSRosterImport.MAX_PART_BYTES);if(Utilities.newBlob(payload).getBytes().length!==part.bytes)error_(503,'The immutable export part length changed.');return {adminVerified:true,sessionId:binding.sessionId,manifestDigest:checkpoint.manifestDigest,partId:part.id,payload};
 }
 function rosterEdgeExportAbandon_(req){
- const binding=rosterEdgeExportBindingV2_(req),resetRequestId=req.input.resetRequestId;if(typeof resetRequestId!=='string'||!resetRequestId||resetRequestId.length>200)error_(400,'A stable restart request ID is required.');
+ // Migration dispatch verified the current Admin. An emergency rollback may
+ // have been imported by another Admin; retain that original capture identity.
+ const input={...req.input},importActor=input.importActor;delete input.importActor;
+ if(importActor!==undefined&&(typeof importActor!=='string'||!/^\S+@\S+\.\S+$/.test(importActor)||importActor.length>320))error_(400,'Use the retained import actor.');
+ const binding=rosterEdgeExportBindingV2_({...req,input,identity:importActor?{...req.identity,email:importActor}:req.identity}),resetRequestId=input.resetRequestId;if(typeof resetRequestId!=='string'||!resetRequestId||resetRequestId.length>200)error_(400,'A stable restart request ID is required.');
  const prior=rosterEdgeExportAbandoned_(binding);if(prior){if(prior.resetRequestId!==resetRequestId)error_(409,'This preparation was already abandoned by another restart.');return {adminVerified:true,sessionId:binding.sessionId,abandoned:true,resetRequestId};}
  const descriptor=rosterEdgeExportDescriptor_(binding);const tombstone={schema:2,...binding,resetRequestId,abandonedAt:Date.now(),descriptor:descriptor||null};const raw=JSON.stringify(tombstone);if(Utilities.newBlob(raw).getBytes().length>8500)error_(503,'The retained preparation evidence exceeds its property bound.');
  props_().setProperty('ROSTER_EDGE_EXPORT_ABANDONED:'+binding.sessionId,raw);props_().deleteProperty('ROSTER_EDGE_EXPORT:'+binding.sessionId);return {adminVerified:true,sessionId:binding.sessionId,abandoned:true,resetRequestId};

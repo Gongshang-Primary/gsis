@@ -1,3 +1,7 @@
+# Pending: R1 D1 reset after manual rollback, 2 November 2026
+
+Model: Codex. Admin can reset retained D1 Roster heads only with explicit legacy Cloudflare authority and signed proof that Google is writable. One D1 transaction archives the exact old rows, receipts, heads and mirror evidence, resets both heads and invalidates backup work. Google capture cleanup remains recoverable under the same reset request. No live settings or records changed. See [R1 task](docs/coordination/tasks/roster-d1-rollback-reset.md).
+
 # Pending: freeze Google for the D1 cutover, 1 November 2026
 
 Model: Codex. Admin can freeze Google writes before the final import, inspect its age and cancel a pre-fence cutover. Both writer locks drain before the freeze. Roster writers refuse clearly; immutable preparation files remain usable. Worker jobs skip frozen Google work while durable absence receipts and Queue wakes remain retained. A four-hour warning never auto-releases the freeze.
