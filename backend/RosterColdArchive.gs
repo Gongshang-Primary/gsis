@@ -62,6 +62,7 @@ function rosterColdArchiveRun_(options){
  if(!options.manual&&(minute<960||minute>=1440))return {skipped:true,reason:'outside-maintenance-hours'};
  const lock=LockService.getScriptLock();if(!deployLock_(lock,1000))return {busy:true};let deliveryLock=null,deliveryHeld=false;
  try{
+  if(typeof rosterEdgeAssertLegacyWrite_==='function')rosterEdgeAssertLegacyWrite_();
   if(typeof rosterNotificationState_==='function'){
    deliveryLock=LockService.getUserLock();if(!deliveryLock.tryLock(1000))return {busy:true};deliveryHeld=true;
   }

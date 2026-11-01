@@ -28,8 +28,8 @@ function rosterDriveFailure_(detail){
  if(typeof deployTrace_!=='undefined'&&deployTrace_)deployTrace_.rosterDrive=detail;
  const error=Object.assign(new Error(message),{status:503,rosterDrive:detail});throw error;
 }
-function rosterDriveRequest_(url,options,operation){
- if(typeof rosterEdgeAssertLegacyWrite_==='function'&&String(options?.method||'get').toLowerCase()!=='get'&&!(typeof rosterMirrorWriteAllowed_==='function'&&rosterMirrorWriteAllowed_()))rosterEdgeAssertLegacyWrite_();
+function rosterDriveRequest_(url,options,operation,preparation=false){
+ if(typeof rosterEdgeAssertLegacyWrite_==='function'&&String(options?.method||'get').toLowerCase()!=='get'&&!(typeof rosterMirrorWriteAllowed_==='function'&&rosterMirrorWriteAllowed_()))rosterEdgeAssertLegacyWrite_(preparation);
  if(!['get','head'].includes(String(options?.method||'get').toLowerCase()))gsisRequireBackendRole_('roster');
  const started=Date.now(),detail={operation,httpStatus:null,reasons:[]};
  let token,response;
@@ -71,12 +71,12 @@ function rosterFindFile_(folderId,name){
  return '';
 }
 function rosterReadFile_(id){return rosterDriveRequest_('https://www.googleapis.com/drive/v3/files/'+encodeURIComponent(id)+'?supportsAllDrives=true&alt=media',{},'file-read').getContentText();}
-function rosterCreateFile_(folderId,name,blob){if(typeof rosterEdgeAssertLegacyWrite_==='function'&&!(typeof rosterMirrorWriteAllowed_==='function'&&rosterMirrorWriteAllowed_()))rosterEdgeAssertLegacyWrite_();gsisRequireBackendRole_('roster');
+function rosterCreateFile_(folderId,name,blob){const preparation=typeof rosterEdgeExportImportFolderId_==='string'&&!!rosterEdgeExportImportFolderId_&&folderId===rosterEdgeExportImportFolderId_;if(typeof rosterEdgeAssertLegacyWrite_==='function'&&!(typeof rosterMirrorWriteAllowed_==='function'&&rosterMirrorWriteAllowed_()))rosterEdgeAssertLegacyWrite_(preparation);gsisRequireBackendRole_('roster');
  const bytes=blob.getBytes(),mimeType=blob.getContentType()||'application/octet-stream';
- const start=rosterDriveRequest_('https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable&supportsAllDrives=true&fields=id',{method:'post',contentType:'application/json; charset=UTF-8',headers:{'X-Upload-Content-Type':mimeType,'X-Upload-Content-Length':String(bytes.length)},payload:JSON.stringify({name,parents:[folderId],mimeType})},'upload-start');
+ const start=rosterDriveRequest_('https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable&supportsAllDrives=true&fields=id',{method:'post',contentType:'application/json; charset=UTF-8',headers:{'X-Upload-Content-Type':mimeType,'X-Upload-Content-Length':String(bytes.length)},payload:JSON.stringify({name,parents:[folderId],mimeType})},'upload-start',preparation);
  const headers=start.getAllHeaders(),key=Object.keys(headers).find(x=>x.toLowerCase()==='location'),location=key&&headers[key];
  if(typeof location!=='string'||!/^https:\/\/www\.googleapis\.com\/upload\/drive\/v3\/files\?/.test(location))rosterDriveFailure_({operation:'upload-start',httpStatus:start.getResponseCode(),reasons:['INVALID_UPLOAD_LOCATION']});
- const result=rosterDriveJson_(rosterDriveRequest_(location,{method:'put',contentType:mimeType,payload:bytes},'file-create'),'file-create');
+ const result=rosterDriveJson_(rosterDriveRequest_(location,{method:'put',contentType:mimeType,payload:bytes},'file-create',preparation),'file-create');
  if(typeof result.id!=='string'||!result.id)rosterDriveFailure_({operation:'file-create',httpStatus:200,reasons:['INVALID_RESPONSE']});
  return result.id;
 }
@@ -98,6 +98,7 @@ function rosterDiagnosticText_(value){
  return text.replace(/https?:\/\/\S+/gi,'[URL]').replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi,'[email]').replace(/[A-Za-z0-9_+/=-]{28,}/g,'[identifier]').slice(0,900);
 }
 function rosterDiagnosticError_(error){
+ if(error?.code==='ROSTER_CUTOVER_FROZEN')return 'Roster is being moved; try again shortly.';
  if(error?.rosterDrive)return error.message;
  if(['DEPLOY_URL_CONFIGURATION','GSIS_SECRET_INVALID'].includes(error?.code))return error.message;
  const message=String(error?.message||error||'');
@@ -117,7 +118,7 @@ function rosterFailureDetail_(error){
  const t=typeof deployTrace_==='undefined'?{}:deployTrace_||{},phase=String(error?.failurePhase||t.phase||'').replace(/^roster\./,'');
  const groups={'calculations-index':'calculation-source','calculations-source':'calculation-source','calculations-history-read':'history-read','calculations-history':'history-read','contacts-authority':'contacts','state-read':'operations-read',context:'timetable','register-read':'timetable','register-json':'timetable','register-schema':'timetable','timetable-read':'timetable','timetable-json':'timetable','timetable-validation':'timetable',quota:'calculation-source',projection:'plan-read',commit:'save','response-serialize':'response','response-create':'response'};
  const operations=['nextAbsenceIntake','deferAbsenceIntake','prepareNotification','requestMutual','saveSchoolAbsence','renameStapler','scheduledRoster','sendPeerMail','peerMailReview','reviewPeerMail','claimNotifications','prepareNotifications','notificationResult','notificationResults','inboxPendingDispatch','inboxReplyPrepare','inboxReplyResult','inboxAlertPrepare','inboxAlertResult','deliveryReviewMailDispatch','dailyEmploymentMailDispatch','processAbsenceIntake','flushAbsenceIntake','captureAbsenceIntake','retryAbsenceIntake','resolveAbsenceIntake','timetableBatch','timetableDay','timetableCacheManifest','read','saveAbsence','saveInstructions','saveStapler','confirmStapler','publishStapler','resetStapler','moveStapler','restoreStapler','deleteStapler','reliefBatch','publish','notifyDaily','autoAllocate','optimise','receiptStatus'];
- const codes=['ROSTER_STORAGE_CAPACITY','GSIS_SECRET_INVALID','ABSENCE_PREPARATION_RETRY','ABSENCE_INTAKE_BUSY','ABSENCE_INTAKE_PENDING','CONTACTS_RECOVERY_REQUIRED','STAPLER_BASELINE_CONFLICT','STAPLER_CONFLICT','PEER_MAIL_REVIEW_CONFLICT','TIMETABLE_BATCH_CHANGED','TIMETABLE_BATCH_TOO_LARGE','CELL_CONFLICT','ABSENCE_CONFLICT','ALLOCATION_IN_PROGRESS','ALLOCATION_UNCONFIRMED','ALLOCATION_CANCELLED','ALLOCATION_ABANDONED','ALLOCATION_CUTOFF'];
+ const codes=['ROSTER_CUTOVER_FROZEN','ROSTER_STORAGE_CAPACITY','GSIS_SECRET_INVALID','ABSENCE_PREPARATION_RETRY','ABSENCE_INTAKE_BUSY','ABSENCE_INTAKE_PENDING','CONTACTS_RECOVERY_REQUIRED','STAPLER_BASELINE_CONFLICT','STAPLER_CONFLICT','PEER_MAIL_REVIEW_CONFLICT','TIMETABLE_BATCH_CHANGED','TIMETABLE_BATCH_TOO_LARGE','CELL_CONFLICT','ABSENCE_CONFLICT','ALLOCATION_IN_PROGRESS','ALLOCATION_UNCONFIRMED','ALLOCATION_CANCELLED','ALLOCATION_ABANDONED','ALLOCATION_CUTOFF'];
  return {backendVersion:GSIS_DEPLOY_VERSION,failureStage:phases.includes(phase)?phase:groups[phase]||'backend',...(operations.includes(t.operation)?{operation:t.operation}:{}),...(codes.includes(error?.code)?{code:error.code}:{})};
 }
 function rosterDiagnosticLog_(record){
@@ -258,7 +259,7 @@ function rosterModelResponse_(entry,p){const known=Array.isArray(p.knownModelIds
 function rosterFile_(folderId,name,blob){return rosterFindFile_(folderId,name)||rosterCreateFile_(folderId,name,blob);}
 function rosterInput_(fn){try{return fn()}catch(e){error_(400,e.message)}}
 function rosterDispatch_(req,c){gsisRequireBackendRole_('roster');
- if(!['edgeExport','edgeExportManifest','edgeExportPart','edgeModel','edgeFence','edgeReferences','edgeContactCreate','edgeAudit'].includes(req.input?.operation)&&!(req.action==='rosterOperations'&&req.input?.operation==='edgeHealthAuthority')&&typeof rosterEdgeAssertLegacyWrite_==='function')rosterEdgeAssertLegacyWrite_();
+ if(!['edgeFreeze','edgeUnfreeze','edgeExport','edgeExportManifest','edgeExportPart','edgeExportAbandon','edgeModel','edgeFence','edgeReferences','edgeContactCreate','edgeAudit'].includes(req.input?.operation)&&!(req.action==='rosterOperations'&&req.input?.operation==='edgeHealthAuthority')&&typeof rosterEdgeAssertLegacyWrite_==='function')rosterEdgeAssertLegacyWrite_();
  if(typeof c?.user?.rosterSMC!=='boolean'){
   if(typeof deployTrace_!=='undefined'&&deployTrace_)deployTrace_.phase='contacts-authority';
   error_(503,'Contacts did not return verified Roster authority. Update the existing Contacts web app deployment.');

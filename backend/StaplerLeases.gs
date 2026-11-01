@@ -44,6 +44,7 @@ function rosterStaplerLeaseDispatch_(req,c){gsisRequireBackendRole_('roster');
  if(typeof p.leaseSessionId!=='string'||! /^[\w-]{36}$/.test(p.leaseSessionId)||!Number.isInteger(p.leaseFence)||p.leaseFence<0)error_(400,'A current editing session and lock version are required.');
  const lock=LockService.getScriptLock();if(!deployLock_(lock,8000))error_(503,'Another save is running. Retry the editing lock.');
  try{
+  if(typeof rosterEdgeAssertLegacyWrite_==='function')rosterEdgeAssertLegacyWrite_();
   const row=rosterStaplerLeaseRead_(date),now=Date.now(),active=!!row.owner&&row.until>now,op=p.operation;let saved=row;
   if(op==='acquireStaplerLock'){
    const state=rosterOperationsState_(),ctx={user,people:c.rosterPeople,today};if(!GSISRosterOperations.staplerPermission(state,ctx,date))error_(403,'Planning access is required for this date.');
