@@ -2,7 +2,7 @@
 // Exercise the real shell, page registry and planner navigation with local API fixtures.
 const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),{chromium}=require('playwright');
 const order=['Report Absence','Manage reported absences','Assign Relief','Daily Notify','Absences by Date','Manage Ad-hoc relief','Stapler','WhatsApp Inbox','Check Availability','Timetable','Daily Updates','Statistics','Baseline Timetable','My Relief Duties','Learn about Auto Allocation','Recess Regression','SMC Duty Roster','Custom Notifications','Manage Absence Type','System Config','Prune records'];
-const title='Suspended Timeable Advance PLannER',pub=path.resolve('roster-update/public');
+const title='Suspended Timetable Advance PLannER',pub=path.resolve('roster-update/public');
 (async()=>{
  const browser=await chromium.launch({headless:true,args:['--no-sandbox'],...(process.env.ROSTER_TEST_CHROMIUM||process.env.GSIS_BROWSER_EXECUTABLE?{executablePath:process.env.ROSTER_TEST_CHROMIUM||process.env.GSIS_BROWSER_EXECUTABLE}:{})});
  try{

@@ -44,7 +44,7 @@
   {name:'Baseline Timetable',icon:'baseline',description:'Manage saved timetables; Admin can upload',baseline:true},
   {name:'Timetable',icon:'timetable',description:'View and export teacher, class or TG timetables'},
   {name:'Check Availability',icon:'availability',description:'Find common periods to meet'},
-  {name:'Stapler',icon:'stapler',description:'Suspended Timeable Advance PLannER'},
+  {name:'Stapler',icon:'stapler',description:'Suspended Timetable Advance PLannER'},
   {name:'SMC Duty Roster',icon:'smc-duty',description:'Choose duty members and duty dates',smc:true},
   {name:'WhatsApp Inbox',icon:'whatsapp-inbox',description:'Read and reply from the school number',smc:true},
   {name:'Daily Updates',icon:'daily-employment',description:'View original daily absence and relief reports',smc:true},
