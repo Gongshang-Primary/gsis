@@ -23,7 +23,7 @@ Owner: Song Wee (does every click). Checks: Claude (D1 queries, job health). Upd
 - Switch-back ("Switch back to Google…") pauses D1, waits until the Google backup has every change, checks digests, then lifts the Google fence. It refuses if it cannot prove that.
 
 ## 0. Before you start (5 minutes)
-- [ ] v0.9.9e is deployed (Roster header shows v0.9.9e).
+- [ ] v0.9.9f is deployed (Roster header shows v0.9.9f; edge-setup shows the freeze section).
 - [ ] Nobody is using Roster. No absence report is pending (Manage school-wide absences → Reports to resolve is empty).
 - [ ] Claude is reachable in this chat. Send "starting cutover".
 - [ ] You have the Cloudflare dashboard open: Workers & Pages.
@@ -46,7 +46,7 @@ Do nothing in Roster until Claude replies. Claude compares D1 with the frozen Go
 
 ## 3. Set the D1 switch in Cloudflare (10 minutes, before activation)
 Safe now: it has no effect until step 4.
-1. **Roster Pages project (gsps-roster)** → Settings → Variables and Secrets → Production → add `ROSTER_EDGE_AUTHORITY` = `d1` (type Text) → Save. Then apply it with a new deployment: Deployments → latest production deployment → **⋯ → Retry deployment**; if that option is missing, Create deployment → upload the v0.9.9e `3_Roster_Frontend.zip` again → Production.
+1. **Roster Pages project (gsps-roster)** → Settings → Variables and Secrets → Production → add `ROSTER_EDGE_AUTHORITY` = `d1` (type Text) → Save. Then apply it with a new deployment: Deployments → latest production deployment → **⋯ → Retry deployment**; if that option is missing, Create deployment → upload the v0.9.9f `3_Roster_Frontend.zip` again → Production.
 2. **Worker gsis-roster-notifications** → Settings → Variables and Secrets → add `ROSTER_EDGE_AUTHORITY` = `d1` → Deploy.
 3. **Worker gsis-operations** → same.
 4. Roster still works on Google: open Assign Relief once to confirm. Tell Claude "step 3 done".
