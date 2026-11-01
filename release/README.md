@@ -1,0 +1,13 @@
+# Release labels
+
+`package.json` `gsisBuildLabel` is the build label. `release/LAST_BUNDLE_VERSION` records the last successfully assembled delivery. Its initial `0.9.9f` value is the existing cutover bundle label supplied by the owner/coordinator on 1 November 2026; Phase 2 does not create or redeploy that bundle.
+
+For every delivery, advance the letter once (`f` to `g`, then `h`); after `z`, ask the owner. Keep `gsisRelease`, component versions and protocol constants unchanged. Run `npm run build`, the full Singapore-timezone suite and the required independent review, commit the source, and create a tag for that full label at the exact reviewed source commit (for example `v0.9.9g`).
+
+Use `npm run package:suite` for the final delivery. This mandatory path takes a per-source nonblocking lock in the Git directory, refuses the previous label before creating output, verifies exact committed/tagged provenance, builds under `deliverables/GSiS_v<full-label>/`, and includes `DEPLOY_STEPS.md` and `COMMIT.txt`. Concurrent attempts from the same source, including different output directories, fail clearly while a transaction is active. The lock does not change the tracked source or relax its clean-state check. It records the label only after the archives complete successfully; commit that tracked record afterwards. Preparation companion files remain separate, in the output parent. Supply the separately verified preparation companion using the existing packaging workflow.
+
+`npm run build` remains repeatable and produces canonical verification/component outputs. `python3 scripts/package-099-suite.py --preview` remains a repeatable uncommitted verification preview. Neither consumes or rejects the last delivery label; neither is the final delivery path. Use only the release-built frontend ZIPs for installation.
+
+Final packaging uses the host's standard-library lock, `flock` on POSIX and a nonblocking byte lock on Windows. Importing the packager, ordinary builds and previews do not require either platform's lock module.
+
+Packaging is separate from deployment. The owner chooses installation timing and records actual rollout and hashes. New build-label archive manifests preserve unchanged configured Roster authority; historical archives without build labels retain their Google baseline contract. No live authority is inferred, probed or changed by packaging. No label advancement or final delivery is performed by tests; gate tests use temporary synthetic roots. A failed packaging attempt leaves the recorded label unchanged. If writing the record fails after folder promotion, the transaction removes its own new folder while holding the lock so the unconsumed label can be retried safely.

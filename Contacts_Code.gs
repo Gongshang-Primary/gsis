@@ -1,3 +1,6 @@
+/* GSIS_BUILD_LABEL_BEGIN */
+const GSIS_BUILD_LABEL='0.9.9f';
+/* GSIS_BUILD_LABEL_END */
 const GSIS_CONTACTS_VERSION='0.9.9';
 /* GSIS_SHEETS_IO_BEGIN */
 /* Bounded Sheets API v4 value I/O. Journals, locks and commit markers belong to callers. */
@@ -189,7 +192,7 @@ function doPost(e) {
 }
 var contactRequestEpoch_=null;
 function contactEpoch_(){PropertiesService.getScriptProperties().setProperty('CONTACTS_DATA_EPOCH',Utilities.getUuid());}
-function reply_(data){if(data.ok&&contactRequestEpoch_!==null&&(contactRequestEpoch_!==(PropertiesService.getScriptProperties().getProperty('CONTACTS_DATA_EPOCH')||'')||PropertiesService.getScriptProperties().getProperty('DEPLOY_CATALOGUE_PENDING')||Object.keys(JSON.parse(PropertiesService.getScriptProperties().getProperty('CONTACTS_PENDING_V2')||'{}')).length))throw fault_(503,'Contacts changed while reading. Retry the load.');if(contactTrace_){const timing={backendVersion:GSIS_CONTACTS_VERSION,requestId:contactTrace_.requestId,traceId:contactTrace_.requestId,action:contactTrace_.action,cache:contactTrace_.cache,phases:contactTrace_.phases,preparedIO:contactTrace_.preparedIO,io:GSISSheets.stats(),totalMs:Date.now()-contactTrace_.started};if(data.data)data.data.timing=timing;else data.timing=timing;console.info(JSON.stringify({event:'gsis-contacts-request',status:data.ok?200:data.status,...timing}));}return ContentService.createTextOutput(JSON.stringify(data)).setMimeType(ContentService.MimeType.JSON);}
+function reply_(data){data.gsisBuildLabel=GSIS_BUILD_LABEL;if(data.ok&&contactRequestEpoch_!==null&&(contactRequestEpoch_!==(PropertiesService.getScriptProperties().getProperty('CONTACTS_DATA_EPOCH')||'')||PropertiesService.getScriptProperties().getProperty('DEPLOY_CATALOGUE_PENDING')||Object.keys(JSON.parse(PropertiesService.getScriptProperties().getProperty('CONTACTS_PENDING_V2')||'{}')).length))throw fault_(503,'Contacts changed while reading. Retry the load.');if(contactTrace_){const timing={backendVersion:GSIS_CONTACTS_VERSION,requestId:contactTrace_.requestId,traceId:contactTrace_.requestId,action:contactTrace_.action,cache:contactTrace_.cache,phases:contactTrace_.phases,preparedIO:contactTrace_.preparedIO,io:GSISSheets.stats(),totalMs:Date.now()-contactTrace_.started};if(data.data)data.data.timing=timing;else data.timing=timing;console.info(JSON.stringify({event:'gsis-contacts-request',status:data.ok?200:data.status,...timing}));}return ContentService.createTextOutput(JSON.stringify(data)).setMimeType(ContentService.MimeType.JSON);}
 function fault_(status,message){const e=new Error(message);e.status=status;return e;}
 function equal_(a,b){if(typeof b!=='string'||a.length!==b.length)return false;let mismatch=0;for(let i=0;i<a.length;i++)mismatch|=a.charCodeAt(i)^b.charCodeAt(i);return mismatch===0;}
 var contactReadCache_=new Map(),contactCacheEnabled_=false,contactPrefetchedValues_=new Map(),contactReadOnly_=false;

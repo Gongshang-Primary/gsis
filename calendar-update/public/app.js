@@ -282,6 +282,7 @@
     const timer=setTimeout(()=>controller.abort(),timeoutMs);
     try {
       const res=await fetch(url,{...fetchOptions,signal:controller.signal,cache:'no-store'});
+      window.GSISversionNotice?.(res);
       let data;
       try{data=await res.json();}catch(err){const bad=new Error('The server response was not valid JSON.');Object.assign(bad,{status:res.status,code:'RESPONSE_UNREADABLE',definite:false});throw bad;}
       if(!res.ok || data?.ok===false){

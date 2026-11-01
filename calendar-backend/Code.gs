@@ -1,3 +1,6 @@
+/* GSIS_BUILD_LABEL_BEGIN */
+const GSIS_BUILD_LABEL='0.9.9f';
+/* GSIS_BUILD_LABEL_END */
 /**
  * GSiS Calendar — Apps Script backend
  *
@@ -8953,6 +8956,7 @@ function constantTimeEqual_(a, b) {
 }
 
 function jsonOutput_(obj) {
+  obj.gsisBuildLabel=GSIS_BUILD_LABEL;
   return ContentService.createTextOutput(JSON.stringify(obj))
     .setMimeType(ContentService.MimeType.JSON);
 }

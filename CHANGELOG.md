@@ -1,3 +1,7 @@
+# Pending: release build metadata Phase 2, 1 November 2026
+
+Model: Codex. Google and D1 responses identify their build without changing the 0.9.9 protocol. Pages show an advisory page/server mismatch notice, and Worker health identifies the executing build without configuration or storage work. Final delivery packaging now requires a fresh recorded label and full-label provenance; ordinary builds and previews remain repeatable. Current `0.9.9f` is unchanged. Focused checks pass; full exact-tree CI and independent review are pending. No deployment or final delivery bundle. See [task evidence and release operator steps](docs/coordination/tasks/release-version-letter.md).
+
 # Pending: freeze Google for the D1 cutover, 1 November 2026
 
 Model: Codex. Admin can freeze Google writes before the final import, inspect its age and cancel a pre-fence cutover. Both writer locks drain before the freeze. Roster writers refuse clearly; immutable preparation files remain usable. Worker jobs skip frozen Google work while durable absence receipts and Queue wakes remain retained. A four-hour warning never auto-releases the freeze.

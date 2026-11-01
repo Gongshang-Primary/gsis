@@ -1,3 +1,15 @@
+/* GSIS_BUILD_LABEL_BEGIN */
+const GSIS_BUILD_LABEL='0.9.9f';
+/* Executing gateway identity is separate from the observed upstream build. */
+function gsisBuildMetadata(value){
+ const label=value?.gsisBuildLabel;
+ return typeof label==='string'&&label.length<=32&&/^\d+\.\d+\.\d+[a-z]?$/.test(label)?{gsisBuildLabel:label}:{};
+}
+function gsisBuildHeaders(value){
+ const label=gsisBuildMetadata(value).gsisBuildLabel;
+ return {'X-GSiS-Worker-Build-Label':GSIS_BUILD_LABEL,...(label?{'X-GSiS-Build-Label':label}:{})};
+}
+/* GSIS_BUILD_LABEL_END */
 /* GSIS_API_SECRET_BEGIN */
 // First-party API credentials share one operator-selected setting. Browser
 // sessions, private relief links and third-party credentials stay independent.
@@ -16,7 +28,7 @@ const VERSION='0.9.9',encoder=new TextEncoder(),decoder=new TextDecoder();
 const READS=new Set(['bootstrap','manifest','piece','bookings','admin']);
 const COMMANDS=new Set(['book','amend','cancel','decide','requestTransfer','decideTransfer','respond','saveVenue','saveRoomOwners','saveRoomMetadata','saveGrant','saveClosure','sync','notificationDecision']);
 const keySets=new Map(),keyFlights=new Map();
-function json(data,status=200){return Response.json(data,{status,headers:{'Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff','Referrer-Policy':'same-origin'}});}
+function json(data,status=200){return Response.json(data,{status,headers:{...gsisBuildHeaders(data),'Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff','Referrer-Policy':'same-origin'}});}
 function failure(status,code,error){return json({ok:false,status,code,error},status);}
 function decode(value){if(!/^[A-Za-z0-9_-]+$/.test(value))throw Error('Invalid token');return Uint8Array.from(atob(value.replace(/-/g,'+').replace(/_/g,'/')),c=>c.charCodeAt(0));}
 function config(env){

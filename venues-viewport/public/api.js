@@ -5,6 +5,7 @@
   const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),route==='command'||input.refreshSources===true?90000:30000);
   try{
    const response=await fetch('/api/'+route,{method:'POST',credentials:'same-origin',cache:'no-store',headers:{'Content-Type':'application/json','Accept':'application/json'},body:JSON.stringify(input),signal:controller.signal});
+   global.GSISversionNotice?.(response);
    let result;try{result=await response.json();}catch{throw Object.assign(Error('The server reply could not be read. Check the outcome before retrying.'),{status:response.status,uncertain:route==='command'});}
    if(!response.ok||result.ok!==true){const error=Error(result.error||'The request could not be completed.');Object.assign(error,{status:result.status||response.status,code:result.code,conflicts:result.conflicts,uncertain:route==='command'&&(response.status>=500||response.status===408)});throw error;}
    return result.data;

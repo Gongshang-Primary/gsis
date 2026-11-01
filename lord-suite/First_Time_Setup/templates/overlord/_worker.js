@@ -1,3 +1,15 @@
+/* GSIS_BUILD_LABEL_BEGIN */
+const GSIS_BUILD_LABEL='0.9.9f';
+/* Executing gateway identity is separate from the observed upstream build. */
+function gsisBuildMetadata(value){
+ const label=value?.gsisBuildLabel;
+ return typeof label==='string'&&label.length<=32&&/^\d+\.\d+\.\d+[a-z]?$/.test(label)?{gsisBuildLabel:label}:{};
+}
+function gsisBuildHeaders(value){
+ const label=gsisBuildMetadata(value).gsisBuildLabel;
+ return {'X-GSiS-Worker-Build-Label':GSIS_BUILD_LABEL,...(label?{'X-GSiS-Build-Label':label}:{})};
+}
+/* GSIS_BUILD_LABEL_END */
 /* GSIS_API_SECRET_BEGIN */
 // First-party API credentials share one operator-selected setting. Browser
 // sessions, private relief links and third-party credentials stay independent.
@@ -114,7 +126,7 @@ async function backendJson(target, init = {}, { timeoutMs = 45000, label = 'LORD
       throw serviceError(`${label} returned an empty response.`, { status: 502, retryable: true, code: 'UPSTREAM_EMPTY' });
     }
     if (RETRYABLE_UPSTREAM_STATUS.has(response.status)) {
-      throw serviceError(payload.error || `${label} is temporarily unavailable.`, { status: 502, retryable: true, code: 'UPSTREAM_TRANSIENT' });
+      throw Object.assign(serviceError(payload.error || `${label} is temporarily unavailable.`, { status: 502, retryable: true, code: 'UPSTREAM_TRANSIENT' }),gsisBuildMetadata(payload));
     }
     return { response, payload };
   } catch (error) {
@@ -124,7 +136,7 @@ async function backendJson(target, init = {}, { timeoutMs = 45000, label = 'LORD
   }
 }
 function json(data, status = 200, extraHeaders = {}) {
-  return Response.json(data, { status, headers: { 'Cache-Control': 'no-store', 'X-LORD-Worker-Version': '0.9.9', ...extraHeaders } });
+  return Response.json(data, { status, headers: { 'Cache-Control': 'no-store', 'X-LORD-Worker-Version': '0.9.9', ...gsisBuildHeaders(data), ...extraHeaders } });
 }
 function b64urlDecode(value) {
   value = value.replace(/-/g, '+').replace(/_/g, '/');
@@ -281,7 +293,7 @@ async function loadReferenceResponse(env, forceRefresh = false, latestOnly = fal
   if (cached) {
     const fetchedAt = Number(cached.headers.get('X-OVERLORD-Fetched-At') || 0);
     if (fetchedAt && now - fetchedAt < REFERENCE_FRESH_SECONDS * 1000) {
-      return new Response(await cached.clone().text(), { status: 200, headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'private, no-store', 'X-LORD-Worker-Version': '0.9.9', 'X-OVERLORD-Reference': 'edge-fresh' } });
+      return new Response(await cached.clone().text(), { status: 200, headers: { ...gsisBuildHeaders({gsisBuildLabel:cached.headers.get('X-GSiS-Build-Label')}), 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'private, no-store', 'X-LORD-Worker-Version': '0.9.9', 'X-OVERLORD-Reference': 'edge-fresh' } });
     }
   }
   const target = new URL(backendUrl(env));
@@ -293,22 +305,22 @@ async function loadReferenceResponse(env, forceRefresh = false, latestOnly = fal
   }
   try {
     const { response, payload } = await backendJson(target.toString(), { redirect: 'follow', cache: 'no-store' }, { timeoutMs: 45000, label: 'Reference service' });
-    if (!response.ok || !payload.ok) throw serviceError(payload.error || 'Reference service returned an error.', { status: response.status || 502, retryable: RETRYABLE_UPSTREAM_STATUS.has(response.status), code: 'REFERENCE_UPSTREAM' });
-    if (forceRefresh && payload.cacheReloaded !== true) throw serviceError('Reload requires the current LORD backend. Update the Apps Script deployment.');
-    const stored = new Response(JSON.stringify(payload), { headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': `public, max-age=${REFERENCE_STALE_SECONDS}`, 'X-OVERLORD-Fetched-At': String(now), ...(forceRefresh ? { 'X-OVERLORD-Reloaded-At': String(Date.now()) } : {}) } });
+    if (!response.ok || !payload.ok) throw Object.assign(serviceError(payload.error || 'Reference service returned an error.', { status: response.status || 502, retryable: RETRYABLE_UPSTREAM_STATUS.has(response.status), code: 'REFERENCE_UPSTREAM' }),gsisBuildMetadata(payload));
+    if (forceRefresh && payload.cacheReloaded !== true) throw Object.assign(serviceError('Reload requires the current LORD backend. Update the Apps Script deployment.'),gsisBuildMetadata(payload));
+    const stored = new Response(JSON.stringify(payload), { headers: { ...gsisBuildHeaders(payload), 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': `public, max-age=${REFERENCE_STALE_SECONDS}`, 'X-OVERLORD-Fetched-At': String(now), ...(forceRefresh ? { 'X-OVERLORD-Reloaded-At': String(Date.now()) } : {}) } });
     // An ordinary read started before a manual reload must not replace it.
     const latest = await cache.match(cacheKey);
     if (forceRefresh || !latest || (Number(latest.headers.get('X-OVERLORD-Reloaded-At') || 0) < now && Number(latest.headers.get('X-OVERLORD-Fetched-At') || 0) <= now)) {
       await cache.put(cacheKey, stored.clone());
     }
-    return new Response(JSON.stringify(payload), { status: 200, headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'private, no-store', 'X-LORD-Worker-Version': '0.9.9', 'X-OVERLORD-Reference': 'live' } });
+    return new Response(JSON.stringify(payload), { status: 200, headers: { ...gsisBuildHeaders(payload), 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'private, no-store', 'X-LORD-Worker-Version': '0.9.9', 'X-OVERLORD-Reference': 'live' } });
   } catch (error) {
     if (forceRefresh) throw error;
     if (!cached) cached = await cache.match(cacheKey);
     if (cached) {
       const fallback = await cached.clone().json();
       if (fallback.data) fallback.data = {...fallback.data, referenceReadDelayed:true};
-      return new Response(JSON.stringify(fallback), { status: 200, headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'private, no-store', 'X-LORD-Worker-Version': '0.9.9', 'X-OVERLORD-Reference': 'edge-stale' } });
+      return new Response(JSON.stringify(fallback), { status: 200, headers: { ...gsisBuildHeaders(fallback), 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'private, no-store', 'X-LORD-Worker-Version': '0.9.9', 'X-OVERLORD-Reference': 'edge-stale' } });
     }
     throw error;
   }
@@ -347,7 +359,7 @@ async function proxyTransaction(request, session, env) {
   });
   if (reloading && payload.ok) {
     if (payload.cacheReloaded !== true || !payload.reference) throw serviceError('Reload requires the current LORD backend. Update the Apps Script deployment.');
-    const stored = new Response(JSON.stringify({ ok: true, data: payload.reference }), { headers: { 'Content-Type': 'application/json', 'Cache-Control': `public, max-age=${REFERENCE_STALE_SECONDS}`, 'X-OVERLORD-Fetched-At': String(Date.now()), 'X-OVERLORD-Reloaded-At': String(Date.now()) } });
+    const stored = new Response(JSON.stringify({ ok: true, ...gsisBuildMetadata(payload), data: payload.reference }), { headers: { ...gsisBuildHeaders(payload), 'Content-Type': 'application/json', 'Cache-Control': `public, max-age=${REFERENCE_STALE_SECONDS}`, 'X-OVERLORD-Fetched-At': String(Date.now()), 'X-OVERLORD-Reloaded-At': String(Date.now()) } });
     await caches.default.put(new Request('https://overlord-reference-cache.local/v1.3'), stored);
   }
   const status = response.ok ? 200 : (RETRYABLE_UPSTREAM_STATUS.has(response.status) ? 502 : response.status);
@@ -408,6 +420,6 @@ export default {
       }
       if (url.pathname === '/api/transaction') return await proxyTransaction(request, session, env);
       return env.ASSETS.fetch(request);
-    } catch (error) { return json({ ok: false, error: error.message || String(error), retryable: Boolean(error && error.retryable), code: error && error.code || 'WORKER_ERROR' }, error && error.status || 500); }
+    } catch (error) { return json({ ok: false, ...gsisBuildMetadata(error), error: error.message || String(error), retryable: Boolean(error && error.retryable), code: error && error.code || 'WORKER_ERROR' }, error && error.status || 500); }
   }
 };

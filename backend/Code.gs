@@ -1,3 +1,6 @@
+/* GSIS_BUILD_LABEL_BEGIN */
+const GSIS_BUILD_LABEL='0.9.9f';
+/* GSIS_BUILD_LABEL_END */
 const GSIS_BACKEND_KIND='deploy';
 /* GSIS_SHEETS_IO_BEGIN */
 /* Bounded Sheets API v4 value I/O. Journals, locks and commit markers belong to callers. */
@@ -526,7 +529,7 @@ const GSIS_DEPLOY_VERSION='0.9.9';
 const DEPLOY_ID='1gXyYNbb8tHKDsb3Q3yepLEuc3cjsbbAsfLl7_XACfls';
 function error_(status,message){const e=new Error(message);e.status=status;throw e;}
 function deployResponseIO_(){try{return GSISSheets.stats();}catch(e){return {};}}
-function out_(x){const started=Date.now(),payload=JSON.stringify(x.data===undefined?x:x.data),serializationMs=Date.now()-started;let text;
+function out_(x){x.gsisBuildLabel=GSIS_BUILD_LABEL;const started=Date.now(),payload=JSON.stringify(x.data===undefined?x:x.data),serializationMs=Date.now()-started;let text;
  if(deployTrace_){const timing={backendVersion:deployTrace_.backendVersion,diagnosticBuild:deployTrace_.diagnosticBuild,requestId:deployTrace_.requestId,traceId:deployTrace_.requestId,action:deployTrace_.action,phases:deployTrace_.phases,contacts:deployTrace_.contacts,io:deployResponseIO_(),reliefCacheHit:!!deployTrace_.reliefCacheHit,serializationMs,totalMs:Date.now()-deployTrace_.started},meta=JSON.stringify(timing);try{console.info(JSON.stringify({event:'gsis-request',status:x.ok?200:x.status,...timing}));}catch(ignore){}
   if(x.data&&typeof x.data==='object'&&!Array.isArray(x.data)){const shell={...x};delete shell.data;const header=JSON.stringify(shell);text=header.slice(0,-1)+',"data":'+payload.slice(0,-1)+(payload==='{}'?'':',')+'"timing":'+meta+'}}';}
   else text=JSON.stringify({...x,timing});

@@ -25,6 +25,19 @@ version=release['gsisRelease']
 build_label=release.get('gsisBuildLabel',version)
 assert re.fullmatch(re.escape(version)+r'[a-z]?',build_label), 'gsisBuildLabel must be the release plus at most one letter'
 label_pattern=re.compile(r'(\?v=|(?<![\w.])v)'+re.escape(version)+r'[a-z]?(?![\w.])')
+# Protocol versions stay unchanged. These generated constants identify code builds.
+frontend_folders=list(json.loads((root/'release-installation-manifest.json').read_text())['frontends'].values())
+lord_templates=['lord-suite/First_Time_Setup/templates/'+app for app in ['lord','overlord','starlord']]
+build_constant="const GSIS_BUILD_LABEL='"+build_label+"';\n"
+build_targets={name:False for name in ['backend/Code.gs','Contacts_Code.gs','calendar-backend/Code.gs','venues-backend/Code.gs','lord-suite/Source/backend/Code.gs','lord-suite/First_Time_Setup/templates/backend/Code.gs','roster-update/public/edge-roster.js']}
+build_targets.update({folder+'/_worker.js':True for folder in frontend_folders+lord_templates})
+build_targets.update({'notification-worker/index.js':False,'operations-worker/index.js':False,'calendar-job-worker/worker.mjs':False})
+for target,headers in build_targets.items():
+ path=root/target;content=path.read_text();marker='GSIS_BUILD_LABEL'
+ block='/* '+marker+'_BEGIN */\n'+build_constant+((root/'shared/build-label.js').read_text() if headers else '')+'/* '+marker+'_END */'
+ pattern=r'/\* '+marker+r'_BEGIN \*/[\s\S]*?/\* '+marker+r'_END \*/'
+ assert len(re.findall(pattern,content))<=1, 'Duplicate build label: '+target
+ path.write_text(re.sub(pattern,lambda _:block,content) if re.search(pattern,content) else block+'\n'+content)
 # LORD setup templates must stay byte-identical to their Source pages.
 for folder in [*json.loads((root/'release-installation-manifest.json').read_text())['frontends'].values(),*['lord-suite/First_Time_Setup/templates/'+app for app in ['lord','overlord','starlord']]]:
  for page in sorted((root/folder).rglob('*.html')):
@@ -161,6 +174,17 @@ app=root/'public/app.js'
 app.write_text(re.sub(r'^controls\(\);startSignIn\(\);\s*$', '', app.read_text(), flags=re.M).rstrip()+'\n\ncontrols();startSignIn();\n')
 subprocess.run(['node',str(root/'scripts/build-edge-deploy.cjs')],cwd=root,check=True)
 subprocess.run(['node',str(root/'scripts/build-edge-modules.cjs')],cwd=root,check=True)
+# Edge setup HTML is generated above; stamp pages and copy the notice afterwards.
+for folder in frontend_folders+lord_templates:
+ shutil.copyfile(root/'shared/version-notice.js',root/folder/'version-notice.js')
+ for page in sorted((root/folder).rglob('*.html')):
+  content=label_pattern.sub(lambda m:m.group(1)+build_label,page.read_text())
+  content=re.sub(r'<meta name="gsis-build-label"[^>]*>\s*','',content)
+  content=re.sub(r'<script src="/?version-notice\.js[^\"]*"[^>]*></script>\s*','',content)
+  # Static landmark/privacy pages make no backend requests and need no observer.
+  notice='' if page.name in ['landmark.html','privacy.html'] else '<script src="/version-notice.js?v='+build_label+'"></script>\n'
+  content=re.sub(r'(<head\b[^>]*>)',lambda m:m[1]+'\n<meta name="gsis-build-label" content="'+build_label+'">\n'+notice,content,count=1,flags=re.I)
+  page.write_text(content)
 code=(root/'backend/Code.gs').read_text()+'\n'+(root/'backend/Seed.gs').read_text()
 assert code.count("const GSIS_BACKEND_KIND='deploy';")==1, 'Canonical backend needs one fixed Deploy role'
 roster_version=release.get('gsisComponentVersions',{}).get('rosterBackend',version)

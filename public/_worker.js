@@ -1,3 +1,15 @@
+/* GSIS_BUILD_LABEL_BEGIN */
+const GSIS_BUILD_LABEL='0.9.9f';
+/* Executing gateway identity is separate from the observed upstream build. */
+function gsisBuildMetadata(value){
+ const label=value?.gsisBuildLabel;
+ return typeof label==='string'&&label.length<=32&&/^\d+\.\d+\.\d+[a-z]?$/.test(label)?{gsisBuildLabel:label}:{};
+}
+function gsisBuildHeaders(value){
+ const label=gsisBuildMetadata(value).gsisBuildLabel;
+ return {'X-GSiS-Worker-Build-Label':GSIS_BUILD_LABEL,...(label?{'X-GSiS-Build-Label':label}:{})};
+}
+/* GSIS_BUILD_LABEL_END */
 import {edgeDeployEnabled,edgeDeployDispatch,edgeDeployAdmin,edgeDeployService} from './edge-deploy.js';
 import {callOperationalBackend,forwardOperationalRequest} from '../shared/backend-service.js';
 import {assertRecoveryWritable} from '../shared/edge-recovery.js';
@@ -16,7 +28,7 @@ function gsisApiSecret(env,legacyName){
 /* GSIS_API_SECRET_END */
 // GSiS Deploy: same-origin authenticated gateway. No secrets in browser assets.
 const enc=new TextEncoder();let keys=null,keysAt=0;
-function json(data,status=200){return Response.json(data,{status,headers:{'Cache-Control':'no-store','X-Content-Type-Options':'nosniff','Referrer-Policy':'same-origin'}})}
+function json(data,status=200){return Response.json(data,{status,headers:{...gsisBuildHeaders(data),'Cache-Control':'no-store','X-Content-Type-Options':'nosniff','Referrer-Policy':'same-origin'}})}
 function decode(s){if(!/^[A-Za-z0-9_-]+$/.test(s))throw Error('Invalid token');return Uint8Array.from(atob(s.replace(/-/g,'+').replace(/_/g,'/')),c=>c.charCodeAt(0))}
 // Coalesce concurrent key reads. A missing key refreshes once per short cooldown;
 // known keys remain usable and a failed fetch never replaces the last valid set.
@@ -45,7 +57,7 @@ async function backend(env,action,input,who,trace){
  assertRecoveryWritable(env);
  const delegated=await callOperationalBackend(env,'deploy',{action,input,identity:who,traceId:trace.traceId,diagnosticId:trace.diagnosticId,started:trace.started});if(delegated!==undefined)return delegated;
  const started=Date.now(),diagnosticId=trace.diagnosticId;trace.backendStarted=started;
- if(action==='deployEdgeAdmin'||edgeDeployEnabled(env)){try{const data=action==='deployEdgeAdmin'?await edgeDeployAdmin(env,input,who):await edgeDeployDispatch(env,action,input,who,trace.context);return {ok:true,data,gatewayTiming:{backendMs:Date.now()-started,totalMs:Date.now()-trace.started,diagnosticId,traceId:trace.traceId}};}catch(e){return {ok:false,status:e.status||503,error:e.status?e.message:'Deploy edge service unavailable.',code:e.code};}}
+ if(action==='deployEdgeAdmin'||edgeDeployEnabled(env)){try{const data=action==='deployEdgeAdmin'?await edgeDeployAdmin(env,input,who):await edgeDeployDispatch(env,action,input,who,trace.context);return {ok:true,gsisBuildLabel:GSIS_BUILD_LABEL,data,gatewayTiming:{backendMs:Date.now()-started,totalMs:Date.now()-trace.started,diagnosticId,traceId:trace.traceId}};}catch(e){return {ok:false,gsisBuildLabel:GSIS_BUILD_LABEL,status:e.status||503,error:e.status?e.message:'Deploy edge service unavailable.',code:e.code};}}
  const endpoint=new URL(env.APPS_SCRIPT_URL);
  if(endpoint.protocol!=='https:'||endpoint.hostname!=='script.google.com'||!/^\/macros\/s\/[^/]+\/exec$/.test(endpoint.pathname))throw Object.assign(Error('Invalid backend URL'),{code:'BACKEND_CONFIG'});
  const body=await sign({action,input,identity:who,timestamp:Date.now(),nonce:diagnosticId,traceId:trace.traceId},gsisApiSecret(env,'BRIDGE_SECRET'));

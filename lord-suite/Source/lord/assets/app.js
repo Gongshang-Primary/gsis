@@ -1859,6 +1859,7 @@ async function lordFetch(url, options = {}) {
     try {
       const response = await fetch(url, { ...options, signal: controller.signal });
       clearTimeout(timer);
+      window.GSISversionNotice?.(response);
       if (response.status === 401) {
         const err = new Error('Your LORD session has expired. Sign in again to continue.');
         err.code = 'AUTH_EXPIRED';

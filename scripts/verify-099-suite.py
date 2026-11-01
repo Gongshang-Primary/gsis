@@ -52,8 +52,12 @@ def verify_source_provenance(root, metadata, review):
     committed = metadata['sourceState'] == 'committed'
     if committed:
         assert not p.git(root, 'status', '--porcelain').strip(), 'Committed source claim has a dirty checkout'
-        assert metadata['tag'] == 'v' + p.VERSION, 'Committed release tag claim differs'
-        assert p.git(root, 'rev-parse', 'refs/tags/v' + p.VERSION + '^{commit}').decode().strip() == head, 'Release tag differs from trusted HEAD'
+        label = metadata.get('buildLabel', p.VERSION)
+        assert isinstance(label, str) and re.fullmatch(re.escape(p.VERSION) + r'[a-z]?', label), 'Invalid build label claim'
+        if 'buildLabel' in metadata:
+            assert p.release_build_label(json.loads(p.read_required(root, 'package.json'))) == label, 'Build label differs from trusted source'
+        assert metadata['tag'] == 'v' + label, 'Committed release tag claim differs'
+        assert p.git(root, 'rev-parse', 'refs/tags/v' + label + '^{commit}').decode().strip() == head, 'Release tag differs from trusted HEAD'
     else:
         assert metadata['sourceState'] == 'working-tree-preview' and metadata['tag'] is None, 'Unexpected preview provenance'
     expected = p.git(root, 'diff', '--binary', p.BASELINE, *([head] if committed else []))
@@ -171,8 +175,11 @@ def verify(suite_path, review_path, source_root, preview=False):
     review_meta = p.verify_archive(review_path)
     for field in ['release', 'sourceCommit', 'sourceState', 'baselineCommit', 'productionDeployed', 'productionAuthorities', 'authorityCutoverPerformed', 'componentVersions', 'tag', 'baseline']:
         assert suite_meta[field] == review_meta[field], 'Suite/review provenance differs: ' + field
+    assert suite_meta.get('buildLabel') == review_meta.get('buildLabel'), 'Suite/review build labels differ'
+    if 'buildLabel' in suite_meta:
+        assert suite_meta['buildLabel'] == p.release_build_label(json.loads(p.read_required(source_root, 'package.json'))), 'Suite build label differs from trusted source'
     assert suite_meta['release'] == p.VERSION and suite_meta['baselineCommit'] == p.BASELINE
-    assert suite_meta['productionAuthorities'] == p.PRODUCTION_AUTHORITIES
+    assert suite_meta['productionAuthorities'] == (p.BUILD_PRODUCTION_AUTHORITIES if 'buildLabel' in suite_meta else p.PRODUCTION_AUTHORITIES), 'Production authority claim differs from this archive format'
     expected_keys = {name.lower() + 'Frontend' for name in p.FRONTENDS} | {name.lower() + 'Backend' for name in p.BACKENDS} | {'notificationWorker', 'operationsWorker', 'calendarJobWorker'}
     assert suite_meta['componentVersions'] == dict.fromkeys(expected_keys, p.VERSION), 'Eighteen component versions must match'
     assert suite_meta['productionDeployed'] is False and suite_meta['authorityCutoverPerformed'] is False
@@ -242,9 +249,16 @@ def verify(suite_path, review_path, source_root, preview=False):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('suite', type=Path)
-    parser.add_argument('review', type=Path)
+    parser.add_argument('suite', type=Path, nargs='?', help='Full-suite ZIP; defaults to the current full-label bundle folder')
+    parser.add_argument('review', type=Path, nargs='?', help='Review-source ZIP; defaults alongside the full-suite ZIP')
     parser.add_argument('--source-root', type=Path, default=ROOT)
     parser.add_argument('--preview', action='store_true')
     args = parser.parse_args()
+    if args.suite is None and args.review is None:
+        label = p.release_build_label(json.loads(p.read_required(args.source_root, 'package.json')))
+        folder = args.source_root.parent / 'deliverables' / ('GSiS_v' + label)
+        args.suite = folder / ('GSiS_v' + p.VERSION + '_Full_Suite.zip')
+        args.review = folder / ('GSiS_v' + p.VERSION + '_Review_Source.zip')
+    elif args.suite is None or args.review is None:
+        parser.error('Supply both suite and review paths, or neither for the current bundle')
     print(json.dumps(verify(args.suite.resolve(), args.review.resolve(), args.source_root.resolve(), args.preview), indent=2))

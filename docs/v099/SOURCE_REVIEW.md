@@ -6,7 +6,7 @@ The review archive retains current source, meaningful tests and required compari
 
 ## Review priorities
 
-1. Confirm production Roster still uses the Google recovery profile. A Worker route or durable accepted receipt must not be mistaken for D1 operational authority or an applied absence.
+1. Verify Roster's configured authority against the current owner deployment record and preserve it. The historical 0.9.9 baseline used the Google recovery profile; the owner has reported a later D1 cutover. This package records unchanged configured authority and performs no live authority probe or change. A Worker route or durable accepted receipt must not be mistaken for verified authority or an applied absence.
 2. Check Calendar source commit, queue receipt, change invalidation and provider sync as separate states. Optional push is explicitly enabled only after its setup; `CALENDAR_SYNC_CONTINUE=false` is retained.
 3. Exercise table stability with delayed responses, an open draft, a newer local save, a role change and a row growing above the viewport. Preserve meaningful current contract tests rather than restoring obsolete policy expectations.
 4. Inspect the optional change journal's crash/replay, authorization, pruning and disconnected-client boundaries. A generic invalidation is not proof that an uncertain Google write committed.

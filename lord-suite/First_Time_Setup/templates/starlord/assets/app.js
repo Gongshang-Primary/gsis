@@ -149,6 +149,7 @@
         headers: { 'Accept': 'application/json' },
         signal: controller.signal
       });
+      window.GSISversionNotice?.(response);
       let payload;
       try { payload = await response.json(); }
       catch { const error=new Error('Invalid booking response'); error.code='BOARD_INVALID_JSON'; throw error; }

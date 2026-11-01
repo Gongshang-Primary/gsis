@@ -1,3 +1,15 @@
+/* GSIS_BUILD_LABEL_BEGIN */
+const GSIS_BUILD_LABEL='0.9.9f';
+/* Executing gateway identity is separate from the observed upstream build. */
+function gsisBuildMetadata(value){
+ const label=value?.gsisBuildLabel;
+ return typeof label==='string'&&label.length<=32&&/^\d+\.\d+\.\d+[a-z]?$/.test(label)?{gsisBuildLabel:label}:{};
+}
+function gsisBuildHeaders(value){
+ const label=gsisBuildMetadata(value).gsisBuildLabel;
+ return {'X-GSiS-Worker-Build-Label':GSIS_BUILD_LABEL,...(label?{'X-GSiS-Build-Label':label}:{})};
+}
+/* GSIS_BUILD_LABEL_END */
 /* GSIS_API_SECRET_BEGIN */
 // First-party API credentials share one operator-selected setting. Browser
 // sessions, private relief links and third-party credentials stay independent.
@@ -13,7 +25,7 @@ function gsisApiSecret(env,legacyName){
 /* GSIS_API_SECRET_END */
 // GSiS Deploy: same-origin authenticated gateway. No secrets in browser assets.
 const enc=new TextEncoder();let keys=null,keysAt=0;
-function json(data,status=200){return Response.json(data,{status,headers:{'Cache-Control':'no-store','X-Content-Type-Options':'nosniff','Referrer-Policy':'same-origin'}})}
+function json(data,status=200){return Response.json(data,{status,headers:{...gsisBuildHeaders(data),'Cache-Control':'no-store','X-Content-Type-Options':'nosniff','Referrer-Policy':'same-origin'}})}
 function decode(s){if(!/^[A-Za-z0-9_-]+$/.test(s))throw Error('Invalid token');return Uint8Array.from(atob(s.replace(/-/g,'+').replace(/_/g,'/')),c=>c.charCodeAt(0))}
 // Coalesce concurrent key reads. A missing key refreshes once per short cooldown;
 // known keys remain usable and a failed fetch never replaces the last valid set.

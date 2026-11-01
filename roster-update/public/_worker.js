@@ -1,3 +1,15 @@
+/* GSIS_BUILD_LABEL_BEGIN */
+const GSIS_BUILD_LABEL='0.9.9f';
+/* Executing gateway identity is separate from the observed upstream build. */
+function gsisBuildMetadata(value){
+ const label=value?.gsisBuildLabel;
+ return typeof label==='string'&&label.length<=32&&/^\d+\.\d+\.\d+[a-z]?$/.test(label)?{gsisBuildLabel:label}:{};
+}
+function gsisBuildHeaders(value){
+ const label=gsisBuildMetadata(value).gsisBuildLabel;
+ return {'X-GSiS-Worker-Build-Label':GSIS_BUILD_LABEL,...(label?{'X-GSiS-Build-Label':label}:{})};
+}
+/* GSIS_BUILD_LABEL_END */
 import {recoveryTimetableSnapshot} from './roster-recovery-timetable-cache.js';
 import {dispatchEdgeDeliveryReview,edgeDeliveryReportRead,edgeDeliveryReviewBackend} from './edge-notification-review.js';
 import {edgeRosterEnabled,edgeRosterService,edgeRosterBackend,edgeRosterMigration,readEdgeRosterReferences,mirrorEdgeRoster,readRosterMirrorStatus} from './edge-roster.js';
@@ -23,7 +35,7 @@ function gsisApiSecret(env,legacyName){
 /* GSIS_API_SECRET_END */
 // GSiS Deploy: same-origin authenticated gateway. No secrets in browser assets.
 const enc=new TextEncoder();let keys=null,keysAt=0;
-function json(data,status=200){return Response.json(data,{status,headers:{'Cache-Control':'no-store','X-Content-Type-Options':'nosniff','Referrer-Policy':'no-referrer'}})}
+function json(data,status=200){return Response.json(data,{status,headers:{...gsisBuildHeaders(data),'Cache-Control':'no-store','X-Content-Type-Options':'nosniff','Referrer-Policy':'no-referrer'}})}
 function decode(s){if(!/^[A-Za-z0-9_-]+$/.test(s))throw Error('Invalid token');return Uint8Array.from(atob(s.replace(/-/g,'+').replace(/_/g,'/')),c=>c.charCodeAt(0))}
 // Coalesce concurrent key reads. A missing key refreshes once per short cooldown;
 // known keys remain usable and a failed fetch never replaces the last valid set.
@@ -52,10 +64,10 @@ export async function sign(data,secret,ascii=false){const raw=JSON.stringify(dat
 async function backend(env,action,input,who,traceId){
  assertRecoveryWritable(env);
  const delegated=await callOperationalBackend(env,'roster',{action,input,identity:who,traceId});if(delegated!==undefined)return delegated;
- if(action==='edgeMigration'){try{return {result:{ok:true,data:await edgeRosterMigration(env,input,who)},backendMs:0};}catch(error){return {result:{ok:false,status:error.status||503,code:error.code,error:error.message},backendMs:0};}}
+ if(action==='edgeMigration'){try{return {result:{ok:true,gsisBuildLabel:GSIS_BUILD_LABEL,data:await edgeRosterMigration(env,input,who)},backendMs:0};}catch(error){return {result:{ok:false,gsisBuildLabel:GSIS_BUILD_LABEL,status:error.status||503,code:error.code,error:error.message},backendMs:0};}}
  if(edgeRosterEnabled(env)){
   const inbox=action==='rosterInbox',review=action==='rosterOperations'&&['deliveryReview','dismissDeliveryIssues','cancelPendingNotifications'].includes(input.operation);
-  if(inbox||review){const started=Date.now();try{return {result:{ok:true,data:await (inbox?edgeInboxBackend(env,input,who):edgeDeliveryReviewBackend(env,input,who))},backendMs:Date.now()-started};}catch(error){return {result:{ok:false,status:error.status||503,code:error.code,error:error.status&&error.status<500?error.message:'The operation could not be confirmed.'},backendMs:Date.now()-started};}}
+  if(inbox||review){const started=Date.now();try{return {result:{ok:true,gsisBuildLabel:GSIS_BUILD_LABEL,data:await (inbox?edgeInboxBackend(env,input,who):edgeDeliveryReviewBackend(env,input,who))},backendMs:Date.now()-started};}catch(error){return {result:{ok:false,gsisBuildLabel:GSIS_BUILD_LABEL,status:error.status||503,code:error.code,error:error.status&&error.status<500?error.message:'The operation could not be confirmed.'},backendMs:Date.now()-started};}}
   return edgeRosterBackend(env,action,input,who,traceId);
  }
  const started=Date.now(),nonce=crypto.randomUUID();
@@ -125,7 +137,7 @@ export async function timetableSnapshot(env,input,who,traceId){
  try{
   if(!flights.has(requestKey))flights.set(requestKey,build().finally(()=>flights.delete(requestKey)));
   const data=await flights.get(requestKey);if(data.failure||data.uncached)return data.failure||data.uncached;
-  return {result:{ok:true,data:{...data,checkedAt:new Date().toISOString()}},backendMs:Date.now()-started,upstreamTraceId:traceId};
+  return {result:{ok:true,...(manifestRead.result.gsisBuildLabel?{gsisBuildLabel:manifestRead.result.gsisBuildLabel}:{}),data:{...data,checkedAt:new Date().toISOString()}},backendMs:Date.now()-started,upstreamTraceId:traceId};
  }catch(error){
   if(error.code==='SNAPSHOT_BUILDING')throw error;
   // A cache/storage failure cannot turn a permitted timetable into lost data.
@@ -362,7 +374,7 @@ export default {async fetch(req,env,ctx){
 }};
 function rosterBackendFailure(result){
  const safe=safeHealthError(result),{code,httpStatus,...detail}=safe;
- return {...detail,...(code===result.code?{code}:{}),...(['ABSENCE_PREPARATION_RETRY','ABSENCE_INTAKE_BUSY','ABSENCE_INTAKE_PENDING'].includes(result.code)?{backendCode:result.code,...(['TIMETABLE_MANIFEST_CHANGED','ABSENCE_CONTEXT_CHANGED','SCHOOL_DATE_CHANGED','REFERENCE_SOURCE_CHANGED'].includes(result.reasonCode)?{reasonCode:result.reasonCode}:{}),...(result.attempts===2?{attempts:2}:{})}:{})};
+ return {...detail,...(typeof result.gsisBuildLabel==='string'&&/^\d+\.\d+\.\d+[a-z]?$/.test(result.gsisBuildLabel)?{gsisBuildLabel:result.gsisBuildLabel}:{}),...(code===result.code?{code}:{}),...(['ABSENCE_PREPARATION_RETRY','ABSENCE_INTAKE_BUSY','ABSENCE_INTAKE_PENDING'].includes(result.code)?{backendCode:result.code,...(['TIMETABLE_MANIFEST_CHANGED','ABSENCE_CONTEXT_CHANGED','SCHOOL_DATE_CHANGED','REFERENCE_SOURCE_CHANGED'].includes(result.reasonCode)?{reasonCode:result.reasonCode}:{}),...(result.attempts===2?{attempts:2}:{})}:{})};
 }
 function rosterFailure(action,diagnosticId,detail){
  if(detail.code==='ROSTER_CUTOVER_FROZEN')return json({ok:false,status:423,code:'ROSTER_CUTOVER_FROZEN',error:'Roster is being moved; try again shortly.'},423);

@@ -1,3 +1,15 @@
+/* GSIS_BUILD_LABEL_BEGIN */
+const GSIS_BUILD_LABEL='0.9.9f';
+/* Executing gateway identity is separate from the observed upstream build. */
+function gsisBuildMetadata(value){
+ const label=value?.gsisBuildLabel;
+ return typeof label==='string'&&label.length<=32&&/^\d+\.\d+\.\d+[a-z]?$/.test(label)?{gsisBuildLabel:label}:{};
+}
+function gsisBuildHeaders(value){
+ const label=gsisBuildMetadata(value).gsisBuildLabel;
+ return {'X-GSiS-Worker-Build-Label':GSIS_BUILD_LABEL,...(label?{'X-GSiS-Build-Label':label}:{})};
+}
+/* GSIS_BUILD_LABEL_END */
 /* GSIS_API_SECRET_BEGIN */
 // First-party API credentials share one operator-selected setting. Browser
 // sessions, private relief links and third-party credentials stay independent.
@@ -13,7 +25,7 @@ function gsisApiSecret(env,legacyName){
 /* GSIS_API_SECRET_END */
 // GSiS Deploy: same-origin authenticated gateway. No secrets in browser assets.
 const enc=new TextEncoder();let keys=null,keysAt=0;
-function json(data,status=200){return Response.json(data,{status,headers:{'Cache-Control':'no-store','X-Content-Type-Options':'nosniff','Referrer-Policy':'same-origin'}})}
+function json(data,status=200){return Response.json(data,{status,headers:{...gsisBuildHeaders(data),'Cache-Control':'no-store','X-Content-Type-Options':'nosniff','Referrer-Policy':'same-origin'}})}
 function decode(s){if(!/^[A-Za-z0-9_-]+$/.test(s))throw Error('Invalid token');return Uint8Array.from(atob(s.replace(/-/g,'+').replace(/_/g,'/')),c=>c.charCodeAt(0))}
 // Coalesce concurrent key reads. A missing key refreshes once per short cooldown;
 // known keys remain usable and a failed fetch never replaces the last valid set.
@@ -57,7 +69,7 @@ function publicSnapshot(result,year){
  clean.reviews=(Array.isArray(data.reviews)?data.reviews:[]).map(r=>publicPick(r,'id kind target sourceValue referenceValue action sourceLocator'));
  clean.sourceSummaries=(Array.isArray(data.sourceSummaries)?data.sourceSummaries:[]).map(r=>publicPick(r,'level label totalText breakdownText sourceLocator'));
  clean.handoff=data.handoff?publicPick(data.handoff,'status year versionId revision commit layoutRevision message'):null;
- return {ok:true,data:clean};
+ return {ok:true,...gsisBuildMetadata(result),data:clean};
 }
 function requestTrace(req){const supplied=req.headers.get('X-GSiS-Trace-ID');return supplied&&/^[\w-]{36}$/.test(supplied)?supplied:crypto.randomUUID();}
 async function backend(env,action,input,who,traceId){
@@ -98,7 +110,7 @@ const session=await sessionRoute(req,env);if(session)return session;
    const year=u.searchParams.get('year')||env.LAYOUT_YEAR||undefined,value=await publicCampus(req,env,year,traceId),since=u.searchParams.get('since');
    // Always cache the complete publication. A caller's cursor only changes
    // this response and cannot replace the canonical cache with 'unchanged'.
-   if(since&&value.result.ok&&value.result.data?.cursor===since&&publicSnapshot(value.result,year))value.result={ok:true,data:{unchanged:true,cursor:since,handoff:value.result.data.handoff}};
+   if(since&&value.result.ok&&value.result.data?.cursor===since&&publicSnapshot(value.result,year))value.result={ok:true,...gsisBuildMetadata(value.result),data:{unchanged:true,cursor:since,handoff:value.result.data.handoff}};
    const result=gatewayResult(value,traceId,started),response=json(result,result.ok?200:result.status||503);response.headers.set('Access-Control-Allow-Origin','*');return response;
   }
   if(u.pathname==='/api/unit/rename')return json({ok:false,error:'Edit venues in Deploy and explicitly republish to update Layout.'},410);

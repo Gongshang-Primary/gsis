@@ -15,6 +15,7 @@
    outer?.addEventListener('abort',abort,{once:true});
    try{
     response=await fetch(url,{...init,signal:controller.signal});
+    window.GSISversionNotice?.(response);
     // A response is complete only when its body has arrived within this deadline.
     if(typeof response.arrayBuffer==='function'&&typeof Response!=='undefined'){const bytes=await response.arrayBuffer();response=new Response([204,205,304].includes(response.status)?null:bytes,{status:response.status,statusText:response.statusText,headers:response.headers});}
     response.gsisDiagnostics=diagnostics;response.gsisAttempts=attempts;response.gsisTraceId=traceId;record.status=response.status;

@@ -1,3 +1,6 @@
+/* GSIS_BUILD_LABEL_BEGIN */
+const GSIS_BUILD_LABEL='0.9.9f';
+/* GSIS_BUILD_LABEL_END */
 /**
  * LORD component patch v0.9.8d. One Code.gs, one Apps Script web app,
  * two workbooks and two Drive folders. Existing schema and API actions retained.
@@ -2615,6 +2618,7 @@ function padNumber_(value, width) {
 }
 
 function jsonResponse_(payload) {
+  payload.gsisBuildLabel=GSIS_BUILD_LABEL;
   return ContentService
     .createTextOutput(JSON.stringify(payload))
     .setMimeType(ContentService.MimeType.JSON);
@@ -6293,6 +6297,7 @@ function referenceErrorMessage_(error) {
 }
 
 function referenceJsonResponse_(payload) {
+  payload.gsisBuildLabel=GSIS_BUILD_LABEL;
   return ContentService
     .createTextOutput(JSON.stringify(payload))
     .setMimeType(ContentService.MimeType.JSON);

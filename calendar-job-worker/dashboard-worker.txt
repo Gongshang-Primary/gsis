@@ -1,3 +1,6 @@
+/* GSIS_BUILD_LABEL_BEGIN */
+const GSIS_BUILD_LABEL='0.9.9f';
+/* GSIS_BUILD_LABEL_END */
 // GSiS Calendar Job Worker release 0.9.9; queue protocol unchanged.
 /** Optional Calendar-only durable command service. D1 is a receipt/queue, Google is authoritative. */
 const ACTIONS=new Set(['saveEvent','deleteEvent','saveParentSide','relocateEvent']);
@@ -7,6 +10,7 @@ const PURPOSE='calendar-job-gateway-v1';
 
 export default {
  async fetch(request,env){
+  if(new URL(request.url).pathname==='/health'&&request.method==='GET')return json({ok:true,version:GSIS_BUILD_LABEL});
   try{
    if(new URL(request.url).pathname==='/changes'&&request.method==='POST')return await calendarChangesRequest(request,env);
    if(new URL(request.url).pathname!=='/commands'||request.method!=='POST')return json({ok:false,error:'Not found.'},404);

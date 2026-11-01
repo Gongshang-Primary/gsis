@@ -1,3 +1,15 @@
+/* GSIS_BUILD_LABEL_BEGIN */
+const GSIS_BUILD_LABEL='0.9.9f';
+/* Executing gateway identity is separate from the observed upstream build. */
+function gsisBuildMetadata(value){
+ const label=value?.gsisBuildLabel;
+ return typeof label==='string'&&label.length<=32&&/^\d+\.\d+\.\d+[a-z]?$/.test(label)?{gsisBuildLabel:label}:{};
+}
+function gsisBuildHeaders(value){
+ const label=gsisBuildMetadata(value).gsisBuildLabel;
+ return {'X-GSiS-Worker-Build-Label':GSIS_BUILD_LABEL,...(label?{'X-GSiS-Build-Label':label}:{})};
+}
+/* GSIS_BUILD_LABEL_END */
 /* GSIS_API_SECRET_BEGIN */
 // First-party API credentials share one operator-selected setting. Browser
 // sessions, private relief links and third-party credentials stay independent.
@@ -97,6 +109,7 @@ async function loadBoardResponse(request, env) {
         const response=new Response(cached.body,cached);
         response.headers.set('X-LORD-Cache','HIT');
         response.headers.set('X-LORD-Worker-Version','0.9.9');
+        response.headers.set('X-GSiS-Worker-Build-Label',GSIS_BUILD_LABEL);
         return response;
       }
     } catch {}
@@ -114,10 +127,10 @@ async function loadBoardResponse(request, env) {
     let payload;
     try { payload=await upstream.json(); }
     catch { return json({ok:false,error:'The booking service returned a page instead of valid data.',code:'BOARD_INVALID_JSON'},502); }
-    if(payload && payload.ok===false) return json({ok:false,error:'The backend could not produce the booking feed.',code:'BOARD_BACKEND_REJECTED'},502);
+    if(payload && payload.ok===false) return json({ok:false,gsisBuildLabel:payload.gsisBuildLabel,error:'The backend could not produce the booking feed.',code:'BOARD_BACKEND_REJECTED'},502);
     if(!payload || payload.ok!==true || !Array.isArray(payload.bookings)) return json({ok:false,error:'The booking service returned an invalid feed.',code:'BOARD_INVALID_FEED'},502);
     if(forceRefresh && payload.cacheReloaded!==true) return json({ok:false,error:'Reload requires the current LORD backend.',code:'BOARD_BACKEND_VERSION'},502);
-    const headers={'Content-Type':'application/json; charset=utf-8','Cache-Control':'public, max-age=15, s-maxage=30',
+    const headers={...gsisBuildHeaders(payload),'Content-Type':'application/json; charset=utf-8','Cache-Control':'public, max-age=15, s-maxage=30',
       'X-Content-Type-Options':'nosniff','Referrer-Policy':'no-referrer','X-LORD-Fetched-At':String(startedAt),'X-LORD-Worker-Version':'0.9.9',
       'Content-Security-Policy':"default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'none'"};
     if(cache) {
@@ -177,6 +190,7 @@ function json(payload, status = 200) {
       'Content-Type': 'application/json; charset=utf-8',
       'Cache-Control': 'no-store',
       'X-LORD-Worker-Version': '0.9.9',
+      ...gsisBuildHeaders(payload),
       'X-Content-Type-Options': 'nosniff'
     }
   });

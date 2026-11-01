@@ -1,3 +1,6 @@
+/* GSIS_BUILD_LABEL_BEGIN */
+const GSIS_BUILD_LABEL='0.9.9f';
+/* GSIS_BUILD_LABEL_END */
 import rosterGateway,{rosterBackend,serviceBackend,absenceTransportRoute,assertAbsenceTransportReady,forwardAbsenceTransport,receivedReportWorkDue} from '../roster-update/public/_worker.js';
 import deployGateway,{deployBackend} from '../public/_worker.js';
 import {runDeployHandoffs} from '../public/edge-deploy.js';
@@ -77,9 +80,10 @@ async function relay(env,command,ctx){
  return (domain==='roster'?rosterGateway:deployGateway).fetch(request,env,ctx);
 }
 export default {async fetch(request,bindings,ctx){
+ if(new URL(request.url).pathname==='/health'&&request.method==='GET')return Response.json({ok:true,version:GSIS_BUILD_LABEL},{headers:{'Cache-Control':'no-store'}});
  try{
   const command=await verifyBackendEnvelope(request,bindings),domain=command.purpose.startsWith('deploy')?'deploy':'roster',env=backendDomainEnv(bindings,domain);
-  if(command.purpose==='health')return Response.json({ok:true,value:await health(env,command)},{headers:{'Cache-Control':'no-store'}});
+  if(command.purpose==='health')return Response.json({ok:true,version:GSIS_BUILD_LABEL,value:await health(env,command)},{headers:{'Cache-Control':'no-store'}});
   if(command.purpose==='roster'&&(!ROSTER_ACTIONS.has(command.action)||!object(command.input))||command.purpose==='deploy'&&(!DEPLOY_ACTIONS.has(command.action)||!object(command.input)))fail(403,'GSIS_BACKEND_ACTION','This operational action is not available.');
   assertRecoveryWritable(env);await authority(env,domain,command);
   if(command.purpose.endsWith('-http'))return await relay(env,command,ctx);

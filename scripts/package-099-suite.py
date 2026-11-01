@@ -5,11 +5,15 @@ changes Git history, or runs a migration. Default operation requires committed
 source and the exact release tag. --preview creates explicitly uncommitted drafts.
 """
 from pathlib import Path, PurePosixPath
+from contextlib import contextmanager
 import argparse
 import hashlib
 import json
+import os
 import re
+import shutil
 import subprocess
+import sys
 import tempfile
 import zipfile
 
@@ -35,6 +39,9 @@ WORKERS = {
 }
 PRODUCTION_AUTHORITIES = {'roster': 'Google', 'calendar': 'Google',
                          'deploy': 'unchanged configured authority', 'preparation': 'shadow-only'}
+# Preserve the historical 0.9.9 archive contract. A new build cannot infer the
+# current Roster authority from source or a release label.
+BUILD_PRODUCTION_AUTHORITIES = {**PRODUCTION_AUTHORITIES, 'roster': 'unchanged configured authority'}
 
 EXCLUDED_LIVE_EVIDENCE = {
     'docs/reviews/optimization-20261024/lord-deploy-live-catalogue-evidence.json',
@@ -278,8 +285,87 @@ def build(root):
     return {'release': VERSION, 'builtProductionComponents': len(files), 'productionDeployed': False}
 
 
+def release_build_label(settings):
+    label = settings.get('gsisBuildLabel', settings['gsisRelease'])
+    assert isinstance(label, str) and re.fullmatch(re.escape(VERSION) + r'[a-z]?', label), 'Invalid gsisBuildLabel; use the release plus one letter (ask the owner after z)'
+    return label
+
+
+@contextmanager
+def final_bundle_lock(lock):
+    """Native nonblocking locks release on close/crash as well as normal exit."""
+    if sys.platform == 'win32':
+        import msvcrt
+        if os.fstat(lock.fileno()).st_size == 0:
+            lock.write(b'\0')
+            lock.flush()
+        lock.seek(0)
+        acquire = lambda: msvcrt.locking(lock.fileno(), msvcrt.LK_NBLCK, 1)
+        release = lambda: msvcrt.locking(lock.fileno(), msvcrt.LK_UNLCK, 1)
+    else:
+        import fcntl
+        acquire = lambda: fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        release = lambda: fcntl.flock(lock, fcntl.LOCK_UN)
+    try:
+        acquire()
+    except OSError:
+        raise AssertionError('Another final bundle is in progress for this source; retry after it finishes') from None
+    try:
+        yield
+    finally:
+        lock.seek(0)
+        release()
+
+
 def package(root, output, preview=False, evidence_dir=None):
+    """Mandatory final delivery gate; previews and ordinary builds never consume labels."""
+    if preview:
+        return _package(root, output, preview, evidence_dir)
+    # Git internals stay outside source inventory/dirty checks. Keep one inode:
+    # unlinking a lock file could let another process lock a different inode.
+    lock_path = Path(git(root, 'rev-parse', '--absolute-git-dir').decode().strip()) / 'gsis-final-bundle.lock'
+    with lock_path.open('a+b') as lock, final_bundle_lock(lock):
+        return _final_package(root, output, preview, evidence_dir)
+
+
+def _final_package(root, output, preview, evidence_dir):
+    label = release_build_label(json.loads(read_required(root, 'package.json', 'release metadata')))
+    last = root / 'release/LAST_BUNDLE_VERSION'
+    assert last.is_file(), 'Missing tracked last successful bundle label'
+    assert last.read_text().strip() != label, 'This label already has a bundle; advance gsisBuildLabel before final packaging'
+    destination = output / ('GSiS_v' + label)
+    assert not destination.exists(), 'Bundle folder already exists: ' + str(destination)
+    output.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(prefix='.GSiS_v' + label + '-', dir=output) as td:
+        staging = Path(td)
+        result = _package(root, staging, preview, evidence_dir)
+        (staging / 'DEPLOY_STEPS.md').write_text('# GSiS v' + label + ' deploy steps\n\nSource commit: `' + result['sourceCommit'] + '`.\n\nUse START_HERE in the full suite for the existing destinations, settings, component install order and verification. Component filenames/protocol remain v' + VERSION + '. This bundle is prepared; deployment is the owner\'s decision. Record the actual rollout in docs/coordination/DEPLOYMENTS.md.\n')
+        (staging / 'COMMIT.txt').write_text('GSiS v' + label + '\nSource commit: ' + result['sourceCommit'] + '\nProtocol/component version: ' + VERSION + '\n')
+        staging.rename(destination)
+        for kind in ['suite', 'review']:
+            if kind in result:
+                result[kind]['path'] = str(destination / Path(result[kind]['path']).name)
+    # Nothing above this point consumes a label. A failed archive remains retryable.
+    temporary = None
+    try:
+        with tempfile.NamedTemporaryFile(mode='w', prefix='last-bundle-', dir=last.parent, delete=False) as handle:
+            temporary = Path(handle.name)
+            handle.write(label + '\n')
+        temporary.replace(last)
+    except BaseException:
+        # This transaction alone created/promoted this folder. Roll it back
+        # while holding the source lock so the unconsumed label can be retried.
+        shutil.rmtree(destination)
+        raise
+    finally:
+        if temporary is not None:
+            temporary.unlink(missing_ok=True)
+    return {**result, 'buildLabel': label, 'bundle': str(destination)}
+
+
+def _package(root, output, preview=False, evidence_dir=None):
     settings = json.loads(read_required(root, 'package.json', 'release metadata'))
+    build_label = release_build_label(settings)
     assert settings['gsisRelease'] == VERSION, 'Package release is not 0.9.9'
     assert set(settings['gsisComponentVersions'].values()) == {VERSION}, 'Production component labels are not harmonised'
     expected_keys = {n.lower() + 'Frontend' for n in FRONTENDS} | {n.lower() + 'Backend' for n in BACKENDS} | {'notificationWorker', 'operationsWorker', 'calendarJobWorker'}
@@ -291,15 +377,15 @@ def package(root, output, preview=False, evidence_dir=None):
     dirty = bool(git(root, 'status', '--porcelain').strip())
     if not preview:
         assert not dirty, 'Commit every source change before final packaging'
-        assert git(root, 'rev-parse', 'refs/tags/v' + VERSION + '^{commit}').decode().strip() == commit, '0.9.9 tag does not identify HEAD'
+        assert git(root, 'rev-parse', 'refs/tags/v' + build_label + '^{commit}').decode().strip() == commit, 'Build-label tag does not identify HEAD'
     names = sorted(set(tracked + (untracked if preview else [])))
     current = {name for name in names if (root / name).is_file()}
     assert not (set(tracked) - current), 'Tracked source deletion must be committed before packaging'
     review, index = source_files(root, sorted(current))
-    metadata = {'schema': 1, 'release': VERSION, 'sourceCommit': commit,
+    metadata = {'schema': 1, 'release': VERSION, 'buildLabel': build_label, 'sourceCommit': commit,
                 'sourceState': 'working-tree-preview' if dirty or preview else 'committed',
-                'baseline': BASELINE_LABEL, 'baselineCommit': BASELINE, 'componentVersions': settings['gsisComponentVersions'], 'tag': None if dirty or preview else 'v' + VERSION,
-                'productionDeployed': False, 'productionAuthorities': PRODUCTION_AUTHORITIES,
+                'baseline': BASELINE_LABEL, 'baselineCommit': BASELINE, 'componentVersions': settings['gsisComponentVersions'], 'tag': None if dirty or preview else 'v' + build_label,
+                'productionDeployed': False, 'productionAuthorities': BUILD_PRODUCTION_AUTHORITIES,
                 'authorityCutoverPerformed': False, 'historyKind': 'current-source-with-baseline-diff'}
     review['SOURCE_INDEX.json'] = json_bytes(index)
     review['CHANGES_FROM_0.9.9_BASELINE.patch'] = git(root, 'diff', '--binary', BASELINE, *([] if preview else [commit]))
@@ -320,6 +406,8 @@ def package(root, output, preview=False, evidence_dir=None):
         name = safe_path(item['name'])
         assert '/' not in name and item['productionInstallation'] is False, 'Preparation must remain separate'
         path = output / name
+        if not path.is_file():
+            path = output.parent / name
         assert path.is_file(), 'Missing separately verified preparation companion: ' + name
         data = path.read_bytes()
         verify_preparation_bytes(data)

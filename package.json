@@ -5,7 +5,7 @@
   "scripts": {
     "test": "node tests/run.cjs && python3 lord-suite/tests/run_all_checks.py",
     "build": "python3 scripts/package-099-suite.py --build-only",
-    "test:release": "python3 scripts/verify-099-suite.py ../deliverables/GSiS_v0.9.9_Full_Suite.zip ../deliverables/GSiS_v0.9.9_Review_Source.zip",
+    "test:release": "python3 scripts/verify-099-suite.py",
     "test:lord": "python3 lord-suite/tests/run_all_checks.py",
     "package:suite": "python3 scripts/package-099-suite.py --evidence-dir verification/v099",
     "test:packaging": "python3 tests/release098p-packaging.py && python3 tests/release098q-packaging.py && python3 tests/release099-packaging.py",

@@ -11,6 +11,8 @@ npm run build
 TZ=Asia/Singapore npm test
 ```
 
+Final deliveries must use `npm run package:suite` after advancing `gsisBuildLabel` and tagging the exact reviewed source with that full label. Ordinary builds and `--preview` remain repeatable. See [release label and bundle steps](release/README.md).
+
 ## Rules
 1. Never commit secrets, `.dev.vars` files or school data exports.
 2. Deployment timing is the owner's decision (docs/coordination/OWNER_DIRECTIVES.md). Record every deployment in docs/coordination/DEPLOYMENTS.md.

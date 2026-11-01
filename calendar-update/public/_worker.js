@@ -1,3 +1,15 @@
+/* GSIS_BUILD_LABEL_BEGIN */
+const GSIS_BUILD_LABEL='0.9.9f';
+/* Executing gateway identity is separate from the observed upstream build. */
+function gsisBuildMetadata(value){
+ const label=value?.gsisBuildLabel;
+ return typeof label==='string'&&label.length<=32&&/^\d+\.\d+\.\d+[a-z]?$/.test(label)?{gsisBuildLabel:label}:{};
+}
+function gsisBuildHeaders(value){
+ const label=gsisBuildMetadata(value).gsisBuildLabel;
+ return {'X-GSiS-Worker-Build-Label':GSIS_BUILD_LABEL,...(label?{'X-GSiS-Build-Label':label}:{})};
+}
+/* GSIS_BUILD_LABEL_END */
 /* GSIS_API_SECRET_BEGIN */
 // First-party API credentials share one operator-selected setting. Browser
 // sessions, private relief links and third-party credentials stay independent.
@@ -276,7 +288,7 @@ async function proxyAppsScript(env, actor, action, payload) {
 
   if (!data || data.ok !== true) {
     const message = data && data.error ? data.error : 'Calendar backend returned an invalid response.';
-    return json({ok:false,error:message,code:data?.code || 'BACKEND_ERROR',
+    return json({ok:false,...gsisBuildMetadata(data),error:message,code:data?.code || 'BACKEND_ERROR',
       definite:data?.definite === true,current:data?.current || null,
       ...(Number.isFinite(data?.retryAfterMs)?{retryAfterMs:Math.max(0,Math.min(86400000,data.retryAfterMs))}:{})},
       Math.min(599,Math.max(400,Number(data?.status) || 502)),{'Cache-Control':'no-store'});
@@ -495,6 +507,7 @@ function json(data, status = 200, extraHeaders = {}) {
     'Content-Type': 'application/json; charset=utf-8',
     'Cache-Control': 'no-store',
     'X-Content-Type-Options': 'nosniff',
+    ...gsisBuildHeaders(data),
     ...extraHeaders
   });
   return new Response(JSON.stringify(data), { status, headers });

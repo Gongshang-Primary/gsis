@@ -21,7 +21,7 @@ const env={GSIS_JOBS:db,ROSTER_EDGE_AUTHORITY:'d1',ROSTER_TIMETABLE_SNAPSHOTS:bu
 const state=O.initial();state.staplerPlans=[{id:'archived',date:'2020-01-01',revision:1,draft:{edgeObject:true,key:'unavailable-history',digest:'a'.repeat(64),encoding:'gzip-json-v1'}}];
 const store=await activate(db,'roster',state);await activate(db,'roster-register',{revision:0,entries:[],receipts:[]});await activate(db,'roster-references',refs);
 globalThis.fetch=()=>assert.fail('normal D1 operations must not call Apps Script');
-const send=async input=>{const reply=await edgeRosterBackend(env,'rosterOperations',input,who,crypto.randomUUID());if(!reply.result.ok)throw Object.assign(Error(reply.result.error),reply.result);return reply.result.data;};
+const send=async input=>{const reply=await edgeRosterBackend(env,'rosterOperations',input,who,crypto.randomUUID());assert.equal(reply.result.gsisBuildLabel,JSON.parse(fs.readFileSync('package.json')).gsisBuildLabel,'actual D1 success/error envelope identifies its executing build');if(!reply.result.ok)throw Object.assign(Error(reply.result.error),reply.result);return reply.result.data;};
 const command={operation:'saveAbsence',intake:true,requestId:crypto.randomUUID(),date:day,staffId:'alice',typeId:'mc',fullDay:true,reliefRequired:false,receiptOnly:true,revision:0};
 const first=await send(command);assert.equal(first.absenceApplied,true);assert.equal(first.savedIds.length,1);assert.equal(objectReads,0,'critical full day capture never inflates archived timetable models');
 assert.equal((await send(command)).replayed,true);assert.equal((await loadEdgeRoster(env)).state.absences.length,1);

@@ -1,3 +1,6 @@
+/* GSIS_BUILD_LABEL_BEGIN */
+const GSIS_BUILD_LABEL='0.9.9f';
+/* GSIS_BUILD_LABEL_END */
 import {runRecoveryTimetableCleanup} from '../roster-update/public/roster-recovery-timetable-cache.js';
 import {recordJobHealth,safeHealthError} from '../shared/edge-health.js';
 import {assertRecoveryWritable} from '../shared/edge-recovery.js';
@@ -131,6 +134,7 @@ export default {
   }else settleMessages(batch,supported,'ack');
  },
  async fetch(req,env){
+  if(new URL(req.url).pathname==='/health'&&req.method==='GET')return Response.json({ok:true,version:GSIS_BUILD_LABEL},{headers:{'Cache-Control':'no-store'}});
   env=(typeof resolveRosterAuthorityEnvironment==='function'?await resolveRosterAuthorityEnvironment(env):rosterRecoveryEnvironment(env));
   if(new URL(req.url).pathname!=='/dispatch'||req.method!=='POST')return new Response('Not found',{status:404,headers:{'Cache-Control':'no-store'}});
   try{writable(env);}catch{return Response.json({ok:false,error:'Background work is paused for recovery.'},{status:503,headers:{'Cache-Control':'no-store'}});}

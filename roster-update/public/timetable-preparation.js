@@ -6,6 +6,7 @@ function invalid(message){throw Error(message);}
 async function call(body,signal,max=MAX_RESPONSE){
  const timeout=setTimeout(()=>active?.abort(),60000);try{
  const response=await fetch('/api/operations',{method:'POST',credentials:'same-origin',cache:'no-store',redirect:'error',headers:{'Content-Type':'application/json'},body:JSON.stringify(body),signal});
+ window.GSISversionNotice?.(response);
  if(response.status===401||response.status===403)invalid('Sign in to Roster with your school administrator account, then try again.');
  const chunks=[];let size=0;if(Number(response.headers.get('Content-Length'))>max)invalid('The export response exceeds its supported size.');const reader=response.body.getReader();try{while(true){const {value,done}=await reader.read();if(done)break;size+=value.byteLength;if(size>max){await reader.cancel();invalid('The export response exceeds its supported size.');}chunks.push(value);}}finally{reader.releaseLock();}
  const bytes=new Uint8Array(size);let offset=0;for(const chunk of chunks){bytes.set(chunk,offset);offset+=chunk.length;}let result;try{result=JSON.parse(new TextDecoder().decode(bytes));}catch{invalid('The source response could not be read. Start a fresh export.');}

@@ -54,6 +54,7 @@ if(typeof module!=='undefined'&&module.exports)module.exports=GSISRosterTimetabl
  const formatDate=value=>{const d=new Date(value+'T12:00:00+08:00');return new Intl.DateTimeFormat('en-SG',{timeZone:'Asia/Singapore',day:'numeric',month:'short',year:'numeric'}).format(d)+' ('+new Intl.DateTimeFormat('en-SG',{timeZone:'Asia/Singapore',weekday:'short'}).format(d)+')'};
  async function api(input){
   const response=await fetch('/api/external',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify(input),cache:'no-store',referrerPolicy:'no-referrer'});
+  window.GSISversionNotice?.(response);
   const result=await response.json();if(!response.ok||!result.ok)throw Object.assign(Error(result.error||'This request could not be confirmed. Refresh to check its current state.'),{status:response.status});return result.data;
  }
  // The signed read can run while HTML and styles finish loading. Keep its

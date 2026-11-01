@@ -32,6 +32,7 @@ async function apiJsonV1(path,options={},policy={}){
     const timeout=setTimeout(()=>controller.abort(),policy.timeoutMs || (method==='GET'?55000:75000));
     try{
       const response=await fetch(path,controller?{...init,signal:controller.signal}:init);
+      window.GSISversionNotice?.(response);
       const text=await response.text();
       let payload=null;
       if(text.trim()){
