@@ -27,4 +27,13 @@ properties.set('ROSTER_EDGE_SNAPSHOT_PARTS',JSON.stringify({...stored,sourceDige
 const fresh=call({operation:'edgeExport'});assert.equal(call({operation:'edgeFence',sourceDigest:fresh.sourceDigest}).legacyWritesDisabled,true,'unchanged activation still uses the full digest');
 const packed=require('./fixtures/roster099-packed-capture.cjs')();packed.call(packed.input);
 const packedParts=JSON.parse(packed.properties.get('ROSTER_EDGE_SNAPSHOT_PARTS')||'null');assert(packedParts,'v2 capture stores fingerprints');assert.equal(packed.stats().decodes,0,'per-part hashing keeps packed plans packed');
+const large=require('./fixtures/roster099-packed-capture.cjs')(),capture=large.scope.rosterEdgeSnapshot_;
+large.scope.rosterEdgeSnapshot_=()=>{const value=capture();for(let i=0;i<600;i++)value.state['diagnosticPart'+i]=i;value.sourceDigest=large.scope.rosterOperationsDigest_({schema:value.schema,state:value.state,index:value.index});return value;};
+const largeResult=large.call(large.input);assert(largeResult.preparing,'oversized diagnostics never stop v2 capture');
+const marker=JSON.parse(large.properties.get('ROSTER_EDGE_SNAPSHOT_PARTS'));assert.equal(marker.truncated,true);assert.equal(marker.parts,undefined);assert(marker.sourceDigest);assert(Buffer.byteLength(JSON.stringify(marker))<8500);assert.equal(large.scope.rosterEdgeChangedParts_({state:{},index:{}},marker.sourceDigest),null);
+const unavailable=require('./fixtures/roster099-packed-capture.cjs')(),getProps=unavailable.scope.props_;
+unavailable.scope.props_=()=>{const props=getProps();return {...props,setProperty(key,value){if(key==='ROSTER_EDGE_SNAPSHOT_PARTS')throw Error('diagnostics storage unavailable');return props.setProperty(key,value);}};};
+assert(unavailable.call(unavailable.input).preparing,'diagnostic property write failures never stop capture');
+const unhashable=require('./fixtures/roster099-packed-capture.cjs')();unhashable.scope.rosterEdgeSnapshotParts_=()=>{throw Error('diagnostic hash unavailable');};
+assert(unhashable.call(unhashable.input).preparing,'diagnostic-only hashing failures never stop capture');
 console.log('PASS snapshot capture fingerprints, drift reads, changed part names and unchanged authority fence');

@@ -64,8 +64,10 @@ function rosterEdgeSnapshotParts_(snapshot){
  const parts={};for(const key of Object.keys(snapshot.state))parts[key]=rosterOperationsDigest_(snapshot.state[key]).slice(0,16);parts.index=rosterOperationsDigest_(snapshot.index).slice(0,16);return parts;
 }
 function rosterEdgeRememberSnapshotParts_(snapshot){
- const value=JSON.stringify({sourceDigest:snapshot.sourceDigest,at:new Date().toISOString(),parts:rosterEdgeSnapshotParts_(snapshot)});
- if(value.length>8500)error_(413,'Snapshot part diagnostics exceed the Script Property bound.');props_().setProperty('ROSTER_EDGE_SNAPSHOT_PARTS',value);
+ // Best-effort diagnostics must never stop an otherwise valid source capture.
+ try{const marker={sourceDigest:snapshot.sourceDigest,at:new Date().toISOString()},value=JSON.stringify({...marker,parts:rosterEdgeSnapshotParts_(snapshot)});
+  props_().setProperty('ROSTER_EDGE_SNAPSHOT_PARTS',value.length>8500?JSON.stringify({...marker,truncated:true}):value);
+ }catch(_){}
 }
 function rosterEdgeChangedParts_(snapshot,sourceDigest){
  const raw=props_().getProperty('ROSTER_EDGE_SNAPSHOT_PARTS');if(!raw)return null;let stored;try{stored=JSON.parse(raw);}catch(_){return null;}

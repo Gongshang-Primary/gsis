@@ -7,7 +7,7 @@
 - Branch: codex/roster-cutover-diagnostics
 - Base SHA: b8612f5e85736eccb09233f8dbb49b691c39991c (current main at start)
 - Current head SHA: see the PR for the exact published head
-- PR: pending exact-head verification
+- PR: #45 (draft)
 - User-authorised scope: owner 1 Nov 2026 ~19:00: "do 2,3,7 now" (items from Claude's cutover improvement list), "do up PR, let codex code".
 - Files/domains owned (include generated outputs): `backend/RosterEdgeMigration.gs` (and its regenerated copy in `backend/Code.gs` and the built Roster backend), `roster-update/public/edge-roster.js`, `shared/edge-setup.js` (and built copies `public/edge-setup.js`, `roster-update/public/edge-setup.js`), `roster-update/public/edge-setup.html` if a button is needed, focused tests, this record.
 - Out of scope: changing what the digest covers, closing the freeze gap for webhooks, top-up import (items 1, 4, 5; separate rows). Any weakening of the activation fence.
@@ -66,10 +66,15 @@ Regression tests first failed for missing capture fingerprints, the missing gate
 No production state, authority/configuration, provider messages or deployment changes. One additive Google diagnostic property is written only at capture. Rollback restores the prior code; the property is harmless and retained imports remain usable. Existing imports without matching part digests can still be checked for current/not-current, but cannot name their changed parts. No deployment or live cutover acceptance is claimed. PRs #38, #40, #41 and #42 are untouched.
 
 ## Review
-Not started.
+
+Claude reviewed exact head `1e25d343ea2ee62647e2f449246e9ae7d7d3f4b6` on 1 November 2026. His blocking finding was that oversized optional diagnostics could stop capture; he also recommended a 135-second drift timeout and restored UI error limits. The owner requested all three corrections.
+
+The diagnostic write now uses a bounded `{sourceDigest, at, truncated:true}` marker if the part map is too large. Hashing or property-storage failures are ignored by this optional helper, leaving the actual snapshot capture and activation digest intact. Regressions exercise all three cases through v2 capture. `edgeDrift` uses the 135-second bridge deadline; reference checks retain 55 seconds. Upstream and network errors are bounded to 320 characters in `call()`; display catches retain the 360-character limit.
+
+The new assertions failed first at the 413, 55-second deadline and unbounded text. They pass after correction. Generated outputs and exact-head CI are rechecked before handoff.
 
 ## Deployment
 Not deployed.
 
 ## Handoff
-Next action: finish exact-head CI, then open a draft PR on `codex/roster-cutover-diagnostics` naming Claude and that head. Owner decides merge and deployment.
+Next action: push the review corrections on `codex/roster-cutover-diagnostics`, verify the new exact head, and return PR #45 to Claude. Owner decides merge and deployment.
