@@ -211,6 +211,7 @@ function rosterOperationsContext_(req,c,state,providedIndex){
   return {user,people,days:{},timetableEntries:(providedIndex||rosterIndex_()).entries,today,minute,now:now.getTime(),iso:now.toISOString(),uuid:()=>Utilities.getUuid(),smcIds:c.rosterSMCIds||[],...(projected?{staplerSponsors:c.rosterDates.sponsors}:{})};
  }
  const requested=GSISRosterOperations.date(p.date||today),dates=[requested,...(Array.isArray(p.dates)?p.dates:[])];if(p.actualDate)dates.push(GSISRosterOperations.date(p.actualDate));
+ if(p.operation==='scheduledRoster'){const week=GSISRosterAllocation.quotaCheckpoint({today,minute,now:now.getTime()}).week;for(let n=0;n<5;n++)dates.push(GSISRosterAllocation.addDays(week,n));}
  const people=rosterOperationsPeople_(c),contactsDuty={available:Array.isArray(c.rosterSMCIds),staffIds:(c.rosterSMCIds||[]).filter(id=>people.some(t=>t.id===id&&GSISRosterOperations.dutyEligible(t))),source:{kind:'Contacts'}};
  GSISRosterOperations.seedNameBridges(state,people);const recordContext={calendarDatesVerified:Object.entries(p.calendarByDate||{}).filter(([date,value])=>value?.date===date&&value.available===true).map(([date])=>date),user,people,days:{},timetableEntries:[],dutySources:{[requested]:contactsDuty},today,minute,now:now.getTime(),iso:now.toISOString(),uuid:()=>Utilities.getUuid(),notificationsConfigured:p.notificationsReady===true,adminRecipients:[],smcIds:c.rosterSMCIds||[]};
  if(p.view==='reportForm'&&(p.operation||'read')==='read')return recordContext;
@@ -224,9 +225,9 @@ function rosterOperationsContext_(req,c,state,providedIndex){
   return {...recordContext,customPeriods:[...periods].sort((a,b)=>a-b).map(period=>({period})),teachingGroups:catalogue.teachingGroups||[]};
  }
  if(['systemConfig','saveSystemConfig','nameBridges','saveNameBridge','deleteNameBridge'].includes(p.operation)||['systemConfig','nameBridges'].includes(p.view)){
-  const configRead=p.operation==='systemConfig'||p.operation==='read'&&p.view==='systemConfig';if(!user.admin&&!(configRead&&user.smc))error_(403,'Contacts Admin access is required.');const index=rosterIndex_(),entry=GSISRoster.active(index.entries,today),subjects=new Set(),unmatchedTimetableNames=[],timetableNames=[],availablePeriods=[];if(entry){const model=rosterModel_(entry),blocks=(model.layoutMode==='single-week'?model.single:model.odd).blocks,matched=new Set(GSISRosterOperations.matchTimetableNames(state,people,blocks).map(r=>r.index));availablePeriods.push(...Array.from({length:model.maxPeriod+1},(_,i)=>i));blocks.forEach((r,i)=>{if(!timetableNames.includes(r.name))timetableNames.push(r.name);if(!matched.has(i))unmatchedTimetableNames.push(r.name);});for(const [,week] of GSISRoster.weeks(model))for(const block of week.blocks)for(const cell of block.cells){const subject=String(cell[0]||'').trim().replace(/\s+/g,' ');if(subject)subjects.add(subject);}}
+  const configRead=p.operation==='systemConfig'||p.operation==='read'&&p.view==='systemConfig';if(!user.admin&&!(configRead&&user.smc))error_(403,'Contacts Admin access is required.');const index=rosterIndex_(),entry=GSISRoster.active(index.entries,today),subjects=new Set(),unmatchedTimetableNames=[],timetableNames=[],availablePeriods=[],fajtPoolIds=[];if(entry){const model=rosterModel_(entry),blocks=(model.layoutMode==='single-week'?model.single:model.odd).blocks,matching=GSISRosterOperations.matchTimetableNames(state,people,blocks),matched=new Set(matching.map(r=>r.index));fajtPoolIds.push(...matching.map(r=>r.person.id));availablePeriods.push(...Array.from({length:model.maxPeriod+1},(_,i)=>i));blocks.forEach((r,i)=>{if(!timetableNames.includes(r.name))timetableNames.push(r.name);if(!matched.has(i))unmatchedTimetableNames.push(r.name);});for(const [,week] of GSISRoster.weeks(model))for(const block of week.blocks)for(const cell of block.cells){const subject=String(cell[0]||'').trim().replace(/\s+/g,' ');if(subject)subjects.add(subject);}}
   const subjectConfig=configRead||p.operation==='saveSystemConfig',catalogue=subjectConfig?rosterOperationsSubjectCatalogue_():null;
-  return {...recordContext,timetableEntries:index.entries,teachingGroups:catalogue?.teachingGroups||[],timetableNames:timetableNames.sort((a,b)=>a.localeCompare(b)),availablePeriods:entry?availablePeriods:Array.from({length:17},(_,i)=>i),unmatchedTimetableNames,subjects:[...subjects].sort((a,b)=>a.localeCompare(b)),subjectBaseline:entry?{id:entry.id,name:entry.name,from:entry.from,to:entry.to}:null,schedulerAvailable:p.schedulerAvailable===true};
+  return {...recordContext,fajtPoolIds,timetableEntries:index.entries,teachingGroups:catalogue?.teachingGroups||[],timetableNames:timetableNames.sort((a,b)=>a.localeCompare(b)),availablePeriods:entry?availablePeriods:Array.from({length:17},(_,i)=>i),unmatchedTimetableNames,subjects:[...subjects].sort((a,b)=>a.localeCompare(b)),subjectBaseline:entry?{id:entry.id,name:entry.name,from:entry.from,to:entry.to}:null,schedulerAvailable:p.schedulerAvailable===true};
  }
  if(['dutyRoster','setDutySMC'].includes(p.operation)||p.view==='dutyRoster'){if(!user.smc&&!user.admin)error_(403,'SMC or Admin access is required.');return recordContext;}
 
@@ -249,7 +250,9 @@ function rosterOperationsContext_(req,c,state,providedIndex){
  const inactiveDates=GSISRosterOperations.inactiveAssignmentDates(state,recordContext);dates.push(...inactiveDates);
  const unique=[...new Set(dates)],index=providedIndex||rosterIndex_(),models={},modelIdentities={},cellMutation=rosterOperationsCellMutation_(p,state),quotaRequested=!savedReadPlan&&!cellMutation&&(rosterOperationsNeedsQuota_(p)||inactiveDates.length>0),quotaSource=allocationRead?rosterOperationsQuotaSource_():null,allocationReferenceKey=allocationRead?rosterOperationsAllocationReference_(state,people,index,p,quotaSource,today,unique):null,cached=allocationRead?rosterOperationsAllocationBaseline_(allocationReferenceKey):null;
  if(cached&&quotaSource.entry)reliefGuard_(quotaSource.book,quotaSource.index,quotaSource.entry);
- const quota=quotaRequested&&!cached?rosterOperationsPhase_('quota',()=>rosterOperationsQuota_(unique,quotaSource)):{from:'',to:'',rows:[]};
+ let quota,quotaReferenceUnavailable=false;
+ try{quota=quotaRequested&&!cached?rosterOperationsPhase_('quota',()=>rosterOperationsQuota_(unique,quotaSource)):{from:'',to:'',rows:[]};}
+ catch(error){if(p.operation!=='scheduledRoster')throw error;quotaReferenceUnavailable=true;quota={from:'',to:'',rows:[]};}
  let subjectCatalogueLoaded=false;
  const compact=!inactiveDates.length&&p.operation==='read'&&p.compact===true&&['report','entry'].includes(p.view),targetId=(user.smc||user.admin)?(p.staffId||state.absences.find(a=>a.id===(p.absenceId||p.id))?.staffId||user.staffId):user.staffId,targetIds=new Set(compact&&p.staffIds!==undefined?GSISRosterOperations.absenceStaffIds(recordContext,p):[targetId]);
 
@@ -267,7 +270,7 @@ function rosterOperationsContext_(req,c,state,providedIndex){
  const dutySources=Object.fromEntries(unique.map(d=>[d,contactsDuty])),venues=cached?cached.venues:Object.fromEntries(unique.map(d=>[d,d>=quota.from&&d<=quota.to?quota.venues||[]:[]]));
  if(allocationRead&&!cached)rosterOperationsAllocationBaseline_(allocationReferenceKey,{days,venues});
  const configured=p.notificationsReady===true,adminRecipients=(props_().getProperty('ROSTER_NOTIFICATION_ADMIN_IDS')||'').split(',').map(s=>s.trim()).filter(id=>people.some(p=>p.id===id)&&(c.rosterAdminIds||[]).includes(id));
- return GSISRosterOperations.composeStaplerContext(state,{calendarDatesVerified:recordContext.calendarDatesVerified,user,people,days,baselineDays:days,...(allocationRead?{allocationReferenceKey,cacheReused:!!cached}:{}),staplerEditor:['stapler','createStapler','importStapler','saveStapler','confirmStapler','publishStapler','resetStapler','moveStapler','restoreStapler'].includes(p.operation),dutySources,venues,quotaRequested,cellMutation,timetableEntries:index.entries,today,minute,now:now.getTime(),iso:now.toISOString(),uuid:()=>Utilities.getUuid(),notificationsConfigured:configured,adminRecipients,smcIds:c.rosterSMCIds||[]});
+ return GSISRosterOperations.composeStaplerContext(state,{calendarDatesVerified:recordContext.calendarDatesVerified,user,people,days,baselineDays:days,...(allocationRead?{allocationReferenceKey,cacheReused:!!cached}:{}),staplerEditor:['stapler','createStapler','importStapler','saveStapler','confirmStapler','publishStapler','resetStapler','moveStapler','restoreStapler'].includes(p.operation),dutySources,venues,quotaRequested:quotaRequested&&!quotaReferenceUnavailable,quotaReferenceUnavailable,cellMutation,timetableEntries:index.entries,today,minute,now:now.getTime(),iso:now.toISOString(),uuid:()=>Utilities.getUuid(),notificationsConfigured:configured,adminRecipients,smcIds:c.rosterSMCIds||[]});
 }
 function rosterOperationsDigest_(p){return Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256,JSON.stringify(p)).map(b=>('0'+((b+256)%256).toString(16)).slice(-2)).join('');}
 function rosterOperationsCommandDigest_(p){const stable={...p};delete stable.calendarByDate;delete stable.trustedNow;delete stable.notificationsReady;delete stable.schedulerAvailable;return rosterOperationsDigest_(stable);}
@@ -1033,7 +1036,11 @@ function rosterDailyEmploymentMailDispatch_(input={}){gsisRequireBackendRole_('r
  }
  return remaining>0?outcome:{...outcome,blocked:1,reason:'The Apps Script daily email quota is exhausted; queued reports will retry later.'};
 }
+function rosterQuotaCheckpointDue_(s,clock){return GSISRosterAllocation.quotaCheckpointDue(s,clock);}
+
+function rosterQuotaCheckpointHint_(){try{return JSON.parse(props_().getProperty('ROSTER_SCHEDULE_HINT')||'{}');}catch(_){return {};}}
 function rosterScheduledIdle_(s,slot,today){
+ if(rosterQuotaCheckpointDue_(s,{today,minute:slot.minute,now:slot.stamp}))return null;
  slot.report=GSISRosterOperations.smcSummarySlot(s,slot.stamp)||slot.minute===389||slot.minute===390;
  if(s.scheduleReceipts[slot.key]&&(!s.scheduleReceipts[slot.key].cancelled||s.scheduleReceipts[slot.key].reportComplete))return {replayed:true};
  const notices=s.massPublications[today]||s.staplerPlans.some(r=>r.date===today&&r.published);
@@ -1044,9 +1051,10 @@ function rosterScheduledIdle_(s,slot,today){
 // Conservative, version-fenced no-work projection. Any operations commit changes
 // the version hint, including publication, absence, notification and settings saves.
 function rosterScheduledHintWrite_(s,version){
- try{if(!version||props_().getProperty('ROSTER_SCHEDULE_DIRTY')||version!==props_().getProperty('ROSTER_VERSION_HINT'))return;const value={schema:1,version,at:Date.now(),enabled:s.systemConfig.scheduledAllocationEnabled===true,times:s.systemConfig.smcSummaryTimes,noticeDates:[...new Set([...Object.keys(s.massPublications),...s.staplerPlans.filter(r=>r.published).map(r=>r.date),...s.publicationSnapshots.filter(r=>r.kind!=='cancelled').map(r=>r.date)])]},json=JSON.stringify(value);if(json.length<7500)props_().setProperty('ROSTER_SCHEDULE_HINT',json);}catch(_){}
+ try{if(!version||props_().getProperty('ROSTER_SCHEDULE_DIRTY')||version!==props_().getProperty('ROSTER_VERSION_HINT'))return;const value={schema:1,version,at:Date.now(),quotaCheckpoints:Object.fromEntries(Object.entries(s.quotaCheckpoints||{}).sort(([a],[b])=>a.localeCompare(b)).slice(-2)),enabled:s.systemConfig.scheduledAllocationEnabled===true,times:s.systemConfig.smcSummaryTimes,noticeDates:[...new Set([...Object.keys(s.massPublications),...s.staplerPlans.filter(r=>r.published).map(r=>r.date),...s.publicationSnapshots.filter(r=>r.kind!=='cancelled').map(r=>r.date)])]},json=JSON.stringify(value);if(json.length<7500)props_().setProperty('ROSTER_SCHEDULE_HINT',json);}catch(_){}
 }
 function rosterScheduledFastSkip_(slot,gate,today){
+ if(rosterQuotaCheckpointDue_(rosterQuotaCheckpointHint_(),{today,minute:slot.minute,now:slot.stamp}))return null;
  try{const raw=props_().getProperty('ROSTER_SCHEDULE_HINT'),hint=raw&&JSON.parse(raw);if(!hint||hint.schema!==1||!hint.version||props_().getProperty('ROSTER_SCHEDULE_DIRTY')||hint.version!==props_().getProperty('ROSTER_VERSION_HINT')||Date.now()<hint.at||Date.now()-hint.at>=5*60000)return null;
  const phase=slot.minute>=960?'evening':slot.minute<390?'morning':null,time=String(Math.floor(slot.minute/60)).padStart(2,'0')+':'+String(slot.minute%60).padStart(2,'0');
  if([389,390].includes(slot.minute)||phase&&hint.times?.[phase]?.includes(time)||hint.noticeDates.includes(today)||gate.allocate&&hint.enabled)return null;
@@ -1063,11 +1071,11 @@ function rosterScheduledDispatch_(req){gsisRequireBackendRole_('roster');
  }
 
  if(tracked)rosterScheduledAllocationRecover_(slot);const gate=tracked?rosterScheduledAllocationGate_(slot):{allocate:slot.optimise};
- if(tracked&&slot.allocationKey){const visible=rosterAllocationRunRead_(slot.date);if(visible?.scheduleKey===slot.allocationKey&&(visible.tickKey||visible.scheduleKey)===slot.key){if(visible.state==='completed')return {replayed:true,allocationSkipped:true};if(gate.allocationInProgress)throw Object.assign(Error('An allocator is already running for this date.'),{status:409,code:'ALLOCATION_IN_PROGRESS'});}}
+ if(tracked&&slot.allocationKey){const visible=rosterAllocationRunRead_(slot.date);if(visible?.scheduleKey===slot.allocationKey&&(visible.tickKey||visible.scheduleKey)===slot.key){if(visible.state==='completed'&&!rosterQuotaCheckpointDue_(rosterQuotaCheckpointHint_(),{today,minute:slot.minute,now:slot.stamp}))return {replayed:true,allocationSkipped:true};if(gate.allocationInProgress)throw Object.assign(Error('An allocator is already running for this date.'),{status:409,code:'ALLOCATION_IN_PROGRESS'});}}
  const fast=rosterScheduledFastSkip_(slot,gate,today);if(fast)return fast;
  const execute=(run,reportOnly=false)=>{
   const version=props_().getProperty('ROSTER_VERSION_HINT');let initial=rosterOperationsState_();
-  if(run&&rosterAllocationRunAccepted_(run,initial)){rosterAllocationRunLocked_(()=>rosterAllocationRunComplete_(run,initial));return {replayed:true};}
+  if(run&&rosterAllocationRunAccepted_(run,initial)&&!rosterQuotaCheckpointDue_(initial,{today,minute:slot.minute,now:slot.stamp})){rosterAllocationRunLocked_(()=>rosterAllocationRunComplete_(run,initial));return {replayed:true};}
   if(typeof rosterAllocationAuditEnsureDay_==='function')initial=rosterAllocationAuditEnsureDay_(initial,p.calendarByDate,today);
   const effectiveSlot={...slot,optimise:!reportOnly&&(!!run||slot.optimise)},preflight=rosterScheduledIdle_(initial,effectiveSlot,today),idleResult=()=>({...preflight,...(reportOnly?{allocationSkipped:true,...(gate.allocationStopped?{allocationStopped:true}:{})}:{})});
   const potential=initial.assignments.some(a=>a.date>=today&&(!a.noRelief&&!a.remove&&['draft','published'].includes(a.status)||a.inactiveReplacementPending))||initial.requests.some(r=>r.date>=today&&['pending','approved'].includes(r.status));
@@ -1079,20 +1087,20 @@ function rosterScheduledDispatch_(req){gsisRequireBackendRole_('roster');
    const now=Date.now();if(now-stamp>120000)error_(400,'Scheduled tick is stale.');
    const s=rosterOperationsPhase_('prepare-state',()=>rosterOperationsState_()),today=new Date(now+8*3600000).toISOString().slice(0,10),idle=rosterScheduledIdle_(s,effectiveSlot,today);if(idle&&!GSISRosterOperations.inactiveAssignmentDates(s,{...inactiveContext,today}).length)return idle;
    const base=rosterOperationsPackedSnapshot_(s),ctx=rosterOperationsPhase_('prepare-context',()=>rosterOperationsContext_({identity:fresh.identity,input:{...p,operation:'scheduledRoster',date:slot.date}},fresh.c,s));
-   ctx.user={staffId:null,email:'roster-service',smc:true,admin:false};ctx.service=true;ctx.skipScheduledAllocation=reportOnly;ctx.scheduledAllocationKey=run?.scheduleKey||slot.allocationKey||slot.key;ctx.scheduledAllocationRetry=!!run&&!slot.optimise;if(run)ctx.allocationBudgetCheck=()=>rosterScheduledAllocationBudget_(run);
+   ctx.user={staffId:null,email:'roster-service',smc:true,admin:false};ctx.service=true;ctx.quotaCheckpointDue=rosterQuotaCheckpointDue_(s,ctx);ctx.quotaCheckpointEvidence=p.quotaCheckpointEvidence;ctx.skipScheduledAllocation=reportOnly;ctx.scheduledAllocationKey=run?.scheduleKey||slot.allocationKey||slot.key;ctx.scheduledAllocationRetry=!!run&&!slot.optimise;if(run)ctx.allocationBudgetCheck=()=>rosterScheduledAllocationBudget_(run);
    const command={...p,operation:'scheduledRoster',date:slot.date};
    try{
     if(run)rosterAllocationRunStage_(run,attempt?'Planning inputs changed; recalculating against current records.':'Calculating scheduled relief while retaining manual choices.');
     const references=rosterOperationsReferenceKey_(ctx),dependencies=rosterOperationsDependencies_(base,command,ctx),beforeOutbox=s.outbox.length;
     rosterOperationsClock_(ctx);rosterOperationsGuardInactive_(s,ctx);const preparedClock=ctx.today+':'+ctx.minute;
-    rosterOperationsPhase_('prepare-reconcile',()=>rosterOperationsReconcile_(s,ctx));const result=rosterOperationsPhase_('prepare-apply',()=>GSISRosterOperations.scheduledTick(s,ctx,stamp)),allocating=effectiveSlot.optimise&&!result.allocationTimedOut;
+    if(!ctx.quotaReferenceUnavailable)rosterOperationsPhase_('prepare-reconcile',()=>rosterOperationsReconcile_(s,ctx));const result=rosterOperationsPhase_('prepare-apply',()=>GSISRosterOperations.scheduledTick(s,ctx,stamp)),allocating=effectiveSlot.optimise&&!result.allocationTimedOut;
     // Scheduled receipts remain durable; the verified cold-output archive owns retention.
     const next=rosterOperationsPackedSnapshot_(s),domainChanged=rosterOperationsDependencies_(base,{},ctx)!==rosterOperationsDependencies_(next,{},ctx);
     if(run)rosterScheduledAllocationBudget_(run,true);
     const lock=LockService.getScriptLock();if(!rosterOperationsPhase_('lock-wait',()=>deployLock_(lock,8000)))error_(503,'Another relief update is finishing. Retry the scheduler tick.');
     try{
      if(typeof rosterAbsenceIntakeGate_==='function')rosterAbsenceIntakeGate_([slot.date],allocating);
-     const current=rosterOperationsState_();if(run&&current.scheduleReceipts[run.scheduleKey]?.cancelled)rosterAllocationRunCancellation_();if(current.scheduleReceipts[slot.key]&&(!current.scheduleReceipts[slot.key].cancelled||current.scheduleReceipts[slot.key].reportComplete))return {replayed:true};
+     const current=rosterOperationsState_();if(run&&current.scheduleReceipts[run.scheduleKey]?.cancelled)rosterAllocationRunCancellation_();if(!rosterQuotaCheckpointDue_(current,ctx)&&current.scheduleReceipts[slot.key]&&(!current.scheduleReceipts[slot.key].cancelled||current.scheduleReceipts[slot.key].reportComplete))return {replayed:true};
      const checkClock=()=>{const clock={};rosterOperationsClock_(clock);if(run)rosterScheduledAllocationBudget_(run,true);if(clock.now-stamp>120000)error_(400,'Scheduled tick is stale.');if(allocating&&!s.scheduleReceipts[ctx.scheduledAllocationKey]?.cancelled&&s.systemConfig.scheduledAllocationEnabled&&ctx.days[slot.date]?.schoolDay&&clock.now>Date.parse(slot.date+'T06:29:59.999+08:00'))rosterOperationsConflict_('ALLOCATION_CUTOFF','Optimisation crossed the morning cut-off. No draft changes were saved.');if(clock.today+':'+clock.minute!==preparedClock)rosterOperationsConflict_('PREPARED_RETRY','The school-day clock changed before writing.');};
      checkClock();if(rosterOperationsReferenceStamp_(ctx)!==references||rosterOperationsDependencies_(rosterOperationsPackPlans_(current),command,ctx)!==dependencies)rosterOperationsConflict_('PREPARED_RETRY','Planning inputs changed during allocation.');
      const merged=rosterOperationsMergePrepared_(base,next,rosterOperationsPackedSnapshot_(current));merged.revision=current.revision+(domainChanged?1:0);

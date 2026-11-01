@@ -17,7 +17,7 @@ function row(scope,collection,id,value,position=0){insert.run(scope,collection,'
 const plan=probe=>sql.prepare('EXPLAIN QUERY PLAN '+probe.text).all(...probe.args).map(row=>row.detail);
 function uses(probe,index){const details=plan(probe);assert(details.some(detail=>detail.includes('USING INDEX '+index)),details.join('\n'));return details;}
 try{
- await activate('roster',O.initial());await activate('deploy',{jobs:{},properties:{}});
+ const state=O.initial(),checkpoint=require('../shared/roster-allocation.js').quotaCheckpoint({now});state.quotaCheckpoints={[checkpoint.week]:{...checkpoint,status:'ready',captured:0,at:new Date(now).toISOString()}};await activate('roster',state);await activate('deploy',{jobs:{},properties:{}});
  for(let i=0;i<2000;i++){
   row('roster','audit','audit-'+i,{date:today});
   row('roster','edgePeerProposals','peer-'+i,{status:'applied'},i);

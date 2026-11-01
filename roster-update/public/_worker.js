@@ -1,3 +1,4 @@
+import {dispatchQuotaSnapshot as runQuotaSnapshotJob,readQuotaCheckpointEvidence,readQuotaSnapshotStatus} from '../../shared/roster-quota-job.js';
 import {recoveryTimetableSnapshot} from './roster-recovery-timetable-cache.js';
 import {dispatchEdgeDeliveryReview,edgeDeliveryReportRead,edgeDeliveryReviewBackend} from './edge-notification-review.js';
 import {edgeRosterEnabled,edgeRosterService,edgeRosterBackend,edgeRosterMigration,readEdgeRosterReferences,mirrorEdgeRoster,readRosterMirrorStatus} from './edge-roster.js';
@@ -419,7 +420,7 @@ export async function systemHealthRoute(req,env,authorityEnv=env){
    if(!auth?.ok)return json({ok:false,...safeHealthError(auth),error:'Current school authority could not be confirmed.'},[401,403].includes(auth?.status)?403:503);
    if(auth.data?.user?.smc!==true&&auth.data?.user?.admin!==true)return json({ok:false,error:'SMC or Admin access is required.'},403);
    const statusEnv=typeof resolveRosterAuthorityEnvironment==='function'?await resolveRosterAuthorityEnvironment(authorityEnv):env;
-   const snapshot={...await readSystemHealth(statusEnv,{jobsOnly:true}),googleBackup:await readRosterMirrorStatus(statusEnv)},jobs=new Set(['google-backup','allocation','notifications','received-reports','inbox','webhook','peer-mail','r2-cleanup','audit-export']);
+   const snapshot={...await readSystemHealth(statusEnv,{jobsOnly:true}),googleBackup:await readRosterMirrorStatus(statusEnv),quotaSnapshot:await readQuotaSnapshotStatus(statusEnv).catch(()=>({configured:true,available:false,status:'missing',lastCode:'QUOTA_SNAPSHOT_STORAGE'}))},jobs=new Set(['quota-snapshot','google-backup','allocation','notifications','received-reports','inbox','webhook','peer-mail','r2-cleanup','audit-export']);
    snapshot.jobs=snapshot.jobs.filter(row=>jobs.has(row.job));snapshot.recentFailures=snapshot.recentFailures.filter(row=>jobs.has(row.job));
    const reports={available:false,transportAvailable:false,href:'/'};let peerMailReviewAllowed=false;
    try{
@@ -1492,16 +1493,21 @@ function rosterScheduledFailure(result){
  const counts={};for(const key of ['pendingCaptureCount','pendingPeerCount'])if(Number.isSafeInteger(result?.[key])&&result[key]>=0)counts[key]=result[key];
  return Object.assign(Error('Scheduled Roster operation could not be confirmed. Check its safe code and receipt status.'),{...safeHealthError(result),status:Number.isInteger(result?.status)?result.status:503,...counts});
 }
+export async function dispatchQuotaSnapshot(env){return runQuotaSnapshotJob(env);}
 export async function scheduledRoster(env,scheduledTime=Date.now()){
  if(env.ROSTER_AUTOMATION_ENABLED!=='true')return {enabled:false};
  const sg=new Date(scheduledTime+8*3600000).toISOString(),minute=+sg.slice(11,13)*60+ +sg.slice(14,16),today=sg.slice(0,10),date=minute>=960?new Date(Date.parse(today+'T12:00:00Z')+86400000).toISOString().slice(0,10):today;
  const pending=await pendingAbsenceTransport(env,[date]);if(pending.pendingCaptureCount||pending.pendingPeerCount)throw rosterScheduledFailure({status:409,code:'ABSENCE_TRANSPORT_PENDING',...pending});
  // D1's scheduler verifies its persisted Calendar/Contacts references after
  // its due-work preflight. Do not fetch the legacy Calendar adapter on idle ticks.
- if(edgeRosterEnabled(env)){const result=await serviceBackend(env,{operation:'scheduledRoster',date,scheduledTime,notificationsReady:notificationStatus(env).ready});if(!result.ok)throw rosterScheduledFailure(result);return result.data;}
+ const dayOfWeek=new Date(today+'T12:00:00Z').getUTCDay(),monday=new Date(Date.parse(today+'T12:00:00Z')+((dayOfWeek===0?(minute>=960?1:-6):1-dayOfWeek)*86400000)).toISOString().slice(0,10);
+ const weekdays=Array.from({length:5},(_,n)=>new Date(Date.parse(monday+'T12:00:00Z')+n*86400000).toISOString().slice(0,10));
+ const schoolDates=calendar=>weekdays.filter(day=>calendar?.[day]?.available===true&&calendar[day].schoolDay===true);
+ if(edgeRosterEnabled(env)){const references=await readEdgeRosterReferences(env,{allowExpired:true}),quotaCheckpointEvidence=await readQuotaCheckpointEvidence(env,{today,minute,now:scheduledTime,schoolDates:schoolDates(references.calendarByDate)});const result=await serviceBackend(env,{operation:'scheduledRoster',date,scheduledTime,quotaCheckpointEvidence,notificationsReady:notificationStatus(env).ready});if(!result.ok)throw rosterScheduledFailure(result);return result.data;}
  // The Calendar service is read-only and separately authenticated by its proxy secret.
- const calendarByDate=await calendarDates(env,date===today?[today]:[today,date],null);
- const input={operation:'scheduledRoster',date,dates:Object.keys(calendarByDate),calendarByDate,scheduledTime,notificationsReady:notificationStatus(env).ready};
+ const dates=[...new Set([today,date,...weekdays])];
+ const calendarByDate=await calendarDates(env,dates,null),quotaCheckpointEvidence=await readQuotaCheckpointEvidence(env,{today,minute,now:scheduledTime,schoolDates:schoolDates(calendarByDate)});
+ const input={operation:'scheduledRoster',date,dates:Object.keys(calendarByDate),calendarByDate,scheduledTime,quotaCheckpointEvidence,notificationsReady:notificationStatus(env).ready};
  const result=await reconcileInactiveReplacements(env,input,await serviceBackend(env,input),null,crypto.randomUUID(),true);
  if(!result.ok)throw rosterScheduledFailure(result);return result.data;
 }

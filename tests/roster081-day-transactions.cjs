@@ -15,7 +15,7 @@ test('same day source change is rejected even if dayRevisions was not bumped',()
 test('paused next-day scheduler persists receipt without domain revision churn',()=>{
  const h=setup(),tomorrow='2026-10-15';h.ctx.minute=960;h.ctx.now=Date.parse(h.date+'T16:00:00+08:00');h.ctx.iso=new Date(h.ctx.now).toISOString();h.ctx.days[tomorrow]=structuredClone(h.ctx.days[h.date]);publication(h);
  // The day's employment report was already captured before the evening tick.
- const settled=h.state();h.O.queueDailyEmployment(settled,h.ctx,h.date);h.setState(settled);
+ const settled=h.state(),checkpoint=h.scope.GSISRosterAllocation.quotaCheckpoint(h.ctx);settled.quotaCheckpoints={[checkpoint.week]:{...checkpoint,status:'ready',captured:0,at:h.ctx.iso}};h.O.queueDailyEmployment(settled,h.ctx,h.date);h.setState(settled);
  const before=h.state(),context=h.scope.rosterOperationsContext_;h.scope.rosterOperationsContext_=(...args)=>{assert.equal(h.locked(),false);return context(...args);};
  const r=h.scope.rosterServiceDispatch_({input:{operation:'scheduledRoster',scheduledTime:h.ctx.now}});assert.equal(r.allocationPaused,true);assert.equal(h.state().revision,before.revision);assert.ok(Object.keys(h.state().scheduleReceipts).length);assert.equal(h.call(command(h,'notifyDaily',{staffId:'bob',expectedPublicationRevision:1})).notificationsQueued,1);
 });

@@ -25,17 +25,18 @@ const worker=await import(toWorkerModuleURL('data:text/javascript;base64,'+Buffe
 const env={APPS_SCRIPT_URL:'https://script.google.com/macros/s/roster-test/exec',BRIDGE_SECRET:'b'.repeat(40),ROSTER_SERVICE_SECRET:'s'.repeat(40),ROSTER_AUTOMATION_ENABLED:'true',CALENDAR_APPS_SCRIPT_URL:'https://script.google.com/macros/s/calendar-test/exec',CALENDAR_PROXY_SECRET:'synthetic-secret'};
 const oldFetch=globalThis.fetch,oldTimeout=AbortSignal.timeout;
 let calls=[],forwarded=[],deadlines=[];
+const schedulerDates=[...new Set([...dates,'2026-10-19','2026-10-22','2026-10-23'])];
 try{
  AbortSignal.timeout=ms=>{deadlines.push(ms);return oldTimeout(ms);};
  globalThis.fetch=async(url,options)=>{
   calls.push(String(url));const body=JSON.parse(options.body);
-  if(String(url)===env.CALENDAR_APPS_SCRIPT_URL){assert.equal(body.action,'rosterDates');assert.deepEqual(body.payload.dates,dates);assert.equal(body.service,'gsis-roster-notifier-v1');assert.equal(body.actor,undefined);return new Response(h.sandbox.doPost({postData:{contents:options.body}}).text);}
+  if(String(url)===env.CALENDAR_APPS_SCRIPT_URL){assert.equal(body.action,'rosterDates');assert.deepEqual(body.payload.dates,schedulerDates);assert.equal(body.service,'gsis-roster-notifier-v1');assert.equal(body.actor,undefined);return new Response(h.sandbox.doPost({postData:{contents:options.body}}).text);}
   assert.equal(String(url),env.APPS_SCRIPT_URL);const payload=JSON.parse(body.payload);forwarded.push(payload);assert.equal(body.signature,(await worker.sign(payload,env.ROSTER_SERVICE_SECRET)).signature);return Response.json({ok:true,data:{accepted:true}});
  };
  const stamp=Date.parse('2026-10-20T16:00:00+08:00');
  assert.equal((await worker.scheduledRoster(env,stamp)).accepted,true);
  assert.deepEqual(calls,[env.CALENDAR_APPS_SCRIPT_URL,env.APPS_SCRIPT_URL]);assert.deepEqual(deadlines,[12000,25000]);
- assert.equal(forwarded[0].input.date,dates[1]);assert.deepEqual(Object.keys(forwarded[0].input.calendarByDate),dates);
+ assert.equal(forwarded[0].input.date,dates[1]);assert.deepEqual(Object.keys(forwarded[0].input.calendarByDate),schedulerDates);
  assert(forwarded[0].input.calendarByDate[dates[0]].available);
 
  // H Notify independently captures the effective saved timetable as an immutable

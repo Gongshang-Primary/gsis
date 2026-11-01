@@ -73,7 +73,7 @@ const result=()=>({ok:true,data:{saved:true,inactiveReplacementDates:[date]}});
  const bundle=require('../scripts/bundle-worker.cjs').bundle;
  const notifier=await import('data:text/javascript;base64,'+Buffer.from(bundle('notification-worker/dashboard-entry.js')).toString('base64'));
  const originalFetch=globalThis.fetch,originalInfo=console.info,originalError=console.error;
- const serviceCalls=[],calendarReads=[],background=[],later='2026-11-05';
+ const serviceCalls=[],calendarReads=[],background=[],later='2026-11-12';
  const env={APPS_SCRIPT_URL:'https://script.google.com/macros/s/roster-fixture/exec',CALENDAR_APPS_SCRIPT_URL:'https://script.google.com/macros/s/calendar-fixture/exec',CALENDAR_PROXY_SECRET:'calendar-fixture-'.repeat(3),ROSTER_SERVICE_SECRET:'service-fixture-'.repeat(3),ROSTER_AUTOMATION_ENABLED:'true',WHATSAPP_ENABLED:'false'};
  try{
   console.info=console.error=()=>{};
@@ -92,6 +92,6 @@ const result=()=>({ok:true,data:{saved:true,inactiveReplacementDates:[date]}});
  const scheduled=serviceCalls.filter(command=>command.operation==='scheduledRoster');
  assert.equal(scheduled.length,2,'real notifier follows the initial tick with one inactive-only reconciliation');
  assert.deepEqual(scheduled[1].inactiveReconcileDates,[later]);assert.equal(scheduled[1].scheduledTime,stamp);
- assert(calendarReads.some(dates=>dates.length===1&&dates[0]===later),'real notifier fetches the affected future date beyond the original next-day request');
+ assert(calendarReads.some(dates=>dates.length===1&&dates[0]===later),'real notifier fetches the affected future date beyond the initial checkpoint week');
  console.log('PASS inactive replacement gateway: exact dates, bounded Calendar reads, read refresh, no mutation replay, scheduler continuation and retained saved result on failure');
 })().catch(error=>{console.error(error);process.exitCode=1;});

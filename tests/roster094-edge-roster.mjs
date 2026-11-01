@@ -83,7 +83,7 @@ console.log('PASS independent absence+peer capture, quota-free tentative request
 // would miss an externalRespond accidentally bypassing respondMutual quotas.
 const peerRequest=peerState.requests[0],approval={operation:'externalRespond',requestId:crypto.randomUUID(),decision:'approve',capability:{purpose:'mutual',staffId:'bob',requestId:peerRequest.id,date:schoolDate,issuedAt:Date.now(),expiresAt:Date.now()+3600000}},peerStore=GSiSEdgeStore.open(peerDb,'roster');
 const approvalBefore=await peerStore.load();
-await assert.rejects(edgeRosterService(peerEnv,approval),error=>error.status===503&&/Deploy authority is not active/.test(error.message));
+await assert.rejects(edgeRosterService(peerEnv,approval),error=>error.status===503&&error.code==='DEPLOY_EDGE_CONFIG');
 assert.equal((await peerStore.head()).revision,approvalBefore.revision,'unavailable quota must not commit any business or receipt state');
 assert.equal(await peerStore.receipt('external:bob',approval.requestId),null,'an unverified approval remains safely retryable');
 assert.deepEqual((await peerStore.load()).state,approvalBefore.state);

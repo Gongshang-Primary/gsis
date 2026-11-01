@@ -10,7 +10,8 @@ function setup(time='06:00:00'){
  h.scope.deployLock_=(...args)=>{locks++;return lock(...args);};h.scope.rosterOperationsContext_=(...args)=>{contexts++;assert(!h.locked(),'preparation must stay outside writer lock');return context(...args);};
  h.scope.rosterServiceContacts_=()=>({identity:h.ctx.user,c});h.scope.rosterIndex_=()=>({entries:[{id:'baseline',from:'2026-01-01',to:'2026-12-31'}]});
  vm.runInContext(fs.readFileSync('backend/RosterAllocationRun.gs','utf8'),h.scope);
- const state=h.state();state.systemConfig.scheduledAllocationEnabled=true;state.accountingYears['2026']={verified:true};h.O.apply(state,h.ctx,{operation:'saveAbsence',date:h.date,staffId:'alice',typeId:'mc',periods:[2,3]});h.setState(state);
+ // These tests isolate allocator lifecycle after the weekly quota checkpoint.
+ const checkpoint=h.scope.GSISRosterAllocation.quotaCheckpoint(h.ctx),state=h.state();state.quotaCheckpoints={...state.quotaCheckpoints,[checkpoint.week]:{...checkpoint,status:'ready',at:h.ctx.iso}};state.systemConfig.scheduledAllocationEnabled=true;state.accountingYears['2026']={verified:true};h.O.apply(state,h.ctx,{operation:'saveAbsence',date:h.date,staffId:'alice',typeId:'mc',periods:[2,3]});h.setState(state);
  return {...h,at,properties,c,counts:()=>({locks,contexts,reads:h.calls.reads,writes:h.calls.writes}),tick:()=>h.scope.rosterScheduledDispatch_({input:{operation:'scheduledRoster',scheduledTime:h.ctx.now}}),row:()=>h.scope.rosterAllocationRunRead_(h.date),manual:()=>h.scope.rosterOperationsDispatch_({identity:h.ctx.user,input:{operation:'autoAllocate',allocationMode:'reoptimise',date:h.date,requestId:crypto.randomUUID(),revision:h.state().revision}},c)};
 }
 test('minute receipts remain distinct while allocation retries keep the last actual scheduled slot',()=>{

@@ -39,7 +39,7 @@ function harness(){
  assert.deepEqual(Object.keys(ctx.days).sort(),[h.date,next]);assert.equal(ctx.days[next].teachers.length,4,'replacement preparation includes all timetable candidates');assert.equal(ctx.quotaRequested,true);assert.equal(h.stats.quota,1);assert.equal(ctx.people.find(p=>p.id==='bob').active,false,'keep inactive identity available to history');
 }
 {
- const h=harness(),hint={schema:1,version:'current',at:h.ctx.now-299999,enabled:false,times:{morning:[],evening:[]},noticeDates:[]};
+ const h=harness(),week=A.monday(h.date),hint={schema:1,version:'current',at:h.ctx.now-299999,enabled:false,times:{morning:[],evening:[]},noticeDates:[],quotaCheckpoints:{[week]:{week,status:'ready',cutoff:A.quotaCheckpoint(h.ctx).cutoff,at:h.ctx.iso}}};
  h.scope.props_=()=>({getProperty:key=>key==='ROSTER_SCHEDULE_HINT'?JSON.stringify(hint):key==='ROSTER_VERSION_HINT'?'current':null});
  const slot={minute:800};assert(h.scope.rosterScheduledFastSkip_(slot,{allocate:false},h.date));hint.at--;
  assert.equal(h.scope.rosterScheduledFastSkip_(slot,{allocate:false},h.date),null,'recheck Contacts after at most five minutes');

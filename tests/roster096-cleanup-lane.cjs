@@ -5,7 +5,7 @@ const vm=require('node:vm');
 function fixture(failCleanup=false){
  const calls=[],logs=[],errors=[],background=[];
  const scope={URL,Request,Response,AbortSignal,Date,crypto:globalThis.crypto,assertRecoveryWritable:()=>{},safeHealthError:error=>({code:error.code||'UNKNOWN_ERROR'}),console:{info:value=>logs.push(JSON.parse(value)),error:value=>errors.push(JSON.parse(value))},edgeRosterEnabled:env=>env.ROSTER_EDGE_AUTHORITY==='d1',sign:async value=>value};
- for(const name of ['runDeployHandoffs','refreshEdgeRosterReferences','dispatchNotifications','dispatchDailyEmploymentReports','dispatchDeliveryReviewReports','scheduledRoster','diagnoseNotificationConnections','dispatchInboxPending','dispatchAllocationAudit','dispatchWebhookJobs','dispatchReceivedReports','dispatchPeerMail','serviceBackend'])scope[name]=async()=>{calls.push(name);return {ok:true};};
+ for(const name of ['runDeployHandoffs','refreshEdgeRosterReferences','dispatchNotifications','dispatchDailyEmploymentReports','dispatchDeliveryReviewReports','scheduledRoster','diagnoseNotificationConnections','dispatchInboxPending','dispatchAllocationAudit','dispatchQuotaSnapshot','dispatchWebhookJobs','dispatchReceivedReports','dispatchPeerMail','serviceBackend'])scope[name]=async()=>{calls.push(name);return {ok:true};};
  const cleaner={Date,TextEncoder,crypto:globalThis.crypto,assertRecoveryWritable:()=>{}};vm.runInNewContext(fs.readFileSync('roster-update/public/roster-recovery-timetable-cache.js','utf8').replace(/^import .*;$/gm,'').replace(/export async function /g,'async function '),cleaner);
  scope.runRecoveryTimetableCleanup=async(env,options)=>{calls.push({name:'cleanup',options});assert.equal(env.ROSTER_EDGE_AUTHORITY,'legacy');if(failCleanup)throw Error('private provider detail');return cleaner.runRecoveryTimetableCleanup(env,options);};
  const source=fs.readFileSync('notification-worker/index.js','utf8').replace(/^import .*;\s*$/gm,'').replace('export default','globalThis.worker=');
@@ -21,6 +21,7 @@ function fixture(failCleanup=false){
  const minute=fixture();await minute.run('* * * * *');
  assert(!minute.calls.some(call=>call.name==='cleanup'),'minute tick must never scan R2 cleanup candidates');
  assert(minute.calls.includes('scheduledRoster'),'normal scheduling remains enabled');
+ assert(minute.calls.includes('dispatchQuotaSnapshot'),'R snapshot transfer belongs to the minute lane');assert.deepEqual(minute.errors,[],'required minute-lane service bindings are complete');
  const failed=fixture(true);await failed.run('15 18 * * *');
  assert.equal(failed.calls.length,1);assert.equal(failed.errors.length,1);
  assert.equal(failed.errors[0].event,'roster-r2-cleanup-failed');
