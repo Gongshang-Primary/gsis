@@ -1,8 +1,15 @@
+## Pending: inactive Contacts staff in Roster (Model: Codex)
+
+Inactive staff are unavailable for new relief, ad hoc engagement, peer choices and notification delivery. Owner option 1B removes their duties that have not started and refills only the freed lessons, while retaining started/past duties, other staff's protected cover and original publications. Pending peer requests are included even before they create an assignment. Reactivation restores eligibility. Previously queued Daily Updates also block inactive addresses. A duty that starts while repair is saving stays in history, and slow Calendar loads cannot extend Contacts freshness.
+
+The same repair runs through Google and D1's guarded commit paths, with fresh Contacts data and deferred replacement when timetable, quota or attendance evidence is unavailable. D1 repair metadata remains readable after Google backup and switch-back. No authority change, activation or deployment is included. Verification and exact-head review remain in [the task](docs/coordination/tasks/roster-inactive-teacher.md).
+
 # Pending: freeze Google for the D1 cutover, 1 November 2026
 
 Model: Codex. Admin can freeze Google writes before the final import, inspect its age and cancel a pre-fence cutover. Both writer locks drain before the freeze. Roster writers refuse clearly; immutable preparation files remain usable. Worker jobs skip frozen Google work while durable absence receipts and Queue wakes remain retained. A four-hour warning never auto-releases the freeze.
 
 Explicit activation is available only behind a confirmed freeze and the existing preparation flag, current Admin and exact imported-source checks. The freeze completes after both D1 stores activate. Partial or uncertain completion remains recoverable; no authority flag is changed automatically. See [the F task](docs/coordination/tasks/roster-d1-cutover-freeze.md) for verification, configuration, rollback and the runbook handoff. Not deployed or live-activated.
+
 
 # Packed D1 import capture, Follow-up R2, 31 October 2026
 

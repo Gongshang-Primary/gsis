@@ -319,6 +319,7 @@ export default {async fetch(req,env,ctx){
    try{const stage=Date.now();input=await trustedOperationsInput(input,env,who,calendarOutput);calendarMs=Date.now()-stage;}catch(error){return json({ok:false,error:error.message},400)}
    const quietEnds=Object.hasOwn(QUIET_END_OPERATIONS,input.operation),quietSession=quietEnds?await readQuietMode(env.GSIS_JOBS,requestStarted).then(q=>q.active&&q.startedAt<=requestStarted?q.startedAt:0).catch(()=>0):0;
    const value=input.operation==='timetableBatch'&&!edgeRosterEnabled(env)&&!backendAvailable(env)?await timetableSnapshot(env,input,who,traceId):await backend(env,action,input,who,traceId);backendMs=value.backendMs;
+   value.result=await reconcileInactiveReplacements(env,input,value.result,who,traceId);
    // A confirmed publish or WhatsApp send ends quiet mode on the server, not in the browser.
    // Only work done now ends it: a replayed receipt (a retry, or a request from an
    // earlier session) ends nothing, and only the session active when this request
@@ -509,6 +510,7 @@ async function statisticsCalendar(env,who,year){
  const value=await response.json();if(!response.ok||!value.ok||!Array.isArray(value.data?.terms)||!Array.isArray(value.data?.semesters))throw Error('School calendar periods could not be loaded.');return value.data;
 }
 export async function trustedOperationsInput(input,env,who,calendarOutput={},now=Date.now()){
+ const {inactiveReconcileDates,...browserInput}=input;input=browserInput;
  if(edgeRosterEnabled(env)){const safe={...input};for(const key of ['calendarByDate','calendarCache','calendar','capability','identity','service','trustedIntakeAt','trustedNow','pendingTransportDates'])delete safe[key];return safe;}
  if(typeof input.operation!=='string'||!/^[A-Za-z][A-Za-z0-9]{0,63}$/.test(input.operation))throw Error('Choose a valid Roster operation.');
  // Preparation has a narrow read-only contract and no Calendar dependency.
@@ -529,6 +531,34 @@ export async function trustedOperationsInput(input,env,who,calendarOutput={},now
  const calendarByDate=cached?Object.fromEntries(wanted.map(date=>[date,cached.calendarByDate[date]||{available:false}])):Object.assign({},...await Promise.all(Array.from({length:Math.ceil(dates.length/62)},(_,i)=>calendarDates(env,dates.slice(i*62,(i+1)*62),who))));
  if(!intake&&['saveAbsence','saveInstructions'].includes(input.operation)){const selected=operationDates(input,true);if(selected.length>62){const unavailable=selected.find(date=>calendarByDate[date]?.available!==true);if(unavailable)throw Error(calendarByDate[unavailable]?.message||'Calendar must verify every selected date before reporting or updating an absence longer than 62 days.');}}
  const safe={...input,calendarByDate,trustedNow:now,schedulerAvailable:env.ROSTER_AUTOMATION_ENABLED==='true',notificationsReady:notificationStatus(env).ready};delete safe.calendarCache;delete safe.calendar;delete safe.capability;delete safe.identity;delete safe.service;delete safe.trustedIntakeAt;delete safe.pendingTransportDates;if(intake&&env.ROSTER_PUBLIC_ORIGIN)safe.publicOrigin=publicOrigin(env);return safe;
+}
+
+// Most requests need no extra source read. Only pending inactive-teacher duties
+// request their missing Calendar dates, followed by one reconciliation-only read.
+// A completed save is never replayed or reported as failed by this maintenance.
+export async function reconcileInactiveReplacements(env,input,result,who,traceId,service=false){
+ if(!result?.ok||!result.data||!Array.isArray(result.data.inactiveReplacementDates))return result;
+ const pending=result.data.inactiveReplacementDates;delete result.data.inactiveReplacementDates;
+ if(edgeRosterEnabled(env)||!pending.length)return result;
+ const dates=[...new Set(pending)];
+ if(dates.length>366||dates.some(date=>!validDate(date))){result.data.inactiveReconciliationPending=true;return result;}
+ const missing=dates.filter(date=>input.calendarByDate?.[date]?.available!==true);
+ if(!missing.length)return result;
+ try{
+  const calendar={...input.calendarByDate};
+  for(let offset=0;offset<missing.length;offset+=62)Object.assign(calendar,await calendarDates(env,missing.slice(offset,offset+62),who));
+  const ready=missing.filter(date=>calendar[date]?.available===true);
+  if(!ready.length){result.data.inactiveReconciliationPending=true;return result;}
+  const followInput={...(service||input.operation==='read'?input:{operation:'read',view:'reportForm',date:ready[0],notificationsReady:input.notificationsReady,schedulerAvailable:input.schedulerAvailable}),inactiveReconcileDates:ready,calendarByDate:calendar};
+  const follow=service?await serviceBackend(env,followInput):(await backend(env,'rosterOperations',followInput,who,traceId)).result;
+  if(!follow?.ok){result.data.inactiveReconciliationPending=true;return result;}
+  if(follow.data)delete follow.data.inactiveReplacementDates;
+  const queued=Number(result.data.notificationsQueued||0)+Number(follow.data?.notificationsQueued||0);
+  if(!service&&input.operation==='read')result=follow;
+  if(queued)result.data.notificationsQueued=queued;
+  if(ready.length<missing.length)result.data.inactiveReconciliationPending=true;
+  return result;
+ }catch(_){result.data.inactiveReconciliationPending=true;return result;}
 }
 
 function configuredSecret(secret){return typeof secret==='string'&&secret.length>=32}
@@ -1471,7 +1501,8 @@ export async function scheduledRoster(env,scheduledTime=Date.now()){
  if(edgeRosterEnabled(env)){const result=await serviceBackend(env,{operation:'scheduledRoster',date,scheduledTime,notificationsReady:notificationStatus(env).ready});if(!result.ok)throw rosterScheduledFailure(result);return result.data;}
  // The Calendar service is read-only and separately authenticated by its proxy secret.
  const calendarByDate=await calendarDates(env,date===today?[today]:[today,date],null);
- const result=await serviceBackend(env,{operation:'scheduledRoster',date,dates:Object.keys(calendarByDate),calendarByDate,scheduledTime,notificationsReady:notificationStatus(env).ready});
+ const input={operation:'scheduledRoster',date,dates:Object.keys(calendarByDate),calendarByDate,scheduledTime,notificationsReady:notificationStatus(env).ready};
+ const result=await reconcileInactiveReplacements(env,input,await serviceBackend(env,input),null,crypto.randomUUID(),true);
  if(!result.ok)throw rosterScheduledFailure(result);return result.data;
 }
 
