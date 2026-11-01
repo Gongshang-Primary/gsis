@@ -51,7 +51,7 @@ function normalizeFunction(fn){return fn.toString().replace(/^(async )?function\
     for(const name of Object.keys(old)){
       if(typeof old[name]==='function'){
         if(require('./evidence_contract_changes.cjs').changed.includes(name)||require('./booking_speed_contract_changes.cjs').changed.includes(name)||propertyContract.changed.includes(name)||settingsContract.changed.includes(name)||changedReads.has(name)||require('./v17_allowed_changes.cjs').includes(name)||require('./v18_contract_changes.cjs').changed.includes(name)||require('./gsis_contract_changes.cjs').changed.includes(name))continue;
-        assert.equal(now[name]?.toString().replace('LORD Suite Backend v1.7','LORD Suite Backend v1.5'),old[name].toString(),name);
+        assert.equal(now[name]?.toString().replace('LORD Suite Backend v1.7','LORD Suite Backend v1.5'),require('./gsis_contract_changes.cjs').expectedBuildMetadata(name,old[name].toString()),name);
       }else{
         const a=settingsContract.value(old,name),b=settingsContract.value(now,name);propertyContract.compareConfig(name,a,b);if(name==='LORD_CONFIG'){b.VERSION=a.VERSION;b.RELEASE_CHANNEL=a.RELEASE_CHANNEL;}
         assert(JSON.stringify(a)===JSON.stringify(b),name+' configuration changed');
@@ -62,7 +62,7 @@ function normalizeFunction(fn){return fn.toString().replace(/^(async )?function\
     const fixture={linked:mode!=='no-linked-session'};
     const request={action,date:mode==='empty-day'?'2027-01-01':'2026-10-09',...(mode==='forced'?{forceRefresh:'1',authEmail:'admin@gsps.edu.sg',authSub:'admin-sub',authIsAdmin:true}:{})};
     const old=probe(seeded(previous,fixture),request,mode==='warm'),now=probe(seeded(current,fixture),request,mode==='warm');
-    assert.deepEqual(now.output,old.output);
+    assert.deepEqual(now.output,{...old.output,gsisBuildLabel:require('../../package.json').gsisBuildLabel});
     // Privileged forced reads additionally recheck the current six-column admin row.
     assert(now.stats.cellsRead<=old.stats.cellsRead+(mode==='forced'?6:0));assert(now.stats.dateFormats<old.stats.dateFormats);
     if(action==='dashboard')assert(now.stats.trolleyConversions<old.stats.trolleyConversions);
@@ -85,13 +85,13 @@ function normalizeFunction(fn){return fn.toString().replace(/^(async )?function\
         h.sheets.Bookings.data[3][20]=s[4][0];h.sheets.Bookings.data[4][20]=s[4][0];
         s[5][0]='ORPHAN';outputs.push(h.get({action,date:'2026-10-09'}));
       }
-      assert(outputs[0].ok&&outputs[1].ok);assert.deepEqual(outputs[1],outputs[0]);
+      assert(outputs[0].ok&&outputs[1].ok);assert.deepEqual(outputs[1],{...outputs[0],gsisBuildLabel:require('../../package.json').gsisBuildLabel});
     }
   });
   await test('Empty workbooks and all-cancelled boards retain the exact response shape',()=>{
     for(const action of ['dashboard','starlordBoard'])for(const count of [0,1]){
       const outputs=[previous,current].map(source=>{const h=seeded(source,{count,selected:count});return h.get({action,date:'2026-10-09'});});
-      assert(outputs.every(x=>x.ok));assert.deepEqual(outputs[1],outputs[0]);
+      assert(outputs.every(x=>x.ok));assert.deepEqual(outputs[1],{...outputs[0],gsisBuildLabel:require('../../package.json').gsisBuildLabel});
     }
   });
   await test('Active feeds still reject invalid Session headers and untrusted proxy credentials',()=>{
@@ -118,7 +118,8 @@ function normalizeFunction(fn){return fn.toString().replace(/^(async )?function\
       if(['bindBooking','bindReturnIssueControl','updateReturnIssueUi','submitReturn'].includes(key))continue;
       if(removed.includes(key)){assert.equal(now.ctx[key],undefined);continue;}
       const actual=now.ctx[key]?.toString().replace('ask an administrator to refresh shared lists in OVERLORD Settings.','select Reload from Sheets.');
-      assert.equal(actual,old.ctx[key].toString(),key+' changed');
+      const expected=key==='lordFetch'?old.ctx[key].toString().replace('      clearTimeout(timer);','      clearTimeout(timer);\n      window.GSISversionNotice?.(response);'):old.ctx[key].toString();
+      assert.equal(actual,expected,key+' changed');
     }
   });
   await test('OVERLORD keeps the final authentication, editor, notes, issue and photo behaviour',()=>{

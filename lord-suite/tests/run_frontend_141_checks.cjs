@@ -109,7 +109,7 @@ const propertyContract=require('./property_policy_contract_changes.cjs');
         if(['getOverlordBookings_','getOverlordMovements_','getOverlordTrolleyMap_','getStarlordBoardData_','getStarlordSessionMap_'].includes(key))continue;
         if(require('./evidence_contract_changes.cjs').changed.includes(key)||require('./booking_speed_contract_changes.cjs').changed.includes(key)||propertyContract.changed.includes(key)||settingsContract.changed.includes(key)||require('./v17_allowed_changes.cjs').includes(key)||require('./v18_contract_changes.cjs').changed.includes(key)||require('./gsis_contract_changes.cjs').changed.includes(key))continue;
         const actual=current[key].toString();
-        const expected=['jsonResponse_','referenceJsonResponse_'].includes(key)?previous[key].toString().replace('function '+key+'(payload) {','function '+key+'(payload) {\n  payload.gsisBuildLabel=GSIS_BUILD_LABEL;'):previous[key].toString();
+        const expected=require('./gsis_contract_changes.cjs').expectedBuildMetadata(key,previous[key].toString());
         assert.equal(key==='doGet'?actual.replace('LORD Suite Backend v1.7','LORD Suite Backend v1.4'):actual,expected,key+' behavior changed');
       }else{
         const old=settingsContract.value(previous,key),now=settingsContract.value(current,key);propertyContract.compareConfig(key,old,now);

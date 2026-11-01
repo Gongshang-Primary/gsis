@@ -100,7 +100,7 @@ const report = {
 };
 
 function compare(name, before, after, changedMetric) {
-  assert.deepEqual(after.response, before.response, name + ': complete response changed');
+  assert.deepEqual(after.response, {...before.response,gsisBuildLabel:require('../../package.json').gsisBuildLabel}, name + ': complete response plus required build metadata changed');
   assert(after.stats[changedMetric] < before.stats[changedMetric], name + ': no measured reduction');
   assert(after.stats.cellsRead <= before.stats.cellsRead, name + ': read transfer grew');
   report.checks.push({ name, completeResponseEqual: true, before: before.stats, after: after.stats });
