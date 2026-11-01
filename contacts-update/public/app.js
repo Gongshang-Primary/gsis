@@ -155,11 +155,21 @@ async function start(forceSignIn=false){
 let contactData=null,dataEdits=new Map(),dataSaving=false,dataRequest=null;
 function sortContactData(data){if(data?.rows){const i=data.fields.indexOf('Active');if(i>=0)data.rows.sort((a,b)=>Number(a.values[i]==='N')-Number(b.values[i]==='N'));}return data;}
 const newContactIds=new Set();
-$('addContactRow').onclick=()=>{if(!contactDataEditable()||dataLoading||dataSaving||dataRequest)return;const id='contact-'+crypto.randomUUID(),row={id,values:contactData.fields.map(()=>''),computed:contactData.fields.map(f=>['TTb Name','EO Appt Level'].includes(f))};contactData.rows.unshift(row);newContactIds.add(id);const i=contactData.fields.indexOf('Active');dataEdits.set(id+'|'+i,{id,field:'Active',expected:'',value:'Y'});renderData();$('dataGrid').querySelector('[data-person="'+id+'"][data-field="'+contactData.fields.indexOf('Basic Name')+'"]')?.focus();};
+$('addContactRow').onclick=()=>{if(!contactDataEditable()||dataLoading||dataSaving||dataRequest)return;const id='contact-'+crypto.randomUUID(),row={id,values:contactData.fields.map(()=>''),computed:contactData.fields.map(f=>['TTb Name','EO Appt Level'].includes(f))};contactData.rows.unshift(row);newContactIds.add(id);const i=contactData.fields.indexOf('Active');dataEdits.set(id+'|'+i,{id,field:'Active',expected:'',value:'Y'});if($('ttbFilter'))$('ttbFilter').value='';renderData();$('dataGrid').querySelector('[data-person="'+id+'"][data-field="'+contactData.fields.indexOf('Basic Name')+'"]')?.focus();};
 function renderData(){
  if(!contactData||!privileged())return;
- renderStaffGrid('dataGrid',contactData,dataEdits,()=>{$('dataStatus').textContent=dataEdits.size+' unsaved cell(s)'},dataLoading||dataSaving||!!dataRequest||!contactDataEditable());syncContactDataControls();
- $('dataStatus').textContent=contactViewPending()?'Viewing saved Contacts. Editing is paused until the interrupted save is completed.'+(hasContactDrafts()?' Your draft is retained.':''):dataRequest?'Save unconfirmed. Draft locked. Retry Save changes to confirm the same save.':dataEdits.size?dataEdits.size+' unsaved cell(s)':!contactData.editable?'View only':'Up to date'+(contactData.rows.some(r=>r.values.some((v,i)=>outsideHRChoices(contactData.fields[i],v,contactData.lists||{})))?' · Amber cells: outside published HR choices; existing values retained':'');
+ const filterText=($('ttbFilter')?.value||'').normalize('NFKC').replace(/\s+/g,' ').trim().toLowerCase();
+ let visibleRows=contactData.rows;
+ if(filterText){const ttbIndex=contactData.fields.indexOf('TTb Name');if(ttbIndex>=0)visibleRows=contactData.rows.filter(r=>{const val=dataEdits.get(r.id+'|'+ttbIndex)?.value??r.values[ttbIndex];return String(val||'').normalize('NFKC').replace(/\s+/g,' ').toLowerCase().includes(filterText)});}
+ const renderDataData={...contactData,rows:visibleRows};
+ renderStaffGrid('dataGrid',renderDataData,dataEdits,()=>{renderDataStatus()},dataLoading||dataSaving||!!dataRequest||!contactDataEditable());syncContactDataControls();
+ renderDataStatus();
+}
+function renderDataStatus(){
+ const filterText=($('ttbFilter')?.value||'').trim();
+ const visibleCount=$('dataGrid').querySelectorAll('tbody tr').length;
+ const countText=filterText?`Showing ${visibleCount} of ${contactData.rows.length} staff`:'';
+ $('dataStatus').textContent=contactViewPending()?'Viewing saved Contacts. Editing is paused until the interrupted save is completed.'+(hasContactDrafts()?' Your draft is retained.':''):dataRequest?'Save unconfirmed. Draft locked. Retry Save changes to confirm the same save.':dataEdits.size?dataEdits.size+' unsaved cell(s)'+(countText?' · '+countText:''):!contactData.editable?'View only':(countText?countText:'Up to date')+(contactData.rows.some(r=>r.values.some((v,i)=>outsideHRChoices(contactData.fields[i],v,contactData.lists||{})))?' · Amber cells: outside published HR choices; existing values retained':'');
 }
 let dataFlight=null,dataLoading=false;
 const yieldGrid=()=>document.hidden?Promise.resolve():new Promise(resolve=>setTimeout(resolve,0));
@@ -183,7 +193,7 @@ async function loadContactData(force=false){
   const result=await api('data',undefined,undefined,event=>{attempt=event.attempt;status()});sortContactData(result);
   if(!valid())return;
   clearInterval(timer);progress.max=Math.max(1,result.rows.length);progress.value=0;
-  const changed=()=>{$('dataStatus').textContent=dataEdits.size+' unsaved cell(s)'};
+  const changed=()=>{renderDataStatus();};
   renderStaffGrid('dataGrid',{...result,rows:[]},dataEdits,changed,true);
   for(let start=0;start<result.rows.length;start+=15){
    if(!valid())return;
@@ -198,8 +208,16 @@ async function loadContactData(force=false){
   progress.value=progress.max;
   $('dataStatus').textContent='Ready · '+result.rows.length+' contacts · loaded in '+((Date.now()-started)/1000).toFixed(1)+'s'+(result.editable?'':' · read-only access');
  }catch(e){if(valid()){contactData=null;$('dataStatus').textContent=friendlyFailure(e)+' Showing read-only data. Use Reload to retry.';if(e.code==='CONTACTS_RECOVERY_REQUIRED')await showContactRecovery();}}
- finally{clearInterval(timer);dataFlight=null;dataLoading=false;if(token===credential&&state?.user.email===owner){progress.hidden=true;$('dataGrid').setAttribute('aria-busy','false');syncContactDataControls();}window.GSISTableRefresh?.();}})();
+ finally{clearInterval(timer);dataFlight=null;dataLoading=false;if(token===credential&&state?.user.email===owner){progress.hidden=true;$('dataGrid').setAttribute('aria-busy','false');syncContactDataControls();
+  const message=$('dataStatus').textContent;renderData();
+  if(!($('ttbFilter')?.value||'').trim())$('dataStatus').textContent=message;
+ }window.GSISTableRefresh?.();}})();
  return dataFlight;
+}
+
+if($('ttbFilter')){
+ let filterDebounce;$('ttbFilter').addEventListener('input',()=>{clearTimeout(filterDebounce);filterDebounce=setTimeout(()=>renderData(),150);});
+ $('ttbFilter').addEventListener('keydown',e=>{if(e.key==='Escape'){e.preventDefault();$('ttbFilter').value='';renderData();}});
 }
 $('reloadData').onclick=()=>{if(dataSaving||dataRequest){notice('Confirm the pending save with Retry Save changes before reloading.');return;}if(hasContactDrafts()&&!confirm('Discard unsaved data cells and load saved values?'))return;dataEdits.clear();if(contactData)contactData.rows=contactData.rows.filter(r=>!newContactIds.has(r.id));newContactIds.clear();dataRequest=null;loadContactData(true)};
 function applyContactSavedRows(changed){for(const row of changed||[]){const local=contactData.rows.find(x=>x.id===row.id);if(local)local.values=row.values;let p=state.people.find(x=>x.id===row.id);if(!p){p={id:row.id,emails:{},groups:[]};state.people.push(p);}if(p){if(row.groups)p.groups=row.groups;if(row.formalRole!==undefined)p.formalRole=row.formalRole;const get=k=>row.values[contactData.fields.indexOf(k)]||'';p.name=get('TTb Name');p.basicName=get('Basic Name');p.statutoryName=get('Statutory Name');p.mobile=get('Mobile No');p.ext=get('EXT');p.role=get('Role');p.appointmentLevel=get('EO Appt Level');p.appointmentStatus=get('Appointment Status');p.active=get('Active');p.employment=get('Employment Modifier');p.subject=get('Subject Modifier');p.mk=get('MK Modifier');p.dayOfBirth=get('Day of Birth');p.monthOfBirth=get('Month of birth');for(const [key,field,domain] of [['gsps','GSPS Alias (@gsps.edu.sg)','gsps.edu.sg'],['icon','iCON Alias (@moe.edu.sg)','moe.edu.sg'],['ces','CES Alias (@schools.gov.sg)','schools.gov.sg']]){const value=get(field);p.emails[key]=value?(value.includes('@')?value:value+'@'+domain):'';}}}}

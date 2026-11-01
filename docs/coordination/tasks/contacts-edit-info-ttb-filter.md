@@ -1,12 +1,12 @@
 # contacts-edit-info-ttb-filter: Codex takeover of Contacts PR #35
 
-- Status: claimed
+- Status: implementing
 - Owner/model: Codex
 - Reviewer/model: Claude
-- Last updated (Asia/Singapore): 2026-11-01 08:31
+- Last updated (Asia/Singapore): 2026-11-01 09:06
 - Branch: codex/contacts-edit-info-ttb-filter
 - Base SHA: PR #35 exact head a7cf72dc1368279e3014c0cbcce2bfeacfcd91da; main observed at 0860d6b29b03fb55544cc0f452851009364570b4
-- Current head SHA (or PR head; avoid self-referential commit hashes): implementation not yet published
+- Current head SHA (or PR head; avoid self-referential commit hashes): inherited #35 at a7cf72dc1368279e3014c0cbcce2bfeacfcd91da; failed candidate 7d87e59d121420699f34d0db6dea7a4c10216f6e; Ready-status correction publication pending
 - PR: replacement for https://github.com/helper-gsps/gsis/pull/35, to be opened after the complete gate is green
 - User-authorised scope: owner transferred Row C from Gemini to Codex; start from #35 latest exact head, resolve Claude's three blocking review items, and open a replacement PR that supersedes #35.
 - Files/domains owned: contacts-update/public/app.js, contacts-update/public/index.html, tests/contacts-edit-info-filter.cjs, this task record.
@@ -17,15 +17,32 @@
 
 The owner explicitly transferred the Gemini assignment to Codex. PR #35 remains open until its replacement exists. Preserve its lineage; reconcile the accepted claim/current main in the Contacts branch without editing lane R implementation.
 
-Claude's review at 65bd942914eb5d95531b74e3daf0589526d125b0 identified a loading lock, a string-only test and an inaccurate PR description. The later Gemini reply is unverified. Re-read #35 at a7cf72dc1368279e3014c0cbcce2bfeacfcd91da before branching.
+Claude's review at 65bd942914eb5d95531b74e3daf0589526d125b0 identified a loading lock, a string-only test and an inaccurate PR description. The later Gemini reply did not establish correctness. Re-read #35 at a7cf72dc1368279e3014c0cbcce2bfeacfcd91da before branching. The inherited task record incorrectly said merged; this accepted claim replaces that stale ownership/status.
+
+The latest source already normalized width/spaces and debounced input. Its acceptContactViewState path rendered while loading, then manually unlocked cells; no final render restored the filtered status. A real DOM test failed after Reload because the matching count was overwritten by Ready. Render once in finally after dataLoading=false so the final grid and count reflect the filter without locking editable cells.
+
+Replace the inherited test that invoked renderData() directly with real sign-in/fetch/DOM events. Exercise partial case-insensitive and NFKC/collapsed-space matching, deferred input rendering, read-only loading preview, editable text/select cells after Reload, computed-cell protection, complete hidden-plus-visible save changes, no-match count, Escape, Recalculate over all staff, and add-row filter clearing/focus. Close the JSDOM window even on failures.
+
+Reconcile current main/accepted claims while keeping #35 as the first parent; no lane-R implementation is edited.
 
 ## Verification
 
-No implementation checks claimed by this documentation-only claim. Exact-tree local checks and the existing push-triggered full GitHub workflow will supply evidence; unavailable browser/history checks will be recorded as omissions, never passes.
+- Inherited exact #35 tree: 1dc5a010b709b62a17b3fb9db0d5b3b4e03bfa13; both its root tree and original a7cf72d commit were reconstructed and hash-verified locally.
+- TZ=Asia/Singapore npm run build: passed before npm test after switching to the assigned branch.
+- TZ=Asia/Singapore npm test: attempted locally; browser-dependent scripts fail because Chromium is absent, and complete historical Git objects are unavailable. This is not a full local pass. No browsers were installed and no tests were weakened.
+- TZ=Asia/Singapore node tests/contacts-edit-info-filter.cjs: new test first failed against inherited source at the filtered count after Reload; passed after the final-render fix. It uses application DOM handlers and the real serialization path, with fixture HTTP responses.
+- Final reconciled TZ=Asia/Singapore npm run build: passed; generated outputs match current main, with no generated-file edits in this task.
+- Targeted checks passed: tests/contacts-edit-info-filter.cjs, tests/contacts-data-loading.cjs, tests/contacts410-save-ui.cjs, tests/contacts502-ui.cjs and tests/contacts503-ui.cjs, all with TZ=Asia/Singapore.
+- TZ=Asia/Singapore npm run test:lord: attempted; stopped at tests/gsis098h-background-ui.cjs because Chromium is absent. Earlier checks ran, but this is not a complete LORD pass.
+- Final local npm test was started after the reconciled build; browser-dependent scripts fail because Chromium is absent. The existing codex/** push workflow must complete the full Node and LORD suite on the exact published head before opening the replacement PR; its body will record the actual run and SHA.
+- Failed candidate evidence retained: https://github.com/helper-gsps/gsis/actions/runs/41257824948 at 7d87e59d121420699f34d0db6dea7a4c10216f6e. Build and six browser-portability checks passed; Node passed 910/912. tests/release18-loading.cjs and tests/review04-background-contacts.cjs failed because the final render replaced the existing unfiltered Ready completion message with Up to date. LORD did not execute after Node failed. No PR was opened for that candidate.
+- Correct the Contacts final render to preserve the load result message when unfiltered, while retaining the active filter's matching count after loading clears. Add Ready completion feedback to the new DOM regression. Both existing status regressions and the new assertion were observed failing, then passed after correction; the loading, immutable-save, 502 and 503 checks also passed. No existing tests were changed or weakened. Rebuild and repeat the complete exact-head gate before opening the replacement PR.
 
 ## Review
 
 Claude must review the eventual exact replacement head. No Claude approval is claimed.
+
+Internal Codex advisory review independently ran the filter and Contacts 503 DOM checks and found no blocking final-render issue. Follow-up advisory review of the Ready-status correction independently passed tests/release18-loading.cjs, tests/review04-background-contacts.cjs and tests/contacts-edit-info-filter.cjs, with no blocking finding. Two inherited non-blocking display limits remain: filtered read-only KP users see View only without the count, and successful Save shows Saved without the count until the view is rendered again. These are disclosed for Claude's review; no other-model approval is claimed.
 
 ## Deployment
 
