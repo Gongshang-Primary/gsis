@@ -1,11 +1,15 @@
 # roster-statistics-next-in-line: "Cumulative percentage of relief done R%" table (changelog)
 
-- Status: authorised to build (owner 1 Nov ~20:45: "let codex work on the last 2 PRs"); merge held per lane R rule
+- Status: claimed by Codex; merge held by owner
 - Owner/model: Codex
 - Branch: codex/roster-statistics-r-percent
 - Depends on: roster-relief-count-investigation (same count definition; build after or together)
 - Reviewer/model: Claude
-- Lane: R (serial; held until after the D1 cutover and Monday's first busy period)
+- Lane: R (serial; held by owner)
+- Last updated (Asia/Singapore): 1 Nov 2026 20:40
+- Base: stacked on relief-count head 514a3411b46025db5e7e12046eb9c599336a8871; retarget to main after the count PR merges
+- PR: not opened
+- Out of scope: cutover, freeze, import, activation, live record/configuration changes and messages.
 - Files/domains (expected): `roster-update/public/roster-statistics-ui.js` (third table after "Total Absences and Relief — by Date"), statistics data source, `shared/roster-allocation.js` (read only, for the ordering key), tests.
 
 ## Owner request (verbatim)
