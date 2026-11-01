@@ -1,7 +1,9 @@
 # roster-statistics-next-in-line: "Cumulative percentage of relief done R%" table (changelog)
 
-- Status: proposed (owner changelog, 1 Nov 2026 ~20:00; not claimed, not authorised to build)
-- Owner/model: unassigned (Codex when authorised)
+- Status: authorised to build (owner 1 Nov ~20:45: "let codex work on the last 2 PRs"); merge held per lane R rule
+- Owner/model: Codex
+- Branch: codex/roster-statistics-r-percent
+- Depends on: roster-relief-count-investigation (same count definition; build after or together)
 - Reviewer/model: Claude
 - Lane: R (serial; held until after the D1 cutover and Monday's first busy period)
 - Files/domains (expected): `roster-update/public/roster-statistics-ui.js` (third table after "Total Absences and Relief — by Date"), statistics data source, `shared/roster-allocation.js` (read only, for the ordering key), tests.
@@ -19,9 +21,9 @@ A table of teachers by cumulative R% done, ascending by default: least done at t
 4. Columns (proposed): Rank, Teacher, Relief done, R entitlement, R% done, Last relief date.
 5. Must read from D1 when D1 is the record; add a D1-path test.
 
-## Open questions for the owner
-1. Period: this term, this year, or the weekly R snapshot (3B)?
-2. Ties: break by fewest reliefs, then name?
+## Defaults until the owner rules otherwise (Claude, 1 Nov)
+1. Period: the accounting year to date, the same window as My Calculations ("1 Jan to today").
+2. Ties: fewest relief periods done, then name.
 
 ## Verification / Review / Deployment
 Not started.
