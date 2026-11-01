@@ -33,7 +33,7 @@ guardedRows=A.manualRanks(guarded,f.dem);assert.equal(guardedRows.find(r=>r.id==
 
 const special=setup();special.teachers.find(t=>t.staffId==='dora').cells[2]=['Recess duty P1','','',''];
 special.state.entitlements.find(t=>t.staffId==='dora').quota=0;
-special.people.push({id:'external',name:'External relief',active:false,mobile:'90000001'});
+special.people.push({id:'external',name:'External relief',active:true,mobile:'90000001'});
 special.state.adhoc.push({staffId:'external',date:special.date,periods:[2]});
 const specialRows=A.manualRanks(A.manualModel(special.state,special.ctx,special.date),{...special.dem,recessActivationId:'recess',level:1}).filter(r=>r.available);
 assert.deepEqual(specialRows.slice(0,2).map(r=>[r.id,r.tier]),[['dora',-1],['external',0]],'recess duty and activated ad hoc retain their priorities');

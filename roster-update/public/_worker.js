@@ -1,3 +1,4 @@
+import {dispatchQuotaSnapshot as runQuotaSnapshotJob,readQuotaCheckpointEvidence,readQuotaSnapshotStatus} from '../../shared/roster-quota-job.js';
 import {recoveryTimetableSnapshot} from './roster-recovery-timetable-cache.js';
 import {dispatchEdgeDeliveryReview,edgeDeliveryReportRead,edgeDeliveryReviewBackend} from './edge-notification-review.js';
 import {edgeRosterEnabled,edgeRosterService,edgeRosterBackend,edgeRosterMigration,readEdgeRosterReferences,mirrorEdgeRoster,readRosterMirrorStatus} from './edge-roster.js';
@@ -319,6 +320,7 @@ export default {async fetch(req,env,ctx){
    try{const stage=Date.now();input=await trustedOperationsInput(input,env,who,calendarOutput);calendarMs=Date.now()-stage;}catch(error){return json({ok:false,error:error.message},400)}
    const quietEnds=Object.hasOwn(QUIET_END_OPERATIONS,input.operation),quietSession=quietEnds?await readQuietMode(env.GSIS_JOBS,requestStarted).then(q=>q.active&&q.startedAt<=requestStarted?q.startedAt:0).catch(()=>0):0;
    const value=input.operation==='timetableBatch'&&!edgeRosterEnabled(env)&&!backendAvailable(env)?await timetableSnapshot(env,input,who,traceId):await backend(env,action,input,who,traceId);backendMs=value.backendMs;
+   value.result=await reconcileInactiveReplacements(env,input,value.result,who,traceId);
    // A confirmed publish or WhatsApp send ends quiet mode on the server, not in the browser.
    // Only work done now ends it: a replayed receipt (a retry, or a request from an
    // earlier session) ends nothing, and only the session active when this request
@@ -418,7 +420,7 @@ export async function systemHealthRoute(req,env,authorityEnv=env){
    if(!auth?.ok)return json({ok:false,...safeHealthError(auth),error:'Current school authority could not be confirmed.'},[401,403].includes(auth?.status)?403:503);
    if(auth.data?.user?.smc!==true&&auth.data?.user?.admin!==true)return json({ok:false,error:'SMC or Admin access is required.'},403);
    const statusEnv=typeof resolveRosterAuthorityEnvironment==='function'?await resolveRosterAuthorityEnvironment(authorityEnv):env;
-   const snapshot={...await readSystemHealth(statusEnv,{jobsOnly:true}),googleBackup:await readRosterMirrorStatus(statusEnv)},jobs=new Set(['google-backup','allocation','notifications','received-reports','inbox','webhook','peer-mail','r2-cleanup','audit-export']);
+   const snapshot={...await readSystemHealth(statusEnv,{jobsOnly:true}),googleBackup:await readRosterMirrorStatus(statusEnv),quotaSnapshot:await readQuotaSnapshotStatus(statusEnv).catch(()=>({configured:true,available:false,status:'missing',lastCode:'QUOTA_SNAPSHOT_STORAGE'}))},jobs=new Set(['quota-snapshot','google-backup','allocation','notifications','received-reports','inbox','webhook','peer-mail','r2-cleanup','audit-export']);
    snapshot.jobs=snapshot.jobs.filter(row=>jobs.has(row.job));snapshot.recentFailures=snapshot.recentFailures.filter(row=>jobs.has(row.job));
    const reports={available:false,transportAvailable:false,href:'/'};let peerMailReviewAllowed=false;
    try{
@@ -509,6 +511,7 @@ async function statisticsCalendar(env,who,year){
  const value=await response.json();if(!response.ok||!value.ok||!Array.isArray(value.data?.terms)||!Array.isArray(value.data?.semesters))throw Error('School calendar periods could not be loaded.');return value.data;
 }
 export async function trustedOperationsInput(input,env,who,calendarOutput={},now=Date.now()){
+ const {inactiveReconcileDates,...browserInput}=input;input=browserInput;
  if(edgeRosterEnabled(env)){const safe={...input};for(const key of ['calendarByDate','calendarCache','calendar','capability','identity','service','trustedIntakeAt','trustedNow','pendingTransportDates'])delete safe[key];return safe;}
  if(typeof input.operation!=='string'||!/^[A-Za-z][A-Za-z0-9]{0,63}$/.test(input.operation))throw Error('Choose a valid Roster operation.');
  // Preparation has a narrow read-only contract and no Calendar dependency.
@@ -529,6 +532,34 @@ export async function trustedOperationsInput(input,env,who,calendarOutput={},now
  const calendarByDate=cached?Object.fromEntries(wanted.map(date=>[date,cached.calendarByDate[date]||{available:false}])):Object.assign({},...await Promise.all(Array.from({length:Math.ceil(dates.length/62)},(_,i)=>calendarDates(env,dates.slice(i*62,(i+1)*62),who))));
  if(!intake&&['saveAbsence','saveInstructions'].includes(input.operation)){const selected=operationDates(input,true);if(selected.length>62){const unavailable=selected.find(date=>calendarByDate[date]?.available!==true);if(unavailable)throw Error(calendarByDate[unavailable]?.message||'Calendar must verify every selected date before reporting or updating an absence longer than 62 days.');}}
  const safe={...input,calendarByDate,trustedNow:now,schedulerAvailable:env.ROSTER_AUTOMATION_ENABLED==='true',notificationsReady:notificationStatus(env).ready};delete safe.calendarCache;delete safe.calendar;delete safe.capability;delete safe.identity;delete safe.service;delete safe.trustedIntakeAt;delete safe.pendingTransportDates;if(intake&&env.ROSTER_PUBLIC_ORIGIN)safe.publicOrigin=publicOrigin(env);return safe;
+}
+
+// Most requests need no extra source read. Only pending inactive-teacher duties
+// request their missing Calendar dates, followed by one reconciliation-only read.
+// A completed save is never replayed or reported as failed by this maintenance.
+export async function reconcileInactiveReplacements(env,input,result,who,traceId,service=false){
+ if(!result?.ok||!result.data||!Array.isArray(result.data.inactiveReplacementDates))return result;
+ const pending=result.data.inactiveReplacementDates;delete result.data.inactiveReplacementDates;
+ if(edgeRosterEnabled(env)||!pending.length)return result;
+ const dates=[...new Set(pending)];
+ if(dates.length>366||dates.some(date=>!validDate(date))){result.data.inactiveReconciliationPending=true;return result;}
+ const missing=dates.filter(date=>input.calendarByDate?.[date]?.available!==true);
+ if(!missing.length)return result;
+ try{
+  const calendar={...input.calendarByDate};
+  for(let offset=0;offset<missing.length;offset+=62)Object.assign(calendar,await calendarDates(env,missing.slice(offset,offset+62),who));
+  const ready=missing.filter(date=>calendar[date]?.available===true);
+  if(!ready.length){result.data.inactiveReconciliationPending=true;return result;}
+  const followInput={...(service||input.operation==='read'?input:{operation:'read',view:'reportForm',date:ready[0],notificationsReady:input.notificationsReady,schedulerAvailable:input.schedulerAvailable}),inactiveReconcileDates:ready,calendarByDate:calendar};
+  const follow=service?await serviceBackend(env,followInput):(await backend(env,'rosterOperations',followInput,who,traceId)).result;
+  if(!follow?.ok){result.data.inactiveReconciliationPending=true;return result;}
+  if(follow.data)delete follow.data.inactiveReplacementDates;
+  const queued=Number(result.data.notificationsQueued||0)+Number(follow.data?.notificationsQueued||0);
+  if(!service&&input.operation==='read')result=follow;
+  if(queued)result.data.notificationsQueued=queued;
+  if(ready.length<missing.length)result.data.inactiveReconciliationPending=true;
+  return result;
+ }catch(_){result.data.inactiveReconciliationPending=true;return result;}
 }
 
 function configuredSecret(secret){return typeof secret==='string'&&secret.length>=32}
@@ -1462,16 +1493,22 @@ function rosterScheduledFailure(result){
  const counts={};for(const key of ['pendingCaptureCount','pendingPeerCount'])if(Number.isSafeInteger(result?.[key])&&result[key]>=0)counts[key]=result[key];
  return Object.assign(Error('Scheduled Roster operation could not be confirmed. Check its safe code and receipt status.'),{...safeHealthError(result),status:Number.isInteger(result?.status)?result.status:503,...counts});
 }
+export async function dispatchQuotaSnapshot(env){return runQuotaSnapshotJob(env);}
 export async function scheduledRoster(env,scheduledTime=Date.now()){
  if(env.ROSTER_AUTOMATION_ENABLED!=='true')return {enabled:false};
  const sg=new Date(scheduledTime+8*3600000).toISOString(),minute=+sg.slice(11,13)*60+ +sg.slice(14,16),today=sg.slice(0,10),date=minute>=960?new Date(Date.parse(today+'T12:00:00Z')+86400000).toISOString().slice(0,10):today;
  const pending=await pendingAbsenceTransport(env,[date]);if(pending.pendingCaptureCount||pending.pendingPeerCount)throw rosterScheduledFailure({status:409,code:'ABSENCE_TRANSPORT_PENDING',...pending});
  // D1's scheduler verifies its persisted Calendar/Contacts references after
  // its due-work preflight. Do not fetch the legacy Calendar adapter on idle ticks.
- if(edgeRosterEnabled(env)){const result=await serviceBackend(env,{operation:'scheduledRoster',date,scheduledTime,notificationsReady:notificationStatus(env).ready});if(!result.ok)throw rosterScheduledFailure(result);return result.data;}
+ const dayOfWeek=new Date(today+'T12:00:00Z').getUTCDay(),monday=new Date(Date.parse(today+'T12:00:00Z')+((dayOfWeek===0?(minute>=960?1:-6):1-dayOfWeek)*86400000)).toISOString().slice(0,10);
+ const weekdays=Array.from({length:5},(_,n)=>new Date(Date.parse(monday+'T12:00:00Z')+n*86400000).toISOString().slice(0,10));
+ const schoolDates=calendar=>weekdays.filter(day=>calendar?.[day]?.available===true&&calendar[day].schoolDay===true);
+ if(edgeRosterEnabled(env)){const references=await readEdgeRosterReferences(env,{allowExpired:true}),quotaCheckpointEvidence=await readQuotaCheckpointEvidence(env,{today,minute,now:scheduledTime,schoolDates:schoolDates(references.calendarByDate)});const result=await serviceBackend(env,{operation:'scheduledRoster',date,scheduledTime,quotaCheckpointEvidence,notificationsReady:notificationStatus(env).ready});if(!result.ok)throw rosterScheduledFailure(result);return result.data;}
  // The Calendar service is read-only and separately authenticated by its proxy secret.
- const calendarByDate=await calendarDates(env,date===today?[today]:[today,date],null);
- const result=await serviceBackend(env,{operation:'scheduledRoster',date,dates:Object.keys(calendarByDate),calendarByDate,scheduledTime,notificationsReady:notificationStatus(env).ready});
+ const dates=[...new Set([today,date,...weekdays])];
+ const calendarByDate=await calendarDates(env,dates,null),quotaCheckpointEvidence=await readQuotaCheckpointEvidence(env,{today,minute,now:scheduledTime,schoolDates:schoolDates(calendarByDate)});
+ const input={operation:'scheduledRoster',date,dates:Object.keys(calendarByDate),calendarByDate,scheduledTime,quotaCheckpointEvidence,notificationsReady:notificationStatus(env).ready};
+ const result=await reconcileInactiveReplacements(env,input,await serviceBackend(env,input),null,crypto.randomUUID(),true);
  if(!result.ok)throw rosterScheduledFailure(result);return result.data;
 }
 

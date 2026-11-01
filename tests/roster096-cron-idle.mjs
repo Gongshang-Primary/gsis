@@ -36,6 +36,7 @@ let now=Date.parse(today+'T07:01:00+08:00');Date.now=()=>now;
 const db=database(),objectCalls={gets:0,puts:0},networkCalls=[],serviceCalls=[];
 try{
  const state=O.initial();state.systemConfig.scheduledAllocationEnabled=true;
+ state.quotaCheckpoints={[today]:{week:today,cutoff:Date.parse('2026-10-25T16:00:00+08:00'),status:'ready',at:new Date(now).toISOString()}};
  // Handled delivery failures remain in the private history after their alerts
  // are archived. They must not turn every idle tick into an empty claim/write.
  state.outbox=[
@@ -53,7 +54,8 @@ try{
  const person={id:'synthetic-staff',name:'Synthetic Staff',active:true,email:'fixture@gsps.edu.sg',emails:['fixture@gsps.edu.sg'],groups:['Teaching'],role:'Teacher',mobile:'6590000001',employment:'Permanent',mk:'',appointmentLevel:'',adhocEligible:true};
  const references={schema:1,contacts:{rosterPeople:[person],rosterSMCIds:[person.id],rosterAdminIds:[person.id],rosterUrgentSMCIds:[person.id]},contactsCheckedAt:now,calendarCheckedAt:now,calendarByDate};
  await activate(db,'roster',state);await activate(db,'roster-register',{revision:0,entries:[],receipts:[]});await activate(db,'roster-references',references);
- await activate(db,'deploy',{index:{versions:[],active:null,published:null,publicationSchema:1,revision:0,requests:[]},drafts:{},publications:{},receipts:{},deltas:{},leases:{},properties:{},jobs:{}});
+ // Retained Deploy imports are inert; an active head would make D1 the quota source.
+ await GSiSEdgeStore.open(db,'deploy').importState({state:{index:{versions:[],active:null,published:null,publicationSchema:1,revision:0,requests:[]},drafts:{},publications:{},receipts:{},deltas:{},leases:{},properties:{},jobs:{}},actor:'fixture',requestId:crypto.randomUUID()});
  // Existing capture tables and completed audit checkpoints represent an
  // installed, idle service. These fixture writes never enter the measurements.
  db.sql.exec(gateway.WEBHOOK_SCHEMA_SQL);db.sql.exec(gateway.ABSENCE_TRANSPORT_SCHEMA_SQL);
@@ -62,6 +64,10 @@ try{
  db.sql.prepare("INSERT INTO gsis_roster_audit_exports(date,source_count,source_revision,reference_json,exported_at) SELECT record_date,COUNT(*),MAX(revision),'{}',? FROM gsis_edge_records WHERE scope='roster' AND collection='audit' AND record_id<>'$' GROUP BY record_date").run(now);
  db.sql.exec('CREATE TABLE IF NOT EXISTS gsis_roster_audit_scan(scope TEXT PRIMARY KEY,scanned_revision INTEGER NOT NULL)');
  db.sql.exec("INSERT INTO gsis_roster_audit_scan(scope,scanned_revision) SELECT scope,revision FROM gsis_edge_heads WHERE scope='roster'");
+ const quotaSource={service:'deploy',versionId:'published-quota-fixture',revision:1,commit:'published-quota-commit',calculationVersion:'fixture-model',publishedAt:'2026-10-25T08:00:00.000Z',from:'2026-01-01',to:'2026-12-31'};
+ const quotaValue={versionId:quotaSource.versionId,from:quotaSource.from,to:quotaSource.to,source:quotaSource,rows:[{id:'synthetic-staff',R:5}]};
+ await (await moduleAt('shared/roster-quota-snapshot.js')).writeQuotaSnapshot({GSIS_JOBS:db},quotaValue,{now});
+ const quotaSourceCalls=[];
  const originalHeads=db.sql.prepare('SELECT scope,mode,revision FROM gsis_edge_heads ORDER BY scope').all();
  const historyBytes=db.sql.prepare("SELECT SUM(length(value_json)) n FROM gsis_edge_records WHERE scope='roster' AND collection='audit'").get().n;
  assert(historyBytes>2_000_000,'fixture must contain enough irrelevant retained history to detect hydration');
@@ -74,10 +80,11 @@ try{
  // Generic historical Store fixtures do not prove a coordinated Roster cutover.
  // Reject that incomplete D1 selection, then measure explicitly selected Google recovery.
  await assert.rejects(resolveRosterAuthorityEnvironment(env),error=>error.code==='ROSTER_AUTHORITY_UNVERIFIED');
- const recoveryEnv={...env,ROSTER_EDGE_AUTHORITY:'legacy'};
+ const recoveryEnv={...env,ROSTER_EDGE_AUTHORITY:'legacy',DEPLOY_EDGE_AUTHORITY:'legacy'};
  globalThis.fetch=async(input,init)=>{
   const url=String(input),request=JSON.parse(init.body);networkCalls.push(url);
   if(url===env.CALENDAR_APPS_SCRIPT_URL){const dates=request.payload.dates||[request.payload.date],values=dates.map(date=>({date,schoolDay:true,parity:'odd'}));return Response.json({ok:true,result:request.action==='rosterDates'?{dates:values}:values[0]});}
+  if(url===env.DEPLOY_APPS_SCRIPT_URL){const command=JSON.parse(request.payload);assert.equal(command.action,'deployEdge');assert.equal(command.service,'gsis-roster-quota-v1');assert.equal(command.input.operation,'quotaSnapshot');assert.equal(command.input.manifest,true,'idle transfer checks only publication metadata');assert.equal(request.signature,(await gateway.sign(command,env.DEPLOY_BRIDGE_SECRET)).signature,'the source manifest uses the existing Deploy credential');quotaSourceCalls.push(command.input);return Response.json({ok:true,data:{schema:'gsis-roster-quota-source-v1',publications:[quotaSource],expectedSource:quotaSource}});}
   assert.equal(url,env.APPS_SCRIPT_URL,'recovery calls only existing Google adapters');const command=JSON.parse(request.payload);assert.equal(command.action,'rosterService');serviceCalls.push(command.input.operation);
   const responses={nextAbsenceIntake:{job:null},claimNotifications:{transportVersion:2,notifications:[]},sendPeerMail:{sent:0},inboxPendingDispatch:{replies:[],alerts:[]},scheduledRoster:{idle:true,notificationsQueued:0}};
   assert(Object.hasOwn(responses,command.input.operation),'only critical jobs run');return Response.json({ok:true,data:responses[command.input.operation]});
@@ -85,7 +92,7 @@ try{
  const measurements=[];
  for(let pass=0;pass<2;pass++){
   now=Date.parse(today+'T07:01:00+08:00')+pass*60000;
-  objectCalls.gets=0;objectCalls.puts=0;networkCalls.length=0;serviceCalls.length=0;
+  objectCalls.gets=0;objectCalls.puts=0;networkCalls.length=0;serviceCalls.length=0;quotaSourceCalls.length=0;
   const logs={info:[],warn:[],error:[]},pending=[];
   console.info=(...args)=>logs.info.push(args.join(' '));console.warn=(...args)=>logs.warn.push(args.join(' '));console.error=(...args)=>logs.error.push(args.join(' '));
   db.start();
@@ -97,7 +104,8 @@ try{
   assert.equal(pending.length,1,'real scheduled handler must register its complete invocation');
   assert.deepEqual(logs.error,[],'caught failures must not masquerade as successful idle skips');
   assert.deepEqual(logs.warn,[],'idle gates must not hide refresh or cache failures');
-  assert.deepEqual([...serviceCalls].sort(),['nextAbsenceIntake','claimNotifications','sendPeerMail','inboxPendingDispatch','scheduledRoster'].sort(),'recovery runs each critical Google lane once');assert.equal(networkCalls.length,serviceCalls.length+1,'Calendar is read once for allocation');
+  assert.deepEqual([...serviceCalls].sort(),['nextAbsenceIntake','claimNotifications','sendPeerMail','inboxPendingDispatch','scheduledRoster'].sort(),'recovery runs each critical Google lane once');assert.equal(networkCalls.length,serviceCalls.length+2,'one Calendar context and one published R manifest accompany the critical lanes');
+  assert.equal(quotaSourceCalls.length,1,'one bounded published R manifest check runs per minute');assert.equal(db.sql.prepare('SELECT COUNT(*) n FROM gsis_roster_quota_snapshots').get().n,1,'unchanged R snapshots are not duplicated');
   assert.equal(objectCalls.gets,0,'idle scheduler must not fetch archived timetable objects');
   assert.equal(objectCalls.puts,0,'unchanged audit and timetable data must not be uploaded');
   assert.deepEqual(db.sql.prepare('SELECT scope,mode,revision FROM gsis_edge_heads ORDER BY scope').all(),originalHeads,'idle work must preserve business authority and revisions');
@@ -106,6 +114,7 @@ try{
   assert(measured.bytes<65536,'idle D1 responses must stay below 64 KiB despite retained history');
   assert(measured.sessions.length>0&&measured.sessions.every(value=>value==='first-primary'),'idle decisions must use primary D1 reads');
   const events=logs.info.flatMap(line=>{try{return [JSON.parse(line)];}catch{return [];}});
+  assert(events.some(row=>row.event==='roster-quota-snapshot'&&row.configured===true),'the required R transfer lane uses its real configured source');
   const dispatch=events.find(row=>row.event==='roster-notification-dispatch');
   assert(dispatch&&dispatch.enabled===true,'notification path must be enabled, not bypassed through missing configuration');
   assert.equal(dispatch.claimed,0);assert.equal(dispatch.prepareFailures,0);assert.equal(dispatch.resultFailures,0);assert.equal(dispatch.backendCalls,1);

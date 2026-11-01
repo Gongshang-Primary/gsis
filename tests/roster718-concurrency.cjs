@@ -47,7 +47,7 @@ for(const users of [1,10,30]){
  const replay=h.send(0,p);assert.equal(replay.replayed,true);assert.equal(h.state().absences.length,2);
 }
 {
- const h=harness(1),tick={operation:'scheduledRoster',scheduledTime:h.f.ctx.now};assert.equal(h.service(tick).idle,true);assert.equal(h.stats.contacts,0);assert.equal(h.stats.locks,0);
+ const h=harness(1),tick={operation:'scheduledRoster',scheduledTime:h.f.ctx.now},settled=h.state(),checkpoint=h.scope.GSISRosterAllocation.quotaCheckpoint(h.f.ctx);settled.quotaCheckpoints={[checkpoint.week]:{...checkpoint,status:'ready',captured:0,at:h.f.ctx.iso}};h.setState(settled);assert.equal(h.service(tick).idle,true);assert.equal(h.stats.contacts,0);assert.equal(h.stats.locks,0);
  const state=h.state();state.massPublications[h.f.date]={at:h.f.ctx.iso};h.setState(state);h.hook(()=>{const newer=h.state();delete newer.massPublications[h.f.date];h.setState(newer);});const before={...h.stats};assert.equal(h.service(tick).idle,true);assert.equal(h.stats.reads-before.reads,2);assert.equal(h.stats.contacts-before.contacts,1);assert.equal(h.stats.contexts,before.contexts,'latest locked state cancels obsolete scheduling work');
  const current=h.state();current.massPublications[h.f.date]={at:h.f.ctx.iso};h.setState(current);h.hook(()=>{const newer=h.state(),slot=h.scope.GSISRosterAllocation.schedule(h.f.ctx.now);newer.scheduleReceipts[slot.key]={at:h.f.ctx.iso};h.setState(newer);});assert.equal(h.service(tick).replayed,true);assert.equal(h.stats.writes,0,'concurrent scheduler receipt prevents duplicate commit');
 }

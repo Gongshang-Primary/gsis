@@ -6,7 +6,7 @@ import {readQuietMode} from '../shared/roster-quiet-mode.js';
 import {readRosterCutoverFreeze} from '../shared/roster-cutover-freeze.js';
 // Test harnesses load this file with its imports removed; treat quiet mode as off there.
 const quietMode=(db,at)=>typeof readQuietMode==='function'?readQuietMode(db,at):Promise.resolve({active:false});
-import {dispatchNotifications,scheduledRoster,diagnoseNotificationConnections,dispatchInboxPending,dispatchWebhookJobs,dispatchReceivedReports,dispatchPeerMail,dispatchAllocationAudit,dispatchGoogleBackup} from '../roster-update/public/_worker.js';
+import {dispatchNotifications,scheduledRoster,diagnoseNotificationConnections,dispatchInboxPending,dispatchWebhookJobs,dispatchReceivedReports,dispatchPeerMail,dispatchAllocationAudit,dispatchGoogleBackup,dispatchQuotaSnapshot} from '../roster-update/public/_worker.js';
 /* GSIS_API_SECRET_BEGIN */
 // First-party API credentials share one operator-selected setting. Browser
 // sessions, private relief links and third-party credentials stay independent.
@@ -25,7 +25,7 @@ function gsisApiSecret(env,legacyName){
 // Existing send/automation/diagnostic/pause flags retain their meanings.
 function writable(env){assertRecoveryWritable(env);}
 function safeError(error){return safeHealthError(error);}
-const summaryKeys=['configured','enabled','idle','hasMore','claimed','sent','failed','uncertain','reviewedUncertain','cancelled','prepareFailures','resultFailures','batches','backendCalls','processed','pending','exported','queued','applied','deferred','scanned','deleted','protected','candidates','removed','completed','retried','parked','readyAt','pendingCaptureCount','pendingPeerCount','notificationsQueued','forwarded','needsReview','replies','alerts','retrying','blocked','unconfirmed'];
+const summaryKeys=['quotaPending','quotaFallback','configured','enabled','idle','hasMore','claimed','sent','failed','uncertain','reviewedUncertain','cancelled','prepareFailures','resultFailures','batches','backendCalls','processed','pending','exported','queued','applied','deferred','scanned','deleted','protected','candidates','removed','completed','retried','parked','readyAt','pendingCaptureCount','pendingPeerCount','notificationsQueued','forwarded','needsReview','replies','alerts','retrying','blocked','unconfirmed'];
 function safeSummary(result){
  const summary=Object.fromEntries(summaryKeys.filter(key=>typeof result?.[key]==='boolean'||Number.isFinite(result?.[key])&&result[key]>=0).map(key=>[key,result[key]]));
  // Received-report work reports its two processing stages separately. Retain
@@ -45,9 +45,9 @@ async function stage(env,job,event,work,{scheduledTime}={}){
   const result=freeze?.active?{skipped:true,cutoverFrozen:true,reason:'cutover freeze',code:freeze.overdue?'ROSTER_CUTOVER_OVERDUE':'ROSTER_CUTOVER_FROZEN'}:await work(),data=result?.data||result,summary=safeSummary(data);
   if(result?.ok===false||data?.failures?.length)throw Object.assign(Error('Job failed'),{...safeError(result),status:result.status});
   const measured=Object.entries(summary).filter(([key,value])=>typeof value==='number'&&!['readyAt','backendCalls','reviewedUncertain'].includes(key));
-  const failed=!!(data?.prepareFailures||data?.resultFailures||data?.failed||data?.uncertain||data?.unconfirmed||summary.needsReview||summary.deferred||summary.retrying||summary.blocked),idle=!data?.hasMore&&!data?.pending&&(data?.idle===true||data?.state==='idle'||measured.length>0&&measured.every(([,value])=>value===0));
+  const failed=!!(data?.quotaPending||data?.quotaFallback||data?.prepareFailures||data?.resultFailures||data?.failed||data?.uncertain||data?.unconfirmed||summary.needsReview||summary.deferred||summary.retrying||summary.blocked||data?.quotaPending===true),idle=!data?.hasMore&&!data?.pending&&(data?.idle===true||data?.state==='idle'||measured.length>0&&measured.every(([,value])=>value===0));
   const status=failed?'failure':data?.configured===false||data?.enabled===false||data?.skipped===true?'skipped':idle?'idle':'success';
-  const detail=failed&&data?.failure?safeError(data.failure):{},outcomeCode=data?.code?safeError(data).code:'UNKNOWN_ERROR';
+  const detail=failed&&data?.failure?safeError(data.failure):failed&&data?.quotaPending===true?safeError(data):{},outcomeCode=data?.code?safeError(data).code:'UNKNOWN_ERROR';
   await record({status,...detail,code:failed?(detail.code&&detail.code!=='UNKNOWN_ERROR'?detail.code:'JOB_FAILED'):outcomeCode!=='UNKNOWN_ERROR'?outcomeCode:status==='idle'?'IDLE':status==='skipped'?'SKIPPED':'OK',finishedAt:Date.now(),counts:summary});
   if(event)console.info(JSON.stringify({event,...(scheduledTime?{scheduledTime}:{}),...summary,...detail}));
   return result;
@@ -89,6 +89,7 @@ export default {
     await run('audit-export','roster-allocation-audit',()=>dispatchAllocationAudit(env));return;
    }
    const backup=typeof dispatchGoogleBackup==='function'?run('google-backup','roster-google-backup',()=>dispatchGoogleBackup(env)):Promise.resolve();
+   const quota=run('quota-snapshot','roster-quota-snapshot',()=>dispatchQuotaSnapshot(env));
    const send=()=>run('notifications','roster-notification-dispatch',()=>dispatchNotifications(env));
    // Independent notice and human inbox work can progress during slow planning.
    // The backend still gates each affected date on all pending attendance.
@@ -106,7 +107,7 @@ export default {
     // Reuse the same durable outbox. Never reconstruct or reset provider claims.
     if(result?.notificationsQueued>0||receiptResult?.intake?.notificationsQueued>0){await notifications;await send();}
    })();
-   await Promise.all([backup,received,notifications,inbox,ingress,peerMail,planning]);
+   await Promise.all([backup,quota,received,notifications,inbox,ingress,peerMail,planning]);
   })());
  },
  async queue(batch,env){

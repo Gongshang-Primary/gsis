@@ -12,7 +12,9 @@ function database(){
 }
 async function activate(db,scope,state){const store=GSiSEdgeStore.open(db,scope),head=await store.importState({state,actor:'setup',requestId:crypto.randomUUID()});await store.transition({from:'imported',to:'active',expectedRevision:head.revision,actor:'setup',proof:{legacyWritesDisabled:true,sourceDigest:head.sourceDigest,verifiedRecords:head.importedRecords}});return store;}
 async function fixture(change=()=>{}){
- const db=database(),state=O.initial();change(state);const store=await activate(db,'roster',state),objects=new Map();let puts=0,putHook=null;
+ const db=database(),state=O.initial(),checkpoint=A.quotaCheckpoint({now});
+ // Idle probes start after the independent weekly checkpoint has settled.
+ state.quotaCheckpoints={[checkpoint.week]:{...checkpoint,status:'ready',captured:0,at:new Date(now).toISOString()}};change(state);const store=await activate(db,'roster',state),objects=new Map();let puts=0,putHook=null;
  const env={GSIS_JOBS:db,ROSTER_EDGE_AUTHORITY:'d1',APPS_SCRIPT_URL:'https://script.google.com/macros/s/fixture/exec',ROSTER_PUBLIC_ORIGIN:'https://roster.gsps.edu.sg',ROSTER_TIMETABLE_SNAPSHOTS:{async put(key,value){puts++;objects.set(key,new Uint8Array(value));if(putHook){const fn=putHook;putHook=null;await fn();}},async get(key){const value=objects.get(key);return value?{body:new Blob([value]).stream(),text:async()=>new TextDecoder().decode(value)}:null;}}};
  db.trace.length=0;db.sessions.length=0;return {db,env,state,store,objects,get puts(){return puts;},onPut(fn){putHook=fn;}};
 }
@@ -22,6 +24,7 @@ const at=time=>{now=Date.parse(today+'T'+time+':00+08:00');};
 const snapshot=(time,id='notice')=>({id,date:today,staffId:'teacher',assignmentId:id,kind:'assigned',assignment:{date:today,timeStart:time},publishedAt:today+'T07:00:00+08:00'});
 let passed=0,failed=0;async function test(name,run){try{await run();passed++;console.log('PASS',name);}catch(error){failed++;console.error('FAIL',name,error.stack);}}
 try{
+await test('an uncaptured weekly checkpoint still enters verified processing',async()=>{at('11:01');const f=await fixture(s=>{s.quotaCheckpoints={};});await assert.rejects(tick(f.env),e=>e.code==='ROSTER_EDGE_NOT_ACTIVE');assert(fullLoads(f.db).length>0);});
 await test('idle scheduled tick never loads the operational document',async()=>{at('11:01');const f=await fixture(s=>{s.audit=Array.from({length:300},(_,i)=>({id:'audit-'+i,date:today,detail:'retained '.repeat(100)}));});assert.equal((await tick(f.env)).idle,true);assert.equal(fullLoads(f.db).length,0);assert(f.db.sessions.every(s=>s==='first-primary'));});
 await test('published history alone stays idle after the daily report is complete',async()=>{at('11:01');const f=await fixture(s=>{s.massPublications[today]={at:today+'T07:00:00+08:00'};s.dailyEmploymentAutomatic[today]={status:'queued'};s.publicationSnapshots=[snapshot('14:00')];});assert.equal((await tick(f.env)).idle,true);assert.equal(fullLoads(f.db).length,0);});
 await test('existing slot receipt replays without loading other collections',async()=>{at('05:30');const f=await fixture(s=>{s.scheduleReceipts[A.schedule(now).key]={at:new Date(now).toISOString()};});assert.equal((await tick(f.env)).replayed,true);assert.equal(fullLoads(f.db).length,0);});

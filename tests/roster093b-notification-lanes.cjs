@@ -12,6 +12,7 @@ function host(overrides={}){
   dispatchPeerMail:async()=>{calls.push('peer-mail');return {sent:0};},
   dispatchInboxPending:async()=>{calls.push('inbox');},
   dispatchAllocationAudit:async()=>{calls.push('audit');},
+  dispatchQuotaSnapshot:async()=>{calls.push('quota');return {idle:true};},
   dispatchDeliveryReviewReports:async()=>{calls.push('review');},
   scheduledRoster:async env=>{calls.push('planning:'+env.ROSTER_AUTOMATION_ENABLED);return {notificationsQueued:0};},
   dispatchDailyEmploymentReports:async()=>{calls.push('employment-mail');},
@@ -24,7 +25,7 @@ function host(overrides={}){
   const intake=deferred(),h=host();h.scope.dispatchReceivedReports=async env=>{h.calls.push('received');assert.equal(env.ROSTER_AUTOMATION_ENABLED,enabled);return intake.promise;};
   await h.run({ROSTER_AUTOMATION_ENABLED:enabled});
   assert(h.calls.includes('received'),'critical received reports start even with automatic allocation disabled');
-  for(const lane of ['notifications','inbox'])assert(h.calls.includes(lane),lane+' progresses while critical projection is awaiting its response');
+  for(const lane of ['quota','notifications','inbox'])assert(h.calls.includes(lane),lane+' progresses while critical projection is awaiting its response');
   assert(!h.calls.some(call=>call.startsWith('planning:')),'planning waits for this tick’s critical report drain');assert(!h.calls.includes('peer-mail'),'peer mail waits for durable proposal projection');
   intake.resolve(h.empty);await h.finish();assert(h.calls.includes('planning:'+enabled));assert(h.calls.includes('peer-mail'));for(const extra of ['audit','review','employment-mail'])assert(!h.calls.includes(extra),'noncritical work is absent from the restoration tick');assert.deepEqual(h.errors,[]);
  }

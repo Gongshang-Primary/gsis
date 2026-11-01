@@ -8,6 +8,7 @@ function host(overrides={}){
   dispatchNotifications:async()=>{calls.push('notify');return {sent:0};},
   dispatchInboxPending:async()=>{calls.push('inbox');},
   dispatchAllocationAudit:async()=>{},
+  dispatchQuotaSnapshot:async()=>({idle:true}),
   dispatchReceivedReports:async()=>({transport:{},intake:{}}),
   dispatchPeerMail:async()=>({sent:0}),
   dispatchDeliveryReviewReports:async()=>{calls.push('review');},

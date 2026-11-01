@@ -156,7 +156,7 @@ export async function dispatchEdgeEmploymentMail(env,sendMail){
  if(!await edgeDispatchHasWork(env,'employmentMail'))return outcome;
  for(let count=0;count<5;count++){
   const claim=await service(env,{operation:'claimEmploymentMail'},(state,ctx)=>{
-   const addresses=new Set(ctx.people.flatMap(p=>[p.email,p.cesEmail,...(p.emails||[])]).filter(Boolean).map(value=>String(value).trim().toLowerCase()));
+   const addresses=new Set(ctx.people.filter(p=>p.active===true).flatMap(p=>[p.email,p.cesEmail,...(p.emails||[])]).filter(Boolean).map(value=>String(value).trim().toLowerCase()));
    for(const row of state.dailyEmploymentMail||[])if(row.status==='sending'&&ctx.now-Date.parse(row.claimedAt)>600000){row.status='uncertain';row.error='Email acceptance was not confirmed. Check the mailbox before sending again.';}
    const job=(state.dailyEmploymentMail||[]).find(row=>row.status==='queued');if(!job)return {job:null};const snapshot=state.dailyEmploymentSnapshots.find(row=>row.date===job.date);
    if(!snapshot||!addresses.has(job.to)){job.status='blocked';job.error=!snapshot?'The original report snapshot is unavailable.':'The selected email is no longer in Contacts.';return {blocked:true};}

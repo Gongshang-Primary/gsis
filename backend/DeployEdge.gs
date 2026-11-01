@@ -11,7 +11,12 @@ function deployEdgeForward_(action,input,identity){
  try{body=JSON.parse(response.getContentText());}catch(ignore){error_(503,'Deploy Worker returned an invalid service response.');}if(!body.ok){const codes=['VENUES_SOURCE_AUTH','VENUES_SOURCE_SETUP','VENUES_SOURCE_INPUT','VENUES_SOURCE_PENDING','VENUES_SOURCE_CHANGED','VENUES_SOURCE_INVALID','VENUES_FENCE_PENDING','SOURCE_CHANGED','SOURCE_INVALID','SOURCE_UNAVAILABLE'];throw Object.assign(Error(body.error||'Deploy Worker is unavailable.'),{status:body.status||503,...(codes.includes(body.code)?{code:body.code}:{})});}return body.data;
 }
 function deployEdgeAdapter_(req){
- gsisRequireBackendRole_('deploy');const p=req.input||{},allowed=['export','fence','contacts','layoutRead','layoutHandoff'];if(!allowed.includes(p.operation))error_(400,'Unknown Deploy Google adapter operation.');
+ gsisRequireBackendRole_('deploy');const p=req.input||{},allowed=['export','fence','contacts','layoutRead','layoutHandoff','quotaSnapshot'];if(!allowed.includes(p.operation))error_(400,'Unknown Deploy Google adapter operation.');
+ if(p.operation==='quotaSnapshot'){
+  if(req.service!=='gsis-roster-quota-v1')error_(403,'Use the signed Roster quota service.');
+  if(deployEdgeFenced_())return deployEdgeForward_('quotaSnapshot',p);
+  return reliefQuotaSource_(book_(),index_(book_()),p);
+ }
  if(p.operation==='contacts'){
   if(!['deploySnapshot','deployPublishReview','approveDeployTeachers','applyDeployCatalogues','roleTruthTable','saveRoleTruthTable'].includes(p.contactAction))error_(400,'Unsupported Contacts adapter action');
   return contacts_(req.identity,false,p.contactAction,p.contactInput||{});
@@ -33,11 +38,11 @@ function deployEdgeAdapter_(req){
    return {legacyWritesDisabled:true,sourceDigest:p.sourceDigest,verifiedRecords:p.verifiedRecords,revision:idx.revision};
   }
   const documents=[],seen=new Set();for(const entry of idx.versions)documents.push({entry,published:false,fields:GSISFields.flat(document_(b,entry))});
-  for(const entry of [...(idx.venuePublications||[]),...(publishedEntry_(idx)?[publishedEntry_(idx)]:[])])if(!seen.has(entry.commit)){seen.add(entry.commit);const d=document_(b,entry);documents.push({entry:{...entry,from:d.from||'',to:d.to||''},published:true,fields:GSISFields.flat(d)});}
+  for(const entry of [...(idx.venuePublications||[]),...reliefQuotaPublications_(b,idx),...(publishedEntry_(idx)?[publishedEntry_(idx)]:[])])if(!seen.has(entry.commit)){seen.add(entry.commit);const d=document_(b,entry);documents.push({entry:{...entry,from:d.from||'',to:d.to||''},published:true,fields:GSISFields.flat(d)});}
   const receipts={},sheet=b.getSheetByName('deploy_save_receipts');if(sheet&&sheet.getLastRow()>1){const rows=sheet.getRange(2,1,sheet.getLastRow()-1,5).getValues();for(let i=0;i<rows.length;){const row=rows[i],parts=Number(row[3]);if(!row[0]||!Number.isInteger(parts)||parts<1||i+parts>rows.length)error_(503,'Deploy receipt export is incomplete.');receipts[row[1]+'|'+row[0]]=JSON.parse(rows.slice(i,i+parts).map(r=>r[4]).join(''));i+=parts;}}
   for(const item of documents)if(!item.published){const d=GSISFields.inflate(item.fields);for(const receipt of d.saveReceipts||[])if(!receipts[d.id+'|'+receipt.id])receipts[d.id+'|'+receipt.id]=receipt;}
   const properties=Object.fromEntries(Object.entries(props_().getProperties()).filter(([key])=>/^NOTICE_ACK_/.test(key)));
-  const exported=JSON.parse(JSON.stringify(idx));exported.published=publishedEntry_(idx)||null;exported.venuePublications=documents.filter(x=>x.published).map(x=>x.entry);if(exported.published){const matching=documents.find(x=>x.published&&x.entry.commit===exported.published.commit);if(matching)exported.published=matching.entry;}
+  const exported=JSON.parse(JSON.stringify(idx)),venueCommits=new Set([...(idx.venuePublications||[]),...(publishedEntry_(idx)?[publishedEntry_(idx)]:[])].map(entry=>entry.commit));exported.published=publishedEntry_(idx)||null;exported.venuePublications=documents.filter(x=>x.published&&venueCommits.has(x.entry.commit)).map(x=>x.entry);exported.quotaPublications=reliefQuotaPublications_(b,idx);if(exported.published){const matching=documents.find(x=>x.published&&x.entry.commit===exported.published.commit);if(matching)exported.published=matching.entry;}
   return {schema:'gsis-deploy-edge-v1',capturedAt:new Date().toISOString(),index:exported,documents,receipts,properties};
  }finally{deployUnlock_(lock);}
 }

@@ -75,7 +75,7 @@ function reliefCache_(b,en,value){
   const item=JSON.parse(text);if(!item.source||!Array.isArray(item.result?.rows)||item.source.id!==en.id||item.result.calculationVersion!==GSISRelief.model)return null;return item;
  }catch(e){return null;}
 }
-function reliefGuard_(b,idx,en){const after=index_(b);if(after.pendingFieldCommit||after.revision!==idx.revision||![...after.versions,...(after.published?[after.published]:[])].some(x=>x.id===en.id&&x.commit===en.commit&&x.store===en.store))error_(503,'Deployment changed while calculating relief. Retry.');}
+function reliefGuard_(b,idx,en){const after=index_(b),current=[...after.versions,...(after.published?[after.published]:[])].some(x=>x.id===en.id&&x.commit===en.commit&&x.store===en.store);if(after.pendingFieldCommit||after.revision!==idx.revision||!current&&!reliefQuotaPublications_(b,after).some(x=>x.id===en.id&&x.commit===en.commit&&x.store===en.store))error_(503,'Deployment changed while calculating relief. Retry.');}
 function reliefDocument_(b,en,roots=reliefRoots_){
  if(!en.viewIndex||!en.rootViewRanges||!en.fastIndex&&!en.reliefReadRangesSchema){const d=document_(b,en,'viewPlain');return Object.fromEntries(roots.filter(k=>Object.prototype.hasOwnProperty.call(d,k)).map(k=>[k,d[k]]));}
  const sheet=b.getSheetByName(en.viewIndex);if(!sheet)error_(503,'Missing calculation projection.');
@@ -104,7 +104,7 @@ function reliefRosterQuota_(b,idx,en){
  // Roster is served by this same authenticated Deploy API. Reuse its confirmed
  // calculation rather than make a second HTTP call while a save holds the lock.
  if(idx.pendingFieldCommit)error_(503,'Save confirmation pending.');
- const now=Date.now(),day=new Date(now+8*3600000).toISOString().slice(0,10),key='roster-quota-sre-teaching1:'+hash_([b.getId(),en.id,en.store||'',en.commit,en.revision,GSISRelief.model,day]);
+ const now=Date.now(),day=new Date(now+8*3600000).toISOString().slice(0,10),key='roster-quota-weekly-checkpoint1:'+hash_([b.getId(),en.id,en.store||'',en.commit,en.revision,GSISRelief.model,day]);
  let cache=null,value=null;
  try{cache=CacheService.getScriptCache();const raw=cache.get(key),item=raw?JSON.parse(raw):null;
   const v=item?.value,s=v?.source;
@@ -115,7 +115,7 @@ function reliefRosterQuota_(b,idx,en){
  const formClasses=(d.classes||[]).map(c=>{const level=Number(String(c.level||'').replace(/\D/g,'')),short=String(c.shortName||c.ref||c.name||''),name=short.startsWith(String(level))?short:String(level)+short;return {id:c.ref||c.id||name,name,level,venue:c.venue||d.assignments?.[c.ref]?.venue||d.assignments?.[name]?.venue||''};}).filter(c=>c.id&&c.name&&c.level>=1&&c.level<=6);
  const catalogue=Array.isArray(d.membership)?membershipCatalogue_(d.membership):undefined,smcIds=(d.teachers||[]).map(t=>GSISTeachingRules.resolve(t,catalogue,undefined,d.teacherDrafts?.[t.id])).filter(t=>t.active&&(t.groups||[]).includes('SMC')).map(t=>t.id);
  const teachingGroups=reliefTeachingGroups_(d);
- value={teachingEvidenceVersion:1,formClasses,teachingGroups,smcIds,subjectCategories:Object.fromEntries([...GSISWorkload.subjects(d).map(subject=>[subject,GSISWorkload.category(d,subject)]),...GSISWorkload.nonTeachingActivities(d).map(a=>[a.code,'Non-teaching'])]),venues:[...new Set(formClasses.map(c=>c.venue).concat(Object.values(d.assignments||{}).map(a=>a.venue),(d.venueRegistry?.venues||d.venues||[]).flatMap(v=>[v.unitNumber||v.id,v.name])).filter(Boolean))].sort(),from:d.from||'',to:d.to||'',rows:confirmed.result.rows.map(r=>({id:r.id,R:Number.isFinite(r.quota)?r.quota:null,rawR:r.rawQuota,teachingPeriods:r.actualTeaching,teachingVerified:r.teachingVerified===true,periodCap:r.periodCap??null,capConfigured:r.capConfigured===true,capBasis:r.capBasis,capNonTeachingPeriods:r.capNonTeachingPeriods,capWorkload:r.capWorkload??null,capVerified:r.quota!==null,capVerificationReason:r.quota===null?r.reason||'Published Deploy workload is unverified.':null,timetableFactor:r.timetableFactor,teachingWeight:1+confirmed.result.settings.siuePercent/100,offloadFactor:r.OF,fullTimeTeacherCount:confirmed.result.reference.fullTimeTeacherCount})),versionId:en.id,source:{service:'deploy',versionId:en.id,revision:en.revision,from:d.from||'',to:d.to||'',commit:en.commit||en.publishedAt||'',calculationVersion:GSISRelief.model,cacheDay:day,checkedAt:new Date(now).toISOString()}};
+ value={teachingEvidenceVersion:1,formClasses,teachingGroups,smcIds,subjectCategories:Object.fromEntries([...GSISWorkload.subjects(d).map(subject=>[subject,GSISWorkload.category(d,subject)]),...GSISWorkload.nonTeachingActivities(d).map(a=>[a.code,'Non-teaching'])]),venues:[...new Set(formClasses.map(c=>c.venue).concat(Object.values(d.assignments||{}).map(a=>a.venue),(d.venueRegistry?.venues||d.venues||[]).flatMap(v=>[v.unitNumber||v.id,v.name])).filter(Boolean))].sort(),from:d.from||'',to:d.to||'',rows:confirmed.result.rows.map(r=>({id:r.id,R:Number.isFinite(r.quota)?r.quota:null,rawR:r.rawQuota,teachingPeriods:r.actualTeaching,teachingVerified:r.teachingVerified===true,periodCap:r.periodCap??null,capConfigured:r.capConfigured===true,capBasis:r.capBasis,capNonTeachingPeriods:r.capNonTeachingPeriods,capWorkload:r.capWorkload??null,capVerified:r.quota!==null,capVerificationReason:r.quota===null?r.reason||'Published Deploy workload is unverified.':null,timetableFactor:r.timetableFactor,teachingWeight:1+confirmed.result.settings.siuePercent/100,offloadFactor:r.OF,fullTimeTeacherCount:confirmed.result.reference.fullTimeTeacherCount})),versionId:en.id,source:{service:'deploy',weeklyCheckpoint:true,publishedAt:en.updatedAt||en.publishedAt||null,versionId:en.id,revision:en.revision,from:d.from||'',to:d.to||'',commit:en.commit||en.publishedAt||'',calculationVersion:GSISRelief.model,cacheDay:day,checkedAt:new Date(now).toISOString()}};
  reliefGuard_(b,idx,en);
  // Singapore-day boundary, with the platform's six-hour maximum and possible
  // early eviction. Cache only quota data; authority and mutable cover stay live.
@@ -185,4 +185,50 @@ function rosterPersonalCompletion_(state,staffId,today,now=Date.now()){
  const completed=A.accounted(state,ctx).filter(a=>a.staffId===staffId&&(a.accountingYear||A.year(a.date))===year&&a.date<=today&&A.reliefCompleted(a,ctx)).reduce((n,a)=>n+A.cost(a),0);
  const verified=history?.verified===true,currentWeekRecorded=seen.has(week),reason=!valid?'Recorded weekly quotas need review.':!verified?'Relief history has not been verified.':!rows.length?'No weekly quota history is recorded.':!currentWeekRecorded?'This week’s quota has not been recorded yet.':entitlement===0?'No relief quota is recorded for this period.':'';
  return {from:year+'-01-01',to:today,throughWeek:week,completed,entitlement:valid&&rows.length?entitlement:null,percentage:!reason?100*completed/entitlement:null,reason,historyVerified:verified,currentWeekRecorded,recordedWeeks:seen.size,excludedWeeks:rows.filter(r=>r.excluded).length,firstWeek:rows[0]?.week||null,lastWeek:rows.at(-1)?.week||null,zeroStart:history?.mode==='zero-start',startedAt:history?.mode==='zero-start'?history.at:null};
+}
+
+
+// Publication intent is committed in the existing Google field journal. Transfer
+// to Cloudflare is separate, so network failures cannot reject a saved publish.
+function reliefQuotaPublicationEntry_(entry,publicationRevision){
+ const keys=['id','name','revision','commit','store','row','parts','from','to','updatedAt','publishedAt','quotaCalculationVersion'];
+ return {...Object.fromEntries(keys.filter(key=>entry[key]!==undefined).map(key=>[key,entry[key]])),publishedAt:entry.publishedAt||entry.updatedAt,quotaCalculationVersion:entry.quotaCalculationVersion||GSISRelief.model,publicationRevision};
+}
+function reliefQuotaPublicationRows_(entry,publicationRevision){
+ const text=JSON.stringify(reliefQuotaPublicationEntry_(entry,publicationRevision)),parts=Math.ceil(text.length/30000);
+ return Array.from({length:parts},(_,part)=>[entry.commit,part,parts,text.slice(part*30000,(part+1)*30000)]);
+}
+function reliefQuotaPublications_(b,idx){
+ const sheet=b.getSheetByName('deploy_quota_publications'),entries=[];
+ if(sheet&&sheet.getLastRow()>1){
+  const count=sheet.getLastRow()-1;if(count>20000)error_(503,'Quota publication history needs administrator review.');
+  const rows=sheet.getRange(2,1,count,4).getValues();
+  for(let i=0;i<rows.length;){const [commit,part,parts]=rows[i];if(!commit||Number(part)!==0||!Number.isInteger(Number(parts))||parts<1||parts>32||i+Number(parts)>rows.length)error_(503,'Quota publication history is incomplete.');
+   const chunks=rows.slice(i,i+Number(parts));if(chunks.some((row,n)=>row[0]!==commit||Number(row[1])!==n||Number(row[2])!==Number(parts)))error_(503,'Quota publication history changed.');
+   const entry=JSON.parse(chunks.map(row=>row[3]).join(''));if(entry.commit!==commit||!entry.id||!Number.isInteger(entry.revision)||!Number.isSafeInteger(entry.publicationRevision)||entry.publicationRevision<0)error_(503,'Quota publication identity is invalid.');if(entry.publicationRevision<=idx.revision)entries.push(entry);i+=Number(parts);
+  }
+ }
+ for(const entry of [...(idx.quotaPublications||[]),...(idx.venuePublications||[]),...(publishedEntry_(idx)?[publishedEntry_(idx)]:[])])if(entry?.commit&&!entries.some(row=>row.commit===entry.commit))entries.push(reliefQuotaPublicationEntry_(entry,entry.publicationRevision));
+ return entries;
+}
+function reliefQuotaSourceManifest_(entries,input={}){
+ if(!input||typeof input!=='object'||Array.isArray(input)||Object.keys(input).some(key=>!['operation','manifest','date','asOf','versionId','revision','commit'].includes(key)))error_(400,'Invalid quota source request.');
+ const date=input.date,cutoff=input.asOf===undefined?Date.now():typeof input.asOf==='number'?input.asOf:Date.parse(input.asOf);
+ if(date!==undefined&&(typeof date!=='string'||!/^20\d\d-\d\d-\d\d$/.test(date)||!Number.isFinite(Date.parse(date+'T00:00:00Z'))||new Date(date+'T00:00:00Z').toISOString().slice(0,10)!==date)||!Number.isFinite(cutoff))error_(400,'Use a valid school date and publication cutoff.');
+ const publications=entries.map(entry=>({service:'deploy',versionId:entry.id,revision:entry.revision,commit:entry.commit,from:entry.from||'',to:entry.to||'',publishedAt:entry.publishedAt||entry.updatedAt,calculationVersion:entry.quotaCalculationVersion||GSISRelief.model,...(Number.isInteger(entry.publicationRevision)?{publicationRevision:entry.publicationRevision}:{})})).filter(source=>source.versionId&&Number.isInteger(source.revision)&&source.commit&&Number.isFinite(Date.parse(source.publishedAt))).sort((a,b)=>Date.parse(b.publishedAt)-Date.parse(a.publishedAt)||(b.publicationRevision||0)-(a.publicationRevision||0)||b.revision-a.revision||b.commit.localeCompare(a.commit));
+ const expectedSource=publications.find(source=>Date.parse(source.publishedAt)<=cutoff&&(!date||source.from<=date&&source.to>=date))||null;
+ return {schema:'gsis-roster-quota-source-v1',publications:publications.slice(0,200),expectedSource};
+}
+function reliefQuotaSource_(b,idx,input={}){
+ if(!idx.publicationSchema)error_(503,'Publish an immutable Deploy version before preparing its quota snapshot.');
+ if(idx.pendingFieldCommit)error_(503,'Deploy publication is awaiting save confirmation.');
+ const entries=reliefQuotaPublications_(b,idx),manifest=reliefQuotaSourceManifest_(entries,input);
+ const after=index_(b);if(after.pendingFieldCommit||after.revision!==idx.revision)error_(503,'Deploy publication changed while reading quota history. Retry.');
+ if(input.manifest===true)return manifest;
+ if(typeof input.versionId!=='string'||!input.versionId||typeof input.commit!=='string'||!input.commit||!Number.isInteger(input.revision))error_(400,'Provide the exact quota publication identity.');
+ const entry=entries.find(row=>row.id===input.versionId&&row.commit===input.commit&&row.revision===input.revision),source=entry?reliefQuotaSourceManifest_([entry],{}).publications[0]:null;
+ if(!entry||!source)error_(409,'The requested quota publication is unavailable. Refresh its manifest.');
+ if(source.calculationVersion!==GSISRelief.model)error_(503,'The published quota calculation version needs review.');
+ const value=reliefRosterQuota_(b,idx,entry);if(value.from!==source.from||value.to!==source.to)error_(503,'Quota publication effective dates differ from the frozen source.');
+ return {...value,source:{...value.source,...source,weeklyCheckpoint:true}};
 }

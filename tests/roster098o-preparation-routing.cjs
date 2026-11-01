@@ -2,7 +2,7 @@
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
 const names=['timetablePreparationManifest','timetablePreparationPart','timetablePreparationCheck'];
 test('preparation exports use existing authenticated roster operations without Calendar reads',async()=>{
- const source=fs.readFileSync('roster-update/public/_worker.js','utf8'),fn=source.slice(source.indexOf('export async function trustedOperationsInput('),source.indexOf('\nfunction configuredSecret(',source.indexOf('export async function trustedOperationsInput('))).replace('export ','');
+ const source=fs.readFileSync('roster-update/public/_worker.js','utf8'),fn=source.slice(source.indexOf('export async function trustedOperationsInput('),source.indexOf('\nfunction configuredSecret(',source.indexOf('export async function trustedOperationsInput('))).replace(/^export\s+/gm,'');
  let calendar=0,dates=0;const context=vm.createContext({edgeRosterEnabled:()=>false,operationDates:()=>{dates++;return ['2026-10-28'];},calendarDates:async()=>{calendar++;throw Error('Calendar unavailable');},notificationStatus:()=>({ready:false}),Object,Date,Promise,Number,Error});vm.runInContext(fn,context);
  for(const operation of names){const value=await context.trustedOperationsInput({operation,sourceKey:'a'.repeat(64),partId:'baseline:one',identity:{email:'forged'},calendarByDate:{forged:true}},{},{email:'admin@gsps.edu.sg'});assert.equal(value.operation,operation);assert.equal(value.identity,undefined);assert.equal(value.calendarByDate,undefined);assert.equal(value.trustedNow,undefined);}
  assert.equal(calendar,0);assert.equal(dates,0);

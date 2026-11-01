@@ -7,7 +7,8 @@ function setup(){
  const c={user:{rosterStaffId:'alice',rosterSMC:true,rosterAdmin:true},rosterPeople:h.people,rosterSMCIds:['alice'],rosterAdminIds:['alice']};
  h.scope.rosterServiceContacts_=()=>({identity:h.ctx.user,c});h.scope.rosterIndex_=()=>({entries:[{id:'baseline',from:'2026-01-01',to:'2026-12-31'}]});
  vm.runInContext(fs.readFileSync('backend/RosterAllocationRun.gs','utf8'),h.scope);
- const state=h.state();state.systemConfig.scheduledAllocationEnabled=true;state.accountingYears['2026']={verified:true};h.O.apply(state,h.ctx,{operation:'saveAbsence',date:h.date,staffId:'alice',typeId:'mc',periods:[2,3]});h.setState(state);
+ // These tests isolate allocator lifecycle after the weekly quota checkpoint.
+ const checkpoint=h.scope.GSISRosterAllocation.quotaCheckpoint(h.ctx),state=h.state();state.quotaCheckpoints={...state.quotaCheckpoints,[checkpoint.week]:{...checkpoint,status:'ready',at:h.ctx.iso}};state.systemConfig.scheduledAllocationEnabled=true;state.accountingYears['2026']={verified:true};h.O.apply(state,h.ctx,{operation:'saveAbsence',date:h.date,staffId:'alice',typeId:'mc',periods:[2,3]});h.setState(state);
  const call=(input,contacts=c)=>h.scope.rosterOperationsDispatch_({identity:h.ctx.user,input},contacts),command=()=>({operation:'autoAllocate',date:h.date,view:'allocation',requestId:crypto.randomUUID(),revision:h.state().revision}),row=()=>h.scope.rosterAllocationRunRead_(h.date),cancel=()=>call({operation:'cancelAllocationRun',date:h.date,runId:row().id,requestId:crypto.randomUUID()}),status=()=>call({operation:'allocationVersion',date:h.date,statusOnly:true});
  return {...h,c,properties,call,command,row,cancel,status};
 }

@@ -34,7 +34,8 @@ const h=harness(),input={...h.payload,includeMutualCandidates:true},saved=h.call
 assert.deepEqual(h.counts,{state:2,register:2,model:1,quota:1,writes:1});
 assert.equal(saved.revision,1);assert.equal(batch.revision,1);assert.equal(batch.date,h.date);assert.equal(batch.absenceId,saved.savedId);assert.equal(batch.timetableId,'baseline');
 assert.deepEqual(Object.keys(batch.candidatesByPeriod),['2','3']);assert.equal(batch.candidatesByPeriod[2].find(x=>x.staffId==='bob').available,true);
-assert(batch.candidatesByPeriod[2].every(x=>Object.keys(x).sort().join(',')==='available,combineAllowed,external,name,reasons,staffId'),'the prepared screen does not expose quotas or contacts');
+assert(batch.candidatesByPeriod[2].every(x=>Object.keys(x).sort().join(',')==='active,available,combineAllowed,external,name,reasons,staffId'),'the prepared screen does not expose quotas or contacts');
+for(const rows of Object.values(batch.candidatesByPeriod))for(const candidate of rows){assert.equal(typeof candidate.active,'boolean');assert.equal(candidate.active,true,'prepared candidates remain active Contacts staff');}
 assert(h.events.indexOf('commit')<h.events.indexOf('unlock')&&h.events.indexOf('unlock')<h.events.indexOf('quota'));
 const durable=h.stored();assert.equal(durable.receipts.length,1);assert.equal(durable.audit.filter(a=>a.operation==='saveAbsence').length,1);assert.equal(durable.absences.length,1);
 assert(!JSON.stringify(durable.receipts).includes('candidatesByPeriod'),'screen projections are not persisted in receipts');

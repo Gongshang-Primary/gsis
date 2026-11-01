@@ -1,0 +1,23 @@
+import assert from 'node:assert/strict';
+import {createHmac} from 'node:crypto';
+import {edgeDeployQuotaSource,edgeDeployRosterReference} from '../public/edge-deploy.js';
+const secret='quota-client-test-'.repeat(3),endpoint='https://script.google.com/macros/s/verified-deploy/exec',env={GSIS_SECRET:secret,DEPLOY_APPS_SCRIPT_URL:endpoint,APPS_SCRIPT_URL:'https://script.google.com/macros/s/roster/exec'},calls=[];
+const original=globalThis.fetch;
+try{
+ globalThis.fetch=async(url,options)=>{
+  assert.equal(url,endpoint,'source reads use the Deploy endpoint rather than the Roster backend');const envelope=JSON.parse(options.body);assert.equal(envelope.signature,createHmac('sha256',secret).update(envelope.payload).digest('hex'));
+  const request=JSON.parse(envelope.payload);calls.push(request);assert.equal(request.action,'deployEdge');assert.equal(request.service,'gsis-roster-quota-v1');assert.equal(request.input.operation,'quotaSnapshot');assert.equal(request.identity,undefined,'service reads do not impersonate a school user');assert(Math.abs(Date.now()-request.timestamp)<60000);assert.match(request.nonce,/^[\w-]{36}$/);
+  return Response.json({ok:true,data:{schema:'gsis-roster-quota-source-v1',publications:[],expectedSource:null}});
+ };
+ const input={manifest:true,date:'2026-11-02',asOf:'2026-11-01T08:00:00Z'};assert.equal((await edgeDeployQuotaSource(env,input)).schema,'gsis-roster-quota-source-v1');assert.deepEqual(calls[0].input,{...input,operation:'quotaSnapshot'});
+ const source={service:'deploy',versionId:'published-version',revision:8,commit:'published-commit',from:'2026-01-01',to:'2026-12-31',publishedAt:'2026-10-31T00:00:00Z',calculationVersion:'verified-model'},quota={versionId:source.versionId,from:source.from,to:source.to,rows:[{id:'stable-teacher',R:4,teachingVerified:true,teachingPeriods:20}],source};
+ const referenceCalls=[];globalThis.fetch=async(url,options)=>{assert.equal(url,endpoint);const envelope=JSON.parse(options.body);assert.equal(envelope.signature,createHmac('sha256',secret).update(envelope.payload).digest('hex'));const request=JSON.parse(envelope.payload);referenceCalls.push(request.input);return Response.json({ok:true,data:request.input.manifest?{schema:'gsis-roster-quota-source-v1',publications:[source],expectedSource:source}:quota});};
+ const live=await edgeDeployRosterReference({...env,ROSTER_EDGE_AUTHORITY:'d1'},['2026-11-02']);assert.deepEqual(live,quota,'Roster D1 can retain current cap and teaching evidence while Deploy stays Google');assert.equal(referenceCalls[0].date,'2026-11-02');assert.deepEqual(referenceCalls[1],{operation:'quotaSnapshot',versionId:source.versionId,revision:source.revision,commit:source.commit});
+ assert.equal(referenceCalls.length,3,'a source manifest check fences publication changes during the body read');
+ let manifests=0;globalThis.fetch=async(_url,options)=>{const request=JSON.parse(JSON.parse(options.body).payload),newer={...source,revision:9,commit:'newer-publication'};return Response.json({ok:true,data:request.input.manifest?{schema:'gsis-roster-quota-source-v1',publications:[source],expectedSource:++manifests===1?source:newer}:quota});};await assert.rejects(edgeDeployRosterReference(env,['2026-11-02']),e=>e.status===409&&e.code==='QUOTA_SNAPSHOT_CHANGED','concurrent publication rejects an outdated live safety reference');
+ const legacySecret='dedicated-deploy-bridge-'.repeat(3),legacy={DEPLOY_APPS_SCRIPT_URL:endpoint,DEPLOY_BRIDGE_SECRET:legacySecret,BRIDGE_SECRET:'other-roster-bridge-'.repeat(3)};let legacyCalls=0;
+ globalThis.fetch=async(_url,options)=>{legacyCalls++;const envelope=JSON.parse(options.body);assert.equal(envelope.signature,createHmac('sha256',legacySecret).update(envelope.payload).digest('hex'),'dedicated Deploy bridge key takes precedence over the Roster bridge key');return Response.json({ok:true,data:{schema:'gsis-roster-quota-source-v1',publications:[],expectedSource:null}});};await edgeDeployQuotaSource(legacy,input);assert.equal(legacyCalls,1);
+ await assert.rejects(edgeDeployQuotaSource({...legacy,GSIS_SECRET:'bad'},input),e=>e.code==='GSIS_SECRET_INVALID','an invalid explicit common key cannot fall back to either legacy key');assert.equal(legacyCalls,1,'invalid common key fails before disclosure');
+ globalThis.fetch=async()=>Response.json({ok:false,status:503,code:'QUOTA_SNAPSHOT_SOURCE',error:'Publication cannot be confirmed.'});await assert.rejects(edgeDeployQuotaSource(env,input),e=>e.status===503&&e.code==='QUOTA_SNAPSHOT_SOURCE');
+ console.log('PASS quota source client: explicit Deploy endpoint, signed service purpose, cutoff preservation, no user impersonation and source failure propagation.');
+}finally{globalThis.fetch=original;}

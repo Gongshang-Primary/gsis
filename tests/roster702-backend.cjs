@@ -41,8 +41,8 @@ for(const role of ['roster','deploy']){
  const report=good.h.diagnoseRoster();assert.equal(report.ready,true);assert.equal(report.recent.historyOnly,true);assert.equal(report.recent.lastFailure.historical,true);assert.equal(report.recent.lastFailure.at,'2020-01-01T00:00:00Z');
 }
 
-// The picker includes inactive external staff only on their activation date.
-// It reads operational activations without register, timetable, quota or writes.
+// Contacts inactivity excludes staff even when an old ad hoc engagement exists.
+// The directory uses fresh Contacts authority without reading operational records.
 {
  const {O}=fixture(),date='2026-10-14',forbidden=()=>{throw Error('Directory performed a timetable read or write');};let reads=0;
  const h=vm.createContext({GSISRosterOperations:O,error_:(status,message)=>{throw Object.assign(Error(message),{status});}});
@@ -51,10 +51,12 @@ for(const role of ['roster','deploy']){
  Object.assign(h,{rosterToday_:()=>date,rosterOperationsState_:()=>{reads++;return {adhoc:[{staffId:'external',date},{staffId:'deleted',date,deletedAt:'2026-10-13T00:00:00Z'},{staffId:'other-day',date:'2026-10-15'}]};},rosterIndex_:forbidden,rosterModel_:forbidden,rosterOperationsQuota_:forbidden,rosterOperationsReadReconcile_:forbidden,rosterOperationsCommit_:forbidden,LockService:{getScriptLock:forbidden}});
  const c={user:{rosterSMC:false,rosterAdmin:false},rosterPeople:[{id:'alice',name:'Alice',active:true,mobile:'private',email:'private@example.test'},...['inactive','external','deleted','other-day'].map(id=>({id,name:id,active:false}))]};
  const result=h.rosterOperationsDispatch_({input:{operation:'directory',date},identity:{email:'helper@gsps.edu.sg'}},c);
- assert.deepEqual(JSON.parse(JSON.stringify(result)),{date,people:[{id:'alice',name:'Alice'},{id:'external',name:'external'}]});
+ assert.deepEqual(JSON.parse(JSON.stringify(result)),{date,people:[{id:'alice',name:'Alice'}]});
  const later=h.rosterOperationsDispatch_({input:{operation:'directory',date:'2026-10-15'},identity:{email:'helper@gsps.edu.sg'}},c);
- assert.deepEqual(Array.from(later.people,p=>p.id),['alice','other-day']);assert.equal(reads,2);
- assert.throws(()=>h.rosterOperationsDispatch_({input:{operation:'directory',date:'invalid'},identity:{}},c),/date/i);assert.equal(reads,2,'invalid dates do not read operations');
+ assert.deepEqual(Array.from(later.people,p=>p.id),['alice']);assert.equal(reads,0);
+ c.rosterPeople.find(p=>p.id==='external').active=true;
+ assert.deepEqual(Array.from(h.rosterOperationsDispatch_({input:{operation:'directory',date},identity:{}},c).people,p=>p.id),['alice','external'],'reactivated staff return to the picker');
+ assert.throws(()=>h.rosterOperationsDispatch_({input:{operation:'directory',date:'invalid'},identity:{}},c),/date/i);assert.equal(reads,0,'invalid dates do not read operations');
  assert.throws(()=>h.rosterOperationsDispatch_({input:{operation:'directory'},identity:{}},{rosterPeople:[]}),/verified relief authority/);
 }
 

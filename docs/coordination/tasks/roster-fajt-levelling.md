@@ -1,12 +1,12 @@
 # roster-fajt-levelling: after SREs, FAJT average R% rises first until it leads the school by a set margin
 
-- Status: implementing in an isolated branch while completed predecessors await review. Owner clarified 30 Oct 2026: "FAJT average R% to rise first, but once significantly above school-wide R%, start prioritising others".
+- Status: implemented locally within combined PR #29; full verification and exact-head Claude review remain required.
 - Owner/model: Codex
 - Reviewer/model: Claude
-- Last updated (Asia/Singapore): 30 Oct 2026 22:25
-- Branch: codex/roster-fajt-levelling
-- Base SHA: cb8b587c10322b49c3d0e907f3baec3f4bd151a8
-- PR: none
+- Last updated (Asia/Singapore): 31 Oct 2026
+- Branch: codex/roster-weekly-quota-snapshot
+- Base SHA: see roster-combined-weekly-quota.md for the current #30/main integration.
+- PR: #29, incorporating #27.
 - User-authorised scope: Song Wee, 30 Oct 2026: "after SRE; then FAJT but balance FAJT R% against all other EOs R%. rule 1: SREs first; rule 2: level up FAJT R% first to be equal with FAJT average R%; rule 3: annual R% levelling across all staff".
 - Files/domains owned: shared/roster-allocation.js (candidate ranking, preferenceRules, balances), Roster settings text, generated copies, tests.
 - Out of scope: R quota formula; Deploy specialist counts (separate task); SRE rule itself.
@@ -40,3 +40,21 @@ Why points, not a ratio: early in the year all R% are small, and a ratio (e.g. 1
 ## Continuation and dependency
 
 Owner, 30 Oct: "do not wait for review on completion of changelog items keep on going". This task may progress on an isolated branch while review continues. Integrate the SRE FAJT basis from PR #20 at 16624d4de46caf8b3a1547069eea1e6ab9ab24aa before implementation. Reconcile predecessor changes, regenerate bundles and rerun the full suite before a final integration handoff. No merge, deployment, authority change or message send is authorised by this claim. Version-label work remains independently tracked under release-version-letter.
+
+## Current bounded continuation
+
+Model: Codex. Owner assigned row 2c on 31 Oct 2026. The previous prepared branch includes unrelated version-label work, so this continuation applies only FAJT policy, Settings, context and regression changes onto current main. Claude's version-label and specialist changes remain independent. The earlier branch is retained.
+
+Scope: shared/roster-allocation.js, shared/roster-operations.js, backend/RosterOperations.gs, roster-update/public/roster-settings-ui.js, their deterministic generated copies, focused tests and the existing branch-scoped Linux verification workflow. No R quota formula changes, messages, deployment, or production authority changes.
+
+The local shell and browser execution tools are unavailable in this session. No local build or test execution is claimed. Linux CI will build before the full suite. Any generated Worker differences will be retained and applied before final review; CI results and exact heads will be recorded.
+
+## 31 October source handoff
+
+Model: Codex. Isolated implementation on codex/roster-fajt-levelling-review, based on main 4a4001c. Only the FAJT source/test changes were transplanted from the earlier prepared branch. Current SIUE settings, specialist counts and collapsible exception controls are retained. Canonical code and deterministic backend/browser copies are included; the actual Linux builder will supply the remaining Worker outputs. Full suite and exact-head review pending. No merge or deployment.
+
+
+
+## Combined continuation, 31 October 2026
+
+Owner authorised combining PR #27 with #29. Active implementation is now codex/roster-weekly-quota-snapshot, PR #29. Original #27 commit history is retained; do not run parallel changes on the old branch. Nine focused FAJT cases pass after integration with current main. Full suite and Claude review pending.
