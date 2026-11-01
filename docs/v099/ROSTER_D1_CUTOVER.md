@@ -1,8 +1,21 @@
-# Roster: making D1 the record (runbook, v0.9.9e)
+# Roster: making D1 the record (runbook, v0.9.9f with cutover freeze)
 
-Owner: Song Wee (does every click). Checks: Claude (D1 queries, job health). Written 31 Oct 2026 21:45 SGT for a dawn session on Sunday 1 Nov. Applies to v0.9.9e (main 8df5a92) and later.
+Owner: Song Wee (does every click). Checks: Claude (D1 queries, job health). Updated 1 Nov 2026 for the **Sunday 1 Nov evening cutover** ready for Monday. Requires v0.9.9f (cutover freeze, PR for row F) deployed.
 
-**Shape of the session:** one fresh import, Claude's parity check, activation, then a test window. If every check passes, D1 stays the record. If any check fails, switch back to Google in the same session. Allow 2 to 2.5 hours. Do it while nobody uses Roster.
+**Shape of the session:** freeze Google, one fresh import, Claude's parity check, activation (which lifts the freeze), then a test window. If every check passes, D1 stays the record. If anything fails before activation: **Cancel freeze** and Google carries on. After activation: **Switch back to Google**. Allow **4 hours** (the rehearsal import took about 3 hours of active time).
+
+**Sunday 1 Nov timeline**
+| Time (SGT) | Step |
+|---|---|
+| by 17:00 | v0.9.9f deployed; Claude checks the job log |
+| 18:45 | Staff notice sent (below) |
+| 19:00 | Step 1: Freeze, then import |
+| ~22:00 | Step 2: Claude's parity check |
+| ~22:15 | Steps 3 to 5: Cloudflare settings, activate, test |
+| **23:00** | **Go/no-go.** If not activated and tested by 23:00: **Cancel freeze** and stay on Google for Monday |
+| Mon 06:30 to 08:00 | Step 6a: watch the first busy period |
+
+**Staff notice (send at 18:45):** "Roster maintenance tonight 7 pm to 11 pm. Roster will not save changes during this time. Absence reports you submit will be queued and applied when maintenance ends; urgent matters, please WhatsApp the duty SMC."
 
 **Facts that make this safe:**
 - The Cloudflare setting `ROSTER_EDGE_AUTHORITY=d1` alone never moves Roster to D1. Roster switches only after D1 records a proven activation (`resolveRosterAuthorityEnvironment`).
@@ -15,13 +28,14 @@ Owner: Song Wee (does every click). Checks: Claude (D1 queries, job health). Wri
 - [ ] Claude is reachable in this chat. Send "starting cutover".
 - [ ] You have the Cloudflare dashboard open: Workers & Pages.
 
-## 1. Fresh import (35 to 45 minutes)
-Last night's rehearsal copy is out of date (Google changed overnight), so import again.
-1. `https://roster.gsps.edu.sg/edge-setup.html` → **Check status**.
-2. If an import is retained: section 2 **Download private export** (keep it private) → section 3 tick the box (**Activate stays greyed**) → **Restart incomplete import** → **Restart import** → untick the box.
-3. Section 2 **Import / retry same import** → Review → Continue. Send Claude the import reference.
-4. Keep the page open until it reports the import complete and **Check status** shows `roster` and `roster-register` in mode **imported** with records above 0. Screenshot and send.
-5. If it errors: screenshot (the page shows reason and step), then **Import / retry same import** to resume.
+## 1. Freeze, then fresh import (about 3 hours)
+1. **Windows: turn sleep off** (Settings → System → Power → Screen and sleep: Never). Keep the edge-setup tab in front the whole time; background tabs paused the rehearsal twice.
+2. `https://roster.gsps.edu.sg/edge-setup.html` → **Check status**.
+3. If an import is retained (rehearsal 3 is): section 2 **Download private export** (keep it private) → section 3 tick the box (**Activate stays greyed**) → **Restart incomplete import** → **Restart import** → untick the box.
+4. **Freeze Google for cutover…** → Review → Continue. The freeze notice shows frozen, with its time. Roster saves now answer "Roster is being moved"; new absence reports queue.
+5. Section 2 **Import / retry same import** → Review → Continue. Send Claude the import reference.
+6. Keep the page open until it reports the import complete and **Check status** shows `roster` and `roster-register` in mode **imported**. Screenshot and send.
+7. If it errors: screenshot (reason and step are shown), then **Import / retry same import** to resume. If it cannot finish by 22:30: **Cancel freeze…** (Google resumes normally) and stop.
 
 ## 2. Parity check (Claude, 10 to 15 minutes)
 Do nothing in Roster until Claude replies. Claude compares D1 with the frozen Google source and reports:
@@ -39,8 +53,8 @@ Safe now: it has no effect until step 4.
 
 ## 4. Activate (2 minutes)
 1. edge-setup → section 3 → tick the box → **Activate verified owner** → Review → Continue.
-2. Expect: active, legacy writes disabled. **Check status**: `roster` and `roster-register` mode **active**. Screenshot and send.
-3. If it refuses ("fence unverified", "source mismatch"): stop. Google stays the record. Send the screenshot.
+2. Expect: active, legacy writes disabled; the freeze shows activated (lifted). **Check status**: `roster` and `roster-register` mode **active**. Queued absence reports now drain into D1. Screenshot and send.
+3. If it refuses ("fence unverified", "source mismatch"): stop, send the screenshot, then **Cancel freeze…** so Google resumes. Google stays the record.
 
 ## 5. Test window (30 to 45 minutes)
 Use a **future date** with no real reliefs (for example next Friday) and your own name.
@@ -70,3 +84,4 @@ Use a **future date** with no real reliefs (for example next Friday) and your ow
 - Never start a second import while one is retained; resume it or Restart it.
 - Never press "Let teachers see", WhatsApp or "Archive now" during the test window.
 - Never activate during school hours, or without Claude's "parity OK".
+- Never leave the freeze on overnight without activation: by 23:00 either activate or **Cancel freeze**.
