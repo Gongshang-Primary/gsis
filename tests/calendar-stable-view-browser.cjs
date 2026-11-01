@@ -20,7 +20,10 @@ const clone=value=>JSON.parse(JSON.stringify(value));
    if(holdNext){holdNext=false;await new Promise(resolve=>{held=resolve;});}
    return route.fulfill({json:{ok:true,result}});
   }
-  if(url.pathname==='/api/calendar-jobs')return route.fulfill({json:{ok:true,result:{jobs:serverJobs}}});
+  if(url.pathname==='/api/calendar-jobs'){
+   if(route.request().method()==='GET')return route.fulfill({json:{ok:true,result:{jobs:serverJobs}}});
+   const input=route.request().postDataJSON(),job={jobId:input.payload.operationId,action:input.action,payload:input.payload,state:'QUEUED',blocked:true,attemptOperationId:input.payload.operationId,attempts:0,checks:0};serverJobs.push(job);return route.fulfill({status:202,json:{ok:true,result:job}});
+  }
   const file=url.pathname==='/'?'index.html':url.pathname.slice(1),local=path.join(root,'calendar-update/public',file);
   if(file==='app.js')return route.fulfill({contentType:'text/javascript',body:source});
   if(fs.existsSync(local))return route.fulfill({path:local});
@@ -153,6 +156,25 @@ const clone=value=>JSON.parse(JSON.stringify(value));
   await page.evaluate(()=>window.stableCalendar.loadBootstrap(2026,true,{refresh:true}));
   assert.deepEqual(await page.evaluate(()=>{const b=window.narrowStable,p=window.stableCalendar.captureEventViewPosition();return {wrap:b.wrap===document.querySelector('.weekly-wrap'),anchor:b.position.anchorDate===p.anchorDate,offset:Math.abs(b.position.anchorOffset-p.anchorOffset)<1};}),{wrap:true,anchor:true,offset:true});
   console.log('PASS yellow status, truthful saved state, recovery actions, floating details and narrow viewport');
+
+  // The edited weekly cell stays fixed at receipt and after Google confirms it.
+  await page.setViewportSize({width:1280,height:900});serverJobs=[];
+  await page.evaluate(()=>{
+   const a=window.stableCalendar;a.state.calendarJobs=[];a.state.calendarJobsEnabled=true;
+   Object.defineProperty(window,'sessionStorage',{get(){throw Error('Storage blocked');},configurable:true});
+   const event=a.state.data.events.find(e=>e.EventID==='E1'),node=document.querySelector('#weeklyHost [data-event-id="E1"]'),wrap=document.querySelector('.weekly-wrap');
+   wrap.scrollTop+=node.getBoundingClientRect().top-wrap.getBoundingClientRect().top-110;
+   window.editedStable={offset:node.getBoundingClientRect().top-wrap.getBoundingClientRect().top,date:node.dataset.segmentDate};a.openEventModal(event);
+  });
+  await page.locator('[name=StaffTitle]').fill('Receipt anchors this edited event');
+  const saveStarted=Date.now();await page.locator('#eventSaveBtn').click();await page.waitForFunction(()=>!document.querySelector('#eventForm'));
+  assert(Date.now()-saveStarted<1000,'Durable acceptance closes the form without waiting for Google');
+  const editedOffset=()=>page.evaluate(()=>{const b=window.editedStable,wrap=document.querySelector('.weekly-wrap'),node=[...wrap.querySelectorAll('[data-event-id="E1"]')].find(n=>n.dataset.segmentDate===b.date);return Math.abs(node.getBoundingClientRect().top-wrap.getBoundingClientRect().top-b.offset);});
+  assert(await editedOffset()<2,'Receipt preserves the edited event offset');
+  const queued=serverJobs.at(-1);queued.state='SAVED';queued.outcome='SAVED';queued.blocked=false;queued.result={...queued.payload.event,StaffTitle:'Saved with more wrapped content '.repeat(12),_revision:'row9-saved',LastMutationID:queued.attemptOperationId};
+  await page.evaluate(()=>window.stableCalendar.loadCalendarJobs());assert(await editedOffset()<2,'SAVED rerender preserves the edited event offset with session storage blocked');
+  await page.evaluate(()=>{const a=window.stableCalendar;a.state.calendarJobsEnabled=false;clearTimeout(a.state.calendarJobsTimer);});
+  console.log('PASS edited weekly cell survives receipt and SAVED rerenders with blocked storage');
 
   // The job-snapshot path must enforce a same-alias permission change too.
   await page.evaluate(()=>{const a=window.stableCalendar;a.openEventModal(null,{StartDate:'2026-10-29',LaneID:'day'});a.state.calendarJobsEnabled=true;a.state.pendingJobSnapshotRefresh=true;});

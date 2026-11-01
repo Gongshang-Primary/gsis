@@ -1035,3 +1035,12 @@ button:disabled {cursor:not-allowed;opacity:.55}
 .calendar-venue-suggestions button[aria-selected="true"],.calendar-venue-suggestions button:hover { background:#e6f1f5; }
 @media (max-width:650px) { .calendar-jobs-panel { top:110px; right:8px; width:calc(100vw - 16px); max-height:65vh; } .calendar-job-actions { width:100%; } }
 @media print { .calendar-jobs-panel { display:none!important; } }
+
+.calendar-venue-chips { display:flex; flex-wrap:wrap; gap:.4rem; margin-bottom:.4rem; min-width:0; }
+.calendar-venue-chip { display:inline-flex; align-items:flex-start; gap:.4rem; max-width:100%; text-align:left; white-space:normal; overflow-wrap:anywhere; border:1px solid #b3c8d2; border-radius:1rem; background:#e6f1f5; color:#193e51; padding:.35rem .65rem; }
+.calendar-venue-chip.custom { background:#f0f2f3; color:#4d5b61; border-color:#c8ced1; }
+.calendar-venue-chip:focus-visible { outline:2px solid #214e67; outline-offset:2px; }
+
+#appView > main { position:relative; }
+.year-loading-overlay { position:absolute; inset:0; z-index:50; }
+@media print { .year-loading-overlay { display:none!important; } }

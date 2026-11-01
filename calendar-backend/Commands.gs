@@ -27,7 +27,7 @@ function calendarCommandServiceCore_(request){
 }
 function calendarCommandAuthorize_(actor,action,payload,requestId){
   rc18ResetIO_();
-  if(action==='saveEvent'&&payload.event&&payload.event.VenueID||action==='relocateEvent'&&payload.mode==='copy')rc18IO_().venueCatalogue=calendarVenueCatalogue_(actor);
+  if(action==='saveEvent'&&payload.event&&payload.event.VenueID||action==='relocateEvent')rc18IO_().venueCatalogue=calendarVenueCatalogue_(actor);
   const prior=calendarRequestAuthority_;calendarRequestAuthority_={alias:actor.userAlias,parent:action==='saveParentSide'};
   try{return withRC17WriteLock_(()=>{
     const identity=mutationIdentity_(actor,action,payload),log=mutationSheet_(),receipt=mutationLookup_(log,identity.operationId);

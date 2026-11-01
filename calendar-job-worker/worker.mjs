@@ -64,7 +64,8 @@ async function enqueue(env,actor,input){
  const {id,payload}=operation(input),db=env.CALENDAR_JOBS_DB,hash=await digest(JSON.stringify({actor,action:input.action,payload}));
  const prior=await db.prepare('SELECT * FROM calendar_jobs WHERE job_id=?').bind(payload.operationId).first();
  if(prior){if(prior.actor_key!==actorKey(actor)||prior.payload_hash!==hash)throw failure(409,'JOB_MISMATCH','Calendar job identity does not match the accepted proposal.');return publicJob(prior);}
- await backend(env,actor,input.action,payload,payload.operationId,'authorize');
+ // D1 acknowledges capture only. Google rechecks authority and all event
+ // fences during execute; a queued proposal is never a saved event.
  const now=Date.now(),eventKey=id?'event:'+id:'new:'+payload.operationId;
  try{
   const result=await db.prepare(`INSERT INTO calendar_jobs(job_id,actor_key,actor_json,action,payload_json,payload_hash,event_key,year,state,attempt_operation_id,next_at,created_at,updated_at)

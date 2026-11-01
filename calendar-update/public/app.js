@@ -9,13 +9,15 @@
   // RC1.0 promotes Weekly View to the default landing page. The version marker
   // moves existing sessions to Weekly once on upgrade; after that, navigation
   // within the same browser session is remembered normally.
-  let storedPage = sessionStorage.getItem(PAGE_STORAGE_KEY) || '';
-  const landingVersion = sessionStorage.getItem(LANDING_VERSION_KEY) || '';
+  const sessionGet=key=>{try{return sessionStorage.getItem(key);}catch{return null;}};
+  const sessionSet=(key,value)=>{try{sessionStorage.setItem(key,value);}catch{}};
+  let storedPage = sessionGet(PAGE_STORAGE_KEY) || '';
+  const landingVersion = sessionGet(LANDING_VERSION_KEY) || '';
 
   if (landingVersion !== FRONTEND_VERSION) {
     storedPage = 'weekly';
-    sessionStorage.setItem(PAGE_STORAGE_KEY, storedPage);
-    sessionStorage.setItem(LANDING_VERSION_KEY, FRONTEND_VERSION);
+    sessionSet(PAGE_STORAGE_KEY, storedPage);
+    sessionSet(LANDING_VERSION_KEY, FRONTEND_VERSION);
   }
 
   if (!storedPage || storedPage === 'migration') {
@@ -131,7 +133,7 @@
       if(!confirmUnsavedChanges('change calendar year')){renderYearSelect();return;}
       if(state.pendingMutation){renderYearSelect();toast('Resolve the pending save before switching years.',true);return;}
       closeModal(true);
-      try {await loadBootstrap(year,true);} catch(err){toast(err.message,true);}
+      try {await loadBootstrap(year,true,{yearSwitch:true});} catch(err){toast(err.message,true);}
     });
     bindRC17StaticEvents();
 
@@ -210,15 +212,27 @@
   async function loadBootstrapSnapshot(year, render = true, options = {}) {
     cancelSourceReadRetry();
     const sequence=++bootstrapSequence;
+    clearYearLoadingOverlay();
     const requested=Number(year||0);
     rememberView();
     const previous={data:state.data,year:state.year,readOnly:state.readOnly};
+    // Superseded requests may have installed a read-only cache or temporarily
+    // disabled editing. Keep the original verified fallback across the chain.
+    if(options.yearSwitch && previous.data && !state.yearSwitchFallback)state.yearSwitchFallback=previous;
+    const fallback=options.yearSwitch?(state.yearSwitchFallback||previous):previous;
     const sameYear=!!previous.data && requested===Number(previous.year);
     const beforeSnapshot=sameYear?JSON.stringify(previous.data):'';
     state.retryYear=null;
     state.loadingYear=requested || true; state.readOnly=sameYear?previous.readOnly:true; state.refreshFailed=false;
     state.freshnessMessage=options.refresh?'Refreshing…':`Loading ${requested || 'calendar'}…`;
     const cached=requested ? yearCache.get(requested) : null;
+    if(options.yearSwitch && render && previous.data && !sameYear && !cached){
+      state.yearLoadingTimer=setTimeout(()=>{
+        if(sequence!==bootstrapSequence)return;
+        $('yearLoadingTitle').textContent=`Loading ${requested} calendar…`;
+        $('yearLoadingOverlay').classList.remove('hidden');
+      },300);
+    }
     if(cached && render && !sameYear){
       state.freshnessMessage='Refreshing… Previously loaded data is read-only.';
       installBootstrap(cached,true,true);
@@ -253,9 +267,14 @@
       if(err.status===401){clearCalendarOwnerState();yearCache.clear();viewMemory.clear();state.data=null;showLogin();showSignInPrompt();initGoogleButton();}
       else if(cached && err.status===403){
         yearCache.delete(requested);
-        if(previous.data && Number(previous.year)!==requested)installBootstrap(previous.data,render,true);
+        if(fallback.data && Number(fallback.year)!==requested)installBootstrap(fallback.data,render,options.yearSwitch?fallback.readOnly:true);
         else {state.data=null;showLogin();showLoginError(err.message);}
-        state.freshnessMessage='Access could not be verified. Refresh before editing.';
+        state.freshnessMessage=options.yearSwitch?'That year is not available. The previous calendar is retained.':'Access could not be verified. Refresh before editing.';
+      } else if(options.yearSwitch && fallback.data){
+        if(state.data!==fallback.data)installBootstrap(fallback.data,render,fallback.readOnly);
+        state.readOnly=fallback.readOnly;
+        state.freshnessMessage=`Could not load ${requested}. The previous calendar is retained.`;
+        renderYearSelect();
       } else {
         state.readOnly=true;
         state.freshnessMessage=cached || options.refresh?'Previously loaded data—refresh failed':`Could not load ${requested}. The previous calendar is retained read-only.`;
@@ -263,7 +282,7 @@
       }
       throw err;
     } finally {
-      if(sequence===bootstrapSequence){state.loadingYear=null;updateFreshnessUI();drainDeferredRefresh();}
+      if(sequence===bootstrapSequence){clearYearLoadingOverlay();state.yearSwitchFallback=null;state.loadingYear=null;updateFreshnessUI();drainDeferredRefresh();}
     }
   }
 
@@ -584,7 +603,7 @@
 
     state.page = page;
     if (!preserve) {
-      sessionStorage.setItem(PAGE_STORAGE_KEY, page);
+      sessionSet(PAGE_STORAGE_KEY, page);
     }
 
     activatePage(page);
@@ -708,85 +727,25 @@
    * CALENDAR
    * ========================= */
 
+  const todayJumpedViews=new Set();
+  let todayJumpGeneration=0;
+  function cancelTodayJump(){todayJumpGeneration++;}
   function jumpViewToTodayOnce(viewName, host) {
-    const storageKey =
-      `gspsCalTodayJump:${viewName}`;
-
-    const today =
-      sgToday();
-
-    // Do not consume the session's one-time jump while the user is looking at
-    // a past/future Calendar year. If they later switch to the current year,
-    // the first render of that view will still jump to today.
-    if (
-      Number(today.slice(0, 4)) !==
-      Number(state.year)
-    ) {
-      return;
-    }
-
-    try {
-      if (
-        sessionStorage.getItem(
-          storageKey
-        ) === '1'
-      ) {
-        return;
-      }
-    } catch (err) {}
-
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        const wrap =
-          viewName === 'weekly'
-            ? host.querySelector(
-                '.weekly-wrap'
-              )
-            : host.querySelector(
-                '.calendar-wrap'
-              );
-
-        const target =
-          viewName === 'weekly'
-            ? host.querySelector(
-                '.week-day.today'
-              )?.closest('tr')
-            : host.querySelector(
-                '.cal-row.today'
-              );
-
-        if (!wrap || !target) {
-          return;
-        }
-
-        const contextOffset =
-          Math.min(
-            90,
-            Math.max(
-              30,
-              wrap.clientHeight * 0.12
-            )
-          );
-
-        wrap.scrollTop =
-          Math.max(
-            0,
-            target.offsetTop -
-            contextOffset
-          );
-
-        // The first view should expose Date/Term/Week/Day context rather than
-        // preserving a stale horizontal position from another render.
-        wrap.scrollLeft = 0;
-
-        try {
-          sessionStorage.setItem(
-            storageKey,
-            '1'
-          );
-        } catch (err) {}
-      });
-    });
+    const key=`gspsCalTodayJump:${viewName}`;
+    if(Number(sgToday().slice(0,4))!==Number(state.year)||todayJumpedViews.has(viewName))return;
+    todayJumpedViews.add(viewName);
+    if(sessionGet(key)==='1')return;
+    sessionSet(key,'1');
+    const generation=todayJumpGeneration,year=state.year;
+    const wrap=host.querySelector(viewName==='weekly'?'.weekly-wrap':'.calendar-wrap');
+    wrap?.addEventListener('scroll',cancelTodayJump,{passive:true,once:true});
+    requestAnimationFrame(()=>requestAnimationFrame(()=>{
+      if(generation!==todayJumpGeneration||year!==state.year||!wrap?.isConnected)return;
+      const target=viewName==='weekly'?host.querySelector('.week-day.today')?.closest('tr'):host.querySelector('.cal-row.today');
+      if(!target)return;
+      const offset=Math.min(90,Math.max(30,wrap.clientHeight*.12));
+      wrap.scrollTop=Math.max(0,target.offsetTop-offset);wrap.scrollLeft=0;
+    }));
   }
 
   function renderCalendar() {
@@ -4178,8 +4137,9 @@
   function openEventModal(event, defaults = {}) {
     if (!state.data.actor.isAdmin || !isCalendarEditable()) return;
     if(guardPendingEvent(event))return;
+    rememberEditedEvent(event,defaults.anchorDate||defaults.StartDate);
     let expectedRevision=event?._revision || '';
-    let reviewBaseline=event ? JSON.parse(JSON.stringify(event)) : null;
+    let reviewBaseline=defaults.reviewBaseline || (event ? JSON.parse(JSON.stringify(event)) : null);
 
     const years = state.data.years || [];
     const lanes = state.data.lanes || [];
@@ -4253,7 +4213,7 @@
             <div id="endTimeField" class="field"><label>End time</label><input name="EndTime" type="time" value="${esc(timeOnly(e.EndTime))}"></div>
             <div id="laneAvailabilityNotice" class="field full hidden"><div class="notice compact-notice"></div></div>
             <div id="shiftSpanPreview" class="field full hidden"><div class="notice compact-notice"></div></div>
-            <div class="field full calendar-venue-field"><label for="calendarVenueInput">Location (staff calendar)</label><input id="calendarVenueInput" name="Location" value="${esc(e.Location || '')}" autocomplete="off" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="calendarVenueSuggestions" aria-describedby="calendarVenueHelp"><input type="hidden" name="VenueID" value="${esc(e.VenueID || '')}"><div id="calendarVenueSuggestions" class="calendar-venue-suggestions" role="listbox" hidden></div><small id="calendarVenueHelp">Find a school venue by name, unit or alias, or enter a custom location. Selecting a venue does not reserve it.</small></div>
+            <div class="field full calendar-venue-field"><label for="calendarVenueInput">Location (staff calendar)</label><div id="calendarVenueChips" class="calendar-venue-chips" aria-label="Selected locations"></div><input id="calendarVenueInput" value="" autocomplete="off" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="calendarVenueSuggestions" aria-describedby="calendarVenueHelp"><input type="hidden" name="Location" value="${esc(e.Location || '')}"><input type="hidden" name="VenueID" value="${esc(e.VenueID || '')}"><div id="calendarVenueSuggestions" class="calendar-venue-suggestions" role="listbox" hidden></div><small id="calendarVenueHelp">Add up to six locations. Find a school venue by name, unit or alias, or press Enter to add one custom location. Selecting a venue does not reserve it.</small></div>
             <div class="field full"><label>Staff description</label><textarea name="StaffDescription">${esc(e.StaffDescription || '')}</textarea></div>
           </div>
 
@@ -4277,7 +4237,7 @@
     `);
 
     const form = $('eventForm');
-    bindCalendarVenuePicker(form);
+    const venuePicker=bindCalendarVenuePicker(form);
     form.elements.Year.value = String(e.Year || state.year);
     if(event) $('moveCopyEventBtn').onclick=()=>{
       if(!confirmUnsavedChanges('move or copy the saved event'))return;
@@ -4590,6 +4550,7 @@
 
     form.addEventListener('submit', async ev => {
       ev.preventDefault();
+      if(!venuePicker.commit())return;
       const f = new FormData(form);
       const payload = {
         expectedRevision,
@@ -4621,7 +4582,10 @@
         }
       };
 
-      showWorkOverlay('Saving Event', 'Writing event to the backend…');
+      const proposed=payload.event;
+      if(!String(proposed.StaffTitle||'').trim()||!proposed.OwnerTag||!proposed.LaneID||!proposed.StartDate||!proposed.EndDate){toast('Complete the title, glossary tag, lane and dates before saving.',true);return;}
+      if(proposed.EndDate<proposed.StartDate||(proposed.EventType==='TIMED'&&(!proposed.StartTime||!proposed.EndTime||(proposed.EndDate===proposed.StartDate&&proposed.EndTime<=proposed.StartTime)))){toast('End must be after the start. Check the event dates and times.',true);return;}
+      showWorkOverlay('Saving Event', state.calendarJobsEnabled?'Accepting your event proposal…':'Writing event to the backend…');
       try {
         const response =
           await api('saveEvent', payload);
@@ -4694,9 +4658,10 @@
     }
   }
 
-  function openParentModal(e, inlineConflict = null) {
+  function openParentModal(e, inlineConflict = null, anchorDate = null) {
     if (!(state.data.actor.isAdmin || state.data.actor.isParentPublisher) || !isCalendarEditable()) return;
     if(guardPendingEvent(e))return;
+    rememberEditedEvent(e,anchorDate);
     let expectedRevision=e._revision;
     let reviewBaseline=JSON.parse(JSON.stringify(e));
     const display = inlineConflict?.proposal || e;
@@ -5810,6 +5775,11 @@
     if (overlay) overlay.classList.add('hidden');
   }
 
+  function clearYearLoadingOverlay(){
+    clearTimeout(state.yearLoadingTimer);state.yearLoadingTimer=0;
+    $('yearLoadingOverlay')?.classList.add('hidden');
+  }
+
   function showSyncOverlay() { showWorkOverlay('Synchronising', 'Preparing differential sync…'); }
   function setSyncProgress(percent, stage) { setWorkProgress(percent, stage); }
   function hideSyncOverlay() { hideWorkOverlay(); }
@@ -6022,6 +5992,13 @@
     return saved;
   }
 
+  function rememberEditedEvent(event,date) {
+    if(!['events','weekly'].includes(state.page))return;
+    cancelTodayJump();
+    state.editedViewAnchor={page:state.page,year:state.year,eventId:event?.EventID||'',date:date||dateOnly(event?.StartDate)};
+    rememberView();
+  }
+
   function captureEventViewPosition() {
     const wrap =
       state.page === 'weekly'
@@ -6035,14 +6012,23 @@
     const rect=wrap?.getBoundingClientRect();
     const header=wrap?.querySelector('.cal-row.header,thead');
     const visibleTop=Math.max(rect?.top||0,header?.getBoundingClientRect().bottom||0);
-    const anchor=wrap && [...wrap.querySelectorAll('[data-date]')].find(row=>{
+    const preferred=state.editedViewAnchor;
+    const eligible=preferred?.page===state.page && preferred.year===state.year;
+    const cards=wrap?[...wrap.querySelectorAll('[data-event-id]')]:[];
+    const visible=node=>{const box=node.getBoundingClientRect();return box.height>0 && box.bottom>visibleTop && box.top<rect.bottom;};
+    const eventAnchor=eligible && cards.find(node=>node.dataset.eventId===preferred.eventId && (!preferred.date||node.dataset.segmentDate===preferred.date) && visible(node));
+    const preferredDate=eligible && [...(wrap?.querySelectorAll('[data-date]')||[])].find(node=>node.dataset.date===preferred.date && visible(node));
+    const anchor=preferredDate || (wrap && [...wrap.querySelectorAll('[data-date]')].find(row=>{
       const box=row.getBoundingClientRect();return box.height>0 && box.bottom>visibleTop && box.top<rect.bottom;
-    });
+    }));
     const focus=document.activeElement;
     return {
       page:state.page,year:state.year,wrap,focus,
       anchorDate:anchor?.dataset.date,
-      anchorOffset:anchor?anchor.getBoundingClientRect().top-rect.top:0,
+      anchorEventId:eventAnchor?.dataset?.eventId,
+      anchorSegmentDate:eventAnchor?.dataset?.segmentDate,
+      anchorOffset:eventAnchor?eventAnchor.getBoundingClientRect().top-rect.top:anchor?anchor.getBoundingClientRect().top-rect.top:0,
+      fallbackOffset:anchor?anchor.getBoundingClientRect().top-rect.top:0,
       windowX:
         window.scrollX,
       windowY:
@@ -6055,6 +6041,7 @@
   }
 
   function restoreEventViewPosition(position) {
+    cancelTodayJump();
     if(position.page!==undefined && (position.page!==state.page || position.year!==state.year))return;
     const apply=()=>{
       if(window.scrollX!==position.windowX || window.scrollY!==position.windowY)window.scrollTo(position.windowX,position.windowY);
@@ -6071,8 +6058,10 @@
       if (wrap) {
         wrap.scrollLeft =
           position.wrapLeft;
-        const anchor=position.anchorDate && [...wrap.querySelectorAll('[data-date]')].find(row=>row.dataset.date===position.anchorDate && row.getBoundingClientRect().height>0);
-        wrap.scrollTop = anchor?wrap.scrollTop+anchor.getBoundingClientRect().top-wrap.getBoundingClientRect().top-position.anchorOffset:position.wrapTop;
+        const event=position.anchorEventId && [...wrap.querySelectorAll('[data-event-id]')].find(node=>node.dataset.eventId===position.anchorEventId && node.dataset.segmentDate===position.anchorSegmentDate && node.getBoundingClientRect().height>0);
+        const row=position.anchorDate && [...wrap.querySelectorAll('[data-date]')].find(node=>node.dataset.date===position.anchorDate && node.getBoundingClientRect().height>0);
+        const anchor=event||row,offset=event?position.anchorOffset:(position.fallbackOffset??position.anchorOffset);
+        wrap.scrollTop = anchor?wrap.scrollTop+anchor.getBoundingClientRect().top-wrap.getBoundingClientRect().top-offset:position.wrapTop;
       }
       if(position.focus && !position.focus.isConnected && document.activeElement===document.body && wrap){
         const old=position.focus;
@@ -6097,7 +6086,7 @@
     if(!patched && ['events','weekly'].includes(state.page) && document.querySelector(state.page==='events'?'#calendarHost .calendar-wrap':'#weeklyHost .weekly-wrap')){patchCalendarGrid();patched=true;}
     if(!patched)renderPage(state.page);
     if(state.page==='events')applyDateSearch(true);
-    renderDirtyPill();restoreEventViewPosition(position);if(!options.keepOverlay)hideWorkOverlay();updateFreshnessUI();
+    renderDirtyPill();restoreEventViewPosition(position);rememberView();if(!options.keepOverlay)hideWorkOverlay();updateFreshnessUI();
     yearCache.set(Number(state.year),state.data);
     drainDeferredRefresh();
   }
@@ -6154,7 +6143,7 @@
 
     const targetPage = page || state.page || 'events';
     state.page = targetPage;
-    sessionStorage.setItem('gspsCalPage', targetPage);
+    sessionSet('gspsCalPage', targetPage);
     setWorkProgress(78, stage);
     await new Promise(resolve => setTimeout(resolve, 300));
     setWorkProgress(100, 'Saved. Reloading…');
@@ -6405,7 +6394,7 @@
         button.addEventListener('click', async () => {
           if (!confirmUnsavedChanges('switch calendar year')) return;
           const requestedQuery = memory.query;
-          const switched = await loadBootstrap(parsed.year,true).catch(err => {toast(err.message,true); return false;});
+          const switched = await loadBootstrap(parsed.year,true,{yearSwitch:true}).catch(err => {toast(err.message,true); return false;});
           if (switched && Number(state.year) === parsed.year) {
             yearView().query = requestedQuery; $('dateSearch').value = requestedQuery; applyDateSearch();
           }
@@ -6484,6 +6473,7 @@
   function staleCalendarOwner() { return Object.assign(new Error('The Calendar session changed. The original actor can check their retained job after signing in.'),{code:'STALE_CALENDAR_CONTEXT',definite:true}); }
   function clearCalendarOwnerState() {
     stopCalendarChangeStream();
+    clearYearLoadingOverlay();state.yearSwitchFallback=null;state.editedViewAnchor=null;cancelTodayJump();
     state.calendarOwnerEpoch=(state.calendarOwnerEpoch||0)+1;
     state.calendarJobs=[];state.calendarJobsError='';state.calendarJobsExpanded=false;state.calendarJobsFlight=null;state.pendingJobSnapshotRefresh=false;state.pendingGridRefresh=false;state.pendingJobsRender=false;state.refreshDeferred=false;
     clearTimeout(state.calendarJobsTimer);cancelSourceReadRetry();$('calendarJobsPanel')?.remove();$('modalHost')?.replaceChildren();hideWorkOverlay();
@@ -6526,6 +6516,8 @@
       if(!sameCalendarOwner(owner))throw staleCalendarOwner();
       if(!isCalendarJob(response.result)||response.result.jobId!==payload.operationId)throw new Error('The job service did not confirm durable acceptance.');
       const job=rememberCalendarJob(response.result);Object.defineProperty(job,'_uiContext',{value:{owner,form},configurable:true});
+      const baseline=(state.data.events||[]).find(event=>event.EventID===(action==='saveEvent'?payload.event?.EventID:payload.eventId));
+      if(baseline)Object.defineProperty(job,'_uiBaseline',{value:JSON.parse(JSON.stringify(baseline)),configurable:true});
       if(job.state==='SAVED'){state.pendingJobSnapshotRefresh=true;loadCalendarJobs().catch(()=>{});}
       scheduleCalendarJobs();return job;
     } catch(err) {
@@ -6575,7 +6567,19 @@
           if(job.action==='deleteEvent'){if(!before||before._revision===job.payload.expectedRevision||before.LastMutationID===job.attemptOperationId)removeLocalEvent(job.result.eventId);}else if(!newer)upsertLocalEvent(job.result);
           affected.push(before,job.result,job.payload.event);
         }
-        for(const job of jobs)if(job.state!=='SAVED'&&(!old.has(job.jobId)||old.get(job.jobId).state!==job.state))affected.push(job.payload.event,(state.data.events||[]).find(e=>e.EventID===jobEventId(job)));
+        for(const job of jobs){
+          const previous=old.get(job.jobId);
+          if(previous?._uiBaseline)Object.defineProperty(job,'_uiBaseline',{value:previous._uiBaseline,configurable:true});
+          if(job.outcome==='REJECTED' && job.error?.current){
+            const current=(state.data.events||[]).find(event=>event.EventID===jobEventId(job));
+            const latest=job.error.current;
+            // A delayed rejection cannot roll back a newer local/colleague save.
+            if(latest.EventID===jobEventId(job) && latest._revision && (!current || current._revision===job.payload.expectedRevision)){
+              affected.push(current,latest);upsertLocalEvent(latest);
+            }
+          }
+          if(job.state!=='SAVED'&&(!previous||previous.state!==job.state))affected.push(job.payload.event,(state.data.events||[]).find(e=>e.EventID===jobEventId(job)));
+        }
         if(state.pendingJobSnapshotRefresh){
           const beforeEvents=JSON.stringify(state.data.events),beforeRemovals=JSON.stringify(state.data.pendingRemovals);
           const year=state.year,response=await fetchJson(`/api/bootstrap?year=${year}`,{timeoutMs:45000});
@@ -6647,6 +6651,19 @@
   function openCalendarJobProposal(job) {
     if(!job||!confirmUnsavedChanges('view this retained proposal'))return;
     openModal(`<div class="modal-head"><h3>Retained event proposal</h3><button class="close-x" data-close>&times;</button></div><div class="modal-body"><p>${esc(calendarJobLabel(job))}. Job ${esc(job.jobId)}.</p><p>Google remains authoritative. Review the current event before creating a revised change.</p><pre class="calendar-job-proposal">${esc(JSON.stringify({action:job.action,payload:job.payload,error:job.error},null,2))}</pre></div><div class="modal-foot"><button type="button" class="secondary" data-close>Close</button><button type="button" class="primary" id="downloadCalendarJobProposal">Download proposal</button></div>`);
+    if(job.outcome==='REJECTED' && job.error?.code==='CONFLICT' && job.error.current){
+      const baseline=job._uiBaseline||{},proposal=job.payload.event||job.payload;
+      showConflictReview(responseError(job.error),baseline,proposal,latest=>{
+        if(!isCalendarEditable())return;
+        if(job.action==='saveEvent')openEventModal({...proposal,_revision:latest._revision},{reviewBaseline:latest});
+        else if(job.action==='saveParentSide'){
+          openParentModal(latest);
+          const form=$('parentForm');if(form){form.elements.ParentEnabled.checked=yes(job.payload.ParentEnabled);form.elements.ParentTitle.value=job.payload.ParentTitle||'';form.elements.ParentDescription.value=job.payload.ParentDescription||'';}
+        }else if(job.action==='relocateEvent')openRelocation(latest,{date:job.payload.targetDate,laneId:job.payload.targetLaneId,shift:job.payload.targetShift,anchorDate:job.payload.anchorDate});
+        else openEventModal(latest);
+        const form=$('modalHost').querySelector('form');if(form)form.dataset.dirty='1';
+      },{baselineAvailable:!!job._uiBaseline});
+    }
     $('downloadCalendarJobProposal').onclick=()=>{
       const url=URL.createObjectURL(new Blob([JSON.stringify(job,null,2)],{type:'application/json'}));
       const a=document.createElement('a');a.href=url;a.download=`calendar-job-${job.jobId}.json`;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
@@ -6673,26 +6690,59 @@
     });
   }
   function bindCalendarVenuePicker(form) {
-    const input=form.elements.Location,selected=form.elements.VenueID,list=$('calendarVenueSuggestions'),help=$('calendarVenueHelp');
-    let chosenText=input.value,active=-1;
+    const input=$('calendarVenueInput'),selected=form.elements.VenueID,location=form.elements.Location,list=$('calendarVenueSuggestions'),help=$('calendarVenueHelp'),host=$('calendarVenueChips');
+    const catalogue=state.data.venues||[],ids=selected.value.split(',').filter(Boolean),chips=[];
+    let remaining=location.value,active=-1;
+    for(const id of ids){
+      const venue=catalogue.find(v=>v.id===id);
+      const labels=venue?[`${venue.unit} ${venue.name}`,`${venue.name} (${venue.unit})`,venue.name,venue.unit,...(venue.aliases||[])]:[];
+      const label=labels.find(value=>remaining===value||remaining.startsWith(value+', '));
+      if(label){chips.push({id,label});remaining=remaining.slice(label.length).replace(/^, /,'');}
+      else {
+        // A custom chip may precede or separate directory chips. Find the next
+        // exact label at a delimiter; commas inside a venue name stay intact.
+        const found=labels.map(label=>({label,at:remaining.indexOf(', '+label)})).filter(x=>x.at>=0&&(remaining.length===x.at+2+x.label.length||remaining.slice(x.at+2+x.label.length).startsWith(', '))).sort((a,b)=>a.at-b.at||b.label.length-a.label.length)[0];
+        if(found){chips.push({id:'',label:remaining.slice(0,found.at)},{id,label:found.label});remaining=remaining.slice(found.at+2+found.label.length).replace(/^, /,'');}
+        else {const parts=remaining.split(', ');chips.push({id,label:ids.length===1?remaining:parts.shift()||id});remaining=ids.length===1?'':parts.join(', ');}
+      }
+    }
+    if(remaining)chips.push({id:'',label:remaining});
+    const normalHelp=help.textContent;
     if(state.data.venueSource?.status!=='ready')help.textContent='School venue lookup could not load. Custom location text is still supported. Selecting a venue does not reserve it.';
     const close=()=>{list.hidden=true;input.setAttribute('aria-expanded','false');input.removeAttribute('aria-activedescendant');active=-1;};
-    const choose=id=>{const venue=(state.data.venues||[]).find(v=>v.id===id);if(!venue)return;input.value=`${venue.name} (${venue.unit})`;chosenText=input.value;selected.value=venue.id;form.dataset.dirty='1';close();};
+    const sync=()=>{selected.value=chips.filter(c=>c.id).map(c=>c.id).join(',');location.value=chips.map(c=>c.label).join(', ');form.dataset.dirty='1';};
+    const render=()=>{
+      host.innerHTML=chips.map((chip,i)=>`<button type="button" class="calendar-venue-chip${chip.id?'':' custom'}" data-remove-venue="${i}" aria-label="Remove ${esc(chip.label)}"><span aria-hidden="true">×</span><span>${esc(chip.label)}</span></button>`).join('');
+      host.querySelectorAll('[data-remove-venue]').forEach(button=>button.onclick=()=>{chips.splice(Number(button.dataset.removeVenue),1);sync();render();input.focus();});
+    };
+    const add=chip=>{
+      if(chip.id&&chips.some(c=>c.id===chip.id)){input.value='';close();return true;}
+      if(!chip.id&&chips.some(c=>!c.id)){help.textContent='Remove the existing custom location before adding another.';return false;}
+      if(chips.length>=6){help.textContent='Choose up to six locations. Remove a chip before adding another.';return false;}
+      chips.push(chip);sync();render();input.value='';help.textContent=normalHelp;close();return true;
+    };
+    const choose=id=>{const venue=catalogue.find(v=>v.id===id);if(venue)add({id:venue.id,label:`${venue.unit} ${venue.name}`});};
+    const commit=()=>{
+      const text=input.value.trim();if(!text)return true;
+      const exact=catalogue.find(v=>[`${v.unit} ${v.name}`,`${v.name} (${v.unit})`,v.name,v.unit,...(v.aliases||[])].some(label=>label.toLocaleLowerCase()===text.toLocaleLowerCase()));
+      return exact?add({id:exact.id,label:`${exact.unit} ${exact.name}`}):add({id:'',label:text});
+    };
     const search=()=>{
-      if(input.value!==chosenText)selected.value='';
       const words=input.value.trim().toLocaleLowerCase().split(/\s+/).filter(Boolean);
-      const venues=words.length?(state.data.venues||[]).filter(v=>v.active!==false&&words.every(word=>[v.unit,v.name,...(v.aliases||[])].join(' ').toLocaleLowerCase().includes(word))).slice(0,12):[];
+      const venues=words.length?catalogue.filter(v=>v.active!==false&&words.every(word=>[v.unit,v.name,...(v.aliases||[])].join(' ').toLocaleLowerCase().includes(word))).slice(0,12):[];
       list.innerHTML=venues.map((v,i)=>`<button type="button" role="option" id="calendarVenueOption${i}" data-calendar-venue="${esc(v.id)}" aria-selected="false"><strong>${esc(v.unit)}</strong> ${esc(v.name)}</button>`).join('');
       list.hidden=!venues.length;input.setAttribute('aria-expanded',String(!!venues.length));active=-1;
       list.querySelectorAll('[data-calendar-venue]').forEach(button=>{button.onmousedown=ev=>ev.preventDefault();button.onclick=()=>choose(button.dataset.calendarVenue);});
     };
-    input.addEventListener('input',search);input.addEventListener('focus',search);input.addEventListener('blur',()=>setTimeout(close,100));
+    render();input.addEventListener('input',search);input.addEventListener('focus',search);input.addEventListener('blur',()=>setTimeout(close,100));
     input.addEventListener('keydown',event=>{
       const buttons=[...list.querySelectorAll('[data-calendar-venue]')];
       if(event.key==='Escape'){close();return;}
+      if(event.key==='Backspace'&&!input.value&&chips.length){event.preventDefault();chips.pop();sync();render();return;}
       if(['ArrowDown','ArrowUp'].includes(event.key)&&buttons.length){event.preventDefault();active=(active+(event.key==='ArrowDown'?1:-1)+buttons.length)%buttons.length;buttons.forEach((b,i)=>b.setAttribute('aria-selected',String(i===active)));input.setAttribute('aria-activedescendant',buttons[active].id);}
-      if(event.key==='Enter'&&!list.hidden&&active>=0){event.preventDefault();choose(buttons[active].dataset.calendarVenue);}
+      if(event.key==='Enter'){event.preventDefault();if(!list.hidden&&active>=0)choose(buttons[active].dataset.calendarVenue);else commit();}
     });
+    return {commit};
   }
 
   function waitForRecovery(pending, notSaved) {
@@ -6747,15 +6797,15 @@
     };
   }
 
-  function showConflictReview(err, baseline, proposal, accepted) {
+  function showConflictReview(err, baseline, proposal, accepted, options = {}) {
     if (!err.current || err.code !== 'CONFLICT') {toast(err.message,true); return;}
     $('conflictReview')?.remove();
     const latest=err.current;
     const fields=GSPSCalendarCore.EDIT_FIELDS.filter(k => k!=='EventID' && String(baseline[k]||'')!==String(latest[k]||''));
     const box=document.createElement('div'); box.id='conflictReview'; box.className='notice';
     box.innerHTML=`<strong>A colleague changed this event.</strong><p>Your proposal has not been saved or discarded. Review the differences before resubmitting.</p>
-      <div class="conflict-table-wrap"><table class="data-table"><thead><tr><th>Field</th><th>When opened</th><th>Latest saved</th><th>Your proposal</th></tr></thead><tbody>
-      ${fields.map(k=>`<tr><td>${esc(k)}</td><td class="wrap">${esc(baseline[k])}</td><td class="wrap">${esc(latest[k])}</td><td class="wrap">${esc(proposal[k]??baseline[k])}</td></tr>`).join('')}</tbody></table></div>
+      <div class="conflict-table-wrap"><table class="data-table"><thead><tr><th>Field</th><th>${options.baselineAvailable===false?'Before queued change':'When opened'}</th><th>Latest saved</th><th>Your proposal</th></tr></thead><tbody>
+      ${fields.map(k=>`<tr><td>${esc(k)}</td><td class="wrap">${options.baselineAvailable===false?'Not retained':esc(baseline[k])}</td><td class="wrap">${esc(latest[k])}</td><td class="wrap">${esc(proposal[k]??baseline[k])}</td></tr>`).join('')}</tbody></table></div>
       <p>Keeping your proposal may replace the newer values shown above. Nothing is submitted by the review button.</p>
       <button id="acceptConflictReview" type="button" class="secondary">Reviewed — keep my proposal</button>`;
     (document.querySelector('#modalHost .modal-body') || $('modalHost')).prepend(box);
@@ -6784,6 +6834,7 @@
   function openRelocation(source, destination = {}) {
     if (!state.data.actor.isAdmin || !isCalendarEditable()) return;
     if(guardPendingEvent(source))return;
+    rememberEditedEvent(source,destination.anchorDate);
     let baseline=JSON.parse(JSON.stringify(source));
     const anchor=destination.anchorDate || dateOnly(source.StartDate);
     const choices=displayColumns().map(l=>({key:l.laneId+'|'+l.shift,label:l.label}));
@@ -6861,7 +6912,7 @@
       if (!isCalendarEditable()) {if(ev.target.closest('.editable,.cell-add,.editable-note'))toast('This calendar is read-only until verification or save recovery completes.',true);return;}
       const card=ev.target.closest('[data-event-id]');
       if(card){if(card.dataset.eventId.startsWith('JOB-')){openCalendarJobProposal((state.calendarJobs||[]).find(j=>'JOB-'+j.jobId===card.dataset.eventId));return;}const event=(state.data.events||[]).find(e=>e.EventID===card.dataset.eventId);if(!event)return;
-        if(state.data.actor.isAdmin)openEventModal(event);else if(state.data.actor.isParentPublisher)openParentModal(event);return;}
+        if(state.data.actor.isAdmin)openEventModal(event,{anchorDate:card.dataset.segmentDate});else if(state.data.actor.isParentPublisher)openParentModal(event,null,card.dataset.segmentDate);return;}
       const add=ev.target.closest('.cell-add');
       if(add && state.data.actor.isAdmin){openEventModal(null,{StartDate:add.dataset.addDate,EndDate:add.dataset.addDate,LaneID:add.dataset.addLane,ShiftSpan:add.dataset.addShift});return;}
       const note=ev.target.closest('[data-note-date]');

@@ -935,7 +935,7 @@ function dispatchCore_(action, actor, payload, requestId) {
 
     case 'relocateEvent':
       requireAdmin_(roles);
-      if(payload.mode==='copy')rc18IO_().venueCatalogue=calendarVenueCatalogue_(actor);
+      rc18IO_().venueCatalogue=calendarVenueCatalogue_(actor);
       return runEventMutation_(actor, action, payload, requestId);
 
     case 'eventMutationStatus':
@@ -10211,7 +10211,7 @@ function calendarCommandServiceCore_(request){
 }
 function calendarCommandAuthorize_(actor,action,payload,requestId){
   rc18ResetIO_();
-  if(action==='saveEvent'&&payload.event&&payload.event.VenueID||action==='relocateEvent'&&payload.mode==='copy')rc18IO_().venueCatalogue=calendarVenueCatalogue_(actor);
+  if(action==='saveEvent'&&payload.event&&payload.event.VenueID||action==='relocateEvent')rc18IO_().venueCatalogue=calendarVenueCatalogue_(actor);
   const prior=calendarRequestAuthority_;calendarRequestAuthority_={alias:actor.userAlias,parent:action==='saveParentSide'};
   try{return withRC17WriteLock_(()=>{
     const identity=mutationIdentity_(actor,action,payload),log=mutationSheet_(),receipt=mutationLookup_(log,identity.operationId);
@@ -10306,12 +10306,27 @@ function calendarValidateVenue_(event,before){
   const supplied=Object.prototype.hasOwnProperty.call(event,'VenueID');
   const id=String(supplied?event.VenueID||'':before&&String(before.Location||'').trim()===event.Location?before.VenueID||'':'').trim();
   if(!id)return '';
-  if(before&&String(before.VenueID||'')===id&&String(before.Location||'').trim()===event.Location)return id;
-  const directory=rc18IO_().venueCatalogue,venue=directory&&directory.venueSource.status==='ready'&&directory.venues.find(v=>v.id===id);
-  const matches=venue&&[venue.name+' ('+venue.unit+')',venue.name,venue.unit].concat(venue.aliases).some(value=>value===event.Location);
-  if(matches)return id;
-  if(before&&String(before.VenueID||'')===id)return ''; // edited into custom text
-  throw mutationError_('VENUE_NOT_VALIDATED','Choose a current venue directory result, or keep this as custom location text.',409,true);
+  const ids=id.split(',').map(value=>value.trim());
+  if(ids.length>6||ids.some(value=>!value)||new Set(ids).size!==ids.length)throw mutationError_('VENUE_NOT_VALIDATED','Choose up to six different venues.',409,true);
+  const unchanged=before&&String(before.VenueID||'')===id&&String(before.Location||'').trim()===event.Location;
+  const directory=rc18IO_().venueCatalogue;
+  // Preserve historical selections during an outage, but validate every id
+  // whenever the current catalogue is available, including unchanged edits.
+  if(unchanged&&(!directory||directory.venueSource.status!=='ready'))return ids.join(',');
+  const venues=ids.map(value=>directory&&directory.venueSource.status==='ready'&&directory.venues.find(v=>v.id===value));
+  if(venues.every(Boolean)){
+    if(unchanged)return ids.join(',');
+    const escape=value=>String(value).replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+    const labels=venues.map(v=>'(?:'+[v.unit+' '+v.name,v.name+' ('+v.unit+')',v.name,v.unit].concat(v.aliases||[]).map(escape).join('|')+')');
+    // Location stores chip labels, with at most one free-text chip anywhere.
+    for(let custom=-1;custom<=labels.length;custom++){
+      if(custom>=0&&ids.length>=6)continue;
+      const parts=labels.slice();if(custom>=0)parts.splice(custom,0,'.+');
+      if(new RegExp('^'+parts.join(', ')+'$').test(event.Location))return ids.join(',');
+    }
+  }
+  if(ids.length===1&&before&&String(before.VenueID||'')===id&&venues.every(Boolean))return ''; // legacy edit into custom text
+  throw mutationError_('VENUE_NOT_VALIDATED','Choose current venue directory results, or keep this as custom location text.',409,true);
 }
 
 /* GSIS_CALENDAR_VENUE_DIRECTORY_END */
