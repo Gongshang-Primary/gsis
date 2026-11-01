@@ -1,6 +1,6 @@
 # wording-timetabled-occupancy: "individual (timetabled) workload" → "individual (timetabled) occupancy" (changelog)
 
-- Status: proposed (owner changelog, 1 Nov 2026 ~21:00); not authorised to build; scope needs owner confirmation
+- Status: proposed (owner changelog, 1 Nov 2026 ~21:00); scope confirmed; not authorised to build
 - Owner/model: unassigned (Codex when authorised)
 - Reviewer/model: Claude
 - Lanes: D (Deploy) and R (Roster); wording only; serial with lane R; after the D1 cutover
@@ -25,14 +25,14 @@ Roster, Learn about Auto Allocation → My Calculations (`roster-update/public/r
 Deploy, Stats tab (`public/workload-ui.js` / `public/app.js`):
 - Title "**Workload** reference"; "**Actual load** includes FTT, teaching, PD…"; "**Individual load status** uses each teacher's own ±10% limits".
 
-## Proposed mapping (Claude; owner to confirm the quota lines)
+## Mapping (owner confirmed 1 Nov ~21:20)
 | Now | New |
 |---|---|
-| weekly workload estimate (Wi) | weekly individual (timetabled) occupancy |
+| weekly workload estimate (Wi) | weekly individual occupancy (timetabled plus allowances) — owner ruling 1 Nov ~21:20 |
 | recorded work | recorded (timetabled) occupancy |
 | Workload reference (Deploy Stats title) | Occupancy reference |
 | Actual load | Actual (timetabled) occupancy |
 | Individual load status | Individual (timetabled) occupancy status |
-| weekly quota / quota (highlighted) | **to confirm**: "weekly relief quota, R" / "relief quota"? |
+| weekly quota / quota (highlighted) | weekly relief quota, R / relief quota — owner ruling 1 Nov ~21:20 |
 
 Visible text only, same rule as above. Also update any help text, tooltips and Excel headers that show the same terms, in Deploy and Roster (and Contacts/Layout if they show them).
