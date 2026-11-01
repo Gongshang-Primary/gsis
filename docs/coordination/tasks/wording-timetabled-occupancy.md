@@ -1,9 +1,14 @@
 # wording-timetabled-occupancy: "individual (timetabled) workload" → "individual (timetabled) occupancy" (changelog)
 
-- Status: authorised (owner 1 Nov ~21:25: "let codex work on it after it is done with current work"); queued after rows 9 and 10; merge held per lane R rule
+- Status: claimed by Codex; after relief-count and R% PRs; merge held by owner
 - Owner/model: Codex
 - Branch: codex/wording-timetabled-occupancy
 - Reviewer/model: Claude
+- Last updated (Asia/Singapore): 1 Nov 2026 21:07
+- Base: c1b33acdd0d55755d1e035328c678e999d0ed8da; claim follows draft PRs #46 and #47
+- Scope: public/workload-ui.js, public/relief-ui.js, generated public/app.js, roster-update/public/roster-calculations.js and relief-health copy, related string assertions; visible wording only.
+- Acceptance: confirmed mapping in rendered copy, help, tooltips, accessible labels and Excel headers; preserve Workload settings/cap policies and all identifiers/data keys/API names; npm run build and full Node/LORD CI.
+- Coordination: refreshed main includes Claude's separate displayed Stapler typo correction c1b33ac; no overlap. Owner explicitly authorised these three separate held draft PRs in order; no merge/deployment.
 - Lanes: D (Deploy) and R (Roster); wording only; serial with lane R; after the D1 cutover
 
 ## Owner request (verbatim)
@@ -15,7 +20,7 @@ The exact phrase "individual (timetabled) workload" does not appear in any sourc
 - Deploy (`public/workload-ui.js`, `public/app.js`): "Individual load is all actual deployed periods…", "Individual load status uses each teacher's own ±10% limits…", "UT: total actual workload", "Workload statistics by teacher category".
 - Not the same concept (keep unless the owner says otherwise): the "Workload settings" tab and policy, weekly caps ("Weekly cap covers total actual workload"), "workload category" of a subject.
 
-## Proposed rule (pending owner confirmation)
+## Wording boundary (confirmed by owner mapping below)
 Change only the per-teacher measure (Wi and "Individual load") to "individual (timetabled) occupancy". Keep policy/settings names. Visible text only: no identifiers, data fields, exports' column keys or API names change. Check Excel export headers and help text too.
 
 ## Owner screenshots (1 Nov ~21:10): highlighted text
