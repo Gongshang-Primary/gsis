@@ -74,6 +74,8 @@ All eighteen components rebuild successfully. Full exact-tree Node/LORD CI and C
 
 Fresh serial recovery checks passed: the metadata/notice, zero-config Worker health, cached gateway, transformation, build-label parity, twelve bundle, fourteen existing packaging and actual D1 operational programs. This is eight complete commands after the successful build, with `TZ=Asia/Singapore`. The earlier overlapping incomplete local full-suite runs remain diagnostic failures, not claimed passes.
 
+The first exact-tree remote run, `41277596213` at `706f9b38f4609584d2cdf2a36af357d43a8b57dd`, caught a genuine privacy regression before the regression shards: the notice script preceded the private page's referrer meta policy and sent a referrer on its own fetch. The existing private-link browser assertion was unchanged. A new all-page label assertion reproduced the missing policy locally, then the canonical builder gave the notice script its own explicit `referrerpolicy="no-referrer"`. This preserves script loading order and the private page's existing policy. A new exact-head full run must verify the correction; the failed run is retained evidence, not a pass.
+
 ### Verification recorded before snapshot
 
 - RED then GREEN: 19 metadata/notice checks in `tests/release-version-phase2.cjs`; three real bundled Worker health routes with all configuration reads and provider calls forbidden; three real LORD cached gateway flows, including different cached/current Worker identities; actual Roster D1 success/error metadata in the unchanged operational fixture.

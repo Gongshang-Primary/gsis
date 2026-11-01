@@ -182,7 +182,7 @@ for folder in frontend_folders+lord_templates:
   content=re.sub(r'<meta name="gsis-build-label"[^>]*>\s*','',content)
   content=re.sub(r'<script src="/?version-notice\.js[^\"]*"[^>]*></script>\s*','',content)
   # Static landmark/privacy pages make no backend requests and need no observer.
-  notice='' if page.name in ['landmark.html','privacy.html'] else '<script src="/version-notice.js?v='+build_label+'"></script>\n'
+  notice='' if page.name in ['landmark.html','privacy.html'] else '<script src="/version-notice.js?v='+build_label+'" referrerpolicy="no-referrer"></script>\n'
   content=re.sub(r'(<head\b[^>]*>)',lambda m:m[1]+'\n<meta name="gsis-build-label" content="'+build_label+'">\n'+notice,content,count=1,flags=re.I)
   page.write_text(content)
 code=(root/'backend/Code.gs').read_text()+'\n'+(root/'backend/Seed.gs').read_text()
