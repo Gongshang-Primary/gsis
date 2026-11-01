@@ -1,3 +1,48 @@
+# LORD queued writes — phase 1, D1-first
+
+- Status: implemented locally; exact-tree remote full CI, Claude exact-head review and owner merge required; no deployment
+- Owner/model: Codex; reviewer Claude at exact head; owner merges
+- Last updated (Asia/Singapore): 1 November 2026
+- Branch: codex/lord-queued-writes-phase1
+- Base: bb8d72d5c08925fe56b0131eee674a66a630a2d5; tree a58e4e3210bcf52bb846abc1ec5249f1b00b28fd (exact remote main 4a93be7 tree)
+- Scope: dedicated LORD job Worker/schema, LORD authenticated gateway, backend queue command and private Google backup, behavioural tests and this task's documentation.
+- Authority: D1 is authoritative for NEW jobs, receipts, status and bounded audit history. Existing Google booking/resource/preference decisions remain Google. Copy direction is D1 → private Google backup, never blank replacement or Google → D1 authority inference.
+- Phase 1: queue plus actor-private status API, no user UI changes. Phase 2 booking/collect/return/photo wiring is excluded. No Calendar/Roster/release assembly edits, deployment, live schema/settings changes, provider sends or live records.
+- Current session authorisation supersedes the older Google-first queue wording retained below as history. Implementation/isolation and routine design choices are authorised; no additional design approval is required.
+
+## Phase 1 decisions
+
+Use a dedicated default-off service and D1 binding, reusing Calendar's signed short-lived gateway and SQL conditional admission patterns without importing its Google-first queue authority. Only the existing notificationPreferences operation executes in phase 1; unsupported operations are rejected before admission. No production diagnostic action and no permanently queued placeholders. This ruling follows the current implementation scope clarification. Existing browser write paths remain unchanged.
+
+The gateway derives the actor from its signed school session, rejects relief identities and cross-origin writes, and replaces user-supplied identity. The service verifies a purpose-bound HMAC envelope and unique nonce. Operation identity includes its issuance timestamp plus UUID; canonical JSON binds actor, action and payload. Exact retry returns the same durable receipt. Changed identity/payload receives a conflict. Old, missing or uncertain enqueue responses never authorise direct resubmission: query/retry the SAME identity.
+
+Admission is one SQL statement with bounded pending, actor-pending, overall row and payload limits. One unresolved preference command per actor serialises that actor's commands. Receipt acceptance means submitted, not a confirmed booking or delivery. A single dispatch claim precedes Google execution; expired claims and lost responses use read-only receipt checks only, never blind execute retries. Bounded unsuccessful checks retain an UNCERTAIN blocking job. Google acceptance is established by the existing preference decision event under the Google ScriptLock, with exact queue identity/payload/actor binding; this event is decision evidence, not a second authoritative queue. The existing preference GET returns its exact Google decisionRevision; queued payloads must bind that observed expectedRevision. Admission makes no Google call. Execution checks current Contacts and that exact revision under the writer lock; a successful direct save records a decision even when its value repeats, fencing older opposite queued choices. Client clock skew never determines preference ordering. No notification is sent at enqueue or by this preference executor.
+
+Google backup consists of pretty-printed immutable per-job/version JSON files in an operator-selected private Drive folder. A version is checkpointed only after exact ID/version/content digest acknowledgement; lost backup responses retry the same filename and content. Backup failure cannot turn acceptance into application or erase a job. No Google backup input updates D1 automatically.
+
+Retention: nonce history 3 minutes; only terminal APPLIED/REJECTED jobs older than 30 days whose current version has a verified Google copy may expire from D1. Pending, running, checking and uncertain jobs never expire. Bounded audit history is retained with each job. Google copies have a 365-day minimum retention; an operator archives/deletes completed old generations only after verifying the current D1 record or a reconciled restore export. Unresolved evidence is never age-deleted. Admission refuses at capacity instead of evicting unresolved work.
+
+Switch-back: pause admission and dispatch, wait for active Google calls to settle, export D1 jobs including audit/hash/version and verify all current versions against Google copies. Reconcile RUNNING/CHECKING/UNCERTAIN against exact Google decision events under the writer lock; never assume absence proves failure while an earlier request could still arrive. Carry unresolved jobs and original IDs forward and block affected actor/action. Only after an owner-approved reconciliation manifest may a Google-hosted queue replace D1; import the complete verified records, never start blank, compare row counts/digests/outcomes, then change the route once. Retain paused D1 and restore routing to D1 if reconciliation or import fails. Disabling the optional service leaves existing direct UI paths intact; it never permits direct replay of a previously queued command.
+
+## Checks and handoff
+
+Build before tests after branch switch. Meaningful RED→GREEN SQLite service, real backend handler and signed gateway tests; full Node/LORD results and omitted browser/history checks will be recorded below. Local browser and historical comparison inputs are unavailable and are not passes. Root handles exact-tree remote full CI and release integration. Claude exact-head review and owner merge remain required.
+
+## Local verification and handoff — 1 November 2026 (SGT)
+
+- Initial implementation commit: 54f0cad11987606d64c2a0d18e8ed3d780f20a99. A follow-up commit records review fixes and final evidence; root receives its exact head/tree separately (the commit cannot embed its own SHA).
+- Build passes with Asia/Singapore timezone, including Apps Script syntax gate and generated LORD backend. LORD setup templates match canonical source. No global package/version/build scripts were edited.
+- Four focused queue/gateway/end-to-end/backend programs pass. Real SQLite tests include atomic admission/concurrent replay, total/pending/nonce capacity, actor/payload binding, single dispatch, read-only uncertainty recovery, exact receipt/backup checkpoints and retention. Integration loses both an accepted D1 enqueue response and a committed Google response, then reuses the same identity without duplicate decisions.
+- Full current LORD program inventory independently executed: **36/39 pass**. Failures are exactly `gsis098h-background-ui.cjs`, `gsis-reference-ui-browser.cjs`, `booking-remarks-return-browser.cjs`, each because Chromium is unavailable. None is counted passed. The normal LORD runner stops on the first unavailable browser. Legacy exact-helper inventory was explicitly extended for the six new helpers; every historical behavior assertion remains, and `run_frontend_141_checks.cjs` passes 20/20.
+- Existing signed LORD source bridges, component packaging/parity and shared-secret boundary programs pass. The initial broad `npm test` attempt is retained; it has unavailable Chromium/history/ancestry failures and was started at the base while implementation proceeded. It is **not** exact-final-tree verification. Root must run full Node/LORD remote CI; no green broad-suite claim is made.
+- Fresh read-only internal review of 54f0cad found three preference safety issues. Each was reproduced RED and fixed GREEN: refresh Contacts inside the writer lock; use an exact observed Google decision revision rather than client clock ordering; record successful repeated direct decisions so an older opposite queue choice cannot overwrite them. No findings are deferred. The owner-visible rule remains Claude review of the final exact head, then owner merge.
+- Coordinating clarification: remove Apps Script authorization before enqueue. Existing profile/preference GET supplies `decisionRevision`; payload `expectedRevision` binds it. Admission is signed-session → D1 only. Execute checks live contact and revision under the Google writer lock. This is the chosen latency/authorization split; durable acceptance never means application.
+- Evidence: `docs/coordination/review/lord-queued-writes-phase1-tests.json` includes exact source hashes, command outcomes, full LORD program results and limitations. New optional service deployment/configuration/schema application and live verification remain separate owner actions. Nothing deployed, no authority/configuration flag changed and no live records or notifications touched.
+
+---
+
+## Historical approved request (superseded authority wording)
+
 # lord-queued-writes: LORD suite actions feel instant via a Worker queue; Google stays the record
 
 - Status: approved (owner go 30 Oct 2026: all logged items may proceed while the owner teaches); Codex builds phase 1 then phase 2 in the priority order below

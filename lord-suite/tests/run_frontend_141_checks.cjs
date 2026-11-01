@@ -120,7 +120,9 @@ const propertyContract=require('./property_policy_contract_changes.cjs');
     // Already present in the supplied v1.8.1 package; independently covered by
     // run_school_agreement_checks.cjs, rather than introduced by GSiS integration.
     const v181Additions=['enableLORDSchoolWhatsAppAgreement','schoolWhatsAppAgreement_'];
-    assert.deepEqual(Object.keys(current).filter(k=>!Object.hasOwn(previous,k)).sort(),additions.concat(require('./evidence_contract_changes.cjs').added,require('./booking_speed_contract_changes.cjs').added,propertyContract.added,settingsContract.added,v181Additions,require('./v18_contract_changes.cjs').added,require('./gsis_contract_changes.cjs').added).sort());
+    // Phase-1 queue additions are behaviorally checked by queued-writes.cjs.
+    const queueAdditions=['lordQueueBackup_','lordQueueCanonical_','lordQueueCommand_','lordQueueExact_','lordQueueHash_','lordQueuePreferenceRevision_'];
+    assert.deepEqual(Object.keys(current).filter(k=>!Object.hasOwn(previous,k)).sort(),additions.concat(require('./evidence_contract_changes.cjs').added,require('./booking_speed_contract_changes.cjs').added,propertyContract.added,settingsContract.added,v181Additions,queueAdditions,require('./v18_contract_changes.cjs').added,require('./gsis_contract_changes.cjs').added).sort());
     const marker={checked:true};current.selfTestLORDV1=()=>marker;current.inspectLORDV1Configuration=()=>marker;
     assert.equal(current.selfTestLORDV15(),marker);assert.equal(current.inspectLORDV15Configuration(),marker);assert.equal(current.selfTestLORDV16(),marker);assert.equal(current.inspectLORDV16Configuration(),marker);
     const services='Source/backend/appsscript.services.fragment.json';
