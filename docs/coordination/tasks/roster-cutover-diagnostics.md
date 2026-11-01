@@ -1,13 +1,13 @@
 # roster-cutover-diagnostics: name the drift, check it early, retry by itself (row G)
 
-- Status: claimed (implementer: Codex)
+- Status: implemented locally; exact-head CI pending (implementer: Codex)
 - Owner/model: Codex
 - Reviewer/model: Claude
 - Last updated (Asia/Singapore): 1 Nov 2026 19:10
 - Branch: codex/roster-cutover-diagnostics
-- Base SHA: current main (4a93be7 or later)
-- Current head SHA: none yet
-- PR: none yet
+- Base SHA: b8612f5e85736eccb09233f8dbb49b691c39991c (current main at start)
+- Current head SHA: see the PR for the exact published head
+- PR: #45 (draft)
 - User-authorised scope: owner 1 Nov 2026 ~19:00: "do 2,3,7 now" (items from Claude's cutover improvement list), "do up PR, let codex code".
 - Files/domains owned (include generated outputs): `backend/RosterEdgeMigration.gs` (and its regenerated copy in `backend/Code.gs` and the built Roster backend), `roster-update/public/edge-roster.js`, `shared/edge-setup.js` (and built copies `public/edge-setup.js`, `roster-update/public/edge-setup.js`), `roster-update/public/edge-setup.html` if a button is needed, focused tests, this record.
 - Out of scope: changing what the digest covers, closing the freeze gap for webhooks, top-up import (items 1, 4, 5; separate rows). Any weakening of the activation fence.
@@ -45,14 +45,36 @@
 - Lane R is serial. Open PRs #38, #40, #41 and #42 are held by the owner until after Monday's first busy period. #42 also edits `shared/edge-setup.js` and the import progress code; base this branch on main and keep the edge-setup change small so #42 can rebase after.
 - The owner may want to use this before the next cutover attempt. Ship it as a small, separate PR.
 
+## Implementation and scope notes
+
+Model: Codex. Only items 2, 3 and 7 are implemented. The complete stored-view source digest and activation decision remain unchanged. Capture stores 16-hex per-part digests in `ROSTER_EDGE_SNAPSHOT_PARTS`, bounded below 9 KB. Matching metadata supplies added, removed and changed part names; old, corrupt or unrelated metadata cannot override the full digest.
+
+`edgeDrift` reads the current Google snapshot under the existing Admin requirement. The Worker selects the retained import and passes its accepted source digest. Current main does not populate the session's `source_digest` until manifest binding, so the route also reads `preparationStatus().result.sourceDigest` during preparation. Status and import replies expose that same accepted digest without changing the schema or import source. Drift never advances or cancels an import.
+
+Two necessary canonical dependencies extend the original file list: `roster-update/public/_worker.js` adds only `drift` to the existing preparation allowlist; `shared/edge-setup.html` supplies the button template. Both remain in lane R. The HTML in `public/` and `roster-update/public/`, and all backend/Worker copies, are regenerated with `npm run build`. The shared template hides the Roster-only check on Deploy.
+
+Transient retries reuse the exact request/session. Only 502/503/504 without another code, the two named bridge codes and network failures qualify. Any 4xx, cutover code, other code or restart requirement stops. Ten consecutive failures stop; accepted progress resets the count, lease polling alone does not. Retry delays rise from 1 s to 30 s; the existing preparation lease remains intact. The optional 30-minute background drift poll is omitted to keep this PR small.
+
 ## Verification
-Not started.
+
+Regression tests first failed for missing capture fingerprints, the missing gateway route and lack of automatic retry. New tests exercise backend fingerprints and read-only drift, signed gateway authentication/current Admin/origin checks, captured digest selection, unchanged D1 import rows, stable request/session retries, the ten-failure cap, progress resets and a concurrent drift check. Existing setup tests now expect automatic recovery; an activation regression asserts the exact refusal text and unchanged imported heads.
+
+`TZ=Asia/Singapore npm run build` passes. The 28 focused programs pass, including the repaired isolated export fixture, all `roster-cutover-freeze-*`, all `roster099-*` and `edge094-setup`. LORD reaches its browser checks, then stops because the local Playwright Chromium executable is absent. The local broad run encounters the existing missing `/tmp/chromium` executable; these browser failures are not reported as passes. Full verification will use the branch CI with its installed Chromium.
+
+## Authority, rollback and remaining gates
+
+No production state, authority/configuration, provider messages or deployment changes. One additive Google diagnostic property is written only at capture. Rollback restores the prior code; the property is harmless and retained imports remain usable. Existing imports without matching part digests can still be checked for current/not-current, but cannot name their changed parts. No deployment or live cutover acceptance is claimed. PRs #38, #40, #41 and #42 are untouched.
 
 ## Review
-Not started.
+
+Claude reviewed exact head `1e25d343ea2ee62647e2f449246e9ae7d7d3f4b6` on 1 November 2026. His blocking finding was that oversized optional diagnostics could stop capture; he also recommended a 135-second drift timeout and restored UI error limits. The owner requested all three corrections.
+
+The diagnostic write now uses a bounded `{sourceDigest, at, truncated:true}` marker if the part map is too large. Hashing or property-storage failures are ignored by this optional helper, leaving the actual snapshot capture and activation digest intact. Regressions exercise all three cases through v2 capture. `edgeDrift` uses the 135-second bridge deadline; reference checks retain 55 seconds. Upstream and network errors are bounded to 320 characters in `call()`; display catches retain the 360-character limit.
+
+The new assertions failed first at the 413, 55-second deadline and unbounded text. They pass after correction. Generated outputs and exact-head CI are rechecked before handoff.
 
 ## Deployment
 Not deployed.
 
 ## Handoff
-Next action: Codex claims, builds on `codex/roster-cutover-diagnostics`, opens a draft PR naming Claude as reviewer and the exact head SHA.
+Next action: push the review corrections on `codex/roster-cutover-diagnostics`, verify the new exact head, and return PR #45 to Claude. Owner decides merge and deployment.
