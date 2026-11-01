@@ -78,3 +78,8 @@ Not deployed.
 
 ## Handoff
 Next action: push the review corrections on `codex/roster-cutover-diagnostics`, verify the new exact head, and return PR #45 to Claude. Owner decides merge and deployment.
+
+## Defect found live (Claude, 1 Nov 2026 22:50, v0.9.9g, import 24ee4057)
+**Check snapshot is current is refused while the freeze is on** ("Roster is being moved; try again shortly"), which is exactly when it is needed. Cause: `rosterDispatch_` in `backend/Roster.gs` (about line 262) only exempts `edgeFreeze, edgeUnfreeze, edgeExport, edgeExportManifest, edgeExportPart, edgeExportAbandon, edgeModel, edgeFence, edgeReferences, edgeContactCreate, edgeAudit` from `rosterEdgeAssertLegacyWrite_()`; `edgeDrift` is missing (also check the matching list in `backend/Code.gs`). Tests covered drift only with the freeze off.
+Side effect seen: the import loop on the page stopped at step 99 after the drift refusal and had to be resumed by hand (no failure recorded in D1). Check whether the drift error path or a shared state (`busy`/`controls`) stops the import loop; the drift check must never stop the import.
+Fix (Codex, small PR, after the cutover): add `edgeDrift` to the exemption list (read-only); test drift while frozen returns current/changed; test that a drift error during an import leaves the import loop running.
