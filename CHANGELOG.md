@@ -1,3 +1,9 @@
+# Pending: freeze Google for the D1 cutover, 1 November 2026
+
+Model: Codex. Admin can freeze Google writes before the final import, inspect its age and cancel a pre-fence cutover. Both writer locks drain before the freeze. Roster writers refuse clearly; immutable preparation files remain usable. Worker jobs skip frozen Google work while durable absence receipts and Queue wakes remain retained. A four-hour warning never auto-releases the freeze.
+
+Explicit activation is available only behind a confirmed freeze and the existing preparation flag, current Admin and exact imported-source checks. The freeze completes after both D1 stores activate. Partial or uncertain completion remains recoverable; no authority flag is changed automatically. See [the F task](docs/coordination/tasks/roster-d1-cutover-freeze.md) for verification, configuration, rollback and the runbook handoff. Not deployed or live-activated.
+
 # Packed D1 import capture, Follow-up R2, 31 October 2026
 
 Model: Codex. Snapshot digesting and frozen-source serialization retain stored compressed Stapler plans and allocation evidence. Later steps expand only the selected plan; D1 retains compressed audit evidence and verifies it when a dated consumer needs it. Roster and notification locks release before source upload. Google descriptors and D1 sessions retain bounded failure details, and edge setup shows the failed phase and elapsed time. A production-shaped regression reproduces the old 92.53 MB expansion from 1.46 MB stored data; fixed capture writes 1.46 MB without decompression. See [the R2 task](docs/coordination/tasks/roster-d1-import-packed-capture.md). No deployment or authority change. After deployment, explicitly restart imports prepared before R2 because the source digest now describes stored bytes.

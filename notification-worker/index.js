@@ -3,6 +3,7 @@ import {recordJobHealth,safeHealthError} from '../shared/edge-health.js';
 import {assertRecoveryWritable} from '../shared/edge-recovery.js';
 import {rosterRecoveryEnvironment,resolveRosterAuthorityEnvironment} from '../shared/roster-recovery-profile.js';
 import {readQuietMode} from '../shared/roster-quiet-mode.js';
+import {readRosterCutoverFreeze} from '../shared/roster-cutover-freeze.js';
 // Test harnesses load this file with its imports removed; treat quiet mode as off there.
 const quietMode=(db,at)=>typeof readQuietMode==='function'?readQuietMode(db,at):Promise.resolve({active:false});
 import {dispatchNotifications,scheduledRoster,diagnoseNotificationConnections,dispatchInboxPending,dispatchWebhookJobs,dispatchReceivedReports,dispatchPeerMail,dispatchAllocationAudit,dispatchGoogleBackup} from '../roster-update/public/_worker.js';
@@ -39,7 +40,9 @@ async function stage(env,job,event,work,{scheduledTime}={}){
  const startedAt=Date.now(),traceId=crypto.randomUUID();
  const record=async data=>{if(env.GSIS_JOBS?.prepare)try{await recordJobHealth(env,{job,traceId,startedAt,...data});}catch{console.error(JSON.stringify({event:'roster-health-record-failed',job,code:'UNAVAILABLE',traceId}));}};
  try{
-  writable(env);const result=await work(),data=result?.data||result,summary=safeSummary(data);
+  writable(env);
+  const freeze=env.ROSTER_EDGE_AUTHORITY!=='d1'&&!['r2-cleanup','google-backup'].includes(job)&&typeof readRosterCutoverFreeze==='function'?await readRosterCutoverFreeze(env):null;
+  const result=freeze?.active?{skipped:true,cutoverFrozen:true,reason:'cutover freeze',code:freeze.overdue?'ROSTER_CUTOVER_OVERDUE':'ROSTER_CUTOVER_FROZEN'}:await work(),data=result?.data||result,summary=safeSummary(data);
   if(result?.ok===false||data?.failures?.length)throw Object.assign(Error('Job failed'),{...safeError(result),status:result.status});
   const measured=Object.entries(summary).filter(([key,value])=>typeof value==='number'&&!['readyAt','backendCalls','reviewedUncertain'].includes(key));
   const failed=!!(data?.prepareFailures||data?.resultFailures||data?.failed||data?.uncertain||data?.unconfirmed||summary.needsReview||summary.deferred||summary.retrying||summary.blocked),idle=!data?.hasMore&&!data?.pending&&(data?.idle===true||data?.state==='idle'||measured.length>0&&measured.every(([,value])=>value===0));
@@ -50,6 +53,7 @@ async function stage(env,job,event,work,{scheduledTime}={}){
   return result;
  }catch(error){
   const safe=safeError(error),counts=safeSummary(error),blocked=['ABSENCE_INTAKE_PENDING','ABSENCE_TRANSPORT_PENDING'].includes(safe.code);
+  if(safe.code==='ROSTER_CUTOVER_FROZEN'){await record({status:'skipped',...safe,finishedAt:Date.now(),counts});return {skipped:true,cutoverFrozen:true,code:safe.code};}
   await record({status:'failure',...safe,finishedAt:Date.now(),counts});
   console.error(JSON.stringify({event:event?event+(blocked?'-blocked':'-failed'):'roster-'+job+'-failed',job,...safe,...counts,traceId,...(scheduledTime?{scheduledTime}:{})}));
   return {stageFailed:true,...safe,...counts};
@@ -121,7 +125,7 @@ export default {
   const result=await run('notifications',()=>dispatchNotifications(env,{budgetMs:240000}));
   const peer=(await quietMode(env.GSIS_JOBS).catch(()=>({active:false}))).active?{}:await run('peer-mail',()=>dispatchPeerMail(env));
   console.info(JSON.stringify({event:'roster-notification-queue',...safeSummary(result)}));
-  if(received.stageFailed||result.stageFailed||peer.stageFailed||received.hasMore||received.transport?.pending||received.intake?.deferred||result.pending||result.prepareFailures||result.resultFailures||peer.pending||peer.failed||peer.blocked){
+  if(received.cutoverFrozen||result.cutoverFrozen||peer.cutoverFrozen||received.stageFailed||result.stageFailed||peer.stageFailed||received.hasMore||received.transport?.pending||received.intake?.deferred||result.pending||result.prepareFailures||result.resultFailures||peer.pending||peer.failed||peer.blocked){
    const delaySeconds=Math.max(1,Math.min(900,Math.ceil(((received.hasMore?Date.now()+1000:result.readyAt||Date.now()+60000)-Date.now())/1000)));
    settleMessages(batch,supported,'retry',{delaySeconds});
   }else settleMessages(batch,supported,'ack');

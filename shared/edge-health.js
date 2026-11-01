@@ -1,4 +1,5 @@
 import {assertRecoveryWritable} from './edge-recovery.js';
+import {readRosterCutoverFreeze} from './roster-cutover-freeze.js';
 
 /* Compact operational metadata only. Callers must verify school administrator
  * authority before exposing these functions. Never pass request bodies or errors
@@ -26,7 +27,7 @@ function parseObject(value){if(typeof value!=='string'||value.length>4096)return
 const FAILURE_STAGES=new Set(['operations-location','operations-read','operations-json','operations-schema','stapler-unpack','stapler-json','stapler-identity','stapler-proof','stapler-validation','stapler-ready','calculation-source','history-read','bridge-signature','request-freshness','request-identity','contacts-config','contacts-fetch','contacts-json','contacts-result','contacts','timetable','plan-read','save','response','backend','peer-mail-review']);
 const FAILURE_OPERATIONS=new Set(['nextAbsenceIntake','deferAbsenceIntake','prepareNotification','requestMutual','saveSchoolAbsence','renameStapler','scheduledRoster','sendPeerMail','peerMailReview','reviewPeerMail','claimNotifications','prepareNotifications','notificationResult','notificationResults','inboxPendingDispatch','inboxReplyPrepare','inboxReplyResult','inboxAlertPrepare','inboxAlertResult','deliveryReviewMailDispatch','dailyEmploymentMailDispatch','processAbsenceIntake','flushAbsenceIntake','captureAbsenceIntake','retryAbsenceIntake','resolveAbsenceIntake','timetableBatch','timetableDay','timetableCacheManifest','read','saveAbsence','saveInstructions','saveStapler','confirmStapler','publishStapler','resetStapler','moveStapler','restoreStapler','deleteStapler','reliefBatch','publish','notifyDaily','autoAllocate','optimise','receiptStatus','allocationAuditExport']);
 export function safeHealthError(error){
- const status=httpStatus(error?.httpStatus??error?.status),code=CODES.has(error?.code)?error.code:['AbortError','TimeoutError'].includes(error?.name)?'TIMEOUT':status?'HTTP_ERROR':'UNKNOWN_ERROR',diagnosticId=trace(error?.diagnosticId);
+ const status=httpStatus(error?.httpStatus??error?.status),code=CODES.has(error?.code)||['ROSTER_CUTOVER_FROZEN','ROSTER_CUTOVER_OVERDUE','ROSTER_CUTOVER_STATUS_UNAVAILABLE'].includes(error?.code)?error.code:['AbortError','TimeoutError'].includes(error?.name)?'TIMEOUT':status?'HTTP_ERROR':'UNKNOWN_ERROR',diagnosticId=trace(error?.diagnosticId);
  return {code,...(status?{httpStatus:status}:{}),...(diagnosticId?{diagnosticId}:{}),...(typeof error?.backendVersion==='string'&&/^\d{1,3}\.\d{1,3}\.\d{1,3}[a-z]?$/.test(error.backendVersion)?{backendVersion:error.backendVersion}:{}),...(FAILURE_STAGES.has(error?.failureStage)?{failureStage:error.failureStage}:{}),...(FAILURE_OPERATIONS.has(error?.operation)?{operation:error.operation}:{})};
 }
 function diagnostics(value){const safe=safeHealthError(value);return Object.fromEntries(['diagnosticId','backendVersion','failureStage','operation'].filter(key=>safe[key]!==undefined).map(key=>[key,safe[key]]));}
@@ -100,6 +101,7 @@ export async function readSystemHealth(env,{now=Date.now(),jobsOnly=false}={}){
   const jobs=healthAvailable?checked(await session.prepare(`SELECT ${fields},${healthDetail} FROM gsis_job_health ORDER BY job LIMIT 32`).all()):{results:[]};
   const failures=historyAvailable?checked(await session.prepare(`SELECT job,status,code,http_status,trace_id,started_at,finished_at,event_at,recorded_at,counts_json,${historyDetail} FROM gsis_job_health_history WHERE status='failure' AND recorded_at>=? ORDER BY event_at DESC,id DESC LIMIT 20`).bind(checkedAt-HISTORY_DAYS*DAY).all()):{results:[]};
   output.jobs=(jobs.results||[]).map(rowProjection).filter(Boolean);output.recentFailures=(failures.results||[]).map(rowProjection).filter(Boolean);output.storage.available=true;
+  try{output.cutoverFreeze=await readRosterCutoverFreeze(env,{now:checkedAt});}catch{output.cutoverFreeze={available:false,code:'ROSTER_CUTOVER_STATUS_UNAVAILABLE'};}
   if(jobsOnly)return output;
   // A missing optional schema cannot convert healthy storage into a false empty
   // backlog. Each section independently says whether it could be checked.

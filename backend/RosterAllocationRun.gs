@@ -25,6 +25,7 @@ function rosterScheduledAllocationLedger_(date){
  try{const value=JSON.parse(raw);if(value.schema!==1||value.date!==date||!value.slots||typeof value.slots!=='object'||Array.isArray(value.slots))throw Error('shape');for(const [slot,row] of Object.entries(value.slots))if(!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(slot)||![1,2].includes(row.attempts)||!['running','committing','uncertain','failed','completed','stopped'].includes(row.state)||!Number.isFinite(row.started)||typeof row.fence!=='string')throw Error('row');return value;}catch(_){error_(503,'Scheduled allocation history could not be read. Ask Admin to review it before retrying.');}
 }
 function rosterScheduledAllocationSave_(ledger){
+ if(typeof rosterEdgeAssertLegacyWrite_==='function')rosterEdgeAssertLegacyWrite_();
  const json=JSON.stringify(ledger);if(json.length>7500)error_(503,'Scheduled allocation history is full. Ask Admin to review unfinished slots.');props_().setProperty('ROSTER_ALLOCATION_SLOTS:'+ledger.date,json);
 }
 function rosterScheduledAllocationRecord_(run){

@@ -61,9 +61,11 @@ function gsisNotificationMaintenanceClear_(state,now,actor){
 }
 function gsisNotificationMaintenance_(write){
  gsisRequireBackendRole_('roster');
+ if(write&&typeof rosterEdgeAssertLegacyWrite_==='function')rosterEdgeAssertLegacyWrite_();
  const script=LockService.getScriptLock();if(!deployLock_(script,8000))throw Error('Roster is saving another change. Run this same function again. Nothing was cleared.');
  let user=null;
  try{
+  if(write&&typeof rosterEdgeAssertLegacyWrite_==='function')rosterEdgeAssertLegacyWrite_();
   const id=props_().getProperty('ROSTER_OPERATIONS_FILE')||rosterFindFile_(ROSTER_DATA,'Roster operations.json');
   if(!id)throw Error('Roster operations file was not found. Nothing was cleared.');
   const primary=typeof rosterSplitReadDocument_==='function'?rosterSplitReadDocument_(id,false,false).value:JSON.parse(rosterReadFile_(id));

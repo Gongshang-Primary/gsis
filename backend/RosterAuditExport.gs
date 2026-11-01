@@ -137,6 +137,7 @@ function rosterAllocationAuditExportCore_(p){gsisRequireBackendRole_('roster');
  // No UserLock -> ScriptLock nesting: maintenance uses the opposite order.
  if(!exportLock.tryLock(1))return {...result,busy:true};exportHeld=true;
  try{
+  if(typeof rosterEdgeAssertLegacyWrite_==='function')rosterEdgeAssertLegacyWrite_();
   const snapshot=rosterOperationsState_();if(!rosterAllocationAuditEnabled_(snapshot))return {...result,disabled:true};const dates=Object.entries(snapshot.allocationAuditExports||{}).filter(([date,row])=>rosterAllocationAuditEnabled_(snapshot,date)&&(row.pendingVersion||0)>(row.exportedVersion||0)).sort(([a],[b])=>a.localeCompare(b));result.pending=dates.length;
   for(const [date,watermark] of dates.slice(0,1)){
    try{

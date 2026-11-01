@@ -5,6 +5,7 @@ import {edgeNotificationService,edgeInboxBackend,supportsEdgeNotificationOperati
 import {backendAvailable,callOperationalBackend,forwardOperationalRequest} from '../../shared/backend-service.js';
 import {assertRecoveryWritable} from '../../shared/edge-recovery.js';
 import {readSystemHealth,safeHealthError} from '../../shared/edge-health.js';
+import {readRosterCutoverFreeze} from '../../shared/roster-cutover-freeze.js';
 import {rosterRecoveryEnvironment,resolveRosterAuthorityEnvironment} from '../../shared/roster-recovery-profile.js';
 import {readQuietMode,startQuietMode,endQuietMode,endQuietModeSession,QUIET_END_OPERATIONS} from '../../shared/roster-quiet-mode.js';
 /* GSIS_API_SECRET_BEGIN */
@@ -260,10 +261,10 @@ async function quietModeRoute(req,env,u){
   return json({ok:true,data:input.action==='on'?await startQuietMode(env.GSIS_JOBS,who.email):await endQuietMode(env.GSIS_JOBS,who.email,'manual')});
  }catch(error){return json({ok:false,error:error.status&&error.status<500?error.message:'Quiet mode could not be confirmed.'},error.status||503);}
 }
-const D1_PREPARE_OPERATIONS=new Set(['status','import','export','restart']);
+const D1_PREPARE_OPERATIONS=new Set(['status','import','export','restart','freeze','cancelFreeze']);
 async function d1PrepareAllows(req,env){
  if(env.ROSTER_D1_PREPARE!=='import'||req.method!=='POST')return false;
- try{const input=JSON.parse(await req.clone().text());return D1_PREPARE_OPERATIONS.has(input?.operation);}catch{return false;}
+ try{const input=JSON.parse(await req.clone().text());if(input?.operation==='activate'){const freeze=await readRosterCutoverFreeze(env);return freeze.active===true&&freeze.state==='frozen';}return D1_PREPARE_OPERATIONS.has(input?.operation);}catch{return false;}
 }
 export default {async fetch(req,env,ctx){
  const u=new URL(req.url);
@@ -364,6 +365,7 @@ function rosterBackendFailure(result){
  return {...detail,...(code===result.code?{code}:{}),...(['ABSENCE_PREPARATION_RETRY','ABSENCE_INTAKE_BUSY','ABSENCE_INTAKE_PENDING'].includes(result.code)?{backendCode:result.code,...(['TIMETABLE_MANIFEST_CHANGED','ABSENCE_CONTEXT_CHANGED','SCHOOL_DATE_CHANGED','REFERENCE_SOURCE_CHANGED'].includes(result.reasonCode)?{reasonCode:result.reasonCode}:{}),...(result.attempts===2?{attempts:2}:{})}:{})};
 }
 function rosterFailure(action,diagnosticId,detail){
+ if(detail.code==='ROSTER_CUTOVER_FROZEN')return json({ok:false,status:423,code:'ROSTER_CUTOVER_FROZEN',error:'Roster is being moved; try again shortly.'},423);
  console.error(JSON.stringify({event:'roster-request-failed',action,diagnosticId,...detail}));
  const saving=action==='rosterUpload'||action==='rosterUpdate',reading=action==='rosterOperations'&&['archiveItems','archivedItem','statistics','statisticsCalendar','acknowledgementStatus','deliveryReview','calculations','read','directory','candidates','availability','audit','prunePreview','externalLink','health','accounting','allocation','allocationVersion','history','exportDaily','dailyTimetable','teacherDailyUpdate','currentDuty','timetableBatch','timetableDay','timetablePreparationManifest','timetablePreparationPart','timetablePreparationCheck','stapler','staplerDates','dutyRoster','systemConfig','dailyEmployment','dailyNotify','nameBridges'].includes(detail.operation);
  let error=saving?'The timetable save could not be confirmed. Retry the same save.':action==='rosterOperations'?(reading?'Roster records could not load. Retry loading.':'The Roster save could not be confirmed. Retry the same save.'):'Roster is temporarily unavailable. Use Retry or Refresh to try again.';
