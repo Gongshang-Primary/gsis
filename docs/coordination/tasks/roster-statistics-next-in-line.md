@@ -1,4 +1,4 @@
-# roster-statistics-next-in-line: rank teachers by cumulative R% done (changelog)
+# roster-statistics-next-in-line: "Cumulative percentage of relief done R%" table (changelog)
 
 - Status: proposed (owner changelog, 1 Nov 2026 ~20:00; not claimed, not authorised to build)
 - Owner/model: unassigned (Codex when authorised)
@@ -10,11 +10,11 @@
 "under roster > statistics > add as third diagram (first being "Total Absences and Relief — cumulative", 2nd being "Total Absences and Relief — by Date") rank table of teachers by cumulative R% done (i.e. the higher the name, the more like system will assign the teacher next available)"
 
 ## Intent
-A ranked table: teachers who have done the least of their R share appear at the top (next in line), the most at the bottom.
+A table of teachers by cumulative R% done, ascending by default: least done at the top, most at the bottom.
 
 ## Design rules (Claude)
 1. Use the allocator's own fairness key from `shared/roster-allocation.js`; never a second formula. Otherwise the table misleads.
-2. Label it honestly: "Next in line (fairness order)". Real assignment also depends on free periods, clashes, specialism, FAJT levelling and inactive status; say so in one line under the title.
+2. Title (owner ruling 1 Nov ~20:15): **"Cumulative percentage of relief done R%"**. No "next in line" wording. Default sort: R% ascending (lowest first); columns stay sortable.
 3. Exclude inactive staff (Contacts inactive, owner option 1B) and staff with no R entitlement.
 4. Columns (proposed): Rank, Teacher, Relief done, R entitlement, R% done, Last relief date.
 5. Must read from D1 when D1 is the record; add a D1-path test.
