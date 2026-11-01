@@ -138,10 +138,10 @@ function fixture(){
  }
  // Venue partial name/unit/alias lookup preserves stable identity and custom text clears it.
  {
-  const f=fixture();f.app.openEventModal(null,{StartDate:'2026-10-29',LaneID:'day'});const form=f.node('eventForm'),input=form.elements.Location;
+  const f=fixture();f.app.openEventModal(null,{StartDate:'2026-10-29',LaneID:'day'});const form=f.node('eventForm'),input=f.node('calendarVenueInput');
   for(const query of ['School','A1','assembly']){input.value=query;input.dispatchEvent(new f.w.Event('input',{bubbles:true}));assert.match(f.node('calendarVenueSuggestions').textContent,/School Hall/);}
-  f.w.document.querySelector('[data-calendar-venue="venue-hall"]').click();assert.equal(form.elements.VenueID.value,'venue-hall');assert.equal(input.value,'School Hall (A1-01)');
-  input.value='Custom offsite venue';input.dispatchEvent(new f.w.Event('input',{bubbles:true}));assert.equal(form.elements.VenueID.value,'');assert(!/available|booked/i.test(f.node('calendarVenueHelp').textContent));f.dom.window.close();
+  f.w.document.querySelector('[data-calendar-venue="venue-hall"]').click();assert.equal(form.elements.VenueID.value,'venue-hall');assert.equal(input.value,'');assert.equal(form.elements.Location.value,'A1-01 School Hall');
+  input.value='Custom offsite venue';input.dispatchEvent(new f.w.Event('input',{bubbles:true}));input.dispatchEvent(new f.w.KeyboardEvent('keydown',{key:'Enter',bubbles:true,cancelable:true}));assert.equal(form.elements.VenueID.value,'venue-hall');assert.equal(form.elements.Location.value,'A1-01 School Hall, Custom offsite venue');assert(!/available|booked/i.test(f.node('calendarVenueHelp').textContent));f.dom.window.close();
  }
  console.log('PASS Calendar job UI: all four nonblocking mutation paths, independent editor retention, same-event locks, lost acceptance recovery, local glossary updates and partial venue identity');
 })().catch(error=>{console.error(error);process.exit(1);});

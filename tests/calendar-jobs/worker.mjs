@@ -11,8 +11,9 @@ if(existsSync(schema))db.exec(readFileSync(schema,'utf8'));
 function statement(sql,args=[]){return {bind(...values){return statement(sql,values);},async first(){return db.prepare(sql).get(...args)||null;},async all(){return {results:db.prepare(sql).all(...args)};},async run(){const result=db.prepare(sql).run(...args);return {meta:{changes:Number(result.changes)}};}};}
 const env={CALENDAR_JOBS_DB:{prepare:sql=>statement(sql),async batch(statements){db.exec('BEGIN');try{const result=[];for(const s of statements)result.push(await s.run());db.exec('COMMIT');return result;}catch(e){db.exec('ROLLBACK');throw e;}}},GSIS_SECRET:'test-calendar-jobs-secret-'.repeat(3),CALENDAR_APPS_SCRIPT_URL:'https://script.google.com/macros/s/synthetic/exec'};
 const actor={sub:'synthetic-sub',email:'admin@gsps.edu.sg',userAlias:'admin'};
-let executions=0,statuses=0,mode='saved',authorize=true,checkpointCrash=false,syncContinuations=0;
+let backendCalls=0,executions=0,statuses=0,mode='saved',authorize=true,checkpointCrash=false,syncContinuations=0;
 globalThis.fetch=async(url,options)=>{
+ backendCalls++;
  assert.equal(url,env.CALENDAR_APPS_SCRIPT_URL);
  const input=JSON.parse(options.body);
  if(input.service==='gsis-calendar-sync-worker-v1'){
@@ -26,6 +27,7 @@ globalThis.fetch=async(url,options)=>{
  if(input.mode==='authorize')return Response.json(authorize?{ok:true,result:{authorized:true}}:{ok:false,status:403,definite:true,code:'FORBIDDEN',error:'Role revoked'});
  if(input.mode==='execute'){
   executions++;
+  if(mode==='forbidden')return Response.json({ok:false,status:403,definite:true,code:'FORBIDDEN',error:'Role revoked'});
   if(mode==='crash-after-send'){checkpointCrash=true;throw Error('Execution died after delivery');}
   if(mode==='lost')throw Error('Lost committed response');
   if(mode==='rejected')return Response.json({ok:false,status:409,definite:true,code:'CONFLICT',error:'Changed',current:{EventID:'E1',_revision:'new'}});
@@ -42,7 +44,7 @@ function due(){db.exec('UPDATE calendar_jobs SET next_at=0,lease_until=0');}
 // Losing durable capture or permitting concurrent commands for one event must fail this test.
 let p=proposal(),result=await send(p);
 assert.equal(result.response.status,202,'Calendar must durably accept without executing Google writes');
-assert.equal(executions,0);assert.equal(result.data.result.state,'QUEUED');
+assert.equal(backendCalls,0,'D1 acceptance must not wait for any Apps Script call');assert.equal(executions,0);assert.equal(result.data.result.state,'QUEUED');
 assert.equal(db.prepare('SELECT COUNT(*) n FROM calendar_jobs').get().n,1);
 assert.equal((await send(p)).data.result.jobId,p.payload.operationId,'Exact replay returns the original durable receipt');
 assert.equal(db.prepare('SELECT COUNT(*) n FROM calendar_jobs').get().n,1);
@@ -53,14 +55,17 @@ await worker.scheduled({},env);assert.equal(executions,2);
 result=await send({kind:'list'});assert.equal(result.data.result.jobs.filter(j=>j.state==='SAVED').length,2);
 assert.equal((await send({kind:'list'},{...actor,sub:'another-sub',email:'other@gsps.edu.sg',userAlias:'other'})).data.result.jobs.length,0);
 
-// Invalid/replayed envelopes cannot mutate storage, and authorization is checked before capture.
+// Invalid/replayed envelopes cannot mutate storage; Google permission denial happens after capture.
 const count=db.prepare('SELECT COUNT(*) n FROM calendar_jobs').get().n;
 assert.equal((await send(p,actor,{payload:'{}',signature:'0'.repeat(64)})).response.status,401);
 assert.equal((await send(p,actor,envelope(p,actor,{timestamp:Date.now()-180000}))).response.status,401);
 assert.equal((await send({...proposal(),action:'saveUser'})).response.status,400);
 const replay=envelope({kind:'list'});assert.equal((await send(null,actor,replay)).response.status,200);assert.equal((await send(null,actor,replay)).response.status,409);
-authorize=false;assert.equal((await send(proposal('DENIED'))).response.status,403);authorize=true;
 assert.equal(db.prepare('SELECT COUNT(*) n FROM calendar_jobs').get().n,count);
+mode='forbidden';p=proposal('DENIED');assert.equal((await send(p)).response.status,202);
+due();await worker.scheduled({},env);
+const denied=db.prepare('SELECT * FROM calendar_jobs WHERE job_id=?').get(p.payload.operationId);
+assert.equal(denied.state,'NEEDS_ATTENTION');assert.equal(denied.outcome,'REJECTED');assert.equal(denied.blocked,0);assert.equal(JSON.parse(denied.error_json).code,'FORBIDDEN');mode='saved';
 
 // A crash after delivery must recover the receipt, never blindly execute a second write.
 mode='lost';p=proposal();result=await send(p);const jobId=result.data.result.jobId;
