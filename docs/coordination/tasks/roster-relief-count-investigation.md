@@ -1,10 +1,16 @@
 # roster-relief-count-investigation: completed relief shows 0 for a teacher who did relief
 
-- Status: authorised (owner 1 Nov ~20:45: "let codex work on the last 2 PRs"); merge held per lane R rule (after the D1 cutover and Monday's first busy period)
+- Status: claimed; implementing (Codex); merge held by owner
 - Owner/model: Codex
 - Reviewer/model: Claude
 - Branch: codex/roster-relief-count
 - Lane: R (serial)
+- Last updated (Asia/Singapore): 1 Nov 2026 20:17
+- Base SHA: b8f1fa307ee596ca7e31fb99d19d83255bf9e295 before this claim
+- Current head: see the eventual PR exact head
+- PR: not opened
+- User-authorised scope: investigate the five stated hypotheses, align counts only if wrong, fix zero-quota wording and add D1-path coverage.
+- Out of scope: cutover, freeze, import, activation and live record changes.
 - Files/domains (expected): `shared/roster-allocation.js` (`reliefCompleted`, `accounted`, `corrected`), `shared/roster-operations.js` (calculations payload), `roster-update/public/roster-calculations.js`, generated bundles, tests.
 
 ## Evidence (owner screenshot, v0.9.9g, 1 Nov ~20:30)
