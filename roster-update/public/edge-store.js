@@ -399,6 +399,12 @@ var GSiSRosterImport=(()=>{
 
   async function manifest(){const row=await read();if(!row?.manifest_json)fail(409,'ROSTER_IMPORT_PREPARING','The immutable snapshot is not ready.');return JSON.parse(row.manifest_json);}
   async function partReceipt(partId){identity(partId,'part',80);await read();const row=await connection().prepare('SELECT receipt_json FROM gsis_roster_import_parts WHERE session_id=? AND part_id=?').bind(sessionId,partId).first();return row?.receipt_json?JSON.parse(row.receipt_json):null;}
+  async function pendingParts(limit=4){
+   await read();const rows=(await connection().prepare('SELECT part_id id,kind,scope,digest,bytes,records FROM gsis_roster_import_parts WHERE session_id=? AND receipt_json IS NULL ORDER BY ordinal LIMIT ?').bind(sessionId,Math.max(1,Math.min(4,limit))).all()).results;
+   // Object assembly consumes earlier segment receipts. Keep that dependency
+   // barrier out of a parallel batch, even when it is the fourth selected part.
+   const barrier=rows.findIndex(part=>part.kind==='object');return barrier===0?rows.slice(0,1):barrier>0?rows.slice(0,barrier):rows;
+  }
   async function segmentReceipts(ids){
    if(!Array.isArray(ids)||!ids.length||ids.length>MAX_PARTS||new Set(ids).size!==ids.length)fail(409,'ROSTER_IMPORT_OBJECT','Invalid segment dependency list.');await read();const found=await connection().prepare("SELECT part_id,receipt_json FROM gsis_roster_import_parts WHERE session_id=? AND kind='segment' AND receipt_json IS NOT NULL AND part_id IN (SELECT value FROM json_each(?))").bind(sessionId,JSON.stringify(ids)).all(),byId=new Map(found.results.map(row=>[row.part_id,JSON.parse(row.receipt_json)]));if(found.results.length!==ids.length)fail(409,'ROSTER_IMPORT_OBJECT','Object segments are incomplete.');return ids.map(id=>byId.get(id));
   }
@@ -448,7 +454,7 @@ var GSiSRosterImport=(()=>{
    statements.push(c.prepare("UPDATE gsis_edge_heads SET revision=0,mode='legacy',source_digest='',imported_records=0,metadata_json='{}',write_token=?,updated_at=? WHERE scope IN ('roster','roster-register') AND "+guard).bind(token,Date.now(),sessionId,token),c.prepare('DELETE FROM gsis_roster_import_locks WHERE session_id=? AND '+guard).bind(sessionId,sessionId,token));
    try{checked(await c.batch(statements));}catch(error){if((await read())?.reset_request===resetRequest)return restartResult(resetRequest);throw error;}if((await read())?.reset_request!==resetRequest)fail(409,'ROSTER_RESTART_ACTIVE','An active, paused or changed authority cannot be reset.');return restartResult(resetRequest,{evidence:{sessionId,manifestDigest:row.manifest_digest,sourceDigest:row.source_digest},next:'Use a new request ID to capture a new Google source.'});
   }
-  return {reserve,preparationStatus,claimPreparation,commitPreparation,recordPreparationFailure,assertRestartable,recordRestartCleanup,bind,progress,manifest,validatePart,partReceipt,segmentReceipts,stage,referencesReady,failPreparation,finalize,evidence,restart};
+  return {reserve,preparationStatus,claimPreparation,commitPreparation,recordPreparationFailure,assertRestartable,recordRestartCleanup,bind,progress,manifest,validatePart,partReceipt,pendingParts,segmentReceipts,stage,referencesReady,failPreparation,finalize,evidence,restart};
  }
  async function hashBytes(bytes){return Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',bytes)),n=>n.toString(16).padStart(2,'0')).join('');}
  async function stageObject(bucket,store,sessionId,part,body){

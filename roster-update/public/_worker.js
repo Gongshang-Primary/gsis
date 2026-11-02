@@ -1,6 +1,6 @@
 import {recoveryTimetableSnapshot} from './roster-recovery-timetable-cache.js';
 import {dispatchEdgeDeliveryReview,edgeDeliveryReportRead,edgeDeliveryReviewBackend} from './edge-notification-review.js';
-import {edgeRosterEnabled,edgeRosterService,edgeRosterBackend,edgeRosterMigration,readEdgeRosterReferences,mirrorEdgeRoster,readRosterMirrorStatus} from './edge-roster.js';
+import {edgeRosterEnabled,edgeRosterService,edgeRosterBackend,edgeRosterMigration,startEdgeRosterImport,runEdgeRosterImports,readEdgeRosterReferences,mirrorEdgeRoster,readRosterMirrorStatus} from './edge-roster.js';
 import {edgeNotificationService,edgeInboxBackend,supportsEdgeNotificationOperation,dispatchEdgePeerMail,dispatchEdgeEmploymentMail,reserveEdgeWhatsAppSend,recordEdgeWhatsAppThrottle,edgeDispatchHasWork} from './edge-notifications.js';
 import {backendAvailable,callOperationalBackend,forwardOperationalRequest} from '../../shared/backend-service.js';
 import {assertRecoveryWritable} from '../../shared/edge-recovery.js';
@@ -52,7 +52,7 @@ export async function sign(data,secret,ascii=false){const raw=JSON.stringify(dat
 async function backend(env,action,input,who,traceId){
  assertRecoveryWritable(env);
  const delegated=await callOperationalBackend(env,'roster',{action,input,identity:who,traceId});if(delegated!==undefined)return delegated;
- if(action==='edgeMigration'){try{return {result:{ok:true,data:await edgeRosterMigration(env,input,who)},backendMs:0};}catch(error){return {result:{ok:false,status:error.status||503,code:error.code,error:error.message},backendMs:0};}}
+ if(action==='edgeMigration'){try{const data=await (input.operation==='import'?startEdgeRosterImport(env,input,who):edgeRosterMigration(env,input,who));if(data.serverDriven&&input.operation==='import')data.wake=await enqueueNotificationWake(env,'gsis-roster-import-wake-v1').catch(()=>({queued:false,mode:'scheduled'}));return {result:{ok:true,data},backendMs:0};}catch(error){return {result:{ok:false,status:error.status||503,code:error.code,error:error.message},backendMs:0};}}
  if(edgeRosterEnabled(env)){
   const inbox=action==='rosterInbox',review=action==='rosterOperations'&&['deliveryReview','dismissDeliveryIssues','cancelPendingNotifications'].includes(input.operation);
   if(inbox||review){const started=Date.now();try{return {result:{ok:true,data:await (inbox?edgeInboxBackend(env,input,who):edgeDeliveryReviewBackend(env,input,who))},backendMs:Date.now()-started};}catch(error){return {result:{ok:false,status:error.status||503,code:error.code,error:error.status&&error.status<500?error.message:'The operation could not be confirmed.'},backendMs:Date.now()-started};}}
@@ -1224,11 +1224,13 @@ export async function dispatchNotifications(env,options={}){
  if(Date.now()-started>=budget-30000||summary.claimed>=500)summary.pending=true;
  return summary;
 }
-export async function enqueueNotificationWake(env){
+export async function dispatchRosterImports(env,options={}){assertRecoveryWritable(env);return runEdgeRosterImports(env,options);}
+export async function enqueueNotificationWake(env,purpose='gsis-notification-wake-v1'){
+ if(!['gsis-notification-wake-v1','gsis-roster-import-wake-v1'].includes(purpose))throw Error('Invalid wake purpose.');
  if(!env.NOTIFICATION_DISPATCH_URL)return {queued:false,mode:'scheduled'};
  const url=new URL(env.NOTIFICATION_DISPATCH_URL);if(url.protocol!=='https:'||url.username||url.password||url.search||url.hash||url.pathname!=='/dispatch')throw Error('Invalid notification dispatcher URL.');
  if(!configuredSecret(gsisApiSecret(env,'ROSTER_SERVICE_SECRET')))throw Error('Notification wake secret is not configured.');
- const body=await sign({purpose:'gsis-notification-wake-v1',timestamp:Date.now(),nonce:crypto.randomUUID()},gsisApiSecret(env,'ROSTER_SERVICE_SECRET'));
+ const body=await sign({purpose,timestamp:Date.now(),nonce:crypto.randomUUID()},gsisApiSecret(env,'ROSTER_SERVICE_SECRET'));
  const response=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body),redirect:'manual',signal:AbortSignal.timeout(8000)});
  if(!response.ok)throw Error('Notification wake could not be queued. The scheduled worker will recover the durable intent.');
  return {queued:true,mode:'immediate'};
