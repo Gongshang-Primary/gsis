@@ -91,3 +91,6 @@ Deploy-first needs a verified native Google backup/reverse cutover for all post-
 Use R1 plus R2 for tonight's go/no-go. Keep Deploy, Contacts, Calendar and Venues on their current Google sources. R2 supplies the immutable published Deploy document to D1 Roster through the existing signed Roster service, runs the existing `rosterReference` calculator, and caches the verified publication identity. Then take R6 and R7 in the revised owner order. R3-R5 remain conditional on time. Owner still decides merge and deployment.
 
 **Verdict: R2. Do not cut over Deploy first tonight.**
+
+## Defect found live (Claude, 3 Nov 2026 04:23)
+**Cancel freeze does not stop the server-driven import (#55).** After the owner cancelled the freeze at 04:23, the Worker kept advancing preparation (step 79 → 81), which makes Google read the whole Roster store each step and would compete with morning SMC saves. The owner had to Restart the import to abandon the session (job state `attention`). Fix (Codex, small): Cancel freeze abandons or pauses any server-driven import for that freeze and records why; edge-setup says so; test that no preparation step runs after a cancel.
