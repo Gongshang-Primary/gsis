@@ -468,6 +468,11 @@ var GSiSRosterImport=(()=>{
   await Promise.all([upload,pump]);const saved=await bucket.head(body.reference.key);if(!saved||saved.size!==body.gzipBytes||saved.customMetadata?.digest!==body.reference.digest)fail(503,'ROSTER_IMPORT_OBJECT','The immutable object assembly could not be verified.');return {verified:true,key:body.reference.key,bytes:body.gzipBytes,digest:body.reference.digest};
  }
 
+ async function pendingRollbackReset(db,actor){
+  await ensure(db);const c=typeof db.withSession==='function'?db.withSession('first-primary'):db;
+  if(!await c.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='gsis_roster_rollback_resets'").first())return null;
+  const row=await c.prepare(`SELECT r.request_id FROM gsis_roster_rollback_resets r WHERE r.actor=? AND EXISTS(SELECT 1 FROM gsis_roster_import_sessions s WHERE s.reset_request=r.request_id AND ${PENDING_CLEANUP}) ORDER BY r.created_at DESC LIMIT 1`).bind(actor).first();return row?.request_id||null;
+ }
  async function resetAfterRollback(db,{actor,requestId,legacyWritesDisabled}){
   identity(actor,'actor',320);identity(requestId,'rollback reset request');
   if(legacyWritesDisabled!==false)fail(409,'ROSTER_ROLLBACK_FENCED','Google must prove its D1 writer fence is lifted before reset.');
@@ -498,7 +503,7 @@ var GSiSRosterImport=(()=>{
  }
  async function latest(db){await ensure(db);return (await (typeof db.withSession==='function'?db.withSession('first-primary'):db).prepare(`SELECT s.session_id sessionId,s.actor,s.request_id requestId,s.state,s.source_digest sourceDigest,s.manifest_digest manifestDigest FROM gsis_roster_import_sessions s ORDER BY EXISTS(SELECT 1 FROM gsis_roster_import_locks l WHERE l.session_id=s.session_id) DESC,(${PENDING_CLEANUP}) DESC,s.created_at DESC,s.rowid DESC LIMIT 1`).first())||null;}
 
- return {objectJobs,prepareObject,prepareRecords,finishFreeze,freeze,validateManifest,utf8Length,open,ensure,latest,resetAfterRollback,hashText,hashBytes,stageObject,FORMAT,SCOPES,TARGET_BYTES,SEGMENT_BYTES,MAX_PART_BYTES,MAX_PARTS,MAX_MANIFEST_BYTES,MAX_TOTAL_BYTES,MAX_OBJECT_BYTES,MAX_RETAINED_SESSIONS,PREPARATION_LEASE_MS,MAX_PREPARATION_RESULT_BYTES};
+ return {objectJobs,prepareObject,prepareRecords,finishFreeze,freeze,validateManifest,utf8Length,open,ensure,latest,resetAfterRollback,pendingRollbackReset,hashText,hashBytes,stageObject,FORMAT,SCOPES,TARGET_BYTES,SEGMENT_BYTES,MAX_PART_BYTES,MAX_PARTS,MAX_MANIFEST_BYTES,MAX_TOTAL_BYTES,MAX_OBJECT_BYTES,MAX_RETAINED_SESSIONS,PREPARATION_LEASE_MS,MAX_PREPARATION_RESULT_BYTES};
 })();
 if(typeof module!=='undefined'&&module.exports)module.exports=GSiSRosterImport;
 

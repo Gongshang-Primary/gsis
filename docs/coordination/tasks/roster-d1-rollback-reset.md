@@ -3,7 +3,7 @@
 - Status: verifying
 - Owner/model: Codex
 - Reviewer/model: Claude
-- Last updated (Asia/Singapore): 2026-11-02 13:50
+- Last updated (Asia/Singapore): 2026-11-02, this session
 - Branch: codex/roster-d1-rollback-reset
 - Base SHA: 50ac0b1fe2bd2c73b5c4555969df4fdaf43ca318
 - Current head SHA: see PR head
@@ -29,3 +29,5 @@ Not deployed. No live authority or school records changed.
 Build R1, run checks, open draft PR, record exact head for Claude, then continue R2.
 
 Claim-only main update was rejected by automatic approval review. The claim is retained on this PR branch instead.
+
+Reload recovery returns the current Admin's pending reset request, including an import originally owned by a different Admin. Local shards ran every Node program and LORD. Four initial environment/load failures were rerun; the package check still needs the historical Git ancestry available in CI. CI verifies the pushed branch before its draft is opened.
