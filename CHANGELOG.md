@@ -1,3 +1,7 @@
+# Pending: R2 Google published Deploy source for D1 Roster, 2 November 2026
+
+Model: Codex. D1 Roster reads the immutable published Deploy document through its signed Google service while Deploy remains on Google. Both sources use the existing rosterReference calculator. D1 caches the publication by commit and revision, rechecks metadata after 30 seconds, and fails closed if verification fails. Personal calculations use the same source. No live authority or settings changed. See [R2 task](docs/coordination/tasks/roster-google-deploy-reference.md).
+
 # Pending: R1 D1 reset after manual rollback, 2 November 2026
 
 Model: Codex. Admin can reset retained D1 Roster heads only with explicit legacy Cloudflare authority and signed proof that Google is writable. One D1 transaction archives the exact old rows, receipts, heads and mirror evidence, resets both heads and invalidates backup work. Google capture cleanup remains recoverable under the same reset request. No live settings or records changed. See [R1 task](docs/coordination/tasks/roster-d1-rollback-reset.md).
