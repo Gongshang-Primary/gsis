@@ -12,7 +12,19 @@ Import a90c68d1 and parity passed; activation at 04:41 matched exactly (lease-or
 3. Google backup copies the full 13,561 items per generation and stalled at 465; "Update backup" on Pages ran out of memory and held a 7-minute lease.
 4. Emergency rollback 05:15-05:19: Cloudflare `ROSTER_EDGE_AUTHORITY=legacy` (3 places) and Apps Script property deleted with `edgeAuthorityRollbackToLegacy()`. D1 heads stay `active` (revision ~18), unused.
 
-## Queue, in order (one PR each, draft, CI green, Claude reviews exact head)
+## Reprioritised order (owner 2 Nov ~05:45)
+R0 (first hour, report by 10:00) → R1 → (R2-alt Deploy-first, or R2) → R6 → R7 → R3 → R4 → R5.
+
+### R0: Deploy-on-D1 readiness check (report, no product change; by 10:00)
+Assess moving Deploy to D1 first (it would satisfy Roster's designed path: `edgeDeployRosterReference` reads an active D1 `deploy` scope). Report in this record: (a) the Deploy import/activate/fence/pause/resume flow in `edge-deploy.js` `edgeDeployAdmin` and `public/edge-setup.js`, with test coverage; (b) the rollback path: is there a verified Google backup or switch-back for Deploy, and what happens to Deploy edits after activation; (c) every reader of Deploy from Google while Roster stays on Google (Roster Apps Script, Contacts, Calendar, LORD, Venues) and what freezes; (d) estimated import time; (e) gaps to close today. Verdict: Deploy-first (R2-alt) or R2.
+
+### R2-alt (if R0 says ready): Deploy cutover runbook support
+Close only the gaps R0 lists so Deploy can cut over at ~21:00 tonight, before Roster at 22:00. Roster's D1 path then reads the active D1 Deploy scope with no new adapter.
+
+### R7: server-driven import continuation and parallel staging
+A Worker (cron or queue) advances preparation and staging without the browser tab; staging commits 2-4 parts concurrently. The page only shows progress. Tests: import completes with no page polling; a stalled page never stalls the import.
+
+## Queue detail (one PR each, draft, CI green, Claude reviews exact head)
 ### R1 (P0): reset D1 after an emergency rollback
 `restart` refuses an `active` head ("An active, paused or changed authority cannot be reset"), so no new import is possible. Add an Admin operation in edge-setup ("Reset D1 after manual rollback") that proceeds only when Google proves the fence is lifted (`edgeFenceStatus.legacyWritesDisabled===false`) and Cloudflare authority is legacy, then retains evidence, sets both Roster heads to `legacy`, clears the mirror generation/outbox, and leaves an audit row. Tests: refuses while fenced; refuses with d1 env; succeeds and a new import can start.
 
