@@ -233,6 +233,10 @@ async function migrationCutoverStatus(env,proof,legacyWritesDisabled=false){
 export async function startEdgeRosterImport(env,input,who){return edgeRosterMigration(env,input,who,{enqueue:true});}
 export async function runEdgeRosterImports(env,options={}){return drainRosterImports(env.GSIS_JOBS,(input,who)=>edgeRosterMigration(env,input,who,{parallelParts:true}),options);}
 export async function edgeRosterMigration(env,input,who,internal={}){const adminProof=await signedBridge(env,{operation:'edgeReferences'},who);if(adminProof.adminVerified!==true)fail(403,'ROSTER_ADMIN_REQUIRED','Admin access is required for migration controls.');const operation=input.operation;
+ if(operation==='archiveImports'){
+  if(Object.keys(input).some(key=>key!=='operation'))fail(400,'ROSTER_IMPORT_ARCHIVE_INPUT','The server selects only eligible abandoned sessions for archival.');
+  return GSiSRosterImport.archiveRetained(database(env),env.ROSTER_TIMETABLE_SNAPSHOTS,{maxSteps:12,budgetMs:8000});
+ }
  if(operation==='resetAfterRollback'){
   if(env.ROSTER_EDGE_AUTHORITY!=='legacy')fail(409,'ROSTER_ROLLBACK_AUTHORITY','Set Cloudflare Roster authority to legacy after manual rollback before resetting D1.');
   validRequest(input.requestId);const proof=await signedBridge(env,{operation:'edgeFenceStatus'}),reset=await GSiSRosterImport.resetAfterRollback(database(env),{actor:who.email,requestId:input.requestId,legacyWritesDisabled:proof.legacyWritesDisabled});
@@ -266,6 +270,9 @@ export async function edgeRosterMigration(env,input,who,internal={}){const admin
   validRequest(input.requestId);if(Object.keys(input).some(key=>!['operation','requestId','sessionId'].includes(key)))fail(400,'ROSTER_IMPORT_INPUT','The server selects the next import part.');
   const heads=await migrationHeads(env);if(heads.some(head=>['active','paused'].includes(head.mode)))fail(409,'ROSTER_IMPORT_STATE','An active or paused authority cannot prepare another import.');
   const binding={actor:who.email,requestId:input.requestId,sessionId:sha256Hex(JSON.stringify([who.email,input.requestId]))};if(input.sessionId!==undefined&&input.sessionId!==binding.sessionId)fail(409,'ROSTER_IMPORT_ID','The session belongs to another request or actor.');
+  // Automatic maintenance copies only abandoned sessions. A failed R2 write
+  // never removes evidence or changes the admitted import's outcome.
+  try{await GSiSRosterImport.archiveRetained(database(env),env.ROSTER_TIMETABLE_SNAPSHOTS,{maxSteps:2,budgetMs:2500});}catch{console.warn(JSON.stringify({code:'ROSTER_IMPORT_ARCHIVE_PENDING'}));}
   const store=GSiSRosterImport.open(database(env),binding);let progress=await store.reserve();if(progress.requiresRestart)return progress;
   if(internal.enqueue)return {...progress,serverDriven:true,serverImport:await queueRosterImport(database(env),binding,who)};
   if(progress.next==='prepare'){

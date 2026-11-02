@@ -168,7 +168,7 @@ function rosterEdgeExportManifestLegacy_(req){
  const binding=rosterEdgeExportBinding_(req),script=LockService.getScriptLock();if(!deployLock_(script,8000))error_(503,'A Roster save is finishing. Retry the same import.');let user,snapshot,descriptor,created=false;
  try{
   descriptor=rosterEdgeExportDescriptor_(binding);if(!descriptor){
-  if(Object.keys(props_().getProperties()).filter(key=>key.startsWith('ROSTER_EDGE_EXPORT:')).length>=GSiSRosterImport.MAX_RETAINED_SESSIONS)error_(409,'Preparation has eight retained sessions. Reviewed archival and cleanup are required before a new capture; existing sessions remain resumable.');
+  if(Object.keys(props_().getProperties()).filter(key=>key.startsWith('ROSTER_EDGE_EXPORT:')).length>=GSiSRosterImport.MAX_RETAINED_SESSIONS)error_(409,'Preparation has 24 retained sessions. Reviewed archival and cleanup are required before a new capture; existing sessions remain resumable.');
   rosterEdgeAssertLegacyWrite_(true);user=typeof rosterNotificationLock_==='function'?rosterNotificationLock_():LockService.getUserLock();if(!deployLock_(user,8000))error_(503,'Notification delivery is finishing. Retry the same import.');
   descriptor={...binding,state:'preparing',sourceDigest:null,createdAt:Date.now(),leaseUntil:Date.now()+600000,name:'Roster immutable import '+binding.sessionId+'.bin'};rosterEdgeExportSave_(descriptor);created=true;
   snapshot=rosterEdgeSnapshot_();rosterEdgeRememberSnapshotParts_(snapshot);descriptor.sourceDigest=snapshot.sourceDigest;rosterEdgeExportSave_(descriptor);
@@ -281,7 +281,7 @@ function rosterEdgeExportCaptureV2_(binding){
  try{
   descriptor=rosterEdgeExportDescriptor_(binding);if(descriptor)return descriptor;
   const retained=new Set(Object.keys(props_().getProperties()).filter(key=>key.startsWith('ROSTER_EDGE_EXPORT:')||key.startsWith('ROSTER_EDGE_EXPORT_ABANDONED:')).map(key=>key.slice(key.indexOf(':')+1)));
-  if(retained.size>=GSiSRosterImport.MAX_RETAINED_SESSIONS)error_(409,'Preparation has eight retained sessions. Reviewed archival and cleanup are required before a new capture; existing sessions remain resumable.');
+  if(retained.size>=GSiSRosterImport.MAX_RETAINED_SESSIONS)error_(409,'Preparation has 24 retained sessions. Reviewed archival and cleanup are required before a new capture; existing sessions remain resumable.');
   rosterEdgeAssertLegacyWrite_(true);user=typeof rosterNotificationLock_==='function'?rosterNotificationLock_():LockService.getUserLock();if(!deployLock_(user,8000))error_(503,'Notification delivery is finishing. Retry the same import.');
   descriptor={schema:2,...binding,state:'capturing',createdAt:Date.now(),stepStartedAt:Date.now(),sourceName:'Roster import '+binding.sessionId+' source.json'};rosterEdgeExportPhaseV2_(descriptor,'Capture snapshot');
   const snapshot=rosterEdgeSnapshot_();rosterEdgeRememberSnapshotParts_(snapshot);envelope={schema:ROSTER_EXPORT_V2,...binding,sourceDigest:snapshot.sourceDigest,snapshot};
