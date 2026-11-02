@@ -11,6 +11,8 @@ const require=createRequire(import.meta.url),database=require('./helpers/chunked
 const env={GSIS_JOBS:db,APPS_SCRIPT_URL:'https://script.google.com/macros/s/freeze-fixture/exec',ROSTER_PUBLIC_ORIGIN:'https://roster.gsps.edu.sg',ROSTER_SERVICE_SECRET:'s'.repeat(40),WHATSAPP_ENABLED:'false'},who={email:'alice@gsps.edu.sg',subject:'alice'},id=crypto.randomUUID(),date='2026-11-02';
 const command={operation:'saveAbsence',requestId:crypto.randomUUID(),intake:true,revision:0,date,staffId:'alice',typeId:'mc',fullDay:true,reliefRequired:false,receiptOnly:true};
 const realFetch=globalThis.fetch;let network=0;
+// The dated report fixture must remain current when this test runs after midnight.
+const realNow=Date.now;Date.now=()=>Date.parse('2026-11-02T00:00:00Z');
 try{
  globalThis.fetch=()=>{network++;throw Error('frozen jobs must not call Google or a provider');};
  const held=await beginRosterCutoverFreeze(env,{requestId:id});
@@ -29,4 +31,4 @@ try{
  const first=await dispatchAbsenceTransport(activeEnv,{capture}),second=await dispatchAbsenceTransport(activeEnv,{capture});assert.equal(first.forwarded,1);assert.equal(second.claimed,0);assert.equal(forwarded,1);
  assert.equal((await GSiSEdgeStore.open(db,'roster').load()).state.absences.length,1,'retained report applies to D1 exactly once');assert.equal(db.sql.prepare('SELECT state FROM gsis_absence_transport').get().state,'forwarded');
  assert.equal((await readRosterCutoverFreeze(env)).active,false);assert.equal(network,0);console.log('PASS frozen cron/queue skip, retained capture, retry wake and exactly-once D1 report drain after activation');
-}finally{globalThis.fetch=realFetch;db.sql.close();}
+}finally{Date.now=realNow;globalThis.fetch=realFetch;db.sql.close();}

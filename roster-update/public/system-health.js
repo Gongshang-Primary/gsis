@@ -60,7 +60,7 @@ function showBacklog(snapshot){
  const box=$('backlog');box.replaceChildren();
  const audit=rows(snapshot.jobs).find(row=>row.job==='audit-export');
  if(audit&&number(audit.counts?.pending)!==null){
-  box.append(element('p','Pending daily audit exports at last check: '+audit.counts.pending+'.'),element('p','Checked '+date(audit.eventAt)+'. One pending day is exported per five-minute audit invocation.','muted'));
+  box.append(element('p','Pending daily audit exports at last check: '+audit.counts.pending+'.'),element('p','Checked '+date(audit.eventAt)+'. Up to three pending days are exported per five-minute audit invocation. Quiet mode pauses export.','muted'));
   const reason={AUDIT_LOGGING_DISABLED:'Verbose logging is off; optional audit exports are paused.',AUDIT_EXPORT_BUSY:'Audit export is waiting for its lock and will retry.',AUDIT_NOTIFICATION_PRIORITY:'Audit export yielded to pending notifications and will retry.',AUDIT_EXPORT_PENDING:'An audit export could not be confirmed and will retry.'}[audit.code];if(reason)box.append(element('p',reason,'muted'));
  }else box.append(element('p','Daily allocation audit export status is unavailable. Check that the five-minute audit trigger is installed.','muted'));
 

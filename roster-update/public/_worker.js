@@ -1240,11 +1240,12 @@ export async function dispatchAllocationAudit(env){
  const result=await serviceBackend(env,{operation:'allocationAuditExport',limit:1});
  if(!result.ok)throw Object.assign(Error('Allocation audit export could not be confirmed.'),safeHealthError(result),{status:result.status,operation:'allocationAuditExport'});
  const data=result.data;
- if(!data||!Array.isArray(data.exported)||!Array.isArray(data.failures)||!Number.isSafeInteger(data.pending)||data.pending<0)throw Object.assign(Error('Invalid allocation audit status.'),{code:'INVALID_RESPONSE',operation:'allocationAuditExport'});
+ const exported=Array.isArray(data?.exported)?data.exported:Number.isSafeInteger(data?.exported)&&data.exported>=0&&Array.isArray(data.exports)&&data.exported===data.exports.length?data.exports:null;
+ if(!exported||!Array.isArray(data.failures)||!Number.isSafeInteger(data.pending)||data.pending<0)throw Object.assign(Error('Invalid allocation audit status.'),{code:'INVALID_RESPONSE',operation:'allocationAuditExport'});
  // Only operational counters cross into health/logs; never persist dates,
  // file identifiers, staff facts or provider/backend error text here.
- const failed=data.failures.length,code=data.disabled?'AUDIT_LOGGING_DISABLED':data.busy?'AUDIT_EXPORT_BUSY':data.deferred==='notification-priority'?'AUDIT_NOTIFICATION_PRIORITY':undefined;
- return {exported:data.exported.length,pending:data.pending,failed,enabled:data.disabled!==true,...(code?{skipped:true,code}:{}),...(failed?{failure:{code:'AUDIT_EXPORT_PENDING',operation:'allocationAuditExport'}}:{})};
+ const failed=data.failures.length,code=data.disabled?'AUDIT_LOGGING_DISABLED':data.busy?'AUDIT_EXPORT_BUSY':data.deferred==='notification-priority'?'AUDIT_NOTIFICATION_PRIORITY':Number.isSafeInteger(data.deferred)&&data.deferred>0?'AUDIT_EXPORT_PENDING':undefined;
+ return {exported:exported.length,pending:data.pending,failed,enabled:data.disabled!==true,...(code?{skipped:true,code}:{}),...(failed?{failure:{code:'AUDIT_EXPORT_PENDING',operation:'allocationAuditExport'}}:{})};
 }
 
 export function menuReply(reply,env){
