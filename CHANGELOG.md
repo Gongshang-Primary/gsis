@@ -1,3 +1,7 @@
+# Pending: cancel freeze stops its server import, 3 November 2026
+
+Model: Codex. Confirmed Cancel freeze atomically stops the unfinished server import, records why and invalidates its preparation and staging claims. Late responses cannot advance it. Source snapshots, checkpoints, staged rows and receipts stay retained for explicit restart. Edge setup shows "Import stopped because the freeze was cancelled". No authority or live configuration change. See [the task](docs/coordination/tasks/roster-cancel-freeze-import.md).
+
 # Pending: quiet-mode allocation audit catch-up, 3 November 2026
 
 Model: Codex. The dedicated audit lane catches up retained daily exports in oldest-first batches, up to three calls with a 20-second budget for starting further work. A renewed quiet session, notification priority, contention or failure leaves work pending. D1 export status now reaches the shared dispatcher with an accurate backlog count and concurrent-change protection. Saved SMC decision facts and original timestamps stay in the existing authoritative records and immutable archives. See [the task](docs/coordination/tasks/roster-quiet-mode-log-catchup.md). Draft review only; merge held until after the cutover and owner release. Not deployed.
