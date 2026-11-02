@@ -37,3 +37,10 @@ Report Absence lets any signed-in teacher submit for one or more colleagues (e.g
 1. Should SMC approve on-behalf reports before relief is allocated, or treat them like self-reports?
 2. May the absent teacher's own later report override or withdraw an on-behalf report?
 3. Which channels notify the absent teacher: WhatsApp, email, or both?
+
+## WhatsApp template submitted (2 Nov 2026, owner approved wording)
+- Name `gsis_absence_on_behalf_v1`, en_GB, UTILITY, template id 1110444688418734, Messaging Account Gongshang Primary. Review status at submission: PENDING.
+- Body: "*Absence Reported For You* / Hi {{1}}, {{2}} has reported on your behalf that you will be absent on {{3}}: {{4}}. / Please approve or deny using the button below. No relief is arranged until you approve. / Thank you."
+- Positional values: {{1}} recipient (absent teacher), {{2}} submitting teacher, {{3}} date, {{4}} periods and absence type.
+- Button: URL "Approve or deny" → `https://roster.gsps.edu.sg/external.html#{{1}}` (button {{1}} = private capability token from `externalUrl`, not the full URL). Owner rule: link behind the button, never in the body.
+- Register it in the template registry as `absence_on_behalf_request` with `enabled:false` until review is APPROVED.
