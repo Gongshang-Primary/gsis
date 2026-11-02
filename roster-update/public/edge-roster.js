@@ -230,6 +230,16 @@ async function migrationCutoverStatus(env,proof,legacyWritesDisabled=false){
  return {...held,supported};
 }
 export async function edgeRosterMigration(env,input,who){const adminProof=await signedBridge(env,{operation:'edgeReferences'},who);if(adminProof.adminVerified!==true)fail(403,'ROSTER_ADMIN_REQUIRED','Admin access is required for migration controls.');const operation=input.operation;
+ if(operation==='resetAfterRollback'){
+  if(env.ROSTER_EDGE_AUTHORITY!=='legacy')fail(409,'ROSTER_ROLLBACK_AUTHORITY','Set Cloudflare Roster authority to legacy after manual rollback before resetting D1.');
+  validRequest(input.requestId);const proof=await signedBridge(env,{operation:'edgeFenceStatus'}),reset=await GSiSRosterImport.resetAfterRollback(database(env),{actor:who.email,requestId:input.requestId,legacyWritesDisabled:proof.legacyWritesDisabled});
+  for(const binding of reset.sessions){const store=GSiSRosterImport.open(database(env),binding),progress=await store.progress();if(!progress.cleanupPending)continue;
+   const abandoned=await signedBridge(env,{operation:'edgeExportAbandon',requestId:binding.requestId,sessionId:binding.sessionId,importActor:binding.actor,resetRequestId:input.requestId},who);
+   if(abandoned.adminVerified!==true||abandoned.abandoned!==true||abandoned.sessionId!==binding.sessionId||abandoned.resetRequestId!==input.requestId)fail(409,'ROSTER_IMPORT_CLEANUP_PENDING','Reset evidence is retained. Retry this same reset to confirm Google preparation cleanup.');
+   await store.recordRestartCleanup(input.requestId);
+  }
+  return {...reset,scopes:await migrationHeads(env),canResetAfterRollback:false};
+ }
  if(['freeze','cancelFreeze'].includes(operation)){
   if(adminProof.cutoverFreeze?.available!==true)fail(503,'ROSTER_CUTOVER_BACKEND','Install the matched Roster backend before using cutover freeze.');
   if(adminProof.legacyWritesDisabled===true)fail(409,'ROSTER_CUTOVER_ALREADY_FENCED','Google is already fenced for D1. Check status and finish or recover activation; do not cancel the writer fence.');
@@ -239,7 +249,7 @@ export async function edgeRosterMigration(env,input,who){const adminProof=await 
  }
  if(operation==='mirror')return mirrorEdgeRoster(env);
  if(operation==='release')return releaseRosterMirror(env,{requestId:input.requestId,bridge:p=>signedBridge(env,p),quiescent:()=>rosterMirrorQuiescent(env)});
- if(operation==='status'){const googleBackup=await readRosterMirrorStatus(env),scopes=await migrationHeads(env,true),retained=await GSiSRosterImport.latest(database(env)),importSession=retained?await GSiSRosterImport.open(database(env),retained).progress():null;if(importSession&&!importSession.sourceDigest)importSession.sourceDigest=await migrationImportDigest(GSiSRosterImport.open(database(env),retained),importSession);return {scopes,importSession,googleBackup,cutoverFreeze:await migrationCutoverStatus(env,adminProof.cutoverFreeze,adminProof.legacyWritesDisabled===true),canResume:retained?.actor===who.email};}
+ if(operation==='status'){const googleBackup=await readRosterMirrorStatus(env),scopes=await migrationHeads(env,true),retained=await GSiSRosterImport.latest(database(env)),importSession=retained?await GSiSRosterImport.open(database(env),retained).progress():null;if(importSession&&!importSession.sourceDigest)importSession.sourceDigest=await migrationImportDigest(GSiSRosterImport.open(database(env),retained),importSession);const rollbackResetRequestId=await GSiSRosterImport.pendingRollbackReset(database(env),who.email);return {scopes,importSession,googleBackup,rollbackResetRequestId,canResetAfterRollback:env.ROSTER_EDGE_AUTHORITY==='legacy'&&adminProof.legacyWritesDisabled===false&&(scopes.filter(h=>['roster','roster-register'].includes(h.scope)).length===2&&scopes.filter(h=>['roster','roster-register'].includes(h.scope)).every(h=>['active','paused'].includes(h.mode))||!!rollbackResetRequestId),cutoverFreeze:await migrationCutoverStatus(env,adminProof.cutoverFreeze,adminProof.legacyWritesDisabled===true),canResume:retained?.actor===who.email};}
  if(operation==='drift'){
   if(Object.keys(input).some(key=>!['operation','importRequestId','sessionId'].includes(key)))fail(400,'ROSTER_DRIFT_INPUT','The retained import selects the snapshot digest.');
   const store=await migrationRetainedImport(env,input,who),progress=store?await store.progress():null,sourceDigest=store?await migrationImportDigest(store,progress):null;

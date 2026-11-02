@@ -53,13 +53,16 @@ function rosterEdgeSnapshot_(){
  const state=rosterOperationsState_(true),transport=typeof rosterNotificationState_==='function'?rosterNotificationState_():null,index=rosterIndex_();
  if(transport){rosterNotificationOverlayWith_(state,transport);state.notificationTransport={};for(const key of ['cooldownUntil','cooldowns','leases','readyBatches','unmatchedReceipts','senderPacing','providerBackoff','retryAfter'])if(transport[key]!==undefined)state.notificationTransport[key]=transport[key];state.peerMail=transport.peerMail||[];state.deliveryEvents=transport.deliveryEvents||state.deliveryEvents;}
  if(typeof rosterInboxState_==='function'){const inbox=rosterInboxState_();state.inbox={schema:inbox.schema,revision:inbox.revision};for(const key of ['threads','messages','audit','receipts','deliveryEvents','alerts'])state['inbox'+key.charAt(0).toUpperCase()+key.slice(1)]=inbox[key]||[];}
- const properties=props_().getProperties();state.edgeStaplerLeases={};for(const key of Object.keys(properties))if(key.startsWith('ROSTER_STAPLER_LEASE:')){const date=key.slice('ROSTER_STAPLER_LEASE:'.length);try{state.edgeStaplerLeases[date]=JSON.parse(properties[key]);}catch(error){error_(503,'A dated planning lease is malformed. Repair it before migration.');}}
+ const properties=props_().getProperties();state.edgeStaplerLeases={};// Sort: getProperties() order is not stable between executions; the digest must not depend on it.
+ for(const key of Object.keys(properties).sort())if(key.startsWith('ROSTER_STAPLER_LEASE:')){const date=key.slice('ROSTER_STAPLER_LEASE:'.length);try{state.edgeStaplerLeases[date]=JSON.parse(properties[key]);}catch(error){error_(503,'A dated planning lease is malformed. Repair it before migration.');}}
  if(typeof rosterAbsenceIntakePending_==='function'){const pending=rosterAbsenceIntakePending_();if(pending?.blockedDates?.length)error_(409,'Finish the captured absence queue before exporting Roster authority. Unresolved report dates: '+pending.blockedDates.join(', ')+'. Resolve them in Manage school-wide absences.');}
  // Include all mutable writer domains, not merely the relief document counter.
  // Hash and freeze the stored view: serializing lazy facades expands every
  // historical plan and audit payload before the first upload can begin.
  const value={schema:1,state:typeof rosterOperationsStoredView_==='function'?rosterOperationsStoredView_(state):state,index};return {...value,sourceDigest:rosterOperationsDigest_(value)};
 }
+// Short-lived metadata (3-minute editor leases) that activation may tolerate when nothing else changed.
+const ROSTER_EDGE_EPHEMERAL_PARTS_=['edgeStaplerLeases'];
 function rosterEdgeSnapshotParts_(snapshot){
  const parts={};for(const key of Object.keys(snapshot.state))parts[key]=rosterOperationsDigest_(snapshot.state[key]).slice(0,16);parts.index=rosterOperationsDigest_(snapshot.index).slice(0,16);return parts;
 }
@@ -93,9 +96,13 @@ function rosterEdgeMigrationDispatch_(req,c){
  if(op==='edgeModel'){/* 0.9.9a: uploaded model files are immutable and each upload has a new ID; read the register only. Activation still re-checks the exact source digest under the writer fence. */if(typeof p.modelFile!=='string'||!p.modelFile)error_(400,'Reload the Roster import page and import again.');const entry=rosterIndex_().entries.find(row=>row.id===p.id);if(!entry)error_(404,'Baseline model not found.');if(entry.modelFile!==p.modelFile)error_(409,'A timetable model changed during import. Import again.');return {handled:true,result:{id:entry.id,model:rosterModel_(entry)}};}
  const script=LockService.getScriptLock();if(!deployLock_(script,8000))error_(503,'A Roster save is finishing. Retry migration.');let user;
  try{user=typeof rosterNotificationLock_==='function'?rosterNotificationLock_():LockService.getUserLock();if(!deployLock_(user,8000))error_(503,'Notification delivery is finishing. Retry migration.');const snapshot=rosterEdgeSnapshot_();if(op==='edgeExport'){rosterEdgeRememberSnapshotParts_(snapshot);if(typeof rosterAllocationAuditUnpack_==='function')rosterAllocationAuditUnpack_(snapshot.state);if(typeof rosterOperationsUnpackPlans_==='function')rosterOperationsUnpackPlans_(snapshot.state);return {handled:true,result:{...snapshot,adminVerified:true}};}
-  if(typeof p.sourceDigest!=='string'||p.sourceDigest!==snapshot.sourceDigest){const changed=rosterEdgeChangedParts_(snapshot,p.sourceDigest);error_(409,'The imported snapshot is no longer current. Legacy writers remain enabled; migrate the latest source before cutover.'+(changed?.length?' Changed since the snapshot: '+changed.join(', ')+'.':''));}
-  props_().setProperties({ROSTER_EDGE_AUTHORITY:'d1',ROSTER_EDGE_SOURCE_DIGEST:snapshot.sourceDigest,ROSTER_EDGE_FENCED_AT:new Date().toISOString()});
-  return {handled:true,result:{legacyWritesDisabled:true,sourceDigest:snapshot.sourceDigest,adminVerified:true,cutoverFreeze:rosterCutoverStatus_()}};
+  // Owner ruling 2 Nov 2026: only short-lived editing locks may differ. Every other part must
+  // match the imported snapshot's stored per-part fingerprints; without them the full digest decides.
+  let tolerated=[];
+  if(typeof p.sourceDigest!=='string'||!/^[a-f0-9]{64}$/.test(p.sourceDigest))error_(409,'The imported snapshot is no longer current. Legacy writers remain enabled; migrate the latest source before cutover.');
+  if(p.sourceDigest!==snapshot.sourceDigest){const changed=rosterEdgeChangedParts_(snapshot,p.sourceDigest);if(!(Array.isArray(changed)&&changed.length&&changed.every(part=>ROSTER_EDGE_EPHEMERAL_PARTS_.includes(part))))error_(409,'The imported snapshot is no longer current. Legacy writers remain enabled; migrate the latest source before cutover.'+(changed?.length?' Changed since the snapshot: '+changed.join(', ')+'.':''));tolerated=changed;}
+  props_().setProperties({ROSTER_EDGE_AUTHORITY:'d1',ROSTER_EDGE_SOURCE_DIGEST:p.sourceDigest,ROSTER_EDGE_FENCED_AT:new Date().toISOString(),...(tolerated.length?{ROSTER_EDGE_FENCE_TOLERATED:JSON.stringify({parts:tolerated,currentDigest:snapshot.sourceDigest,at:new Date().toISOString()})}:{})});
+  return {handled:true,result:{legacyWritesDisabled:true,sourceDigest:p.sourceDigest,toleratedParts:tolerated,adminVerified:true,cutoverFreeze:rosterCutoverStatus_()}};
  }finally{if(user)deployUnlock_(user);deployUnlock_(script);}
 }
 function rosterEdgeServiceMigrationDispatch_(req){
@@ -347,7 +354,11 @@ function rosterEdgeExportPart_(req){
  GSiSRosterImport.validateManifest(checkpoint.manifest);const part=checkpoint.manifest.parts.find(p=>p.id===req.input.partId),file=part&&checkpoint.partFiles[part.id];if(!part||!file||file.digest!==part.digest||file.bytes!==part.bytes)error_(404,'The immutable export part is not in this session.');const payload=rosterEdgeExportPrivateText_(file,GSiSRosterImport.MAX_PART_BYTES);if(Utilities.newBlob(payload).getBytes().length!==part.bytes)error_(503,'The immutable export part length changed.');return {adminVerified:true,sessionId:binding.sessionId,manifestDigest:checkpoint.manifestDigest,partId:part.id,payload};
 }
 function rosterEdgeExportAbandon_(req){
- const binding=rosterEdgeExportBindingV2_(req),resetRequestId=req.input.resetRequestId;if(typeof resetRequestId!=='string'||!resetRequestId||resetRequestId.length>200)error_(400,'A stable restart request ID is required.');
+ // Migration dispatch verified the current Admin. An emergency rollback may
+ // have been imported by another Admin; retain that original capture identity.
+ const input={...req.input},importActor=input.importActor;delete input.importActor;
+ if(importActor!==undefined&&(typeof importActor!=='string'||!/^\S+@\S+\.\S+$/.test(importActor)||importActor.length>320))error_(400,'Use the retained import actor.');
+ const binding=rosterEdgeExportBindingV2_({...req,input,identity:importActor?{...req.identity,email:importActor}:req.identity}),resetRequestId=input.resetRequestId;if(typeof resetRequestId!=='string'||!resetRequestId||resetRequestId.length>200)error_(400,'A stable restart request ID is required.');
  const prior=rosterEdgeExportAbandoned_(binding);if(prior){if(prior.resetRequestId!==resetRequestId)error_(409,'This preparation was already abandoned by another restart.');return {adminVerified:true,sessionId:binding.sessionId,abandoned:true,resetRequestId};}
  const descriptor=rosterEdgeExportDescriptor_(binding);const tombstone={schema:2,...binding,resetRequestId,abandonedAt:Date.now(),descriptor:descriptor||null};const raw=JSON.stringify(tombstone);if(Utilities.newBlob(raw).getBytes().length>8500)error_(503,'The retained preparation evidence exceeds its property bound.');
  props_().setProperty('ROSTER_EDGE_EXPORT_ABANDONED:'+binding.sessionId,raw);props_().deleteProperty('ROSTER_EDGE_EXPORT:'+binding.sessionId);return {adminVerified:true,sessionId:binding.sessionId,abandoned:true,resetRequestId};

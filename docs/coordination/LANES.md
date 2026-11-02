@@ -43,6 +43,7 @@ Owner 1 Nov 2026 08:05: "allocate any left PR to codex". All open work goes to C
 
 | # | Job | Lane | Model | Status |
 |---|---|---|---|---|
+| 0 | **Attempt 3 blockers (tonight 22:00): R1 reset after rollback, R2 Deploy-from-Google, R3 backup, R4 smoke test, R5 review #49/#50** `tasks/roster-d1-cutover-attempt3.md` | R | Codex | **Top priority**, owner 2 Nov 05:22; merge by 17:00 |
 | 1 | G: cutover diagnostics `tasks/roster-cutover-diagnostics.md` | R | Codex | Merged #45; shipped in v0.9.9g |
 | 2 | #38 inactive Contacts staff (1B) | R | Codex | Reviewed, no blockers; merge held until after Monday's first busy period on D1 |
 | 3 | #40 weekly R snapshot plus FAJT levelling (3B) | R | Codex | CI green; Claude full review pending; held |
