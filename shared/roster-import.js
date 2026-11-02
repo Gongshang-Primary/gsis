@@ -258,8 +258,41 @@ var GSiSRosterImport=(()=>{
   await Promise.all([upload,pump]);const saved=await bucket.head(body.reference.key);if(!saved||saved.size!==body.gzipBytes||saved.customMetadata?.digest!==body.reference.digest)fail(503,'ROSTER_IMPORT_OBJECT','The immutable object assembly could not be verified.');return {verified:true,key:body.reference.key,bytes:body.gzipBytes,digest:body.reference.digest};
  }
 
+ async function pendingRollbackReset(db,actor){
+  await ensure(db);const c=typeof db.withSession==='function'?db.withSession('first-primary'):db;
+  if(!await c.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='gsis_roster_rollback_resets'").first())return null;
+  const row=await c.prepare(`SELECT r.request_id FROM gsis_roster_rollback_resets r WHERE r.actor=? AND EXISTS(SELECT 1 FROM gsis_roster_import_sessions s WHERE s.reset_request=r.request_id AND ${PENDING_CLEANUP}) ORDER BY r.created_at DESC LIMIT 1`).bind(actor).first();return row?.request_id||null;
+ }
+ async function resetAfterRollback(db,{actor,requestId,legacyWritesDisabled}){
+  identity(actor,'actor',320);identity(requestId,'rollback reset request');
+  if(legacyWritesDisabled!==false)fail(409,'ROSTER_ROLLBACK_FENCED','Google must prove its D1 writer fence is lifted before reset.');
+  await ensure(db);const c=typeof db.withSession==='function'?db.withSession('first-primary'):db;
+  checked(await c.batch([
+   c.prepare('CREATE TABLE IF NOT EXISTS gsis_roster_rollback_resets (actor TEXT NOT NULL,request_id TEXT NOT NULL,write_token TEXT NOT NULL,proof_json TEXT NOT NULL,created_at INTEGER NOT NULL,PRIMARY KEY(actor,request_id))'),
+   c.prepare('CREATE TABLE IF NOT EXISTS gsis_roster_rollback_evidence (actor TEXT NOT NULL,request_id TEXT NOT NULL,source_table TEXT NOT NULL,scope TEXT NOT NULL,record_key TEXT NOT NULL,row_json TEXT NOT NULL,PRIMARY KEY(actor,request_id,source_table,record_key))')
+  ]));
+  const prior=()=>c.prepare('SELECT * FROM gsis_roster_rollback_resets WHERE actor=? AND request_id=?').bind(actor,requestId).first();
+  const result=async replayed=>({reset:true,recordsRetained:true,replayed,requestId,sessions:(await c.prepare("SELECT session_id sessionId,actor,request_id requestId FROM gsis_roster_import_sessions WHERE state='abandoned' AND reset_request=?").bind(requestId).all()).results});
+  if(await prior())return result(true);
+  const heads=(await c.prepare("SELECT scope,revision,mode FROM gsis_edge_heads WHERE scope IN ('roster','roster-register') ORDER BY scope").all()).results;
+  if(heads.length!==2||heads.some(h=>!['active','paused'].includes(h.mode)))fail(409,'ROSTER_ROLLBACK_STATE','Reset requires both retained Roster heads to be active or paused after manual rollback.');
+  const now=Date.now(),token=crypto.randomUUID(),guard='EXISTS(SELECT 1 FROM gsis_roster_rollback_resets WHERE actor=? AND request_id=? AND write_token=?)',args=[actor,requestId,token];
+  const statements=[c.prepare('INSERT INTO gsis_roster_rollback_resets(actor,request_id,write_token,proof_json,created_at) SELECT ?,?,?,?,? WHERE (SELECT COUNT(*) FROM gsis_edge_heads WHERE (scope=? AND revision=? AND mode=?) OR (scope=? AND revision=? AND mode=?))=2').bind(actor,requestId,token,JSON.stringify({operation:'resetAfterRollback',legacyWritesDisabled:false,authority:'legacy',heads}),now,...heads.flatMap(h=>[h.scope,h.revision,h.mode]))];
+  // Copy rows inside the same transaction. Never materialize the school history
+  // in Pages memory, and retain the exact stored JSON and provider uncertainty.
+  for(const table of ['gsis_edge_heads','gsis_edge_records','gsis_edge_receipts','gsis_edge_transitions','gsis_roster_import_sessions','gsis_roster_mirror_control','gsis_roster_mirror_generations','gsis_roster_mirror_outbox']){
+   const columns=(await c.prepare('PRAGMA table_info('+table+')').all()).results.map(row=>row.name),scoped=columns.includes('scope');
+   const json=columns.flatMap(name=>["'"+name+"'",name]).join(',');
+   statements.push(c.prepare('INSERT INTO gsis_roster_rollback_evidence(actor,request_id,source_table,scope,record_key,row_json) SELECT ?,?,?, '+(scoped?'scope':"''")+',CAST(rowid AS TEXT),json_object('+json+') FROM '+table+' WHERE '+(scoped?"scope IN ('roster','roster-register') AND ":'')+guard).bind(actor,requestId,table,...args));
+  }
+  statements.push(c.prepare("UPDATE gsis_roster_import_sessions SET state='abandoned',reset_request=?,write_token=?,updated_at=? WHERE session_id IN (SELECT session_id FROM gsis_roster_import_locks) AND "+guard).bind(requestId,token,now,...args),c.prepare("UPDATE gsis_roster_import_preparation SET claim_token='',lease_until=0 WHERE session_id IN (SELECT session_id FROM gsis_roster_import_sessions WHERE reset_request=?) AND "+guard).bind(requestId,...args));
+  for(const table of ['gsis_edge_records','gsis_edge_receipts','gsis_edge_transitions','gsis_roster_import_locks'])statements.push(c.prepare('DELETE FROM '+table+" WHERE scope IN ('roster','roster-register') AND "+guard).bind(...args));
+  statements.push(c.prepare("UPDATE gsis_edge_heads SET revision=0,mode='legacy',source_digest='',imported_records=0,metadata_json='{}',write_token=?,updated_at=? WHERE scope IN ('roster','roster-register') AND "+guard).bind(token,now,...args),c.prepare("UPDATE gsis_roster_mirror_generations SET state='superseded',lease_token='',lease_until=0 WHERE state='captured' AND "+guard).bind(...args),c.prepare('DELETE FROM gsis_roster_mirror_outbox WHERE '+guard).bind(...args),c.prepare("UPDATE gsis_roster_mirror_control SET epoch=epoch+1,phase='normal',release_request='',transport_revision=0,updated_at=? WHERE id=1 AND "+guard).bind(now,...args));
+  try{checked(await c.batch(statements));}catch(error){if(await prior())return result(true);throw error;}
+  if(!await prior())fail(409,'ROSTER_ROLLBACK_CHANGED','Roster changed before reset. Check the current authority and retry.');return result(false);
+ }
  async function latest(db){await ensure(db);return (await (typeof db.withSession==='function'?db.withSession('first-primary'):db).prepare(`SELECT s.session_id sessionId,s.actor,s.request_id requestId,s.state,s.source_digest sourceDigest,s.manifest_digest manifestDigest FROM gsis_roster_import_sessions s ORDER BY EXISTS(SELECT 1 FROM gsis_roster_import_locks l WHERE l.session_id=s.session_id) DESC,(${PENDING_CLEANUP}) DESC,s.created_at DESC,s.rowid DESC LIMIT 1`).first())||null;}
 
- return {objectJobs,prepareObject,prepareRecords,finishFreeze,freeze,validateManifest,utf8Length,open,ensure,latest,hashText,hashBytes,stageObject,FORMAT,SCOPES,TARGET_BYTES,SEGMENT_BYTES,MAX_PART_BYTES,MAX_PARTS,MAX_MANIFEST_BYTES,MAX_TOTAL_BYTES,MAX_OBJECT_BYTES,MAX_RETAINED_SESSIONS,PREPARATION_LEASE_MS,MAX_PREPARATION_RESULT_BYTES};
+ return {objectJobs,prepareObject,prepareRecords,finishFreeze,freeze,validateManifest,utf8Length,open,ensure,latest,resetAfterRollback,pendingRollbackReset,hashText,hashBytes,stageObject,FORMAT,SCOPES,TARGET_BYTES,SEGMENT_BYTES,MAX_PART_BYTES,MAX_PARTS,MAX_MANIFEST_BYTES,MAX_TOTAL_BYTES,MAX_OBJECT_BYTES,MAX_RETAINED_SESSIONS,PREPARATION_LEASE_MS,MAX_PREPARATION_RESULT_BYTES};
 })();
 if(typeof module!=='undefined'&&module.exports)module.exports=GSiSRosterImport;
