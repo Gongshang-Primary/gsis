@@ -1,3 +1,7 @@
+# Pending: cancel freeze stops its server import, 3 November 2026
+
+Model: Codex. Confirmed Cancel freeze atomically stops the unfinished server import, records why and invalidates its preparation and staging claims. Late responses cannot advance it. Source snapshots, checkpoints, staged rows and receipts stay retained for explicit restart. Edge setup shows "Import stopped because the freeze was cancelled". No authority or live configuration change. See [the task](docs/coordination/tasks/roster-cancel-freeze-import.md).
+
 # Pending: R8 verified retained import archival, 2 November 2026
 
 Model: Codex. Admin can archive eligible abandoned import sessions into bounded, checksum-verified private R2 gzip JSON pages and a manifest. D1 copies are removed only in a guarded transaction after readback; the newest two sessions and every session not abandoned stay in D1. Import continuation makes bounded automatic progress. Admission cap increases from 8 to 24. Original records, receipts and evidence remain retained; no live archival or authority change. See [R8 task](docs/coordination/tasks/roster-import-session-archive.md).

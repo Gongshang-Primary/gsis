@@ -27,12 +27,22 @@ async function ensure(db){
 }
 async function save(env,row,expectedRevision,now){
  assertRecoveryWritable(env);const db=database(env,true);await ensure(db);
- const results=await db.batch([
-  db.prepare('INSERT INTO gsis_roster_cutover_freeze(id,request_id,phase,started_at,updated_at,revision) VALUES(1,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET request_id=excluded.request_id,phase=excluded.phase,started_at=excluded.started_at,updated_at=excluded.updated_at,revision=excluded.revision WHERE gsis_roster_cutover_freeze.revision=?').bind(row.requestId,row.state,Date.parse(row.frozenAt),now,expectedRevision+1,expectedRevision),
-  db.prepare('SELECT request_id,phase,started_at,revision FROM gsis_roster_cutover_freeze WHERE id=1')
- ]);
+ const statements=[db.prepare('INSERT INTO gsis_roster_cutover_freeze(id,request_id,phase,started_at,updated_at,revision) VALUES(1,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET request_id=excluded.request_id,phase=excluded.phase,started_at=excluded.started_at,updated_at=excluded.updated_at,revision=excluded.revision WHERE gsis_roster_cutover_freeze.revision=?').bind(row.requestId,row.state,Date.parse(row.frozenAt),now,expectedRevision+1,expectedRevision)];
+ if(row.state==='cancelled'&&await db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='gsis_roster_import_jobs'").first()){
+  // The two import locks admit only one unfinished session. Fence its writes
+  // with the confirmed cancellation, retaining every source, row and receipt.
+  // The freeze revision also prevents a stale reply from stopping a newer job.
+  const cancelled="EXISTS(SELECT 1 FROM gsis_roster_cutover_freeze WHERE id=1 AND request_id=? AND phase='cancelled' AND revision=?)",jobs="SELECT session_id FROM gsis_roster_import_jobs WHERE state IN ('waiting','running','attention')";
+  statements.push(
+   db.prepare(`UPDATE gsis_roster_import_sessions SET state='failed',write_token='',updated_at=? WHERE state IN ('preparing','staging') AND session_id IN (${jobs}) AND ${cancelled}`).bind(now,row.requestId,expectedRevision+1),
+   db.prepare(`UPDATE gsis_roster_import_preparation SET claim_token='',lease_until=0 WHERE session_id IN (${jobs}) AND session_id IN (SELECT session_id FROM gsis_roster_import_sessions WHERE state='failed') AND ${cancelled}`).bind(row.requestId,expectedRevision+1),
+   db.prepare(`UPDATE gsis_roster_import_jobs SET state='stopped',claim_token='',lease_until=0,next_at=0,error_code='ROSTER_IMPORT_FREEZE_CANCELLED',updated_at=? WHERE state IN ('waiting','running','attention') AND session_id IN (SELECT session_id FROM gsis_roster_import_sessions WHERE state='failed') AND ${cancelled}`).bind(now,row.requestId,expectedRevision+1)
+  );
+ }
+ statements.push(db.prepare('SELECT request_id,phase,started_at,revision FROM gsis_roster_cutover_freeze WHERE id=1'));
+ const results=await db.batch(statements);
  if(!Array.isArray(results)||results.some(item=>item?.success===false))fail('The cutover freeze hold was not confirmed.');
- return {owned:results[0]?.meta?.changes===1,value:project(results[1]?.results?.[0],now)};
+ return {owned:results[0]?.meta?.changes===1,value:project(results.at(-1)?.results?.[0],now),importStopped:results.length>2&&results.at(-2)?.meta?.changes>0};
 }
 export async function beginRosterCutoverFreeze(env,{requestId,now=Date.now()}={}){
  if(!validId(requestId)||!validTime(now))fail('Use a stable cutover request reference.',400,'ROSTER_CUTOVER_REQUEST');
@@ -55,5 +65,6 @@ export async function syncRosterCutoverFreeze(env,proof,{expectedRevision,now=Da
  const db=database(env,true),before=project(await stored(db),now),expected=expectedRevision??before.revision;
  if(!Number.isSafeInteger(expected)||expected<0)fail('The cutover response revision is invalid.');
  if(before.revision!==expected)return before;
- const result=await save(env,proof,expected,now);return result.value;
+ if(proof.state==='cancelled'&&before.state==='cancelled'&&proof.requestId===before.requestId)return before;
+ const result=await save(env,proof,expected,now);return {...result.value,...(result.importStopped?{importStopped:true}:{})};
 }
