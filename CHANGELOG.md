@@ -1,3 +1,7 @@
+# Pending: R7 server-driven Roster import, 2 November 2026
+
+Model: Codex. A current Admin queues one durable import. The notification Worker advances preparation and stages up to four independent parts, retaining exact source and part receipts. Object assembly waits for segments. Minute cron and dedicated import Queue wakes continue without a browser; the page polls status. Both heads stop at imported for separate evidence review and activation. See [R7 task](docs/coordination/tasks/roster-import-server-continuation.md).
+
 # Pending: R2 Google published Deploy source for D1 Roster, 2 November 2026
 
 Model: Codex. D1 Roster reads the immutable published Deploy document through its signed Google service while Deploy remains on Google. Both sources use the existing rosterReference calculator. D1 caches the publication by commit and revision, rechecks metadata after 30 seconds, and fails closed if verification fails. Personal calculations use the same source. No live authority or settings changed. See [R2 task](docs/coordination/tasks/roster-google-deploy-reference.md).
