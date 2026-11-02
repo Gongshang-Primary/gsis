@@ -22,6 +22,10 @@ const notificationFailureWork=`(COALESCE(json_extract(r.value_json,'$.status'),'
 // These primary reads are only an idle shortcut. A positive result still uses
 // the existing guarded claim, current Contacts and send/settlement protocol.
 // Include recovery/maintenance candidates, not just immediately sendable rows.
+const peerMailToken=row=>sha256Hex(JSON.stringify(GSiSEdgeNotifications.peerMailReviewFields(row)));
+const peerMailEvidenceSql="json_array(1,"+['id','requestId','recipientId','recipientName','date','email','fingerprint','status'].map(key=>"json_extract(r.value_json,'$."+key+"')").join(',')+","+[['claimId',"''"],['claimExpiresAt','0'],['preparedAt','0'],['acceptedAt',"''"],['completedAt',"''"],['attempts','0'],['error',"''"]].map(([key,fallback])=>"COALESCE(json_extract(r.value_json,'$."+key+"'),"+fallback+")").join(',')+")";
+const peerMailObservedSql=`json_extract(r.value_json,'$.healthReceipt.schema')=1 AND length(json_extract(r.value_json,'$.healthReceipt.fingerprint'))=64 AND json_extract(r.value_json,'$.healthReceipt.evidence')=${peerMailEvidenceSql}`;
+const peerMailReviewedSql=`(${peerMailObservedSql}) AND json_extract(r.value_json,'$.reviewReceipt.schema')=1 AND json_extract(r.value_json,'$.reviewReceipt.fingerprint')=json_extract(r.value_json,'$.healthReceipt.fingerprint')`;
 async function edgeDispatchProbe(env,kind,date){
  const db=env.GSIS_JOBS;if(!db?.prepare)fail(503,'The operational D1 binding is required.');
  const connection=typeof db.withSession==='function'?db.withSession('first-primary'):db;
@@ -31,11 +35,11 @@ async function edgeDispatchProbe(env,kind,date){
   notifications:[`r.collection='outbox' AND (COALESCE(json_extract(r.value_json,'$.status'),'') NOT IN ('sent','cancelled','superseded','expired') OR (json_extract(r.value_json,'$.deliveryStatus') IN ('delivered','read') AND json_extract(r.value_json,'$.status')<>'sent')) AND ${notificationFailureWork}`,`r.collection='notificationTransport' AND r.record_id='key:unmatchedDeliveryEvents' AND json_array_length(r.value_json)>0`],
   inbox:[`r.collection='inboxMessages' AND json_extract(r.value_json,'$.direction')='outbound' AND json_extract(r.value_json,'$.status') IN ('queued','sending')`,`r.collection='inboxAlerts' AND json_extract(r.value_json,'$.status') IN ('queued','sending')`,`r.collection='inbox' AND r.record_id IN ('key:messages','key:alerts') AND json_array_length(r.value_json)>0`],
   peerMail:[`r.collection='peerMail' AND COALESCE(json_extract(r.value_json,'$.status'),'') NOT IN ('sent','cancelled')
-   AND (COALESCE(json_extract(r.value_json,'$.status'),'')<>'uncertain' OR NOT EXISTS(SELECT 1 FROM gsis_edge_records alert WHERE alert.scope='roster' AND alert.collection='smcAlerts' AND alert.record_id<>'$' AND json_extract(alert.value_json,'$.key')='delivery:peer-mail:'||json_extract(r.value_json,'$.id') AND json_extract(alert.value_json,'$.status')='open' AND json_extract(alert.value_json,'$.summary')='Email delivery for the peer arrangement proposed to '||COALESCE(json_extract(r.value_json,'$.recipientName'),'undefined')||' is unconfirmed. Check with the colleague before sending again. The absence remains recorded.'))`,
+   AND (COALESCE(json_extract(r.value_json,'$.status'),'')<>'uncertain' OR NOT COALESCE((${peerMailObservedSql}),0) OR NOT COALESCE((${peerMailReviewedSql}),0) AND NOT EXISTS(SELECT 1 FROM gsis_edge_records alert WHERE alert.scope='roster' AND alert.collection='smcAlerts' AND alert.record_id<>'$' AND json_extract(alert.value_json,'$.key')='delivery:peer-mail:'||json_extract(r.value_json,'$.id') AND json_extract(alert.value_json,'$.status')='open' AND json_extract(alert.value_json,'$.summary')='Email delivery for the peer arrangement proposed to '||COALESCE(json_extract(r.value_json,'$.recipientName'),'undefined')||' is unconfirmed. Check with the colleague before sending again. The absence remains recorded.'))`,
    // Pending proposals still require current Contacts to discover changed addresses.
    `r.collection='requests' AND json_extract(r.value_json,'$.status')='pending' AND CAST(json_extract(r.value_json,'$.expiresAt') AS REAL)>? AND json_extract(r.value_json,'$.date')>=?`,
    `r.collection='smcAlerts' AND json_extract(r.value_json,'$.status')='open' AND json_extract(r.value_json,'$.key') LIKE 'delivery:peer-mail:%'
-    AND EXISTS(SELECT 1 FROM gsis_edge_records mail WHERE mail.scope='roster' AND mail.collection='peerMail' AND mail.record_id='id:'||substr(json_extract(r.value_json,'$.key'),length('delivery:peer-mail:')+1) AND json_extract(mail.value_json,'$.status') IN ('sent','cancelled'))`],
+    AND EXISTS(SELECT 1 FROM gsis_edge_records mail WHERE mail.scope='roster' AND mail.collection='peerMail' AND mail.record_id='id:'||substr(json_extract(r.value_json,'$.key'),length('delivery:peer-mail:')+1) AND (json_extract(mail.value_json,'$.status') IN ('sent','cancelled') OR json_extract(mail.value_json,'$.reviewReceipt.schema')=1 AND json_extract(mail.value_json,'$.reviewReceipt.fingerprint')=json_extract(mail.value_json,'$.healthReceipt.fingerprint')))`],
   employmentMail:[`r.collection='dailyEmploymentMail' AND json_extract(r.value_json,'$.status') IN ('queued','sending')`]
  };
  let predicate,args=[];
@@ -117,19 +121,19 @@ export async function recordEdgeWhatsAppThrottle(env,retryAfterMs){
  if(result.success===false)fail(503,'Sender cooldown could not be confirmed.');return {recorded:true,readyAt:until};
 }
 export async function dispatchEdgePeerMail(env,sendMail){
- const summary={sent:0,uncertain:0,blocked:0,cancelled:0,pending:0},origin=String(env.ROSTER_PUBLIC_ORIGIN||'').replace(/\/$/,'');
+ const summary={sent:0,uncertain:0,reviewedUncertain:0,newUncertain:0,blocked:0,cancelled:0,pending:0},origin=String(env.ROSTER_PUBLIC_ORIGIN||'').replace(/\/$/,'');
  if(!/^https:\/\/[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?(?::\d{1,5})?$/i.test(origin))return {...summary,blocked:1,reason:'Configure ROSTER_PUBLIC_ORIGIN.'};
  // Idle counters describe this invocation. Cumulative queue counts are returned
  // by the existing claim path only when a drain actually examines that queue.
  const readiness=await edgeDispatchProbe(env,'peerMail');if(readiness.has_work===0)return summary;
  for(let count=0;count<6;count++){
   const claim=await service(env,{operation:'claimPeerMail'},(state,ctx)=>{
-   GSiSEdgeNotifications.peerMailSync(state,state,ctx.people,ctx.now);const row=state.peerMail.find(r=>r.status==='queued');
-   if(!row)return {job:null,counts:Object.fromEntries(['uncertain','blocked','cancelled'].map(status=>[status,state.peerMail.filter(r=>r.status===status).length])),pending:state.peerMail.filter(r=>['queued','blocked','sending'].includes(r.status)).length};
+   GSiSEdgeNotifications.peerMailSync(state,state,ctx.people,ctx.now,peerMailToken);const row=state.peerMail.find(r=>r.status==='queued');
+   if(!row)return {job:null,newUncertain:GSiSEdgeNotifications.peerMailHealth(state.peerMail,peerMailToken),counts:GSiSEdgeNotifications.peerMailCounts(state.peerMail,peerMailToken),pending:state.peerMail.filter(r=>['queued','blocked','sending'].includes(r.status)).length};
    const request=state.requests.find(r=>r.id===row.requestId);row.status='sending';row.preparedAt=ctx.now;row.claimId=crypto.randomUUID();row.claimExpiresAt=ctx.now+600000;row.attempts++;row.error='';
    return {job:clone(row),mail:GSiSEdgeNotifications.peerMailMessage(request,origin,row.email)};
   });
-  if(!claim.job)return {...summary,...claim.counts,pending:claim.pending};
+  if(!claim.job)return {...summary,...claim.counts,newUncertain:summary.newUncertain+claim.newUncertain,pending:claim.pending};
   const job=claim.job;
   const prepared=await service(env,{operation:'preparePeerMail',id:job.id,claimId:job.claimId},(state,ctx)=>{
    const row=(state.peerMail||[]).find(r=>r.id===job.id&&r.claimId===job.claimId);if(!row||row.status!=='sending'||row.launchAuthorizedAt)return {send:false};
@@ -142,11 +146,11 @@ export async function dispatchEdgePeerMail(env,sendMail){
   // At-most-once submission by the persisted claim. Even a transport timeout is
   // settled as uncertain, never a reason to call MailApp a second time.
   try{const result=await sendMail({operation:'sendEdgeMail',id:job.id,claimId:job.claimId,mail:claim.mail});if(result.ok&&result.data?.accepted===true){status='sent';error='';}else if(result.ok&&result.data?.notSent===true){status='blocked';error='Email service is unavailable; no message was sent.';}}catch{}
-  await service(env,{operation:'settlePeerMail'},(state,ctx)=>{
+  const settled=await service(env,{operation:'settlePeerMail'},(state,ctx)=>{
    const row=(state.peerMail||[]).find(r=>r.id===job.id&&r.claimId===job.claimId);if(!row)fail(409,'Peer email claim changed.');
-   if(row.status!=='sent'&&['sending','uncertain'].includes(row.status)){row.status=status;row.error=error;row.completedAt=ctx.iso;if(status==='blocked')delete row.launchAuthorizedAt;if(status==='sent')row.acceptedAt=ctx.iso;GSiSEdgeNotifications.peerMailAlert(state,row,state,ctx.now);}
-   return {recorded:true};
-  },false);summary[status]++;
+   if(row.status!=='sent'&&['sending','uncertain'].includes(row.status)){row.status=status;row.error=error;row.completedAt=ctx.iso;if(status==='blocked')delete row.launchAuthorizedAt;if(status==='sent')row.acceptedAt=ctx.iso;GSiSEdgeNotifications.peerMailAlert(state,row,state,ctx.now,peerMailToken);}
+   return {recorded:true,newUncertain:GSiSEdgeNotifications.peerMailHealth(state.peerMail,peerMailToken)};
+  },false);summary[status]++;summary.newUncertain+=settled.newUncertain;
  }
  return {...summary,pending:1};
 }

@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import {DatabaseSync} from 'node:sqlite';
 import {createRequire} from 'node:module';
+import {createHash} from 'node:crypto';
 const require=createRequire(import.meta.url),GSiSEdgeStore=require('../shared/edge-store.js');
 import {GSISRosterOperations as O,GSiSEdgeNotifications as N} from '../roster-update/public/edge-roster-domain.js';
 import * as edge from '../roster-update/public/edge-notifications.js';
@@ -16,6 +17,7 @@ async function fixture(state=O.initial()){
  const db=database(),store=await activate(db,'roster',state),env={GSIS_JOBS:db,ROSTER_EDGE_AUTHORITY:'d1',ROSTER_AUTOMATION_ENABLED:'true',ROSTER_PUBLIC_ORIGIN:'https://roster.gsps.edu.sg',APPS_SCRIPT_URL:'https://script.google.com/macros/s/fixture/exec',ROSTER_SERVICE_SECRET:'s'.repeat(32),WHATSAPP_ENABLED:'true',WHATSAPP_PHONE_NUMBER_ID:'123456789',WHATSAPP_API_VERSION:'v22.0',WHATSAPP_ACCESS_TOKEN:'a'.repeat(40),WHATSAPP_APP_SECRET:'b'.repeat(40),EXTERNAL_LINK_SECRET:'c'.repeat(40),WHATSAPP_VERIFY_TOKEN:'d'.repeat(40),WHATSAPP_ACCOUNT_ID:'123456789',WHATSAPP_TEMPLATE_ACCOUNT_ID:'123456789',CONTACTS_PUBLIC_URL:'https://contacts.gsps.edu.sg/',WHATSAPP_TEMPLATES_JSON:'{}'};
  db.statements.length=0;db.sessions.length=0;return {db,store,env};
 }
+const peerToken=row=>createHash('sha256').update(JSON.stringify(N.peerMailReviewFields(row))).digest('hex');
 function insert(db,collection,id,value){db.sql.prepare('INSERT OR REPLACE INTO gsis_edge_records(scope,collection,record_id,position,record_date,value_json,revision) VALUES(?,?,?,?,?,?,?)').run('roster',collection,id,0,value.date||'',JSON.stringify(value),1);}
 function noHydration(db){assert(!db.statements.some(sql=>/SELECT (?:r\.)?collection,/.test(sql)),'idle dispatch must not hydrate the roster collections');assert(!db.statements.some(sql=>/^UPDATE gsis_edge_heads/.test(sql)),'idle dispatch must not create a transport receipt or revision');assert(db.sessions.includes('first-primary'),'idle decision must read the primary');}
 let failures=0;
@@ -77,10 +79,11 @@ await test('handled uncertain peer mail stays idle while escalation creation, re
  const summary='Email delivery for the peer arrangement proposed to Teacher is unconfirmed. Check with the colleague before sending again. The absence remains recorded.';
  for(const [status,alert] of [['uncertain',null],['uncertain',{status:'open',summary}],['uncertain',{status:'resolved',summary}],['uncertain',{status:'open',summary:'old summary'}],['sent',{status:'open',summary}],['sent',{status:'resolved',summary}],['cancelled',{status:'open',summary}],['cancelled',null]]){
   const state=O.initial();state.peerMail=[{id:'mail',requestId:'old-request',status,recipientName:'Teacher'}];state.smcAlerts=alert?[{id:'alert',key:'delivery:peer-mail:mail',closedAt:'2026-10-25T00:00:00Z',...alert}]:[];
+  N.peerMailHealth(state.peerMail,peerToken);
   const after=structuredClone(state);N.peerMailSync(after,after,[],Date.now());const expected=JSON.stringify([after.peerMail,after.smcAlerts])!==JSON.stringify([state.peerMail,state.smcAlerts]),{env}=await fixture(state);
   assert.equal(await edge.edgeDispatchHasWork(env,'peerMail'),expected,JSON.stringify({status,alert}));
  }
- const {db,env}=await fixture();for(let n=0;n<2000;n++){insert(db,'peerMail','id:handled-'+n,{id:'handled-'+n,status:'uncertain',recipientName:'Teacher'});insert(db,'smcAlerts','id:peer-alert-'+n,{id:'peer-alert-'+n,key:'delivery:peer-mail:handled-'+n,status:'open',summary,closedAt:'2026-10-25T00:00:00Z'});}
+ const {db,env}=await fixture();for(let n=0;n<2000;n++){const handled={id:'handled-'+n,status:'uncertain',recipientName:'Teacher'};N.peerMailHealth([handled],peerToken);insert(db,'peerMail','id:handled-'+n,handled);insert(db,'smcAlerts','id:peer-alert-'+n,{id:'peer-alert-'+n,key:'delivery:peer-mail:handled-'+n,status:'open',summary,closedAt:'2026-10-25T00:00:00Z'});}
  assert.equal((await edge.dispatchEdgePeerMail(env,()=>assert.fail('no mail'))).sent,0);noHydration(db);
 });
 await test('handled failures and uncertain sends stay idle without hiding retries, normalization or missing alerts',async()=>{

@@ -166,13 +166,17 @@ function rosterPeerMailAddresses_(person){
 }
 function rosterPeerMailPending_(request,now){return !!request&&request.status==='pending'&&Number(request.expiresAt)>now&&request.date>=new Date(now+8*3600000).toISOString().slice(0,10);}
 function rosterPeerMailFingerprint_(request){return JSON.stringify([request.id,request.recipientId,request.absenceId,request.date,request.absentName,request.combination===true,request.demandIds,request.periods,request.lessons]);}
-function rosterPeerMailAlert_(store,row,primary,now){
- const key='delivery:peer-mail:'+row.id,open=['uncertain','blocked'].includes(row.status);let alert=store.smcAlerts.find(a=>a.key===key);
- if(!open){if(alert&&alert.status==='open'&&['sent','cancelled'].includes(row.status)){alert.status='resolved';alert.resolvedAt=new Date(now).toISOString();}return;}
+function rosterPeerMailReviewFields_(row){return [1,row.id,row.requestId,row.recipientId,row.recipientName,row.date,row.email,row.fingerprint,row.status,row.claimId||'',row.claimExpiresAt||0,row.preparedAt||0,row.acceptedAt||'',row.completedAt||'',row.attempts||0,row.error||''];}
+function rosterPeerMailReviewed_(row,token){return row.status==='uncertain'&&typeof token==='string'&&row.reviewReceipt?.schema===1&&row.reviewReceipt.fingerprint===token;}
+function rosterPeerMailCounts_(rows,tokenForRow){return {uncertain:rows.filter(row=>row.status==='uncertain'&&!rosterPeerMailReviewed_(row,tokenForRow(row))).length,reviewedUncertain:rows.filter(row=>rosterPeerMailReviewed_(row,tokenForRow(row))).length,blocked:rows.filter(row=>row.status==='blocked').length,cancelled:rows.filter(row=>row.status==='cancelled').length};}
+function rosterPeerMailHealth_(rows,tokenForRow){let count=0;for(const row of rows){if(row.status!=='uncertain')continue;const fingerprint=tokenForRow(row),evidence=JSON.stringify(rosterPeerMailReviewFields_(row));if(row.healthReceipt?.schema===1&&row.healthReceipt.fingerprint===fingerprint&&row.healthReceipt.evidence===evidence)continue;if(!rosterPeerMailReviewed_(row,fingerprint))count++;row.healthReceipt={schema:1,fingerprint,evidence};}return count;}
+function rosterPeerMailAlert_(store,row,primary,now,tokenForRow=()=>null){
+ const key='delivery:peer-mail:'+row.id,open=row.status==='blocked'||row.status==='uncertain'&&!rosterPeerMailReviewed_(row,tokenForRow(row));let alert=store.smcAlerts.find(a=>a.key===key);
+ if(!open){if(alert&&alert.status==='open'&&(['sent','cancelled'].includes(row.status)||rosterPeerMailReviewed_(row,tokenForRow(row)))){alert.status='resolved';alert.resolvedAt=new Date(now).toISOString();}return;}
  if(!alert){alert={id:crypto.randomUUID(),key,date:row.date,createdAt:new Date(now).toISOString(),recipients:(primary.smcDutyRoster||[]).find(d=>d.date===row.date)?.staffIds||[],origin:'peer-email'};store.smcAlerts.push(alert);}
  alert.status='open';alert.summary=row.status==='uncertain'?'Email delivery for the peer arrangement proposed to '+row.recipientName+' is unconfirmed. Check with the colleague before sending again. The absence remains recorded.':'The peer arrangement email to '+row.recipientName+' is waiting: '+row.error+' The absence remains recorded.';
 }
-function rosterPeerMailSync_(store,primary,people,now){
+function rosterPeerMailSync_(store,primary,people,now,tokenForRow=()=>null){
  store.peerMail=store.peerMail||[];const requests=new Map((primary.requests||[]).map(r=>[r.id,r])),persons=new Map(people.map(p=>[String(p.id),p]));
  for(const row of store.peerMail){
   if(row.status==='sending'&&row.claimExpiresAt<=now){row.status='uncertain';row.error='The prepared email has no confirmed provider outcome. Check with the recipient before sending again.';row.completedAt=new Date(now).toISOString();}
@@ -194,7 +198,7 @@ function rosterPeerMailSync_(store,primary,people,now){
   }
   const missing=existing.get(String(request.id)+':');if(addresses.length&&missing?.status==='blocked'){missing.status='cancelled';missing.error='A current Contacts email address is now available.';}
  }
- for(const row of store.peerMail)rosterPeerMailAlert_(store,row,primary,now);
+ for(const row of store.peerMail)rosterPeerMailAlert_(store,row,primary,now,tokenForRow);
 }
 function rosterPeerMailMessage_(request,origin,email){
  const escape=value=>String(value??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
@@ -274,6 +278,6 @@ function packInbox(primary,value=inboxState(primary)){
  for(const [key,collection] of Object.entries(inboxCollections))primary[collection]=value[key].map(row=>key==='threads'?{...row,id:row.waId}:key==='receipts'?{...row,id:row.requestId}:row);
  return primary;
 }
-return {inboxState,packInbox,transport,eligible:rosterNotificationEligible_,applyResult:rosterNotificationApplyResult_,applyDelivery:rosterNotificationApplyDelivery_,expire:rosterNotificationExpire_,retry:rosterNotificationRetries_,peerMailSync:rosterPeerMailSync_,peerMailMessage:rosterPeerMailMessage_,peerMailPending:rosterPeerMailPending_,peerMailAddresses:rosterPeerMailAddresses_,peerMailFingerprint:rosterPeerMailFingerprint_,peerMailAlert:rosterPeerMailAlert_};
+return {peerMailReviewFields:rosterPeerMailReviewFields_,peerMailReviewed:rosterPeerMailReviewed_,peerMailCounts:rosterPeerMailCounts_,peerMailHealth:rosterPeerMailHealth_,inboxState,packInbox,transport,eligible:rosterNotificationEligible_,applyResult:rosterNotificationApplyResult_,applyDelivery:rosterNotificationApplyDelivery_,expire:rosterNotificationExpire_,retry:rosterNotificationRetries_,peerMailSync:rosterPeerMailSync_,peerMailMessage:rosterPeerMailMessage_,peerMailPending:rosterPeerMailPending_,peerMailAddresses:rosterPeerMailAddresses_,peerMailFingerprint:rosterPeerMailFingerprint_,peerMailAlert:rosterPeerMailAlert_};
 })();
 if(typeof module!=='undefined'&&module.exports)module.exports=GSiSEdgeNotifications;
