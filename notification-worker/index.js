@@ -113,11 +113,16 @@ export default {
  async queue(batch,env){
   env=(typeof resolveRosterAuthorityEnvironment==='function'?await resolveRosterAuthorityEnvironment(env):rosterRecoveryEnvironment(env));
   try{writable(env);}catch(error){console.error(JSON.stringify({event:'roster-queue-paused',...safeError(error)}));batch.retryAll({delaySeconds:300});return;}
-  const importMessages=batch.messages.filter(message=>message.body?.purpose==='gsis-roster-import-wake-v1'),supported=batch.messages.filter(message=>message.body?.purpose==='gsis-notification-wake-v1'),unsupported=batch.messages.filter(message=>!['gsis-notification-wake-v1','gsis-roster-import-wake-v1'].includes(message.body?.purpose));
+  const backupMessages=batch.messages.filter(message=>message.body?.purpose==='gsis-roster-backup-wake-v1'),importMessages=batch.messages.filter(message=>message.body?.purpose==='gsis-roster-import-wake-v1'),supported=batch.messages.filter(message=>message.body?.purpose==='gsis-notification-wake-v1'),unsupported=batch.messages.filter(message=>!['gsis-notification-wake-v1','gsis-roster-import-wake-v1','gsis-roster-backup-wake-v1'].includes(message.body?.purpose));
   if(importMessages.length){
    const result=await stage(env,'roster-import',null,()=>dispatchRosterImports(env));
    if(result.stageFailed||result.pending)settleMessages(batch,importMessages,'retry',{delaySeconds:Math.max(1,Math.min(900,Math.ceil(((result.readyAt||Date.now()+1000)-Date.now())/1000)))});
    else settleMessages(batch,importMessages,'ack');
+  }
+  if(backupMessages.length){
+   const result=await stage(env,'google-backup',null,()=>dispatchGoogleBackup(env));
+   if(result.stageFailed||result.pending||result.failed)settleMessages(batch,backupMessages,'retry',{delaySeconds:60});
+   else settleMessages(batch,backupMessages,'ack');
   }
   if(unsupported.length){
    console.error(JSON.stringify({event:'roster-queue-unsupported-recovery-wake',code:'RECOVERY_UNSUPPORTED_WAKE',pending:unsupported.length}));
@@ -147,7 +152,7 @@ export default {
    if(typeof envelope.payload!=='string'||!/^[a-f0-9]{64}$/.test(envelope.signature||''))throw Error();
    const key=await crypto.subtle.importKey('raw',new TextEncoder().encode(serviceSecret),{name:'HMAC',hash:'SHA-256'},false,['verify']);
    if(!await crypto.subtle.verify('HMAC',key,Uint8Array.from(envelope.signature.match(/../g),value=>parseInt(value,16)),new TextEncoder().encode(envelope.payload)))throw Error();
-   const input=JSON.parse(envelope.payload);if(!['gsis-notification-wake-v1','gsis-roster-import-wake-v1'].includes(input.purpose)||!Number.isFinite(input.timestamp)||Math.abs(Date.now()-input.timestamp)>120000||!/^[a-f0-9-]{36}$/i.test(input.nonce||''))throw Error();
+   const input=JSON.parse(envelope.payload);if(!['gsis-notification-wake-v1','gsis-roster-import-wake-v1','gsis-roster-backup-wake-v1'].includes(input.purpose)||!Number.isFinite(input.timestamp)||Math.abs(Date.now()-input.timestamp)>120000||!/^[a-f0-9-]{36}$/i.test(input.nonce||''))throw Error();
    writable(env);await env.NOTIFICATION_QUEUE.send({purpose:input.purpose,id:input.nonce,queuedAt:Date.now()});
    return Response.json({ok:true,queued:true},{status:202,headers:{'Cache-Control':'no-store'}});
   }catch{return Response.json({ok:false,error:'Notification wake was not accepted.'},{status:403,headers:{'Cache-Control':'no-store'}});}

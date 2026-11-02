@@ -67,7 +67,7 @@ async function copyObject(env,generation,reference,saved,call,canContinue){
 export async function runRosterMirror(env,options={}){
  if(!enabled(env))return {enabled:false,skipped:true,reason:'google-authoritative'};
  const core=coreFor(options),db=database(env),bridge=options.bridge;if(typeof bridge!=='function')fail('ROSTER_MIRROR_BRIDGE','A signed Google backup bridge is required.');
- const now=options.now??Date.now(),clock=options.clock||Date.now,started=clock(),budget=Math.max(1,Math.min(180000,options.budgetMs??45000)),maximum=Math.max(1,Math.min(64,options.maxSteps??16));let steps=0;
+ const now=options.now??Date.now(),clock=options.clock||Date.now,started=clock(),budget=Math.max(1,Math.min(180000,options.budgetMs??180000)),maximum=Math.max(1,Math.min(64,options.maxSteps??64));let steps=0;
  const canContinue=()=>steps<maximum&&clock()-started<budget;
  const call=async input=>{steps++;return bridge({operation:'edgeMirror',...input});};
  const currentStatus=await core.status(db,now);
@@ -88,7 +88,7 @@ export async function runRosterMirror(env,options={}){
  if(!Number.isSafeInteger(start.cursor)||start.cursor<generation.cursor)fail('ROSTER_MIRROR_ACK','Google backup progress is behind its confirmed D1 checkpoint.');
  while(canContinue()){
   if(generation.cursor<generation.totalCount){
-   const page=await core.page(db,generation.id,{cursor:generation.cursor,limit:128,maxBytes:524288,leaseToken:generation.leaseToken});
+   const page=await core.page(db,generation.id,{cursor:generation.cursor,limit:500,maxBytes:2097152,leaseToken:generation.leaseToken});
    if(!page.items.length||page.next<=generation.cursor)fail('ROSTER_MIRROR_PAGE','The frozen backup page did not advance.');
    const refs=references(page.items);let objectStates=new Map();
    if(refs.length){const reply=boundReply(await call({step:'objectsStatus',generationId:generation.id,epoch:generation.epoch,references:refs}),generation);
