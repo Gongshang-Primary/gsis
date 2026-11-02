@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import {createHash} from 'node:crypto';
 import {DatabaseSync} from 'node:sqlite';
 import path from 'node:path';
 import {fileURLToPath,pathToFileURL} from 'node:url';
@@ -7,7 +8,7 @@ import {fileURLToPath,pathToFileURL} from 'node:url';
 // lanes remain active while retained migration data is never hydrated or changed.
 const root=path.resolve(process.env.GSIS_TEST_ROOT||fileURLToPath(new URL('..',import.meta.url)));
 const moduleAt=name=>import(pathToFileURL(path.join(root,name)).href);
-const [{default:worker},{GSiSEdgeStore},{GSISRosterOperations:O},gateway,{resolveRosterAuthorityEnvironment}]=await Promise.all([
+const [{default:worker},{GSiSEdgeStore},{GSISRosterOperations:O,GSiSEdgeNotifications:N},gateway,{resolveRosterAuthorityEnvironment}]=await Promise.all([
  moduleAt('notification-worker/index.js'),moduleAt('roster-update/public/edge-store.js'),
  moduleAt('roster-update/public/edge-roster-domain.js'),moduleAt('roster-update/public/_worker.js'),moduleAt('shared/roster-recovery-profile.js')
 ]);
@@ -44,6 +45,7 @@ try{
  ];
  state.smcAlerts=state.outbox.map(row=>({id:'alert-'+row.id,key:'delivery:'+row.id,notificationId:row.id,status:'open',date:row.date,closedAt:'2026-10-25T00:00:00Z',reviewedAt:'2026-10-25T00:00:00Z',reviewReason:'Archived in the private daily report'}));
  state.peerMail=[{id:'handled-peer',requestId:'historical-request',recipientName:'Synthetic Staff',date:'2026-10-25',status:'uncertain',preparedAt:now-2*86400000,claimExpiresAt:now-86400000}];
+ N.peerMailHealth(state.peerMail,row=>createHash('sha256').update(JSON.stringify(N.peerMailReviewFields(row))).digest('hex'));
  state.smcAlerts.push({id:'handled-peer-alert',key:'delivery:peer-mail:handled-peer',date:'2026-10-25',status:'open',summary:'Email delivery for the peer arrangement proposed to Synthetic Staff is unconfirmed. Check with the colleague before sending again. The absence remains recorded.'});
  // Large retained history makes a hidden full-document read observable even
  // when the cron catches the resulting downstream error and resolves normally.

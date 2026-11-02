@@ -1,3 +1,7 @@
+## Pending: R6 peer-mail health only, 2 November 2026
+
+Model: Codex. Split the peer-mail health changes from held #41 without inactive-staff or weekly-R/FAJT work. Each unchanged uncertain outcome records one health observation, reviewed uncertainty remains idle, and delivery evidence is retained. D1 health receipts commit to D1; Google remains send-only for new guarded mail handoffs. The fenced-Google regression runs actual Worker dispatch through ten idle ticks with zero Google calls and no resend. #41 stays open. See [R6 task](docs/coordination/tasks/roster-peer-mail-health-only.md). Not deployed.
+
 # Pending: R1 D1 reset after manual rollback, 2 November 2026
 
 Model: Codex. Admin can reset retained D1 Roster heads only with explicit legacy Cloudflare authority and signed proof that Google is writable. One D1 transaction archives the exact old rows, receipts, heads and mirror evidence, resets both heads and invalidates backup work. Google capture cleanup remains recoverable under the same reset request. No live settings or records changed. See [R1 task](docs/coordination/tasks/roster-d1-rollback-reset.md).
