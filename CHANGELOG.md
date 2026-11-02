@@ -1,3 +1,7 @@
+# Pending: quiet-mode allocation audit catch-up, 3 November 2026
+
+Model: Codex. The dedicated audit lane catches up retained daily exports in oldest-first batches, up to three calls with a 20-second budget for starting further work. A renewed quiet session, notification priority, contention or failure leaves work pending. D1 export status now reaches the shared dispatcher with an accurate backlog count and concurrent-change protection. Saved SMC decision facts and original timestamps stay in the existing authoritative records and immutable archives. See [the task](docs/coordination/tasks/roster-quiet-mode-log-catchup.md). Draft review only; merge held until after the cutover and owner release. Not deployed.
+
 # Pending: R8 verified retained import archival, 2 November 2026
 
 Model: Codex. Admin can archive eligible abandoned import sessions into bounded, checksum-verified private R2 gzip JSON pages and a manifest. D1 copies are removed only in a guarded transaction after readback; the newest two sessions and every session not abandoned stay in D1. Import continuation makes bounded automatic progress. Admission cap increases from 8 to 24. Original records, receipts and evidence remain retained; no live archival or authority change. See [R8 task](docs/coordination/tasks/roster-import-session-archive.md).

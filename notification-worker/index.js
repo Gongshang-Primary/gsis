@@ -67,6 +67,19 @@ function settleMessages(batch,messages,action,options){
  // must retain the whole mixed batch rather than acknowledge unsupported work.
  else if(action==='retry')batch.retryAll(options);
 }
+async function catchUpAllocationAudit(env){
+ const startedAt=Date.now();let summary={exported:0,failed:0};
+ // The existing per-day watermark is the durable backlog. Keep heavy exports
+ // in this lane, and give renewed quiet mode or foreground work another turn.
+ for(let step=0;step<3&&Date.now()-startedAt<20000;step++){
+  if((await quietMode(env.GSIS_JOBS)).active)return {...summary,skipped:true};
+  if(Date.now()-startedAt>=20000)break;
+  const result=await dispatchAllocationAudit(env);
+  summary={...result,exported:summary.exported+result.exported,failed:summary.failed+result.failed};
+  if(result.skipped||result.failed||result.pending===0||result.exported===0)break;
+ }
+ return summary;
+}
 export default {
  async scheduled(event,env,ctx){
   env=(typeof resolveRosterAuthorityEnvironment==='function'?await resolveRosterAuthorityEnvironment(env):rosterRecoveryEnvironment(env));
@@ -83,11 +96,11 @@ export default {
    if(event.cron==='15 18 * * *'){
     await run('r2-cleanup','roster-r2-cleanup',()=>runRecoveryTimetableCleanup(env,{now:event.scheduledTime}));return;
    }
-   // Separate execution from the critical minute lane: at most one retained day
-   // per five-minute invocation, with backend notification and lock safeguards.
+   // Separate execution from the critical minute lane. Catch up retained days
+   // in bounded batches, with backend notification and lock safeguards.
    if(event.cron==='2-57/5 * * * *'){
     if(quiet.active)return;
-    await run('audit-export','roster-allocation-audit',()=>dispatchAllocationAudit(env));return;
+    await run('audit-export','roster-allocation-audit',()=>catchUpAllocationAudit(env));return;
    }
    // Keep D1's Contacts authority fresh before any job reads it (run() never throws).
    if(typeof dispatchReferencesRefresh==='function')await run('references','roster-references-refresh',()=>dispatchReferencesRefresh(env));
