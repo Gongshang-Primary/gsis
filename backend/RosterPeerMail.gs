@@ -56,8 +56,17 @@ function rosterPeerMailSettle_(job,status,error,primary){
   rosterPeerMailAlert_(store,row,primary,Date.now());rosterNotificationCommit_(store);
  }finally{deployUnlock_(lock);}
 }
+function rosterPeerMailIdle_(store,version,now){
+ const hint=store?.peerMailIdleHint,rows=store?.peerMail||[];
+ if(!version||props_().getProperty('ROSTER_SCHEDULE_DIRTY')||hint?.schema!==1||hint.version!==version||!Number.isFinite(hint.at)||now<hint.at||now-hint.at>=300000)return false;
+ return rows.every(row=>['sent','cancelled'].includes(row.status)||row.status==='uncertain'&&(rosterPeerMailReviewed_(row)||row.healthReceipt?.schema===1&&row.healthReceipt.fingerprint===rosterPeerMailReviewToken_(row)));
+}
+function rosterPeerMailHealth_(store){
+ let newUncertain=0;for(const row of store.peerMail||[]){if(row.status!=='uncertain')continue;const fingerprint=rosterPeerMailReviewToken_(row);if(row.healthReceipt?.schema===1&&row.healthReceipt.fingerprint===fingerprint)continue;if(!rosterPeerMailReviewed_(row))newUncertain++;row.healthReceipt={schema:1,fingerprint,evidence:JSON.stringify(rosterPeerMailReviewFields_(row))};}return newUncertain;
+}
 function rosterPeerMailDispatch_(input){
  gsisRequireBackendRole_('roster');const initial=rosterNotificationEnsure_(),origin=String(props_().getProperty('ROSTER_PUBLIC_ORIGIN')||input.publicOrigin||'').replace(/\/$/,''),limit=Math.min(10,Math.max(1,Math.floor(Number(input.limit)||6)));
+ const version=props_().getProperty('ROSTER_VERSION_HINT');if(rosterPeerMailIdle_(initial,version,Date.now()))return {sent:0,...rosterPeerMailCounts_(initial.peerMail||[]),newUncertain:0,idle:true};
  let primary=rosterOperationsState_(true);const people=(primary.requests||[]).some(r=>rosterPeerMailPending_(r,Date.now()))?rosterServiceContacts_().c.rosterPeople:[];let quota=0,reason='';
  if(!/^https:\/\/[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?(?::\d{1,5})?$/i.test(origin))reason='Configure ROSTER_PUBLIC_ORIGIN with the HTTPS Roster site origin.';
  else try{quota=Number(MailApp.getRemainingDailyQuota());if(!Number.isFinite(quota)||quota<1)reason='The email recipient quota is exhausted; the next worker run will retry.';}catch(e){reason='Authorise the Roster email service before sending.';}
@@ -83,16 +92,20 @@ function rosterPeerMailDispatch_(input){
   let accepted=false;try{MailApp.sendEmail(rosterPeerMailMessage_(request,origin,job.email));accepted=true;sent++;}catch(e){/* MailApp provides no idempotency key or delivery receipt; preserve ambiguity. */}
   quota--;rosterPeerMailSettle_(job,accepted?'sent':'uncertain',accepted?'':'MailApp did not confirm acceptance. Check with the recipient before sending again.',current);
  }
- const store=rosterNotificationState_(),rows=store.peerMail||[];return {sent,...rosterPeerMailCounts_(rows),cancelled:rows.filter(r=>r.status==='cancelled').length,...(reason?{reason}:{})};
+ const lock=rosterNotificationLock_(lastStore);if(!deployLock_(lock,1500))return {sent,busy:true,pending:1,reason:'peer-mail-busy'};
+ try{const store=rosterNotificationState_(),before=JSON.stringify(store),rows=store.peerMail||[],newUncertain=rosterPeerMailHealth_(store);
+  if(version&&version===props_().getProperty('ROSTER_VERSION_HINT')&&!props_().getProperty('ROSTER_SCHEDULE_DIRTY')&&!(primary.requests||[]).some(r=>rosterPeerMailPending_(r,Date.now()))&&!rows.some(r=>['queued','blocked','sending'].includes(r.status)))store.peerMailIdleHint={schema:1,version,at:Date.now()};else delete store.peerMailIdleHint;
+  if(JSON.stringify(store)!==before)rosterNotificationCommit_(store);
+  return {sent,...rosterPeerMailCounts_(rows),newUncertain,cancelled:rows.filter(r=>r.status==='cancelled').length,...(reason?{reason}:{})};
+ }finally{deployUnlock_(lock);}
 }
 
 /* Review records an administrator's acknowledgement, never a delivery outcome.
  * The exact provider evidence remains intact and MailApp is never called here.
  * These operations receive freshly verified Contacts authority from the bridge.
  */
-function rosterPeerMailReviewToken_(row){
- return rosterOperationsDigest_([1,row.id,row.requestId,row.recipientId,row.recipientName,row.date,row.email,row.fingerprint,row.status,row.claimId||'',row.claimExpiresAt||0,row.preparedAt||0,row.acceptedAt||'',row.completedAt||'',row.attempts||0,row.error||'']);
-}
+function rosterPeerMailReviewFields_(row){return [1,row.id,row.requestId,row.recipientId,row.recipientName,row.date,row.email,row.fingerprint,row.status,row.claimId||'',row.claimExpiresAt||0,row.preparedAt||0,row.acceptedAt||'',row.completedAt||'',row.attempts||0,row.error||''];}
+function rosterPeerMailReviewToken_(row){return rosterOperationsDigest_(rosterPeerMailReviewFields_(row));}
 function rosterPeerMailReviewId_(row){return rosterOperationsDigest_(['peer-mail-review-id',row.id]);}
 function rosterPeerMailReviewed_(row){return row.status==='uncertain'&&row.reviewReceipt?.schema===1&&row.reviewReceipt.fingerprint===rosterPeerMailReviewToken_(row);}
 function rosterPeerMailCounts_(rows){return {uncertain:rows.filter(row=>row.status==='uncertain'&&!rosterPeerMailReviewed_(row)).length,reviewedUncertain:rows.filter(rosterPeerMailReviewed_).length,blocked:rows.filter(row=>row.status==='blocked').length,pending:rows.filter(row=>['queued','blocked','sending'].includes(row.status)).length};}

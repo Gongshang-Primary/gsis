@@ -6,7 +6,7 @@ import {readQuietMode} from '../shared/roster-quiet-mode.js';
 import {readRosterCutoverFreeze} from '../shared/roster-cutover-freeze.js';
 // Test harnesses load this file with its imports removed; treat quiet mode as off there.
 const quietMode=(db,at)=>typeof readQuietMode==='function'?readQuietMode(db,at):Promise.resolve({active:false});
-import {dispatchNotifications,scheduledRoster,diagnoseNotificationConnections,dispatchInboxPending,dispatchWebhookJobs,dispatchReceivedReports,dispatchPeerMail,dispatchAllocationAudit,dispatchGoogleBackup,dispatchRosterImports} from '../roster-update/public/_worker.js';
+import {dispatchNotifications,scheduledRoster,diagnoseNotificationConnections,dispatchInboxPending,dispatchWebhookJobs,dispatchReceivedReports,dispatchPeerMail,dispatchAllocationAudit,dispatchGoogleBackup,dispatchRosterImports,dispatchReferencesRefresh} from '../roster-update/public/_worker.js';
 /* GSIS_API_SECRET_BEGIN */
 // First-party API credentials share one operator-selected setting. Browser
 // sessions, private relief links and third-party credentials stay independent.
@@ -25,7 +25,7 @@ function gsisApiSecret(env,legacyName){
 // Existing send/automation/diagnostic/pause flags retain their meanings.
 function writable(env){assertRecoveryWritable(env);}
 function safeError(error){return safeHealthError(error);}
-const summaryKeys=['configured','enabled','idle','hasMore','claimed','sent','failed','uncertain','reviewedUncertain','cancelled','prepareFailures','resultFailures','batches','backendCalls','processed','pending','exported','queued','applied','deferred','scanned','deleted','protected','candidates','removed','completed','retried','parked','readyAt','pendingCaptureCount','pendingPeerCount','notificationsQueued','forwarded','needsReview','replies','alerts','retrying','blocked','unconfirmed'];
+const summaryKeys=['configured','enabled','idle','hasMore','claimed','sent','failed','uncertain','newUncertain','reviewedUncertain','cancelled','prepareFailures','resultFailures','batches','backendCalls','processed','pending','exported','queued','applied','deferred','scanned','deleted','protected','candidates','removed','completed','retried','parked','readyAt','pendingCaptureCount','pendingPeerCount','notificationsQueued','forwarded','needsReview','replies','alerts','retrying','blocked','unconfirmed'];
 function safeSummary(result){
  const summary=Object.fromEntries(summaryKeys.filter(key=>typeof result?.[key]==='boolean'||Number.isFinite(result?.[key])&&result[key]>=0).map(key=>[key,result[key]]));
  // Received-report work reports its two processing stages separately. Retain
@@ -44,8 +44,9 @@ async function stage(env,job,event,work,{scheduledTime}={}){
   const freeze=env.ROSTER_EDGE_AUTHORITY!=='d1'&&!['r2-cleanup','google-backup','roster-import'].includes(job)&&typeof readRosterCutoverFreeze==='function'?await readRosterCutoverFreeze(env):null;
   const result=freeze?.active?{skipped:true,cutoverFrozen:true,reason:'cutover freeze',code:freeze.overdue?'ROSTER_CUTOVER_OVERDUE':'ROSTER_CUTOVER_FROZEN'}:await work(),data=result?.data||result,summary=safeSummary(data);
   if(result?.ok===false||data?.failures?.length)throw Object.assign(Error('Job failed'),{...safeError(result),status:result.status});
-  const measured=Object.entries(summary).filter(([key,value])=>typeof value==='number'&&!['readyAt','backendCalls','reviewedUncertain'].includes(key));
-  const failed=!!(data?.prepareFailures||data?.resultFailures||data?.failed||data?.uncertain||data?.unconfirmed||summary.needsReview||summary.deferred||summary.retrying||summary.blocked),idle=!data?.hasMore&&!data?.pending&&(data?.idle===true||data?.state==='idle'||measured.length>0&&measured.every(([,value])=>value===0));
+  const uncertain=job==='peer-mail'&&Number.isSafeInteger(data?.newUncertain)?data.newUncertain:data?.uncertain;
+  const measured=Object.entries(summary).filter(([key,value])=>typeof value==='number'&&!['readyAt','backendCalls','reviewedUncertain'].includes(key)&&!(job==='peer-mail'&&Number.isSafeInteger(data?.newUncertain)&&key==='uncertain'));
+  const failed=!!(data?.prepareFailures||data?.resultFailures||data?.failed||uncertain||data?.unconfirmed||summary.needsReview||summary.deferred||summary.retrying||summary.blocked),idle=!data?.hasMore&&!data?.pending&&(data?.idle===true||data?.state==='idle'||measured.length>0&&measured.every(([,value])=>value===0));
   const status=failed?'failure':data?.configured===false||data?.enabled===false||data?.skipped===true?'skipped':idle?'idle':'success';
   const detail=failed&&data?.failure?safeError(data.failure):{},outcomeCode=data?.code?safeError(data).code:'UNKNOWN_ERROR';
   await record({status,...detail,code:failed?(detail.code&&detail.code!=='UNKNOWN_ERROR'?detail.code:'JOB_FAILED'):outcomeCode!=='UNKNOWN_ERROR'?outcomeCode:status==='idle'?'IDLE':status==='skipped'?'SKIPPED':'OK',finishedAt:Date.now(),counts:summary});
@@ -88,6 +89,8 @@ export default {
     if(quiet.active)return;
     await run('audit-export','roster-allocation-audit',()=>dispatchAllocationAudit(env));return;
    }
+   // Keep D1's Contacts authority fresh before any job reads it (run() never throws).
+   if(typeof dispatchReferencesRefresh==='function')await run('references','roster-references-refresh',()=>dispatchReferencesRefresh(env));
    const imports=typeof dispatchRosterImports==='function'?run('roster-import','roster-import-continuation',()=>dispatchRosterImports(env)):Promise.resolve();
    const backup=typeof dispatchGoogleBackup==='function'?run('google-backup','roster-google-backup',()=>dispatchGoogleBackup(env)):Promise.resolve();
    const send=()=>run('notifications','roster-notification-dispatch',()=>dispatchNotifications(env));
