@@ -1,7 +1,8 @@
 # roster-quiet-mode-log-catchup: catch up verbose logging after quiet mode ends (changelog)
 
-- Status: proposed (owner changelog, 2 Nov 2026 ~06:00); not authorised to build
-- Owner/model: unassigned (Codex when authorised)
+- Status: authorised (owner 2 Nov: "let codex work"); merge held per lane R rule
+- Owner/model: Codex
+- Branch: codex/roster-quiet-mode-log-catchup
 - Reviewer/model: Claude
 - Lane: R (serial); applies to the Google (fallback) workflow, and must also hold on D1
 
