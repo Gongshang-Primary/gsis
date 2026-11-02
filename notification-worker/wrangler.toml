@@ -47,3 +47,9 @@ WHATSAPP_SENDS_PER_SECOND = "4"
 # max_concurrency = 1
 # max_retries = 3
 # retry_delay = 60
+
+# R7: the minute cron also advances explicitly queued Roster imports. Use the
+# same GSIS_JOBS D1, private ROSTER_TIMETABLE_SNAPSHOTS R2, APPS_SCRIPT_URL,
+# Calendar adapter and GSIS_SECRET (or both bridge/service secrets) as Pages.
+# No send or automation flag enables an import; only a current Admin start does.
+# Dedicated gsis-roster-import-wake-v1 messages run only import continuation.

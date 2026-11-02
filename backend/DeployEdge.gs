@@ -1,4 +1,11 @@
 /* v0.9.4 Deploy Google adapters. D1 remains the only operational writer after fencing. */
+function deployEdgeRosterPublication_(input){
+ const {book:b,index:idx,entry}=rosterOperationsQuotaSource_();
+ if(!entry?.id||!entry.commit||!Number.isSafeInteger(entry.revision))error_(503,'No verified published Deploy document is available.');
+ const result=input.knownCommit===entry.commit&&input.knownRevision===entry.revision?{unchanged:true,entry}:{entry,document:document_(b,entry)};
+ const after=index_(b),current=publishedEntry_(after);if(after.pendingFieldCommit||current?.id!==entry.id||current?.commit!==entry.commit||current?.revision!==entry.revision)error_(503,'Deploy publication changed during the read. Retry.');
+ return result;
+}
 function deployEdgeFenced_(){return props_().getProperty('DEPLOY_EDGE_MODE')==='fenced';}
 function deployEdgeFence_(req){
  if(!deployEdgeFenced_())return;

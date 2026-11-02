@@ -20,6 +20,7 @@ import {sha256Hex} from './edge-deploy-sha256.js';
 import {beginEdgeVenuesChange,completeEdgeVenuesChange,inspectEdgeVenuesFence,revokeEdgeVenuesChange} from './edge-venues-fence.js';
 import {edgeDeployRosterReference,edgeDeployPersonalCalculation} from './edge-deploy.js';
 import {runRosterMirror,rosterMirrorStatus,releaseRosterMirror} from './edge-roster-mirror.js';
+import {queueRosterImport,rosterImportRunnerStatus,drainRosterImports} from './edge-roster-import-runner.js';
 import {readRosterCutoverFreeze,beginRosterCutoverFreeze,cancelRosterCutoverFreeze,syncRosterCutoverFreeze} from '../../shared/roster-cutover-freeze.js';
 const clone=value=>structuredClone(value), textEncoder=new TextEncoder(), modelFlights=new Map();
 const fail=(status,code,message)=>{throw Object.assign(Error(message),{status,code});};
@@ -229,7 +230,9 @@ async function migrationCutoverStatus(env,proof,legacyWritesDisabled=false){
  if(supported&&proof.requestId&&(!held.active||held.requestId===proof.requestId)&&(held.state!=='cancelling'||!proof.active||legacyWritesDisabled))held=await syncRosterCutoverFreeze(env,proof,{expectedRevision:held.revision});
  return {...held,supported};
 }
-export async function edgeRosterMigration(env,input,who){const adminProof=await signedBridge(env,{operation:'edgeReferences'},who);if(adminProof.adminVerified!==true)fail(403,'ROSTER_ADMIN_REQUIRED','Admin access is required for migration controls.');const operation=input.operation;
+export async function startEdgeRosterImport(env,input,who){return edgeRosterMigration(env,input,who,{enqueue:true});}
+export async function runEdgeRosterImports(env,options={}){return drainRosterImports(env.GSIS_JOBS,(input,who)=>edgeRosterMigration(env,input,who,{parallelParts:true}),options);}
+export async function edgeRosterMigration(env,input,who,internal={}){const adminProof=await signedBridge(env,{operation:'edgeReferences'},who);if(adminProof.adminVerified!==true)fail(403,'ROSTER_ADMIN_REQUIRED','Admin access is required for migration controls.');const operation=input.operation;
  if(operation==='resetAfterRollback'){
   if(env.ROSTER_EDGE_AUTHORITY!=='legacy')fail(409,'ROSTER_ROLLBACK_AUTHORITY','Set Cloudflare Roster authority to legacy after manual rollback before resetting D1.');
   validRequest(input.requestId);const proof=await signedBridge(env,{operation:'edgeFenceStatus'}),reset=await GSiSRosterImport.resetAfterRollback(database(env),{actor:who.email,requestId:input.requestId,legacyWritesDisabled:proof.legacyWritesDisabled});
@@ -247,9 +250,9 @@ export async function edgeRosterMigration(env,input,who){const adminProof=await 
   const result=await signedBridge(env,{operation:operation==='freeze'?'edgeFreeze':'edgeUnfreeze',requestId:input.requestId,...(operation==='cancelFreeze'?{freezeId:input.freezeId}:{})},who);
   const cutoverFreeze=await syncRosterCutoverFreeze(env,result.cutoverFreeze,{expectedRevision:held.revision});return {cutoverFreeze:{...cutoverFreeze,supported:true}};
  }
- if(operation==='mirror')return mirrorEdgeRoster(env);
+ if(operation==='mirror'){const googleBackup=await readRosterMirrorStatus(env);return {...googleBackup,requested:googleBackup.enabled===true};}
  if(operation==='release')return releaseRosterMirror(env,{requestId:input.requestId,bridge:p=>signedBridge(env,p),quiescent:()=>rosterMirrorQuiescent(env)});
- if(operation==='status'){const googleBackup=await readRosterMirrorStatus(env),scopes=await migrationHeads(env,true),retained=await GSiSRosterImport.latest(database(env)),importSession=retained?await GSiSRosterImport.open(database(env),retained).progress():null;if(importSession&&!importSession.sourceDigest)importSession.sourceDigest=await migrationImportDigest(GSiSRosterImport.open(database(env),retained),importSession);const rollbackResetRequestId=await GSiSRosterImport.pendingRollbackReset(database(env),who.email);return {scopes,importSession,googleBackup,rollbackResetRequestId,canResetAfterRollback:env.ROSTER_EDGE_AUTHORITY==='legacy'&&adminProof.legacyWritesDisabled===false&&(scopes.filter(h=>['roster','roster-register'].includes(h.scope)).length===2&&scopes.filter(h=>['roster','roster-register'].includes(h.scope)).every(h=>['active','paused'].includes(h.mode))||!!rollbackResetRequestId),cutoverFreeze:await migrationCutoverStatus(env,adminProof.cutoverFreeze,adminProof.legacyWritesDisabled===true),canResume:retained?.actor===who.email};}
+ if(operation==='status'){const googleBackup=await readRosterMirrorStatus(env),scopes=await migrationHeads(env,true),retained=await GSiSRosterImport.latest(database(env)),importSession=retained?await GSiSRosterImport.open(database(env),retained).progress():null;if(importSession&&!importSession.sourceDigest)importSession.sourceDigest=await migrationImportDigest(GSiSRosterImport.open(database(env),retained),importSession);if(importSession){const runner=await rosterImportRunnerStatus(database(env),retained.sessionId);if(runner){importSession.serverDriven=true;importSession.serverImport=runner;}}const rollbackResetRequestId=await GSiSRosterImport.pendingRollbackReset(database(env),who.email);return {scopes,importSession,googleBackup,rollbackResetRequestId,canResetAfterRollback:env.ROSTER_EDGE_AUTHORITY==='legacy'&&adminProof.legacyWritesDisabled===false&&(scopes.filter(h=>['roster','roster-register'].includes(h.scope)).length===2&&scopes.filter(h=>['roster','roster-register'].includes(h.scope)).every(h=>['active','paused'].includes(h.mode))||!!rollbackResetRequestId),cutoverFreeze:await migrationCutoverStatus(env,adminProof.cutoverFreeze,adminProof.legacyWritesDisabled===true),canResume:retained?.actor===who.email};}
  if(operation==='drift'){
   if(Object.keys(input).some(key=>!['operation','importRequestId','sessionId'].includes(key)))fail(400,'ROSTER_DRIFT_INPUT','The retained import selects the snapshot digest.');
   const store=await migrationRetainedImport(env,input,who),progress=store?await store.progress():null,sourceDigest=store?await migrationImportDigest(store,progress):null;
@@ -264,6 +267,7 @@ export async function edgeRosterMigration(env,input,who){const adminProof=await 
   const heads=await migrationHeads(env);if(heads.some(head=>['active','paused'].includes(head.mode)))fail(409,'ROSTER_IMPORT_STATE','An active or paused authority cannot prepare another import.');
   const binding={actor:who.email,requestId:input.requestId,sessionId:sha256Hex(JSON.stringify([who.email,input.requestId]))};if(input.sessionId!==undefined&&input.sessionId!==binding.sessionId)fail(409,'ROSTER_IMPORT_ID','The session belongs to another request or actor.');
   const store=GSiSRosterImport.open(database(env),binding);let progress=await store.reserve();if(progress.requiresRestart)return progress;
+  if(internal.enqueue)return {...progress,serverDriven:true,serverImport:await queueRosterImport(database(env),binding,who)};
   if(progress.next==='prepare'){
    const claim=await store.claimPreparation();let frozen=claim.result;
    if(claim.owned){
@@ -277,20 +281,22 @@ export async function edgeRosterMigration(env,input,who){const adminProof=await 
      const detail=error.failureReason||{},status=Number.isSafeInteger(detail.status)?detail.status:error.status,reason={status:status>=400&&status<=599?status:503,message:String(detail.message||error.message||'The preparation response was not confirmed.').slice(0,800),phase:String(detail.phase||claim.result?.lastPhase||(claim.ordinal===0?'capture':'preparation')).replace(/[\u0000-\u001f]/g,' ').slice(0,80),elapsed:Number.isSafeInteger(detail.elapsed)&&detail.elapsed>=0?detail.elapsed:Math.max(0,Date.now()-started)};
      await store.recordPreparationFailure(claim,reason);error.failureReason=reason;error.message=reason.message+' Phase: '+reason.phase+'; '+Math.floor(reason.elapsed/1000)+' s.';throw error;
     }
-   }else if(!claim.finished)return {...await store.progress(),preparing:true,sourceDigest:claim.result?.sourceDigest||null,retryAfterMs:2000};
+   }else if(!claim.finished)return {...await store.progress(),preparing:true,preparationLeaseUntil:claim.leaseUntil,sourceDigest:claim.result?.sourceDigest||null,retryAfterMs:2000};
    if(!frozen||frozen.adminVerified!==true||frozen.sessionId!==binding.sessionId)fail(503,'ROSTER_EXPORT_INVALID','The accepted immutable preparation is unavailable.');
    if(frozen.preparing)return {...await store.progress(),preparing:true,sourceDigest:frozen.sourceDigest||null,retryAfterMs:Math.min(5000,Math.max(1000,Number(frozen.retryAfterMs)||2000))};const current=await signedBridge(env,{operation:'edgeReferences'},who);if(current.adminVerified!==true)fail(403,'ROSTER_ADMIN_REQUIRED','Admin access is required to bind the prepared source.');
    if(frozen.preparationFailed)return store.failPreparation();
    await store.bind(frozen.manifest,frozen.manifestDigest);return {...await store.progress(),scopes:heads};
   }
   if(progress.nextPart){
-   const part=progress.nextPart,exported=await signedBridge(env,{operation:'edgeExportPart',requestId:binding.requestId,sessionId:binding.sessionId,partId:part.id,...await acceptedImportPreparation(store)},who);
+   const parts=internal.parallelParts?await store.pendingParts(4):[progress.nextPart],preparation=await acceptedImportPreparation(store);
+   const staged=await Promise.allSettled(parts.map(async part=>{const exported=await signedBridge(env,{operation:'edgeExportPart',requestId:binding.requestId,sessionId:binding.sessionId,partId:part.id,...preparation},who);
    if(exported.adminVerified!==true||exported.sessionId!==binding.sessionId||exported.manifestDigest!==progress.manifestDigest||exported.partId!==part.id)fail(503,'ROSTER_EXPORT_INVALID','The immutable export part belongs to another session.');
    const verified=await store.validatePart(part.id,exported.payload),prior=await store.partReceipt(part.id),objectReceipt=part.kind==='records'||prior?undefined:await GSiSRosterImport.stageObject(bucket(env),store,binding.sessionId,verified.part,verified.body);
    // Revalidate the current Admin after potentially slow object I/O, before its
    // durable receipt. A revoked actor cannot finish a formerly accepted step.
    const current=await signedBridge(env,{operation:'edgeReferences'},who);if(current.adminVerified!==true)fail(403,'ROSTER_ADMIN_REQUIRED','Admin access is required to commit import progress.');
-   await store.stage(part.id,exported.payload,objectReceipt);return store.progress();
+   await store.stage(part.id,exported.payload,objectReceipt);}));
+   const failed=staged.find(result=>result.status==='rejected');if(failed)throw failed.reason;return store.progress();
   }
   if(!progress.referencesReady){await refreshEdgeRosterReferences(env,{force:true});const current=await signedBridge(env,{operation:'edgeReferences'},who);if(current.adminVerified!==true)fail(403,'ROSTER_ADMIN_REQUIRED','Admin access is required to commit import progress.');return store.referencesReady();}
   progress=await store.finalize();return {...progress,scopes:await migrationHeads(env),next:'Verify the immutable export manifest, part receipts and source digest before activation.'};

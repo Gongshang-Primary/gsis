@@ -106,6 +106,7 @@ function rosterEdgeMigrationDispatch_(req,c){
  }finally{if(user)deployUnlock_(user);deployUnlock_(script);}
 }
 function rosterEdgeServiceMigrationDispatch_(req){
+ if(req.input?.operation==='edgeDeployPublication')return {handled:true,result:deployEdgeRosterPublication_(req.input)};
  const op=req.input?.operation;if(op==='edgeReferences'){const fresh=rosterServiceContacts_();return {handled:true,result:rosterEdgeReferences_(fresh.c,false)};}
  if(op==='edgeFenceStatus')return {handled:true,result:{legacyWritesDisabled:props_().getProperty('ROSTER_EDGE_AUTHORITY')==='d1',sourceDigest:props_().getProperty('ROSTER_EDGE_SOURCE_DIGEST')||null,cutoverFreeze:rosterCutoverStatus_()}};
  if(op==='edgeCutoverComplete')return {handled:true,result:rosterCutoverComplete_(req.input)};

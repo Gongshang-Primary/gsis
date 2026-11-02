@@ -1,0 +1,37 @@
+import assert from 'node:assert/strict';
+import {createRequire} from 'node:module';
+import {createDeployDomain} from '../public/edge-deploy-domain.js';
+import {edgeDeployRosterReference,edgeDeployPersonalCalculation} from '../public/edge-deploy.js';
+import {sha256Bytes} from '../public/edge-deploy-sha256.js';
+const require=createRequire(import.meta.url),Store=require('../shared/edge-store.js'),database=require('./helpers/chunked-import-db.cjs');
+const state={index:{versions:[],published:null,revision:0,publicationSchema:1,requests:[]},drafts:{},publications:{},receipts:{},deltas:{},leases:{},properties:{},jobs:{}},identity={email:'fixture@school.test'},model=createDeployDomain({state,identity,sha256:sha256Bytes,calculations:new Map(),integration(){throw Error('Unexpected integration');}});
+model.dispatch({action:'change',input:{operation:'create',name:'2026 Fixture',requestId:crypto.randomUUID()},identity},{user:{email:identity.email,roles:['Admin','KP']},people:[],sysFields:{},roleCatalogue:[],authoritative:true});
+const document=structuredClone(model.readDocument(state.index.versions[0]));Object.assign(document,{from:'2026-01-01',to:'2026-12-31',teachers:[{id:'one',name:'One',active:true,role:'Teacher',groups:[],profile:{'Basic Name':'One',Role:'Teacher',Active:'Y','EO Appt Level':'GEO3'}},{id:'two',name:'Two',active:true,role:'Teacher',groups:[],profile:{'Basic Name':'Two',Role:'Teacher',Active:'Y','EO Appt Level':'GEO3'}}],assignments:[]});
+let entry={...state.index.versions[0],commit:'published-fixture-1',revision:7,from:document.from,to:document.to},now=Date.now(),calls=0,fail=false;const originalFetch=globalThis.fetch,originalNow=Date.now,originalWarn=console.warn,warnings=[];
+const google=database(),d1=database(),env={GSIS_JOBS:google,APPS_SCRIPT_URL:'https://script.google.com/macros/s/roster-fixture/exec',ROSTER_SERVICE_SECRET:'s'.repeat(40)};
+const clean=value=>{const copy=structuredClone(value);delete copy.edgeRevision;delete copy.source?.checkedAt;return copy;};
+try{
+ Date.now=()=>now;
+ globalThis.fetch=async(_,options)=>{calls++;const request=JSON.parse(JSON.parse(options.body).payload);assert.equal(request.action,'rosterService');assert.equal(request.input.operation,'edgeDeployPublication');assert.equal(request.service,'gsis-roster-notifier-v1');if(fail)throw Error('Google unavailable');return Response.json({ok:true,data:request.input.knownCommit===entry.commit&&request.input.knownRevision===entry.revision?{unchanged:true,entry}:{entry,document}});};
+ const actual=await edgeDeployRosterReference(env,['2026-11-02']),expected=model.rosterReference(document,entry);assert.deepEqual(clean(actual),clean(expected));assert.equal(actual.rows.length,2);assert(actual.rows.some(row=>Number.isFinite(row.R)),'parity includes calculated quotas');
+ await edgeDeployRosterReference(env);assert.equal(calls,1,'warm D1 publication cache avoids Google requests');
+ const native={index:{versions:[],published:{...entry,edgePublished:true},venuePublications:[],revision:entry.revision},publications:{},drafts:{},receipts:{},deltas:{},leases:{},properties:{},jobs:{}};
+ const fieldScope={};require('node:vm').runInNewContext(require('node:fs').readFileSync('shared/fields.js','utf8'),fieldScope);const Fields=fieldScope.GSISFields;for(const [key,value] of Object.entries(Fields.flat(document)))native.publications[entry.commit+'|'+key]=value;
+ const store=Store.open(d1,'deploy'),imported=await store.importState({state:native,actor:'admin',requestId:'d1-import'});await store.transition({from:'imported',to:'active',expectedRevision:imported.revision,actor:'admin',proof:{legacyWritesDisabled:true,sourceDigest:imported.sourceDigest,verifiedRecords:imported.importedRecords}});
+ assert.deepEqual(clean(await edgeDeployRosterReference({GSIS_JOBS:d1})),clean(actual),'D1 and Google publications use the same calculator');
+ const personal=await edgeDeployPersonalCalculation(env,'one','2026-11-02');assert.equal(personal.row.teacherId,'one');assert.equal(calls,1);
+ now+=31000;await edgeDeployRosterReference(env);assert.equal(calls,2,'expired metadata checks preserve the immutable cached document');
+ entry={...entry,commit:'published-fixture-2',revision:8};now+=31000;assert.equal((await edgeDeployRosterReference(env)).source.commit,entry.commit);assert.equal(calls,3);
+ console.warn=(...args)=>warnings.push(args.join(' '));
+ google.sql.exec("CREATE TRIGGER reject_deploy_cache BEFORE INSERT ON gsis_roster_deploy_publications BEGIN SELECT RAISE(FAIL,'private upstream cache failure'); END");
+ now+=31000;assert.deepEqual(clean(await edgeDeployRosterReference(env)),clean(model.rosterReference(document,entry)),'a failed metadata cache refresh still returns verified quotas');
+ google.sql.exec('DELETE FROM gsis_roster_deploy_publications');
+ document.cacheSizeFixture='x'.repeat(2*1024*1024);assert(Buffer.byteLength(JSON.stringify({entry,document}))>2*1024*1024);
+ assert.deepEqual(clean(await edgeDeployRosterReference(env)),clean(model.rosterReference(document,entry)),'an uncached document above the D1 row limit still returns verified quotas');
+ assert.equal((await edgeDeployPersonalCalculation(env,'one','2026-11-02')).row.teacherId,'one','personal calculation survives a rejected cache write');
+ assert.equal(warnings.length,3);assert(warnings.every(line=>JSON.parse(line).code==='ROSTER_DEPLOY_CACHE_WRITE_FAILED'));assert(!warnings.join(' ').includes('private upstream'),'cache diagnostics omit upstream error text');
+ google.sql.exec('DROP TRIGGER reject_deploy_cache');delete document.cacheSizeFixture;
+ fail=true;now+=31000;await assert.rejects(edgeDeployRosterReference(env),/Google unavailable/,'failed validation cannot return empty or stale quotas');
+ google.sql.exec('DELETE FROM gsis_roster_deploy_publications');await assert.rejects(edgeDeployRosterReference(env),/Google unavailable/,'cold failure fails closed');
+ console.log('PASS published Google Deploy adapter: canonical quota parity, D1 parity, revision cache, publication refresh, personal calculation and failed source');
+}finally{Date.now=originalNow;globalThis.fetch=originalFetch;console.warn=originalWarn;google.sql.close();d1.sql.close();}

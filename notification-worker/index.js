@@ -6,7 +6,7 @@ import {readQuietMode} from '../shared/roster-quiet-mode.js';
 import {readRosterCutoverFreeze} from '../shared/roster-cutover-freeze.js';
 // Test harnesses load this file with its imports removed; treat quiet mode as off there.
 const quietMode=(db,at)=>typeof readQuietMode==='function'?readQuietMode(db,at):Promise.resolve({active:false});
-import {dispatchNotifications,scheduledRoster,diagnoseNotificationConnections,dispatchInboxPending,dispatchWebhookJobs,dispatchReceivedReports,dispatchPeerMail,dispatchAllocationAudit,dispatchGoogleBackup,dispatchReferencesRefresh} from '../roster-update/public/_worker.js';
+import {dispatchNotifications,scheduledRoster,diagnoseNotificationConnections,dispatchInboxPending,dispatchWebhookJobs,dispatchReceivedReports,dispatchPeerMail,dispatchAllocationAudit,dispatchGoogleBackup,dispatchRosterImports,dispatchReferencesRefresh} from '../roster-update/public/_worker.js';
 /* GSIS_API_SECRET_BEGIN */
 // First-party API credentials share one operator-selected setting. Browser
 // sessions, private relief links and third-party credentials stay independent.
@@ -41,7 +41,7 @@ async function stage(env,job,event,work,{scheduledTime}={}){
  const record=async data=>{if(env.GSIS_JOBS?.prepare)try{await recordJobHealth(env,{job,traceId,startedAt,...data});}catch{console.error(JSON.stringify({event:'roster-health-record-failed',job,code:'UNAVAILABLE',traceId}));}};
  try{
   writable(env);
-  const freeze=env.ROSTER_EDGE_AUTHORITY!=='d1'&&!['r2-cleanup','google-backup'].includes(job)&&typeof readRosterCutoverFreeze==='function'?await readRosterCutoverFreeze(env):null;
+  const freeze=env.ROSTER_EDGE_AUTHORITY!=='d1'&&!['r2-cleanup','google-backup','roster-import'].includes(job)&&typeof readRosterCutoverFreeze==='function'?await readRosterCutoverFreeze(env):null;
   const result=freeze?.active?{skipped:true,cutoverFrozen:true,reason:'cutover freeze',code:freeze.overdue?'ROSTER_CUTOVER_OVERDUE':'ROSTER_CUTOVER_FROZEN'}:await work(),data=result?.data||result,summary=safeSummary(data);
   if(result?.ok===false||data?.failures?.length)throw Object.assign(Error('Job failed'),{...safeError(result),status:result.status});
   const uncertain=job==='peer-mail'&&Number.isSafeInteger(data?.newUncertain)?data.newUncertain:data?.uncertain;
@@ -91,6 +91,7 @@ export default {
    }
    // Keep D1's Contacts authority fresh before any job reads it (run() never throws).
    if(typeof dispatchReferencesRefresh==='function')await run('references','roster-references-refresh',()=>dispatchReferencesRefresh(env));
+   const imports=typeof dispatchRosterImports==='function'?run('roster-import','roster-import-continuation',()=>dispatchRosterImports(env)):Promise.resolve();
    const backup=typeof dispatchGoogleBackup==='function'?run('google-backup','roster-google-backup',()=>dispatchGoogleBackup(env)):Promise.resolve();
    const send=()=>run('notifications','roster-notification-dispatch',()=>dispatchNotifications(env));
    // Independent notice and human inbox work can progress during slow planning.
@@ -109,13 +110,23 @@ export default {
     // Reuse the same durable outbox. Never reconstruct or reset provider claims.
     if(result?.notificationsQueued>0||receiptResult?.intake?.notificationsQueued>0){await notifications;await send();}
    })();
-   await Promise.all([backup,received,notifications,inbox,ingress,peerMail,planning]);
+   await Promise.all([imports,backup,received,notifications,inbox,ingress,peerMail,planning]);
   })());
  },
  async queue(batch,env){
   env=(typeof resolveRosterAuthorityEnvironment==='function'?await resolveRosterAuthorityEnvironment(env):rosterRecoveryEnvironment(env));
   try{writable(env);}catch(error){console.error(JSON.stringify({event:'roster-queue-paused',...safeError(error)}));batch.retryAll({delaySeconds:300});return;}
-  const supported=batch.messages.filter(message=>message.body?.purpose==='gsis-notification-wake-v1'),unsupported=batch.messages.filter(message=>message.body?.purpose!=='gsis-notification-wake-v1');
+  const backupMessages=batch.messages.filter(message=>message.body?.purpose==='gsis-roster-backup-wake-v1'),importMessages=batch.messages.filter(message=>message.body?.purpose==='gsis-roster-import-wake-v1'),supported=batch.messages.filter(message=>message.body?.purpose==='gsis-notification-wake-v1'),unsupported=batch.messages.filter(message=>!['gsis-notification-wake-v1','gsis-roster-import-wake-v1','gsis-roster-backup-wake-v1'].includes(message.body?.purpose));
+  if(importMessages.length){
+   const result=await stage(env,'roster-import',null,()=>dispatchRosterImports(env));
+   if(result.stageFailed||result.pending)settleMessages(batch,importMessages,'retry',{delaySeconds:Math.max(1,Math.min(900,Math.ceil(((result.readyAt||Date.now()+1000)-Date.now())/1000)))});
+   else settleMessages(batch,importMessages,'ack');
+  }
+  if(backupMessages.length){
+   const result=await stage(env,'google-backup',null,()=>dispatchGoogleBackup(env));
+   if(result.stageFailed||result.pending||result.failed)settleMessages(batch,backupMessages,'retry',{delaySeconds:60});
+   else settleMessages(batch,backupMessages,'ack');
+  }
   if(unsupported.length){
    console.error(JSON.stringify({event:'roster-queue-unsupported-recovery-wake',code:'RECOVERY_UNSUPPORTED_WAKE',pending:unsupported.length}));
    // An old v0.9.7 background consumer may still be attached. Do not claim its
@@ -144,8 +155,8 @@ export default {
    if(typeof envelope.payload!=='string'||!/^[a-f0-9]{64}$/.test(envelope.signature||''))throw Error();
    const key=await crypto.subtle.importKey('raw',new TextEncoder().encode(serviceSecret),{name:'HMAC',hash:'SHA-256'},false,['verify']);
    if(!await crypto.subtle.verify('HMAC',key,Uint8Array.from(envelope.signature.match(/../g),value=>parseInt(value,16)),new TextEncoder().encode(envelope.payload)))throw Error();
-   const input=JSON.parse(envelope.payload);if(input.purpose!=='gsis-notification-wake-v1'||!Number.isFinite(input.timestamp)||Math.abs(Date.now()-input.timestamp)>120000||!/^[a-f0-9-]{36}$/i.test(input.nonce||''))throw Error();
-   writable(env);await env.NOTIFICATION_QUEUE.send({purpose:'gsis-notification-wake-v1',id:input.nonce,queuedAt:Date.now()});
+   const input=JSON.parse(envelope.payload);if(!['gsis-notification-wake-v1','gsis-roster-import-wake-v1','gsis-roster-backup-wake-v1'].includes(input.purpose)||!Number.isFinite(input.timestamp)||Math.abs(Date.now()-input.timestamp)>120000||!/^[a-f0-9-]{36}$/i.test(input.nonce||''))throw Error();
+   writable(env);await env.NOTIFICATION_QUEUE.send({purpose:input.purpose,id:input.nonce,queuedAt:Date.now()});
    return Response.json({ok:true,queued:true},{status:202,headers:{'Cache-Control':'no-store'}});
   }catch{return Response.json({ok:false,error:'Notification wake was not accepted.'},{status:403,headers:{'Cache-Control':'no-store'}});}
  }
