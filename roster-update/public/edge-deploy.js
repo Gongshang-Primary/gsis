@@ -219,8 +219,27 @@ export async function edgeDeployPublishedReferences(env,input={}){
  const entry=input.commit?entries.find(en=>en.commit===input.commit&&(!input.versionId||en.id===input.versionId)):state.index.published;
  if(!entry)fail(404,'Published Deploy version is unavailable.');return {entry,document:readDocument(state,entry),edgeRevision:loaded.revision,source:references.find(ref=>ref.commit===entry.commit)};
 }
+async function rosterDeployPublication(env){
+ const store=storeFor(env),head=await store.head();if(head.mode==='active')return edgeDeployPublishedReferences(env);
+ // Deploy stays on Google. The signed Roster adapter reads only its immutable
+ // publication; the common domain below owns every calculation in both paths.
+ const db=env.GSIS_JOBS.withSession?.('first-primary')||env.GSIS_JOBS,sourceKey=sha256Hex(String(env.APPS_SCRIPT_URL||'')),started=Date.now();
+ await db.prepare('CREATE TABLE IF NOT EXISTS gsis_roster_deploy_publications (source_key TEXT PRIMARY KEY,publication_key TEXT NOT NULL,checked_at INTEGER NOT NULL,reference_json TEXT NOT NULL)').run();
+ const row=await db.prepare('SELECT * FROM gsis_roster_deploy_publications WHERE source_key=?').bind(sourceKey).first();let cached=null;
+ try{cached=row?JSON.parse(row.reference_json):null;}catch{}
+ const valid=ref=>ref?.entry&&typeof ref.entry.id==='string'&&ref.entry.id&&typeof ref.entry.commit==='string'&&ref.entry.commit&&Number.isSafeInteger(ref.entry.revision)&&ref.entry.revision>=0&&ref.document?.id===ref.entry.id&&Array.isArray(ref.document.teachers)&&Array.isArray(ref.document.assignments);
+ if(cached&&!valid(cached))cached=null;
+ if(cached&&row.publication_key===JSON.stringify([cached.entry.id,cached.entry.commit,cached.entry.revision])&&started>=row.checked_at&&started-row.checked_at<30000)return cached;
+ const reply=await signed(env.APPS_SCRIPT_URL,gsisApiSecret(env,'ROSTER_SERVICE_SECRET'),{action:'rosterService',service:'gsis-roster-notifier-v1',input:{operation:'edgeDeployPublication',...(cached?{knownCommit:cached.entry.commit,knownRevision:cached.entry.revision}:{})}});
+ const ref=reply?.unchanged===true&&cached&&reply.entry?.id===cached.entry.id&&reply.entry?.commit===cached.entry.commit&&reply.entry?.revision===cached.entry.revision?cached:reply;
+ if(!valid(ref))fail(503,'Google did not return a verified published Deploy document.','ROSTER_DEPLOY_PUBLICATION_INVALID');
+ const publicationKey=JSON.stringify([ref.entry.id,ref.entry.commit,ref.entry.revision]);
+ try{await db.prepare('INSERT INTO gsis_roster_deploy_publications(source_key,publication_key,checked_at,reference_json) VALUES(?,?,?,?) ON CONFLICT(source_key) DO UPDATE SET publication_key=excluded.publication_key,checked_at=excluded.checked_at,reference_json=excluded.reference_json WHERE excluded.checked_at>=gsis_roster_deploy_publications.checked_at').bind(sourceKey,publicationKey,started,JSON.stringify(ref)).run();}
+ catch{console.warn(JSON.stringify({code:'ROSTER_DEPLOY_CACHE_WRITE_FAILED'}));}
+ return ref;
+}
 export async function edgeDeployRosterReference(env,dates){
- const ref=await edgeDeployPublishedReferences(env),state=knownState({index:{versions:[],published:ref.entry,venuePublications:[ref.entry],revision:ref.entry.revision},publications:{}});
+ const ref=await rosterDeployPublication(env),state=knownState({index:{versions:[],published:ref.entry,venuePublications:[ref.entry],revision:ref.entry.revision},publications:{}});
  // Canonical relief model consumes an immutable publication document.
  return {...createDeployDomain({state,identity:{email:'internal'},sha256:sha256Bytes,calculations,integration:()=>fail(503,'Unexpected integration')}).rosterReference(ref.document,ref.entry),edgeRevision:ref.edgeRevision};
 }
@@ -228,7 +247,7 @@ export async function edgeDeployRosterReference(env,dates){
 // The result contains one teacher's calculation and aggregate reference numbers only.
 export async function edgeDeployPersonalCalculation(env,staffId,today=new Date(Date.now()+8*3600000).toISOString().slice(0,10)){
  if(typeof staffId!=='string'||!staffId||!/^\d{4}-\d{2}-\d{2}$/.test(today))fail(400,'A verified teacher and school date are required.');
- let ref;try{ref=await edgeDeployPublishedReferences(env);}catch(e){if(e.status!==404)throw e;return {asOf:today,units:'periods/week',source:null,calculation:null,calculationReason:'No published Deploy calculation is available.',row:null,reference:null};}
+ let ref;try{ref=await rosterDeployPublication(env);}catch(e){if(e.status!==404)throw e;return {asOf:today,units:'periods/week',source:null,calculation:null,calculationReason:'No published Deploy calculation is available.',row:null,reference:null};}
  const state=knownState({index:{versions:[],published:ref.entry,revision:ref.entry.revision}}),model=createDeployDomain({state,identity:{email:'internal'},sha256:sha256Bytes,calculations,integration:()=>fail(503,'Unexpected integration')});
  return {...model.personalCalculation(ref.document,ref.entry,staffId,today),edgeRevision:ref.edgeRevision};
 }

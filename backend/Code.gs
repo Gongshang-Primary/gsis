@@ -9986,6 +9986,13 @@ function rosterPeerMailReviewDispatch_(req,c){
 
 /* GSIS_DEPLOY_EDGE_BEGIN */
 /* v0.9.4 Deploy Google adapters. D1 remains the only operational writer after fencing. */
+function deployEdgeRosterPublication_(input){
+ const {book:b,index:idx,entry}=rosterOperationsQuotaSource_();
+ if(!entry?.id||!entry.commit||!Number.isSafeInteger(entry.revision))error_(503,'No verified published Deploy document is available.');
+ const result=input.knownCommit===entry.commit&&input.knownRevision===entry.revision?{unchanged:true,entry}:{entry,document:document_(b,entry)};
+ const after=index_(b),current=publishedEntry_(after);if(after.pendingFieldCommit||current?.id!==entry.id||current?.commit!==entry.commit||current?.revision!==entry.revision)error_(503,'Deploy publication changed during the read. Retry.');
+ return result;
+}
 function deployEdgeFenced_(){return props_().getProperty('DEPLOY_EDGE_MODE')==='fenced';}
 function deployEdgeFence_(req){
  if(!deployEdgeFenced_())return;
@@ -10175,6 +10182,7 @@ function rosterEdgeMigrationDispatch_(req,c){
  }finally{if(user)deployUnlock_(user);deployUnlock_(script);}
 }
 function rosterEdgeServiceMigrationDispatch_(req){
+ if(req.input?.operation==='edgeDeployPublication')return {handled:true,result:deployEdgeRosterPublication_(req.input)};
  const op=req.input?.operation;if(op==='edgeReferences'){const fresh=rosterServiceContacts_();return {handled:true,result:rosterEdgeReferences_(fresh.c,false)};}
  if(op==='edgeFenceStatus')return {handled:true,result:{legacyWritesDisabled:props_().getProperty('ROSTER_EDGE_AUTHORITY')==='d1',sourceDigest:props_().getProperty('ROSTER_EDGE_SOURCE_DIGEST')||null,cutoverFreeze:rosterCutoverStatus_()}};
  if(op==='edgeCutoverComplete')return {handled:true,result:rosterCutoverComplete_(req.input)};

@@ -1,3 +1,7 @@
+# Pending: R2 Google published Deploy source for D1 Roster, 2 November 2026
+
+Model: Codex. D1 Roster reads the immutable published Deploy document through its signed Google service while Deploy remains on Google. Both sources use the existing rosterReference calculator. D1 caches the publication by commit and revision, rechecks metadata after 30 seconds, and fails closed if verification fails. Personal calculations use the same source. No live authority or settings changed. See [R2 task](docs/coordination/tasks/roster-google-deploy-reference.md).
+
 ## Pending: R6 peer-mail health only, 2 November 2026
 
 Model: Codex. Split the peer-mail health changes from held #41 without inactive-staff or weekly-R/FAJT work. Each unchanged uncertain outcome records one health observation, reviewed uncertainty remains idle, and delivery evidence is retained. D1 health receipts commit to D1; Google remains send-only for new guarded mail handoffs. The fenced-Google regression runs actual Worker dispatch through ten idle ticks with zero Google calls and no resend. #41 stays open. See [R6 task](docs/coordination/tasks/roster-peer-mail-health-only.md). Not deployed.
