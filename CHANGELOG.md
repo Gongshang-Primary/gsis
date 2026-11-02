@@ -1,3 +1,7 @@
+# Pending: R8 verified retained import archival, 2 November 2026
+
+Model: Codex. Admin can archive eligible abandoned import sessions into bounded, checksum-verified private R2 gzip JSON pages and a manifest. D1 copies are removed only in a guarded transaction after readback; the newest two sessions and every session not abandoned stay in D1. Import continuation makes bounded automatic progress. Admission cap increases from 8 to 24. Original records, receipts and evidence remain retained; no live archival or authority change. See [R8 task](docs/coordination/tasks/roster-import-session-archive.md).
+
 # Pending: R3 Worker-only Google backup, 2 November 2026
 
 Model: Codex. Update backup returns status and queues a dedicated Worker wake without capturing or leasing a mirror in Pages. Worker runs allow 180 seconds and 64 steps, with up to 500 items and a 2 MiB target per transfer. A 13.5k-row full copy passes the 30-minute test under the recorded latency envelope. Source and page receipts, unknown sends and authority stay intact. See [R3 task](docs/coordination/tasks/roster-backup-worker-throughput.md).

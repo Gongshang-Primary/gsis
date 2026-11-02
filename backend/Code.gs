@@ -10244,7 +10244,7 @@ function rosterEdgeExportManifestLegacy_(req){
  const binding=rosterEdgeExportBinding_(req),script=LockService.getScriptLock();if(!deployLock_(script,8000))error_(503,'A Roster save is finishing. Retry the same import.');let user,snapshot,descriptor,created=false;
  try{
   descriptor=rosterEdgeExportDescriptor_(binding);if(!descriptor){
-  if(Object.keys(props_().getProperties()).filter(key=>key.startsWith('ROSTER_EDGE_EXPORT:')).length>=GSiSRosterImport.MAX_RETAINED_SESSIONS)error_(409,'Preparation has eight retained sessions. Reviewed archival and cleanup are required before a new capture; existing sessions remain resumable.');
+  if(Object.keys(props_().getProperties()).filter(key=>key.startsWith('ROSTER_EDGE_EXPORT:')).length>=GSiSRosterImport.MAX_RETAINED_SESSIONS)error_(409,'Preparation has 24 retained sessions. Reviewed archival and cleanup are required before a new capture; existing sessions remain resumable.');
   rosterEdgeAssertLegacyWrite_(true);user=typeof rosterNotificationLock_==='function'?rosterNotificationLock_():LockService.getUserLock();if(!deployLock_(user,8000))error_(503,'Notification delivery is finishing. Retry the same import.');
   descriptor={...binding,state:'preparing',sourceDigest:null,createdAt:Date.now(),leaseUntil:Date.now()+600000,name:'Roster immutable import '+binding.sessionId+'.bin'};rosterEdgeExportSave_(descriptor);created=true;
   snapshot=rosterEdgeSnapshot_();rosterEdgeRememberSnapshotParts_(snapshot);descriptor.sourceDigest=snapshot.sourceDigest;rosterEdgeExportSave_(descriptor);
@@ -10357,7 +10357,7 @@ function rosterEdgeExportCaptureV2_(binding){
  try{
   descriptor=rosterEdgeExportDescriptor_(binding);if(descriptor)return descriptor;
   const retained=new Set(Object.keys(props_().getProperties()).filter(key=>key.startsWith('ROSTER_EDGE_EXPORT:')||key.startsWith('ROSTER_EDGE_EXPORT_ABANDONED:')).map(key=>key.slice(key.indexOf(':')+1)));
-  if(retained.size>=GSiSRosterImport.MAX_RETAINED_SESSIONS)error_(409,'Preparation has eight retained sessions. Reviewed archival and cleanup are required before a new capture; existing sessions remain resumable.');
+  if(retained.size>=GSiSRosterImport.MAX_RETAINED_SESSIONS)error_(409,'Preparation has 24 retained sessions. Reviewed archival and cleanup are required before a new capture; existing sessions remain resumable.');
   rosterEdgeAssertLegacyWrite_(true);user=typeof rosterNotificationLock_==='function'?rosterNotificationLock_():LockService.getUserLock();if(!deployLock_(user,8000))error_(503,'Notification delivery is finishing. Retry the same import.');
   descriptor={schema:2,...binding,state:'capturing',createdAt:Date.now(),stepStartedAt:Date.now(),sourceName:'Roster import '+binding.sessionId+' source.json'};rosterEdgeExportPhaseV2_(descriptor,'Capture snapshot');
   const snapshot=rosterEdgeSnapshot_();rosterEdgeRememberSnapshotParts_(snapshot);envelope={schema:ROSTER_EXPORT_V2,...binding,sourceDigest:snapshot.sourceDigest,snapshot};
@@ -10755,7 +10755,7 @@ if(typeof module!=='undefined'&&module.exports)module.exports=GSiSEdgeStore;
  * until the complete, verified session is committed in one transaction. */
 var GSiSRosterImport=(()=>{
  const Store=typeof GSiSEdgeStore!=='undefined'?GSiSEdgeStore:require('./edge-store.js');
- const FORMAT='gsis-roster-import-v1',TARGET_BYTES=196608,SEGMENT_BYTES=196608,MAX_PART_BYTES=1900000,MAX_MANIFEST_BYTES=524288,MAX_PARTS=2048,MAX_TOTAL_BYTES=41943040,MAX_OBJECT_BYTES=33554432,MAX_RETAINED_SESSIONS=8,PREPARATION_LEASE_MS=420000,MAX_PREPARATION_RESULT_BYTES=1048576;
+ const FORMAT='gsis-roster-import-v1',TARGET_BYTES=196608,SEGMENT_BYTES=196608,MAX_PART_BYTES=1900000,MAX_MANIFEST_BYTES=524288,MAX_PARTS=2048,MAX_TOTAL_BYTES=41943040,MAX_OBJECT_BYTES=33554432,MAX_RETAINED_SESSIONS=24,PREPARATION_LEASE_MS=420000,MAX_PREPARATION_RESULT_BYTES=1048576;
  const SCOPES=['roster','roster-register'];
  const PENDING_CLEANUP="s.state='abandoned' AND s.reset_request<>'' AND NOT EXISTS(SELECT 1 FROM gsis_roster_import_preparation p WHERE p.session_id=s.session_id AND p.cleanup_request=s.reset_request)";
  const fail=(status,code,message)=>{throw Object.assign(Error(message),{status,code});};
@@ -10854,7 +10854,8 @@ var GSiSRosterImport=(()=>{
   async function reserve(){
    const prior=await read();if(prior){if(prior.state==='abandoned')fail(409,'ROSTER_IMPORT_RESTART','This retained session was restarted. Use a new request ID.');return progress();}
    await requireCleanupFinished();
-   const retained=await connection().prepare('SELECT COUNT(*) n FROM gsis_roster_import_sessions').first();if(retained.n>=MAX_RETAINED_SESSIONS)fail(409,'ROSTER_IMPORT_CAPACITY','Preparation has eight retained sessions. Reviewed archival and cleanup are required before a new capture; existing sessions remain resumable.');
+   if(await connection().prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='gsis_roster_import_archives'").first())if(await connection().prepare('SELECT 1 FROM gsis_roster_import_archives WHERE session_id=?').bind(sessionId).first())fail(409,'ROSTER_IMPORT_ARCHIVED','This import identity is retained in an archive. Start with a new request ID.');
+   const retained=await connection().prepare('SELECT COUNT(*) n FROM gsis_roster_import_sessions').first();if(retained.n>=MAX_RETAINED_SESSIONS)fail(409,'ROSTER_IMPORT_CAPACITY','Preparation has 24 retained sessions. Archive eligible abandoned sessions before a new capture; existing sessions remain resumable.');
    const c=connection(),now=Date.now(),stmt=[c.prepare(`INSERT INTO gsis_roster_import_sessions (session_id,actor,request_id,state,created_at,updated_at)
     SELECT ?,?,?,'preparing',?,? WHERE (SELECT COUNT(*) FROM gsis_edge_heads WHERE scope IN ('roster','roster-register') AND mode='legacy' AND revision=0)=2
     AND NOT EXISTS(SELECT 1 FROM gsis_edge_records WHERE scope IN ('roster','roster-register')) AND NOT EXISTS(SELECT 1 FROM gsis_roster_import_locks) AND NOT EXISTS(SELECT 1 FROM gsis_roster_import_sessions s WHERE ${PENDING_CLEANUP}) AND (SELECT COUNT(*) FROM gsis_roster_import_sessions)<?`).bind(sessionId,actor,requestId,now,now,MAX_RETAINED_SESSIONS)];
@@ -11052,7 +11053,94 @@ var GSiSRosterImport=(()=>{
  }
  async function latest(db){await ensure(db);return (await (typeof db.withSession==='function'?db.withSession('first-primary'):db).prepare(`SELECT s.session_id sessionId,s.actor,s.request_id requestId,s.state,s.source_digest sourceDigest,s.manifest_digest manifestDigest FROM gsis_roster_import_sessions s ORDER BY EXISTS(SELECT 1 FROM gsis_roster_import_locks l WHERE l.session_id=s.session_id) DESC,(${PENDING_CLEANUP}) DESC,s.created_at DESC,s.rowid DESC LIMIT 1`).first())||null;}
 
- return {objectJobs,prepareObject,prepareRecords,finishFreeze,freeze,validateManifest,utf8Length,open,ensure,latest,resetAfterRollback,pendingRollbackReset,hashText,hashBytes,stageObject,FORMAT,SCOPES,TARGET_BYTES,SEGMENT_BYTES,MAX_PART_BYTES,MAX_PARTS,MAX_MANIFEST_BYTES,MAX_TOTAL_BYTES,MAX_OBJECT_BYTES,MAX_RETAINED_SESSIONS,PREPARATION_LEASE_MS,MAX_PREPARATION_RESULT_BYTES};
+ const ARCHIVES='gsis_roster_import_archives',ARCHIVE_PREFIX='gsis/roster/import-archives/v1/',ARCHIVE_FORMAT='gsis-roster-import-archive-v1',ARCHIVE_LEASE=90000;
+ const archiveSchemas=new WeakMap(),archiveConnection=db=>typeof db.withSession==='function'?db.withSession('first-primary'):db;
+ async function archiveSchema(db){
+  await ensure(db);
+  if(!archiveSchemas.has(db))archiveSchemas.set(db,(async()=>{
+   const c=archiveConnection(db);
+   checked([await c.prepare(`CREATE TABLE IF NOT EXISTS ${ARCHIVES}(session_id TEXT PRIMARY KEY,state TEXT NOT NULL,manifest_json TEXT NOT NULL,cursor_json TEXT NOT NULL,manifest_key TEXT NOT NULL DEFAULT '',manifest_digest TEXT NOT NULL DEFAULT '',lease_token TEXT NOT NULL DEFAULT '',lease_until INTEGER NOT NULL DEFAULT 0,updated_at INTEGER NOT NULL)`).run()]);
+   const tables=['gsis_roster_import_sessions','gsis_roster_import_preparation','gsis_roster_import_locks','gsis_roster_import_parts','gsis_roster_import_rows'];
+   if(await c.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='gsis_roster_import_jobs'").first())tables.push('gsis_roster_import_jobs');
+   const definitions=[];
+   for(const table of tables){
+    const columns=(await c.prepare('PRAGMA table_info('+table+')').all()).results.map(row=>row.name);
+    if(columns.some(name=>!/^[a-z_]+$/.test(name)))fail(503,'ROSTER_IMPORT_ARCHIVE_SCHEMA','Import archive columns could not be verified.');
+    const schema=await c.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name=?").bind(table).first();definitions.push({name:table,columns,schema:schema.sql});
+    // These session-scoped rows are immutable while copying spans requests.
+    // The final guarded batch changes state before deleting any source row.
+    for(const event of ['INSERT','UPDATE','DELETE']){
+     const refs=event==='INSERT'?['NEW']:event==='DELETE'?['OLD']:['OLD','NEW'],condition=refs.map(ref=>`EXISTS(SELECT 1 FROM ${ARCHIVES} WHERE session_id=${ref}.session_id AND state='copying')`).join(' OR ');
+     checked([await c.prepare(`CREATE TRIGGER IF NOT EXISTS ${table}_archive_${event.toLowerCase()} BEFORE ${event} ON ${table} WHEN ${condition} BEGIN SELECT RAISE(ABORT,'ROSTER_IMPORT_ARCHIVING'); END`).run()]);
+    }
+   }
+   return definitions;
+  })().catch(error=>{archiveSchemas.delete(db);throw error;}));
+  const definitions=await archiveSchemas.get(db);
+  // R7 can create its continuation table after this isolate first saw a session.
+  if(!definitions.some(d=>d.name==='gsis_roster_import_jobs')&&await archiveConnection(db).prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='gsis_roster_import_jobs'").first()){archiveSchemas.delete(db);return archiveSchema(db);}
+  return definitions;
+ }
+ function archiveEligible(definitions){
+  return `s.state='abandoned' AND s.session_id NOT IN(SELECT session_id FROM gsis_roster_import_sessions ORDER BY created_at DESC,rowid DESC LIMIT 2)
+   AND NOT EXISTS(SELECT 1 FROM gsis_roster_import_locks WHERE session_id=s.session_id)
+   AND NOT (${PENDING_CLEANUP}) AND NOT EXISTS(SELECT 1 FROM gsis_roster_import_preparation WHERE session_id=s.session_id AND lease_until>${Date.now()})
+   ${definitions.some(d=>d.name==='gsis_roster_import_jobs')?`AND NOT EXISTS(SELECT 1 FROM gsis_roster_import_jobs WHERE session_id=s.session_id AND (state IN ('waiting','running') OR lease_until>${Date.now()}))`:''}`;
+ }
+ async function archiveStatus(db){
+  const definitions=await archiveSchema(db),c=archiveConnection(db),retained=await c.prepare('SELECT COUNT(*) n FROM gsis_roster_import_sessions').first(),eligible=await c.prepare(`SELECT COUNT(*) n FROM gsis_roster_import_sessions s WHERE ${archiveEligible(definitions)}`).first(),archives=(await c.prepare(`SELECT session_id sessionId,manifest_key key,manifest_digest digest,updated_at archivedAt FROM ${ARCHIVES} WHERE state='archived' ORDER BY updated_at DESC LIMIT 24`).all()).results;
+  return {retained:retained.n,capacity:MAX_RETAINED_SESSIONS,pending:eligible.n,archives};
+ }
+ async function archiveRead(bucket,part){
+  const stored=await bucket.get(part.key);if(!stored||stored.size!==part.gzipBytes)fail(503,'ROSTER_IMPORT_ARCHIVE_VERIFY','The import archive readback length did not match.');
+  const zipped=await stored.arrayBuffer();if(zipped.byteLength!==part.gzipBytes||await hashBytes(zipped)!==part.gzipDigest)fail(503,'ROSTER_IMPORT_ARCHIVE_VERIFY','The compressed import archive failed checksum verification.');
+  const raw=await new Response(new Blob([zipped]).stream().pipeThrough(new DecompressionStream('gzip'))).text();
+  if(utf8Length(raw)!==part.bytes||await hashText(raw)!==part.digest)fail(503,'ROSTER_IMPORT_ARCHIVE_VERIFY','The import archive JSON failed checksum verification.');return raw;
+ }
+ async function archiveWrite(bucket,sessionId,value){
+  const raw=JSON.stringify(value),digest=await hashText(raw);if(utf8Length(raw)>8388608)fail(413,'ROSTER_IMPORT_ARCHIVE_SIZE','An import archive page exceeds its bounded size.');
+  const zipped=await new Response(new Blob([raw]).stream().pipeThrough(new CompressionStream('gzip'))).arrayBuffer(),part={key:ARCHIVE_PREFIX+sessionId+'/'+digest+'.json.gz',digest,bytes:utf8Length(raw),gzipBytes:zipped.byteLength,gzipDigest:await hashBytes(zipped)};
+  await bucket.put(part.key,zipped,{httpMetadata:{contentType:'application/gzip'},customMetadata:{digest,schema:ARCHIVE_FORMAT}});
+  if(await archiveRead(bucket,part)!==raw)fail(503,'ROSTER_IMPORT_ARCHIVE_VERIFY','The import archive readback differs from its source.');return part;
+ }
+ async function archiveRetained(db,bucket,{maxSteps=4,budgetMs=8000}={}){
+  const definitions=await archiveSchema(db),c=archiveConnection(db),started=Date.now(),eligible=archiveEligible(definitions);
+  let job=await c.prepare(`SELECT * FROM ${ARCHIVES} WHERE state='copying' ORDER BY updated_at,session_id LIMIT 1`).first();
+  if(!job){
+   const session=await c.prepare(`SELECT s.* FROM gsis_roster_import_sessions s WHERE ${eligible} AND NOT EXISTS(SELECT 1 FROM ${ARCHIVES} WHERE session_id=s.session_id) ORDER BY s.created_at,s.rowid LIMIT 1`).first();
+   if(!session)return {archived:0,processed:0,...await archiveStatus(db)};
+   const manifest={schema:ARCHIVE_FORMAT,sessionId:session.session_id,tables:[],parts:[]};
+   for(const definition of definitions){const count=await c.prepare('SELECT COUNT(*) n FROM '+definition.name+' WHERE session_id=?').bind(session.session_id).first();manifest.tables.push({...definition,rows:count.n});}
+   checked([await c.prepare(`INSERT INTO ${ARCHIVES}(session_id,state,manifest_json,cursor_json,updated_at) SELECT ?,'copying',?,?,? WHERE EXISTS(SELECT 1 FROM gsis_roster_import_sessions s WHERE s.session_id=? AND ${eligible}) AND NOT EXISTS(SELECT 1 FROM ${ARCHIVES} WHERE state='copying') ON CONFLICT(session_id) DO NOTHING`).bind(session.session_id,JSON.stringify(manifest),JSON.stringify({phase:'copy',table:0,after:0}),started,session.session_id).run()]);
+   job=await c.prepare(`SELECT * FROM ${ARCHIVES} WHERE state='copying' ORDER BY updated_at,session_id LIMIT 1`).first();if(!job)return {archived:0,processed:0,...await archiveStatus(db)};
+  }
+  if(!bucket?.put||!bucket?.get)fail(503,'ROSTER_IMPORT_ARCHIVE_BUCKET','Private R2 storage with verified readback is required to archive import sessions.');
+  const token=crypto.randomUUID(),claim=await c.prepare(`UPDATE ${ARCHIVES} SET lease_token=?,lease_until=? WHERE session_id=? AND state='copying' AND lease_until<=?`).bind(token,Date.now()+ARCHIVE_LEASE,job.session_id,Date.now()).run();checked([claim]);
+  if(!claim.meta?.changes)return {archived:0,processed:0,busy:true,...await archiveStatus(db)};
+  let cursor=JSON.parse(job.cursor_json),manifest=JSON.parse(job.manifest_json),processed=0,archived=0;
+  const persist=async()=>{const result=await c.prepare(`UPDATE ${ARCHIVES} SET manifest_json=?,cursor_json=?,updated_at=? WHERE session_id=? AND state='copying' AND lease_token=? AND lease_until>?`).bind(JSON.stringify(manifest),JSON.stringify(cursor),Date.now(),job.session_id,token,Date.now()).run();checked([result]);if(!result.meta?.changes)fail(409,'ROSTER_IMPORT_ARCHIVE_LEASE','Archive ownership changed. Retry to resume its verified checkpoint.');};
+  try{
+   for(const definition of definitions)if(!manifest.tables.some(table=>table.name===definition.name)){const count=await c.prepare('SELECT COUNT(*) n FROM '+definition.name+' WHERE session_id=?').bind(job.session_id).first();const index=manifest.tables.length;manifest.tables.push({...definition,rows:count.n});if(cursor.phase==='verify')cursor={phase:'copy',table:index,after:0};await persist();}
+   for(;processed<Math.max(1,Math.min(20,maxSteps))&&Date.now()-started<Math.max(1,Math.min(15000,budgetMs));processed++){
+    if(cursor.phase==='copy'){
+     const table=manifest.tables[cursor.table];
+     if(!table){cursor={phase:'verify',part:0};await persist();continue;}
+     const projection=table.columns.flatMap(name=>["'"+name+"'",name]).join(','),rows=(await c.prepare(`WITH candidates AS (SELECT rowid source_id,json_object(${projection}) row_json FROM ${table.name} WHERE session_id=? AND rowid>? ORDER BY rowid LIMIT 64), bounded AS (SELECT *,SUM(length(CAST(row_json AS BLOB))) OVER(ORDER BY source_id) bytes FROM candidates) SELECT source_id,row_json FROM bounded WHERE bytes<=262144 OR source_id=(SELECT MIN(source_id) FROM candidates) ORDER BY source_id`).bind(job.session_id,cursor.after).all()).results;
+     if(!rows.length){cursor={phase:'copy',table:cursor.table+1,after:0};await persist();continue;}
+     const part=await archiveWrite(bucket,job.session_id,{schema:ARCHIVE_FORMAT,sessionId:job.session_id,table:table.name,rows:rows.map(row=>JSON.parse(row.row_json))});manifest.parts.push({...part,table:table.name,rows:rows.length});cursor.after=rows.at(-1).source_id;await persist();continue;
+    }
+    const part=manifest.parts[cursor.part];if(part){await archiveRead(bucket,part);cursor.part++;await persist();continue;}
+    for(const table of manifest.tables)if(manifest.parts.filter(p=>p.table===table.name).reduce((n,p)=>n+p.rows,0)!==table.rows)fail(503,'ROSTER_IMPORT_ARCHIVE_VERIFY','Import archive row counts did not match the frozen source.');
+    const saved=await archiveWrite(bucket,job.session_id,manifest),guard=`EXISTS(SELECT 1 FROM ${ARCHIVES} WHERE session_id=? AND state='deleting' AND lease_token=?)`,args=[job.session_id,token];
+    const statements=[c.prepare(`UPDATE ${ARCHIVES} SET state='deleting',manifest_key=?,manifest_digest=? WHERE session_id=? AND state='copying' AND lease_token=? AND lease_until>? AND EXISTS(SELECT 1 FROM gsis_roster_import_sessions s WHERE s.session_id=? AND ${archiveEligible(definitions)})`).bind(saved.key,saved.digest,job.session_id,token,Date.now(),job.session_id)];
+    for(const table of [...manifest.tables].reverse())statements.push(c.prepare('DELETE FROM '+table.name+' WHERE session_id=? AND '+guard).bind(job.session_id,...args));
+    statements.push(c.prepare(`UPDATE ${ARCHIVES} SET state='archived',lease_token='',lease_until=0,updated_at=? WHERE session_id=? AND ${guard}`).bind(Date.now(),job.session_id,...args));
+    checked(await c.batch(statements));const final=await c.prepare(`SELECT state FROM ${ARCHIVES} WHERE session_id=?`).bind(job.session_id).first();if(final.state!=='archived')fail(409,'ROSTER_IMPORT_ARCHIVE_CHANGED','The retained-session protection changed; no source records were deleted.');archived=1;break;
+   }
+  }finally{checked([await c.prepare(`UPDATE ${ARCHIVES} SET lease_token='',lease_until=0 WHERE session_id=? AND lease_token=?`).bind(job.session_id,token).run()]);}
+  return {archived,processed,...await archiveStatus(db)};
+ }
+ return {objectJobs,prepareObject,prepareRecords,finishFreeze,freeze,validateManifest,utf8Length,open,ensure,latest,resetAfterRollback,pendingRollbackReset,archiveRetained,archiveStatus,hashText,hashBytes,stageObject,FORMAT,SCOPES,TARGET_BYTES,SEGMENT_BYTES,MAX_PART_BYTES,MAX_PARTS,MAX_MANIFEST_BYTES,MAX_TOTAL_BYTES,MAX_OBJECT_BYTES,MAX_RETAINED_SESSIONS,PREPARATION_LEASE_MS,MAX_PREPARATION_RESULT_BYTES};
 })();
 if(typeof module!=='undefined'&&module.exports)module.exports=GSiSRosterImport;
 
