@@ -1,4 +1,5 @@
 import {GSiSRosterImport} from './edge-store.js';
+import {readRosterCutoverFreeze} from '../../shared/roster-cutover-freeze.js';
 
 // Durable continuation belongs to the original verified Admin. Each step checks
 // current Google authority again; neither a browser session nor a Queue receipt
@@ -16,7 +17,7 @@ export async function queueRosterImport(db,binding,identity){
  const c=connection(db),now=Date.now();
  if(identity?.email!==binding.actor||typeof identity.subject!=='string'||!identity.subject||identity.subject.length>320)throw Object.assign(Error('The original verified Admin identity is required.'),{status:403,code:'ROSTER_ADMIN_REQUIRED'});
  checked(await c.prepare(`CREATE TABLE IF NOT EXISTS ${TABLE} (session_id TEXT PRIMARY KEY,identity_json TEXT NOT NULL,state TEXT NOT NULL DEFAULT 'waiting',claim_token TEXT NOT NULL DEFAULT '',lease_until INTEGER NOT NULL DEFAULT 0,next_at INTEGER NOT NULL DEFAULT 0,error_code TEXT NOT NULL DEFAULT '',updated_at INTEGER NOT NULL)`).run());
- checked(await c.prepare(`INSERT INTO ${TABLE} (session_id,identity_json,updated_at) SELECT ?,?,? WHERE EXISTS(SELECT 1 FROM gsis_roster_import_sessions WHERE session_id=? AND actor=? AND request_id=? AND state IN ('preparing','staging')) ON CONFLICT(session_id) DO UPDATE SET state=CASE WHEN ${TABLE}.state='attention' THEN 'waiting' ELSE ${TABLE}.state END,next_at=0,error_code='',updated_at=excluded.updated_at WHERE ${TABLE}.identity_json=excluded.identity_json`).bind(binding.sessionId,JSON.stringify({email:identity.email,subject:identity.subject}),now,binding.sessionId,binding.actor,binding.requestId).run());
+ checked(await c.prepare(`INSERT INTO ${TABLE} (session_id,identity_json,updated_at) SELECT ?,?,? WHERE EXISTS(SELECT 1 FROM gsis_roster_import_sessions WHERE session_id=? AND actor=? AND request_id=? AND state IN ('preparing','staging')) ON CONFLICT(session_id) DO UPDATE SET state=CASE WHEN ${TABLE}.state='attention' THEN 'waiting' ELSE ${TABLE}.state END,next_at=0,error_code='',updated_at=excluded.updated_at WHERE ${TABLE}.identity_json=excluded.identity_json AND ${TABLE}.state<>'stopped'`).bind(binding.sessionId,JSON.stringify({email:identity.email,subject:identity.subject}),now,binding.sessionId,binding.actor,binding.requestId).run());
  return rosterImportRunnerStatus(db,binding.sessionId);
 }
 export async function drainRosterImports(db,advance,{maxSteps=8,budgetMs=180000}={}){
@@ -30,12 +31,18 @@ export async function drainRosterImports(db,advance,{maxSteps=8,budgetMs=180000}
  const token=crypto.randomUUID(),claimed=checked(await c.prepare(`UPDATE ${TABLE} SET state='running',claim_token=?,lease_until=?,updated_at=? WHERE session_id=? AND state IN ('waiting','running') AND next_at<=? AND lease_until<=?`).bind(token,now+LEASE_MS,now,job.session_id,now,now).run());
  if(!claimed.meta?.changes)return {pending:1,readyAt:now+2000};
  const identity=JSON.parse(job.identity_json),input={operation:'import',requestId:job.request_id,sessionId:job.session_id},store=GSiSRosterImport.open(db,{actor:job.actor,requestId:job.request_id,sessionId:job.session_id});
+ async function guard(){
+  if((await readRosterCutoverFreeze({GSIS_JOBS:db})).state==='cancelling')throw Object.assign(Error('Import is paused while freeze cancellation is confirmed.'),{status:503,code:'ROSTER_CUTOVER_CANCELLING'});
+  const current=await c.prepare(`SELECT state,claim_token,error_code FROM ${TABLE} WHERE session_id=?`).bind(job.session_id).first();
+  if(current?.state!=='running'||current.claim_token!==token)throw Object.assign(Error('The import continuation is no longer owned by this runner.'),{status:409,code:current?.error_code||'ROSTER_IMPORT_STOPPED'});
+ }
  let result,steps=0,state='waiting',readyAt=0,errorCode='';
  try{
   while(steps<Math.max(1,Math.min(8,maxSteps))&&Date.now()-now<Math.max(1,Math.min(180000,budgetMs))){
+   await guard();
    const progress=await store.progress();if(!progress||progress.requiresRestart){state='attention';break;}if(progress.imported){state='complete';break;}
    const renewed=checked(await c.prepare(`UPDATE ${TABLE} SET lease_until=?,updated_at=? WHERE session_id=? AND claim_token=?`).bind(Date.now()+LEASE_MS,Date.now(),job.session_id,token).run());if(!renewed.meta?.changes)return {pending:1,readyAt:Date.now()+2000};
-   result=await advance(input,identity);steps++;
+   result=await advance(input,identity,guard);steps++;
    if(result.imported){state='complete';break;}if(result.requiresRestart){state='attention';break;}
    if(result.preparationLeaseUntil>Date.now()){readyAt=result.preparationLeaseUntil;break;}
   }
