@@ -20,5 +20,5 @@ Quiet mode (`shared/roster-quiet-mode.js`) pauses `allocation`, `peer-mail` and 
 ## Acceptance
 Test: a quiet session with N decisions, then publish; the audit export afterwards contains all N in order with their times; nothing is duplicated on retry.
 
-## Open question for the owner
-Which log do you mean by "verbose logging": the allocation audit export (Excel/Drive archive), the in-app audit trail, or the System Health job log? A screenshot of the missing details helps.
+## Owner ruling (2 Nov ~06:05)
+"Verbose logging" = the **allocation audit export** (the per-day Excel/Drive archive), job `audit-export`, which quiet mode pauses.
