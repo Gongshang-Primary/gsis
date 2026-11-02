@@ -46,3 +46,48 @@ New PR from main with only the peer-mail health commits of #41 (521dede, 9099f2e
 
 ## Not in scope today
 Drift-check import stall (logged in roster-cutover-diagnostics.md), #38/#40-#48 (held).
+
+## R0 assessment, 2 November 2026, Model: Codex
+
+Assessed product source at main `db673bb357d4d87ee2f6f9da840c2acadacdf3b6`. This is a source review and synthetic verification, not a live readiness or timing claim. No production setting, source record or message changed.
+
+### (a) Deploy ownership flow and coverage
+
+`public/edge-deploy.js:180`, `edgeDeployAdmin`, requires a fresh Contacts-verified Deploy Admin. Import calls the signed Google `deployEdge/export` adapter, normalises all draft/publication fields, receipts and properties, and imports the `deploy` scope through `GSiSEdgeStore.importState`. It is a single source-export call, not Roster's resumable capture. The same request ID replays its import receipt.
+
+Activation requires an imported head. The Google `backend/DeployEdge.gs` fence acquires the Script lock, verifies the unchanged source index revision, requires the Worker service URL/secret, and writes `DEPLOY_EDGE_MODE=fenced` with source evidence. Only after that signed proof does the Worker transition imported to active. Operator routing to D1 is separate. A failed second stage may leave Google fenced while D1 remains imported and requires recovery; there is no automatic unfence.
+
+Pause transitions active to paused in D1; it leaves the Google fence intact. Resume calls the signed fence adapter again and then transitions paused to active. Neither action restores a Google writer. Export downloads the current D1 state/digest; it does not write that state back to Google. The setup page offers status/import/export, explicit export-review confirmation before activation, pause/resume and retained handoff retry.
+
+Coverage: `tests/deploy094-edge.mjs` passes the canonical D1 domain, publication isolation, receipts, signed-service refusal, Contacts caching and ordered handoff cases. Its initial import/activation calls the generic Store directly. `tests/edge094-store.cjs` covers atomic store import, transitions, pause/resume proof and reset refusal for active/paused stores. `tests/edge094-setup.cjs` covers operator control gates and confirmation. Search found no direct test of the complete `edgeDeployAdmin` Google export-to-fence-to-activation/resume flow. Do not treat domain coverage as that end-to-end rehearsal.
+
+### (b) Rollback and edits after activation
+
+No Deploy equivalent of the Roster mirror, caught-up proof or verified Google switch-back exists. `shared/roster-mirror.js` mirrors only `roster` and `roster-register`; Deploy admin has no release or reverse-import operation. After activation, planning edits, publications and receipts commit in D1. The Google Deploy workbook remains at its cutover version. Contacts/Layout handoff jobs publish derived catalogues; they are not a complete Deploy backup.
+
+A frontend rollback or deleting the Google fence would therefore expose stale Google data and can lose post-cutover edits or create two writers. A private D1 export preserves evidence, but no reviewed native Google restore consumes it. Pausing D1 is a safe stop, not a switch-back. This is a blocking recovery gap for Deploy-first tonight.
+
+### (c) Readers while Roster stays on Google
+
+| Consumer | Current path and effect of a Deploy-only cutover |
+| --- | --- |
+| Roster Apps Script | `backend/RosterOperations.gs:128` opens the Deploy Google book, selects its published entry and calculates quota/reference data directly. Its own script does not inherit Deploy's per-project fence or forward this read. New D1 Deploy publications would leave Google Roster using the old workbook's R, classes, groups and venues. Personal/statistical calculations using that book have the same exposure. |
+| Contacts | `backend/Contacts_Code_with_Deploy_API.gs:398` first uses its retained deployment projection; the optional fallback signs `action:active` to the Google Deploy URL. Fenced Deploy forwards `active` to D1. Published membership/options arrive through ordered Contacts handoff jobs. Staff editing stays on Google; delayed/failed handoffs can leave its derived catalogue behind. |
+| LORD | `lord-suite/Source/backend/Code.gs:7165` reads a signed Deploy source through `LORD_DEPLOY_APPS_SCRIPT_URL`. `backend/LordDeploy.gs:13` forwards it to the Worker when fenced. It should follow D1 once the service bridge and live physical registry work; source failure retains/flags the last verified LORD snapshot rather than verifying a new one. |
+| Venues | `venues-backend/Sources.gs:8` supports a configured Worker source URL or its Google Deploy URL. `backend/DeployVenues.gs:19` forwards the signed Google source when fenced. Refresh depends on an active, reachable D1 Deploy service and matching publication identity. An unavailable source prevents a new verified occupancy projection. |
+| Calendar | No direct Deploy workbook reader was found in the canonical Calendar backend. `calendar-backend/VenueDirectory.gs:3` reads the signed Venues catalogue; its booking/event source remains Google. A Venues lookup failure affects the optional directory, with free-text location retained, rather than freezing Calendar saves. Calendar's date service remains an input to other products. |
+| Layout and public campus | Deploy publication queues a versioned Layout handoff; `backend/DeployEdge.gs` applies it through the existing Google adapter. Contacts and Layout jobs are ordered and retried. Direct Google Deploy `publicCampus` is forwarded when fenced. Failures can leave the last published Layout/campus projection behind; no complete Google Deploy state is restored. |
+
+Only Deploy business writes are fenced. Other products' Google writers do not automatically freeze. The critical incompatible reader is Google Roster's direct Deploy-book access during the proposed 21:00-to-22:00 interval and any Roster rollback afterward.
+
+### (d) Import-time estimate
+
+A small register should take seconds to a few minutes plus operator comparison, but there is no measured production-sized Deploy import in the available evidence. This is an estimate, not a verified service bound. The signed adapter has a 25-second response timeout. Export enumerates every draft, retained publication and saved receipt in one Apps Script call, then D1 performs one logical whole-state import. Large history can exceed that request window; there is no resumable Deploy preparation or captured progress total. Source revision changes also force a fresh import before activation. A reliable tonight estimate requires a read-only sized export and a timed rehearsal, neither performed here.
+
+### (e) Gaps and today's bounded path
+
+Deploy-first needs a verified native Google backup/reverse cutover for all post-activation edits and receipts, a fix or deliberate fence for Google Roster's direct Deploy-book readers, and the full Admin migration/recovery/service-bridge rehearsal on a representative source. These are additional product work, not a runbook-only gap.
+
+Use R1 plus R2 for tonight's go/no-go. Keep Deploy, Contacts, Calendar and Venues on their current Google sources. R2 supplies the immutable published Deploy document to D1 Roster through the existing signed Roster service, runs the existing `rosterReference` calculator, and caches the verified publication identity. Then take R6 and R7 in the revised owner order. R3-R5 remain conditional on time. Owner still decides merge and deployment.
+
+**Verdict: R2. Do not cut over Deploy first tonight.**
