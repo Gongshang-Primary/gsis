@@ -7,7 +7,7 @@
 - Branch: codex/roster-d1-rollback-reset
 - Base SHA: 50ac0b1fe2bd2c73b5c4555969df4fdaf43ca318
 - Current head SHA: see PR head
-- PR: pending
+- PR: https://github.com/helper-gsps/gsis/pull/51
 - User-authorised scope: Attempt 3 R1, lane R cutover-blocker exception. Add an Admin reset only after verified manual rollback.
 - Files/domains owned: backend/RosterEdgeMigration.gs, shared/roster-import.js, shared/edge-setup.js/html, roster-update/public/edge-roster.js, relevant tests and canonical generated copies/bundles.
 - Out of scope: production settings or authority changes; #38/#40-#48; Deploy migration; live records and sends.
@@ -33,3 +33,5 @@ Claim-only main update was rejected by automatic approval review. The claim is r
 Reload recovery returns the current Admin's pending reset request, including an import originally owned by a different Admin. Local shards ran every Node program and LORD. Four initial environment/load failures were rerun; the package check still needs the historical Git ancestry available in CI. CI verifies the pushed branch before its draft is opened.
 
 A final gateway regression reproduced a 404 before authentication because the legacy preparation allowlist omitted resetAfterRollback. Added that exact operation, retaining the preparation flag, same-origin/session, current Admin and signed Google-fence checks. The new gateway test passes along with core/UI checks. This supersedes the earlier green head for merge; review and full CI must use the latest PR head.
+
+Status also includes the reference head. Added a regression that first failed because this third head suppressed the reset control; eligibility now checks only the two Roster heads. The fenced status remains disabled. Latest exact-head CI supersedes earlier runs.

@@ -11,6 +11,8 @@ try{
  await original.reserve();await original.bind(frozen.manifest,frozen.manifestDigest);for(let i=0;i<frozen.parts.length;i++)await original.stage(frozen.manifest.parts[i].id,frozen.parts[i]);await original.referencesReady();await original.finalize();
  for(const scope of Import.SCOPES){const store=Store.open(db,scope),head=await store.head();await store.transition({from:'imported',to:'active',expectedRevision:head.revision,actor:who.email,proof:{legacyWritesDisabled:true,sourceDigest:head.sourceDigest,verifiedRecords:head.importedRecords}});}
  const requestId=crypto.randomUUID(),input={operation:'resetAfterRollback',requestId};
+ const available=await edgeRosterMigration(env,{operation:'status'},who);assert.equal(available.scopes.length,3);assert.equal(available.canResetAfterRollback,true,'the unrelated reference head must not hide the reset for the two Roster heads');
+ fenced=true;assert.equal((await edgeRosterMigration(env,{operation:'status'},who)).canResetAfterRollback,false);fenced=false;
  fenced=true;await assert.rejects(edgeRosterMigration(env,input,who),e=>e.code==='ROSTER_ROLLBACK_FENCED');
  fenced=false;await assert.rejects(edgeRosterMigration({...env,ROSTER_EDGE_AUTHORITY:'d1'},input,who),e=>e.code==='ROSTER_ROLLBACK_AUTHORITY');
  await assert.rejects(edgeRosterMigration({...env,ROSTER_EDGE_AUTHORITY:undefined},input,who),e=>e.code==='ROSTER_ROLLBACK_AUTHORITY');
