@@ -1,3 +1,7 @@
+# Pending: R3 Worker-only Google backup, 2 November 2026
+
+Model: Codex. Update backup returns status and queues a dedicated Worker wake without capturing or leasing a mirror in Pages. Worker runs allow 180 seconds and 64 steps, with up to 500 items and a 2 MiB target per transfer. A 13.5k-row full copy passes the 30-minute test under the recorded latency envelope. Source and page receipts, unknown sends and authority stay intact. See [R3 task](docs/coordination/tasks/roster-backup-worker-throughput.md).
+
 # Pending: R7 server-driven Roster import, 2 November 2026
 
 Model: Codex. A current Admin queues one durable import. The notification Worker advances preparation and stages up to four independent parts, retaining exact source and part receipts. Object assembly waits for segments. Minute cron and dedicated import Queue wakes continue without a browser; the page polls status. Both heads stop at imported for separate evidence review and activation. See [R7 task](docs/coordination/tasks/roster-import-server-continuation.md).

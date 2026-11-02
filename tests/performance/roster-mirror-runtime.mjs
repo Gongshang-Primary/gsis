@@ -26,7 +26,7 @@ const script=await build({stdin:{resolveDir:root,sourcefile:'roster-mirror-runti
    const op=new URL(request.url).pathname,input=request.method==='POST'?await request.json():{};
    if(op==='/start')return Response.json(await Mirror.capture(env.GSIS_JOBS,{leaseMs:420000}));
    if(op==='/step'){
-    const page=await Mirror.page(env.GSIS_JOBS,input.id,{cursor:input.cursor,leaseToken:input.leaseToken,limit:128,maxBytes:524288});
+    const page=await Mirror.page(env.GSIS_JOBS,input.id,{cursor:input.cursor,leaseToken:input.leaseToken,limit:500,maxBytes:2097152});
     const response=await fetch('https://mirror-runtime.invalid/page',{method:'POST',body:JSON.stringify(page)}),proof=await response.json();
     const accepted=await Mirror.advance(env.GSIS_JOBS,input.id,{cursor:page.cursor,next:page.next,digest:page.digest,leaseToken:input.leaseToken,proof});
     return Response.json(accepted);
@@ -77,7 +77,7 @@ try{
  const status=await send('status','/status');assert.equal(status.latest.id,generation.id);assert.equal(status.proof,null,'later live commit keeps older verified generation stale');assert.equal(status.pendingCount,1);
  const next=await send('next-generation','/start');assert.equal(next.revisions.roster,2);assert.notEqual(next.id,generation.id);
  const measurements=profiler.measurements,maximumSampledCpuMs=Math.max(...measurements.map(r=>r.sampledActiveMs)),maximumWallMs=Math.max(...measurements.map(r=>r.wallMs));
- assert(profiler.peakBytes<96*MiB,'sampled app isolate must leave32MiB within128MiB');assert(maximumSampledCpuMs<30000&&maximumWallMs<30000,'each local step must fit paid Worker30s CPU budget');assert(maximumBridgeBytes<MiB,'no page may contain the wholeRoster');
+ assert(profiler.peakBytes<96*MiB,'sampled app isolate must leave32MiB within128MiB');assert(maximumSampledCpuMs<30000&&maximumWallMs<30000,'each local step must fit paid Worker30s CPU budget');assert(maximumBridgeBytes<2.1*MiB,'each page stays within the bounded 2 MiB target plus metadata');
  const report={runtime:'local workerd via miniflare '+require('miniflare/package.json').version,fixtureBytes,recordCount:generation.recordCount,receiptCount:generation.receiptCount,steps,transferredBytes,maximumBridgeBytes,bundleSha256:sha(bundled),sampledPeakIsolateBytes:profiler.peakBytes,maximumSampledCpuMs,maximumWallMs,measurements,boundaries:'Synthetic real workerd/D1 run. Google is a local digest-verifying endpoint double, not Apps Script. Fixture seeding is outside measured isolate. CPU is inspector sampling; memory is sampled V8+embedder+backing storage, not process RSS. Live Google timing, account CPU tier, R2-object conversion and production acceptance are not certified. No deployment, live authority change or real messages.'};
  const output=path.resolve(root,process.env.GSIS_MIRROR_PROFILE_OUTPUT||'docs/coordination/review/roster-d1-mirror-runtime.json');await fs.mkdir(path.dirname(output),{recursive:true});await fs.writeFile(output,JSON.stringify(report,null,2)+'\n');
  console.log(JSON.stringify({...report,measurements:undefined,evidence:path.relative(root,output)},null,2));console.log('PASS real workerd/D1 immutable14MiB mirror paging and subsequent revision queue');

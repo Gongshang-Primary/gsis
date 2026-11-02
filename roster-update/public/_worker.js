@@ -52,7 +52,7 @@ export async function sign(data,secret,ascii=false){const raw=JSON.stringify(dat
 async function backend(env,action,input,who,traceId){
  assertRecoveryWritable(env);
  const delegated=await callOperationalBackend(env,'roster',{action,input,identity:who,traceId});if(delegated!==undefined)return delegated;
- if(action==='edgeMigration'){try{const data=await (input.operation==='import'?startEdgeRosterImport(env,input,who):edgeRosterMigration(env,input,who));if(data.serverDriven&&input.operation==='import')data.wake=await enqueueNotificationWake(env,'gsis-roster-import-wake-v1').catch(()=>({queued:false,mode:'scheduled'}));return {result:{ok:true,data},backendMs:0};}catch(error){return {result:{ok:false,status:error.status||503,code:error.code,error:error.message},backendMs:0};}}
+ if(action==='edgeMigration'){try{const data=await (input.operation==='import'?startEdgeRosterImport(env,input,who):edgeRosterMigration(env,input,who));if(data.serverDriven&&input.operation==='import')data.wake=await enqueueNotificationWake(env,'gsis-roster-import-wake-v1').catch(()=>({queued:false,mode:'scheduled'}));if(input.operation==='mirror'&&data.enabled===true){data.wake=await enqueueNotificationWake(env,'gsis-roster-backup-wake-v1').catch(()=>({queued:false,mode:'scheduled'}));data.queued=data.wake.queued;}return {result:{ok:true,data},backendMs:0};}catch(error){return {result:{ok:false,status:error.status||503,code:error.code,error:error.message},backendMs:0};}}
  if(edgeRosterEnabled(env)){
   const inbox=action==='rosterInbox',review=action==='rosterOperations'&&['deliveryReview','dismissDeliveryIssues','cancelPendingNotifications'].includes(input.operation);
   if(inbox||review){const started=Date.now();try{return {result:{ok:true,data:await (inbox?edgeInboxBackend(env,input,who):edgeDeliveryReviewBackend(env,input,who))},backendMs:Date.now()-started};}catch(error){return {result:{ok:false,status:error.status||503,code:error.code,error:error.status&&error.status<500?error.message:'The operation could not be confirmed.'},backendMs:Date.now()-started};}}
@@ -1226,7 +1226,7 @@ export async function dispatchNotifications(env,options={}){
 }
 export async function dispatchRosterImports(env,options={}){assertRecoveryWritable(env);return runEdgeRosterImports(env,options);}
 export async function enqueueNotificationWake(env,purpose='gsis-notification-wake-v1'){
- if(!['gsis-notification-wake-v1','gsis-roster-import-wake-v1'].includes(purpose))throw Error('Invalid wake purpose.');
+ if(!['gsis-notification-wake-v1','gsis-roster-import-wake-v1','gsis-roster-backup-wake-v1'].includes(purpose))throw Error('Invalid wake purpose.');
  if(!env.NOTIFICATION_DISPATCH_URL)return {queued:false,mode:'scheduled'};
  const url=new URL(env.NOTIFICATION_DISPATCH_URL);if(url.protocol!=='https:'||url.username||url.password||url.search||url.hash||url.pathname!=='/dispatch')throw Error('Invalid notification dispatcher URL.');
  if(!configuredSecret(gsisApiSecret(env,'ROSTER_SERVICE_SECRET')))throw Error('Notification wake secret is not configured.');
