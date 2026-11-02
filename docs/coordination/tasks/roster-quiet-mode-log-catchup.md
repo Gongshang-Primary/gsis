@@ -1,6 +1,6 @@
 # roster-quiet-mode-log-catchup: catch up verbose logging after quiet mode ends (changelog)
 
-- Status: authorised (owner 2 Nov: "let codex work"); merge held per lane R rule
+- Status: claimed by Codex, 2 November 2026; merge held until owner release
 - Owner/model: Codex
 - Branch: codex/roster-quiet-mode-log-catchup
 - Reviewer/model: Claude
@@ -23,3 +23,6 @@ Test: a quiet session with N decisions, then publish; the audit export afterward
 
 ## Owner ruling (2 Nov ~06:05)
 "Verbose logging" = the **allocation audit export** (the per-day Excel/Drive archive), job `audit-export`, which quiet mode pauses.
+
+## Bounded implementation claim, 2 November 2026
+Model: Codex. User explicitly requested this task after the cutover PR fixes/reviews. Base: main b0c30bedf1ad94e9ba35a8121707e94beb32586f. Scope: quiet-mode state/Worker audit scheduling, existing Google/D1 audit service boundary, focused tests and regenerated bundles. Retain each already-durable decision and original timestamp; reuse existing oldest-first exporter and immutable evidence/watermarks. Add a bounded, resumable catch-up after any quiet end, yielding again if quiet restarts. Verify all decisions and ordering on both authorities, retry without duplicates, lock/contention behavior and privacy. Full Node/LORD CI and Claude exact-head review before merge. No live records, messages, activation or deployment.
