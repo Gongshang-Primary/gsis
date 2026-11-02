@@ -55,6 +55,10 @@ An independent Codex review of local head `ea1297f` found that the pre-existing 
 
 The review also found that a slow quiet-mode read could cross the admission deadline. The explicit 20-second budget makes this a required correction: a failing regression now verifies the budget again after that read and before starting the export. All 21 catch-up cases pass after these fixes. Same-day and new-day concurrent-change guards, saved receipt identities and existing quiet-mode end rules remain unchanged. This internal review is not Claude approval; Claude still reviews the final published head.
 
+## Full-suite midnight fixture correction
+
+The first exact-head run, [41515530374](https://github.com/helper-gsps/gsis/actions/runs/41515530374), passed three shards. Its remaining shard failed `roster-cutover-freeze-queue.mjs` because the fixed 2 November report was now in the past. The identical failure reproduced on unchanged main `594c7e3`; changing only the fixture date to the current day made that baseline pass. The retained fix pins the service clock to the original fixture date and restores it in `finally`, leaving every freeze, receipt, queue and exactly-once assertion intact. This changes no production behavior. The final head receives a fresh complete run before the draft PR is opened.
+
 ## Release and rollback
 
 Claude reviews the final published head. Keep the draft PR unmerged until after the cutover and explicit owner release. No live deployment, authority flag, settings, school record or provider message changed. Rolling back this PR restores the previous audit cadence and response handling; all saved audit facts, immutable archives and existing checkpoints remain retained.
