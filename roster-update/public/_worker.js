@@ -1,6 +1,6 @@
 import {recoveryTimetableSnapshot} from './roster-recovery-timetable-cache.js';
 import {dispatchEdgeDeliveryReview,edgeDeliveryReportRead,edgeDeliveryReviewBackend} from './edge-notification-review.js';
-import {edgeRosterEnabled,edgeRosterService,edgeRosterBackend,edgeRosterMigration,startEdgeRosterImport,runEdgeRosterImports,readEdgeRosterReferences,mirrorEdgeRoster,readRosterMirrorStatus} from './edge-roster.js';
+import {edgeRosterEnabled,edgeRosterService,edgeRosterBackend,edgeRosterMigration,startEdgeRosterImport,runEdgeRosterImports,readEdgeRosterReferences,refreshEdgeRosterReferences,mirrorEdgeRoster,readRosterMirrorStatus} from './edge-roster.js';
 import {edgeNotificationService,edgeInboxBackend,supportsEdgeNotificationOperation,dispatchEdgePeerMail,dispatchEdgeEmploymentMail,reserveEdgeWhatsAppSend,recordEdgeWhatsAppThrottle,edgeDispatchHasWork} from './edge-notifications.js';
 import {backendAvailable,callOperationalBackend,forwardOperationalRequest} from '../../shared/backend-service.js';
 import {assertRecoveryWritable} from '../../shared/edge-recovery.js';
@@ -338,7 +338,7 @@ export default {async fetch(req,env,ctx){
    if(value.result.ok&&value.result.data?.notificationsQueued&&ctx?.waitUntil)ctx.waitUntil(enqueueNotificationWake(env).catch(()=>console.error(JSON.stringify({event:'roster-notification-wake-failed',diagnosticId:traceId}))));
    if(value.result.ok&&value.result.data?.intakeReceipt&&ctx?.waitUntil)ctx.waitUntil(wakeAbsenceIntake(env).catch(()=>console.error(JSON.stringify({event:'roster-intake-wake-failed',diagnosticId:traceId}))));
    if(value.result.ok&&value.result.data?.dailyEmploymentMailQueued&&ctx?.waitUntil)ctx.waitUntil(dispatchDailyEmploymentReports(env).catch(()=>console.error(JSON.stringify({event:'roster-employment-email-dispatch-failed',diagnosticId:traceId}))));
-   if(!value.result.ok&&(value.result.status||503)>=500)return rosterFailure(action,traceId,{operation:input.operation,calendarMs,backendMs,totalMs:Date.now()-requestStarted,code:'BACKEND_ERROR',status:value.result.status||503,...rosterBackendFailure(value.result)});
+   if(!value.result.ok&&(value.result.status||503)>=500)return rosterFailure(action,traceId,{operation:input.operation,calendarMs,backendMs,totalMs:Date.now()-requestStarted,code:'BACKEND_ERROR',status:value.result.status||503,...rosterBackendFailure(value.result),...(/^[A-Z][A-Z0-9_]{1,79}$/.test(value.result.code||'')?{backendCode:value.result.code}:{})});
    console.info(JSON.stringify({event:'roster-operation',operation:input.operation,diagnosticId:traceId,calendarMs,backendMs,totalMs:Date.now()-requestStarted,status:value.result.ok?200:value.result.status||503}));
    const response=json(value.result,value.result.ok?200:value.result.status||503);response.headers.set('Server-Timing','calendar;dur='+calendarMs+', backend;dur='+backendMs);return response;
   }
@@ -353,7 +353,7 @@ export default {async fetch(req,env,ctx){
   if(backendRead.status==='rejected')throw backendRead.reason;
   if(calendarRead.status==='rejected')throw calendarRead.reason;
   const value=backendRead.value,calendar=calendarRead.value;backendMs=value.backendMs;
-  if(!value.result.ok&&(value.result.status||503)>=500)return rosterFailure(action,traceId,{calendarMs,backendMs,totalMs:Date.now()-requestStarted,code:'BACKEND_ERROR',status:value.result.status||503,...rosterBackendFailure(value.result)});
+  if(!value.result.ok&&(value.result.status||503)>=500)return rosterFailure(action,traceId,{calendarMs,backendMs,totalMs:Date.now()-requestStarted,code:'BACKEND_ERROR',status:value.result.status||503,...rosterBackendFailure(value.result),...(/^[A-Z][A-Z0-9_]{1,79}$/.test(value.result.code||'')?{backendCode:value.result.code}:{})});
   if(value.result.ok&&['rosterUpload','rosterUpdate'].includes(action))warmAfterRosterWrite(env,who,traceId,ctx,{baseline:true});
   if(value.result.ok&&calendar)value.result.data.calendar=calendar;
   if(value.result.ok&&reportProfile){Object.assign(value.result.data,reportCalendarOutput);if(value.result.data.reportData)Object.assign(value.result.data.reportData,reportCalendarOutput);}
@@ -1665,4 +1665,8 @@ export async function resolveAbsenceTransport(env,who,{requestId,reason,all=fals
 
 /* GSIS_ROSTER_ABSENCE_TRANSPORT_END */
 
+// Live 2 Nov 2026: D1 trusts Contacts permissions for at most ROSTER_AUTHORITY_MAX_AGE_SECONDS (15 min);
+// nothing refreshed them on a schedule, so every Roster read failed with ROSTER_AUTHORITY_STALE.
+// The minute lane calls this; refreshEdgeRosterReferences skips when checked under two minutes ago.
+export async function dispatchReferencesRefresh(env){if(!edgeRosterEnabled(env))return {skipped:true,reason:'google-authoritative'};const result=await refreshEdgeRosterReferences(env);return {...result,idle:result?.refreshed!==true};}
 export async function dispatchGoogleBackup(env){const result=await mirrorEdgeRoster(env);if(result.enabled===false)return result;const status=await readRosterMirrorStatus(env);return {...result,pending:status.pending,failed:status.behindThreshold?1:0,code:status.behindThreshold?'ROSTER_MIRROR_LAG':status.pending?'ROSTER_MIRROR_PENDING':'OK'};}
