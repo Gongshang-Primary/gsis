@@ -31,3 +31,5 @@ Build R1, run checks, open draft PR, record exact head for Claude, then continue
 Claim-only main update was rejected by automatic approval review. The claim is retained on this PR branch instead.
 
 Reload recovery returns the current Admin's pending reset request, including an import originally owned by a different Admin. Local shards ran every Node program and LORD. Four initial environment/load failures were rerun; the package check still needs the historical Git ancestry available in CI. CI verifies the pushed branch before its draft is opened.
+
+A final gateway regression reproduced a 404 before authentication because the legacy preparation allowlist omitted resetAfterRollback. Added that exact operation, retaining the preparation flag, same-origin/session, current Admin and signed Google-fence checks. The new gateway test passes along with core/UI checks. This supersedes the earlier green head for merge; review and full CI must use the latest PR head.

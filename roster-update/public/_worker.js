@@ -261,7 +261,7 @@ async function quietModeRoute(req,env,u){
   return json({ok:true,data:input.action==='on'?await startQuietMode(env.GSIS_JOBS,who.email):await endQuietMode(env.GSIS_JOBS,who.email,'manual')});
  }catch(error){return json({ok:false,error:error.status&&error.status<500?error.message:'Quiet mode could not be confirmed.'},error.status||503);}
 }
-const D1_PREPARE_OPERATIONS=new Set(['status','drift','import','export','restart','freeze','cancelFreeze']);
+const D1_PREPARE_OPERATIONS=new Set(['status','drift','import','export','restart','resetAfterRollback','freeze','cancelFreeze']);
 async function d1PrepareAllows(req,env){
  if(env.ROSTER_D1_PREPARE!=='import'||req.method!=='POST')return false;
  try{const input=JSON.parse(await req.clone().text());if(input?.operation==='activate'){const freeze=await readRosterCutoverFreeze(env);return freeze.active===true&&freeze.state==='frozen';}return D1_PREPARE_OPERATIONS.has(input?.operation);}catch{return false;}
