@@ -105,3 +105,19 @@ test('a repeated cancelled proof leaves a fresh later job alone',async()=>{
   assert.equal(f.db.sql.prepare('SELECT state FROM gsis_roster_import_jobs WHERE session_id=?').get(next.sessionId).state,'waiting');
  }finally{f.close();}
 });
+
+test('a cancellation that loses its transaction race cannot stop the replacement import',async()=>{
+ const f=fixture();try{
+  const freezeId=await f.freeze(),old=await f.start();let next;
+  const intercept=async statements=>{
+   if(!statements.some(s=>s.text.includes("SET state='failed'"))){f.db.onBatch(intercept);return;}
+   const current=await readRosterCutoverFreeze(f.env);
+   await syncRosterCutoverFreeze(f.env,{...current,available:true,active:false,state:'cancelled'},{expectedRevision:current.revision});
+   await edge.edgeRosterMigration(f.env,{operation:'restart',requestId:crypto.randomUUID(),importRequestId:old.requestId,sessionId:old.sessionId},who);
+   next=await f.start();
+  };
+  f.db.onBatch(intercept);await f.cancel(freezeId);
+  assert(next,'the first cancellation completed and a replacement was queued');
+  assert.equal(f.db.sql.prepare('SELECT state FROM gsis_roster_import_jobs WHERE session_id=?').get(next.sessionId).state,'waiting');
+ }finally{f.close();}
+});

@@ -32,17 +32,17 @@ async function save(env,row,expectedRevision,now){
   // The two import locks admit only one unfinished session. Fence its writes
   // with the confirmed cancellation, retaining every source, row and receipt.
   // The freeze revision also prevents a stale reply from stopping a newer job.
-  const cancelled="EXISTS(SELECT 1 FROM gsis_roster_cutover_freeze WHERE id=1 AND request_id=? AND phase='cancelled' AND revision=?)",jobs="SELECT session_id FROM gsis_roster_import_jobs WHERE state IN ('waiting','running','attention')";
-  statements.push(
-   db.prepare(`UPDATE gsis_roster_import_sessions SET state='failed',write_token='',updated_at=? WHERE state IN ('preparing','staging') AND session_id IN (${jobs}) AND ${cancelled}`).bind(now,row.requestId,expectedRevision+1),
-   db.prepare(`UPDATE gsis_roster_import_preparation SET claim_token='',lease_until=0 WHERE session_id IN (${jobs}) AND session_id IN (SELECT session_id FROM gsis_roster_import_sessions WHERE state='failed') AND ${cancelled}`).bind(row.requestId,expectedRevision+1),
-   db.prepare(`UPDATE gsis_roster_import_jobs SET state='stopped',claim_token='',lease_until=0,next_at=0,error_code='ROSTER_IMPORT_FREEZE_CANCELLED',updated_at=? WHERE state IN ('waiting','running','attention') AND session_id IN (SELECT session_id FROM gsis_roster_import_sessions WHERE state='failed') AND ${cancelled}`).bind(now,row.requestId,expectedRevision+1)
+  const cancelled="EXISTS(SELECT 1 FROM gsis_roster_cutover_freeze WHERE id=1 AND request_id=? AND revision=?)",jobs="SELECT session_id FROM gsis_roster_import_jobs WHERE state IN ('waiting','running','attention')";
+  statements.unshift(
+   db.prepare(`UPDATE gsis_roster_import_sessions SET state='failed',write_token='',updated_at=? WHERE state IN ('preparing','staging') AND session_id IN (${jobs}) AND ${cancelled}`).bind(now,row.requestId,expectedRevision),
+   db.prepare(`UPDATE gsis_roster_import_preparation SET claim_token='',lease_until=0 WHERE session_id IN (${jobs}) AND session_id IN (SELECT session_id FROM gsis_roster_import_sessions WHERE state='failed') AND ${cancelled}`).bind(row.requestId,expectedRevision),
+   db.prepare(`UPDATE gsis_roster_import_jobs SET state='stopped',claim_token='',lease_until=0,next_at=0,error_code='ROSTER_IMPORT_FREEZE_CANCELLED',updated_at=? WHERE state IN ('waiting','running','attention') AND session_id IN (SELECT session_id FROM gsis_roster_import_sessions WHERE state='failed') AND ${cancelled}`).bind(now,row.requestId,expectedRevision)
   );
  }
  statements.push(db.prepare('SELECT request_id,phase,started_at,revision FROM gsis_roster_cutover_freeze WHERE id=1'));
  const results=await db.batch(statements);
  if(!Array.isArray(results)||results.some(item=>item?.success===false))fail('The cutover freeze hold was not confirmed.');
- return {owned:results[0]?.meta?.changes===1,value:project(results.at(-1)?.results?.[0],now),importStopped:results.length>2&&results.at(-2)?.meta?.changes>0};
+ return {owned:results.at(-2)?.meta?.changes===1,value:project(results.at(-1)?.results?.[0],now),importStopped:results.length>2&&results.at(-3)?.meta?.changes>0};
 }
 export async function beginRosterCutoverFreeze(env,{requestId,now=Date.now()}={}){
  if(!validId(requestId)||!validTime(now))fail('Use a stable cutover request reference.',400,'ROSTER_CUTOVER_REQUEST');
