@@ -1,6 +1,8 @@
 # roster-venues-fence-after-rollback: Roster saves blocked by a stuck Venues fence (incident 3 Nov 2026)
 
-- Status: incident resolved live 12:05; code follow-up proposed (Codex, lane R + Venues), not yet assigned
+- Status: claimed by Codex, 3 November 2026; owner-authorised implementation due 17:00 SGT
+- Owner/model: Codex
+- Branch: codex/roster-venues-fence-after-rollback
 - Reviewer/model: Claude
 
 ## Incident (3 Nov 2026, Google is the record)
@@ -17,3 +19,9 @@
 ## Admin tools used (kept in owner's Apps Script files)
 - Roster GSiS `EdgeAuthorityTools`: `venuesFenceDiagnose` (read-only), `edgeAuthorityStatus`, `edgeAuthorityRollbackToLegacy`.
 - Venues `VenuesAdminTools`: `recoverVenuesTx_3Nov` (one-off).
+
+## Bounded implementation claim
+
+Model: Codex. Base main 1f6cc7cf90774390147aea8f96b23bd005122553. Owner's latest instruction limits this PR to safe cause codes and wording, a read-only Venues sync status in System Health, a five-minute warning using the existing SMC/Admin alert records, and an Admin recovery action that invokes the existing recovery functions in order. Work is restricted to Roster plus Venues read/recovery adapters, their generated copies, tests and documentation. Existing commit and save algorithms remain unchanged. No automatic transaction recovery, forced fence release, rollback/cutover redesign, Daily Notify wording change, deployment or live operation is included.
+
+Acceptance: all three safe codes survive the backend/website diagnostic path; ready/pending/uncertain status reads both sources without changing their markers; a continuous outage over five minutes turns red and creates one existing SMC/Admin alert; ordinary users cannot inspect recovery details, SMCs can read but only current Admins can recover; the Venues step runs only for a verified COMMIT_UNCERTAIN token and records an evidence note; Roster recovery runs only after the Venues step succeeds or is unnecessary; either built-in refusal stops the chain; request/role/state races and malformed results remain explicit. Regenerate canonical copies with npm run build and run focused plus full Node/LORD checks before review. Claude reviews the exact head; owner merges.
