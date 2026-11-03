@@ -1,6 +1,6 @@
 # roster-consecutive-after-gap: consecutive check ignores timetabled periods after a free period (bug)
 
-- Status: fixing - Option A (owner ruling 4 Nov), allocation fix plus 701/716 fixture exclusions, awaiting full CI
+- Status: fixing - Option A (owner ruling 4 Nov), exclusions in 701/716 setups only after fixture scope correction, awaiting full CI
 - Owner/model: Muse
 - Reviewer/model: Claude
 - Last updated (Asia/Singapore): 2026-11-04
@@ -152,6 +152,13 @@ Conclusion, before any fix: fix automatic streak (and the solver violation check
 - Tests 701 and 716 keep their intent by putting exclusions in tests/roster701-fixture.cjs: PD* and DUTY*. PD* alone was tried first and 716 still failed at line 24, because its Duty period at index 7 still bridges a run of seven (indices 4-10); DUTY* was therefore added as well, and both files then pass locally in full. No assertion was deleted in 701 or 716.
 - tests/roster098k-consecutive-after-gap.cjs now has 10 checks: the previous 7, plus (a) the inverse case, PD not excluded, six lessons plus PD is a run of seven and a further assignment is blocked; (b) the 2 Nov shape, P5 lesson and P7-P12 Don't-need-relief subjects (PD/BLK), not excluded, P6 blocked; (c) the same day with PD* and BLK* exclusions, P6 allowed. The existing real-gap check is the no-violation case. Locally run, TZ=Asia/Singapore: 098k 10 pass, 701 16 pass, 716 14 pass, venues-sources pass, roster084-stapler-unchanged 9 pass, roster084-consecutive-subjects 16 pass, roster098k-suspended-rules node:test 0 fail. Not run locally: npm run build, full npm test, LORD/Playwright suite; those run in CI, and the draft PR is opened only after full CI is green.
 - CHANGELOG.md gains: "Consecutive limit now counts all occupied periods except configured exclusions."
+
+## Fixture scope correction, 2026-11-04 (after CI run 240)
+
+- CI run 240 on head a8c9716 failed in shards 1/4 and 3/4, while 2/4 and 4/4 passed. Each failing shard had exactly one failing file. Shard 1/4: tests/roster701-r18.cjs, test "Manual model allows SMC and Admin, and recommendation categories precede STapler tiers", rows[0].staffId was 'charlie', expected 'dora'. Shard 3/4: tests/roster086-counting-logging.cjs, test "legacy config defaults, independent bounded wildcard validation and Admin-only save", systemConfig.consecutiveCountExclusions was [{PD*}, {DUTY*}], expected [].
+- Both failures are side effects of putting the exclusions in the shared tests/roster701-fixture.cjs, which r18 and r086 also use. In r18, charlie's PD periods at indices 0, 1, 3, 4, 5 were excluded, so his consecutive count fell and his ranking changed. In r086, the fixture no longer represented legacy defaults. The fixture change was therefore the wrong scope, even though it kept 701 and 716 green.
+- Correction: tests/roster701-fixture.cjs is reverted to the original file (blob 1f92cd67ef066408cc5a9f4e4f1dbac6ff5dd0e4). The PD* and DUTY* exclusions are set only in the setup() of tests/roster701-r17-core.cjs and tests/roster716-allocator.cjs, after fixture() and (in 701) after A.ensure(). No assertion was deleted or changed in 701, 716, r18, or r086; only the two setup lines were added.
+- Locally run, TZ=Asia/Singapore, with the fixed allocation: 701 16 pass, 716 14 pass, r18 10 pass, r086 11 pass, 098k 10 pass, venues-sources pass. The r086 audit tests needed backend helper files that are present in the full repo; in the partial local copy they failed only on missing files until those files were fetched, then passed. Not run locally: npm run build, full npm test, LORD/Playwright suite; those run in CI, and the draft PR is opened only after full CI is green.
 
 ## Review
 
