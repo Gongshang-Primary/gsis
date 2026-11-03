@@ -28,7 +28,7 @@ Button URL in every case: `https://roster.gsps.edu.sg/external.html#{{1}}`; butt
 
 Exact bodies: v1 body with the final "…here: {{n}}." sentence replaced by "…using the button below." (urgent: "…acknowledge your duty now using the button below."). Fetch the live body with the Meta API or ask Claude; compute `bodySha256` from the live body, never from this table.
 
-Staff-page links (owner ruling 3 Nov: "yes", buttons too). Static URL buttons, no button parameter; drop the URL body field. Drafted by Claude, awaiting owner confirm before Meta submission:
+Staff-page links (owner ruling 3 Nov: "yes", buttons too). Static URL buttons, no button parameter; drop the URL body field. Submitted 3 Nov on owner confirm ("confirm 4"), all PENDING: contact_review_v2 1512880204232296; relief_unacknowledged_v2 2320845038701493; relief_urgent_smc_v2 1746432063105141; relief_attention_v3 3330480857342320. Add each as a disabled variant until APPROVED.
 | contact_review | gsis_contact_review_v2 | button "Open Contacts" → https://contacts.gsps.edu.sg/ (must equal CONTACTS_PUBLIC_URL) |
 | relief_unacknowledged | gsis_relief_unacknowledged_v2 | "Open Roster" → https://roster.gsps.edu.sg/ |
 | relief_urgent_smc | gsis_relief_urgent_smc_v2 | "Open Roster" → https://roster.gsps.edu.sg/ |
