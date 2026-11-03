@@ -37,7 +37,7 @@ function rosterVenuesAdminDispatch_(req,c){
  if(status.state==='ready')return {complete:true,steps:[{step:'venues',state:'not-needed'},{step:'roster',state:'not-needed'}],status:rosterVenuesPublicStatus_(status,true)};
  if(status.remote.commit.state==='uncertain'){
   const token=status.remote.commit.token;if(typeof token!=='string'||!token||token.length>200)return refused('venues');
-  try{const result=rosterVenuesRecoveryCall_({operation:'recoverCommit',source:'roster',token,evidence:p.evidence.trim()},req.identity);if(result?.recovered!==true)return refused('venues');steps.push({step:'venues',state:'recovered',committed:result.committed===true});}catch(error){return refused('venues',error);}
+  try{const result=rosterVenuesRecoveryCall_({operation:'recoverCommit',source:'roster',token,evidence:p.evidence.trim()},req.identity);if(result?.recovered!==true||typeof result.committed!=='boolean')return refused('venues');steps.push({step:'venues',state:'recovered',committed:result.committed===true});}catch(error){return refused('venues',error);}
   status=rosterVenuesSyncStatus_();if(!status.available||status.remote.commit.state!=='ready')return refused('venues');
  }else steps.push({step:'venues',state:'not-needed'});
  try{const result=recoverRosterVenuesSource();if(result?.ready!==true)return refused('roster');steps.push({step:'roster',state:'recovered'});}catch(error){return refused('roster',error);}

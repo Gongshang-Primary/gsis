@@ -68,7 +68,7 @@ function showVenuesSync(snapshot){
 }
 function showVenuesRecovery(result){
  const box=$('venues-recovery-results');box.replaceChildren();const names={venues:'Venues transaction',roster:'Roster source fence'},states={recovered:'recovered','not-needed':'no recovery needed',refused:'refused; recovery stopped'};
- for(const row of rows(result.steps,3))if(names[row.step]&&states[row.state])box.append(element('p',names[row.step]+': '+states[row.state]+(row.code?' ('+code(row.code)+')':'')+'.'));
+ for(const row of rows(result.steps,3))if(names[row.step]&&states[row.state])box.append(element('p',names[row.step]+': '+states[row.state]+(row.step==='venues'&&row.state==='recovered'&&typeof row.committed==='boolean'?(row.committed?' (stored transaction committed)':' (stored transaction did not commit)'):'')+(row.code?' ('+code(row.code)+')':'')+'.'));
  if(result.note)box.append(element('p','Recovery checks completed. Refresh status; normal Venues source refresh may still be needed.','muted'));
 }
 function showBacklog(snapshot){
