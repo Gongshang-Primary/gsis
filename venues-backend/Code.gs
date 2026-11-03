@@ -48,7 +48,7 @@ function venuesTransaction_(fn){return venuesWithLock_(function(){var before=ven
 function venuesJson_(value){return ContentService.createTextOutput(JSON.stringify(value)).setMimeType(ContentService.MimeType.JSON);}
 function venuesVerifyEnvelope_(event){
   var raw=event&&event.postData&&event.postData.contents;if(typeof raw!=='string'||raw.length>250000)throw venuesError_('INVALID_REQUEST','Send a signed JSON request.',400);var outer,p;try{outer=JSON.parse(raw);p=JSON.parse(outer.payload);}catch(e){throw venuesError_('INVALID_REQUEST','Invalid signed JSON request.',400);}
-  if(!['venues','venuesService','calendarCatalogue'].includes(p.action))throw venuesError_('INVALID_ACTION','Unsupported signed action.',400);
+  if(!['venues','venuesService','venuesRecovery','calendarCatalogue'].includes(p.action))throw venuesError_('INVALID_ACTION','Unsupported signed action.',400);
   var secret=gsisApiSecret_(p.action==='venues'?'VENUES_PROXY_SECRET':'VENUES_BRIDGE_SECRET');if(!secret)throw venuesError_('SETUP_REQUIRED','The endpoint signing secret is not configured.');
   var expected=Utilities.computeHmacSha256Signature(outer.payload,secret).map(function(b){return ('0'+((b+256)%256).toString(16)).slice(-2);}).join(''),given=String(outer.signature||'').toLowerCase(),different=expected.length^given.length;for(var i=0;i<expected.length;i++)different|=expected.charCodeAt(i)^(given.charCodeAt(i)||0);if(different)throw venuesError_('INVALID_SIGNATURE','The request signature is invalid.',401);
   if(!Number.isFinite(p.timestamp)||Math.abs(Date.now()-p.timestamp)>300000||typeof p.nonce!=='string'||p.nonce.length<16||p.nonce.length>200)throw venuesError_('EXPIRED_REQUEST','The signed request expired or has an invalid nonce.',401);
@@ -57,14 +57,24 @@ function venuesVerifyEnvelope_(event){
     if(p.service!=='gsis-calendar-catalogue-v1'||p.purpose!=='calendar-venue-catalogue-v1'||Object.keys(p).some(k=>!['action','service','purpose','timestamp','nonce','identity','input'].includes(k))||Object.keys(p.input).length!==1||p.input.operation!=='calendarLookup'||!p.identity||typeof p.identity.email!=='string'||!p.identity.email.includes('@')||typeof p.identity.subject!=='string'||!p.identity.subject)throw venuesError_('INVALID_SERVICE','Calendar catalogue requests are read-only and identity-scoped.',403);
     return p;
   }
-  if(p.action==='venuesService'){if(p.service!=='gsis-venues-v1'||p.identity!==undefined||!['sourceBegin','sourceComplete','sourceStatus'].includes(p.input.operation))throw venuesError_('INVALID_SERVICE','Service requests cannot act as school users.',403);}
+  if(p.action==='venuesRecovery'){
+    // Only the trusted Roster backend signs this envelope after checking current
+    // Admin authority. Browser role claims and normal Venues commands cannot use it.
+    var recovering=p.input.operation==='recoverCommit',keys=recovering?['operation','source','token','evidence']:['operation','source'];
+    if(p.service!=='gsis-venues-recovery-v1'||p.input.source!=='roster'||!['sourceStatus','recoverCommit'].includes(p.input.operation)||Object.keys(p.input).some(function(k){return keys.indexOf(k)<0;})||recovering&&(p.identity?.admin!==true||typeof p.identity.email!=='string'||!p.identity.email.includes('@')||typeof p.identity.subject!=='string'||!p.identity.subject))throw venuesError_('FORBIDDEN','Verified Roster Admin recovery is required.',403);
+  }
+  else if(p.action==='venuesService'){if(p.service!=='gsis-venues-v1'||p.identity!==undefined||!['sourceBegin','sourceComplete','sourceStatus'].includes(p.input.operation))throw venuesError_('INVALID_SERVICE','Service requests cannot act as school users.',403);}
   else if(!p.identity||typeof p.identity.email!=='string'||typeof p.identity.subject!=='string'||!p.identity.subject||!p.identity.email.includes('@')||!VenuesDomain.READS.concat(VenuesDomain.COMMANDS).includes(p.input.operation))throw venuesError_('INVALID_IDENTITY','A verified Access identity and valid operation are required.',401);
   return p;
 }
 function venuesNonce_(state,p){var prior=state.nonces.find(function(n){return n.id===p.nonce;});if(prior)throw venuesError_('REPLAY','This signed transport request was already consumed. Retry with a fresh signature.',409);state.nonces.push({id:p.nonce,createdAt:venuesNow_(),action:p.action});state.nonces=state.nonces.filter(function(n){return Date.parse(n.createdAt)>=Date.now()-600000;});}
 function doGet(){return venuesJson_({ok:false,status:405,code:'METHOD_NOT_ALLOWED',error:'Use the authenticated Venues application.'});}
 function doPost(event){try{var p=venuesVerifyEnvelope_(event),result;
-  if(p.action==='venuesService'){result=venuesTransaction_(function(state){if(p.input.operation!=='sourceStatus')venuesNonce_(state,p);var out=VenuesDomain.sourceEvent(state,p.input,venuesContext_());return out;});}
+  if(p.action==='venuesRecovery'){
+    if(p.input.operation==='sourceStatus')result=venuesSourceRecoveryStatus_('roster');
+    else {var status=venuesSourceRecoveryStatus_('roster');if(status.commit.state!=='uncertain'||status.commit.token!==p.input.token)throw venuesError_('REVISION_CONFLICT','The uncertain transaction changed. Refresh status first.',409);result=venuesRecoverCommit(p.input.token,p.input.evidence);}
+  }
+  else if(p.action==='venuesService'){result=venuesTransaction_(function(state){if(p.input.operation!=='sourceStatus')venuesNonce_(state,p);var out=VenuesDomain.sourceEvent(state,p.input,venuesContext_());return out;});}
   else{
     // Every operation resolves staff from live Contacts outside the writer lock.
     var actor=venuesResolveActor_(p.identity,true),operation=p.input.operation;
@@ -94,6 +104,11 @@ function setupVenues(){
   if(!ScriptApp.getProjectTriggers().some(function(t){return t.getHandlerFunction()==='venuesRunJobs';}))ScriptApp.newTrigger('venuesRunJobs').timeBased().everyMinutes(1).create();return venuesHealthCheck();
 }
 function venuesHealthCheck(){return venuesTransaction_(function(state){return {result:{version:VENUES_VERSION,revision:state.revision,source:{status:state.source.status,checkedAt:state.source.checkedAt,generation:state.source.generation},admins:state.grants.filter(function(g){return g.kind==='admin'&&g.active;}).length,tables:Object.values(VENUES_TABLES),pendingCommit:false}};});}
+function venuesSourceRecoveryStatus_(source){return venuesWithLock_(function(){
+ var state=venuesLoadState_(),result=VenuesDomain.sourceEvent(state,{operation:'sourceStatus',source:source},venuesContext_()).result,raw=venuesProperties_().getProperty('VENUES_COMMIT_PENDING'),commit={state:'ready'};
+ if(raw){commit={state:'uncertain',code:'COMMIT_UNCERTAIN'};try{var marker=JSON.parse(raw);if(typeof marker.token==='string'&&marker.token.length<=200){commit.token=marker.token;commit.at=marker.at;}}catch(_){}}
+ return Object.assign({},result,{commit:commit});
+});}
 function venuesPruneReceipts(){return venuesTransaction_(function(state){var cutoff=Date.now()-30*86400000,prior=state.receipts.length+state.nonces.length;state.receipts=state.receipts.filter(function(r){return Date.parse(r.createdAt)>=cutoff;});state.nonces=state.nonces.filter(function(r){return Date.parse(r.createdAt)>=Date.now()-600000;});return {state:state,result:{removed:prior-state.receipts.length-state.nonces.length}};});}
 /** Operator-only recovery. No endpoint invokes this function. Never clear on age. */
 function venuesRecoverCommit(expectedToken,evidence){if(typeof evidence!=='string'||evidence.trim().length<20)throw venuesError_('REVIEW_REQUIRED','Record the evidence that this transaction did not commit.',400);return venuesWithLock_(function(){var props=venuesProperties_(),raw=props.getProperty('VENUES_COMMIT_PENDING');if(!raw)return {recovered:false};var marker=JSON.parse(raw),state=venuesLoadState_();if(marker.token!==expectedToken)throw venuesError_('REVISION_CONFLICT','The pending transaction changed.',409);if(state.commitToken===marker.token){props.deleteProperty('VENUES_COMMIT_PENDING');return {recovered:true,committed:true};}if((state.commitToken||'')!==marker.beforeToken)throw venuesError_('COMMIT_UNCERTAIN','The stored state has another transaction. Do not clear this marker.');var before=JSON.parse(JSON.stringify(state)),c=venuesContext_();state.audit.push({id:c.uuid(),kind:'commitRecovery',actorId:'setup',actorName:'Apps Script operator',at:c.now,token:marker.token,evidence:evidence});props.deleteProperty('VENUES_COMMIT_PENDING');venuesCommitState_(before,state);return {recovered:true,committed:false};});}

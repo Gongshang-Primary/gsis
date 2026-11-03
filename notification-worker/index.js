@@ -6,7 +6,7 @@ import {readQuietMode} from '../shared/roster-quiet-mode.js';
 import {readRosterCutoverFreeze} from '../shared/roster-cutover-freeze.js';
 // Test harnesses load this file with its imports removed; treat quiet mode as off there.
 const quietMode=(db,at)=>typeof readQuietMode==='function'?readQuietMode(db,at):Promise.resolve({active:false});
-import {dispatchNotifications,scheduledRoster,diagnoseNotificationConnections,dispatchInboxPending,dispatchWebhookJobs,dispatchReceivedReports,dispatchPeerMail,dispatchAllocationAudit,dispatchGoogleBackup,dispatchRosterImports,dispatchReferencesRefresh} from '../roster-update/public/_worker.js';
+import {dispatchNotifications,scheduledRoster,diagnoseNotificationConnections,dispatchInboxPending,dispatchWebhookJobs,dispatchReceivedReports,dispatchPeerMail,dispatchAllocationAudit,dispatchVenuesSync,dispatchGoogleBackup,dispatchRosterImports,dispatchReferencesRefresh} from '../roster-update/public/_worker.js';
 /* GSIS_API_SECRET_BEGIN */
 // First-party API credentials share one operator-selected setting. Browser
 // sessions, private relief links and third-party credentials stay independent.
@@ -99,6 +99,7 @@ export default {
    // Separate execution from the critical minute lane. Catch up retained days
    // in bounded batches, with backend notification and lock safeguards.
    if(event.cron==='2-57/5 * * * *'){
+    if(typeof dispatchVenuesSync==='function')await run('venues-sync','roster-venues-sync',()=>dispatchVenuesSync(env));
     if(quiet.active)return;
     await run('audit-export','roster-allocation-audit',()=>catchUpAllocationAudit(env));return;
    }

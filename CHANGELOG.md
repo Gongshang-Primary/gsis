@@ -1,3 +1,7 @@
+## Pending: Venues sync diagnostics and Admin recovery, 3 November 2026
+
+Model: Codex. Roster save failures now identify a pending or uncertain Venues fence. System Health shows both source states and a five-minute warning through the existing SMC/Admin alert records. A confirmed Admin action runs the existing Venues transaction recovery, when needed, then Roster source recovery, and stops on either refusal. No save or commit algorithm changed. See [task and evidence](docs/coordination/tasks/roster-venues-fence-after-rollback.md). Not deployed.
+
 # Pending: recipient-approved peer relief can exceed weekly R, 3 November 2026
 
 Model: Codex. A colleague may approve a peer request when weekly R is exhausted or unverified. Timetable, attendance, employment and consecutive-period checks remain enforced. The relief still counts toward R. An essential audit and an SMC warning record the exception; automatic allocation is unchanged. See [peer quota override](docs/coordination/tasks/roster-peer-quota-override.md).
