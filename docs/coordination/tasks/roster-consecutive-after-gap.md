@@ -1,6 +1,6 @@
 # roster-consecutive-after-gap: consecutive check ignores timetabled periods after a free period (bug)
 
-- Status: blocked - awaiting Claude ruling on A vs B (2026-11-04)
+- Status: investigating - owner answers received 4 Nov, plan omission ruled out, new investigation below
 - Owner/model: Muse
 - Reviewer/model: Claude
 - Last updated (Asia/Singapore): 2026-11-04
@@ -114,6 +114,28 @@ If the answer to (3) is that Chuan Song IS in `plan.teachers`, then plan omissio
 Recommendation to Claude, for ruling: do not restore the `effectiveDay` revival, and do not change `tests/venues-sources.cjs`. First answer the owner lookup in section 2. If the plan was baseline-derived and Chuan Song is in `plan.teachers`, investigate the allocation path again from that plan, not from a subset fixture. If the plan was standalone or imported subset, rule on whether that plan type must carry every baseline teacher, and fix at the creation/import path if so.
 
 No PR until Claude rules on A or B, as instructed.
+
+## Second investigation, 2026-11-04 (read-only, before any new fix)
+
+Owner answers on main at a38b174: the real 2 Nov plan was created from the online baseline, Chuan Song was in it, and his schedule was as per baseline. Plan omission is ruled out. The effectiveDay revival on this branch is to be dropped. Shared effectiveDay and tests/venues-sources.cjs stay unchanged.
+
+Baseline-derived fixture, traced from confirmed plan to eligibility (local, original shared files, no live data): full baseline day, 17 periods, Chuan Song cells P5 and P7-P12 (indices 4, 6-11), P6 free, other teacher's tile moved, plan confirmed via composeStaplerContext. Result, Stapler day and baseline day identical: base [4,6,7,8,9,10,11], consecutiveBase [4,6,7,8,9,10,11], periodCount 17, runAt(P6) 8, eligibility consecutive 8, streakViolation true. With R verified, automaticStreakViolation true and autoEligible false for EL/TL subjects. So a simple EL/TL baseline-derived plan does NOT reproduce the bug in eligibility.
+
+Test results, with code references:
+
+1. Tiles to cells: lesson tiles are single-period. S.create creates one tile per baseline cell, with no durationMinutes (shared/roster-stapler.js create, lines 64-66). effectiveDay fills only teacher.cells[t.period] for each active lesson tile (line 228). span() for a lesson tile returns only its start period, because end = p.start + (p.end - p.start) for non-recess tiles, while durationMinutes is used only for recess tiles (span, line 23). A manually built lesson tile with durationMinutes 60 at period 7 gave span [7] and effectiveDay occupied [4,6,7] only, missing period 8. So a duration lesson tile would be counted once, but S.create never creates one, so this is NOT the cause for a baseline-derived plan. It is a latent quirk, not the proven cause, and it is not fixed here.
+
+2. Period mapping: plan.periods = clone(day.periods) in S.create, effectiveDay periods = plan.periods, teacherContext periodCount = dd.periods.length (shared/roster-allocation.js line 278), cells indexed by period value in effectiveDay. With 1-based periods (values 1-17, lessons at values 5, 7-12, prospective 6), periodCount 17, base [5,7,8,9,10,11,12], consecutive 8, streakViolation true, automaticStreakViolation true. Period mapping does NOT break the run. The runAt right-hand stop at total only matters if total is less than the highest period, which is not the case here.
+
+3. Teacher identity: teacherSource finds a row by staffId, with phone-alias joining (shared/roster-allocation.js lines 265-266: blocks keyed by staffId, linked people by mobile, t = joined.find(t => t.staffId === person.id)). With a mismatched person id and no phone link, base is [], t is false, eligibility available is false with reason "No active verified timetable", consecutive 1 (prospective only). That is ineligibility for all periods, not a silent streak miss. It does NOT explain the reported bug, where the teacher was considered for P6 and the streak did not trip. With matching staffId (owner answer), the row is found and base is full.
+
+4. Don't-need-relief, manual consecutive: NO removal on the Stapler path. teacherSource filters activities only by consecutiveCountExclusions (shared/roster-allocation.js line 275), not by reliefRequired or noReliefSubjects. effectiveDay fills every grid lesson tile regardless of subject. Publication copies cells verbatim (dailyPublication in shared/roster-operations.js). So TL, and also PD/BLK, are in consecutiveBase on both baseline and Stapler days. Manual consecutive is 8 in all variants tested.
+
+4b. Don't-need-relief, AUTOMATIC streak: THIS HOLDS, and is the only silent bypass found. Automatic streak uses workloadBase, not consecutiveBase: eligibility automaticStreakViolation = longestRun(consecutivePeriods(t, [...], true), periodCount) > limits.consecutive (shared/roster-allocation.js line 301), and violation() uses consecutivePeriods(t, rows, true) (line 396). workloadBase excludes non-workload activities (shared/roster-allocation.js line 266: activity.kind !== null and (teaching or cap or invigilation)). PD gives kind nonTeaching, cap false; BLK/BLOCK gives kind null; any subject with category Non-teaching gives kind nonTeaching, cap false. With R verified, a PD variant (PD at indices 7 and 9, EL elsewhere) gives: consecutiveBase [4,6,7,8,9,10,11], workloadBase [4,6,8,10,11], eligibility consecutive 8, streakViolation true, automaticStreakViolation false, autoEligible true, category 2. The same result holds on a baseline day and on a Stapler day, so it is not Stapler-only, but it is exactly the reported shape: periods on the Don't-need-relief list (default noReliefSubjects PD, BLK, BLOCK, IMP) are occupied for manual consecutive, but are dropped from the automatic workload run, so automatic allocation assigns a teacher whose run should trip the rule. Manual assignment is different: it allows with a warning, because streakViolation is a warning, not a reason.
+
+5. Other Stapler-vs-normal differences: plan.periods length equals baseline periods length, subjectCategories are copied from the baseline day at creation ({} vs undefined in the fixture, same classification fallback), parity, verified and schoolDay are set by effectiveDay, workloadIgnored is set true by composeStaplerContext but does not change streak in eligibility, staplerRevision is a revision marker only. None of these change base, consecutiveBase, periodCount or runAt for an unchanged teacher. Venues does not use eligibility or workloadBase, so a fix to automatic streak does not change venues.
+
+Conclusion, before any fix: fix automatic streak (and the solver violation check) to use consecutiveBase, not workloadBase, so automatic allocation trips on six consecutive occupied periods, including Don't-need-relief subjects. Keep maxConsecutivePeriods, consecutiveBase, consecutiveCountExclusions, daily workload total, and effectiveDay unchanged. This keeps allocation and venues consistent, because venues reads effectiveDay, which is unchanged, and allocation now counts the same occupied run for manual and automatic checks.
 
 ## Review
 
