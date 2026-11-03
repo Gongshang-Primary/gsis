@@ -4,7 +4,7 @@ const Import=require('../shared/roster-import.js'),Store=require('../shared/edge
 const hash=value=>crypto.createHash('sha256').update(value).digest('hex');
 const binding={actor:'admin@example.test',requestId:'step-budget',sessionId:hash('step-budget')};
 const snapshot={sourceDigest:hash('source'),state:{history:[{id:'large',text:'中文\\"'.repeat(65000)}]},index:{entries:[]}};
-const adapter={hash,base64:bytes=>Buffer.from(bytes).toString('base64'),bytes:text=>[...Buffer.from(text)]};
+const adapter={hash,base64:bytes=>{assert(bytes.every(value=>value>=-128&&value<=127),'Apps Script byte arrays use signed bytes');return Buffer.from(bytes).toString('base64');}};
 (async()=>{
  const frozen=Import.freeze(snapshot,binding,adapter);
  assert(frozen.manifest.parts.every(part=>part.bytes<=262157),'a single large record must split into bounded transport parts');

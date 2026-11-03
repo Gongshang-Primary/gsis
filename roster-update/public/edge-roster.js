@@ -314,7 +314,7 @@ export async function edgeRosterMigration(env,input,who,internal={}){const bridg
       if(frozen.adminVerified!==true||frozen.sessionId!==binding.sessionId)fail(503,'ROSTER_EXPORT_INVALID','The immutable export session was not verified.');
       await store.commitPreparation(claim,frozen);
      }catch(error){
-      if(['ROSTER_BRIDGE_TIMEOUT','ROSTER_GOOGLE_TIMEOUT'].includes(error.code)){
+      if(['ROSTER_BRIDGE_TIMEOUT','ROSTER_GOOGLE_TIMEOUT','ROSTER_BRIDGE_NETWORK','ROSTER_BRIDGE_RESPONSE','ROSTER_GOOGLE_ERROR'].includes(error.code)){
        try{recovered=await recover();}catch(recoveryError){if(recoveryError.code==='ROSTER_EXPORT_INVALID')throw recoveryError;}
       }
       if(!recovered){

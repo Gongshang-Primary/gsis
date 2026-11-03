@@ -10779,7 +10779,7 @@ var GSiSRosterImport=(()=>{
  const PENDING_CLEANUP="s.state='abandoned' AND s.reset_request<>'' AND NOT EXISTS(SELECT 1 FROM gsis_roster_import_preparation p WHERE p.session_id=s.session_id AND p.cleanup_request=s.reset_request)";
  const fail=(status,code,message)=>{throw Object.assign(Error(message),{status,code});};
  function utf8Length(value){let size=0;for(const char of value){const n=char.codePointAt(0);size+=n<128?1:n<2048?2:n<65536?3:4;}return size;}
- function utf8Bytes(value){const bytes=[];for(const char of value){const n=char.codePointAt(0);if(n<128)bytes.push(n);else if(n<2048)bytes.push(192|n>>6,128|n&63);else if(n<65536)bytes.push(224|n>>12,128|n>>6&63,128|n&63);else bytes.push(240|n>>18,128|n>>12&63,128|n>>6&63,128|n&63);}return bytes;}
+ function utf8Bytes(value){const bytes=[];for(const char of value){const n=char.codePointAt(0);if(n<128)bytes.push(n);else if(n<2048)bytes.push(192|n>>6,128|n&63);else if(n<65536)bytes.push(224|n>>12,128|n>>6&63,128|n&63);else bytes.push(240|n>>18,128|n>>12&63,128|n>>6&63,128|n&63);}return bytes.map(value=>value>127?value-256:value);}
  function digestValue(value){return typeof value==='string'&&/^[a-f0-9]{64}$/.test(value);}
  function identity(value,name,max=200){if(typeof value!=='string'||!value||value.length>max||/[\u0000-\u001f]/.test(value))fail(400,'ROSTER_IMPORT_ID','Invalid '+name+'.');return value;}
  function validateFailureReason(reason){
