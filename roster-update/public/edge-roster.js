@@ -172,11 +172,14 @@ async function scheduledRosterWork(env,clock,stamp,slot){
  const [rows]=await serviceProbe(env,[[`SELECT collection,record_id,value_json FROM gsis_edge_records WHERE scope='roster' AND collection='systemConfig' AND record_id IN ('key:scheduledAllocationEnabled','key:smcSummaryTimes')
  UNION ALL SELECT collection,record_id,value_json FROM gsis_edge_records WHERE scope='roster' AND collection='scheduleReceipts' AND record_id=?
  UNION ALL SELECT collection,record_id,value_json FROM gsis_edge_records WHERE scope='roster' AND collection='dailyEmploymentSettings' AND record_id='key:time'
- UNION ALL SELECT collection,record_id,value_json FROM gsis_edge_records WHERE scope='roster' AND collection='dailyEmploymentAutomatic' AND record_id=?`,['key:'+slot.key,'key:'+clock.today]]]);
- const values=new Map(rows.map(row=>[row.collection+'|'+row.record_id,JSON.parse(row.value_json)])),receipt=values.get('scheduleReceipts|key:'+slot.key),enabled=values.get('systemConfig|key:scheduledAllocationEnabled')===true;
- if(receipt&&(!receipt.cancelled||receipt.reportComplete))return {replayed:true};
+ UNION ALL SELECT collection,record_id,value_json FROM gsis_edge_records WHERE scope='roster' AND collection='dailyEmploymentAutomatic' AND record_id=?
+ UNION ALL SELECT collection,record_id,value_json FROM gsis_edge_records WHERE scope='roster' AND collection='edgeAllocatorRuns' AND record_id=?`,['key:'+slot.key,'key:'+clock.today,'key:'+slot.date]]]);
+ const values=new Map(rows.map(row=>[row.collection+'|'+row.record_id,JSON.parse(row.value_json)])),receipt=values.get('scheduleReceipts|key:'+slot.key),enabled=values.get('systemConfig|key:scheduledAllocationEnabled')===true,progress=values.get('edgeAllocatorRuns|key:'+slot.date),obsolete=progress?.state==='yielded'&&(!enabled||progress.scheduleKey!==slot.allocationKey||!GSISRosterAllocation.mayOptimise(clock,slot.date))?progress:null,finish=value=>({...value,...(obsolete?{obsolete}:{})});
+ if(receipt&&(!receipt.cancelled||receipt.reportComplete))return finish({replayed:true,...(receipt.allocationStatus==='budget'?{skipped:true,pending:true,allocationYielded:true,code:'ALLOCATION_YIELDED'}:{})});
+ if(progress?.state==='running'&&Date.parse(progress.updatedAt)>clock.now-600000)return {busy:true,enabled};
+ if(enabled&&progress?.state==='yielded'&&!obsolete)return {due:true,enabled,resume:progress};
  const times=values.get('systemConfig|key:smcSummaryTimes'),config={scheduledAllocationEnabled:enabled,...(times===undefined?{}:{smcSummaryTimes:times})};
- if(GSISRosterOperations.smcSummarySlot({systemConfig:config},stamp)||slot.minute===389||slot.minute===390||slot.optimise&&enabled)return {due:true,enabled};
+ if(GSISRosterOperations.smcSummarySlot({systemConfig:config},stamp)||slot.minute===389||slot.minute===390||slot.optimise&&enabled)return finish({due:true,enabled});
  const automatic=values.get('dailyEmploymentAutomatic|key:'+clock.today),employmentTime=values.get('dailyEmploymentSettings|key:time')||'08:00',employmentDue=!automatic&&clock.minute>=GSISRosterOperations.clock(employmentTime),local=ms=>new Date(ms+28800000).toISOString().slice(0,19);
  const [[work]]=await serviceProbe(env,[[`SELECT
   EXISTS(SELECT 1 FROM gsis_edge_records WHERE scope='roster' AND collection='publicationSnapshots' AND record_date=? AND record_id<>'$' AND COALESCE(json_extract(value_json,'$.kind'),'')<>'cancelled'
@@ -184,13 +187,56 @@ async function scheduledRosterWork(env,clock,stamp,slot){
    AND (json_extract(value_json,'$.assignment.date')||'T'||COALESCE(json_extract(value_json,'$.assignment.timeStart'),'00:00')||':00')<=?
    AND NOT EXISTS(SELECT 1 FROM gsis_edge_records ack WHERE ack.scope='roster' AND ack.collection='acknowledgements' AND ack.record_id<>'$' AND json_extract(ack.value_json,'$.snapshotId')=json_extract(gsis_edge_records.value_json,'$.id'))) reminders,
   ? AND (EXISTS(SELECT 1 FROM gsis_edge_records WHERE scope='roster' AND collection='massPublications' AND record_id=?) OR EXISTS(SELECT 1 FROM gsis_edge_records WHERE scope='roster' AND collection='staplerPlans' AND record_date=? AND record_id<>'$' AND json_extract(value_json,'$.published') IS NOT NULL AND json_extract(value_json,'$.published')<>0 AND date(json_extract(value_json,'$.publishedAt'),'+8 hours')=?)) employment`,[clock.today,local(clock.now),local(clock.now+1200000),employmentDue?1:0,'key:'+clock.today,clock.today,clock.today]]]);
- return {due:!!(work.reminders||work.employment),enabled};
+ return finish({due:!!(work.reminders||work.employment),enabled});
 }
-async function runScheduledRoster(env,p){const clock=edgeRosterClock(),stamp=p.scheduledTime??clock.now;if(!Number.isFinite(stamp)||stamp>clock.now+60000||clock.now-stamp>120000)fail(400,'ROSTER_STALE_TICK','Scheduled tick is stale.');const slot=GSISRosterAllocation.schedule(stamp),date=slot.date,requestId='scheduled-'+Math.floor(stamp/60000),work=await scheduledRosterWork(env,clock,stamp,slot);
- if(work.replayed)return {replayed:true};if(!work.due)return {idle:true,allocationPaused:!work.enabled};
- const id=sha256Hex(requestId),running=slot.optimise&&work.enabled;
- if(running)await mutateEdgeRoster(env,{actor:'roster-service',requestId:'run-'+requestId,command:{operation:'currentDuty',date},domainChanged:false,apply(state,ctx){state.edgeAllocatorRuns||={};const prior=state.edgeAllocatorRuns[date];if(prior&&prior.id!==id&&prior.state==='running'&&Date.parse(prior.updatedAt)>ctx.now-600000)fail(409,'ALLOCATION_IN_PROGRESS','Another allocator is already running.');state.edgeAllocatorRuns[date]={id,date,state:'running',trigger:'scheduled',actor:'roster-service',actorName:'Scheduled allocator',startedAt:ctx.iso,updatedAt:ctx.iso,canCancel:true,log:[{seq:1,at:ctx.iso,message:'Preparing current timetable and staffing inputs.'}]};return {started:true};}});
- const result=await mutateEdgeRoster(env,{actor:'roster-service',requestId,command:{operation:'scheduledRoster',date,scheduledTime:stamp},beforeCommit:(state,ctx,loaded)=>JSON.stringify(state.dailyPublicationStates)!==JSON.stringify(loaded.rawState.dailyPublicationStates)?beginEdgeVenuesChange(env,{source:'roster',requestId}):null,apply(state,ctx){const before=state.outbox.length,run=running?state.edgeAllocatorRuns?.[date]:null;ctx.service=true;ctx.skipScheduledAllocation=!!run&&(run.id!==id||run.state==='cancelled');reconcileOperationalState(state,ctx);const result=GSISRosterOperations.scheduledTick(state,ctx,stamp)||{};if(run?.id===id&&run.state==='running'){Object.assign(run,{state:'completed',canCancel:false,updatedAt:ctx.iso});run.log.push({seq:run.log.length+1,at:ctx.iso,message:'Scheduled allocation completed. Saved human decisions were retained.'});}return {...result,notificationsQueued:state.outbox.length-before,allocatorRun:run||null};}});await completeRosterFence(env,requestId);if(result.published||result.massPublished)await scheduleTimetable(env,{stage:'suspended',dates:[date],revision:result.revision});return result;
+async function runScheduledRoster(env,p){
+ const clock=edgeRosterClock(),stamp=p.scheduledTime??clock.now;
+ if(!Number.isFinite(stamp)||stamp>clock.now+60000||clock.now-stamp>120000)fail(400,'ROSTER_STALE_TICK','Scheduled tick is stale.');
+ const slot=GSISRosterAllocation.schedule(stamp),date=slot.date,requestId='scheduled-'+Math.floor(stamp/60000),work=await scheduledRosterWork(env,clock,stamp,slot);
+ if(work.obsolete)await mutateEdgeRoster(env,{actor:'roster-service',requestId:'stop-'+requestId,command:{operation:'allocatorResult',date,id:work.obsolete.id,scheduleKey:work.obsolete.scheduleKey},needsContext:false,apply(state,ctx){
+  const run=state.edgeAllocatorRuns?.[date];if(run?.id===work.obsolete.id&&run.state==='yielded'&&run.scheduleKey===work.obsolete.scheduleKey){Object.assign(run,{state:'failed',canCancel:false,updatedAt:ctx.iso});run.log=[...run.log,{seq:(run.log.at(-1)?.seq||0)+1,at:ctx.iso,message:'The scheduled slot ended. The saved draft is retained; SMC Auto-allocate remains available.'}].slice(-12);}return {allocatorRun:run||null};
+ }});
+ if(work.replayed)return work;
+ if(work.busy)return {skipped:true,skippedBusy:true,code:'SKIPPED_BUSY'};
+ if(!work.due)return {idle:true,allocationPaused:!work.enabled};
+ const id=sha256Hex(requestId),running=work.enabled&&(slot.optimise||!!work.resume),scheduleKey=work.resume?.scheduleKey||slot.allocationKey||slot.key,deadline=clock.now+20000;
+ if(running){const admission=await mutateEdgeRoster(env,{actor:'roster-service',requestId:'run-'+requestId,command:{operation:'currentDuty',date},domainChanged:false,apply(state,ctx){
+  const prior=state.edgeAllocatorRuns?.[date];
+  // Preflight is only a hint. A foreground cancellation or replacement must
+  // survive a stale resume request, including after an optimistic commit retry.
+  if(work.resume&&(prior?.state!=='yielded'||prior.id!==work.resume.id||prior.scheduleKey!==scheduleKey))return {skipped:true,skippedBusy:true,code:'SKIPPED_BUSY',allocatorRun:prior||null};
+  state.edgeAllocatorRuns||={};
+  if(prior&&prior.id!==id&&prior.state==='running'&&Date.parse(prior.updatedAt)>ctx.now-600000)fail(409,'ALLOCATION_IN_PROGRESS','Another allocator is already running.');
+  const resume=prior?.state==='yielded'&&prior.scheduleKey===scheduleKey,log=resume?prior.log:[];
+  state.edgeAllocatorRuns[date]={id,date,scheduleKey,state:'running',trigger:'scheduled',actor:'roster-service',actorName:'Scheduled allocator',startedAt:resume?prior.startedAt:ctx.iso,updatedAt:ctx.iso,attempts:(resume?prior.attempts||1:0)+1,canCancel:true,log:[...log,{seq:(log.at(-1)?.seq||0)+1,at:ctx.iso,message:resume?'Resuming the yielded scheduled allocation slot.':'Preparing current timetable and staffing inputs.'}].slice(-12)};
+  return {started:true};
+ }});if(admission.skipped)return admission;}
+ const result=await mutateEdgeRoster(env,{actor:'roster-service',requestId,command:{operation:'scheduledRoster',date,scheduledTime:stamp},beforeCommit:(state,ctx,loaded)=>JSON.stringify(state.dailyPublicationStates)!==JSON.stringify(loaded.rawState.dailyPublicationStates)?beginEdgeVenuesChange(env,{source:'roster',requestId}):null,apply(state,ctx){
+  const before=state.outbox.length,current=running?state.edgeAllocatorRuns?.[date]:null;
+  ctx.service=true;ctx.skipScheduledAllocation=running&&(!current||current.id!==id||current.state!=='running');ctx.scheduledAllocationKey=scheduleKey;ctx.scheduledAllocationRetry=!!work.resume;
+  ctx.allocationBudgetCheck=()=>{if(Date.now()>=deadline)throw Object.assign(Error('Scheduled allocation yielded before its compute deadline.'),{status:409,code:'ALLOCATION_BUDGET'});};
+  // Calculation stays outside the D1 transaction. Keep a shadow so a late
+  // proposal cannot change the retained draft when the compute budget expires.
+  let planned=clone(state),outcome;
+  try{
+   if(running)ctx.allocationBudgetCheck();reconcileOperationalState(planned,ctx);outcome=GSISRosterOperations.scheduledTick(planned,ctx,stamp)||{};
+   if(running&&!outcome.allocationTimedOut)ctx.allocationBudgetCheck();
+  }catch(error){
+   if(error.code!=='ALLOCATION_BUDGET')throw error;
+   planned=clone(state);const report={...ctx,skipScheduledAllocation:true};
+   reconcileOperationalState(planned,report);outcome={...GSISRosterOperations.scheduledTick(planned,report,stamp),allocationSkipped:true,allocationTimedOut:true};
+   planned.scheduleReceipts[slot.key]={...planned.scheduleReceipts[slot.key],optimise:false,allocationStatus:'budget'};
+  }
+  for(const key of Object.keys(state))delete state[key];Object.assign(state,planned);
+  const run=running?state.edgeAllocatorRuns?.[date]:null,yielded=outcome.allocationTimedOut===true;
+  if(run?.id===id&&run.state==='running'){
+   Object.assign(run,{state:yielded?'yielded':'completed',canCancel:yielded,updatedAt:new Date(Date.now()).toISOString()});
+   run.log.push({seq:(run.log.at(-1)?.seq||0)+1,at:run.updatedAt,message:yielded?'Compute budget reached. The saved draft is retained; the next minute can resume this slot.':'Scheduled allocation completed. Saved human decisions were retained.'});run.log=run.log.slice(-12);
+  }
+  return {...outcome,...(yielded?{skipped:true,pending:true,allocationYielded:true,code:'ALLOCATION_YIELDED'}:{}),notificationsQueued:state.outbox.length-before,allocatorRun:run||null};
+ }});
+ await completeRosterFence(env,requestId);
+ if(result.published||result.massPublished)await scheduleTimetable(env,{stage:'suspended',dates:[date],revision:result.revision});return result;
 }
 const auditSchemas=new WeakMap();
 async function auditSchema(env){const db=database(env);if(!auditSchemas.has(db))auditSchemas.set(db,db.batch([db.prepare('CREATE TABLE IF NOT EXISTS gsis_roster_audit_exports (date TEXT PRIMARY KEY,source_count INTEGER NOT NULL,source_revision INTEGER NOT NULL,reference_json TEXT NOT NULL,exported_at INTEGER NOT NULL)'),db.prepare('CREATE TABLE IF NOT EXISTS gsis_roster_audit_scan (scope TEXT PRIMARY KEY,scanned_revision INTEGER NOT NULL)')]).then(results=>{if(results.some(result=>result.success===false))fail(503,'ROSTER_AUDIT_STORAGE','Audit export checkpoints could not be initialized.');}).catch(error=>{auditSchemas.delete(db);throw error;}));await auditSchemas.get(db);}

@@ -107,7 +107,7 @@ test('scheduled report runs while manual allocation is active without changing i
 });
 test('duplicate same-slot scheduler delivery cannot replace an in-flight allocation with a report-only receipt',()=>{
  const h=setup(),request={input:{operation:'scheduledRoster',date:h.date,scheduledTime:h.ctx.now}},tick=h.O.scheduledTick;let injected=false;
- h.scope.GSISRosterOperations={...h.O,scheduledTick(s,ctx,stamp){const result=tick(s,ctx,stamp);if(!injected){injected=true;assert.throws(()=>h.scope.rosterScheduledDispatch_(request),e=>e.code==='ALLOCATION_IN_PROGRESS');assert.equal(Object.keys(h.state().scheduleReceipts).length,0);}return result;}};
+ h.scope.GSISRosterOperations={...h.O,scheduledTick(s,ctx,stamp){const result=tick(s,ctx,stamp);if(!injected){injected=true;assert.equal(h.scope.rosterScheduledDispatch_(request).code,'SKIPPED_BUSY');assert.equal(Object.keys(h.state().scheduleReceipts).length,0);}return result;}};
  const result=h.scope.rosterScheduledDispatch_(request);assert.equal(result.run.coverage,2);assert.equal(h.state().assignments.length,2);assert.equal(Object.values(h.state().scheduleReceipts)[0].optimise,true);assert.equal(h.row().state,'completed');assert.equal(h.calls.writes,1);
 });
 console.log('PASS '+checks+' allocator lifecycle regressions.');

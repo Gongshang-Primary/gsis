@@ -1,3 +1,7 @@
+# Pending: bounded single-flight allocation cycles, 4 November 2026
+
+Model: Codex. Scheduled allocation uses a fenced jobs lease, contention skips and timeout backoff. Google preparation resumes checked private context/proposal checkpoints and computes outside the source writer lock. D1 uses cooperative shadow planning with checked yielded-slot continuation. Health shows safe busy/backoff outcomes. Saved human work, receipts, cancellation and cutoff checks remain enforced. See [the task](docs/coordination/tasks/roster-allocation-cycle-overlap.md).
+
 # Pending: bounded Roster import parts and late checkpoint recovery, 4 November 2026
 
 Model: Codex. Split oversized records into verified transport segments, freeze one part per call and recover a late Google checkpoint before repeating work. Import failures distinguish bridge and Google timeouts from Google errors and retain step size. Setup shows the build label, live freeze age and saved preparation progress. The all-phase 25-second timing gate is not yet established; this draft does not clear the next cutover. No deployment or live action. See [the task](docs/coordination/tasks/roster-import-step141-bridge-timeout.md).

@@ -3,6 +3,7 @@ import {recordJobHealth,safeHealthError} from '../shared/edge-health.js';
 import {assertRecoveryWritable} from '../shared/edge-recovery.js';
 import {rosterRecoveryEnvironment,resolveRosterAuthorityEnvironment} from '../shared/roster-recovery-profile.js';
 import {readQuietMode} from '../shared/roster-quiet-mode.js';
+import {runAllocationCycle} from '../shared/roster-allocation-cycle.js';
 import {readRosterCutoverFreeze} from '../shared/roster-cutover-freeze.js';
 // Test harnesses load this file with its imports removed; treat quiet mode as off there.
 const quietMode=(db,at)=>typeof readQuietMode==='function'?readQuietMode(db,at):Promise.resolve({active:false});
@@ -25,7 +26,7 @@ function gsisApiSecret(env,legacyName){
 // Existing send/automation/diagnostic/pause flags retain their meanings.
 function writable(env){assertRecoveryWritable(env);}
 function safeError(error){return safeHealthError(error);}
-const summaryKeys=['configured','enabled','idle','hasMore','claimed','sent','failed','uncertain','newUncertain','reviewedUncertain','cancelled','prepareFailures','resultFailures','batches','backendCalls','processed','pending','exported','queued','applied','deferred','scanned','deleted','protected','candidates','removed','completed','retried','parked','readyAt','pendingCaptureCount','pendingPeerCount','notificationsQueued','forwarded','needsReview','replies','alerts','retrying','blocked','unconfirmed'];
+const summaryKeys=['configured','enabled','idle','hasMore','claimed','sent','failed','uncertain','newUncertain','reviewedUncertain','cancelled','prepareFailures','resultFailures','batches','backendCalls','processed','pending','exported','queued','applied','deferred','scanned','deleted','protected','candidates','removed','completed','retried','parked','readyAt','pendingCaptureCount','pendingPeerCount','notificationsQueued','forwarded','needsReview','replies','alerts','retrying','blocked','unconfirmed','timeoutStreak','backoff','backoffSeconds','leaseSeconds','leaseLost'];
 function safeSummary(result){
  const summary=Object.fromEntries(summaryKeys.filter(key=>typeof result?.[key]==='boolean'||Number.isFinite(result?.[key])&&result[key]>=0).map(key=>[key,result[key]]));
  // Received-report work reports its two processing stages separately. Retain
@@ -119,7 +120,7 @@ export default {
    const peerMail=(async()=>{await received;return await quietNow()?null:run('peer-mail','roster-peer-mail-drain',()=>dispatchPeerMail(env));})();
    const planning=(async()=>{
     const receiptResult=await received;
-    const result=await quietNow()?null:await run('allocation','roster-scheduled-cycle',()=>scheduledRoster(env,event.scheduledTime));
+    const result=await quietNow()?null:await run('allocation','roster-scheduled-cycle',()=>typeof runAllocationCycle==='function'?runAllocationCycle(env,()=>scheduledRoster(env,event.scheduledTime)):scheduledRoster(env,event.scheduledTime));
     // Reuse the same durable outbox. Never reconstruct or reset provider claims.
     if(result?.notificationsQueued>0||receiptResult?.intake?.notificationsQueued>0){await notifications;await send();}
    })();
