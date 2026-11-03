@@ -1,34 +1,74 @@
 # roster-consecutive-after-gap: consecutive check ignores timetabled periods after a free period (bug)
 
-- Status: assigned to Muse (owner 3 Nov 2026: "give consecutive check to muse")
+- Status: implementing
 - Owner/model: Muse
-- Branch: muse/roster-consecutive-after-gap
-- Lane: R, by owner exception to the Muse pilot scope. Allowed files: `shared/roster-allocation.js` and the Stapler-plan occupancy code it reads, generated backends/bundles via build, tests. Must not touch edge-authority, import, mirror, Venues fence or notification code (Codex's open lane R work). If the fix needs those, stop and ask Claude.
 - Reviewer/model: Claude
+- Last updated (Asia/Singapore): 2026-11-03
+- Branch: muse/roster-consecutive-after-gap
+- Base SHA: 45c70bf539ebb6e4accd1f9192ba2ef20e398c61
+- Current head SHA (or PR head; avoid self-referential commit hashes):
+- PR:
+- User-authorised scope: Lane R by owner exception 3 Nov 2026 (LANES.md Muse pilot section). `shared/roster-allocation.js` and the Stapler-plan occupancy code it reads (`shared/roster-stapler.js`, specifically `effectiveDay`, which produces the day `teacherSource` reads via `composeStaplerContext`), generated backends/bundles only via `npm run build`, tests.
+- Files/domains owned (include generated outputs): `shared/roster-stapler.js`, `tests/roster098k-consecutive-after-gap.cjs` (new), generated backends/bundles via build, this task record.
+- Out of scope: edge authority, import, mirror, Venues fence, notification code (Codex's open lane R work). If the fix needs those, stop and ask Claude. No live data, no deploy, no merge.
+- Acceptance checks:
+  1. Stapler day, unchanged teacher, P5 and P7 to P12 with P6 prospective: violation.
+  2. The same on a baseline day: violation (guards against regression).
+  3. A real gap (P5, P8 to P12, P6 prospective): run of 2, no violation.
+  4. A Don't-need-relief subject still counts as occupied.
+  5. A consecutive-exclusion subject is still excluded.
+  6. A teacher whose Stapler plan does change keeps the plan's periods, not the baseline's.
+  Full suite: `TZ=Asia/Singapore npm test`. All CI shards must be green. Draft PR naming Claude as reviewer, with the exact head SHA. Do not claim results that are not in CI.
 
-## Report (verbatim)
-"The consecutive check at a free period ignores timetabled periods that come after it. Example: Chuan Song, 2 Nov, P6. Own lessons P5 and P7 to P12."
-Expected: assigning relief at P6 makes P5-P12 a run of 8 occupied periods, so it must trip the 6-consecutive rule ("Six or more consecutive occupied periods", `streakViolation`) and the configured `maxConsecutivePeriods`.
+## Decisions and changes
 
-## Code path (Claude, main 573f1ed)
-- `shared/roster-allocation.js` `eligibility`: `set=consecutivePeriods(t,[...additions,prospective])`, `consecutive=runAt(set,p,t.periodCount)`, `streakViolation=consecutive>=6`; workload limit uses `longestRun(consecutivePeriods(..., true), t.periodCount)`.
-- `runAt` itself scans both directions correctly, but stops at `right+1<total` where `total=t.periodCount=dd.periods.length`.
-- `consecutiveBase` = `raw.activities` minus subjects in `consecutiveCountExclusions`, keyed by **`a.period` only**.
+- Claim note: WORKFLOW describes a claim-only commit to main, but the pilot rule is never push to main. As with Tasks 1 and 2, the claim is recorded on the task branch only, not on main. The user-given reference "main @ 5464087" does not resolve as a branch or tag in the GitHub tool; the task record content read on current main matches the brief exactly, so the branch starts from current main `45c70bf539ebb6e4accd1f9192ba2ef20e398c61`.
+- Report: Chuan Song, 2 Nov (a Stapler day), P6 free, own lessons P5 and P7 to P12. Assigning relief at P6 should make P5-P12 a run of 8 and trip the six-consecutive rule. It did not. Chuan Song's day was unchanged from baseline. Some of their periods are on the "Don't need relief" list. They are NOT on the consecutive-exclusion list. Periods on "Don't need relief" still count as occupied.
 
-## Hypotheses to test, most likely first
-1. **Multi-period lessons counted once:** a lesson block P7-P12 (or doubles) stored as one activity with a start period, so only P7 enters the set (or none if a later block starts at P8). Then the run around P6 is P5-P7 = 3 and no violation. Fix: expand each activity to every period it occupies.
-2. **Exclusion list:** Chuan Song's P7-P12 subject matches `consecutiveCountExclusions` (System Config), so they are deliberately not counted. If so, it is configuration, not a bug: report which subject.
-3. **`periodCount` too small:** `dd.periods.length` shorter than the highest period index (non-contiguous or 1-based periods), so the right-hand scan stops early. Fix: use the max period index + 1.
+## Step 1 reproduction finding (recorded before the fix commit)
 
-## Requirement
-Reproduce with the 2 Nov baseline (timetable `14a50c1e-…`, Chuan Song) on Google and D1; identify which hypothesis holds; fix the cause in the shared allocator (Google and D1 share it); keep the six-consecutive and configured limits unchanged in meaning. Tests: P5 + P7-P12 with P6 prospective → violation; a real gap (P5, P8-P12) → run of 2 → no violation; excluded subject behaves as configured; multi-period block expanded.
+Fixture (local, `roster-test/repro2.cjs`, not committed): baseline day, 17 periods, Chuan Song cells at indices 4 (P5) and 6-11 (P7-P12), P6 index 5 free, subjects EL with TL at indices 7 and 9 (TL is a Don't-need-relief family subject, reliefRequired false in the default families, and not in `consecutiveCountExclusions`).
 
-## Owner information (3 Nov)
-"chuan songs: some periods are on Dont need relief list, not the count-consecutive list". So hypothesis 2 (consecutive exclusion list) is ruled out.
+Baseline day:
+- `teacherSource` base: [4, 6, 7, 8, 9, 10, 11]
+- `consecutiveBase`: [4, 6, 7, 8, 9, 10, 11]
+- `periodCount`: 17
+- `runAt(P6)`: 8
+- `eligibility` consecutive: 8, `streakViolation`: true
 
-## Claude's follow-up reading (main 6540d97)
-For a **candidate** (the teacher being considered for relief), occupancy comes from `teacherSource`: every non-empty timetable cell is added to `base` and `activities` (`occupied=c=>Array.isArray(c)&&c.some(...)`), and `consecutiveBase` drops only `consecutiveCountExclusions` subjects. The "Don't need relief" policy (`noReliefRequired` / `resolve(dem).reliefRequired`) is applied to **demands** (an absent teacher's lessons), not to a candidate's occupancy, in the code read so far. So if the P7-P12 periods vanish from the run, check: (a) whether anything removes no-relief-policy activities from the candidate's `base`/`consecutiveBase` elsewhere (e.g. teaching-group overrides, `consecutiveExcludedDemands`, absence on those periods, Stapler plan for 2 Nov replacing the baseline), (b) hypothesis 1 (multi-period blocks) and (c) hypothesis 3 (`periodCount`). Reproduce with the exact 2 Nov data before changing code. Owner expectation: periods on the "Don't need relief" list are still **occupied** for the consecutive check.
+Stapler day, plan whose teacher list and tiles do not cover Chuan Song (plan baseline is a subset day with only the other teacher; the plan changes only that teacher, so it does not change Chuan Song):
+- `teacherSource` base: []
+- `consecutiveBase`: []
+- `periodCount`: 17
+- `runAt(P6)`: 1
+- `eligibility` consecutive: 1, `streakViolation`: false
 
-## Owner information 2 (3 Nov)
-"2 Nov was a Stapler day. but Chuan Song's schedule for that day is as per baseline."
-**Leading hypothesis now:** on a Stapler day, candidate occupancy comes from the Stapler (suspended-timetable) plan, not the baseline. If the plan carries only the rows or periods that changed (or drops unchanged cells, or mis-maps a teacher whose day is "as per baseline"), Chuan Song's P7-P12 can be missing from `blocks`/`base`, so the consecutive run at P6 looks short. Reproduce with the 2 Nov plan (Stapler revision for 2026-11-02) versus the baseline, compare Chuan Song's `base`/`consecutiveBase` from each, and fix so that an unchanged teacher on a Stapler day keeps the full baseline occupancy (all periods, including "Don't need relief" subjects).
+Cause that holds: (a) the Stapler plan drops an unchanged teacher's periods.
+
+Code lines, `shared/roster-stapler.js` `effectiveDay` (line 228 in the branch version read):
+- `out.teachers = plan.teachers.filter(...).map(t => ({...clone(baselineTeachers.get(t.staffId) || {}), ...clone(t), cells: empty}))`
+- then only `active(plan)` lesson tiles fill cells: `teacher.cells[t.period] = cell(plan, t)`
+- Baseline day teachers (`day.teachers`) are only used to spread fields onto plan teachers. A baseline teacher who is not in `plan.teachers` gets no row at all, and a plan teacher with no tiles at all in the plan gets empty cells. `teacherSource` in `shared/roster-allocation.js` then builds `base`/`consecutiveBase` from `dd.teachers` only, so the dropped teacher's periods vanish from the run.
+
+Causes ruled out in this fixture:
+- (b) multi-period blocks counted once: the baseline tiles are one per period (7 tiles for P5, P7-P12), and baseline `base` includes all 7. No block expansion issue is present here.
+- (c) `periodCount` too short: `periodCount` is 17 on both the baseline day and the Stapler day. The right-hand scan in `runAt` (`shared/roster-allocation.js`, line 284) is not truncated in this fixture.
+- Consecutive exclusion: `consecutiveCountExclusions` is empty in the fixture, and TL (Don't-need-relief) is counted on the baseline day, as required.
+
+Note on scope of the reproduction: a Stapler plan created from the *full* baseline day via `S.create` does NOT reproduce the bug (both days give run 8, violation true). The drop happens when the plan's coverage does not include the unchanged teacher, not for every Stapler plan. That is why the fix must retain baseline occupancy only for teachers the plan does not cover, and must not restore baseline periods for a teacher the plan does cover (see acceptance check 6).
+
+## Verification
+
+Exact command, tested commit, outcome and evidence. Explicitly list checks not run.
+
+## Review
+
+Reviewer/model, reviewed SHA, findings, resolution. Advisory review is not human approval.
+
+## Deployment
+
+Not deployed. Staging and production separately: none.
+
+## Handoff
+
+Remaining work, blocker, next action, ownership transfer if any. No secrets or private school data.
