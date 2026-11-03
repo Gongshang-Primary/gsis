@@ -28,7 +28,12 @@ Button URL in every case: `https://roster.gsps.edu.sg/external.html#{{1}}`; butt
 
 Exact bodies: v1 body with the final "…here: {{n}}." sentence replaced by "…using the button below." (urgent: "…acknowledge your duty now using the button below."). Fetch the live body with the Meta API or ask Claude; compute `bodySha256` from the live body, never from this table.
 
-Not changed (links are to staff pages, not private tokens): contact_review, relief_unacknowledged, relief_urgent_smc / smc_attention. Owner may ask for these later.
+Staff-page links (owner ruling 3 Nov: "yes", buttons too). Static URL buttons, no button parameter; drop the URL body field. Drafted by Claude, awaiting owner confirm before Meta submission:
+| contact_review | gsis_contact_review_v2 | button "Open Contacts" → https://contacts.gsps.edu.sg/ (must equal CONTACTS_PUBLIC_URL) |
+| relief_unacknowledged | gsis_relief_unacknowledged_v2 | "Open Roster" → https://roster.gsps.edu.sg/ |
+| relief_urgent_smc | gsis_relief_urgent_smc_v2 | "Open Roster" → https://roster.gsps.edu.sg/ |
+| smc_attention | gsis_relief_attention_v3 | "Open Roster" → https://roster.gsps.edu.sg/ |
+On a non-production origin (publicOrigin not roster.gsps.edu.sg), keep v1 so the link is never wrong.
 
 ## Build
 1. `notification-worker/template-contracts.json`: add a `variants.buttons` entry for each PENDING row, same shape as mutual_request; `privateLinkPurpose` unchanged; `submissionState` from Meta.
@@ -42,7 +47,7 @@ She acknowledged, yet got the reminder; her link then said "expired". Context: D
 Questions to answer with evidence before fixing:
 1. Does publish re-issue tokens or bump a revision that invalidates the 07:12 link? If so, is "expired" the right message, or should the old token redirect to the current duties?
 2. Is the acknowledgement keyed to a revision, so a republish resets it and the reminder fires?
-3. Fix so an acknowledgement for the same duty (date, period, class) survives a republish, and a stale token shows the current duties instead of "expired" (owner to confirm the second part).
+3. Fix so an acknowledgement for the same duty (date, period, class) survives a republish, and a stale token shows the current duties instead of "expired". Owner ruling 3 Nov: "yes" to both; no option flag needed. Still expire after the normal link age and for revoked staff.
 
 ## Acceptance
 Full suite green; Claude exact-head review; no live send in tests; owner flips activation.

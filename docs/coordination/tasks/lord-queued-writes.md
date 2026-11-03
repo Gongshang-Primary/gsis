@@ -85,3 +85,17 @@ bookingCreateBatch, bookingUpdate, bookingCancel, bookingRespond, notificationPr
 - Two concurrent requests for one cart: one confirmed, one shown "Not available" with no double booking.
 - Queue down: direct Google path still works, with a visible note.
 - A retried click never creates two bookings.
+
+---
+
+## Status check, 3 Nov 2026 (Claude)
+Owner: "LORD users have been reporting slow uploads/downloads too … is the temporary worker queue in place?"
+Answer: **no, not for any slow action.**
+- Phase 1 (#44, in v0.9.9g) carries only `notificationPreferences`, default off, no UI wiring. The `lord-job-worker` is not deployed (Cloudflare Workers list, 3 Nov: no LORD worker) and no D1 binding exists.
+- Phase 2 (book, collect, collect photos, return, return photos) was never built. Those are the slow paths.
+- Photos: `lord/assets/app.js` holds photos as data URLs (`photoData`, `stylusPhotoData`, `headphonePhotoData`) and sends them inside the Apps Script call on the user's click, then Drive writes them. That is the upload delay. Downloads/views read back through Apps Script/Drive.
+
+## Phase 2 brief (owner priority 30 Oct, unchanged)
+1. **Photos first (biggest win, lowest conflict risk):** resize in the browser (long edge ~1600 px, JPEG/WebP ~0.8) before upload; upload to private R2 via the LORD gateway (signed, actor-bound, size cap); receipt under 1 s with thumbnail and "Submitted, please wait for confirmation"; Worker job copies R2 → Drive in the background and records the Drive file ID on the booking. Serve thumbnails/views from R2 via the gateway while the Drive copy is pending or as a cache.
+2. Book cart, collect, return through the queue, as designed above: pending until Google accepts; never show queued as confirmed; no direct replay after a receipt.
+3. Deploy plan for the owner: create D1 binding and R2 bucket, deploy `lord-job-worker`, set secrets, flip the gateway flag. Default off; fallback = today's direct path.
