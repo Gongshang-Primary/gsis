@@ -8,7 +8,6 @@ The coordinator assigns each job to a lane and a model, keeps this file and the 
 | Model | Role | Branch prefix | Commit/PR label |
 |---|---|---|---|
 | Codex | Builder, Roster core and D1 path | `codex/<task-id>` | `Model: Codex` |
-| Gemini | Builder, isolated product lanes (pilot) | `gemini/<task-id>` | `Model: Gemini` |
 | Muse | Builder, pilot (owner directive 3 Nov 2026) | `muse/<task-id>` | `Model: Muse` |
 | Claude | Coordinator, architect, reviewer; small fixes | `claude/<task-id>` | `Model: Claude` |
 
@@ -19,10 +18,10 @@ All three share one GitHub identity, so the label is the only attribution.
 |---|---|---|---|
 | **R: Roster core and D1** | `shared/roster-*.js`, `backend/Roster*.gs`, `backend/Code.gs`, `roster-update/public/`, `shared/edge-*.js`, `shared/roster-import.js`, `shared/roster-mirror.js`, generated Roster/Deploy backends and Worker bundles | Codex | Serial: one open task at a time touches this lane (WORKFLOW rule). Critical path to D1. |
 | **D: Deploy (planning, workload, relief settings)** | `public/` (Deploy frontend), `shared/workload.js`, `shared/relief.js`, `shared/teaching-rules.js`, `backend/Relief.gs` | Codex or Claude | Shares generated bundles with lane R, so it is serial with R. |
-| **C: Contacts** | `contacts-update/public/`, `backend/Contacts_*.gs`, `Contacts_Code.gs` | Gemini (pilot) | Independent of Roster bundles except the Contacts API used by Roster; API changes need coordinator sign-off. |
-| **K: Calendar** | `calendar-update/public/`, `calendar-backend/`, `calendar-job-worker/` | Gemini or Codex | Independent. |
-| **L: LORD suite UI** | `lord-suite/Source/` (frontends) | Gemini after pilot | LORD backend and queued writes stay with Codex until designed (D1-first rule). |
-| **Y: Layout and Venues** | `layout-update/public/`, `venues-viewport/public/` | Gemini after pilot | Independent. |
+| **C: Contacts** | `contacts-update/public/`, `backend/Contacts_*.gs`, `Contacts_Code.gs` | Codex (Muse after pilot) | Independent of Roster bundles except the Contacts API used by Roster; API changes need coordinator sign-off. |
+| **K: Calendar** | `calendar-update/public/`, `calendar-backend/`, `calendar-job-worker/` | Codex (Muse after pilot) | Independent. |
+| **L: LORD suite UI** | `lord-suite/Source/` (frontends) | Codex (Muse after pilot) | LORD backend and queued writes stay with Codex until designed (D1-first rule). |
+| **Y: Layout and Venues** | `layout-update/public/`, `venues-viewport/public/` | Codex (Muse after pilot) | Independent. |
 | **T: Docs and tests only** | `docs/`, `tests/` without product code | Any | Coordinator approves. |
 
 Any job that touches files in two lanes belongs to the stricter lane (R before D before the rest). Release assembly (`scripts/build-release.py`, `package.json`, `release-installation-manifest.json`) is coordinator-owned.
@@ -36,11 +35,12 @@ Any job that touches files in two lanes belongs to the stricter lane (R before D
 6. Claude reviews each PR at its exact head SHA; the owner merges.
 
 ## Muse pilot (owner 3 Nov 2026: "include muse into agents that can assign coding to")
-- Muse follows AGENTS.md, WORKFLOW.md and this file exactly like Codex and Gemini: one claimed task, one `muse/<task-id>` branch, `Model: Muse` on every commit and PR, draft PR naming Claude as reviewer with the exact head SHA, full CI green before review.
+- Muse follows AGENTS.md, WORKFLOW.md and this file exactly like Codex: one claimed task, one `muse/<task-id>` branch, `Model: Muse` on every commit and PR, draft PR naming Claude as reviewer with the exact head SHA, full CI green before review.
 - Pilot scope: one small, isolated task outside lane R (for example a Contacts, Layout or Calendar fix). Lane R (Roster/D1) stays with Codex until the pilot is reviewed.
 - Never claim another model's approval or a test run that is not in CI. After the pilot the coordinator reports quality and the owner decides which lanes open to Muse.
 
-## Gemini pilot
+## Gemini (Jules): removed 3 Nov 2026 (owner: "remove jules (gemini)")
+Kept for the record. Gemini/Jules no longer receives jobs; its branches no longer trigger CI. Pilot history:
 - First job: **row C**, Contacts Edit Info "Find by TTb name" filter (PENDING_CHANGELOG 31 Oct). Small, lane C only.
 - After the pilot the coordinator reports quality (correctness, rule-following, test discipline) and the owner decides whether lanes K, L and Y open to Gemini.
 
