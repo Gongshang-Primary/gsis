@@ -18,11 +18,13 @@ var GSiSRosterImport=(()=>{
  function freezeBinding(snapshot,binding){
   const {actor,requestId,sessionId}=binding;identity(actor,'actor',320);identity(requestId,'request');if(!digestValue(sessionId)||!digestValue(snapshot.sourceDigest))fail(400,'ROSTER_IMPORT_DIGEST','Invalid import digest.');
  }
- function partWriter(position,adapter){
+ function partWriter(position,adapter,selection){
   let {ordinal,offset}=position;if(!Number.isSafeInteger(ordinal)||ordinal<0||!Number.isSafeInteger(offset)||offset<0)fail(400,'ROSTER_IMPORT_POSITION','Invalid preparation position.');
-  const parts=[],partMetadata=[];
-  function add(kind,body,scope='',records=0){const payload=JSON.stringify(body),bytes=utf8Length(payload);if(bytes>MAX_PART_BYTES||ordinal>=MAX_PARTS||offset+bytes>MAX_TOTAL_BYTES)fail(413,'ROSTER_IMPORT_LIMIT','The immutable export exceeds a documented part/container limit.');const id='part-'+String(ordinal++).padStart(5,'0');partMetadata.push({id,kind,scope,records,offset,bytes,digest:adapter.hash(payload)});parts.push(payload);offset+=bytes;return id;}
-  return {add,result:()=>({parts,partMetadata,position:{ordinal,offset}})};
+  const first=ordinal;
+  if(selection&&(!Number.isSafeInteger(selection.start)||selection.start<0||!Number.isSafeInteger(selection.limit)||selection.limit<1))fail(400,'ROSTER_IMPORT_POSITION','Invalid preparation part window.');
+  const parts=[],partMetadata=[],partPlan=[];
+  function add(kind,body,scope='',records=0,source){const payload=JSON.stringify(body),bytes=utf8Length(payload);if(bytes>MAX_PART_BYTES||ordinal>=MAX_PARTS||offset+bytes>MAX_TOTAL_BYTES)fail(413,'ROSTER_IMPORT_LIMIT','The immutable export exceeds a documented part/container limit.');const index=ordinal-first,id='part-'+String(ordinal++).padStart(5,'0'),selected=!selection||index>=selection.start&&index<selection.start+selection.limit;let part;if(selected||selection?.plan)part={id,kind,scope,records,offset,bytes,digest:adapter.hash(payload)};if(selected){partMetadata.push(part);parts.push(payload);}if(selection?.plan)partPlan.push({part,source});offset+=bytes;return id;}
+  return {add,result:()=>({parts,partMetadata,position:{ordinal,offset},...(selection?{totalParts:ordinal-first}:{}),...(selection?.plan?{partPlan}:{})})};
  }
  function objectJobs(snapshot){
   const jobs=[];
@@ -35,38 +37,51 @@ var GSiSRosterImport=(()=>{
   if(!job||!['baseline','audit','stapler'].includes(job.kind)||!Array.isArray(job.path)||!job.path.length)fail(400,'ROSTER_IMPORT_OBJECT','Invalid preparation object job.');
   let value=snapshot;for(const key of job.path){if(!value||!Object.prototype.hasOwnProperty.call(value,key))fail(409,'ROSTER_IMPORT_OBJECT','The captured object job is unavailable.');value=value[key];}return value;
  }
- function prepareObject(snapshot,job,position,adapter){
+ function prepareObject(snapshot,job,position,adapter,selection){
   const source=jobValue(snapshot,job),value=job.kind==='baseline'?adapter.readModel(JSON.parse(JSON.stringify(source))):job.kind==='audit'?adapter.readArchive(job.id,source.archiveFileId):source;
   const json=JSON.stringify(value);if(utf8Length(json)>MAX_OBJECT_BYTES)fail(413,'ROSTER_IMPORT_OBJECT_LIMIT','A captured object exceeds the supported 32 MiB source-object bound.');
-  const digest=adapter.hash(json),reference={key:'gsis/roster/'+job.kind+'/'+encodeURIComponent(job.id)+'/'+digest+'.json.gz',digest,encoding:'gzip-json-v1'},gzip=adapter.gzip(json),writer=partWriter(position,adapter),segments=[];
+  const digest=adapter.hash(json),reference={key:'gsis/roster/'+job.kind+'/'+encodeURIComponent(job.id)+'/'+digest+'.json.gz',digest,encoding:'gzip-json-v1'},gzip=adapter.gzip(json),writer=partWriter(position,adapter,selection),segments=[];
   for(let n=0;n<gzip.length;n+=SEGMENT_BYTES)segments.push(writer.add('segment',{base64:adapter.base64(gzip.slice(n,n+SEGMENT_BYTES))}));
   writer.add('object',{reference,kind:job.kind,gzipBytes:gzip.length,segments});return {...writer.result(),reference};
  }
- function prepareRecords(snapshot,references,position,adapter){
+ function recordsSnapshot(snapshot,references,shallow=false){
   const jobs=objectJobs(snapshot);if(!Array.isArray(references)||references.length!==jobs.length)fail(409,'ROSTER_IMPORT_OBJECT','Captured object references are incomplete.');
-  const transformed={state:JSON.parse(JSON.stringify(snapshot.state)),index:JSON.parse(JSON.stringify(snapshot.index))};
+  const transformed=shallow?{state:{...snapshot.state},index:{...snapshot.index}}:{state:JSON.parse(JSON.stringify(snapshot.state)),index:JSON.parse(JSON.stringify(snapshot.index))};
   for(let i=0;i<jobs.length;i++){
    const job=jobs[i],item=references[i],reference=item?.reference;if(JSON.stringify(item?.job)!==JSON.stringify(job)||!reference||reference.encoding!=='gzip-json-v1'||!digestValue(reference.digest)||reference.key!=='gsis/roster/'+job.kind+'/'+encodeURIComponent(job.id)+'/'+reference.digest+'.json.gz')fail(409,'ROSTER_IMPORT_OBJECT','A captured object reference does not match its job.');
+   if(shallow){let parent=transformed;for(const key of job.path){parent[key]=Array.isArray(parent[key])?parent[key].slice():{...parent[key]};parent=parent[key];}}
    const value=jobValue(transformed,job);if(job.kind==='baseline'){value.modelObject={...reference};value.modelObjectKey=reference.key;value.modelDigest=reference.digest;delete value.modelFile;}else if(job.kind==='audit'){value.archiveObject={...reference};delete value.archiveFileId;}else{let parent=transformed;for(const key of job.path.slice(0,-1))parent=parent[key];parent[job.path.at(-1)]={edgeObject:true,...reference};}
   }
-  const writer=partWriter(position,adapter),scopes={};
+  return transformed;
+ }
+ function prepareRecordPart(snapshot,references,batch,adapter){
+  const entry=batch.plan[batch.next];if(!entry?.source||!SCOPES.includes(entry.source.scope))fail(409,'ROSTER_IMPORT_PART','The record preparation index is incomplete.');
+  const source=entry.source,state=recordsSnapshot(snapshot,references,true),rows=Store.recordRange(source.scope==='roster'?state.state:state.index,source.start,source.count);
+  let body={rows};if(entry.part.kind==='segment'){const bytes=utf8Bytes(JSON.stringify(body));body={base64:adapter.base64(bytes.slice(source.segment*SEGMENT_BYTES,(source.segment+1)*SEGMENT_BYTES))};}else if(entry.part.kind==='record')body=source.assembly;
+  const payload=JSON.stringify(body);if(utf8Length(payload)!==entry.part.bytes||adapter.hash(payload)!==entry.part.digest)fail(409,'ROSTER_IMPORT_PART','The reconstructed record part changed from its immutable index.');
+  return {parts:[payload],partMetadata:[entry.part],position:batch.end,totalParts:batch.total,scopes:batch.scopes};
+ }
+ function prepareRecords(snapshot,references,position,adapter,selection){
+  const transformed=recordsSnapshot(snapshot,references,!!selection?.plan);
+  const writer=partWriter(position,adapter,selection),scopes={};
   for(const [scope,value]of [['roster',transformed.state],['roster-register',transformed.index]]){
    // Encode each complete scope once. Natural-key multiplicity and positions are
    // global; the prepared payloads are then persisted and uploaded in small batches.
-   const records=Store.encode(value);scopes[scope]={records:records.size,digest:adapter.hash(Store.canonicalJson(value))};let rows=[],bytes=12;
+   const records=Store.encode(value);scopes[scope]={records:records.size,digest:adapter.hash(Store.canonicalJson(value))};let rows=[],bytes=12,start=0,index=0;
    for(const row of records.values()){
     const size=utf8Length(JSON.stringify(row))+1;
-    if(rows.length&&bytes+size>TARGET_BYTES){writer.add('records',{rows},scope,rows.length);rows=[];bytes=12;}
+    if(rows.length&&bytes+size>TARGET_BYTES){writer.add('records',{rows},scope,rows.length,{scope,start,count:rows.length});rows=[];bytes=12;}
+    if(!rows.length)start=index;
     if(size+12>TARGET_BYTES){
      // Split transport bytes, never the logical record or its natural key.
      const payload=JSON.stringify({rows:[row]}),data=utf8Bytes(payload),segments=[];
      if(data.length>MAX_PART_BYTES)fail(413,'ROSTER_IMPORT_LIMIT','The immutable record exceeds its documented limit.');
-     for(let n=0;n<data.length;n+=SEGMENT_BYTES)segments.push(writer.add('segment',{base64:adapter.base64(data.slice(n,n+SEGMENT_BYTES))}));
-     writer.add('record',{segments,bytes:data.length,digest:adapter.hash(payload)},scope,1);continue;
+     for(let n=0;n<data.length;n+=SEGMENT_BYTES)segments.push(writer.add('segment',{base64:adapter.base64(data.slice(n,n+SEGMENT_BYTES))},'',0,{scope,start:index,count:1,segment:n/SEGMENT_BYTES}));
+     const assembly={segments,bytes:data.length,digest:adapter.hash(payload)};writer.add('record',assembly,scope,1,{scope,start:index,count:1,assembly});index++;continue;
     }
-    rows.push(row);bytes+=size;
+    rows.push(row);bytes+=size;index++;
    }
-   if(rows.length)writer.add('records',{rows},scope,rows.length);
+   if(rows.length)writer.add('records',{rows},scope,rows.length,{scope,start,count:rows.length});
   }
   return {...writer.result(),scopes};
  }
@@ -202,7 +217,7 @@ var GSiSRosterImport=(()=>{
    try{checked(await c.batch(statements));}catch(error){const saved=await read();if(saved?.manifest_digest===manifestDigest)return progress();throw error;}return progress();
   }
   async function progress(){const row=await read();if(!row)return null;const c=connection(),count=await c.prepare('SELECT COUNT(*) total,SUM(receipt_json IS NOT NULL) completed FROM gsis_roster_import_parts WHERE session_id=?').bind(sessionId).first(),next=await c.prepare('SELECT part_id id,kind,scope,digest,bytes,records FROM gsis_roster_import_parts WHERE session_id=? AND receipt_json IS NULL ORDER BY ordinal LIMIT 1').bind(sessionId).first(),preparation=await preparationStatus(),detail={};
-   if(row.state==='preparing')for(const key of ['step','done','total','elapsedMs','preparing','retryAfterMs','phase','stepSize','nextStep'])if(preparation?.result?.[key]!==undefined)detail[key]=preparation.result[key];
+   if(['preparing','failed'].includes(row.state))for(const key of ['step','done','total','elapsedMs','preparing','retryAfterMs','phase','stepSize','nextStep'])if(preparation?.result?.[key]!==undefined)detail[key]=preparation.result[key];
    for(const key of ['failureReason','lastPhase'])if(preparation?.result?.[key]!==undefined)detail[key]=preparation.result[key];
    if(row.state==='abandoned')Object.assign(detail,await restartCleanupStatus(row.reset_request));
    return {sessionId,requestId,actor,state:row.state,sourceDigest:row.source_digest||null,manifestDigest:row.manifest_digest||null,completedParts:count.completed||0,totalParts:count.total,imported:row.state==='imported',referencesReady:!!row.references_ready,nextPart:next||null,requiresRestart:['failed','abandoned'].includes(row.state),next:row.state==='preparing'?'prepare':next?'part':!row.references_ready?'references':row.state==='imported'?'complete':'finalize',...detail};}
@@ -421,6 +436,6 @@ var GSiSRosterImport=(()=>{
   }finally{checked([await c.prepare(`UPDATE ${ARCHIVES} SET lease_token='',lease_until=0 WHERE session_id=? AND lease_token=?`).bind(job.session_id,token).run()]);}
   return {archived,processed,...await archiveStatus(db)};
  }
- return {objectJobs,prepareObject,prepareRecords,finishFreeze,freeze,validateManifest,utf8Length,open,ensure,latest,resetAfterRollback,pendingRollbackReset,archiveRetained,archiveStatus,hashText,hashBytes,stageObject,FORMAT,SCOPES,TARGET_BYTES,SEGMENT_BYTES,MAX_PART_BYTES,MAX_PARTS,MAX_MANIFEST_BYTES,MAX_TOTAL_BYTES,MAX_OBJECT_BYTES,MAX_RETAINED_SESSIONS,PREPARATION_LEASE_MS,MAX_PREPARATION_RESULT_BYTES};
+ return {objectJobs,prepareObject,prepareRecords,prepareRecordPart,finishFreeze,freeze,validateManifest,utf8Length,open,ensure,latest,resetAfterRollback,pendingRollbackReset,archiveRetained,archiveStatus,hashText,hashBytes,stageObject,FORMAT,SCOPES,TARGET_BYTES,SEGMENT_BYTES,MAX_PART_BYTES,MAX_PARTS,MAX_MANIFEST_BYTES,MAX_TOTAL_BYTES,MAX_OBJECT_BYTES,MAX_RETAINED_SESSIONS,PREPARATION_LEASE_MS,MAX_PREPARATION_RESULT_BYTES};
 })();
 if(typeof module!=='undefined'&&module.exports)module.exports=GSiSRosterImport;

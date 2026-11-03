@@ -1,6 +1,6 @@
 # roster-import-step141-bridge-timeout: attempt 3 (3-4 Nov) stopped at preparation step 141 of 143
 
-- Status: implementing; local regression checks passing, full-suite verification in progress. Blocks the next cutover attempt.
+- Status: implemented for review; focused checks passing, exact-head full-suite verification pending. Blocks the next cutover attempt.
 - Owner/model: Codex
 - Reviewer/model: Claude
 - Last updated (Asia/Singapore): 4 Nov 2026
@@ -46,18 +46,22 @@ Only after this is merged, reviewed and deployed. Start with quiet mode on (D1 e
 
 - Split an oversized logical record into existing bounded segment payloads plus a new `record` assembly part. Each transfer is at most 262,157 UTF-8 bytes. Reassembly checks all segment receipts, byte lengths and SHA-256 before inserting the original row. Natural keys, row counts, scope digests and source values remain unchanged.
 - Freeze at most one part per call. Preserve deterministic ordering, offsets, manifests and digests. Keep the verified work header in the private checkpoint to avoid three repeat Drive calls per part. Legacy checkpoints retain their prior header-read path.
+- Upload one bounded work part at a time, for both source objects and operational records. Retain the immutable record-part plan so subsequent calls encode only the selected record range, with unchanged natural keys and digests.
 - Add Admin-only, freeze-allowed `edgeExportCheckpoint`. It reads an existing ordinal and never captures or creates parts. Recovery verifies source binding, ordinal, predecessor reference and input digest before D1 accepts the checkpoint under the existing lease. Cancellation and restart checks still fence adoption.
 - Distinguish `ROSTER_BRIDGE_TIMEOUT`, `ROSTER_BRIDGE_NETWORK`, `ROSTER_GOOGLE_TIMEOUT`, `ROSTER_GOOGLE_ERROR` and unreadable responses. Preserve failure phase, ordinal, bytes and record count. A Google timeout remains retryable even when the legacy error envelope uses status 400.
 - After timeout, reconcile immediately and on subsequent wakes while retaining the original preparation lease. Do not repeat a live step. Non-import bridge error behavior remains unchanged.
 - Generate setup labels from `gsisBuildLabel`; update freeze age locally each second; restore the saved preparation step on status/reload.
+- At the authenticated response boundary, log exactly one safe preparation diagnostic containing validated code, zero-based ordinal, allowlisted phase, bytes, records and elapsed milliseconds. Do this for both thrown errors and terminal `preparationFailed` results. Do not log raw errors, stack traces, staff records, private file identifiers or request payloads. Return the same fields with a fixed safe message; the D1 runner preserves them and the validated code.
 
 ## Verification and remaining gates
 
 - `TZ=Asia/Singapore npm run build`: passed; regenerated the canonical backends, Worker bundles and shared setup copies.
 - New regressions passed for oversized UTF-8 records, deterministic manifests, exact row reassembly, duplicate-free retries, fetch/body/Google timeouts, late checkpoint adoption during the live lease, wrong-digest refusal, status reload, current labels and live freeze age.
 - Existing resumable capture, lost-part/checkpoint acknowledgement, cancellation, activation recovery and server continuation checks were run. Final full-suite results will be recorded before handoff.
+- The preceding hosted run at `c71273a75e2191ac4443d9cfba390a5b1d4c8f3b` failed `roster099-preparation-worker.mjs`: its fake Google endpoint did not implement the newly required read-only `edgeExportCheckpoint`. The fixture now models that operation and distinguishes a missing checkpoint from a lost acknowledgement of a completed checkpoint. The corrected program passes.
+- `tests/roster-import-safe-diagnostics.cjs` first failed because the old handled-error path logged its raw synthetic private message and stack. It now passes through the actual Apps Script response boundary and D1 import runner, verifies one bounded log line, rejects malformed metadata, checks terminal failure replies and retains the identical safe fields in D1. Existing authenticated failure-response tests also pass.
 - The new freeze-step latency model passes under 25 seconds at 250 ms per Drive call plus 20 ms per KiB. This is a synthetic bound, **not live Google latency**.
-- The existing pessimistic 16.08M-character fixture still takes up to 97,021 ms per call and 112,147 ms with interruptions under its five-second-per-Drive-call model. It completes 179 preparation steps and 149 parts without duplicate files. **The requested under-25-second bound for every preparation phase is not established.** Snapshot capture, whole-source record preparation, large object preparation and an arbitrarily slow external Drive call remain outside that guarantee. Do not treat this draft as clearance for the next cutover.
+- The existing pessimistic 16.08M-character fixture takes up to 75,069 ms per call and 85,128 ms with interruptions under its five-second-per-Drive-call model. It completes 299 preparation steps and 149 parts without duplicate files, including 299 simulated interruptions. **The requested under-25-second bound for every preparation phase is not established.** Snapshot capture, initial whole-source record planning, large object preparation and an arbitrarily slow external Drive call remain outside that guarantee. Do not treat this draft as clearance for the next cutover.
 - No deployment, live-data reads or writes, freeze, provider messages or authority change.
 
 ## Claim and review
@@ -73,3 +77,10 @@ Before a new-format import starts, revert this PR's code and regenerate matched 
 ## Handoff
 
 Complete full-suite verification and attach the exact head. Remaining cutover blockers are the all-phase timing requirement, exact incident metadata/envelope evidence and Claude's review.
+
+## Step 0 measurement (owner 4 Nov: "add"; Claude coordinator)
+Read-only, before any incremental-import design. Purpose: decide whether "prepare early without freezing, then freeze and rebuild only changed parts" is worth building.
+1. Compare per-part digests between retained preparation sessions 0cafa306… (3 Nov, checkpoint Drive 1gdjHr3nJs88485qjIRQHMIbB9C_RhE7u, reached ordinal 81) and ab0d91fc… (3-4 Nov, checkpoint Drive 18XZ2BGboW-PjVf8gwAKDxP__mNripWlT, ordinal 141). Also 388d395a… (2 Nov, finished, ordinal 186) if its parts are retained.
+2. Report: parts compared, parts identical, parts changed, bytes changed, and which kinds/scopes/dates changed (expect today and the next few days only). Elapsed time between sessions.
+3. Read only: no writes to D1, Drive or Google; no freeze; no restart of any session. If comparison needs a script, put it under scripts/ with a test, in the same PR or a separate draft PR.
+Decision rule (owner to confirm): under about 30% of parts changed per day: design incremental preparation (prepare early, freeze, rebuild changed parts, full parity over all parts before activation). Otherwise: no incremental design; full import on a weekend window.

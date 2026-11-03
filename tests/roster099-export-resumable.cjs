@@ -150,7 +150,7 @@ console.log('PASS unlocked source upload, private import subfolder, pinned in-me
 // Charge deterministic Drive transfer costs to the fake clock. This checks
 // bounded work under a 20 ms/KiB + 250 ms/call latency model, not live latency.
 {
- const h=harness();h.snapshot.state.rows=[];h.snapshot.state.history=[{id:'wide',text:'中文'.repeat(150000)}];h.snapshot.state.staplerPlans=[];h.snapshot.state.allocationAuditExports={};h.snapshot.index.entries=[];
+ const h=harness();h.model.payload=crypto.randomBytes(600000).toString('base64');h.snapshot.state.rows=[];h.snapshot.state.history=[{id:'wide',text:'中文'.repeat(150000)}];h.snapshot.state.staplerPlans=[];h.snapshot.state.allocationAuditExports={};h.snapshot.index.entries=[];
  const create=h.scope.rosterCreateFile_,read=h.scope.rosterReadFile_,request=h.scope.rosterDriveRequest_;
  const charge=bytes=>h.advance(250+Math.ceil(bytes/1024)*20);
  h.scope.rosterCreateFile_=(folder,name,blob)=>{charge(blob.getBytes().length);return create(folder,name,blob);};
@@ -160,6 +160,7 @@ console.log('PASS unlocked source upload, private import subfolder, pinned in-me
  while(current.preparing){const start=h.clock();current=h.call({...h.input,preparation:current.preparation});if(current.phase==='Freeze parts'){assert(h.clock()-start<25000,'one freeze step stays below 25 s in the recorded latency model');assert(current.stepSize.bytes<=262157);steps++;}}
  assert(steps>=4,'the oversized record must span several bounded steps');
  const parts=current.manifest.parts;assert(parts.every(part=>part.bytes<=262157));
+ for(const file of h.files.values())if(file.name.includes(' work ')){const raw=file.bytes.toString(),length=Number(raw.slice(0,8)),header=JSON.parse(raw.slice(9,9+length));assert.equal(header.partMetadata.length,1,'each work upload contains one bounded part');assert(file.bytes.length<=270000,'records and object work files must not upload the full job');}
 }
 {
  const h=harness(),initial=h.call(h.input),work=h.call({...h.input,preparation:initial.preparation}),request={...h.input,preparation:work.preparation};

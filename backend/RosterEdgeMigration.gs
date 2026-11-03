@@ -258,8 +258,9 @@ function rosterEdgeExportCheckpoint_(req){
  return {...rosterEdgeExportReplyV2_(recovered.checkpoint,recovered.ref),completed:true};
 }
 function rosterEdgeExportReplyV2_(checkpoint,ref){
- const uploaded=checkpoint.parts.length,remaining=checkpoint.stage==='ready'?0:(checkpoint.work?checkpoint.work.parts-checkpoint.work.next:0)+Math.max(0,checkpoint.jobs-checkpoint.jobIndex)+(checkpoint.stage==='records'||checkpoint.stage==='objects'?2:1),part=checkpoint.work?.header?.partMetadata[checkpoint.work.next];
- const nextStep=part?{phase:'Freeze parts',bytes:part.bytes,records:part.records,partId:part.id}:{phase:checkpoint.stage==='finalize'?'Manifest':'Prepare source',bytes:checkpoint.sourceBytes||0,records:null};
+ const uploaded=checkpoint.parts.length,part=checkpoint.work?.header?.partMetadata[checkpoint.work.next],pending=checkpoint.batch?Math.max(0,checkpoint.batch.total-checkpoint.batch.next):0;
+ const remaining=checkpoint.stage==='ready'?0:checkpoint.budgetVersion===1?(pending?pending*2-(checkpoint.work?1:0):0)+Math.max(0,checkpoint.jobs-checkpoint.jobIndex-(pending&&checkpoint.stage==='objects'?1:0))*4+(checkpoint.stage==='objects'?5:1):(checkpoint.work?Math.ceil((checkpoint.work.parts-checkpoint.work.next)/2):0)+Math.max(0,checkpoint.jobs-checkpoint.jobIndex)+(checkpoint.stage==='records'||checkpoint.stage==='objects'?2:1);
+ const nextStep=part?{phase:'Freeze parts',bytes:part.bytes,records:part.records,partId:part.id}:{phase:checkpoint.stage==='finalize'?'Manifest':'Prepare source',bytes:checkpoint.sourceBytes??null,records:null};
  const checkpointInputDigest=rosterEdgeExportHash_(JSON.stringify({sessionId:checkpoint.sessionId,ordinal:checkpoint.ordinal,checkpoint:checkpoint.previous||null}));
  const value={adminVerified:true,sessionId:checkpoint.sessionId,requestId:checkpoint.requestId,sourceDigest:checkpoint.sourceDigest,preparation:{ordinal:checkpoint.ordinal+1,checkpoint:ref},checkpointInputDigest,step:checkpoint.ordinal+1,phase:checkpoint.lastStep,nextStep,stepSize:checkpoint.stepSize||null,done:checkpoint.ordinal+1,total:checkpoint.ordinal+1+remaining,elapsedMs:checkpoint.elapsedMs||checkpoint.timing?.elapsedMs||0,stepElapsedMs:checkpoint.timing?.elapsedMs||0,preparedParts:uploaded};
  return checkpoint.stage==='ready'?{...value,manifest:checkpoint.manifest,manifestDigest:checkpoint.manifestDigest}:{...value,preparing:true,retryAfterMs:2000};
@@ -277,6 +278,18 @@ function rosterEdgeExportFailureV2_(descriptor,error){
  const now=Date.now(),status=Number(error?.status);descriptor.failureReason={status:Number.isInteger(status)&&status>=400&&status<=599?status:503,message:String(error?.message||'Preparation failed. Retry the same import.').slice(0,800),phase:String(error?.failurePhase||descriptor.lastPhase||'Preparation').slice(0,80),elapsed:Math.max(0,now-(descriptor.stepStartedAt||descriptor.createdAt||now))};
  if(descriptor.stepSize)Object.assign(descriptor.failureReason,descriptor.stepSize);
  descriptor.failedAt=now;rosterEdgeExportSave_(descriptor);return descriptor.failureReason;
+}
+function rosterEdgeExportDiagnostic_(error,trace){
+ const reason=error?.failureReason||{},integer=value=>Number.isSafeInteger(value)&&value>=0?value:null;
+ const supplied=reason.code||error?.code,timeout=error?.status===504||/timed?\s*out|timeout|deadline|maximum execution time/i.test(String(reason.message||error?.message||''));
+ const code=typeof supplied==='string'&&/^(?:ROSTER_IMPORT_[A-Z0-9_]{1,50}|ROSTER_GOOGLE_(?:ERROR|TIMEOUT)|ROSTER_CUTOVER_FROZEN|EDGE_RECORD_TOO_LARGE)$/.test(supplied)?supplied:timeout?'ROSTER_GOOGLE_TIMEOUT':'ROSTER_GOOGLE_ERROR';
+ const phase=reason.phase||error?.failurePhase||trace.phase,phases=['Preparation','Capture snapshot','Serialize packed source','Hash packed source','Upload packed source','Recover checkpoint','Freeze parts','Prepare baseline','Prepare audit','Prepare stapler','Prepare records','Save checkpoint','Manifest'];
+ const ordinal=integer(trace.preparationOrdinal),diagnostic={code,ordinal:ordinal!==null&&ordinal<=8192?ordinal:null,phase:phases.includes(phase)?phase:'Preparation',bytes:integer(reason.bytes),records:integer(reason.records),elapsed:integer(reason.elapsed)??Math.max(0,Date.now()-trace.started)};
+ // Log one allowlisted record at the response boundary, never raw errors,
+ // stack traces, staff records, private file identifiers or request payloads.
+ rosterDiagnosticLog_(diagnostic);
+ const status=reason.status??error?.status;
+ return {status:Number.isSafeInteger(status)&&status>=400&&status<=599?status:503,message:'Preparation failed. Retry the same import.',...diagnostic,...(/^part-\d{5}$/.test(reason.partId||'')?{partId:reason.partId}:{})};
 }
 function rosterEdgeExportCaptureV2_(binding){
  let descriptor=rosterEdgeExportDescriptor_(binding);if(descriptor){
@@ -350,12 +363,32 @@ function rosterEdgeExportManifestV2_(req){
     const payload=rosterEdgeExportRange_(work.fileId,9+work.headerBytes+part.offset-header.base,part.bytes,work.totalBytes);if(rosterEdgeExportHash_(payload)!==part.digest)error_(503,'The prepared part failed its digest check.');
     const ref=rosterEdgeExportCreateImmutable_('Roster import '+binding.sessionId+' '+part.id+' '+part.digest+'.json',payload);const verified=rosterEdgeExportPrivateText_(ref,GSiSRosterImport.MAX_PART_BYTES);if(Utilities.newBlob(verified).getBytes().length!==part.bytes)error_(503,'The frozen part length changed.');checkpoint.parts.push(part);checkpoint.partFiles[part.id]={fileId:ref.fileId,digest:part.digest,bytes:part.bytes};checkpoint.totalBytes+=part.bytes;work.next++;bytes+=part.bytes;
    }
-   checkpoint.lastStep='Freeze parts';if(work.next===header.partMetadata.length){if(header.kind==='object'){checkpoint.references.push({job:header.job,reference:header.reference});checkpoint.jobIndex++;}else{checkpoint.scopes=header.scopes;checkpoint.stage='finalize';}checkpoint.work=null;}
+   checkpoint.lastStep='Freeze parts';if(work.next===header.partMetadata.length){
+    if(checkpoint.batch)checkpoint.batch.next+=header.partMetadata.length;
+    if(!checkpoint.batch||checkpoint.batch.next===checkpoint.batch.total){
+     if(header.kind==='object'){checkpoint.references.push({job:header.job,reference:header.reference});checkpoint.jobIndex++;}else{checkpoint.scopes=header.scopes;checkpoint.stage='finalize';}
+     checkpoint.batch=null;
+    }
+    checkpoint.work=null;
+   }
   }else if(checkpoint.stage==='objects'||checkpoint.stage==='records'){
    existing.stepSize={bytes:checkpoint.sourceBytes??null,records:null};
    const catalogue=checkpoint.catalogue,jobs=catalogue.jobs,position={ordinal:checkpoint.parts.length,offset:checkpoint.totalBytes};
-   if(checkpoint.jobIndex<jobs.length){rosterEdgeExportPhaseV2_(existing,'Prepare '+jobs[checkpoint.jobIndex].kind);const job=jobs[checkpoint.jobIndex],envelope=job.kind==='stapler'?rosterEdgeExportSourceV2_(binding,checkpoint.source):{snapshot:{sourceDigest:checkpoint.sourceDigest,index:{entries:catalogue.modelEntries},state:{allocationAuditExports:catalogue.auditFiles}}};if(job.kind==='stapler'&&typeof rosterOperationsUnpackPlans_==='function'){const row=envelope.snapshot.state[job.path[1]][job.path[2]];rosterOperationsUnpackPlans_({[job.path[1]]:[row]});}const prepared=GSiSRosterImport.prepareObject(envelope.snapshot,job,position,rosterEdgeExportAdapterV2_(envelope));checkpoint.work=rosterEdgeExportWorkV2_(binding,step.ordinal,prepared,'object',job);checkpoint.lastStep='Prepare '+job.kind;}
-   else{rosterEdgeExportPhaseV2_(existing,'Prepare records');const envelope=rosterEdgeExportSourceV2_(binding,checkpoint.source),prepared=GSiSRosterImport.prepareRecords(envelope.snapshot,checkpoint.references,position,rosterEdgeExportAdapterV2_(envelope));checkpoint.work=rosterEdgeExportWorkV2_(binding,step.ordinal,prepared,'records');checkpoint.stage='records';checkpoint.lastStep='Prepare records';}
+   // Rebuild the immutable job's index, but upload only one selected part.
+   // This avoids a full records/object work-file upload in a single doPost.
+   const batch=checkpoint.batch||{base:position,next:0},selection={start:batch.next,limit:1};let prepared,kind,job;
+   if(checkpoint.jobIndex<jobs.length){
+    job=jobs[checkpoint.jobIndex];kind='object';rosterEdgeExportPhaseV2_(existing,'Prepare '+job.kind);
+    const envelope=job.kind==='stapler'?rosterEdgeExportSourceV2_(binding,checkpoint.source):{snapshot:{sourceDigest:checkpoint.sourceDigest,index:{entries:catalogue.modelEntries},state:{allocationAuditExports:catalogue.auditFiles}}};
+    if(job.kind==='stapler'&&typeof rosterOperationsUnpackPlans_==='function'){const row=envelope.snapshot.state[job.path[1]][job.path[2]];rosterOperationsUnpackPlans_({[job.path[1]]:[row]});}
+    prepared=GSiSRosterImport.prepareObject(envelope.snapshot,job,batch.base,rosterEdgeExportAdapterV2_(envelope),selection);checkpoint.lastStep='Prepare '+job.kind;
+   }else{
+    kind='records';rosterEdgeExportPhaseV2_(existing,'Prepare records');const envelope=rosterEdgeExportSourceV2_(binding,checkpoint.source);
+    prepared=batch.plan?GSiSRosterImport.prepareRecordPart(envelope.snapshot,checkpoint.references,batch,rosterEdgeExportAdapterV2_(envelope)):GSiSRosterImport.prepareRecords(envelope.snapshot,checkpoint.references,batch.base,rosterEdgeExportAdapterV2_(envelope),{...selection,plan:true});checkpoint.stage='records';checkpoint.lastStep='Prepare records';
+   }
+   if(prepared.partMetadata.length!==1||prepared.totalParts<=batch.next)error_(503,'The bounded preparation work index is incomplete.');
+   checkpoint.batch={...batch,total:prepared.totalParts,...(prepared.partPlan?{plan:prepared.partPlan,scopes:prepared.scopes,end:prepared.position}:{})};const part=prepared.partMetadata[0];existing.stepSize={bytes:part.bytes,records:part.records,partId:part.id};rosterEdgeExportSave_(existing);
+   checkpoint.work=rosterEdgeExportWorkV2_(binding,step.ordinal,prepared,kind,job);
   }else if(checkpoint.stage==='finalize'){
    rosterEdgeExportPhaseV2_(existing,'Manifest');
    const ready=GSiSRosterImport.finishFreeze({sourceDigest:checkpoint.sourceDigest},binding,checkpoint.parts,checkpoint.scopes,{hash:rosterEdgeExportHash_});checkpoint.manifest=ready.manifest;checkpoint.manifestDigest=ready.manifestDigest;checkpoint.stage='ready';checkpoint.lastStep='Manifest';

@@ -216,7 +216,7 @@ function prepare({reload = false, changeLive = false, interrupt = false} = {}) {
   }
   let steps = 0;
   while (response.preparing) {
-    assert(++steps < 256, 'preparation must complete in bounded polls');
+    assert(++steps < 512, 'single-part preparation and freeze steps must complete in bounded polls');
     assert(response.preparation, 'reply must bind the next preparation checkpoint');
     h.probeRoster();
     if (reload) h.resetVm();

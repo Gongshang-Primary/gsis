@@ -10,6 +10,12 @@ const adapter={hash,base64:bytes=>{assert(bytes.every(value=>value>=-128&&value<
  assert(frozen.manifest.parts.every(part=>part.bytes<=262157),'a single large record must split into bounded transport parts');
  assert(frozen.manifest.parts.some(part=>part.kind==='record'),'the split retains one logical record with verified segment dependencies');
  assert.deepEqual(Import.freeze(snapshot,binding,adapter),frozen,'splits, offsets and digests must be deterministic');
+ for(let start=0;start<frozen.parts.length;start++){const selected=Import.prepareRecords(snapshot,[],{ordinal:0,offset:0},adapter,{start,limit:1});assert.equal(selected.totalParts,frozen.parts.length);assert.deepEqual(selected.parts,[frozen.parts[start]]);assert.deepEqual(selected.partMetadata,[frozen.manifest.parts[start]]);}
+ const indexed=Import.prepareRecords(snapshot,[],{ordinal:0,offset:0},adapter,{start:0,limit:1,plan:true});
+ for(let next=0;next<indexed.totalParts;next++){const part=Import.prepareRecordPart(snapshot,[],{plan:indexed.partPlan,next,end:indexed.position,total:indexed.totalParts,scopes:indexed.scopes},adapter);assert.deepEqual(part.parts,[frozen.parts[next]],'bounded indexed reads retain exact payloads');}
+ const shapes={rows:[{date:'2026-11-03'},{date:'2026-11-03'},{id:'stable',text:'中文'}],settings:{alpha:1,beta:false},flag:true};const encoded=[...Store.encode(shapes).values()];
+ for(let start=0;start<encoded.length;start++)assert.deepEqual(Store.recordRange(shapes,start,1),[encoded[start]],'ranges preserve global natural IDs and collection metadata');
+ assert.throws(()=>Store.recordRange(shapes,encoded.length,1),error=>error.code==='EDGE_STATE');
  const db=database(),store=Import.open(db,binding),files=new Map();await store.reserve();await store.bind(frozen.manifest,frozen.manifestDigest);
  const bucket={async put(key,bytes,options){files.set(key,{bytes:Buffer.from(bytes),...options});},async head(key){const file=files.get(key);return file&&{size:file.bytes.length,customMetadata:file.customMetadata};},async get(key){const file=files.get(key);return file&&{size:file.bytes.length,arrayBuffer:async()=>file.bytes};}};
  for(let i=0;i<frozen.parts.length;i++){
