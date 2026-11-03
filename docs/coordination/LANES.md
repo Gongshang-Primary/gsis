@@ -37,6 +37,7 @@ Any job that touches files in two lanes belongs to the stricter lane (R before D
 ## Muse pilot (owner 3 Nov 2026: "include muse into agents that can assign coding to")
 - Muse follows AGENTS.md, WORKFLOW.md and this file exactly like Codex: one claimed task, one `muse/<task-id>` branch, `Model: Muse` on every commit and PR, draft PR naming Claude as reviewer with the exact head SHA, full CI green before review.
 - Pilot scope: one small, isolated task outside lane R (for example a Contacts, Layout or Calendar fix). Lane R (Roster/D1) stays with Codex until the pilot is reviewed.
+- Owner exception 3 Nov 2026: Muse takes `roster-consecutive-after-gap` in lane R (allocator occupancy only), running beside Codex's lane R work on disjoint files. Rebase on main before review; the later PR rebases.
 - Never claim another model's approval or a test run that is not in CI. After the pilot the coordinator reports quality and the owner decides which lanes open to Muse.
 
 ## Gemini (Jules): removed 3 Nov 2026 (owner: "remove jules (gemini)")

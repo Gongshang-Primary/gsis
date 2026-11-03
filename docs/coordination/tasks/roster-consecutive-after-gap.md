@@ -1,7 +1,9 @@
 # roster-consecutive-after-gap: consecutive check ignores timetabled periods after a free period (bug)
 
-- Status: reported 3 Nov 2026 (owner relayed); not yet assigned
-- Owner/model: Codex (lane R) when authorised
+- Status: assigned to Muse (owner 3 Nov 2026: "give consecutive check to muse")
+- Owner/model: Muse
+- Branch: muse/roster-consecutive-after-gap
+- Lane: R, by owner exception to the Muse pilot scope. Allowed files: `shared/roster-allocation.js` and the Stapler-plan occupancy code it reads, generated backends/bundles via build, tests. Must not touch edge-authority, import, mirror, Venues fence or notification code (Codex's open lane R work). If the fix needs those, stop and ask Claude.
 - Reviewer/model: Claude
 
 ## Report (verbatim)
