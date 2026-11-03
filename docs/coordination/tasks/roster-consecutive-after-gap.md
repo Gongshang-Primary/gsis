@@ -20,3 +20,9 @@ Expected: assigning relief at P6 makes P5-P12 a run of 8 occupied periods, so it
 
 ## Requirement
 Reproduce with the 2 Nov baseline (timetable `14a50c1e-…`, Chuan Song) on Google and D1; identify which hypothesis holds; fix the cause in the shared allocator (Google and D1 share it); keep the six-consecutive and configured limits unchanged in meaning. Tests: P5 + P7-P12 with P6 prospective → violation; a real gap (P5, P8-P12) → run of 2 → no violation; excluded subject behaves as configured; multi-period block expanded.
+
+## Owner information (3 Nov)
+"chuan songs: some periods are on Dont need relief list, not the count-consecutive list". So hypothesis 2 (consecutive exclusion list) is ruled out.
+
+## Claude's follow-up reading (main 6540d97)
+For a **candidate** (the teacher being considered for relief), occupancy comes from `teacherSource`: every non-empty timetable cell is added to `base` and `activities` (`occupied=c=>Array.isArray(c)&&c.some(...)`), and `consecutiveBase` drops only `consecutiveCountExclusions` subjects. The "Don't need relief" policy (`noReliefRequired` / `resolve(dem).reliefRequired`) is applied to **demands** (an absent teacher's lessons), not to a candidate's occupancy, in the code read so far. So if the P7-P12 periods vanish from the run, check: (a) whether anything removes no-relief-policy activities from the candidate's `base`/`consecutiveBase` elsewhere (e.g. teaching-group overrides, `consecutiveExcludedDemands`, absence on those periods, Stapler plan for 2 Nov replacing the baseline), (b) hypothesis 1 (multi-period blocks) and (c) hypothesis 3 (`periodCount`). Reproduce with the exact 2 Nov data before changing code. Owner expectation: periods on the "Don't need relief" list are still **occupied** for the consecutive check.
