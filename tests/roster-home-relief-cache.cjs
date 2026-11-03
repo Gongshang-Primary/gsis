@@ -29,7 +29,7 @@ async function fixture(saved,setup){
  f.release=async()=>{f.holdMain=false;f.releaseMain?.();await tick();};
  f.text=()=>w.document.querySelector('[data-home-own-relief]')?.textContent;
  f.click=selector=>{const node=w.document.querySelector(selector);assert(node,selector);node.click();};
- f.home=async()=>{f.click('#nav [data-page="Home"]');await until(()=>w.document.querySelector('.function-tile'));await f.flush();};
+ f.home=async()=>{f.click('#nav [data-page="Home"]');await until(()=>w.document.querySelector('.function-tile'));f.beforeFrame=f.text();await f.flush();};
  f.leave=async()=>{f.click('[data-page="Report Absence"]');await until(()=>w.document.querySelector('#content h2')?.textContent==='Report Absence');};
  f.saved=()=>Object.keys(w.sessionStorage).map(key=>[key,w.sessionStorage.getItem(key)]);
  setup?.(f,w);w.eval(source);await until(()=>w.document.querySelector('.function-tile'));
@@ -40,7 +40,7 @@ async function fixture(saved,setup){
  try{
   await a.f.flush();assert.equal(a.f.calls.length,0,'own duties wait until main Home data finishes');assert.equal(a.w.document.querySelector('#content').inert,false,'Home stays usable while main data loads');
   await a.f.release();await until(()=>a.f.text()==='You have no relief duty today.');assert.equal(a.f.calls.length,1);
-  await a.f.leave();a.f.clock+=2*60000;await a.f.home();assert.equal(a.f.calls.length,1,'second Home visit beyond the former one-minute cache sends no new request');
+  await a.f.leave();a.f.clock+=2*60000;await a.f.home();assert.equal(a.f.beforeFrame,'You have no relief duty today.','a known result renders before background requests');assert.equal(a.f.calls.length,1,'second Home visit beyond the former one-minute cache sends no new request');
   const b=await fixture(a.f.saved());try{await b.f.flush();await b.f.release();await until(()=>b.f.text()==='You have no relief duty today.');assert.equal(b.f.calls.length,0,'sessionStorage survives a document reload');}finally{b.close();}
   for(const setup of [f=>f.revision++,f=>f.user.staffId='other',f=>f.clock+=86400000]){
    const other=await fixture(a.f.saved(),setup);try{await other.f.flush();await other.f.release();await until(()=>other.f.calls.length===1);assert.equal(other.f.text(),'You have no relief duty today.','another revision, staff identity or date requires its own check');}finally{other.close();}
