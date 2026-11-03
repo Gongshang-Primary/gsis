@@ -1,7 +1,8 @@
 # roster-home-banner-wording: "No suspended timetable" and the user's own relief duties on Home (changelog)
 
-- Status: proposed (owner 3 Nov 2026 08:50); not yet assigned
-- Owner/model: unassigned (Codex; lane R frontend)
+- Status: authorised (owner 3 Nov 2026: "codex work"); target v0.9.9j with the peer-quota fix
+- Owner/model: Codex (lane R frontend)
+- Branch: codex/roster-home-banner-wording
 - Reviewer/model: Claude
 
 ## Evidence
