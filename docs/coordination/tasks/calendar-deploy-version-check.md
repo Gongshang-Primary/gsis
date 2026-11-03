@@ -19,3 +19,35 @@ Calendar row 9 (#43) must ship as three matched pieces: Calendar Apps Script bac
 - Test: a matched fixture passes; a fixture with one file from an older build fails with a clear reason.
 - Runs on the current `deploy/2026-11-03-v0.9.9i` bundle's `calendar-row9-together/` and reports MATCH.
 - Full CI green on the branch.
+
+## Implementation (Muse, 3 Nov 2026)
+
+- Status: built on branch muse/calendar-deploy-version-check, after pilot 1 draft PR #63 was opened. Claim is recorded here on the branch, not on main, because the owner instruction for this pilot says never push to main.
+- Script: `scripts/check-calendar-bundle.mjs <bundle-folder>`, Node, no new dependencies.
+- Test: `tests/check-calendar-bundle.cjs`, auto-discovered by `tests/run.cjs`.
+- Release note: `docs/coordination/calendar-bundle-check.md`, optional command only, not a blocker. No release build script was changed.
+
+### Findings that shaped the script
+
+- The deploy branch folder is `deploy-bundle/calendar-row9-together/`, not a root folder. Its files are named `C1_Calendar_Backend.gs`, `C2_gsis-calendar-jobs_worker.js` and `C3_Calendar_Frontend.zip`. The script accepts both those names and the canonical names in the task record.
+- No `gsisBuildLabel` stamp lives inside the three files. The build label `0.9.9i` lives in `package.json` (`gsisBuildLabel`), in the bundle `LABEL.txt`, and in the frontend `index.html` release label. The script reports those labels separately and does not claim a stamp inside the files.
+- Product version, from markers actually in the files, is `0.9.9` in all three pieces: backend `RELEASE_VERSION`, frontend `FRONTEND_VERSION` in `app.js` inside the zip, job Worker header "Calendar Job Worker release 0.9.9".
+- Protocol markers: frontend `app.js` throws "Frontend/backend version mismatch" unless the backend version equals `FRONTEND_VERSION`. The job Worker calls backend services `gsis-calendar-command-v1` / `calendarCommand` with purpose `calendar-mutation-job-v1`, `gsis-calendar-sync-worker-v1` / `calendarSyncContinue`, and `calendarChangesAuthorize`. The script checks all of those markers in the backend file.
+- SHA-256 of the deploy bundle files, checked locally, matches `deploy-bundle/SHA256SUMS.txt` on branch `deploy/2026-11-03-v0.9.9i`: backend `5491720f…`, Worker `009a30f1…`, frontend zip `7781d30d…`.
+
+### Verification (local, before CI)
+
+- `node scripts/check-calendar-bundle.mjs` on a local copy of the deploy bundle folder: MATCH, all three pieces product version 0.9.9, exit 0.
+- Same script on the parent deploy-bundle folder (with `calendar-row9-together/` subfolder and `LABEL.txt 0.9.9i`): MATCH, build labels agree at 0.9.9i, exit 0.
+- Same script with the Worker header changed to 0.9.8: MISMATCH, naming job worker 0.9.8, exit 1.
+- `node tests/check-calendar-bundle.cjs`: pass. It covers matched, mixed, missing protocol marker, missing piece and usage cases, and proves the script does not edit its fixture files.
+- Not run locally: `npm run build`, `npm test`, and `python3 lord-suite/tests/run_all_checks.py`, because Playwright is not installed in this workspace. Those are covered only if CI passes; they are not claimed as locally run.
+- No Calendar source was edited. No network call was made by the script. No file was edited by the script.
+
+## Review fix (Claude review, 3 Nov 2026)
+
+- Bug found in review: the first version reported MATCH for a mixed set, a v0.9.9i backend and job Worker with a v0.9.9f Calendar_Frontend.zip. Product version 0.9.9 is shared by every 0.9.9 build, so it cannot detect that mismatch.
+- Real older frontend verified: deploy/2026-11-01-v0.9.9f, LABEL 0.9.9f, optional-label-only/Calendar_Frontend.zip SHA-256 2e2c8483fc808eb566297d50694bd0f08735a65b95dc8ff8d2203fa7f8f6be1a. Its FRONTEND_VERSION is also 0.9.9, its Pages worker version is also 0.9.9, and its bootstrap and job-action markers match the v0.9.9i backend. Only its release label (v0.9.9f in index.html and in every ?v= asset version) and its content hash differ from the v0.9.9i frontend.
+- Fix: MATCH now requires a build-label anchor and agreement among every present build label, plus the frontend bootstrap fields, Worker services and frontend job actions in the backend/Worker, plus SHA256SUMS agreement when a sums file is present. Backend and Worker files in current builds carry no build label and no Source SHA256 header inside the file; that absence is reported, and LABEL.txt / SHA256SUMS.txt in the folder or its parent is then the anchor. A bare three-file copy without LABEL.txt cannot be proven to match and now reports MISMATCH with that reason, instead of a false MATCH.
+- Test added: a real-files mixed case in tests/check-calendar-bundle.cjs, built from the repo's actual Calendar backend, job Worker and frontend, with only the frontend release label changed to 0.9.9f, paired with LABEL.txt 0.9.9i. It must print MISMATCH naming frontend release label 0.9.9f against bundle LABEL.txt 0.9.9i, exit 1. A matching real-files case (label 0.9.9i) must print MATCH. Local verification with the actual f zip from deploy/2026-11-01-v0.9.9f gave the same MISMATCH, plus a SHA256SUMS mismatch when the i sums file was present.
+- Previous draft PR attempt for this task did not complete (first creation was still running, second was blocked as a duplicate). No PR was opened at that time. The PR for this task will be opened only after CI is green on the new head that includes this fix.
