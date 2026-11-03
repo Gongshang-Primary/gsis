@@ -1,15 +1,25 @@
 'use strict';
 // check-calendar-bundle.cjs: tests for scripts/check-calendar-bundle.mjs.
 //
-// Fixtures are built in a temporary folder, not from the real deploy
-// bundle, so this test needs no network, no Google, no Cloudflare and
-// no real Calendar files. It proves:
+// Synthetic fixtures are built in a temporary folder, so this test
+// needs no network, no Google and no Cloudflare. It proves:
 //   - a matched fixture prints MATCH and exits 0;
 //   - a fixture with one piece from an older build prints MISMATCH,
 //     names the differing piece, and exits 1;
 //   - a backend missing a Worker protocol marker is a MISMATCH;
 //   - a missing piece is a MISMATCH, not a pass;
 //   - the script does not edit the fixture files it reads.
+// In addition, a real-files case builds a frontend zip from the repo's
+// actual Calendar frontend, backend and job Worker, with only the
+// frontend release label changed from 0.9.9i to 0.9.9f. That is exactly
+// the mixed case that product version alone cannot catch: the real
+// v0.9.9f frontend (deploy/2026-11-01-v0.9.9f, optional-label-only
+// Calendar_Frontend.zip) has FRONTEND_VERSION 0.9.9, the same protocol
+// markers and the same Pages worker version as the v0.9.9i frontend,
+// but its release label is v0.9.9f. The f deploy bundle is not in the
+// main checkout, so the CI test uses the label-swapped real files;
+// local verification outside this test used the actual f zip and gave
+// the same MISMATCH.
 
 const assert = require('node:assert');
 const { spawnSync } = require('node:child_process');
@@ -32,6 +42,8 @@ function backendText(version, services = SERVICES) {
     '// GSiS Calendar backend fixture',
     `const CALV2 = { RELEASE_VERSION: '${version}' };`,
     ...services.map((s) => `// protocol marker ${s}`),
+    '// frontend bootstrap markers: actor years selectedYear events dayNotes yearStructure',
+    'const bootstrap = { version: CALV2.RELEASE_VERSION, actor: {}, years: [], selectedYear: 2026, events: [], dayNotes: [], yearStructure: [] };',
     '',
   ].join('\n');
 }
@@ -42,6 +54,7 @@ function workerText(version) {
     'const body = { purpose: "calendar-mutation-job-v1", service: "gsis-calendar-command-v1", action: "calendarCommand" };',
     'const sync = { service: "gsis-calendar-sync-worker-v1", action: "calendarSyncContinue" };',
     'const changes = "calendarChangesAuthorize";',
+    'const ACTIONS = new Set(["saveEvent", "deleteEvent", "saveParentSide", "relocateEvent"]);',
     '',
   ].join('\n');
 }
@@ -109,8 +122,9 @@ function zipBuffer(entries) {
   return Buffer.concat([...chunks, centralBuf, eocd]);
 }
 
-function writeBundle(dir, { backendVersion = '0.9.9', frontendVersion = '0.9.9', workerVersion = '0.9.9', backendServices = SERVICES, omit = null } = {}) {
+function writeBundle(dir, { backendVersion = '0.9.9', frontendVersion = '0.9.9', workerVersion = '0.9.9', backendServices = SERVICES, omit = null, label = '0.9.9i' } = {}) {
   fs.mkdirSync(dir, { recursive: true });
+  if (label !== null) fs.writeFileSync(path.join(dir, 'LABEL.txt'), label + '\n');
   if (omit !== 'backend') fs.writeFileSync(path.join(dir, 'Calendar_Backend_v0.9.9.gs'), backendText(backendVersion, backendServices));
   if (omit !== 'frontend') {
     const zip = zipBuffer([
@@ -180,7 +194,49 @@ try {
   assert.strictEqual(usage.status, 2, `no argument must exit 2, got ${usage.status}`);
   assert.match(usage.stderr, /Usage:/);
 
+
+  // Real-files mixed case: v0.9.9i backend and job Worker with a
+  // v0.9.9f frontend. Product version is 0.9.9 in all three, so only
+  // the build label can catch this.
+  const repoRoot = path.join(__dirname, '..');
+  const realBackend = path.join(repoRoot, 'calendar-backend', 'Code.gs');
+  const realWorker = path.join(repoRoot, 'calendar-job-worker', 'dashboard-worker.txt');
+  const realPublic = path.join(repoRoot, 'calendar-update', 'public');
+  assert.ok(fs.existsSync(realBackend), 'real Calendar backend must exist in the repo checkout');
+  assert.ok(fs.existsSync(realWorker), 'real Calendar job Worker must exist in the repo checkout');
+  assert.ok(fs.existsSync(path.join(realPublic, 'index.html')), 'real Calendar frontend must exist in the repo checkout');
+  const realIndex = fs.readFileSync(path.join(realPublic, 'index.html'), 'utf8');
+  assert.match(realIndex, /0\.9\.9i/, 'real frontend index.html must carry the 0.9.9i build label at test time');
+  function writeRealBundle(dir, frontendLabel) {
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(path.join(dir, 'LABEL.txt'), '0.9.9i\n');
+    fs.copyFileSync(realBackend, path.join(dir, 'C1_Calendar_Backend.gs'));
+    fs.copyFileSync(realWorker, path.join(dir, 'C2_gsis-calendar-jobs_worker.js'));
+    const entries = [];
+    for (const name of fs.readdirSync(realPublic).sort()) {
+      const full = path.join(realPublic, name);
+      if (!fs.statSync(full).isFile()) continue;
+      let data = fs.readFileSync(full);
+      if (name === 'index.html') data = Buffer.from(data.toString('utf8').replaceAll('0.9.9i', frontendLabel), 'utf8');
+      entries.push([name, data]);
+    }
+    fs.writeFileSync(path.join(dir, 'C3_Calendar_Frontend.zip'), zipBuffer(entries));
+  }
+  const realMatched = path.join(root, 'real-matched');
+  writeRealBundle(realMatched, '0.9.9i');
+  const realOk = run(realMatched);
+  assert.strictEqual(realOk.status, 0, `real matched bundle must exit 0, got ${realOk.status}: ${realOk.stdout} ${realOk.stderr}`);
+  assert.match(realOk.stdout, /MATCH/);
+  const realMixed = path.join(root, 'real-mixed');
+  writeRealBundle(realMixed, '0.9.9f');
+  const realBad = run(realMixed);
+  assert.strictEqual(realBad.status, 1, `real mixed bundle (0.9.9f frontend, 0.9.9i backend/Worker) must exit 1, got ${realBad.status}: ${realBad.stdout}`);
+  assert.match(realBad.stdout, /MISMATCH/);
+  assert.match(realBad.stdout, /frontend release label 0\.9\.9f/);
+  assert.match(realBad.stdout, /bundle LABEL\.txt 0\.9\.9i/);
+
   console.log('check-calendar-bundle: matched, mixed, protocol, missing-piece and usage cases pass');
+
 } finally {
   fs.rmSync(root, { recursive: true, force: true });
 }
