@@ -22,3 +22,10 @@ Staff WhatsApp (Bee San, 08:49-08:50) with Home screenshot: "Roster · Normal ti
 
 ## Owner ruling
 "SMC doing Relief Allocation: ...." (3 Nov 2026). Spelling corrected from "doign".
+
+## Follow-up before merge (owner 3 Nov ~11:00: "let codex work to cut down the non-blocking trade off")
+Claude's review of #65 (head d1173aa): Home makes one extra `operations read view:'duties'` per teacher on every Home load. On Google this adds read load at the 06:30-07:30 peak (timeouts seen 3 Nov). Change in the same PR:
+1. Reuse duty data already loaded on the page (e.g. My relief duties / current-duty preload / timetable preload) when it covers today.
+2. Otherwise fetch at most once per teacher per day: cache the verified result for today (memory plus sessionStorage, keyed by staff and date and revision if available); refresh only on explicit Refresh, on a known change signal, or after 10 minutes.
+3. Never block or delay the Home render on this call; start it after the main Home data has loaded.
+4. Tests: second Home visit the same day makes no new duties request; Refresh does; failure still shows the retry text.
