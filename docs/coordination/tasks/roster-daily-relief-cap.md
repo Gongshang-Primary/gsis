@@ -1,6 +1,7 @@
 # roster-daily-relief-cap: maximum relief periods per day per non-SRE teacher (changelog)
 
-- Status: changelog only (owner rule: no code until "codex work"/"commit"); lane R, Codex
+- Status: authorised (owner 4 Nov: "codex work"); lane R, Codex; queue after roster-import-duplicate-audit-id
+- Branch: codex/roster-daily-relief-cap
 - Owner/model: Codex when authorised
 - Reviewer/model: Claude
 - Last updated (Asia/Singapore): 4 Nov 2026
@@ -17,9 +18,9 @@ Placement: System Config → Automatic Allocation → "Daily workload limits", a
 5. Same rule on Google and D1 (shared allocator); stored in systemConfig with the other limits; audit/explanations name the limit when it blocks ("Daily relief limit 3 reached").
 6. Tests: Off = no change; On with 3: fourth automatic relief blocked, SRE unaffected, peer-approved relief counts, manual shows warning, value validation (1 to 17).
 
-## Open points for owner
-- Does a peer-approved arrangement count toward the cap? (Draft: yes.)
-- Should Manual assign be warned or blocked? (Draft: warned, like the others.)
+## Owner rulings (4 Nov)
+- Peer-approved arrangements count toward the cap: "peer counts".
+- Manual assignment over the cap: "warn only".
 
 ## Related wording fix (from roster-consecutive-after-gap, Option A)
 The section text "Other duties and PD still block availability, but do not count towards these limits ... The consecutive limit still applies." must say that the consecutive limit counts every occupied period except "Periods excluded from the consecutive count". Muse's consecutive PR updates this sentence.
