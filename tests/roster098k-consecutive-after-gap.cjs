@@ -1,8 +1,12 @@
 'use strict';
-// roster-consecutive-after-gap: an unchanged teacher on a Stapler day keeps
-// the full baseline occupancy, so P5 + P7-P12 with P6 prospective is a run
-// of 8 and trips the six-consecutive rule. Periods are 0-based cell indices
-// here: P5 is index 4, P6 is index 5, P7-P12 are indices 6-11.
+// roster-consecutive-after-gap: a teacher on a Stapler day keeps the full
+// baseline occupancy, so P5 + P7-P12 with P6 prospective is a run of 8 and
+// trips the six-consecutive rule. Periods are 0-based cell indices here:
+// P5 is index 4, P6 is index 5, P7-P12 are indices 6-11.
+// Automatic streak now uses consecutiveBase, not workloadBase, so a run
+// that includes Don't-need-relief subjects (PD, BLK) still trips automatic
+// allocation, matching manual streakViolation. Shared effectiveDay is
+// unchanged; a plan teacher is not revived from the baseline.
 const assert = require('node:assert/strict');
 const A = require('../shared/roster-allocation.js');
 const S = require('../shared/roster-stapler.js');
@@ -35,22 +39,18 @@ const chuanLessons = [
 function fullDay(lessons = chuanLessons) {
   return {date: DATE, id: 'baseline-2nov', parity: 'single', schoolDay: true, verified: true, periods, recesses: [], formClasses,
     teachers: [
-      {staffId: 'chuan', name: 'Chuan Song', timetableName: 'Chuan Song', cells: chuanCells(lessons)},
-      {staffId: 'other', name: 'Other Teacher', timetableName: 'Other Teacher', cells: otherCells()},
+      {staffId: 'chuan', name: 'Chuan Song', timetableName: 'Chuan Song', R: 20, originalR: 20, cells: chuanCells(lessons)},
+      {staffId: 'other', name: 'Other Teacher', timetableName: 'Other Teacher', R: 20, originalR: 20, cells: otherCells()},
     ]};
 }
-function subsetDay() {
-  return {date: DATE, id: 'baseline-2nov', parity: 'single', schoolDay: true, verified: true, periods, recesses: [], formClasses,
-    teachers: [{staffId: 'other', name: 'Other Teacher', timetableName: 'Other Teacher', cells: otherCells()}]};
-}
 function makeCtx(day, exclusions) {
-  const ctx = {subjects: ['EL', 'TL', 'MA'], today: DATE, now: Date.parse(DATE + 'T00:00:00Z'), iso: DATE + 'T00:00:00Z', minute: 360,
+  const ctx = {subjects: ['EL', 'TL', 'MA', 'PD', 'BLK'], today: DATE, now: Date.parse(DATE + 'T00:00:00Z'), iso: DATE + 'T00:00:00Z', minute: 360,
     user: {staffId: 'other', email: 'other@gsps.edu.sg', smc: true, admin: true},
     people: [
       {id: 'chuan', name: 'Chuan Song', active: true, mobile: '91234567'},
       {id: 'other', name: 'Other Teacher', active: true, mobile: '92345678'},
     ],
-    days: {[DATE]: day}, uuid: (() => { let n = 0; return () => 'id-' + (++n); })(),
+    days: {[DATE]: day}, baselineDays: {[DATE]: day}, uuid: (() => { let n = 0; return () => 'id-' + (++n); })(),
     notificationsConfigured: false, adminRecipients: [], smcIds: ['other']};
   return ctx;
 }
@@ -58,15 +58,17 @@ function candidate(ctx, staffId = 'chuan') {
   const state = O.initial();
   if (ctx.exclusions) state.systemConfig.consecutiveCountExclusions = ctx.exclusions;
   A.captureWeek(state, ctx, DATE); state.accountingYears['2026'] = {verified: true};
+  state.entitlements = [{staffId: 'chuan', week: '2026-11-02', year: '2026', quota: 20, excluded: false, mode: 'observed', source: {}}];
   const tm = A.teacherContext(state, ctx, DATE);
   const t = tm.get(staffId);
   const demand = {id: 'dem-p6', date: DATE, staffId: 'absent', period: 5, subject: 'EL', className: '5X', groupName: ''};
   const e = A.eligibility(t, 5, [], {demand});
   return {t, e, run: A.runAt(new Set([...t.consecutiveBase, 5]), 5, t.periodCount)};
 }
-// A Stapler plan that changes only the other teacher and does not cover Chuan Song.
-function uncoveredPlan(baseline) {
-  let plan = S.create({...subsetDay(), date: DATE});
+// A baseline-derived Stapler plan that changes only the other teacher and
+// leaves Chuan Song unchanged.
+function baselineDerivedPlan(baseline) {
+  let plan = S.create({...baseline, date: DATE});
   const tile = plan.tiles.find(t => t.teacherId === 'other' && t.kind === 'lesson');
   plan = S.apply(plan, {type: 'move', tileId: tile.id, period: 3});
   return S.effectiveDay(plan, baseline);
@@ -75,13 +77,15 @@ let passed = 0;
 function test(name, run) { run(); passed++; console.log('PASS', name); }
 
 test('Stapler day, unchanged teacher, P5 and P7-P12 with P6 prospective: violation', () => {
-  const day = uncoveredPlan(fullDay());
+  const day = baselineDerivedPlan(fullDay());
   const {t, e, run} = candidate(makeCtx(day));
   assert.deepEqual([...t.consecutiveBase].sort((a, b) => a - b), [4, 6, 7, 8, 9, 10, 11]);
   assert.equal(t.periodCount, 17);
   assert.equal(run, 8);
   assert.equal(e.consecutive, 8);
   assert.equal(e.streakViolation, true);
+  assert.equal(e.automaticStreakViolation, true);
+  assert.equal(e.autoEligible, false);
 });
 
 test('Same on a baseline day: violation', () => {
@@ -90,39 +94,52 @@ test('Same on a baseline day: violation', () => {
   assert.equal(run, 8);
   assert.equal(e.consecutive, 8);
   assert.equal(e.streakViolation, true);
+  assert.equal(e.automaticStreakViolation, true);
+  assert.equal(e.autoEligible, false);
 });
 
 test('A real gap (P5, P8-P12, P6 prospective): run of 2, no violation', () => {
   const gap = chuanLessons.filter(([index]) => index !== 6);
-  const day = uncoveredPlan(fullDay(gap));
+  const day = baselineDerivedPlan(fullDay(gap));
   const {e, run} = candidate(makeCtx(day));
   assert.equal(run, 2);
   assert.equal(e.consecutive, 2);
   assert.equal(e.streakViolation, false);
+  assert.equal(e.automaticStreakViolation, false);
 });
 
-test("A Don't-need-relief subject still counts as occupied", () => {
+test("A Don't-need-relief subject still counts as occupied, including for automatic allocation", () => {
   // TL is in the default Tamil family with reliefRequired false, and is not
-  // in consecutiveCountExclusions. The Stapler-day run in the first test
-  // already includes TL at indices 7 and 9; here assert it explicitly.
-  const day = uncoveredPlan(fullDay());
+  // in consecutiveCountExclusions.
+  const day = baselineDerivedPlan(fullDay());
   const {t} = candidate(makeCtx(day));
   assert(t.consecutiveBase.has(7), 'TL at P8 must count');
   assert(t.consecutiveBase.has(9), 'TL at P10 must count');
+  // PD and BLK are the default no-relief subjects. They are occupied for
+  // consecutive, but are not workload, so automatic streak must still trip.
+  const pdLessons = chuanLessons.map(([index, subject, cls]) => ([7, 9].includes(index) ? [index, index === 7 ? 'PD' : 'BLK', cls] : [index, subject, cls]));
+  const pdDay = baselineDerivedPlan(fullDay(pdLessons));
+  const pd = candidate(makeCtx(pdDay));
+  assert.deepEqual([...pd.t.consecutiveBase].sort((a, b) => a - b), [4, 6, 7, 8, 9, 10, 11]);
+  assert.equal(pd.e.consecutive, 8);
+  assert.equal(pd.e.streakViolation, true);
+  assert.equal(pd.e.automaticStreakViolation, true);
+  assert.equal(pd.e.autoEligible, false);
 });
 
 test('A consecutive-exclusion subject is still excluded', () => {
   const lessons = chuanLessons.map(([index, subject, cls]) => (index === 6 ? [index, 'PAL', cls] : [index, subject, cls]));
-  const day = uncoveredPlan(fullDay(lessons));
+  const day = baselineDerivedPlan(fullDay(lessons));
   const ctx = makeCtx(day); ctx.exclusions = [{type: 'exact', value: 'PAL'}];
   const {t, e, run} = candidate(ctx);
   assert(!t.consecutiveBase.has(6), 'PAL at P7 must be excluded from consecutiveBase');
   assert.equal(run, 2, 'excluded P7 breaks the run at P6');
   assert.equal(e.streakViolation, false);
+  assert.equal(e.automaticStreakViolation, false);
 });
 
 test("A teacher whose Stapler plan does change keeps the plan's periods, not the baseline's", () => {
-  const day = uncoveredPlan(fullDay());
+  const day = baselineDerivedPlan(fullDay());
   const {t} = candidate(makeCtx(day), 'other');
   assert.deepEqual([...t.base].sort((a, b) => a - b), [3], 'other teacher must keep moved plan period, not baseline period 2');
 });
@@ -136,16 +153,6 @@ test('A suspended teacher keeps the plan empty periods, not the baseline', () =>
   const {t, e} = candidate(makeCtx(day));
   assert.deepEqual([...t.base], []);
   assert.equal(e.streakViolation, false);
-});
-
-test('A plan teacher with no lesson tiles at all keeps the baseline cells', () => {
-  let plan = S.create({...subsetDay(), date: DATE});
-  plan = S.apply(plan, {type: 'addTeacher', teacher: {staffId: 'chuan', name: 'Chuan Song', timetableName: 'Chuan Song'}});
-  const day = S.effectiveDay(plan, fullDay());
-  const {t, e, run} = candidate(makeCtx(day));
-  assert.deepEqual([...t.consecutiveBase].sort((a, b) => a - b), [4, 6, 7, 8, 9, 10, 11]);
-  assert.equal(run, 8);
-  assert.equal(e.streakViolation, true);
 });
 
 console.log(passed + ' consecutive-after-gap checks passed');

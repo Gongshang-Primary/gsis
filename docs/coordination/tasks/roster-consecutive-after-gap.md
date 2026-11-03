@@ -1,6 +1,6 @@
 # roster-consecutive-after-gap: consecutive check ignores timetabled periods after a free period (bug)
 
-- Status: investigating - owner answers received 4 Nov, plan omission ruled out, new investigation below
+- Status: fixing - automatic streak fix in shared/roster-allocation.js, effectiveDay revival dropped, awaiting full CI
 - Owner/model: Muse
 - Reviewer/model: Claude
 - Last updated (Asia/Singapore): 2026-11-04
@@ -136,6 +136,13 @@ Test results, with code references:
 5. Other Stapler-vs-normal differences: plan.periods length equals baseline periods length, subjectCategories are copied from the baseline day at creation ({} vs undefined in the fixture, same classification fallback), parity, verified and schoolDay are set by effectiveDay, workloadIgnored is set true by composeStaplerContext but does not change streak in eligibility, staplerRevision is a revision marker only. None of these change base, consecutiveBase, periodCount or runAt for an unchanged teacher. Venues does not use eligibility or workloadBase, so a fix to automatic streak does not change venues.
 
 Conclusion, before any fix: fix automatic streak (and the solver violation check) to use consecutiveBase, not workloadBase, so automatic allocation trips on six consecutive occupied periods, including Don't-need-relief subjects. Keep maxConsecutivePeriods, consecutiveBase, consecutiveCountExclusions, daily workload total, and effectiveDay unchanged. This keeps allocation and venues consistent, because venues reads effectiveDay, which is unchanged, and allocation now counts the same occupied run for manual and automatic checks.
+
+## Fix (after the second investigation)
+
+- Dropped the effectiveDay revival: shared/roster-stapler.js is back to the original file (blob 47c041c47962cb3ddbe14cd0b2d47e5ff1ae6372), and roster-update/public/roster-stapler-model.js is again the verbatim copy of that original. tests/venues-sources.cjs is unchanged.
+- Changed only shared/roster-allocation.js, in two places: eligibility automaticStreakViolation now uses consecutivePeriods(t, [...additions, prospective]) with no workload flag (line 301, was with workload true), and violation() now uses consecutivePeriods(t, rows) and consecutivePeriods(t, []) with no workload flag (line 396, was with workload true). Manual streakViolation, consecutiveBase, consecutiveCountExclusions, maxConsecutivePeriods, and the daily workload total (still workload-based) are unchanged.
+- Generated outputs: roster-update/public/roster-allocation.js is the verbatim copy of the fixed shared file, and roster-update/public/edge-roster-domain.js was regenerated with scripts/build-edge-modules.cjs from the fixed allocation and original stapler. No other build output changed.
+- Tests: the new tests/roster098k-consecutive-after-gap.cjs has 7 checks (the six required, with test 1 now baseline-derived, plus the suspended-teacher guard). The old subset-plan revival test and the plan-teacher-with-no-tiles revival test were removed with the revival. The new file fails before the fix (PD automatic streak false, autoEligible true) and passes after (automatic streak true, autoEligible false). Locally run, TZ=Asia/Singapore: new test 7 pass, venues-sources pass, roster084-stapler-unchanged 9 pass, roster084-consecutive-subjects 16 pass, roster098k-suspended-rules node:test 0 fail. Not run locally: npm run build, full npm test, LORD/Playwright suite; those run in CI, and the draft PR is opened only after full CI is green.
 
 ## Review
 
