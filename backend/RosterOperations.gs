@@ -1049,19 +1049,30 @@ function rosterScheduledDispatch_(req){gsisRequireBackendRole_('roster');
  };
  const execute=(run,reportOnly=false)=>{
   if(typeof rosterAbsenceIntakeGate_==='function')rosterAbsenceIntakeGate_([slot.date],!!run||slot.optimise&&!reportOnly);
-  const version=props_().getProperty('ROSTER_VERSION_HINT'),sourceFile=props_().getProperty('ROSTER_OPERATIONS_FILE');let initial=rosterOperationsState_();const initialSource={version,file:sourceFile,state:initial};rosterScheduledHintWrite_(initial,version);
+  let version=props_().getProperty('ROSTER_VERSION_HINT'),sourceFile=props_().getProperty('ROSTER_OPERATIONS_FILE'),initial=rosterOperationsState_(),initialSource={version,file:sourceFile,state:initial};rosterScheduledHintWrite_(initial,version);
   if(Date.now()>=deadline-3500){if(run)rosterAllocationRunLocked_(()=>rosterAllocationRunWrite_({...rosterAllocationRunCheck_(run),state:'failed'},'The input read exhausted this call budget; the next tick retries preparation.'),500);return yielded();}
   if(run&&rosterAllocationRunAccepted_(run,initial)){rosterAllocationRunLocked_(()=>rosterAllocationRunComplete_(run,initial),500);return {replayed:true};}
   if(typeof rosterAllocationAuditEnsureDay_==='function')initial=rosterAllocationAuditEnsureDay_(initial,p.calendarByDate,today);
   const effectiveSlot={...slot,optimise:!reportOnly&&(!!run||slot.optimise)},preflight=rosterScheduledIdle_(initial,effectiveSlot,today);if(preflight)return {...preflight,...(reportOnly?{allocationSkipped:true,...(gate.allocationStopped?{allocationStopped:true}:{})}:{})};
-  const fresh=rosterServiceContacts_(),contacts=rosterOperationsDigest_(fresh.c),saved=run?rosterScheduledWorkRead_(run):null;
+  const fresh=rosterServiceContacts_(),contacts=rosterOperationsDigest_(fresh.c);
+  if(props_().getProperty('ROSTER_SCHEDULE_DIRTY'))return busy();
+  if(props_().getProperty('ROSTER_VERSION_HINT')!==version||props_().getProperty('ROSTER_OPERATIONS_FILE')!==sourceFile){
+   version=props_().getProperty('ROSTER_VERSION_HINT');sourceFile=props_().getProperty('ROSTER_OPERATIONS_FILE');initial=rosterOperationsState_();initialSource={version,file:sourceFile,state:initial};
+   if(Date.now()>=deadline-3500){if(run)rosterAllocationRunLocked_(()=>rosterAllocationRunWrite_({...rosterAllocationRunCheck_(run),state:'failed'},'The input read exhausted this call budget; the next tick retries preparation.'),500);return yielded();}
+   if(props_().getProperty('ROSTER_SCHEDULE_DIRTY')||props_().getProperty('ROSTER_VERSION_HINT')!==version||props_().getProperty('ROSTER_OPERATIONS_FILE')!==sourceFile)return busy();
+   if(run&&rosterAllocationRunAccepted_(run,initial)){rosterAllocationRunLocked_(()=>rosterAllocationRunComplete_(run,initial),500);return {replayed:true};}
+   if(typeof rosterAllocationAuditEnsureDay_==='function')initial=rosterAllocationAuditEnsureDay_(initial,p.calendarByDate,today);
+   rosterScheduledHintWrite_(initial,version);
+   const latest=rosterScheduledIdle_(initial,effectiveSlot,today);if(latest)return {...latest,...(reportOnly?{allocationSkipped:true,...(gate.allocationStopped?{allocationStopped:true}:{})}:{})};
+  }
+  const saved=run?rosterScheduledWorkRead_(run):null;
   if(saved?.stage==='prepared'){if(saved.payload.contacts!==contacts)rosterOperationsConflict_('PREPARED_RETRY','Contacts changed during scheduled preparation.');return commitPrepared(run,saved.payload,true,initial===initialSource.state?initialSource:null);}
   for(let attempt=0;attempt<2;attempt++){
    const s=attempt?rosterOperationsPhase_('prepare-state',()=>rosterOperationsState_()):initial,base=rosterOperationsPackedSnapshot_(s),command={...p,operation:'scheduledRoster',date:slot.date};
    let ctx;if(saved?.stage==='context'&&attempt===0){ctx=saved.payload.ctx;if(run)run.budgetDeadline=Math.min(run.saveDeadline-5500,started+18500);if(saved.payload.contacts!==contacts||saved.payload.references!==rosterOperationsReferenceStamp_(ctx)||saved.payload.dependencies!==rosterOperationsDependencies_(base,command,ctx))rosterOperationsConflict_('PREPARED_RETRY','Saved preparation inputs changed.');}
    else ctx=rosterOperationsPhase_('prepare-context',()=>rosterOperationsContext_({identity:fresh.identity,input:command},fresh.c,s));
    if(typeof ctx.uuid!=='function')ctx.uuid=()=>Utilities.getUuid();ctx.user={staffId:null,email:'roster-service',smc:true,admin:false};ctx.service=true;ctx.skipScheduledAllocation=reportOnly;ctx.scheduledAllocationKey=run?.scheduleKey||slot.allocationKey||slot.key;ctx.scheduledAllocationRetry=!!run&&!slot.optimise;
-   const computeStamp=saved?.stage==='context'&&attempt===0?(saved.payload.stamp??stamp):stamp,references=rosterOperationsReferenceKey_(ctx),dependencies=rosterOperationsDependencies_(base,command,ctx);rosterOperationsClock_(ctx);
+   const computeStamp=saved?.stage==='context'&&attempt===0?(saved.payload.stamp??stamp):stamp,references=rosterOperationsReferenceKey_(ctx),dependencies=rosterOperationsDependencies_(base,command,ctx);ctx.verifiedScheduledResumeStamp=saved?.stage==='context'&&attempt===0?computeStamp:undefined;rosterOperationsClock_(ctx);
    if(run&&Date.now()>=run.budgetDeadline)return rosterScheduledWorkSave_(run,'context',{ctx,contacts,references,dependencies,stamp:computeStamp});
    if(run)ctx.allocationBudgetCheck=()=>rosterScheduledAllocationBudget_(run);
    try{

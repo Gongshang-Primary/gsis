@@ -1017,7 +1017,11 @@ const next=stapler().effectiveDay(plan,ctx.baselineDays?.[d]||ctx.days[d]);for(c
   }else return null;return result;
  }
  function scheduledTick(s,ctx,scheduledTime){
-  const A=allocation();A.ensure(s);if(!ctx.service)fail(403,'Only the signed scheduler may run this operation.');if(!Number.isFinite(scheduledTime)||scheduledTime>ctx.now+60000||ctx.now-scheduledTime>120000)fail(400,'Scheduled tick is stale.');const slot=A.schedule(scheduledTime),d=slot.date,key=slot.key;
+  const A=allocation();A.ensure(s);if(!ctx.service)fail(403,'Only the signed scheduler may run this operation.');if(!Number.isFinite(scheduledTime)||scheduledTime>ctx.now+60000)fail(400,'Scheduled tick is stale.');const slot=A.schedule(scheduledTime),d=slot.date,key=slot.key;
+  // Only a server-verified checkpoint may retain its originally due summary.
+  // Live eligibility still uses ctx.now, and continuation never crosses a slot.
+  const verifiedResume=ctx.verifiedScheduledResumeStamp===scheduledTime&&ctx.scheduledAllocationRetry===true&&slot.allocationKey&&ctx.scheduledAllocationKey===slot.allocationKey&&A.schedule(ctx.now).allocationKey===slot.allocationKey;
+  if(ctx.now-scheduledTime>120000&&!verifiedResume)fail(400,'Scheduled tick is stale.');
   const allocationKey=ctx.scheduledAllocationKey||key,allocationSlot=slot.optimise||ctx.scheduledAllocationRetry===true&&slot.allocationKey===allocationKey,cancellation=s.scheduleReceipts[allocationKey]?.cancelled?s.scheduleReceipts[allocationKey]:null;let skipAllocation=ctx.skipScheduledAllocation===true||!!cancellation;
   if(s.scheduleReceipts[key]&&(!cancellation||cancellation.reportComplete))return {replayed:true,savedIds:[]};let result={savedIds:[],allocationPaused:operationalSettings(s).systemConfig.scheduledAllocationEnabled!==true,...(skipAllocation?{allocationSkipped:true}:{})};
   if(!skipAllocation&&allocationSlot&&operationalSettings(s).systemConfig.scheduledAllocationEnabled&&ctx.days[d]?.schoolDay===true){if(A.mayOptimise(ctx,d)){try{result=runOptimisation(s,ctx,d,allocationKey);}catch(error){if(error.code!=='ALLOCATION_BUDGET')throw error;skipAllocation=true;result={savedIds:[],allocationSkipped:true,allocationTimedOut:true};}}else smcAlert(s,ctx,d,'missed-cutoff:'+d,'Final optimisation did not complete before the cut-off. Review the last valid draft and allocate manually.',false);}

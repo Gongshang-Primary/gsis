@@ -5,14 +5,14 @@ function harness(count){
  const f=fixture(),people=Array.from({length:count},(_,i)=>({id:'teacher-'+i,name:'Teacher '+i,active:true,mobile:String(91234567+i),email:'teacher'+i+'@gsps.edu.sg'}));
  const teachers=people.map(p=>({staffId:p.id,name:p.name,timetableName:p.name,R:4,cells:clone(f.teachers[0].cells)}));
  let state=clone(f.state),held=false,clock=f.ctx.now,lose=false,failBefore=false,contactsHook=null;
- const stats={reads:0,writes:0,locks:0,contexts:0,contacts:0,lockMs:0,propertyReads:0,propertyWrites:0},properties=new Map();
+ const stats={reads:0,writes:0,locks:0,contexts:0,contacts:0,lockMs:0,propertyReads:0,propertyWrites:0},properties=new Map([['ROSTER_OPERATIONS_FILE','ops-file'],['ROSTER_VERSION_HINT','fixture-version-0']]);
  const advance=ms=>{clock+=ms;if(held)stats.lockMs+=ms;};
  class Clock extends Date{constructor(...v){super(...(v.length?v:[clock]));}static now(){return clock;}}
  const lock={tryLock(){stats.locks++;if(held)return false;held=true;return true;},releaseLock(){assert(held);held=false;}};
  const scope=vm.createContext({console,Date:Clock,GSISRoster:require('../shared/roster.js'),GSISRosterOperations:f.O,GSISRosterAllocation:require('../shared/roster-allocation.js'),GSISRosterStapler:require('../shared/roster-stapler.js'),Utilities:{getUuid:crypto.randomUUID,DigestAlgorithm:{SHA_256:'sha256'},computeDigest:(_,s)=>[...crypto.createHash('sha256').update(s).digest()]},props_:()=>({getProperty:k=>{stats.propertyReads++;return properties.get(k)||null;},getProperties:()=>Object.fromEntries(properties),setProperty:(k,v)=>{stats.propertyWrites++;properties.set(k,v);},deleteProperty:k=>properties.delete(k)}),rosterToday_:()=>f.date,LockService:{getScriptLock:()=>lock},deployLock_:l=>l.tryLock(),deployUnlock_:l=>l.releaseLock(),error_:(status,message)=>{throw Object.assign(Error(message),{status});}});
  require('./load-backend-role.cjs')(scope,'roster');for(const name of ['backend/RosterOperations.gs','backend/StaplerLeases.gs'])vm.runInContext(fs.readFileSync(path.join(root,name),'utf8'),scope);
  scope.rosterOperationsState_=()=>{stats.reads++;advance(5);return clone(state);};
- scope.rosterOperationsCommit_=s=>{assert(held);advance(10);if(failBefore){failBefore=false;throw Object.assign(Error('write failed'),{status:503});}state=clone(s);stats.writes++;if(lose){lose=false;throw Object.assign(Error('write acknowledgement lost'),{status:503});}};
+ scope.rosterOperationsCommit_=s=>{assert(held);advance(10);if(failBefore){failBefore=false;throw Object.assign(Error('write failed'),{status:503});}state=clone(s);stats.writes++;scope.rosterOperationsVersionChanged_();if(lose){lose=false;throw Object.assign(Error('write acknowledgement lost'),{status:503});}};
  scope.rosterOperationsReferenceStamp_=ctx=>scope.rosterOperationsReferenceKey_(ctx);
  scope.rosterOperationsContext_=(req,c)=>{stats.contexts++;advance(15);const day={...clone(f.ctx.days[f.date]),teachers:clone(teachers)};return {...clone(f.ctx),user:scope.rosterOperationsAuthority_(c,req.identity),people,days:{[f.date]:day},baselineDays:{[f.date]:day},timetableEntries:[{id:'baseline',from:'2026-01-01',to:'2026-12-31'}],now:clock,iso:new Date(clock).toISOString(),uuid:crypto.randomUUID};};
  scope.rosterServiceContacts_=()=>{assert.equal(held,false,'remote Contacts call must not hold the writer lock');stats.contacts++;advance(100);if(contactsHook){const fn=contactsHook;contactsHook=null;fn();}return {identity:{email:'service@gsps.edu.sg'},c:contacts(0,true)};};
@@ -20,7 +20,7 @@ function harness(count){
  const send=(i,input)=>scope.rosterOperationsDispatch_({identity:{email:people[i].email},input},contacts(i));
  const service=input=>scope.rosterServiceDispatch_({input});
  const command=i=>({operation:'saveAbsence',view:'report',date:f.date,staffId:people[i].id,typeId:'mc',periods:[2],instructionsNA:true,revision:0,requestId:crypto.randomUUID()});
- return {f,scope,send,service,command,stats,properties,state:()=>clone(state),setState:s=>{state=clone(s);},lose:()=>{lose=true;},fail:()=>{failBefore=true;},hook:fn=>{contactsHook=fn;},held:value=>{held=value;}};
+ return {f,scope,send,service,command,stats,properties,state:()=>clone(state),setState:s=>{state=clone(s);scope.rosterOperationsVersionChanged_();},lose:()=>{lose=true;},fail:()=>{failBefore=true;},hook:fn=>{contactsHook=fn;},held:value=>{held=value;}};
 }
 const scenarios=[];
 for(const users of [1,10,30]){
@@ -48,7 +48,7 @@ for(const users of [1,10,30]){
 }
 {
  const h=harness(1),tick={operation:'scheduledRoster',scheduledTime:h.f.ctx.now};assert.equal(h.service(tick).idle,true);assert.equal(h.stats.contacts,0);assert.equal(h.stats.locks,0);
- const state=h.state();state.massPublications[h.f.date]={at:h.f.ctx.iso};h.setState(state);h.hook(()=>{const newer=h.state();delete newer.massPublications[h.f.date];h.setState(newer);});const before={...h.stats};assert.equal(h.service(tick).idle,true);assert.equal(h.stats.reads-before.reads,2);assert.equal(h.stats.contacts-before.contacts,1);assert.equal(h.stats.contexts,before.contexts,'latest locked state cancels obsolete scheduling work');
+ const state=h.state();state.massPublications[h.f.date]={at:h.f.ctx.iso};h.setState(state);h.hook(()=>{const newer=h.state();delete newer.massPublications[h.f.date];h.setState(newer);});const before={...h.stats};assert.equal(h.service(tick).idle,true);assert.equal(h.stats.reads-before.reads,2);assert.equal(h.stats.contacts-before.contacts,1);assert.equal(h.stats.contexts,before.contexts,'latest locked state cancels obsolete scheduling work');const hint=JSON.parse(h.properties.get('ROSTER_SCHEDULE_HINT'));assert.equal(hint.version,h.properties.get('ROSTER_VERSION_HINT'),'verified reread refreshes the idle hint');assert.deepEqual(hint.noticeDates,[]);
  const current=h.state();current.massPublications[h.f.date]={at:h.f.ctx.iso};h.setState(current);h.hook(()=>{const newer=h.state(),slot=h.scope.GSISRosterAllocation.schedule(h.f.ctx.now);newer.scheduleReceipts[slot.key]={at:h.f.ctx.iso};h.setState(newer);});assert.equal(h.service(tick).replayed,true);assert.equal(h.stats.writes,0,'concurrent scheduler receipt prevents duplicate commit');
 }
 {

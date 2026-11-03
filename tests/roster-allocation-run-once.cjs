@@ -198,3 +198,19 @@ test('five-second state, Contacts and checkpoint I/O makes bounded forward progr
  for(let n=0;n<3;n++){h.at('06:0'+n+':00');const started=h.ctx.now,before=h.calls.reads;result=h.tick();elapsed.push(h.ctx.now-started);reads.push(h.calls.reads-before);assert(elapsed.at(-1)<25000,'cooperative fixture call must finish before25seconds');if(result.run?.status==='complete')break;assert.equal(result.code,'ALLOCATION_YIELDED');}
  assert.equal(result.run?.status,'complete','checkpoint continuation must complete instead of repeatedly saving the same preparation');assert.equal(contexts,1);assert.equal(calculations,1);assert.equal(reads.at(-1),1,'prepared resume reuses the one full operations read');assert.equal(h.row().attempts,1);assert.equal(h.calls.writes,1);assert.equal(h.state().assignments.length,2);assert.equal(h.state().outbox.filter(row=>row.kind==='smc_report').length,1,'the originally due summary survives staged preparation');assert.equal(result.notificationsQueued,h.state().outbox.length,'cached response counts every newly saved notification intent');
 });
+
+test('verified cached context resumes after a quiet pause within its original slot',()=>{
+ const h=setup(),context=h.scope.rosterOperationsContext_;let builds=0;
+ h.scope.rosterOperationsContext_=(...args)=>{builds++;const ctx=context(...args);h.ctx.now+=15000;return ctx;};
+ assert.equal(h.tick().code,'ALLOCATION_YIELDED');h.at('06:03:00');assert.equal(h.tick().run.status,'complete');assert.equal(builds,1);assert.equal(h.calls.writes,1);assert.equal(h.state().assignments.length,2);
+ const plain=setup();plain.at('06:03:00');assert.throws(()=>plain.O.scheduledTick(plain.state(),{...plain.ctx,service:true},Date.parse(plain.date+'T06:00:00+08:00')),/stale/,'ordinary stale scheduler calls remain rejected');
+});
+
+test('a foreground logging change during Contacts catches up the daily audit before an idle return',()=>{
+ const h=setup('08:00:00'),state=h.state();state.systemConfig.verboseLogging=false;state.massPublications[h.date]={at:h.ctx.iso};h.setState(state);
+ vm.runInContext(fs.readFileSync('backend/RosterAuditExport.gs','utf8'),h.scope);
+ const contacts=h.scope.rosterServiceContacts_;h.scope.rosterServiceContacts_=()=>{const current=h.state();current.systemConfig.verboseLogging=true;delete current.massPublications[h.date];h.setState(current);h.scope.rosterOperationsVersionChanged_();return contacts();};
+ h.scope.rosterOperationsContext_=()=>{throw Error('obsolete publication must not load context');};
+ const result=h.scope.rosterScheduledDispatch_({input:{operation:'scheduledRoster',scheduledTime:h.ctx.now,calendarByDate:{[h.date]:{date:h.date,schoolDay:true}}}});
+ assert.equal(result.idle,true);assert.equal(h.calls.writes,1,'the only write is the newly required daily audit intent');assert.equal(h.state().allocationAuditExports[h.date]?.pendingVersion,1);assert.equal(h.counts().contexts,0);
+});

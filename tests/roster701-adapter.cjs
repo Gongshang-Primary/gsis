@@ -1,9 +1,9 @@
 const fs=require('node:fs'),vm=require('node:vm'),crypto=require('node:crypto'),assert=require('node:assert/strict'),fixture=require('./roster701-fixture.cjs');
 module.exports=function adapter(){
- const f=fixture(),calls={reads:0,writes:0,contexts:[],phases:[]};let durable=structuredClone(f.state),locked=false,failAfter=false;
+ const f=fixture(),calls={reads:0,writes:0,contexts:[],phases:[]};let durable=structuredClone(f.state),locked=false,failAfter=false;const properties=new Map([['ROSTER_OPERATIONS_FILE','ops-file']]);
  const NativeDate=Date,ClockDate=class extends NativeDate{constructor(...args){super(...(args.length?args:[f.ctx.now]));}static now(){return f.ctx.now;}};
  const scope=vm.createContext({Date:ClockDate,GSISRosterOperations:f.O,GSISRosterAllocation:require('../shared/roster-allocation.js'),GSISRoster:require('../shared/roster.js'),ROSTER_DATA:'folder',
-  props_:()=>({getProperty:()=> 'ops-file',setProperty(){}}),rosterFindFile_:()=> 'ops-file',rosterReadFile_:()=>{calls.reads++;return JSON.stringify(durable);},
+  props_:()=>({getProperty:key=>properties.get(key)||null,setProperty:(key,value)=>properties.set(key,String(value)),getProperties:()=>Object.fromEntries(properties),deleteProperty:key=>properties.delete(key)}),rosterFindFile_:()=> 'ops-file',rosterReadFile_:()=>{calls.reads++;return JSON.stringify(durable);},
   rosterDriveRequest_:(url,options)=>{assert(locked,'Commit without lock');durable=JSON.parse(options.payload);calls.writes++;if(failAfter){failAfter=false;throw Error('Uncertain response');}return {};},
   error_:(status,message)=>{throw Object.assign(Error(message),{status});},LockService:{getScriptLock:()=>({})},deployLock_:()=>{assert(!locked);locked=true;return true;},deployUnlock_:()=>{assert(locked);locked=false;},
   deployPhase_:(name,fn)=>{calls.phases.push(name);return fn();},Utilities:{DigestAlgorithm:{SHA_256:'sha256'},computeDigest:(_,s)=>[...crypto.createHash('sha256').update(s).digest()],getUuid:()=>crypto.randomUUID()}});
