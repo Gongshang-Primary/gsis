@@ -22,7 +22,8 @@
 
 ## Decisions and changes
 
-- Claim note: WORKFLOW describes a claim-only commit to main, but the pilot rule is never push to main. As with Tasks 1 and 2, the claim is recorded on the task branch only, not on main. The user-given reference "main @ 5464087" does not resolve as a branch or tag in the GitHub tool; the task record content read on current main matches the brief exactly, so the branch starts from current main `45c70bf539ebb6e4accd1f9192ba2ef20e398c61`.
+- Claim note: WORKFLOW describes a claim-only commit to main, but the pilot rule is never push to main. As with Tasks 1 and 2, the claim is recorded on the task branch only, not on main. The user-given reference "main @ 5464087" resolves, via the branch commit list, to commit `5464087f47bf862a5a7f708888816eb02290d56e` ("Assign roster-consecutive-after-gap to Muse"). Current main `45c70bf539ebb6e4accd1f9192ba2ef20e398c61` is its successor (it reassigns the task back to Muse after a brief reassignment to Codex), so the branch starts from current main.
+- Fix (in `shared/roster-stapler.js` `effectiveDay`, the Stapler-plan occupancy code that produces the day `teacherSource` reads): after building plan teachers and filling cells from active plan tiles, (1) a plan teacher with no lesson tiles at all in the plan keeps the baseline day's cells, and (2) a baseline day teacher who is not in `plan.teachers` at all is added with the baseline day's cells. A teacher the plan does cover, including one whose cards are all in Card Pit, keeps the plan's cells, never the baseline's. No change to the six-consecutive meaning, to `maxConsecutivePeriods`, to `runAt`, to `consecutivePeriods`, or to the consecutive-exclusion filter. No edge authority, import, mirror, Venues fence or notification code was touched.
 - Report: Chuan Song, 2 Nov (a Stapler day), P6 free, own lessons P5 and P7 to P12. Assigning relief at P6 should make P5-P12 a run of 8 and trip the six-consecutive rule. It did not. Chuan Song's day was unchanged from baseline. Some of their periods are on the "Don't need relief" list. They are NOT on the consecutive-exclusion list. Periods on "Don't need relief" still count as occupied.
 
 ## Step 1 reproduction finding (recorded before the fix commit)
@@ -60,6 +61,10 @@ Note on scope of the reproduction: a Stapler plan created from the *full* baseli
 ## Verification
 
 Exact command, tested commit, outcome and evidence. Explicitly list checks not run.
+
+Local, before the fix: new test `tests/roster098k-consecutive-after-gap.cjs` fails at the first test (actual consecutiveBase `[]`, expected `[4, 6, 7, 8, 9, 10, 11]`), exit 1. After the fix, all 8 checks in that file pass.
+Local, after the fix, in a repo-shaped copy (`TZ=Asia/Singapore`): `node tests/roster098k-consecutive-after-gap.cjs` (8 pass), `node tests/roster084-stapler-unchanged.cjs` (9 pass), `node tests/roster084-consecutive-subjects.cjs` (16 pass), `node tests/roster098k-suspended-rules.cjs` (node:test, 0 fail), and `node tests/roster098h-stapler-domain.cjs` run from the copy root (12 pass). `node --check` passes for the changed product file and the new test file.
+Not run locally: `npm run build`, `npm test` (full suite), `python3 lord-suite/tests/run_all_checks.py` (Playwright not in workspace). Those run in CI; the draft PR is opened only after full CI is green, and no CI result is claimed here yet.
 
 ## Review
 
