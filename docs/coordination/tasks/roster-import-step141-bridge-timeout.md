@@ -1,9 +1,15 @@
 # roster-import-step141-bridge-timeout: attempt 3 (3-4 Nov) stopped at preparation step 141 of 143
 
-- Status: open; assign to Codex (lane R). Blocks the next cutover attempt.
+- Status: claimed by Codex (lane R). Blocks the next cutover attempt.
 - Owner/model: Codex
 - Reviewer/model: Claude
-- Last updated (Asia/Singapore): 4 Nov 2026 02:30
+- Last updated (Asia/Singapore): 4 Nov 2026
+- Branch: `codex/roster-import-step-budget`
+- Base SHA: `72017db6b07f05fe8130492663ab84ce60e1935d`
+- User-authorised scope: diagnose step 141; bound preparation steps; reconcile late checkpoints; distinguish bridge failures; restore setup progress and build/age display.
+- Files/domains owned: Roster import preparation, Worker bridge/import runner, shared edge setup, their tests and canonical generated outputs.
+- Out of scope: deployment, live data, freezes, activation, policy changes and other pending PRs.
+- Acceptance: deterministic bounded parts; verified late-step adoption; idempotent retries; accurate errors/setup display; `TZ=Asia/Singapore npm run build` then `TZ=Asia/Singapore npm test` including LORD; draft PR for Claude at the exact head.
 
 ## Evidence
 - Build v0.9.9i. Freeze 21:15:22 (revision 328). Import reference e8cbe838-db63-4ca2-b6d6-6ae6d4e20b33, session ab0d91fc2edcae20aa9162a246f9765ccdd90724dc31cc42f444264ee6f24e78.
