@@ -57,7 +57,7 @@ assert.equal(pastCommands[0].commandId,pastCommands[1].commandId);
 assert.equal(pastCommands[0].items.length,1);
 assert.equal(pastCommands[0].items[0].taskId,'past');
 assert.match(await page2.locator('#backgroundRows').innerText(),/Reviewed/);
-assert.match(await page2.locator('#backgroundRows').innerText(),/Send outcome unknown/);
+assert.match(await page2.locator('#backgroundRows').textContent(),/Send outcome unknown/);
 await page2.getByRole('button',{name:'Close dialog'}).click();
 assert.equal(await page2.locator('#backgroundWorkModal').count(),0);
 await page2.close();

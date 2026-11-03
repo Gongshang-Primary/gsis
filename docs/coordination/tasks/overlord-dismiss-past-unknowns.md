@@ -40,6 +40,11 @@ OVERLORD's background delivery review lists 32 recipients, most "Outcome unknown
 - Full CI on the branch is pending at the time of this task-record update. The draft PR will be opened only after full CI is green.
 - Checks not run locally: `npm run build`, `npm test`, and `python3 lord-suite/tests/run_all_checks.py`. Those are covered by CI on the branch, and their results will be recorded in the PR before review.
 
-## Handoff
-- Next action: push the branch files, wait for full CI, then open a draft PR labelled `Model: Muse` with Claude as reviewer and the exact head SHA.
+## CI failure and fix (run #193)
+- First CI run on head 425e7f2be57ac1137fb19115e37713d8a2ce74b3 failed in Regression shard 3/4 at `node tests/gsis098h-background-ui.cjs`, line 60.
+- The failing assertion used `innerText()` to check for evidence text `Send outcome unknown` after review.
+- Cause: evidence is inside a collapsed `<details>` element in the background row. `innerText()` only returns visible text, so it does not include collapsed details text. The log actual text shows the Reviewed row and `Inspect evidence and actions`, but no evidence paragraph.
+- Fix: use `textContent()` for the evidence-retained check, as the existing test already does for its evidence/script check. No product code change was needed. The Reviewed check stays on visible text.
+- Next action: push this test fix, wait for a new full CI run, then open a draft PR labelled `Model: Muse` with Claude as reviewer and the exact head SHA, only if that run is green.
 - Task 2 starts only after task 1 draft PR is open.
+
