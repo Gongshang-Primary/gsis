@@ -1,10 +1,11 @@
 # roster-import-step141-bridge-timeout: attempt 3 (3-4 Nov) stopped at preparation step 141 of 143
 
-- Status: implemented for review; focused checks passing, exact-head full-suite verification pending. Blocks the next cutover attempt.
+- Status: implemented; use PR #69 for the current exact-head full-suite status. Blocks the next cutover attempt.
 - Owner/model: Codex
 - Reviewer/model: Claude
 - Last updated (Asia/Singapore): 4 Nov 2026
 - Branch: `codex/roster-import-step-budget`
+- PR: https://github.com/helper-gsps/gsis/pull/69
 - Base SHA: `72017db6b07f05fe8130492663ab84ce60e1935d`
 - User-authorised scope: diagnose step 141; bound preparation steps; reconcile late checkpoints; distinguish bridge failures; restore setup progress and build/age display.
 - Files/domains owned: Roster import preparation, Worker bridge/import runner, shared edge setup, their tests and canonical generated outputs.
@@ -57,7 +58,7 @@ Only after this is merged, reviewed and deployed. Start with quiet mode on (D1 e
 
 - `TZ=Asia/Singapore npm run build`: passed; regenerated the canonical backends, Worker bundles and shared setup copies.
 - New regressions passed for oversized UTF-8 records, deterministic manifests, exact row reassembly, duplicate-free retries, fetch/body/Google timeouts, late checkpoint adoption during the live lease, wrong-digest refusal, status reload, current labels and live freeze age.
-- Existing resumable capture, lost-part/checkpoint acknowledgement, cancellation, activation recovery and server continuation checks were run. Final full-suite results will be recorded before handoff.
+- Existing resumable capture, lost-part/checkpoint acknowledgement, cancellation, activation recovery and server continuation checks were run. The PR conversation records the final full-suite result against the published head; focused checks alone are not that handoff.
 - The preceding hosted run at `c71273a75e2191ac4443d9cfba390a5b1d4c8f3b` failed `roster099-preparation-worker.mjs`: its fake Google endpoint did not implement the newly required read-only `edgeExportCheckpoint`. The fixture now models that operation and distinguishes a missing checkpoint from a lost acknowledgement of a completed checkpoint. The corrected program passes.
 - `tests/roster-import-safe-diagnostics.cjs` first failed because the old handled-error path logged its raw synthetic private message and stack. It now passes through the actual Apps Script response boundary and D1 import runner, verifies one bounded log line, rejects malformed metadata, checks terminal failure replies and retains the identical safe fields in D1. Existing authenticated failure-response tests also pass.
 - The new freeze-step latency model passes under 25 seconds at 250 ms per Drive call plus 20 ms per KiB. This is a synthetic bound, **not live Google latency**.
@@ -76,7 +77,7 @@ Before a new-format import starts, revert this PR's code and regenerate matched 
 
 ## Handoff
 
-Complete full-suite verification and attach the exact head. Remaining cutover blockers are the all-phase timing requirement, exact incident metadata/envelope evidence and Claude's review.
+Claude reviews the exact head named in PR #69's full-suite handoff. Main's `e2bfe2c` measurement instructions are retained below. Remaining cutover blockers are the all-phase timing requirement, exact incident metadata/envelope evidence and Claude's review.
 
 ## Step 0 measurement (owner 4 Nov: "add"; Claude coordinator)
 Read-only, before any incremental-import design. Purpose: decide whether "prepare early without freezing, then freeze and rebuild only changed parts" is worth building.
