@@ -240,7 +240,7 @@ var GSiSRosterImport=(()=>{
   const first=ordinal;
   if(selection&&(!Number.isSafeInteger(selection.start)||selection.start<0||!Number.isSafeInteger(selection.limit)||selection.limit<1))fail(400,'ROSTER_IMPORT_POSITION','Invalid preparation part window.');
   const parts=[],partMetadata=[],partPlan=[];
-  function add(kind,body,scope='',records=0,source){const payload=JSON.stringify(body),bytes=utf8Length(payload);if(bytes>MAX_PART_BYTES||ordinal>=MAX_PARTS||offset+bytes>MAX_TOTAL_BYTES)fail(413,'ROSTER_IMPORT_LIMIT','The immutable export exceeds a documented part/container limit.');const index=ordinal-first,id='part-'+String(ordinal++).padStart(5,'0'),selected=!selection||index>=selection.start&&index<selection.start+selection.limit;let part;if(selected||selection?.plan)part={id,kind,scope,records,offset,bytes,digest:adapter.hash(payload)};if(selected){partMetadata.push(part);parts.push(payload);}if(selection?.plan)partPlan.push({part,source});offset+=bytes;return id;}
+  function add(kind,body,scope='',records=0,source){const payload=JSON.stringify(body),bytes=utf8Length(payload);if(bytes>MAX_PART_BYTES||ordinal>=MAX_PARTS||offset+bytes>MAX_TOTAL_BYTES)fail(413,'ROSTER_IMPORT_LIMIT','The immutable export exceeds a documented part/container limit.');const index=ordinal-first,id='part-'+String(ordinal++).padStart(5,'0'),selected=!selection||index>=selection.start&&index<selection.start+selection.limit;let part;if(selected||selection?.plan)part={id,kind,scope,records,offset,bytes,...(!selection?.deferDigests?{digest:adapter.hash(payload)}:{})};if(selected){partMetadata.push(part);parts.push(payload);}if(selection?.plan)partPlan.push({part,source});offset+=bytes;return id;}
   return {add,result:()=>({parts,partMetadata,position:{ordinal,offset},...(selection?{totalParts:ordinal-first}:{}),...(selection?.plan?{partPlan}:{})})};
  }
  function objectJobs(snapshot){
@@ -284,7 +284,7 @@ var GSiSRosterImport=(()=>{
   for(const [scope,value]of [['roster',transformed.state],['roster-register',transformed.index]]){
    // Encode each complete scope once. Natural-key multiplicity and positions are
    // global; the prepared payloads are then persisted and uploaded in small batches.
-   const records=Store.encode(value);scopes[scope]={records:records.size,digest:adapter.hash(Store.canonicalJson(value))};let rows=[],bytes=12,start=0,index=0;
+   const records=Store.encode(value);scopes[scope]={records:records.size,...(!selection?.deferScopes?{digest:adapter.hash(Store.canonicalJson(value))}:{})};let rows=[],bytes=12,start=0,index=0;
    for(const row of records.values()){
     const size=utf8Length(JSON.stringify(row))+1;
     if(rows.length&&bytes+size>TARGET_BYTES){writer.add('records',{rows},scope,rows.length,{scope,start,count:rows.length});rows=[];bytes=12;}

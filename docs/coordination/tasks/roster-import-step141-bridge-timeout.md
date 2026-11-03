@@ -25,7 +25,7 @@
 3. Why did the job wait for an Admin after one bridge error, instead of retrying with backoff like other timeouts?
 
 ## Fix
-1. Bound every preparation step under 25 s: split large parts (by bytes or record count) so no single step exceeds the budget; record the split in the manifest and keep digests stable.
+1. Updated by Claude's 4 November review: the 25 s target is withdrawn. Keep every call below 60 s on the 16M slow-Drive fixture, including interruptions. Total preparation must be no more than 25% slower than v0.9.9i on the same input. Persist each job's prepared plan and payload ranges instead of rebuilding it on later steps.
 2. On a bridge timeout, check Google's checkpoint for that ordinal before failing; if Google completed it, accept the result (same digest) and continue.
 3. Report the real cause in the job error (timeout vs Google error) and the step's bytes/records.
 4. Tests: an oversized part is split and finishes under budget; a late-completed step is adopted, not repeated; retry after a timeout produces no duplicate parts.
@@ -47,7 +47,7 @@ Only after this is merged, reviewed and deployed. Start with quiet mode on (D1 e
 
 - Split an oversized logical record into existing bounded segment payloads plus a new `record` assembly part. Each transfer is at most 262,157 UTF-8 bytes. Reassembly checks all segment receipts, byte lengths and SHA-256 before inserting the original row. Natural keys, row counts, scope digests and source values remain unchanged.
 - Freeze at most one part per call. Preserve deterministic ordering, offsets, manifests and digests. Keep the verified work header in the private checkpoint to avoid three repeat Drive calls per part. Legacy checkpoints retain their prior header-read path.
-- Upload one bounded work part at a time, for both source objects and operational records. Retain the immutable record-part plan so subsequent calls encode only the selected record range, with unchanged natural keys and digests.
+- Superseding the single-part work uploads: prepare and compress each complete job once, retain its indexed compressed payloads in an immutable work file, and read only the selected ranges on later calls. Scope hashes are calculated from cached record payloads in a separate bounded step. Natural keys, source values and final digests remain unchanged.
 - Add Admin-only, freeze-allowed `edgeExportCheckpoint`. It reads an existing ordinal and never captures or creates parts. Recovery verifies source binding, ordinal, predecessor reference and input digest before D1 accepts the checkpoint under the existing lease. Cancellation and restart checks still fence adoption.
 - Distinguish `ROSTER_BRIDGE_TIMEOUT`, `ROSTER_BRIDGE_NETWORK`, `ROSTER_GOOGLE_TIMEOUT`, `ROSTER_GOOGLE_ERROR` and unreadable responses. Preserve failure phase, ordinal, bytes and record count. A Google timeout remains retryable even when the legacy error envelope uses status 400.
 - After timeout, reconcile immediately and on subsequent wakes while retaining the original preparation lease. Do not repeat a live step. Non-import bridge error behavior remains unchanged.
@@ -62,7 +62,8 @@ Only after this is merged, reviewed and deployed. Start with quiet mode on (D1 e
 - The preceding hosted run at `c71273a75e2191ac4443d9cfba390a5b1d4c8f3b` failed `roster099-preparation-worker.mjs`: its fake Google endpoint did not implement the newly required read-only `edgeExportCheckpoint`. The fixture now models that operation and distinguishes a missing checkpoint from a lost acknowledgement of a completed checkpoint. The corrected program passes.
 - `tests/roster-import-safe-diagnostics.cjs` first failed because the old handled-error path logged its raw synthetic private message and stack. It now passes through the actual Apps Script response boundary and D1 import runner, verifies one bounded log line, rejects malformed metadata, checks terminal failure replies and retains the identical safe fields in D1. Existing authenticated failure-response tests also pass.
 - The new freeze-step latency model passes under 25 seconds at 250 ms per Drive call plus 20 ms per KiB. This is a synthetic bound, **not live Google latency**.
-- The existing pessimistic 16.08M-character fixture takes up to 75,069 ms per call and 85,128 ms with interruptions under its five-second-per-Drive-call model. It completes 299 preparation steps and 149 parts without duplicate files, including 299 simulated interruptions. **The requested under-25-second bound for every preparation phase is not established.** Snapshot capture, initial whole-source record planning, large object preparation and an arbitrarily slow external Drive call remain outside that guarantee. Do not treat this draft as clearance for the next cutover.
+- The revised 16.08M-character fixture completes in 108 calls and 4,784,661 simulated ms, versus v0.9.9i's 106 calls and 8,185,122 ms. It is 41.54% faster. Drive reads fall from 1,315 / 59,874,809 bytes to 634 / 59,012,201 bytes. Both normal and interrupted revised runs remain below 60 seconds per call, with a maximum of 59,888 ms. Full old/new and interrupted totals are in [the performance report](../review/roster-import-step141-performance.md).
+- The retained 3–4 November source has two audit rows with the same record ID. Both unmodified implementations reject it with `EDGE_RECORD_ID`. No record was changed or deleted. A clearly marked offline storage-key projection gives approximately 3h 25m for the revised complete run versus 3h 32m for v0.9.9i. The larger retained-data simulation reaches 71.6 seconds in one call; the 60-second claim applies to the specified 16M fixture, not all live inputs.
 - No deployment, live-data reads or writes, freeze, provider messages or authority change.
 
 ## Claim and review
@@ -77,7 +78,7 @@ Before a new-format import starts, revert this PR's code and regenerate matched 
 
 ## Handoff
 
-Claude reviews the exact head named in PR #69's full-suite handoff. Main's `e2bfe2c` measurement instructions are retained below. Remaining cutover blockers are the all-phase timing requirement, exact incident metadata/envelope evidence and Claude's review.
+Claude reviews the exact head named in PR #69's full-suite handoff. Main's `e2bfe2c` measurement instructions are retained below. Remaining cutover blockers include the duplicate audit storage keys, larger-input timing and Claude's review. The original incident envelope is still unavailable.
 
 ## Step 0 measurement (owner 4 Nov: "add"; Claude coordinator)
 Read-only, before any incremental-import design. Purpose: decide whether "prepare early without freezing, then freeze and rebuild only changed parts" is worth building.
@@ -85,3 +86,15 @@ Read-only, before any incremental-import design. Purpose: decide whether "prepar
 2. Report: parts compared, parts identical, parts changed, bytes changed, and which kinds/scopes/dates changed (expect today and the next few days only). Elapsed time between sessions.
 3. Read only: no writes to D1, Drive or Google; no freeze; no restart of any session. If comparison needs a script, put it under scripts/ with a test, in the same PR or a separate draft PR.
 Decision rule (owner to confirm): under about 30% of parts changed per day: design incremental preparation (prepare early, freeze, rebuild changed parts, full parity over all parts before activation). Otherwise: no incremental design; full import on a weekend window.
+
+### Measured result, recorded after the first #69 suite handoff
+
+The detailed record and offline comparison tool remain in [PR #70](https://github.com/helper-gsps/gsis/pull/70). Intervals below use source-file creation times. Changed bytes are complete payload lengths for changed matched parts, before and after; they are not a byte-level edit distance.
+
+| Sessions | Interval | Compared | Identical | Changed | Changed bytes, before / after |
+| --- | --- | ---: | ---: | ---: | ---: |
+| `388d395a` to `0cafa306` | 26h 6m 46.673s | 78 | 74 | 4 | 108,093 / 311,048 |
+| `0cafa306` to `ab0d91fc` | 17h 49m 9.934s | 78 | 70 | 8 | 313,066 / 455,672 |
+| `388d395a` to `ab0d91fc` | 43h 55m 56.607s | 136 | 114 | 22 | 114,872 / 460,433 |
+
+The primary comparison changes audit objects dated 2, 3, 4 and 6 November in logical scope `roster`, collection `allocationAuditExports`. Four new Stapler parts for 6 November add 113,822 bytes. Fourteen of the longest comparison's changed parts are assembly references whose segment IDs moved; their source content is unchanged. The completed session has 97 record parts totaling 18,642,731 bytes that neither later checkpoint reached. Whole-import churn therefore remains unknown. No D1, Drive or Google writes, freeze or session restart were used for the measurement.
