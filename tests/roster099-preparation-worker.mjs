@@ -15,7 +15,7 @@ function fixture(options={}){
  function checkpoint(ordinal){return {fileId:'drive-private-'+sessionId+'-'+ordinal,digest:sha256Hex('checkpoint-'+ordinal)};}
  function step(ordinal){
   if(!checkpoints.has(ordinal)){
-   const common={adminVerified:true,sessionId,requestId,sourceDigest:frozen.manifest.sourceDigest,step:ordinal+1,done:ordinal+1,total:2,elapsedMs:47000,preparation:{ordinal:ordinal+1,checkpoint:checkpoint(ordinal+1)}};
+   const common={adminVerified:true,sessionId,requestId,sourceDigest:frozen.manifest.sourceDigest,step:ordinal+1,done:ordinal+1,total:2,elapsedMs:47000,checkpointInputDigest:sha256Hex(JSON.stringify({sessionId,ordinal,checkpoint:ordinal===0?null:checkpoint(ordinal)})),preparation:{ordinal:ordinal+1,checkpoint:checkpoint(ordinal+1)}};
    checkpoints.set(ordinal,ordinal===0?{...common,preparing:true,retryAfterMs:1000}:{...common,manifest:frozen.manifest,manifestDigest:frozen.manifestDigest});
    files.set(checkpoint(ordinal+1).fileId,checkpoints.get(ordinal));
   }
@@ -24,12 +24,14 @@ function fixture(options={}){
  globalThis.fetch=async(_url,optionsFetch)=>{
   const req=JSON.parse(JSON.parse(optionsFetch.body).payload),p=req.input;calls.push(p);
   if(p.operation==='edgeReferences')return Response.json({ok:true,data:{adminVerified:admin,contacts:{rosterPeople:[],rosterSMCIds:[],rosterAdminIds:[]}}});
+  if(p.operation==='edgeExportCheckpoint'){const result=checkpoints.get(p.preparation.ordinal);return Response.json({ok:true,data:result?{...result,completed:true}:{adminVerified:true,sessionId,completed:false}});}
   if(p.operation==='edgeExportManifest'){
    assert.equal(p.sessionId,sessionId);assert.equal(p.requestId,requestId);
    if(options.failureReason)return Response.json({ok:false,status:503,error:'Roster is temporarily unavailable.',failureReason:options.failureReason});
    const ordinal=p.preparation?.ordinal;assert(Number.isInteger(ordinal));assert(ordinal===0?p.preparation.checkpoint===null:p.preparation.checkpoint.fileId===checkpoint(ordinal).fileId);
-   const result=step(ordinal);
    if(options.holdFirst&&!held){held=true;await new Promise(resolve=>{release=resolve;});}
+   if(loseNext&&options.deferCheckpoint){loseNext=false;throw Error('lost preparation response');}
+   const result=step(ordinal);
    if(loseNext){loseNext=false;throw Error('lost preparation response');}
    return Response.json({ok:true,data:result});
   }
@@ -61,16 +63,18 @@ try{
  const waiting=await concurrent.import();assert.equal(waiting.preparing,true);assert.equal(concurrent.manifestCalls().length,1,'concurrent poll never starts another Apps Script step');
  concurrent.release();await running;
 
- const timeout=fixture();timeout.lose();await assert.rejects(timeout.import(),/lost preparation response/);
+ const timeout=fixture({deferCheckpoint:true});timeout.lose();await assert.rejects(timeout.import(),error=>error.code==='ROSTER_BRIDGE_NETWORK');
  assert.equal((await timeout.store.preparationStatus()).busy,true,'ambiguous timeout retains its lease');
- const timeoutReason=(await timeout.status()).importSession.failureReason;assert.equal(timeoutReason.message,'lost preparation response');assert.equal(timeoutReason.phase,'capture');assert.equal(timeoutReason.status,503);
+ const timeoutReason=(await timeout.status()).importSession.failureReason;assert.equal(timeoutReason.message,'The Google bridge connection failed.');assert.equal(timeoutReason.phase,'capture');assert.equal(timeoutReason.status,503);
  await timeout.import();assert.equal(timeout.manifestCalls().length,1,'retry waits while the previous execution could still run');
  now+=Import.PREPARATION_LEASE_MS+1;await timeout.import();assert.deepEqual(timeout.manifestCalls().map(p=>p.preparation.ordinal),[0,0]);
  assert.equal((await timeout.store.preparationStatus()).ordinal,1,'expired lease repeats only the uncommitted batch');
  assert.equal((await timeout.status()).importSession.failureReason,undefined,'a successful retry clears the earlier attempt failure');
 
+ const recovered=fixture();recovered.lose();const adopted=await recovered.import();assert.equal(adopted.step,1);assert.equal(recovered.manifestCalls().length,1,'a completed checkpoint is adopted without another write');assert.equal((await recovered.store.preparationStatus()).busy,false);
+
  const failureReason={status:413,message:'The frozen source exceeds the capture bound.',phase:'capture-serialize',elapsed:41335},diagnostic=fixture({failureReason});
- await assert.rejects(diagnostic.import(),/capture-serialize/);assert.deepEqual((await diagnostic.status()).importSession.failureReason,failureReason);assert.equal((await diagnostic.store.preparationStatus()).busy,true,'backend failures retain the lease until the execution horizon');
+ await assert.rejects(diagnostic.import(),/capture-serialize/);assert.deepEqual((await diagnostic.status()).importSession.failureReason,{...failureReason,code:'ROSTER_GOOGLE_ERROR',ordinal:0,bytes:null,records:null});assert.equal((await diagnostic.store.preparationStatus()).busy,true,'backend failures retain the lease until the execution horizon');
 
  const late=fixture({holdFirst:true}),old=late.import();while(!late.isHeld())await new Promise(setImmediate);
  now+=Import.PREPARATION_LEASE_MS+1;await late.import();late.release();await assert.rejects(old,e=>e.code==='ROSTER_IMPORT_PREPARATION_STALE');

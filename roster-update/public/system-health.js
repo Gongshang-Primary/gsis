@@ -20,9 +20,11 @@ function message(text,tone='info'){$('status-message').textContent=text;$('statu
 function countText(value){return object(value)?COUNT_KEYS.filter(key=>number(value[key])!==null).map(key=>key+': '+value[key]).join(' · '):'';}
 function diagnostic(row){return code(row.code)+(Number.isInteger(row.httpStatus)&&row.httpStatus>=100&&row.httpStatus<=599?' · HTTP '+row.httpStatus:'')+(trace(row.traceId)?' · Worker trace '+trace(row.traceId):'')+(trace(row.diagnosticId)?' · Backend reference '+trace(row.diagnosticId):'')+(FAILURE_OPERATIONS.has(row.operation)?' · Operation '+row.operation:'')+(FAILURE_STAGES.has(row.failureStage)?' · Stage '+row.failureStage:'')+(typeof row.backendVersion==='string'&&/^\d{1,3}\.\d{1,3}\.\d{1,3}[a-z]?$/.test(row.backendVersion)?' · Backend '+row.backendVersion:'');}
 function unavailable(box){box.replaceChildren(element('p','Status unavailable.','muted'));}
+function venuesRecoveryAllowed(){const value=data?.venuesSync;return ready&&value?.recoveryAllowed===true&&value.enabled===true&&value.state!=='ready';}
 function controls(){
- $('op-venues-recover').disabled=busy||!ready||data?.venuesSync?.recoveryAllowed!==true;
- $('op-venues-recover').hidden=data?.venuesSync?.recoveryAllowed!==true;
+ const venues=$('venues-recovery-controls'),allowed=venuesRecoveryAllowed();venues.hidden=!allowed;
+ if(allowed){if(!$('op-venues-recover'))venues.append($('venues-recovery-form').content.cloneNode(true));$('op-venues-recover').disabled=busy;$('venues-evidence').disabled=busy;}
+ else{venues.replaceChildren();if(pending?.operation==='recoverVenuesSync')closeDialog();}
  $('op-refresh').disabled=busy;const recovery=data?.recovery,active=recovery?.mode==='active'&&recovery?.paused===false;
  $('op-checkpoint').disabled=busy||!ready||!active||recovery?.checkpointCaptureConfigured!==true||recovery?.checkpointStorage!=='available';
  for(const button of document.querySelectorAll('[data-retry-kind]'))button.disabled=busy||!ready||!active||data?.background?.enabled!==true;
@@ -32,7 +34,7 @@ function controls(){
  $('op-peer-retry').hidden=!peerRetry;
  for(const button of document.querySelectorAll('[data-peer-review]'))button.disabled=busy||!!peerRetry;
 }
-function clear(){$('timetable-preparation-link').hidden=true;ready=false;data=null;pending=null;if($('confirmation').open)$('confirmation').close();$('confirm-description').textContent='';$('health-content').hidden=true;for(const id of ['jobs-body','backlog','background-summary','background-jobs','timetables','cleanup','recent-failures','checkpoints','peer-mail-review','google-backup','cutover-freeze','venues-sync','venues-recovery-results'])$(id).replaceChildren();controls();}
+function clear(){$('timetable-preparation-link').hidden=true;ready=false;data=null;pending=null;if($('confirmation').open)$('confirmation').close();$('confirm-description').textContent='';$('health-content').hidden=true;for(const id of ['jobs-body','backlog','background-summary','background-jobs','timetables','cleanup','recent-failures','checkpoints','peer-mail-review','google-backup','cutover-freeze','venues-sync','venues-recovery-controls','venues-recovery-results'])$(id).replaceChildren();controls();}
 function showJobs(snapshot){
  $('storage-status').textContent=snapshot.storage?.available===true?'Operational status storage is available.':snapshot.storage?.configured===true?'Operational status storage could not be read.':'Operational status storage is not configured.';
  const body=$('jobs-body');body.replaceChildren();for(const row of rows(snapshot.jobs).filter(row=>Object.hasOwn(LABELS,row.job))){const tr=element('tr'),outcome=element('td'),success=element('td',stamp(row.lastSuccessAt)===null?'No successful run recorded':date(row.lastSuccessAt)),detail=element('td');outcome.append(badge(row.status),element('span',date(row.eventAt),'muted'));detail.append(element('span',diagnostic(row),'diagnostic'));const summary=countText(row.counts);if(summary)detail.append(element('span',summary,'muted'));tr.append(element('td',LABELS[row.job]),outcome,success,detail);body.append(tr);}if(!body.children.length){const cell=element('td','No job outcomes recorded yet.');cell.colSpan=4;const tr=element('tr');tr.append(cell);body.append(tr);}
@@ -60,7 +62,7 @@ function showGoogleBackup(snapshot){
 }
 function showVenuesSync(snapshot){
  const box=$('venues-sync'),value=snapshot.venuesSync,states={ready:'Ready',pending:'Pending',uncertain:'Uncertain',committed:'Awaiting confirmation',stale:'Awaiting source refresh',unavailable:'Unavailable'};
- box.dataset.tone=value?.overdue===true?'error':'info';box.setAttribute('role',value?.overdue===true?'alert':'status');$('venues-recovery-controls').hidden=value?.recoveryAllowed!==true;
+ box.dataset.tone=value?.overdue===true?'error':'info';box.setAttribute('role',value?.overdue===true?'alert':'status');
  if(!value){box.textContent='Venues sync status is unavailable.';return;}
  if(value.enabled===false){box.textContent='Venues sync is not configured.';return;}
  box.textContent=(states[value.state]||'Uncertain')+' · Roster: '+(states[value.rosterState]||'Unavailable')+' · Venues: '+(states[value.venuesState]||'Unavailable')+' · Transaction: '+(states[value.commitState]||'Unavailable')+'.';
@@ -139,7 +141,7 @@ async function runPeer(body,prepareId){
  }finally{busy=false;controls();}
 }
 function closeDialog(){pending=null;$('confirmation').close();focusReturn?.focus();}
-$('op-refresh').addEventListener('click',()=>run({operation:'read'}));$('op-checkpoint').addEventListener('click',()=>run({operation:'recordRecoveryCheckpoint',reason:'manual'}));$('cancel-action').addEventListener('click',closeDialog);$('confirmation').addEventListener('cancel',()=>{pending=null;focusReturn?.focus();});$('confirm-action').addEventListener('click',()=>{const body=pending;closeDialog();if(body){if(body.operation==='reviewPeerMail'){peerRetry=body;runPeer(body);}else run(body);}});
-$('op-venues-recover').addEventListener('click',()=>{if(busy||data?.venuesSync?.recoveryAllowed!==true)return;const evidence=$('venues-evidence').value.trim();if(evidence.length<20){message('Record at least 20 characters of recovery evidence.','error');return;}pending={operation:'recoverVenuesSync',evidence};focusReturn=document.activeElement;$('confirm-title').textContent='Recover Venues sync?';$('confirm-action').textContent='Run recovery checks';$('confirm-description').textContent='Use the current Venues transaction token and this evidence note, then recover the Roster source fence. A refused check stops the action. Nothing is forced.';$('confirmation').showModal();$('cancel-action').focus();});
+$('op-refresh').addEventListener('click',()=>run({operation:'read'}));$('op-checkpoint').addEventListener('click',()=>run({operation:'recordRecoveryCheckpoint',reason:'manual'}));$('cancel-action').addEventListener('click',closeDialog);$('confirmation').addEventListener('cancel',()=>{pending=null;focusReturn?.focus();});$('confirm-action').addEventListener('click',()=>{const body=pending;closeDialog();if(body){if(body.operation==='reviewPeerMail'){peerRetry=body;runPeer(body);}else if(body.operation!=='recoverVenuesSync'||venuesRecoveryAllowed())run(body);}});
+$('venues-recovery-controls').addEventListener('click',event=>{if(event.target.id!=='op-venues-recover'||busy||!venuesRecoveryAllowed())return;const evidence=$('venues-evidence').value.trim();if(evidence.length<20){message('Record at least 20 characters of recovery evidence.','error');return;}pending={operation:'recoverVenuesSync',evidence};focusReturn=document.activeElement;$('confirm-title').textContent='Recover Venues sync?';$('confirm-action').textContent='Run recovery checks';$('confirm-description').textContent='Use the current Venues transaction token and this evidence note, then recover the Roster source fence. A refused check stops the action. Nothing is forced.';$('confirmation').showModal();$('cancel-action').focus();});
 $('op-peer-review').addEventListener('click',()=>runPeer({operation:'peerMailReview'}));$('op-peer-retry').addEventListener('click',()=>{if(peerRetry)runPeer(peerRetry);});controls();run({operation:'read'});
 })();

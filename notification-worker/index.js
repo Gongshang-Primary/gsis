@@ -99,7 +99,6 @@ export default {
    // Separate execution from the critical minute lane. Catch up retained days
    // in bounded batches, with backend notification and lock safeguards.
    if(event.cron==='2-57/5 * * * *'){
-    if(typeof dispatchVenuesSync==='function')await run('venues-sync','roster-venues-sync',()=>dispatchVenuesSync(env));
     if(quiet.active)return;
     await run('audit-export','roster-allocation-audit',()=>catchUpAllocationAudit(env));return;
    }
@@ -125,6 +124,9 @@ export default {
     if(result?.notificationsQueued>0||receiptResult?.intake?.notificationsQueued>0){await notifications;await send();}
    })();
    await Promise.all([imports,backup,received,notifications,inbox,ingress,peerMail,planning]);
+   // Venues has its own five-minute job after the minute work. Re-read quiet
+   // mode at dispatch so an SMC can pause it while those earlier jobs finish.
+   if(Math.floor(event.scheduledTime/60000)%5===0&&typeof dispatchVenuesSync==='function'&&!await quietNow())await run('venues-sync','roster-venues-sync',async()=>await quietNow()?{skipped:true}:dispatchVenuesSync(env));
   })());
  },
  async queue(batch,env){

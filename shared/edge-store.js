@@ -73,10 +73,10 @@ CREATE TABLE IF NOT EXISTS gsis_edge_import_resets (
  function serialize(value){let result;try{result=JSON.stringify(value);}catch{fail(400,'EDGE_STATE','State must contain JSON values.');}if(result===undefined)fail(400,'EDGE_STATE','State must contain JSON values.');if((typeof TextEncoder!=='undefined'?new TextEncoder().encode(result).length:Utilities.newBlob(result).getBytes().length)>MAX_RECORD_BYTES)fail(413,'EDGE_RECORD_TOO_LARGE','Store large immutable content in R2 and retain its reference.');return result;}
  const key=(collection,id)=>JSON.stringify([collection,id]);
  const recordDate=(value,id)=>typeof value?.date==='string'&&/^20\d\d-\d\d-\d\d$/.test(value.date)?value.date:/^20\d\d-\d\d-\d\d$/.test(id)?id:'';
- function encode(state){
+ function visitRecords(state,visit){
   if(!state||typeof state!=='object'||Array.isArray(state))fail(400,'EDGE_STATE','A state object is required.');
-  const records=new Map(),put=(collection,id,value,position=0,date='')=>{
-   text(collection,'collection',250);text(id,'record identity',1024);const k=key(collection,id);if(records.has(k))fail(409,'EDGE_RECORD_ID','Duplicate record identity.');records.set(k,{collection,record_id:id,position,record_date:date,value_json:serialize(value)});
+  const ids=new Set(),put=(collection,id,value,position=0,date='')=>{
+   text(collection,'collection',250);text(id,'record identity',1024);const k=key(collection,id);if(ids.has(k))fail(409,'EDGE_RECORD_ID','Duplicate record identity.');ids.add(k);visit(k,{collection,record_id:id,position,record_date:date},value);
   };
   const names=Object.keys(state);if(names.includes(ROOT))fail(400,'EDGE_STATE','Reserved state property.');put(ROOT,'$',{keys:names});
   for(const collection of names){const value=state[collection];
@@ -88,7 +88,14 @@ CREATE TABLE IF NOT EXISTS gsis_edge_import_resets (
     put(collection,'$',{kind:'map'});Object.keys(value).forEach(id=>put(collection,'key:'+id,value[id],0,recordDate(value[id],id)));
    }else put(collection,'$',{kind:'value',value:value===undefined?null:value});
   }
-  return records;
+ }
+ function encode(state){
+  const records=new Map();visitRecords(state,(key,row,value)=>records.set(key,{...row,value_json:serialize(value)}));return records;
+ }
+ function recordRange(state,start,count){
+  if(!Number.isSafeInteger(start)||start<0||!Number.isSafeInteger(count)||count<1)fail(400,'EDGE_INPUT','Invalid encoded record range.');
+  let index=0;const rows=[];visitRecords(state,(_key,row,value)=>{if(index>=start&&index<start+count)rows.push({...row,value_json:serialize(value)});index++;});
+  if(rows.length!==count)fail(409,'EDGE_STATE','The captured record range is incomplete.');return rows;
  }
  function decode(rows){
   const root=rows.find(row=>row.collection===ROOT&&row.record_id==='$');if(!root)return null;
@@ -195,6 +202,6 @@ CREATE TABLE IF NOT EXISTS gsis_edge_import_resets (
   async function exportState(){const snapshot=await load();return {schema:'gsis-edge-state-v1',...snapshot,capturedAt:new Date().toISOString(),stateDigest:snapshot.state===null?null:await digest(snapshot.state)};}
   return {scope,ensure,head,load,receipt,commit,importState,resetImport,transition,rows,exportState};
  }
- return {open,encode,decode,digest,canonicalJson,SCHEMA,ROSTER_MIRROR_SCHEMA,rosterWriteGuard,MAX_RECORD_BYTES};
+ return {open,encode,recordRange,decode,digest,canonicalJson,SCHEMA,ROSTER_MIRROR_SCHEMA,rosterWriteGuard,MAX_RECORD_BYTES};
 })();
 if(typeof module!=='undefined'&&module.exports)module.exports=GSiSEdgeStore;
