@@ -41,6 +41,8 @@ async function harness(browser,f,blockedStorage=false){
     data={schema:1,date,today:date,minute:480,revision:f.profile.revision,user:f.profile.user,people:[{id:f.profile.user.staffId,name:'Alice Cached',active:true,absenceEligible:true}],types:[],timetablePeople:[{id:f.profile.user.staffId,name:'Alice Cached'}],nameBridges:[],noReliefSubjects:[],checkedAt:date+'T00:00:00Z'};
    }else if(name==='operations'&&input.operation==='timetableDay'){
     data={date:input.date,baselineId:f.profile.selected.id,source:'baseline',sourceRevision:f.profile.revision,publicationRevision:0,calendar:{status:'not-requested',verified:false},periods:[],teachers:[]};
+   }else if(name==='operations'&&input.operation==='read'&&input.view==='duties'){
+    data={date:input.date,today:date,user:f.profile.user,myDuties:[]};
    }else if(name==='operations'&&input.operation==='currentDuty'){
     data={date,status:'verified',teachers:[],checkedAt:new Date().toISOString()};
    }else if(name==='operations'&&input.operation==='acknowledgementStatus'){

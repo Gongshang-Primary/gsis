@@ -74,8 +74,8 @@
   const key=JSON.stringify([sessionEpoch,apiReadGeneration,route,method,input,...(input.operation==='currentDuty'?[today()]:[])]);
   let entry=apiReads.get(key);
   if(entry)entry.shared=true;else{entry={shared:false};entry.promise=requestApi(route,input,method,token).finally(()=>{if(apiReads.get(key)===entry)apiReads.delete(key);});apiReads.set(key,entry);}
-  const owner=cacheOwner(),epoch=sessionEpoch,generation=apiReadGeneration,date=input.date||today();
-  const result=entry.promise.then(data=>{if(route==='operations'&&input.operation==='read'&&input.view==='duties')rememberHomeRelief(data,owner,epoch,generation,date);return entry.shared?JSON.parse(JSON.stringify(data)):data;});return options.background?result:timedRead(()=>result);
+  const ownDutyRead=route==='operations'&&input.operation==='read'&&input.view==='duties',context=ownDutyRead?{owner:cacheOwner(),epoch:sessionEpoch,generation:apiReadGeneration,date:input.date||today()}:null;
+  const result=entry.promise.then(data=>{if(context)rememberHomeRelief(data,context.owner,context.epoch,context.generation,context.date);return entry.shared?JSON.parse(JSON.stringify(data)):data;});return options.background?result:timedRead(()=>result);
  }
  const calendarProofs=new Map(),calendarContexts=new Map();let reportFormRead=null;
  const calendarProofId=()=> 'calendar:proof:'+(document.querySelector('script[src*="roster.js"]')?.getAttribute('src')||'1');
