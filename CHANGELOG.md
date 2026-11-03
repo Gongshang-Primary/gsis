@@ -1,3 +1,7 @@
+# Pending: clear Home timetable and relief-duty wording, 3 November 2026
+
+Model: Codex. Home distinguishes "No suspended timetable today" from the signed-in teacher's own relief periods. The existing duty roster is labelled "SMC doing Relief Allocation". Own-duty loading, none and failure states are explicit; a recent authenticated duties result is reused. No backend or authority change. See [Home banner task](docs/coordination/tasks/roster-home-banner-wording.md).
+
 # Pending: cancel freeze stops its server import, 3 November 2026
 
 Model: Codex. Confirmed Cancel freeze atomically stops the unfinished server import, records why and invalidates its preparation and staging claims. Late responses cannot advance it. Source snapshots, checkpoints, staged rows and receipts stay retained for explicit restart. Edge setup shows "Import stopped because the freeze was cancelled". No authority or live configuration change. See [the task](docs/coordination/tasks/roster-cancel-freeze-import.md).

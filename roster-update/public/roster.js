@@ -17,7 +17,7 @@
   }
   try{return await request();}finally{if(loadingReads.delete(ticket)&&!loadingReads.size)resetLoadCounter();}
  }
- const timetableDays=new Map();let homeDutyTicket=0,homeDutyDay='',homeAcknowledgementDispose=null;
+ const timetableDays=new Map();let homeDutyTicket=0,homeDutyDay='',homeAcknowledgementDispose=null,homeReliefTicket=0,homeReliefDay='',homeReliefCache=null;
  let preloadSchedule=0,preloadCheckedAt=0,preloadStatus=null,preloadPlanKeys={};
  const timetablePreload=window.RosterTimetablePreload?.create({api:(route,input,method,token)=>api(route,input,method,token,{background:true}),scope:()=>cacheOwner(),today,canReadDrafts:()=>!!(profile?.user.smc||profile?.user.admin),onBaseline:()=>window.RosterOpsUI?.referencesChanged?.(),onSuspended:installSuspendedPreview,onStatus:value=>{preloadStatus=value;showPreloadStatus();}});
  function installSuspendedPreview(payload){
@@ -69,12 +69,13 @@
    // Absence, Inbox and delivery writes do not change immutable timetable content.
    const baselineWrite=['upload','update','remove'].includes(route),timetableWrite=['saveStapler','confirmStapler','resetStapler','publishStapler','renameStapler','moveStapler','deleteStapler','restoreStapler','publish'].includes(input.operation);
    if(baselineWrite||timetableWrite){preloadSchedule++;preloadCheckedAt=0;timetablePreload?.invalidate(!baselineWrite&&input.date?[input.date,...(input.newDate?[input.newDate]:[])]:undefined);if(baselineWrite)timetableDays.clear();else for(const [key,row] of timetableDays)if([input.date,input.newDate].includes(row.date))timetableDays.delete(key);}
-   apiReadGeneration++;apiReads.clear();return route==='session'?timedRead(()=>requestApi(route,input,method,token)):requestApi(route,input,method,token);
+   apiReadGeneration++;apiReads.clear();homeReliefCache=null;return route==='session'?timedRead(()=>requestApi(route,input,method,token)):requestApi(route,input,method,token);
   }
   const key=JSON.stringify([sessionEpoch,apiReadGeneration,route,method,input,...(input.operation==='currentDuty'?[today()]:[])]);
   let entry=apiReads.get(key);
   if(entry)entry.shared=true;else{entry={shared:false};entry.promise=requestApi(route,input,method,token).finally(()=>{if(apiReads.get(key)===entry)apiReads.delete(key);});apiReads.set(key,entry);}
-  const result=entry.promise.then(data=>entry.shared?JSON.parse(JSON.stringify(data)):data);return options.background?result:timedRead(()=>result);
+  const owner=cacheOwner(),epoch=sessionEpoch,generation=apiReadGeneration,date=input.date||today();
+  const result=entry.promise.then(data=>{if(route==='operations'&&input.operation==='read'&&input.view==='duties')rememberHomeRelief(data,owner,epoch,generation,date);return entry.shared?JSON.parse(JSON.stringify(data)):data;});return options.background?result:timedRead(()=>result);
  }
  const calendarProofs=new Map(),calendarContexts=new Map();let reportFormRead=null;
  const calendarProofId=()=> 'calendar:proof:'+(document.querySelector('script[src*="roster.js"]')?.getAttribute('src')||'1');
@@ -152,7 +153,7 @@
   const tomorrow=new Date(Date.parse(date+'T00:00:00Z')+86400000).toISOString().slice(0,10),current=context&&Date.now()-context.checkedAt>=0&&Date.now()-context.checkedAt<300000&&[date,tomorrow].every(day=>context.dates[day]?.date===day&&context.dates[day].available===true&&typeof context.dates[day].schoolDay==='boolean');
   if(!current)await prepare();
  }
- function clear(){calendarProofs.clear();calendarContexts.clear();reportFormRead=null;resetLoadCounter();window.RosterAcknowledgements?.clear();homeDutyTicket++;homeDutyDay='';apiReads.clear();window.RosterReportCache?.clear();profileCheckedAt=0;unmount();window.RosterStaplerUI?.reset();window.RosterDutyUI?.reset();window.RosterInboxUI?.reset();window.RosterOpsUI?.resetPreloads();clearPrint();window.RosterBaselineCache?.removeOwner(cacheOwner());models.clear();modelReads.clear();availabilityReads.clear();viewFields={};availability=null;availabilitySequence++;sessionEpoch++;sequence++;importSequence++;invalidateReads();uploadDraft=null;profile=null;current=null;selected=[];chosenNames={teacher:'',class:'',tg:''};lastPeriod=null;baselinePage='saved';timetablePage='teacher';page='Home';$('content').replaceChildren();$('nav').hidden=true;$('navToggle').hidden=true;$('logout').hidden=true;if($('systemHealthLink'))$('systemHealthLink').hidden=true;$('account').textContent='';}
+ function clear(){calendarProofs.clear();calendarContexts.clear();reportFormRead=null;resetLoadCounter();window.RosterAcknowledgements?.clear();homeDutyTicket++;homeDutyDay='';homeReliefTicket++;homeReliefDay='';homeReliefCache=null;apiReads.clear();window.RosterReportCache?.clear();profileCheckedAt=0;unmount();window.RosterStaplerUI?.reset();window.RosterDutyUI?.reset();window.RosterInboxUI?.reset();window.RosterOpsUI?.resetPreloads();clearPrint();window.RosterBaselineCache?.removeOwner(cacheOwner());models.clear();modelReads.clear();availabilityReads.clear();viewFields={};availability=null;availabilitySequence++;sessionEpoch++;sequence++;importSequence++;invalidateReads();uploadDraft=null;profile=null;current=null;selected=[];chosenNames={teacher:'',class:'',tg:''};lastPeriod=null;baselinePage='saved';timetablePage='teacher';page='Home';$('content').replaceChildren();$('nav').hidden=true;$('navToggle').hidden=true;$('logout').hidden=true;if($('systemHealthLink'))$('systemHealthLink').hidden=true;$('account').textContent='';}
  function baselineDirty(exceptRow){
   if(page!=='Baseline Timetable')return false;
   const area=$(baselinePage==='saved'?'savedTimetables':'uploadForm');
@@ -186,11 +187,11 @@
  function home(){
   const list=allowedFunctions(),tile=f=>'<button class="function-tile'+(f.name==='Report Absence'?' absence-entry':'')+'" data-page="'+esc(f.name)+'"><img src="icons/'+esc(f.icon)+'.svg" alt="" width="56" height="56"><span class="function-title">'+esc(f.label||f.name)+'</span><span class="function-description">'+esc(f.description)+'</span>'+(f.name==='WhatsApp Inbox'?'<span data-inbox-alert hidden role="status"></span>':'')+(f.admin?'<span class="access-label">Admin</span>':f.smc?'<span class="access-label">'+esc(f.accessLabel||'SMC')+'</span>':'')+'</button>';
   const primary=list.filter(f=>homeOrder.slice(0,8).includes(f.name)),rest=list.filter(f=>!primary.includes(f));
-  $('content').innerHTML='<div class="home"><div class="home-heading"><h2>Roster</h2><p class="home-note home-timetable" data-home-timetable role="status" aria-live="polite"></p></div><p class="home-duty" data-current-duty role="status" aria-live="polite"></p><div data-home-acknowledgement></div>'+(primary.length?'<div class="function-grid priority-functions" aria-label="Primary Roster functions">'+primary.map(tile).join('')+'</div><hr class="function-divider">':'')+'<div class="function-grid" aria-label="Other Roster functions">'+rest.map(tile).join('')+'</div></div>';
-  showHomeTimetable();
+  $('content').innerHTML='<div class="home"><div class="home-heading"><h2>Roster</h2><p class="home-note home-timetable" data-home-timetable role="status" aria-live="polite"></p></div><p class="home-note" data-home-own-relief role="status" aria-live="polite"></p><p class="home-duty" data-current-duty role="status" aria-live="polite"></p><div data-home-acknowledgement></div>'+(primary.length?'<div class="function-grid priority-functions" aria-label="Primary Roster functions">'+primary.map(tile).join('')+'</div><hr class="function-divider">':'')+'<div class="function-grid" aria-label="Other Roster functions">'+rest.map(tile).join('')+'</div></div>';
+  showHomeTimetable();showHomeRelief($('content').querySelector('[data-home-own-relief]'),'loading');
   $('content').querySelectorAll('[data-page]').forEach(b=>b.onclick=()=>go(b.dataset.page));
   if(timetablePreload){const notice=document.createElement('p');notice.className='hint';notice.dataset.timetablePreload='';notice.setAttribute('role','status');notice.setAttribute('aria-live','polite');$('content').querySelector('.home').append(notice);showPreloadStatus();scheduleTimetablePreload();}
-  const dutyHost=$('content').querySelector('[data-current-duty]');showHomeDuty(dutyHost,'loading');const dutyMount=sequence;requestAnimationFrame(()=>setTimeout(()=>{if(page==='Home'&&sequence===dutyMount&&dutyHost.isConnected)refreshHomeDuty();},0));
+  const dutyHost=$('content').querySelector('[data-current-duty]');showHomeDuty(dutyHost,'loading');const dutyMount=sequence;requestAnimationFrame(()=>setTimeout(()=>{if(page==='Home'&&sequence===dutyMount&&dutyHost.isConnected){refreshHomeDuty();refreshHomeRelief();}},0));
   const ackHost=$('content').querySelector('[data-home-acknowledgement]');requestAnimationFrame(()=>{if(page==='Home'&&sequence===dutyMount&&ackHost?.isConnected)homeAcknowledgementDispose=window.RosterAcknowledgements?.mount(ackHost,{api,owner:cacheOwner(),today,onView:date=>go('My Relief Duties',date)});});
   refreshInboxBadge();
   const report=$('content').querySelector('[data-page="Report Absence"]');
@@ -204,16 +205,37 @@
   if(snapshot?.phase==='ready'){
    const source=plan?.timetableDay?.source;
    if(plan&&source!=null&&!['baseline','confirmed','published'].includes(source))text="Today's timetable could not be verified. Refresh to retry. "+label;
-   else text=(['confirmed','published'].includes(source)?'Suspended timetable in effect today ':baseline?'Normal timetable today ':'No timetable active today ')+label;
+   else text=(['confirmed','published'].includes(source)?'Suspended timetable in effect today ':baseline?'No suspended timetable today ':'No timetable active today ')+label;
   }else if(preloadStatus?.phase==='failed')text="Today's timetable could not be verified. Refresh to retry. "+label;
   if(host.textContent!==text)host.textContent=text;
  }
+ function rememberHomeRelief(data,owner,epoch,generation,date){
+  if(!owner||owner!==cacheOwner()||epoch!==sessionEpoch||generation!==apiReadGeneration||date!==today()||data?.date!==date||data?.today!==date||data?.user?.staffId!==profile?.user.staffId||String(data?.user?.email||'').toLowerCase()!==String(profile?.user.email||'').toLowerCase()||!Array.isArray(data.myDuties))return;
+  const rows=data.myDuties.filter(a=>a.staffId===profile.user.staffId&&a.date===date&&['published','completed'].includes(a.status)&&!a.noRelief&&!a.remove&&!a.invalidCover&&!a.publicationWithheldAt);
+  if(rows.some(a=>!Number.isInteger(a.period)||a.period<0||a.period>16))return;
+  homeReliefCache={owner,date,generation,checkedAt:Date.now(),periods:[...new Set(rows.map(a=>a.period))].sort((a,b)=>a-b)};
+ }
+ function currentHomeRelief(){const c=homeReliefCache;return c&&c.owner===cacheOwner()&&c.date===today()&&c.generation===apiReadGeneration&&Date.now()-c.checkedAt>=0&&Date.now()-c.checkedAt<60000?c:null;}
+ function showHomeRelief(host,state,periods=[]){
+  if(!host)return;host.replaceChildren();
+  if(state==='ready'&&periods.length){const link=document.createElement('a');link.href='#myReliefDuties';link.textContent='Your relief duty today: '+periods.map(p=>'P'+p).join(', ')+'.';link.onclick=e=>{e.preventDefault();go('My Relief Duties',today());};host.append(link);}
+  else host.textContent=state==='ready'?'You have no relief duty today.':state==='loading'?'Checking your relief duty…':'Your relief duty could not be checked. Refresh to retry.';
+ }
+ async function refreshHomeRelief(){
+  const host=$('content').querySelector('[data-home-own-relief]');if(page!=='Home'||!profile||!host)return;
+  const ticket=++homeReliefTicket,owner=cacheOwner(),epoch=sessionEpoch,mount=sequence,date=today();homeReliefDay=date;
+  const active=()=>ticket===homeReliefTicket&&owner===cacheOwner()&&epoch===sessionEpoch&&mount===sequence&&date===today()&&page==='Home'&&host.isConnected;
+  const cached=currentHomeRelief();if(cached){showHomeRelief(host,'ready',cached.periods);return;}showHomeRelief(host,'loading');
+  try{await api('operations',{operation:'read',view:'duties',date});if(!active())return;const current=currentHomeRelief();if(!current)throw Error('Own duties were not verified.');showHomeRelief(host,'ready',current.periods);}
+  catch{if(active())showHomeRelief(host,'error');}
+ }
  function showHomeDuty(host,state,names=[]){
   if(!host)return;
-  const text=state==='ready'?(names.length?esc(names.join(', '))+'.':'No duty SMC assigned.'):state==='loading'?'<span class="home-duty-loading"><span class="ops-spinner" aria-hidden="true"></span>Checking…</span>':'Unavailable. <button type="button" data-duty-retry>Retry</button>';
-  host.innerHTML='Relief duty today: '+text+' Visit <a href="https://contacts.gsps.edu.sg">contacts.gsps.edu.sg</a> for '+(state==='ready'&&names.length?'their':'staff')+' contact numbers.';
+  const text=state==='ready'?(names.length?'SMC doing Relief Allocation: '+esc(names.join(', '))+'.':'No SMC assigned to Relief Allocation today.'):state==='loading'?'SMC doing Relief Allocation: <span class="home-duty-loading"><span class="ops-spinner" aria-hidden="true"></span>Checking…</span>':'SMC doing Relief Allocation: Unavailable. <button type="button" data-duty-retry>Retry</button>';
+  host.innerHTML=text+' Visit <a href="https://contacts.gsps.edu.sg">contacts.gsps.edu.sg</a> for '+(state==='ready'&&names.length?'their':'staff')+' contact numbers.';
   host.querySelector('[data-duty-retry]')?.addEventListener('click',()=>refreshHomeDuty());
  }
+
  function resetHomeDuty(){homeDutyTicket++;homeDutyDay='';if(page==='Home')showHomeDuty($('content').querySelector('[data-current-duty]'),'loading');}
  async function refreshHomeDuty(){
   const host=$('content').querySelector('[data-current-duty]');if(page!=='Home'||!profile||!host)return;
@@ -233,7 +255,7 @@
  }
  async function load(verifiedProfile){
   if(loadingProfile){queuedProfileLoad=true;return;}resetHomeDuty();loadingProfile=true;availabilitySequence++;unmount();window.RosterOpsUI?.resetPreloads();lockUI(true);
-  const epoch=sessionEpoch,ticket=++sequence;invalidateReads(true);availabilityReads.clear();profileDay=today();if(followingToday)day=profileDay;status('Loading Roster…');if(!profile)$('content').innerHTML='<section><h2>Loading Roster…</h2></section>';
+  const epoch=sessionEpoch,ticket=++sequence;homeReliefCache=null;homeReliefTicket++;invalidateReads(true);availabilityReads.clear();profileDay=today();if(followingToday)day=profileDay;status('Loading Roster…');if(!profile)$('content').innerHTML='<section><h2>Loading Roster…</h2></section>';
   try{
    let x;try{x=verifiedProfile||await api('profile',{date:profileDay,...(page==='Report Absence'||location.hash==='#reportAbsence'?{view:'reportForm'}:{})});}catch(e){if(e.stale||(epoch!==sessionEpoch&&e.status!==401)||(ticket!==sequence&&profile))return;clear();throw e;}if(epoch!==sessionEpoch||ticket!==sequence)return;
    if(x?.user?.accessVerified!==true||typeof x.user.smc!=='boolean'){clear();throw Error('Roster access could not be verified. Ask an Admin to check the Roster connection, then retry.');}
@@ -701,6 +723,7 @@
  async function checkFreshness(){
   if(page==='Home')showHomeTimetable();
   if(page==='Home'&&homeDutyDay&&homeDutyDay!==today())resetHomeDuty();
+  if(page==='Home'&&homeReliefDay&&homeReliefDay!==today()){homeReliefCache=null;refreshHomeRelief();}
   const planning=activePlanner();
   if(!profile||busy||loadingProfile||pending||uploadDraft||baselineDirty()||!planning&&operationsDirty()&&!window.RosterOpsUI?.canRefreshLocal?.()||document.hidden||checkingFreshness||profileDay===today()&&Date.now()-profileCheckedAt<60000)return;
   checkingFreshness=true;const previous=profile,view=page,ticket=sequence,planner=window.RosterStaplerUI?.planningToken?.();
