@@ -1,3 +1,7 @@
+# Pending: recipient-approved peer relief can exceed weekly R, 3 November 2026
+
+Model: Codex. A colleague may approve a peer request when weekly R is exhausted or unverified. Timetable, attendance, employment and consecutive-period checks remain enforced. The relief still counts toward R. An essential audit and an SMC warning record the exception; automatic allocation is unchanged. See [peer quota override](docs/coordination/tasks/roster-peer-quota-override.md).
+
 # Pending: cancel freeze stops its server import, 3 November 2026
 
 Model: Codex. Confirmed Cancel freeze atomically stops the unfinished server import, records why and invalidates its preparation and staging claims. Late responses cannot advance it. Source snapshots, checkpoints, staged rows and receipts stay retained for explicit restart. Edge setup shows "Import stopped because the freeze was cancelled". No authority or live configuration change. See [the task](docs/coordination/tasks/roster-cancel-freeze-import.md).
