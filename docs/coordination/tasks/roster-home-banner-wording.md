@@ -1,6 +1,6 @@
 # roster-home-banner-wording: "No suspended timetable" and the user's own relief duties on Home (changelog)
 
-- Status: authorised (owner 3 Nov 2026: "codex work"); target v0.9.9j with the peer-quota fix
+- Status: claimed by Codex, 3 November 2026; target v0.9.9j with the peer-quota fix
 - Owner/model: Codex (lane R frontend)
 - Branch: codex/roster-home-banner-wording
 - Reviewer/model: Claude
@@ -22,3 +22,7 @@ Staff WhatsApp (Bee San, 08:49-08:50) with Home screenshot: "Roster · Normal ti
 
 ## Owner ruling
 "SMC doing Relief Allocation: ...." (3 Nov 2026). Spelling corrected from "doign".
+
+## Implementation claim
+
+Model: Codex. Base main 6540d97183f91a885e57b10c4f7e6efdb140e08f. Scope: roster-update/public/roster.js, Home browser tests and this record/CHANGELOG. Use the existing own-account read view=duties, reuse current loaded results, and preserve account, date and navigation guards. No backend or authority change. Keep the claim on the feature branch under the already established safe alternative to direct main edits. Claude reviews the exact head; owner merges.
