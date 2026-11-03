@@ -16,8 +16,8 @@ Staff WhatsApp (Bee San, 08:49-08:50) with Home screenshot: "Roster · Normal ti
    - none: "You have no relief duty today."
    - some: "Your relief duty today: P3, P4." (periods in order; link to My relief duties).
    - unavailable/loading: "Checking your relief duty…" then the result; on failure "Your relief duty could not be checked. Refresh to retry."
-3. Clarify the existing SMC line so it is not read as the teacher's own duty: "Relief duty today:" → **"Duty SMC today:"** (owner to confirm).
+3. Rename the existing SMC line (owner ruling 3 Nov): "Relief duty today:" → **"SMC doing Relief Allocation:"**, e.g. "SMC doing Relief Allocation: Jannie, Fadzillah, … Visit contacts.gsps.edu.sg for their contact numbers." Empty state: "No SMC assigned to Relief Allocation today."
 4. Same on Google and D1. Tests for each wording and for none/some/failed duty states.
 
-## Open question for the owner
-Rename "Relief duty today:" (the SMC list) to "Duty SMC today:"? It currently lists SMCs on duty, and staff may confuse it with their own relief duty.
+## Owner ruling
+"SMC doing Relief Allocation: ...." (3 Nov 2026). Spelling corrected from "doign".
