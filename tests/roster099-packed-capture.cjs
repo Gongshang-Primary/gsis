@@ -27,6 +27,7 @@ while (response.preparing) {
   assert(++polls < 250, 'production-shaped import completes in bounded polls');
   response = h.call({...h.input, preparation: response.preparation});
   assert(h.calls.at(-1).decodes <= 1, 'one preparation call expands at most its selected dated plan');
+  if(response.phase==='Freeze parts')assert.equal(h.calls.at(-1).decodes,0,'freezing cached parts never reopens a stored plan');
   assert(h.calls.at(-1).elapsed < 120000, 'every preparation call stays below the simulated two-minute budget');
 }
 assert(response.manifest);

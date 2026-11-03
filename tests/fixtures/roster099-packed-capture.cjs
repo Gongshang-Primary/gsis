@@ -41,10 +41,10 @@ function makeFixture(scope) {
 
 module.exports = function harness({uploadFailure = false, killPhase = null} = {}) {
   const properties = new Map(), files = new Map(), writes = [];
-  let clock = Date.parse('2026-10-31T08:00:00Z'), locks = 0, decodes = 0, captures = 0, serial = 0, elapsed = 0, killed = false;
+  let clock = Date.parse('2026-10-31T08:00:00Z'), locks = 0, decodes = 0, cacheDecodes = 0, captures = 0, serial = 0, elapsed = 0, killed = false;
   const termination = Object.assign(Error('Simulated process termination'), {simulatedTermination: true});
   const cost = bytes => { const ms = Math.ceil(bytes / 1048576 * 300); clock += ms; elapsed += ms; };
-  const blob = value => { const bytes = Buffer.from(value); return {getBytes: () => new Uint8Array(bytes), getDataAsString: () => bytes.toString('utf8')}; };
+  const blob = (value,type,name='') => { const bytes = Buffer.from(value); return {getBytes: () => new Uint8Array(bytes), getDataAsString: () => bytes.toString('utf8'),getName:()=>name}; };
   const Clock = class extends Date { constructor(...args) { super(...(args.length ? args : [clock])); } static now() { return clock; } };
   const scope = {console, Date: Clock, GSISRosterOperations: Operations, GSISRosterStapler: Stapler,
     GSiSRosterImport: Import, GSiSEdgeStore: Store, ROSTER_DATA: 'private',
@@ -52,7 +52,7 @@ module.exports = function harness({uploadFailure = false, killPhase = null} = {}
     Utilities: {newBlob: blob, DigestAlgorithm: {SHA_256: 'sha256'},
       computeDigest: (_, value) => { const bytes = typeof value === 'string' ? Buffer.from(value) : Buffer.from(value); cost(bytes.length); return [...crypto.createHash('sha256').update(bytes).digest()]; },
       gzip: value => { const bytes = Buffer.from(value.getBytes()); cost(bytes.length); return blob(zlib.gzipSync(bytes)); },
-      ungzip: value => { decodes++; const bytes = zlib.gunzipSync(Buffer.from(value.getBytes())); cost(bytes.length); return blob(bytes); },
+      ungzip: value => { if(value.getName()==='roster-import-part.json.gz')cacheDecodes++;else decodes++; const bytes = zlib.gunzipSync(Buffer.from(value.getBytes())); cost(bytes.length); return blob(bytes); },
       base64Encode: value => Buffer.from(value).toString('base64'), base64Decode: value => new Uint8Array(Buffer.from(value, 'base64'))},
     props_: () => ({getProperty: key => properties.get(key) || null, getProperties: () => Object.fromEntries(properties),
       setProperty: (key, value) => {
@@ -119,5 +119,5 @@ module.exports = function harness({uploadFailure = false, killPhase = null} = {}
     return scope.rosterEdgeMigrationDispatch_({input: next, identity: {email: 'admin@example.test'}}, {user: {rosterAdmin: true}}).result;
   } finally { assert.equal(locks, 0); calls.push({ordinal: next.preparation?.ordinal, elapsed, decodes: decodes - before}); } };
   return {scope, files, properties, writes, calls, input, call, packed, packedBytes: Buffer.byteLength(packedRaw),
-    stats: () => ({locks, decodes, captures}), advance: () => { clock += 420001; killed = false; killPhase = null; }};
+    stats: () => ({locks, decodes, cacheDecodes, captures}), advance: () => { clock += 420001; killed = false; killPhase = null; }};
 };

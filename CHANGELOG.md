@@ -1,3 +1,11 @@
+# Pending: distinct audit event identities, 4 November 2026
+
+Model: Codex. New Stapler request and decision audit events retain distinct IDs and a shared planning-request reference. Reserved identity overrides and new duplicate IDs are refused before storage. Existing audit rows and historical collisions remain unchanged pending the owner repair ruling. See [the task](docs/coordination/tasks/roster-import-duplicate-audit-id.md).
+
+# Pending: bounded Roster import parts and late checkpoint recovery, 4 November 2026
+
+Model: Codex. Split oversized records into verified transport segments, freeze one part per call and recover a late Google checkpoint before repeating work. Import failures distinguish bridge and Google timeouts from Google errors and retain step size. Setup shows the build label, live freeze age and saved preparation progress. The all-phase 25-second timing gate is not yet established; this draft does not clear the next cutover. No deployment or live action. See [the task](docs/coordination/tasks/roster-import-step141-bridge-timeout.md).
+
 # Pending: recipient-approved peer relief can exceed weekly R, 3 November 2026
 
 Model: Codex. A colleague may approve a peer request when weekly R is exhausted or unverified. Timetable, attendance, employment and consecutive-period checks remain enforced. The relief still counts toward R. An essential audit and an SMC warning record the exception; automatic allocation is unchanged. See [peer quota override](docs/coordination/tasks/roster-peer-quota-override.md).

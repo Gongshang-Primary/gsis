@@ -1,10 +1,10 @@
 # roster-import-duplicate-audit-id: retained audit identity investigation
 
-Model: Codex. Lane R, read-only investigation.
+Model: Codex. Lane R, investigation followed by the owner-authorized new-event guard.
 
 ## Claim
 
-Status: findings ready for review; owner decision pending. Owner/model: Codex. Reviewer/model: Claude. Updated: 4 November 2026, Asia/Singapore.
+Status: guard implemented; verification in progress; historical repair decision pending. Owner/model: Codex. Reviewer/model: Claude. Updated: 4 November 2026, Asia/Singapore.
 
 Branch: `codex/roster-import-duplicate-audit-id`. Base: main `a38b17464d4cb8d75183569d9c7cc5219fb7da88`, tree `8eaaa41c09eedd93f9c4eb8662849bc56949c27a`. The local base materializes that exact tree; publication uses the actual main commit as parent.
 
@@ -108,3 +108,14 @@ Claude reviews the final published head. This task changes documentation only. N
 ## Handoff
 
 Owner decision pending on historical rule (a), (b) or (c); (c) does not qualify for this pair. Claude should review the evidence and recommendation. Any repair or implementation needs a separate explicit instruction and reviewed plan. Google/Drive/D1 state, retained checkpoints and authority remain untouched.
+
+
+## Owner amendment, 4 November 2026: v0.9.9j item 1
+
+The owner explicitly authorized the new-event guard as the first item in the j queue, using one branch and one draft PR per item. This supersedes the original read-only product scope for the guard only. The read-only findings and unapproved repair options above remain evidence. Base for implementation: main `661e79004a274a33bdee6753507c9efa524cf007`, exact tree `054125ee825e7ccd1ae93f57933c4d5d51cdac36`. Continue PR #71 and its task branch; Claude reviews the new exact head.
+
+Canonical scope: `shared/roster-allocation.js`, the two Stapler audit calls in `shared/roster-operations.js`, Google audit identity validation in `backend/RosterOperations.gs`, a focused regression, changelog and regenerated copies. No repair, cutover, freeze or authority behavior changes.
+
+Each new Stapler event keeps its generated event ID and names the shared business reference `planningRequestId`. The audit helper rejects reserved identity-field overrides and generated-ID collisions. Google captures audit identity counts before mutation and rejects increased duplicate multiplicity before any durable write, including direct appenders. An unchanged historical duplicate pair and export metadata enrichment remain permitted. D1's existing record-key validation remains enforced. No old row is renamed or removed.
+
+The new regression failed first for lifecycle identity, reserved overrides, repeated UUIDs, missing delta validation and a Google direct-append write. It now passes those cases and historical-preservation cases. The final exact-head full-suite evidence and guard review are recorded in PR #71. The repair rule remains for owner approval; no repair is coded.
