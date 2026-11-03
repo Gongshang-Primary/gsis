@@ -55,9 +55,8 @@ function fixture() {
   return {state, index: {schema: 1, revision: 12, entries, receipts: []}, files};
 }
 
-function harness({interrupt = false} = {}) {
-  const backendSource = fs.readFileSync('backend/RosterEdgeMigration.gs', 'utf8');
-  const source = fixture(), files = new Map(source.files), properties = new Map();
+function harness({interrupt = false, backendSource = fs.readFileSync('backend/RosterEdgeMigration.gs', 'utf8'), importModule = Import, storeModule = Store, source = fixture(), prelude = '', stringEncoding = 'utf8', actor = 'admin@example.test'} = {}) {
+  const files = new Map(source.files), properties = new Map();
   const originalArchiveDigests = Object.fromEntries(Object.entries(source.state.allocationAuditExports)
     .map(([date, metadata]) => [date, hash(files.get(metadata.archiveFileId).bytes)]));
   const revisions = new Map([...files].map(([id, file]) => [id + '|revision-1', Buffer.from(file.bytes)]));
@@ -65,12 +64,19 @@ function harness({interrupt = false} = {}) {
   let clock = Date.parse('2026-10-31T08:00:00Z'), locks = 0, uploads = 0, captures = 0;
   let elapsed = 0, active = false, scope, callNumber = 0, ordinal = -1, cutPower = false, lockedArchiveCalls = 0;
   const calls = [], fileReads = new Map(), sourceWrites = [];
+  const io = {readCalls: 0, readBytes: 0, writeCalls: 0, writeBytes: 0, snapshotBytes: 0};
+  let callCosts = [];
   const termination = Object.assign(Error('Simulated process termination'), {simulatedTermination: true});
   function writable() { if (cutPower) throw termination; }
   function cost(kind, bytes = 0) {
     const ms = kind === 'cpu' ? Math.ceil(bytes / MIB * 300) : 5000 + Math.ceil(bytes / MIB * 1000);
+    if (kind === 'read') { io.readCalls++; io.readBytes += bytes; }
+    if (kind === 'write') { io.writeCalls++; io.writeBytes += bytes; }
+    if (kind === 'snapshot') io.snapshotBytes += bytes;
     clock += ms;
     if (active) {
+      const descriptor = [...properties].find(([key]) => key.startsWith('ROSTER_EDGE_EXPORT:'))?.[1];
+      callCosts.push({kind, bytes, ms, phase: descriptor ? JSON.parse(descriptor).lastPhase : 'Initialise'});
       elapsed += ms;
       assert(elapsed <= BUDGET_MS, 'preparation step ' + ordinal + ' exceeded simulated two-minute budget: ' + elapsed + 'ms');
     }
@@ -94,8 +100,9 @@ function harness({interrupt = false} = {}) {
       static now() { return clock; }
     };
     scope = {
-      console, Date: Clock, GSiSEdgeStore: Store, GSiSRosterImport: Import,
+      console, Date: Clock, GSiSEdgeStore: storeModule, GSiSRosterImport: importModule,
       GSISRosterOperations: Operations, GSISRoster: Roster, ROSTER_DATA: 'private-folder',
+      GSISRosterStapler: require('../shared/roster-stapler.js'), rosterOperationsPhase_: (_phase, work) => work(),
       props_: () => ({getProperty: key => properties.get(key) || null,
         getProperties: () => Object.fromEntries(properties),
         setProperty: (key, value) => { writable(); assert(Buffer.byteLength(value) < 9000, 'Script Property exceeds 9KB'); properties.set(key, value); },
@@ -104,11 +111,11 @@ function harness({interrupt = false} = {}) {
       LockService: {getScriptLock: () => ({}), getUserLock: () => ({})},
       deployLock_: () => { locks++; return true; }, deployUnlock_: () => { assert(locks > 0); locks--; },
       error_: (status, message) => { throw Object.assign(Error(message), {status}); },
-      Utilities: {newBlob: blob, gzip: b => { const bytes = Buffer.from(b.getBytes()); cost('cpu', bytes.length); return blob(zlib.gzipSync(bytes)); },
+      Utilities: {newBlob: blob, gzip: b => { const bytes = Buffer.from(b.getBytes()); cost('cpu', bytes.length); return blob(zlib.gzipSync(bytes)); },ungzip: b => {const raw=zlib.gunzipSync(Buffer.from(b.getBytes()));cost('cpu',raw.length);return blob(raw);},
         base64Encode: value => Buffer.from(value).toString('base64'),
         base64Decode: value => [...Buffer.from(value, 'base64')],
         getUuid: () => 'fixture-id-' + uploads,
-        computeDigest: (_algorithm, value) => { const bytes = Buffer.from(value); cost('cpu', bytes.length); return [...crypto.createHash('sha256').update(bytes).digest()]; },
+        computeDigest: (_algorithm, value) => { const bytes = typeof value==='string'&&stringEncoding==='ascii'?Buffer.from([...value].map(char=>char.codePointAt(0)<128?char:'?').join('')):Buffer.from(value); cost('cpu', bytes.length); return [...crypto.createHash('sha256').update(bytes).digest()]; },
         DigestAlgorithm: {SHA_256: 'sha256'}, Charset: {UTF_8: 'utf8'}},
       rosterOperationsDigest_: value => { const raw = JSON.stringify(value); cost('cpu', Buffer.byteLength(raw)); return hash(raw); },
       rosterFolder_: () => ({}), rosterReadFile_: read,
@@ -162,22 +169,23 @@ function harness({interrupt = false} = {}) {
       }
     };
     vm.createContext(scope);
+    if (prelude) vm.runInContext(prelude, scope);
     vm.runInContext(backendSource, scope);
     scope.rosterEdgeSnapshot_ = () => {
       assert(locks > 0, 'snapshot is captured under the production lock'); captures++;
       const value = {schema: 1, state: clone(source.state), index: clone(source.index)};
-      const raw = JSON.stringify(value); cost('read', Buffer.byteLength(raw));
+      const raw = JSON.stringify(value); cost('snapshot', Buffer.byteLength(raw));
       cost('cpu', Buffer.byteLength(raw)); return {...value, sourceDigest: hash(raw)};
     };
   }
   resetVm();
   function call(input) {
-    elapsed = 0; active = true; ordinal = input.preparation?.ordinal ?? -1; cutPower = false;
+    elapsed = 0; active = true; ordinal = input.preparation?.ordinal ?? -1; cutPower = false; callCosts = [];
     try {
-      return scope.rosterEdgeMigrationDispatch_({input, identity: {email: 'admin@example.test'}}, {user: {rosterAdmin: true}}).result;
+      return scope.rosterEdgeMigrationDispatch_({input, identity: {email: actor}}, {user: {rosterAdmin: true}}).result;
     } finally {
       active = false; cutPower = false; assert.equal(locks, 0, 'every call releases production locks');
-      calls.push({number: ++callNumber, elapsed});
+      calls.push({number: ++callNumber, ordinal, elapsed, costs: callCosts});
     }
   }
   function probeRoster() {
@@ -191,12 +199,13 @@ function harness({interrupt = false} = {}) {
     source.state.revision++; scope.deployUnlock_(lock); assert.equal(locks, 0);
   }
   return {call, source, files, properties, resetVm, probeRoster, sourceWrites, originalArchiveDigests,
-    stats: () => ({captures, uploads, calls, fileReads: Object.fromEntries(fileReads),
+    replaceRuntime: runtime => { backendSource=runtime.backendSource;importModule=runtime.importModule;storeModule=runtime.storeModule;prelude=runtime.prelude||'';resetVm(); },
+    stats: () => ({captures, uploads, calls: calls.slice(), io: {...io}, fileReads: Object.fromEntries(fileReads),
       interruptions: killedOrdinals.size, pinnedRevisions: pinnedRevisions.size, lockedArchiveCalls})};
 }
 
-function prepare({reload = false, changeLive = false, interrupt = false} = {}) {
-  const h = harness({interrupt}), request = {operation: 'edgeExportManifest', requestId: 'budget-fixture'};
+function prepare({reload = false, changeLive = false, interrupt = false, ...runtime} = {}) {
+  const h = harness({interrupt, ...runtime}), request = {operation: 'edgeExportManifest', requestId: 'budget-fixture'};
   let response = h.call({...request, preparation: {ordinal: 0, checkpoint: null}});
   assert.equal(response.preparing, true, 'capture returns preparation progress instead of freezing every object in one call');
   assert.equal(response.manifest, undefined);
@@ -216,7 +225,7 @@ function prepare({reload = false, changeLive = false, interrupt = false} = {}) {
   }
   let steps = 0;
   while (response.preparing) {
-    assert(++steps < 256, 'preparation must complete in bounded polls');
+    assert(++steps < 512, 'single-part preparation and freeze steps must complete in bounded polls');
     assert(response.preparation, 'reply must bind the next preparation checkpoint');
     h.probeRoster();
     if (reload) h.resetVm();
@@ -231,6 +240,7 @@ function prepare({reload = false, changeLive = false, interrupt = false} = {}) {
   }
   assert(response.manifest, 'all completed parts produce a manifest');
   assert.equal(h.stats().captures, 1, 'resume never reads the live snapshot again');
+  const preparationStats = h.stats();
   Import.validateManifest(response.manifest);
   const parts = Array.from(response.manifest.parts, part => {
     const value = h.call({...request, operation: 'edgeExportPart', sessionId: response.sessionId,
@@ -259,14 +269,23 @@ function prepare({reload = false, changeLive = false, interrupt = false} = {}) {
   assert.equal(h.stats().pinnedRevisions, 0, 'capture does not perform one revision pin call per historical archive');
   assert.equal(h.stats().lockedArchiveCalls, 0);
   if (interrupt) assert(h.stats().interruptions > 1, 'interruptions cover multiple separate steps');
-  return {manifest: clone(response.manifest), parts, stats: h.stats(), steps};
+  return {manifest: clone(response.manifest), parts, stats: h.stats(), preparationStats, steps};
 }
 
+module.exports = {prepare, harness};
+if (require.main === module) {
 const uninterrupted = prepare();
 const resumed = prepare({reload: true, changeLive: true, interrupt: true});
 assert.deepEqual(resumed.manifest, uninterrupted.manifest, 'resume and live edits preserve the exact final manifest');
 assert.deepEqual(resumed.parts, uninterrupted.parts, 'resume does not duplicate, omit or change a logical part');
+assert(Math.max(...uninterrupted.preparationStats.calls.map(call=>call.elapsed))<60000,'every uninterrupted preparation call stays below the 60-second owner bound');
+assert(Math.max(...resumed.preparationStats.calls.map(call=>call.elapsed))<60000,'every interrupted preparation call stays below the 60-second owner bound');
+// v0.9.9i at e2bfe2c, measured by scripts/measure-roster-preparation.cjs
+// against this same fixture and the unchanged five-second Drive-call model.
+assert(uninterrupted.preparationStats.calls.reduce((n,call)=>n+call.elapsed,0)<=8185122*1.25,'total preparation stays within 25% of the measured v0.9.9i fixture');
+assert(resumed.preparationStats.calls.reduce((n,call)=>n+call.elapsed,0)<=21607582*1.25,'interrupted preparation stays within 25% of the measured v0.9.9i fixture');
 console.log(JSON.stringify({check: '16.08M operations, 12 models, 16 archives; resumable preparation budget',
   steps: uninterrupted.steps, maxCallMs: Math.max(...uninterrupted.stats.calls.map(call => call.elapsed)),
   resumedMaxCallMs: Math.max(...resumed.stats.calls.map(call => call.elapsed)),
   interruptions: resumed.stats.interruptions, parts: uninterrupted.parts.length, simulated: true}));
+}

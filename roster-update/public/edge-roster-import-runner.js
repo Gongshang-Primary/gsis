@@ -44,12 +44,13 @@ export async function drainRosterImports(db,advance,{maxSteps=8,budgetMs=180000}
    const renewed=checked(await c.prepare(`UPDATE ${TABLE} SET lease_until=?,updated_at=? WHERE session_id=? AND claim_token=?`).bind(Date.now()+LEASE_MS,Date.now(),job.session_id,token).run());if(!renewed.meta?.changes)return {pending:1,readyAt:Date.now()+2000};
    result=await advance(input,identity,guard);steps++;
    if(result.imported){state='complete';break;}if(result.requiresRestart){state='attention';break;}
-   if(result.preparationLeaseUntil>Date.now()){readyAt=result.preparationLeaseUntil;break;}
+   if(result.preparationLeaseUntil>Date.now()){readyAt=['ROSTER_BRIDGE_TIMEOUT','ROSTER_GOOGLE_TIMEOUT'].includes(progress.failureReason?.code)?Math.min(result.preparationLeaseUntil,Date.now()+5000):result.preparationLeaseUntil;break;}
   }
  }catch(error){
   // A transport timeout retains the exact preparation checkpoint and its longer
-  // source lease. Retry it after the lease, never capture a fresh live source.
-  const preparation=await store.preparationStatus();readyAt=Math.max(Date.now()+60000,preparation?.busy?preparation.leaseUntil:0);
+  // source lease. Recheck a timed-out checkpoint while retaining that lease;
+  // repeating Google work must wait for the lease, never capture a fresh source.
+  const preparation=await store.preparationStatus();readyAt=['ROSTER_BRIDGE_TIMEOUT','ROSTER_GOOGLE_TIMEOUT'].includes(error.code)?Date.now()+5000:Math.max(Date.now()+60000,preparation?.busy?preparation.leaseUntil:0);
   state=error.status>=400&&error.status<500&&![408,429].includes(error.status)?'attention':'waiting';errorCode=/^[A-Z][A-Z0-9_]{0,79}$/.test(error.code||'')?error.code:'ROSTER_IMPORT_RETRY';
  }
  checked(await c.prepare(`UPDATE ${TABLE} SET state=?,claim_token='',lease_until=0,next_at=?,error_code=?,updated_at=? WHERE session_id=? AND claim_token=?`).bind(state,readyAt,errorCode,Date.now(),job.session_id,token).run());

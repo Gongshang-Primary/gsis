@@ -1,0 +1,145 @@
+{
+  "schema": 1,
+  "baseline": {
+    "label": "v0.9.9i",
+    "ref": "e2bfe2c3283d56ac97868b360211fb049a30b461"
+  },
+  "submittedHead": "f02b2bab787525d1c5c234fee09e89081fc21286",
+  "costModel": {
+    "ioCallMs": 5000,
+    "ioMsPerMiB": 1000,
+    "cpuMsPerMiB": 300,
+    "includesVerificationDownloads": false
+  },
+  "synthetic": {
+    "characters": 16080000,
+    "models": 12,
+    "archives": 16,
+    "old": {
+      "steps": 106,
+      "completedSteps": 106,
+      "totalMs": 8185122,
+      "maxCallMs": 96998,
+      "readCalls": 1315,
+      "readBytes": 59874809,
+      "writeCalls": 285,
+      "writeBytes": 55240891,
+      "parts": 149,
+      "interruptions": 0
+    },
+    "submitted": {
+      "steps": 300,
+      "completedSteps": 300,
+      "totalMs": 16105054,
+      "maxCallMs": 75069,
+      "readCalls": 2210,
+      "readBytes": 1553928037,
+      "writeCalls": 599,
+      "writeBytes": 66725917,
+      "parts": 149,
+      "interruptions": 0
+    },
+    "revised": {
+      "steps": 108,
+      "completedSteps": 108,
+      "totalMs": 4784661,
+      "maxCallMs": 59888,
+      "readCalls": 634,
+      "readBytes": 59012201,
+      "writeCalls": 287,
+      "writeBytes": 38760484,
+      "parts": 149,
+      "interruptions": 0
+    },
+    "oldInterrupted": {
+      "steps": 359,
+      "completedSteps": 180,
+      "totalMs": 21607582,
+      "maxCallMs": 112124,
+      "readCalls": 3899,
+      "readBytes": 144559190,
+      "writeCalls": 359,
+      "writeBytes": 57778128,
+      "parts": 149,
+      "interruptions": 179
+    },
+    "revisedInterrupted": {
+      "steps": 363,
+      "completedSteps": 182,
+      "totalMs": 13628095,
+      "maxCallMs": 59888,
+      "readCalls": 2321,
+      "readBytes": 71541873,
+      "writeCalls": 361,
+      "writeBytes": 42258435,
+      "parts": 149,
+      "interruptions": 181
+    }
+  },
+  "retainedSource": {
+    "sourceBytes": 20228544,
+    "objects": 70,
+    "decodedObjectBytes": 53596757,
+    "originalFailure": {
+      "code": "EDGE_RECORD_ID",
+      "collection": "audit",
+      "duplicateKeys": 1,
+      "affectedRows": 2,
+      "rows": 3634
+    },
+    "counterfactual": "Distinct storage keys for the two audit rows; their payloads remain unchanged. This adjustment exists only in the offline projection.",
+    "old": {
+      "steps": 204,
+      "completedSteps": 204,
+      "totalMs": 16180839,
+      "maxCallMs": 110303,
+      "readCalls": 2428,
+      "readBytes": 934602886,
+      "writeCalls": 534,
+      "writeBytes": 88601207,
+      "parts": 258,
+      "interruptions": 0
+    },
+    "revised": {
+      "steps": 218,
+      "completedSteps": 218,
+      "totalMs": 10605484,
+      "maxCallMs": 71592,
+      "readCalls": 1267,
+      "readBytes": 944817579,
+      "writeCalls": 574,
+      "writeBytes": 75437837,
+      "parts": 284,
+      "interruptions": 0
+    },
+    "projection": {
+      "anchorOrdinal": 140,
+      "observedStepMs": 15475,
+      "observedPrefixMs": 8880083,
+      "fittedIoCallMs": 943.9375,
+      "fittedPacingPerStepMs": 41956.73714539007,
+      "runs": [
+        {
+          "ref": "e2bfe2c",
+          "steps": 204,
+          "simpleStepOnlyMs": 3264000,
+          "backendMs": 4162725.8125,
+          "wallMs": 12721900.190159574
+        },
+        {
+          "ref": "working",
+          "steps": 218,
+          "simpleStepOnlyMs": 3488000,
+          "backendMs": 3134216.875,
+          "wallMs": 12280785.572695035
+        }
+      ]
+    }
+  },
+  "sourceHashes": {
+    "backend/RosterEdgeMigration.gs": "5485a58f226b5988cf4e3dfb3cf4f858d0d4ed36599ad32bbbdd02567af988ec",
+    "shared/roster-import.js": "f0bc106bab3965ae7c7cb0e8604aa1974019dc9433ca1d933f6e5c93e6822a5c",
+    "scripts/measure-roster-preparation.cjs": "2df4e5318d19cc1a6f8b5d697a8308af72ca7504780408dc17c35168b3ece265",
+    "tests/roster099-resumable-budget.cjs": "2d4bce7a5860bc0694a8144953294d33efd687e04a9bd974a0f1f399587ee207"
+  }
+}
