@@ -1,6 +1,6 @@
 # roster-peer-quota-override: a colleague's own approval may exceed weekly R (changelog → Codex)
 
-- Status: authorised (owner 3 Nov 2026 08:37: "need to allow peer arrangement overwrite of relief quota")
+- Status: claimed by Codex, 3 November 2026, Asia/Singapore. Owner authorisation: 08:37, "need to allow peer arrangement overwrite of relief quota".
 - Owner/model: Codex
 - Reviewer/model: Claude
 - Branch: codex/roster-peer-quota-override
@@ -23,3 +23,7 @@ Colleagues' relief requests: Alvinna, 4 Nov (Wed) P3 and P4, EL 3R / D2-09, "Rel
 - Test: a recipient at R=0 remaining approves → assignment saved, counted, flagged; same recipient with a timetable clash → still refused; auto-allocation still respects R.
 - D1-path test (same result on D1).
 - Full CI green.
+
+## Implementation claim
+
+Model: Codex. Base: 87b9662d8018cb6c822a0dc9b46dec70a84e4024. Scope: shared/roster-allocation.js, shared/roster-operations.js, the Assign Relief warning display if required, focused Google/D1/UI tests, CHANGELOG and generated copies from npm run build. No quota/accounting formula, automatic selection, hard eligibility, provider-send, live-record or authority changes. Reproduce zero/unverified R approval failure first; test clash and hard-rule refusal, accounting, SMC warning and D1 persistence. Claude reviews the exact final head; owner merges.
