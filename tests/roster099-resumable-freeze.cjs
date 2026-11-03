@@ -15,11 +15,11 @@ const encode=Store.encode,encoded=[];Store.encode=value=>{encoded.push(value);re
 let records;try{records=Import.prepareRecords(snapshot,references,position,adapter);}finally{Store.encode=encode;}
 assert.equal(encoded.length,2,'each complete scope is encoded once');parts.push(...records.parts);partMetadata.push(...records.partMetadata);
 const result=Import.finishFreeze(snapshot,binding,partMetadata,records.scopes,adapter);
-assert.equal(result.manifestDigest,'cacfe967da6c9cf950608f8f3f902d0626a55e7a62a06204ee16e3d524270d35','manifest remains byte-identical to the original freeze implementation');
+assert.equal(result.manifestDigest,'1f325a3be22823d822bfec344754b0fe30692802bb732a75367b4f32c6bdc152','manifest deterministically includes bounded transport for oversized records');
 assert.deepEqual(Import.freeze(snapshot,binding,adapter),{...result,parts});assert.equal(JSON.stringify(snapshot),original,'helpers never mutate frozen input');
-const rows=parts.flatMap((payload,i)=>partMetadata[i].kind==='records'?JSON.parse(payload).rows.map(r=>({...r,scope:partMetadata[i].scope})):[]),restored=Store.decode(rows.filter(r=>r.scope==='roster'));
+const rows=parts.flatMap((payload,i)=>{const part=partMetadata[i],body=JSON.parse(payload);let records=part.kind==='records'?body.rows:[];if(part.kind==='record')records=JSON.parse(Buffer.concat(body.segments.map(id=>Buffer.from(JSON.parse(parts[partMetadata.findIndex(p=>p.id===id)]).base64,'base64'))).toString()).rows;return records.map(r=>({...r,scope:part.scope}));}),restored=Store.decode(rows.filter(r=>r.scope==='roster'));
 assert.equal(rows.find(r=>r.collection==='rows'&&r.position===0&&r.record_id!=='$').record_id,'index:0');assert.equal(rows.find(r=>r.collection==='rows'&&r.position===2&&r.record_id!=='$').record_id,'index:2');assert.deepEqual(restored.rows,snapshot.state.rows);
 assert.throws(()=>Import.prepareRecords(snapshot,references.slice(1),position,adapter),e=>e.code==='ROSTER_IMPORT_OBJECT');
 assert.throws(()=>Import.prepareRecords({...snapshot,state:{rows:[{id:'same'},{id:'same'}]},index:{entries:[]}},[],{ordinal:0,offset:0},adapter),e=>e.code==='EDGE_RECORD_ID');
 assert.throws(()=>Import.prepareObject(snapshot,jobs[0],{ordinal:Import.MAX_PARTS,offset:0},adapter),e=>e.code==='ROSTER_IMPORT_LIMIT');
-console.log('PASS resumable freeze helpers: exact old manifest, independent replay, complete global encoding, source immutability and limits.');
+console.log('PASS resumable freeze helpers: deterministic bounded manifest, independent replay, complete global encoding, source immutability and limits.');

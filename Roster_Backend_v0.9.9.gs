@@ -2474,7 +2474,7 @@ function rosterModelResponse_(entry,p){const known=Array.isArray(p.knownModelIds
 function rosterFile_(folderId,name,blob){return rosterFindFile_(folderId,name)||rosterCreateFile_(folderId,name,blob);}
 function rosterInput_(fn){try{return fn()}catch(e){error_(400,e.message)}}
 function rosterDispatch_(req,c){gsisRequireBackendRole_('roster');
- if(!['edgeFreeze','edgeUnfreeze','edgeExport','edgeExportManifest','edgeExportPart','edgeExportAbandon','edgeModel','edgeFence','edgeDrift','edgeReferences','edgeContactCreate','edgeAudit'].includes(req.input?.operation)&&!(req.action==='rosterOperations'&&req.input?.operation==='edgeHealthAuthority')&&typeof rosterEdgeAssertLegacyWrite_==='function')rosterEdgeAssertLegacyWrite_();
+ if(!['edgeFreeze','edgeUnfreeze','edgeExport','edgeExportManifest','edgeExportCheckpoint','edgeExportPart','edgeExportAbandon','edgeModel','edgeFence','edgeDrift','edgeReferences','edgeContactCreate','edgeAudit'].includes(req.input?.operation)&&!(req.action==='rosterOperations'&&req.input?.operation==='edgeHealthAuthority')&&typeof rosterEdgeAssertLegacyWrite_==='function')rosterEdgeAssertLegacyWrite_();
  if(typeof c?.user?.rosterSMC!=='boolean'){
   if(typeof deployTrace_!=='undefined'&&deployTrace_)deployTrace_.phase='contacts-authority';
   error_(503,'Contacts did not return verified Roster authority. Update the existing Contacts web app deployment.');
@@ -9740,8 +9740,9 @@ function rosterEdgeReferences_(c,adminVerified){
  return {contacts,adminVerified:adminVerified===true,contactsSource:rosterOperationsDigest_(contacts),checkedAt:new Date().toISOString(),cutoverFreeze:rosterCutoverStatus_(),legacyWritesDisabled:props_().getProperty('ROSTER_EDGE_AUTHORITY')==='d1'};
 }
 function rosterEdgeMigrationDispatch_(req,c){
- const p=req.input||{},op=p.operation;if(op==='edgeHealthAuthority')return {handled:true,result:{user:rosterOperationsAuthority_(c,req.identity)}};if(!['edgeFreeze','edgeUnfreeze','edgeExport','edgeExportManifest','edgeExportPart','edgeModel','edgeFence','edgeDrift','edgeReferences','edgeContactCreate','edgeAudit','edgeExportAbandon'].includes(op))return null;if(op==='edgeContactCreate'){if(!c?.user?.rosterSMC&&!c?.user?.rosterAdmin)error_(403,'SMC or Admin access is required.');}else rosterEdgeAdmin_(c);
+ const p=req.input||{},op=p.operation;if(op==='edgeHealthAuthority')return {handled:true,result:{user:rosterOperationsAuthority_(c,req.identity)}};if(!['edgeFreeze','edgeUnfreeze','edgeExport','edgeExportManifest','edgeExportCheckpoint','edgeExportPart','edgeModel','edgeFence','edgeDrift','edgeReferences','edgeContactCreate','edgeAudit','edgeExportAbandon'].includes(op))return null;if(op==='edgeContactCreate'){if(!c?.user?.rosterSMC&&!c?.user?.rosterAdmin)error_(403,'SMC or Admin access is required.');}else rosterEdgeAdmin_(c);
  if(['edgeFreeze','edgeUnfreeze'].includes(op))return {handled:true,result:rosterCutoverDispatch_(req)};
+ if(op==='edgeExportCheckpoint')return {handled:true,result:rosterEdgeExportCheckpoint_(req)};
  if(op==='edgeExportManifest')return {handled:true,result:rosterEdgeExportManifest_(req)};
  if(op==='edgeExportPart')return {handled:true,result:rosterEdgeExportPart_(req)};
  if(op==='edgeExportAbandon')return {handled:true,result:rosterEdgeExportAbandon_(req)};
@@ -9844,7 +9845,7 @@ function rosterEdgeExportPartLegacy_(req){const binding=rosterEdgeExportBinding_
 
 /* Resumable preparation v2. Only capture holds production locks. Later writes
  * are immutable; the gateway's D1 step lease fences the accepted checkpoint. */
-const ROSTER_EXPORT_V2='gsis-roster-export-v2',ROSTER_EXPORT_BATCH_BYTES=524288,ROSTER_EXPORT_STEP_MS=60000;
+const ROSTER_EXPORT_V2='gsis-roster-export-v2',ROSTER_EXPORT_BATCH_BYTES=262157;
 function rosterEdgeExportBindingV2_(req){
  const p=req.input||{};if(Object.keys(p).some(key=>!['operation','requestId','sessionId','partId','preparation','resetRequestId'].includes(key)))error_(400,'Export file IDs and byte ranges are selected only by the backend.');
  const input={operation:p.operation,requestId:p.requestId,...(p.sessionId!==undefined?{sessionId:p.sessionId}:{}),...(p.partId!==undefined?{partId:p.partId}:{})};return rosterEdgeExportBinding_({...req,input});
@@ -9898,14 +9899,25 @@ function rosterEdgeExportAssertCheckpointV2_(binding,checkpoint,descriptor){
  }
 }
 function rosterEdgeExportRecoveredCheckpoint_(binding,step){
+ let unreadable;
  for(const file of rosterEdgeExportFilesNamed_(rosterEdgeExportCheckpointName_(binding,step.ordinal))){
-  if(Number(file.size)>2097152)continue;let raw,checkpoint;try{raw=rosterReadFile_(file.id);checkpoint=JSON.parse(raw);}catch(error){continue;}
+  if(Number(file.size)>2097152)continue;let raw,checkpoint;try{raw=rosterReadFile_(file.id);checkpoint=JSON.parse(raw);}catch(error){unreadable=error;continue;}
   if(checkpoint.schema===ROSTER_EXPORT_V2&&checkpoint.actor===binding.actor&&checkpoint.requestId===binding.requestId&&checkpoint.sessionId===binding.sessionId&&checkpoint.ordinal===step.ordinal&&JSON.stringify(checkpoint.previous||null)===JSON.stringify(step.checkpoint||null))return {checkpoint,ref:{fileId:file.id,digest:rosterEdgeExportHash_(raw)}};
- }return null;
+ }if(unreadable)error_(503,'The retained preparation checkpoint could not be read. Retry its read before repeating work.');return null;
+}
+function rosterEdgeExportCheckpoint_(req){
+ const binding=rosterEdgeExportBindingV2_(req),step=rosterEdgeExportPreparation_(req.input);
+ if(rosterEdgeExportAbandoned_(binding))error_(409,'This preparation was abandoned.');
+ const descriptor=rosterEdgeExportDescriptor_(binding),recovered=rosterEdgeExportRecoveredCheckpoint_(binding,step);
+ if(!recovered)return {adminVerified:true,sessionId:binding.sessionId,completed:false};
+ rosterEdgeExportAssertCheckpointV2_(binding,recovered.checkpoint,descriptor);
+ return {...rosterEdgeExportReplyV2_(recovered.checkpoint,recovered.ref),completed:true};
 }
 function rosterEdgeExportReplyV2_(checkpoint,ref){
- const uploaded=checkpoint.parts.length,remaining=checkpoint.stage==='ready'?0:(checkpoint.work?Math.ceil((checkpoint.work.parts-checkpoint.work.next)/2):0)+Math.max(0,checkpoint.jobs-checkpoint.jobIndex)+(checkpoint.stage==='records'||checkpoint.stage==='objects'?2:1);
- const value={adminVerified:true,sessionId:checkpoint.sessionId,requestId:checkpoint.requestId,sourceDigest:checkpoint.sourceDigest,preparation:{ordinal:checkpoint.ordinal+1,checkpoint:ref},step:checkpoint.ordinal+1,phase:checkpoint.lastStep,done:checkpoint.ordinal+1,total:checkpoint.ordinal+1+remaining,elapsedMs:checkpoint.elapsedMs||checkpoint.timing?.elapsedMs||0,stepElapsedMs:checkpoint.timing?.elapsedMs||0,preparedParts:uploaded};
+ const uploaded=checkpoint.parts.length,remaining=checkpoint.stage==='ready'?0:(checkpoint.work?checkpoint.work.parts-checkpoint.work.next:0)+Math.max(0,checkpoint.jobs-checkpoint.jobIndex)+(checkpoint.stage==='records'||checkpoint.stage==='objects'?2:1),part=checkpoint.work?.header?.partMetadata[checkpoint.work.next];
+ const nextStep=part?{phase:'Freeze parts',bytes:part.bytes,records:part.records,partId:part.id}:{phase:checkpoint.stage==='finalize'?'Manifest':'Prepare source',bytes:checkpoint.sourceBytes||0,records:null};
+ const checkpointInputDigest=rosterEdgeExportHash_(JSON.stringify({sessionId:checkpoint.sessionId,ordinal:checkpoint.ordinal,checkpoint:checkpoint.previous||null}));
+ const value={adminVerified:true,sessionId:checkpoint.sessionId,requestId:checkpoint.requestId,sourceDigest:checkpoint.sourceDigest,preparation:{ordinal:checkpoint.ordinal+1,checkpoint:ref},checkpointInputDigest,step:checkpoint.ordinal+1,phase:checkpoint.lastStep,nextStep,stepSize:checkpoint.stepSize||null,done:checkpoint.ordinal+1,total:checkpoint.ordinal+1+remaining,elapsedMs:checkpoint.elapsedMs||checkpoint.timing?.elapsedMs||0,stepElapsedMs:checkpoint.timing?.elapsedMs||0,preparedParts:uploaded};
  return checkpoint.stage==='ready'?{...value,manifest:checkpoint.manifest,manifestDigest:checkpoint.manifestDigest}:{...value,preparing:true,retryAfterMs:2000};
 }
 function rosterEdgeExportReadCapturedAudit_(envelope,date,fileId){
@@ -9919,6 +9931,7 @@ function rosterEdgeExportPhaseV2_(descriptor,phase){
 }
 function rosterEdgeExportFailureV2_(descriptor,error){
  const now=Date.now(),status=Number(error?.status);descriptor.failureReason={status:Number.isInteger(status)&&status>=400&&status<=599?status:503,message:String(error?.message||'Preparation failed. Retry the same import.').slice(0,800),phase:String(error?.failurePhase||descriptor.lastPhase||'Preparation').slice(0,80),elapsed:Math.max(0,now-(descriptor.stepStartedAt||descriptor.createdAt||now))};
+ if(descriptor.stepSize)Object.assign(descriptor.failureReason,descriptor.stepSize);
  descriptor.failedAt=now;rosterEdgeExportSave_(descriptor);return descriptor.failureReason;
 }
 function rosterEdgeExportCaptureV2_(binding){
@@ -9959,9 +9972,12 @@ function rosterEdgeExportWorkV2_(binding,ordinal,prepared,kind,job){
  const metadata=prepared.partMetadata,base=metadata[0]?.offset||0,header={schema:ROSTER_EXPORT_V2,...binding,kind,job:job||null,partMetadata:metadata,reference:prepared.reference||null,scopes:prepared.scopes||null,position:prepared.position,base},json=JSON.stringify(header),headerBytes=Utilities.newBlob(json).getBytes().length;
  if(headerBytes>GSiSRosterImport.MAX_MANIFEST_BYTES+2000)error_(413,'The preparation work header exceeds its size bound.');
  const raw=String(headerBytes).padStart(8,'0')+'\n'+json+prepared.parts.join(''),ref=rosterEdgeExportCreateImmutable_('Roster import '+binding.sessionId+' work '+String(ordinal).padStart(5,'0')+'.bin',raw,'application/octet-stream');
- return {...ref,headerDigest:rosterEdgeExportHash_(json),headerBytes,totalBytes:Utilities.newBlob(raw).getBytes().length,parts:metadata.length,next:0};
+ return {...ref,header,headerDigest:rosterEdgeExportHash_(json),headerBytes,totalBytes:Utilities.newBlob(raw).getBytes().length,parts:metadata.length,next:0};
 }
 function rosterEdgeExportWorkHeaderV2_(binding,work){
+ // The immutable checkpoint authenticates this header. Avoid fetching it three
+ // times for every part; old checkpoints still use the verified Drive path.
+ if(work.header&&rosterEdgeExportHash_(JSON.stringify(work.header))===work.headerDigest)return work.header;
  const meta=rosterEdgeExportPrivateMeta_(work.fileId);if(Number(meta.size)!==work.totalBytes)error_(503,'The preparation work file length changed.');
  const prefix=rosterEdgeExportRange_(work.fileId,0,9,work.totalBytes);if(!/^\d{8}\n$/.test(prefix)||Number(prefix.slice(0,8))!==work.headerBytes)error_(503,'The preparation work header is invalid.');
  const raw=rosterEdgeExportRange_(work.fileId,9,work.headerBytes,work.totalBytes);if(rosterEdgeExportHash_(raw)!==work.headerDigest)error_(503,'The preparation work header failed verification.');const value=JSON.parse(raw);if(value.schema!==ROSTER_EXPORT_V2||value.actor!==binding.actor||value.requestId!==binding.requestId||value.sessionId!==binding.sessionId||!Array.isArray(value.partMetadata)||value.partMetadata.length!==work.parts)error_(409,'The work file belongs to another preparation.');return value;
@@ -9970,13 +9986,13 @@ function rosterEdgeExportManifestV2_(req){
  const binding=rosterEdgeExportBindingV2_(req),started=Date.now();if(rosterEdgeExportAbandoned_(binding))error_(409,'This preparation was abandoned. Start with a new request ID.');
  const existing=rosterEdgeExportDescriptor_(binding);if(existing&&existing.schema!==2){const input={...req.input};delete input.preparation;return rosterEdgeExportManifestLegacy_({...req,input});}
  const step=rosterEdgeExportPreparation_(req.input);
- if(existing?.schema===2&&step.ordinal>0){existing.stepStartedAt=started;rosterEdgeExportPhaseV2_(existing,'Recover checkpoint');}
+ if(existing?.schema===2&&step.ordinal>0){existing.stepStartedAt=started;existing.stepSize={bytes:null,records:null};rosterEdgeExportPhaseV2_(existing,'Recover checkpoint');}
  const recovered=rosterEdgeExportRecoveredCheckpoint_(binding,step);if(recovered){rosterEdgeExportAssertCheckpointV2_(binding,recovered.checkpoint,existing);return rosterEdgeExportReplyV2_(recovered.checkpoint,recovered.ref);}
  let checkpoint;
  if(step.ordinal===0){
   const descriptor=rosterEdgeExportCaptureV2_(binding);if(descriptor.state==='failed')return {adminVerified:true,sessionId:binding.sessionId,requestId:binding.requestId,preparationFailed:true,requiresRestart:true,failureReason:descriptor.failureReason,lastPhase:descriptor.lastPhase};
   const source={fileId:descriptor.sourceFileId,digest:descriptor.sourceHash},catalogue=descriptor.catalogue||rosterEdgeExportCatalogueV2_(rosterEdgeExportSourceV2_(binding,source));
-  checkpoint={schema:ROSTER_EXPORT_V2,...binding,ordinal:0,previous:null,source,sourceDigest:descriptor.sourceDigest,stage:'objects',jobs:catalogue.jobs.length,catalogue,jobIndex:0,parts:[],partFiles:{},references:[],scopes:{},totalBytes:0,work:null,lastStep:'Snapshot'};
+  checkpoint={schema:ROSTER_EXPORT_V2,...binding,ordinal:0,previous:null,source,sourceBytes:descriptor.sourceBytes,budgetVersion:1,sourceDigest:descriptor.sourceDigest,stage:'objects',jobs:catalogue.jobs.length,catalogue,jobIndex:0,parts:[],partFiles:{},references:[],scopes:{},totalBytes:0,work:null,lastStep:'Snapshot'};
  }else{
   checkpoint=rosterEdgeExportReadCheckpoint_(binding,step.checkpoint);rosterEdgeExportAssertCheckpointV2_(binding,checkpoint,existing);if(checkpoint.ordinal!==step.ordinal-1)error_(409,'The preparation step does not follow its checkpoint.');
   if(checkpoint.stage==='ready')return rosterEdgeExportReplyV2_(checkpoint,step.checkpoint);
@@ -9984,12 +10000,15 @@ function rosterEdgeExportManifestV2_(req){
   if(checkpoint.work){
    rosterEdgeExportPhaseV2_(existing,'Freeze parts');
    const work=checkpoint.work,header=rosterEdgeExportWorkHeaderV2_(binding,work);let bytes=0;
-   while(work.next<header.partMetadata.length){const part=header.partMetadata[work.next];if(bytes&&bytes+part.bytes>ROSTER_EXPORT_BATCH_BYTES||bytes&&Date.now()-started>=ROSTER_EXPORT_STEP_MS)break;
+   while(work.next<header.partMetadata.length){const part=header.partMetadata[work.next];if(bytes)break;
+    checkpoint.stepSize=existing.stepSize={bytes:part.bytes,records:part.records,partId:part.id};rosterEdgeExportSave_(existing);
+    if(checkpoint.budgetVersion===1&&part.bytes>ROSTER_EXPORT_BATCH_BYTES)error_(413,'The prepared part exceeds the 262157-byte step budget.');
     const payload=rosterEdgeExportRange_(work.fileId,9+work.headerBytes+part.offset-header.base,part.bytes,work.totalBytes);if(rosterEdgeExportHash_(payload)!==part.digest)error_(503,'The prepared part failed its digest check.');
     const ref=rosterEdgeExportCreateImmutable_('Roster import '+binding.sessionId+' '+part.id+' '+part.digest+'.json',payload);const verified=rosterEdgeExportPrivateText_(ref,GSiSRosterImport.MAX_PART_BYTES);if(Utilities.newBlob(verified).getBytes().length!==part.bytes)error_(503,'The frozen part length changed.');checkpoint.parts.push(part);checkpoint.partFiles[part.id]={fileId:ref.fileId,digest:part.digest,bytes:part.bytes};checkpoint.totalBytes+=part.bytes;work.next++;bytes+=part.bytes;
    }
    checkpoint.lastStep='Freeze parts';if(work.next===header.partMetadata.length){if(header.kind==='object'){checkpoint.references.push({job:header.job,reference:header.reference});checkpoint.jobIndex++;}else{checkpoint.scopes=header.scopes;checkpoint.stage='finalize';}checkpoint.work=null;}
   }else if(checkpoint.stage==='objects'||checkpoint.stage==='records'){
+   existing.stepSize={bytes:checkpoint.sourceBytes??null,records:null};
    const catalogue=checkpoint.catalogue,jobs=catalogue.jobs,position={ordinal:checkpoint.parts.length,offset:checkpoint.totalBytes};
    if(checkpoint.jobIndex<jobs.length){rosterEdgeExportPhaseV2_(existing,'Prepare '+jobs[checkpoint.jobIndex].kind);const job=jobs[checkpoint.jobIndex],envelope=job.kind==='stapler'?rosterEdgeExportSourceV2_(binding,checkpoint.source):{snapshot:{sourceDigest:checkpoint.sourceDigest,index:{entries:catalogue.modelEntries},state:{allocationAuditExports:catalogue.auditFiles}}};if(job.kind==='stapler'&&typeof rosterOperationsUnpackPlans_==='function'){const row=envelope.snapshot.state[job.path[1]][job.path[2]];rosterOperationsUnpackPlans_({[job.path[1]]:[row]});}const prepared=GSiSRosterImport.prepareObject(envelope.snapshot,job,position,rosterEdgeExportAdapterV2_(envelope));checkpoint.work=rosterEdgeExportWorkV2_(binding,step.ordinal,prepared,'object',job);checkpoint.lastStep='Prepare '+job.kind;}
    else{rosterEdgeExportPhaseV2_(existing,'Prepare records');const envelope=rosterEdgeExportSourceV2_(binding,checkpoint.source),prepared=GSiSRosterImport.prepareRecords(envelope.snapshot,checkpoint.references,position,rosterEdgeExportAdapterV2_(envelope));checkpoint.work=rosterEdgeExportWorkV2_(binding,step.ordinal,prepared,'records');checkpoint.stage='records';checkpoint.lastStep='Prepare records';}
@@ -10340,10 +10359,13 @@ var GSiSRosterImport=(()=>{
  const PENDING_CLEANUP="s.state='abandoned' AND s.reset_request<>'' AND NOT EXISTS(SELECT 1 FROM gsis_roster_import_preparation p WHERE p.session_id=s.session_id AND p.cleanup_request=s.reset_request)";
  const fail=(status,code,message)=>{throw Object.assign(Error(message),{status,code});};
  function utf8Length(value){let size=0;for(const char of value){const n=char.codePointAt(0);size+=n<128?1:n<2048?2:n<65536?3:4;}return size;}
+ function utf8Bytes(value){const bytes=[];for(const char of value){const n=char.codePointAt(0);if(n<128)bytes.push(n);else if(n<2048)bytes.push(192|n>>6,128|n&63);else if(n<65536)bytes.push(224|n>>12,128|n>>6&63,128|n&63);else bytes.push(240|n>>18,128|n>>12&63,128|n>>6&63,128|n&63);}return bytes;}
  function digestValue(value){return typeof value==='string'&&/^[a-f0-9]{64}$/.test(value);}
  function identity(value,name,max=200){if(typeof value!=='string'||!value||value.length>max||/[\u0000-\u001f]/.test(value))fail(400,'ROSTER_IMPORT_ID','Invalid '+name+'.');return value;}
  function validateFailureReason(reason){
-  if(!reason||typeof reason!=='object'||Array.isArray(reason)||Object.keys(reason).some(key=>!['status','message','phase','elapsed'].includes(key))||!Number.isSafeInteger(reason.status)||reason.status<400||reason.status>599||typeof reason.message!=='string'||!reason.message||reason.message.length>800||typeof reason.phase!=='string'||!reason.phase||reason.phase.length>80||/[\u0000-\u001f]/.test(reason.phase)||!Number.isSafeInteger(reason.elapsed)||reason.elapsed<0)fail(400,'ROSTER_IMPORT_PREPARATION_RESULT','Invalid preparation failure reason.');return reason;
+  if(!reason||typeof reason!=='object'||Array.isArray(reason)||Object.keys(reason).some(key=>!['status','message','phase','elapsed','code','bytes','records','ordinal','partId'].includes(key))||!Number.isSafeInteger(reason.status)||reason.status<400||reason.status>599||typeof reason.message!=='string'||!reason.message||reason.message.length>800||typeof reason.phase!=='string'||!reason.phase||reason.phase.length>80||/[\u0000-\u001f]/.test(reason.phase)||!Number.isSafeInteger(reason.elapsed)||reason.elapsed<0)fail(400,'ROSTER_IMPORT_PREPARATION_RESULT','Invalid preparation failure reason.');
+  for(const key of ['bytes','records','ordinal'])if(reason[key]!==undefined&&reason[key]!==null&&(!Number.isSafeInteger(reason[key])||reason[key]<0))fail(400,'ROSTER_IMPORT_PREPARATION_RESULT','Invalid preparation step size.');
+  if(reason.code!==undefined&&!/^[A-Z][A-Z0-9_]{0,79}$/.test(reason.code)||reason.partId!==undefined&&(typeof reason.partId!=='string'||reason.partId.length>80))fail(400,'ROSTER_IMPORT_PREPARATION_RESULT','Invalid preparation error code or part.');return reason;
  }
  function freezeBinding(snapshot,binding){
   const {actor,requestId,sessionId}=binding;identity(actor,'actor',320);identity(requestId,'request');if(!digestValue(sessionId)||!digestValue(snapshot.sourceDigest))fail(400,'ROSTER_IMPORT_DIGEST','Invalid import digest.');
@@ -10384,7 +10406,18 @@ var GSiSRosterImport=(()=>{
    // Encode each complete scope once. Natural-key multiplicity and positions are
    // global; the prepared payloads are then persisted and uploaded in small batches.
    const records=Store.encode(value);scopes[scope]={records:records.size,digest:adapter.hash(Store.canonicalJson(value))};let rows=[],bytes=12;
-   for(const row of records.values()){const size=utf8Length(JSON.stringify(row))+1;if(rows.length&&bytes+size>TARGET_BYTES){writer.add('records',{rows},scope,rows.length);rows=[];bytes=12;}rows.push(row);bytes+=size;}
+   for(const row of records.values()){
+    const size=utf8Length(JSON.stringify(row))+1;
+    if(rows.length&&bytes+size>TARGET_BYTES){writer.add('records',{rows},scope,rows.length);rows=[];bytes=12;}
+    if(size+12>TARGET_BYTES){
+     // Split transport bytes, never the logical record or its natural key.
+     const payload=JSON.stringify({rows:[row]}),data=utf8Bytes(payload),segments=[];
+     if(data.length>MAX_PART_BYTES)fail(413,'ROSTER_IMPORT_LIMIT','The immutable record exceeds its documented limit.');
+     for(let n=0;n<data.length;n+=SEGMENT_BYTES)segments.push(writer.add('segment',{base64:adapter.base64(data.slice(n,n+SEGMENT_BYTES))}));
+     writer.add('record',{segments,bytes:data.length,digest:adapter.hash(payload)},scope,1);continue;
+    }
+    rows.push(row);bytes+=size;
+   }
    if(rows.length)writer.add('records',{rows},scope,rows.length);
   }
   return {...writer.result(),scopes};
@@ -10401,7 +10434,7 @@ var GSiSRosterImport=(()=>{
  function validateManifest(manifest){
   if(!manifest||manifest.schema!==FORMAT||!digestValue(manifest.sessionId)||!digestValue(manifest.sourceDigest)||utf8Length(JSON.stringify(manifest))>MAX_MANIFEST_BYTES)fail(400,'ROSTER_IMPORT_MANIFEST','Invalid or oversized immutable manifest.');
   identity(manifest.actor,'actor',320);identity(manifest.requestId,'request');if(!Array.isArray(manifest.parts)||!manifest.parts.length||manifest.parts.length>MAX_PARTS||!manifest.scopes||Object.keys(manifest.scopes).sort().join(',')!==[...SCOPES].sort().join(','))fail(400,'ROSTER_IMPORT_MANIFEST','Invalid manifest scopes or parts.');
-  let offset=0;const ids=new Set(),counts={roster:0,'roster-register':0};for(const part of manifest.parts){identity(part.id,'part',80);if(ids.has(part.id)||!['records','segment','object'].includes(part.kind)||part.offset!==offset||!Number.isSafeInteger(part.bytes)||part.bytes<1||part.bytes>MAX_PART_BYTES||!digestValue(part.digest)||!Number.isSafeInteger(part.records)||part.records<0||part.kind==='records'&&!SCOPES.includes(part.scope)||part.kind!=='records'&&(part.scope!==''||part.records!==0))fail(400,'ROSTER_IMPORT_MANIFEST','Duplicate, missing or invalid manifest part.');ids.add(part.id);offset+=part.bytes;if(part.kind==='records')counts[part.scope]+=part.records;}
+  let offset=0;const ids=new Set(),counts={roster:0,'roster-register':0};for(const part of manifest.parts){identity(part.id,'part',80);const records=['records','record'].includes(part.kind);if(ids.has(part.id)||!['records','record','segment','object'].includes(part.kind)||part.offset!==offset||!Number.isSafeInteger(part.bytes)||part.bytes<1||part.bytes>MAX_PART_BYTES||!digestValue(part.digest)||!Number.isSafeInteger(part.records)||part.records<0||records&&!SCOPES.includes(part.scope)||!records&&(part.scope!==''||part.records!==0)||part.kind==='record'&&part.records!==1)fail(400,'ROSTER_IMPORT_MANIFEST','Duplicate, missing or invalid manifest part.');ids.add(part.id);offset+=part.bytes;if(records)counts[part.scope]+=part.records;}
   if(offset!==manifest.totalBytes||offset>MAX_TOTAL_BYTES||SCOPES.some(scope=>!digestValue(manifest.scopes[scope]?.digest)||manifest.scopes[scope]?.records!==counts[scope]||counts[scope]<1))fail(400,'ROSTER_IMPORT_MANIFEST','Manifest lengths or record counts do not match.');return manifest;
  }
  const SQL=`CREATE TABLE IF NOT EXISTS gsis_roster_import_sessions (
@@ -10490,6 +10523,11 @@ var GSiSRosterImport=(()=>{
    // Keep the active lease: a transport failure does not prove that Apps Script stopped.
    checked(await connection().batch([connection().prepare("UPDATE gsis_roster_import_preparation SET result_json=json_set(CASE WHEN result_json='' THEN '{}' ELSE result_json END,'$.failureReason',json(?),'$.lastPhase',?),updated_at=? WHERE session_id=? AND ordinal=? AND claim_token=? AND lease_until>? AND EXISTS(SELECT 1 FROM gsis_roster_import_sessions WHERE session_id=? AND state='preparing')").bind(JSON.stringify(reason),reason.phase,now,sessionId,claim.ordinal,claim.token,now,sessionId)]));
   }
+  async function adoptPreparation(claim,result){
+   const row=await connection().prepare('SELECT * FROM gsis_roster_import_preparation WHERE session_id=?').bind(sessionId).first();
+   if(!row||row.ordinal!==claim.ordinal||row.checkpoint_json!==JSON.stringify(claim.checkpoint)||!row.claim_token)fail(409,'ROSTER_IMPORT_PREPARATION_STALE','The checkpoint changed before reconciliation.');
+   return commitPreparation({...claim,token:row.claim_token},result);
+  }
   async function restartCleanupStatus(resetRequest){
    const row=await connection().prepare('SELECT cleanup_request FROM gsis_roster_import_preparation WHERE session_id=?').bind(sessionId).first();return {resetRequestId:resetRequest,cleanupPending:row?.cleanup_request!==resetRequest};
   }
@@ -10516,7 +10554,7 @@ var GSiSRosterImport=(()=>{
    try{checked(await c.batch(statements));}catch(error){const saved=await read();if(saved?.manifest_digest===manifestDigest)return progress();throw error;}return progress();
   }
   async function progress(){const row=await read();if(!row)return null;const c=connection(),count=await c.prepare('SELECT COUNT(*) total,SUM(receipt_json IS NOT NULL) completed FROM gsis_roster_import_parts WHERE session_id=?').bind(sessionId).first(),next=await c.prepare('SELECT part_id id,kind,scope,digest,bytes,records FROM gsis_roster_import_parts WHERE session_id=? AND receipt_json IS NULL ORDER BY ordinal LIMIT 1').bind(sessionId).first(),preparation=await preparationStatus(),detail={};
-   if(row.state==='preparing')for(const key of ['step','done','total','elapsedMs','preparing','retryAfterMs'])if(preparation?.result?.[key]!==undefined)detail[key]=preparation.result[key];
+   if(row.state==='preparing')for(const key of ['step','done','total','elapsedMs','preparing','retryAfterMs','phase','stepSize','nextStep'])if(preparation?.result?.[key]!==undefined)detail[key]=preparation.result[key];
    for(const key of ['failureReason','lastPhase'])if(preparation?.result?.[key]!==undefined)detail[key]=preparation.result[key];
    if(row.state==='abandoned')Object.assign(detail,await restartCleanupStatus(row.reset_request));
    return {sessionId,requestId,actor,state:row.state,sourceDigest:row.source_digest||null,manifestDigest:row.manifest_digest||null,completedParts:count.completed||0,totalParts:count.total,imported:row.state==='imported',referencesReady:!!row.references_ready,nextPart:next||null,requiresRestart:['failed','abandoned'].includes(row.state),next:row.state==='preparing'?'prepare':next?'part':!row.references_ready?'references':row.state==='imported'?'complete':'finalize',...detail};}
@@ -10527,7 +10565,7 @@ var GSiSRosterImport=(()=>{
    await read();const rows=(await connection().prepare('SELECT part_id id,kind,scope,digest,bytes,records FROM gsis_roster_import_parts WHERE session_id=? AND receipt_json IS NULL ORDER BY ordinal LIMIT ?').bind(sessionId,Math.max(1,Math.min(4,limit))).all()).results;
    // Object assembly consumes earlier segment receipts. Keep that dependency
    // barrier out of a parallel batch, even when it is the fourth selected part.
-   const barrier=rows.findIndex(part=>part.kind==='object');return barrier===0?rows.slice(0,1):barrier>0?rows.slice(0,barrier):rows;
+   const barrier=rows.findIndex(part=>['object','record'].includes(part.kind));return barrier===0?rows.slice(0,1):barrier>0?rows.slice(0,barrier):rows;
   }
   async function segmentReceipts(ids){
    if(!Array.isArray(ids)||!ids.length||ids.length>MAX_PARTS||new Set(ids).size!==ids.length)fail(409,'ROSTER_IMPORT_OBJECT','Invalid segment dependency list.');await read();const found=await connection().prepare("SELECT part_id,receipt_json FROM gsis_roster_import_parts WHERE session_id=? AND kind='segment' AND receipt_json IS NOT NULL AND part_id IN (SELECT value FROM json_each(?))").bind(sessionId,JSON.stringify(ids)).all(),byId=new Map(found.results.map(row=>[row.part_id,JSON.parse(row.receipt_json)]));if(found.results.length!==ids.length)fail(409,'ROSTER_IMPORT_OBJECT','Object segments are incomplete.');return ids.map(id=>byId.get(id));
@@ -10539,8 +10577,14 @@ var GSiSRosterImport=(()=>{
   }
   async function stage(partId,payload,objectReceipt){
    const {part,body}=await validatePart(partId,payload);if(part.receipt_json)return JSON.parse(part.receipt_json);
-   let rows=[];if(part.kind==='records'){
-    rows=body.rows;if(!Array.isArray(rows)||rows.length!==part.records)fail(409,'ROSTER_IMPORT_PART','The export record count is invalid.');const ids=new Set();
+   let rows=[];if(['records','record'].includes(part.kind)){
+    rows=part.kind==='record'?objectReceipt?.rows:body.rows;
+    if(part.kind==='record'){
+     const raw=JSON.stringify({rows});
+     if(objectReceipt?.verified!==true||utf8Length(raw)!==body.bytes||await hashText(raw)!==body.digest)fail(409,'ROSTER_IMPORT_PART','The assembled record failed its length or digest check.');
+     await segmentReceipts(body.segments);
+    }
+    if(!Array.isArray(rows)||rows.length!==part.records)fail(409,'ROSTER_IMPORT_PART','The export record count is invalid.');const ids=new Set();
     for(const r of rows){identity(r.collection,'collection',250);identity(r.record_id,'record',1024);if(!Number.isSafeInteger(r.position)||r.position<0||typeof r.record_date!=='string'||!/^$|^20\d\d-\d\d-\d\d$/.test(r.record_date)||typeof r.value_json!=='string'||utf8Length(r.value_json)>Store.MAX_RECORD_BYTES)fail(409,'ROSTER_IMPORT_PART','Invalid exported record.');try{JSON.parse(r.value_json);}catch{fail(409,'ROSTER_IMPORT_PART','Invalid exported record JSON.');}const id=JSON.stringify([r.collection,r.record_id]);if(ids.has(id))fail(409,'ROSTER_IMPORT_DUPLICATE','Duplicate record identity in import part.');ids.add(id);}
    }else{
     if(!objectReceipt||objectReceipt.verified!==true||typeof objectReceipt.key!=='string'||!Number.isSafeInteger(objectReceipt.bytes)||objectReceipt.bytes<1)fail(409,'ROSTER_IMPORT_OBJECT','The private object write has no verified receipt.');
@@ -10549,7 +10593,7 @@ var GSiSRosterImport=(()=>{
      const dependencies=await connection().prepare("SELECT part_id,receipt_json FROM gsis_roster_import_parts WHERE session_id=? AND kind='segment' AND part_id IN (SELECT value FROM json_each(?))").bind(sessionId,JSON.stringify(body.segments)).all();if(dependencies.results.length!==body.segments.length||dependencies.results.some(row=>!row.receipt_json)||dependencies.results.reduce((n,row)=>n+(JSON.parse(row.receipt_json).object?.bytes||0),0)!==body.gzipBytes)fail(409,'ROSTER_IMPORT_OBJECT','The object segments are incomplete.');
     }else if(objectReceipt.key!=='gsis/roster/import-staging/'+sessionId+'/'+partId||objectReceipt.bytes>SEGMENT_BYTES||!digestValue(objectReceipt.digest))fail(409,'ROSTER_IMPORT_OBJECT','Invalid private object segment.');
    }
-   const receipt={partId,digest:part.digest,records:rows.length,...(objectReceipt?{object:objectReceipt}:{} )},c=connection(),token=crypto.randomUUID(),now=Date.now();
+   const receipt={partId,digest:part.digest,records:rows.length,...(part.kind==='record'?{assembly:{digest:body.digest,bytes:body.bytes}}:objectReceipt?{object:objectReceipt}:{} )},c=connection(),token=crypto.randomUUID(),now=Date.now();
    const statements=[c.prepare("UPDATE gsis_roster_import_sessions SET write_token=?,updated_at=? WHERE session_id=? AND state='staging' AND EXISTS(SELECT 1 FROM gsis_roster_import_parts WHERE session_id=? AND part_id=? AND receipt_json IS NULL)").bind(token,now,sessionId,sessionId,partId)];
    if(rows.length)statements.push(c.prepare(`INSERT INTO gsis_roster_import_rows (session_id,scope,collection,record_id,position,record_date,value_json) SELECT ?,?,json_extract(value,'$.collection'),json_extract(value,'$.record_id'),json_extract(value,'$.position'),json_extract(value,'$.record_date'),json_extract(value,'$.value_json') FROM json_each(?) WHERE ${guard}`).bind(sessionId,part.scope,JSON.stringify(rows),sessionId,token));
    statements.push(c.prepare('UPDATE gsis_roster_import_parts SET receipt_json=? WHERE session_id=? AND part_id=? AND receipt_json IS NULL AND '+guard).bind(JSON.stringify(receipt),sessionId,partId,sessionId,token));
@@ -10578,11 +10622,20 @@ var GSiSRosterImport=(()=>{
    statements.push(c.prepare("UPDATE gsis_edge_heads SET revision=0,mode='legacy',source_digest='',imported_records=0,metadata_json='{}',write_token=?,updated_at=? WHERE scope IN ('roster','roster-register') AND "+guard).bind(token,Date.now(),sessionId,token),c.prepare('DELETE FROM gsis_roster_import_locks WHERE session_id=? AND '+guard).bind(sessionId,sessionId,token));
    try{checked(await c.batch(statements));}catch(error){if((await read())?.reset_request===resetRequest)return restartResult(resetRequest);throw error;}if((await read())?.reset_request!==resetRequest)fail(409,'ROSTER_RESTART_ACTIVE','An active, paused or changed authority cannot be reset.');return restartResult(resetRequest,{evidence:{sessionId,manifestDigest:row.manifest_digest,sourceDigest:row.source_digest},next:'Use a new request ID to capture a new Google source.'});
   }
-  return {reserve,preparationStatus,claimPreparation,commitPreparation,recordPreparationFailure,assertRestartable,recordRestartCleanup,bind,progress,manifest,validatePart,partReceipt,pendingParts,segmentReceipts,stage,referencesReady,failPreparation,finalize,evidence,restart};
+  return {reserve,preparationStatus,claimPreparation,commitPreparation,adoptPreparation,recordPreparationFailure,assertRestartable,recordRestartCleanup,bind,progress,manifest,validatePart,partReceipt,pendingParts,segmentReceipts,stage,referencesReady,failPreparation,finalize,evidence,restart};
  }
  async function hashBytes(bytes){return Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',bytes)),n=>n.toString(16).padStart(2,'0')).join('');}
  async function stageObject(bucket,store,sessionId,part,body){
   if(!bucket?.put||!bucket?.head||!bucket?.get)fail(503,'ROSTER_IMPORT_BUCKET','Private R2 storage with verified readback is required.');
+  if(part.kind==='record'){
+   if(!Number.isSafeInteger(body.bytes)||body.bytes<1||body.bytes>MAX_PART_BYTES||!digestValue(body.digest))fail(409,'ROSTER_IMPORT_PART','Invalid split record descriptor.');
+   const receipts=await store.segmentReceipts(body.segments);
+   if(receipts.reduce((n,row)=>n+row.object.bytes,0)!==body.bytes)fail(409,'ROSTER_IMPORT_PART','The record segments are incomplete.');
+   const bytes=new Uint8Array(body.bytes);let offset=0;
+   for(const receipt of receipts){const segment=receipt.object,file=await bucket.get(segment.key);if(!file||file.size!==segment.bytes||file.size>SEGMENT_BYTES)fail(503,'ROSTER_IMPORT_PART','A record segment is missing or altered.');const raw=new Uint8Array(await file.arrayBuffer());if(raw.length!==segment.bytes||await hashBytes(raw)!==segment.digest)fail(503,'ROSTER_IMPORT_PART','A record segment failed its digest check.');bytes.set(raw,offset);offset+=raw.length;}
+   if(await hashBytes(bytes)!==body.digest)fail(409,'ROSTER_IMPORT_PART','The assembled record failed its digest check.');
+   const value=JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(bytes));return {verified:true,rows:value.rows};
+  }
   if(part.kind==='segment'){
    if(typeof body.base64!=='string'||body.base64.length>4*Math.ceil(SEGMENT_BYTES/3)||! /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(body.base64))fail(409,'ROSTER_IMPORT_OBJECT','Invalid compressed object segment.');
    const bytes=Uint8Array.from(atob(body.base64),char=>char.charCodeAt(0));if(!bytes.length||bytes.length>SEGMENT_BYTES)fail(409,'ROSTER_IMPORT_OBJECT','Invalid compressed object segment size.');const digest=await hashBytes(bytes),key='gsis/roster/import-staging/'+sessionId+'/'+part.id;

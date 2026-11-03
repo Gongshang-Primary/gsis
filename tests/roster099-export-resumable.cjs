@@ -21,7 +21,7 @@ function harness(){
  const input={operation:'edgeExportManifest',requestId:'request',preparation:{ordinal:0,checkpoint:null}};
  const call=p=>scope.rosterEdgeMigrationDispatch_({identity:{email:'admin@example.test'},input:p},{user:{rosterAdmin:true}}).result;
  function finish(start=call(input)){let r=start;for(let n=0;n<100&&r.preparing;n++)r=call({...input,preparation:r.preparation});assert(r.manifest,'preparation must reach manifest');return r;}
- return {scope,snapshot,model,archive,files,properties,pinned,input,call,finish,stats:()=>({captures,uploads,locks}),lose:name=>loseName=name,advance:()=>now+=700000};
+ return {scope,snapshot,model,archive,files,properties,pinned,input,call,finish,stats:()=>({captures,uploads,locks}),lose:name=>loseName=name,advance:(ms=700000)=>now+=ms,clock:()=>now};
 }
 {
  const h=harness(),initial=h.call(h.input);assert(initial.preparing);assert.equal(initial.step,1);assert.equal(initial.phase,'Snapshot');assert.equal(h.stats().captures,1);const before=h.stats().uploads;
@@ -55,8 +55,8 @@ function harness(){
 }
 {
  const h=harness(),first=h.call(h.input),work=h.call({...h.input,preparation:first.preparation}),file=[...h.files.values()].find(f=>f.name.includes('work'));
- const raw=file.bytes.toString(),headerLength=Number(raw.slice(0,8)),header=JSON.parse(raw.slice(9,9+headerLength));header.partMetadata[0].digest='b'.repeat(64);const replacement=JSON.stringify(header);assert.equal(Buffer.byteLength(replacement),headerLength);file.bytes=Buffer.from(raw.slice(0,9)+replacement+raw.slice(9+headerLength));
- assert.throws(()=>h.call({...h.input,preparation:work.preparation}),e=>e.status===503&&/header failed verification/.test(e.message));
+ const raw=file.bytes.toString(),headerLength=Number(raw.slice(0,8));file.bytes=Buffer.from(raw.slice(0,9+headerLength)+'!'+raw.slice(10+headerLength));
+ assert.throws(()=>h.call({...h.input,preparation:work.preparation}),e=>e.status===503&&/part failed its digest/.test(e.message),'the checkpoint-authenticated header still rejects altered payload bytes');
 }
 // A lost final acknowledgement must not let recovered checkpoint contents
 // redefine the already captured source, even with a self-consistent manifest.
@@ -146,3 +146,28 @@ console.log('PASS unlocked source upload, private import subfolder, pinned in-me
  assert.equal(h.properties.has('ROSTER_EDGE_EXPORT:'+sessionId),false);assert(h.properties.has('ROSTER_EDGE_EXPORT_ABANDONED:'+sessionId));
  assert([...h.files.values()].some(file=>file.name.endsWith('source.json')),'late source upload remains retained evidence');
 }
+
+// Charge deterministic Drive transfer costs to the fake clock. This checks
+// bounded work under a 20 ms/KiB + 250 ms/call latency model, not live latency.
+{
+ const h=harness();h.snapshot.state.rows=[];h.snapshot.state.history=[{id:'wide',text:'中文'.repeat(150000)}];h.snapshot.state.staplerPlans=[];h.snapshot.state.allocationAuditExports={};h.snapshot.index.entries=[];
+ const create=h.scope.rosterCreateFile_,read=h.scope.rosterReadFile_,request=h.scope.rosterDriveRequest_;
+ const charge=bytes=>h.advance(250+Math.ceil(bytes/1024)*20);
+ h.scope.rosterCreateFile_=(folder,name,blob)=>{charge(blob.getBytes().length);return create(folder,name,blob);};
+ h.scope.rosterReadFile_=id=>{const raw=read(id);charge(Buffer.byteLength(raw));return raw;};
+ h.scope.rosterDriveRequest_=(...args)=>{const response=request(...args);charge(response.getContent().length);return response;};
+ let current=h.call(h.input),steps=0;
+ while(current.preparing){const start=h.clock();current=h.call({...h.input,preparation:current.preparation});if(current.phase==='Freeze parts'){assert(h.clock()-start<25000,'one freeze step stays below 25 s in the recorded latency model');assert(current.stepSize.bytes<=262157);steps++;}}
+ assert(steps>=4,'the oversized record must span several bounded steps');
+ const parts=current.manifest.parts;assert(parts.every(part=>part.bytes<=262157));
+}
+{
+ const h=harness(),initial=h.call(h.input),work=h.call({...h.input,preparation:initial.preparation}),request={...h.input,preparation:work.preparation};
+ h.lose(' part-');assert.throws(()=>h.call(request),/lost upload/);
+ const before=[...h.files.values()].filter(file=>file.name.includes(' part-')).length;
+ const recovered=h.call(request),names=[...h.files.values()].filter(file=>file.name.includes(' part-')).map(file=>file.name);
+ assert.equal(names.length,before,'an unacknowledged part upload is adopted without creating another file');assert.equal(new Set(names).size,names.length);
+ const checkpoint=h.call({operation:'edgeExportCheckpoint',requestId:'request',preparation:request.preparation});
+ assert(checkpoint.completed);assert.equal(checkpoint.preparation.checkpoint.digest,recovered.preparation.checkpoint.digest);
+}
+console.log('PASS bounded freeze-step latency model, split metadata and duplicate-free lost part/checkpoint recovery');
