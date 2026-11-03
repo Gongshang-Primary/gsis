@@ -26,3 +26,10 @@
 
 ## Next attempt
 Only after this is merged, reviewed and deployed. Start with quiet mode on (D1 expires_at extended by Claude with owner approval) and the 21:15 health check.
+
+## Step 0 measurement (owner 4 Nov: "add"; Claude coordinator)
+Read-only, before any incremental-import design. Purpose: decide whether "prepare early without freezing, then freeze and rebuild only changed parts" is worth building.
+1. Compare per-part digests between retained preparation sessions 0cafa306… (3 Nov, checkpoint Drive 1gdjHr3nJs88485qjIRQHMIbB9C_RhE7u, reached ordinal 81) and ab0d91fc… (3-4 Nov, checkpoint Drive 18XZ2BGboW-PjVf8gwAKDxP__mNripWlT, ordinal 141). Also 388d395a… (2 Nov, finished, ordinal 186) if its parts are retained.
+2. Report: parts compared, parts identical, parts changed, bytes changed, and which kinds/scopes/dates changed (expect today and the next few days only). Elapsed time between sessions.
+3. Read only: no writes to D1, Drive or Google; no freeze; no restart of any session. If comparison needs a script, put it under scripts/ with a test, in the same PR or a separate draft PR.
+Decision rule (owner to confirm): under about 30% of parts changed per day: design incremental preparation (prepare early, freeze, rebuild changed parts, full parity over all parts before activation). Otherwise: no incremental design; full import on a weekend window.
