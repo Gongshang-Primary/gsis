@@ -354,7 +354,7 @@
   return modelReads.get(key).then(result=>result&&cachedTimetable(date)||result);
  }
  function invalidateOperations(dates,options={}){
-  if(!dates||(Array.isArray(dates)?dates:[dates]).includes(today()))invalidateHomeRelief();
+  if(!dates||(Array.isArray(dates)?dates:[dates]).includes(today())){apiReadGeneration++;apiReads.clear();invalidateHomeRelief();}
   if(options.timetables===true){preloadSchedule++;preloadCheckedAt=0;timetablePreload?.invalidate(dates);}
   window.RosterReportCache?.clear(dates);
   window.RosterOpsUI?.invalidateDates?.(dates,cacheOwner());

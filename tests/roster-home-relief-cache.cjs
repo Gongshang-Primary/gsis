@@ -61,6 +61,7 @@ async function fixture(saved,setup){
  const d=await fixture(null,f=>{f.holdMain=false;f.holdDuties=true;});try{
   await d.f.flush();await until(()=>d.f.pending.length===1);d.f.rows=[{date:'2026-11-03',staffId:'teacher',period:6,status:'published'}];d.f.click('#refresh');await until(()=>!d.w.document.querySelector('#refresh').disabled);await d.f.flush();await until(()=>d.f.pending.length===2);
   d.f.pending.pop()();await until(()=>d.f.text()==='Your relief duty today: P6.');d.f.pending.pop()();await tick();assert.equal(d.f.text(),'Your relief duty today: P6.','pre-Refresh response cannot overwrite the new result');await d.f.leave();await d.f.home();assert.equal(d.f.calls.length,2,'stale result cannot replace the reusable cache');
+  await d.f.leave();d.f.ctx.invalidateOperations(['2026-11-03']);await d.f.home();await until(()=>d.f.pending.length===1);await d.f.leave();d.f.rows=[{date:'2026-11-03',staffId:'teacher',period:7,status:'published'}];d.f.ctx.invalidateOperations(['2026-11-03']);await d.f.home();await until(()=>d.f.pending.length===2);d.f.pending.pop()();await until(()=>d.f.text()==='Your relief duty today: P7.');d.f.pending.pop()();await tick();assert.equal(d.f.text(),'Your relief duty today: P7.','known change fences an already running duty read');
  }finally{d.close();}
  console.log('PASS Home duty cache: nonblocking order, memory/session reuse, loaded duty list, Refresh, expiry, change signals and failure retry');
 })().catch(error=>{console.error(error);process.exitCode=1;});
