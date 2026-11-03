@@ -46,3 +46,11 @@ Reproduce with a baseline-derived plan that contains Chuan Song with unchanged c
 4. Don't-need-relief: is any no-relief subject removed from a candidate's occupancy on the Stapler path only (e.g. during publication or effective-day building)?
 5. Anything else that differs between a Stapler day and a normal day for an unchanged teacher.
 Report which holds before any fix. Then fix at that point only, keeping allocation and venues consistent.
+
+## Owner ruling (4 Nov 2026): Option A
+Owner: "A. and the do-not-count periods are user-configurable (see screenshot); PD was not selected."
+- Automatic consecutive limit (maxConsecutivePeriods, default 6) counts **every occupied period**, except subjects matched by System Config "Periods excluded from the consecutive count" (`consecutiveCountExclusions`). The workload flag no longer affects the consecutive count. Don't-need-relief has no effect on the count.
+- Current list (owner screenshot 4 Nov): pattern `BLK*` only. PD, DUTY, FORM, CCE and others are NOT excluded, so they count from release onward. The owner may add patterns at any time; no code change needed.
+- Automatic and manual (streakViolation) now use the same occupied set (`consecutiveBase`). Daily totals, workload and quota counting are unchanged.
+- Tests 701 and 716: keep their intent (PD may be excluded) by putting `PD*` in the fixture's `consecutiveCountExclusions`; add the inverse case (PD not excluded: six lessons + PD = seven, seventh blocked). Do not delete assertions.
+- Release note: allocation becomes stricter for teachers with PD/duty/FORM next to lessons; the owner reviews the list before deploy.
