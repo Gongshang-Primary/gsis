@@ -1,9 +1,9 @@
 # roster-consecutive-after-gap: consecutive check ignores timetabled periods after a free period (bug)
 
-- Status: implementing
+- Status: blocked - awaiting Claude ruling on A vs B (2026-11-04)
 - Owner/model: Muse
 - Reviewer/model: Claude
-- Last updated (Asia/Singapore): 2026-11-03
+- Last updated (Asia/Singapore): 2026-11-04
 - Branch: muse/roster-consecutive-after-gap
 - Base SHA: 45c70bf539ebb6e4accd1f9192ba2ef20e398c61
 - Current head SHA (or PR head; avoid self-referential commit hashes):
@@ -65,6 +65,55 @@ Exact command, tested commit, outcome and evidence. Explicitly list checks not r
 Local, before the fix: new test `tests/roster098k-consecutive-after-gap.cjs` fails at the first test (actual consecutiveBase `[]`, expected `[4, 6, 7, 8, 9, 10, 11]`), exit 1. After the fix, all 8 checks in that file pass.
 Local, after the fix, in a repo-shaped copy (`TZ=Asia/Singapore`): `node tests/roster098k-consecutive-after-gap.cjs` (8 pass), `node tests/roster084-stapler-unchanged.cjs` (9 pass), `node tests/roster084-consecutive-subjects.cjs` (16 pass), `node tests/roster098k-suspended-rules.cjs` (node:test, 0 fail), and `node tests/roster098h-stapler-domain.cjs` run from the copy root (12 pass). `node --check` passes for the changed product file and the new test file.
 Not run locally: `npm run build`, `npm test` (full suite), `python3 lord-suite/tests/run_all_checks.py` (Playwright not in workspace). Those run in CI; the draft PR is opened only after full CI is green, and no CI result is claimed here yet.
+
+## Claude ruling and read-only investigation, 2026-11-04 (no fix yet, no PR)
+
+Claude ruling, relayed by the owner on 2026-11-04: do NOT narrow the revival to `teacherSource`. Allocation and venues must agree on who teaches on a Stapler day. The `effectiveDay` change is reverted locally (local copies back to blob `47c041c47962cb3ddbe14cd0b2d47e5ff1ae6372`, the pre-fix shared file); the branch still stands at head `8245697` with the fix, the new test and the generated outputs, pending this ruling. No branch file was changed by this investigation, and no PR is open. No live data was read by Muse for this investigation.
+
+CI context that forced this investigation: CI run 225, attempt 2, on head `8245697` failed with Regression shards 1/4, 3/4, 4/4 passing, shard 2/4 failing, and full-suite failing only because a shard failed. The single failing script was `tests/venues-sources.cjs`, line 24, assertion "a teacher omitted from the final dated plan is not revived from the recurring comparison". Locally, with the original Stapler file that test passes fully; with the fixed file it fails at the same line. `rosterVenuesDay_` in `backend/RosterVenues.gs` builds its base day from the full week blocks and calls `GSISRosterStapler.effectiveDay(confirmed.plan, base)`, so the fix revived the omitted teacher's Lab venue there.
+
+Correction to the Step 1 finding above: the mechanism is confirmed (if a plan omits a teacher, `effectiveDay` drops that teacher from `dd.teachers`, and `teacherSource` then has no base for them), but live-plan omission for 2 Nov is NOT proven by the earlier fixture. That fixture built a plan from a subset day, which is equivalent to an imported subset-baseline plan, not to a baseline-derived saved plan. The question below is therefore whether the real 2 Nov plan omitted Chuan Song, and if so by which path.
+
+### 1. Every path that creates or changes a confirmed plan's teacher list
+
+Code references are to the branch version (`shared/roster-operations.js` operations, `shared/roster-stapler.js` model). "Can omit an unchanged teacher" means the confirmed plan's `plan.teachers` can lack a teacher who taught the baseline day, with no validation failure.
+
+- `createStapler` (`shared/roster-operations.js` `createOrImportStapler`, via `shared/roster-stapler.js` `createStandalone`): YES, by construction. A standalone plan starts with `teachers: []` (`createStandalone` calls `create` with `teachers: []`), and the planner adds only the teachers they add (`S.apply` `addTeacher`). The UI message is "Standalone plan created. Add verified teachers and your classes, then Save and Confirm." A standalone plan confirmed as-is lists only the teachers the planner added. It is not a baseline-derived plan.
+- `importStapler` (`createOrImportStapler`, via `importNative`): YES, if the imported payload's own baseline is a subset. `importNative` only validates the payload against its own `plan.baseline` (`shared/roster-stapler.js` `validate`, lines 124, 146-148: baseline cards retained, baseline teachers not removable, but only against the payload's own baseline). There is no check in `createOrImportStapler` that the imported plan's `baselineId` matches the current baseline timetable for that date, or that its teachers cover the current baseline teachers. An imported subset-baseline plan can therefore be saved and confirmed with a teacher missing.
+- `saveStapler`, baseline-derived (`shared/roster-operations.js` `staplerApply`, `saveStapler` branch): NO. The plan sent by the planner is validated with `validate(plan, {baseline: previous, previous})`, where `previous` is the saved draft or, if none, `staplerBaseline` = `S.create` of the full baseline day. That validation requires `plan.baseline` to equal the previous baseline exactly, and requires every `plan.baseline` teacher to be in `plan.teachers` with the same name and timetable name. A client plan that drops a baseline teacher fails validation.
+- `saveStapler` via surgical patch (`applyStaplerPlanPatch`) or merge (`mergeStaplerPlans`): NO. Both end with `validate(next, {baseline: current, previous: current})`, so deleting a baseline teacher from `plan.teachers` fails the same baseline-teacher check. Patch collections are `tiles`, `mats`, `teachers`, `classes`, but a teacher deletion does not survive that final validation for a full-baseline plan.
+- `confirmStapler` (`staplerApply`, confirm branch): NO change to the teacher list. It copies the saved draft, runs `validateStaplerPlan` (double-booking and absence guards only), sets status confirmed, and stores the draft as `confirmedPlan`. An omission, if present, was already in the draft.
+- `restoreStapler` (`staplerLifecycle`, both the reset-archive and deleted-plan branches): NO change to the teacher list. It copies the archived draft or published plan verbatim (and, for a reset archive, preserves the confirmed snapshot). An omission, if present, was already in the archive.
+- `renameStapler` (`staplerLifecycle`): NO. Name only, revision increments.
+- `moveStapler` (`staplerLifecycle`, via `shared/roster-stapler.js` `redate`): NO drop; it adds teachers. `redate` adds every destination baseline teacher to `plan.teachers` if missing, and adds their destination tiles (or pits the old teacher's tiles when the teacher was in the old plan). The destination baseline becomes the plan's new baseline.
+- `resetStapler` / rebuild after a baseline change (`staplerApply`, reset branch, via `staplerBaseline`): NO drop. The new draft is `S.create` of the full current baseline day, so `plan.teachers` is the full baseline teacher list.
+- In-plan edits (`shared/roster-stapler.js` `S.apply`): NO teacher removal. There is no `removeTeacher` command. `move` and `pit` move tiles, `suspend` pits a teacher's tiles for a period range, `addTeacher` adds a teacher. A suspended or pitted teacher stays in `plan.teachers` with empty cells, which is the correct non-revival case and is distinct from a teacher missing from `plan.teachers` entirely.
+- `publishDay` / published plan (not a `staplerApply` operation): NO change to the teacher list. It stores `readyStaplerPlan` (draft or published, if confirmed or published) verbatim as the published plan.
+
+Fixture check with the original `effectiveDay`, same 17-period shape as Step 1: baseline-derived plan (full `S.create`, other teacher's tile moved) gives effective teachers `[chuan, other]` with Chuan Song occupied at indices 4, 6-11. Standalone plan (only the other teacher added) gives effective teachers `[other]` only, Chuan Song missing. Imported subset-baseline plan (created from a day with only the other teacher) gives the same missing result. Redated baseline-derived plan gives both teachers again. So the only fixture types that reproduce the bug are standalone and imported subset-baseline, not baseline-derived save, confirm, restore, rename, move, or reset.
+
+### 2. Does the 2 Nov plan omit Chuan Song?
+
+Not established from code alone, and no live data was read by Muse. The earlier fixture does not establish it, because it was built by the subset method, not by the baseline-derived save method. The owner lookup below is the exact check needed. Until it is answered, neither A nor B below is proven for the real plan.
+
+Owner lookup, for the Roster Stapler record for 2026-11-02 only (do not send staff personal data beyond what is already in this task record):
+1. Plan record: name, revision, status (draft, confirmed, or published), confirmed date and confirmer if confirmed, and `baselineId`. Does `baselineId` start with `standalone:`, or does it equal the 2 Nov baseline timetable id?
+2. Audit trail for 2026-11-02, in order: which operations ran (`createStapler`, `importStapler`, `saveStapler`, `confirmStapler`, `restoreStapler`, `moveStapler`, `resetStapler`), by whom, and at what time? Was the plan created standalone, imported as a native draft, or started from the baseline?
+3. Confirmed plan's `plan.teachers` list: is Chuan Song present, with what staff id, name, and timetable name?
+4. Confirmed plan's `plan.baseline.teachers` list: is Chuan Song present there? Is `plan.baseline` the full 2 Nov baseline, or a subset?
+5. Confirmed plan's `plan.tiles` for Chuan Song: grid lesson tiles at periods P5 and P7-P12, Card Pit tiles (location `pit`, period null), or no tiles at all?
+6. Baseline day for 2026-11-02: timetable id and parity, and Chuan Song's cells at P5 and P7-P12 (subject, class, venue), to confirm the baseline side matches the report.
+
+If the answer to (3) is that Chuan Song IS in `plan.teachers`, then plan omission is ruled out for the real plan, and the bug lies elsewhere (not in `effectiveDay` teacher-list handling). If the answer is that he is missing, then (1), (2), and (4) decide between A and B below.
+
+### 3. A or B
+
+- (A) A path drops unchanged teachers by mistake: NOT supported for any baseline-derived path. Save, confirm, patch, merge, restore, rename, move, and reset all preserve or add baseline teachers, and validation blocks removal from a full baseline. A fix "at that path, so every baseline teacher stays in the plan with baseline cells" has no target path identified among baseline-derived operations.
+- (B) Plans list only covered teachers by design: SUPPORTED for standalone and imported subset-baseline plans, which by construction list only the teachers the planner added or the payload covered. If the 2 Nov plan was one of those types, then B holds for that plan, and venues would indeed also be wrong for it under the current shared `effectiveDay` semantics, because allocation and venues read the same effective day. That is an owner ruling question, not a code question: is a standalone or imported plan for a school day supposed to represent the whole day (in which case the creation/import path must be fixed to include every baseline teacher with baseline cells), or only the teachers it covers (in which case the 2 Nov report's expectation that Chuan Song's baseline lessons count is inconsistent with that plan type, and the plan itself, not `effectiveDay`, needs correction)?
+
+Recommendation to Claude, for ruling: do not restore the `effectiveDay` revival, and do not change `tests/venues-sources.cjs`. First answer the owner lookup in section 2. If the plan was baseline-derived and Chuan Song is in `plan.teachers`, investigate the allocation path again from that plan, not from a subset fixture. If the plan was standalone or imported subset, rule on whether that plan type must carry every baseline teacher, and fix at the creation/import path if so.
+
+No PR until Claude rules on A or B, as instructed.
 
 ## Review
 
