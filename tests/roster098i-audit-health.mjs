@@ -7,7 +7,7 @@ import {safeHealthError,recordJobHealth,readSystemHealth} from '../shared/edge-h
 globalThis.crypto??=webcrypto;
 function database(){const sql=new DatabaseSync(':memory:');return {sql,prepare(query){const make=(args=[])=>({bind(...next){return make(next);},async all(){return {success:true,results:sql.prepare(query).all(...args)};},async first(){return sql.prepare(query).get(...args)||null;},async run(){return {success:true,meta:{changes:sql.prepare(query).run(...args).changes}};}});return make();},async batch(statements){return Promise.all(statements.map(s=>s.run()));}};}
 const db=database(),env={GSIS_JOBS:db},logs=[];let backend;
-const source=fs.readFileSync('roster-update/public/_worker.js','utf8'),start=source.indexOf('export async function dispatchAllocationAudit('),end=source.indexOf('\nexport function menuReply',start);
+const source=fs.readFileSync('roster-update/public/_worker.js','utf8'),start=source.indexOf('export async function dispatchAllocationAudit('),end=source.indexOf('\nexport ',start+1);
 const worker=fs.readFileSync('notification-worker/index.js','utf8');
 const scope=vm.createContext({crypto,Date,safeHealthError,recordJobHealth,assertRecoveryWritable(){},serviceBackend:async(_,command)=>{assert.equal(command.operation,'allocationAuditExport');assert.equal(command.limit,1);return backend;},console:{info:s=>logs.push(JSON.parse(s)),error:s=>logs.push(JSON.parse(s))}});
 vm.runInContext(source.slice(start,end).replace('export async function ','async function '),scope);vm.runInContext(worker.slice(worker.indexOf('function writable'),worker.indexOf('function settleMessages')),scope);
