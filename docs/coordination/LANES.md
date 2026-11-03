@@ -9,6 +9,7 @@ The coordinator assigns each job to a lane and a model, keeps this file and the 
 |---|---|---|---|
 | Codex | Builder, Roster core and D1 path | `codex/<task-id>` | `Model: Codex` |
 | Gemini | Builder, isolated product lanes (pilot) | `gemini/<task-id>` | `Model: Gemini` |
+| Muse | Builder, pilot (owner directive 3 Nov 2026) | `muse/<task-id>` | `Model: Muse` |
 | Claude | Coordinator, architect, reviewer; small fixes | `claude/<task-id>` | `Model: Claude` |
 
 All three share one GitHub identity, so the label is the only attribution.
@@ -33,6 +34,11 @@ Any job that touches files in two lanes belongs to the stricter lane (R before D
 4. Run `npm run build` before `npm test` after every branch switch. Open a PR only when the full suite (Node and LORD) is green with `TZ=Asia/Singapore`; state exactly what ran.
 5. Never deploy, change live settings, activate D1 or change `ROSTER_EDGE_AUTHORITY`. Never send messages or change live school records.
 6. Claude reviews each PR at its exact head SHA; the owner merges.
+
+## Muse pilot (owner 3 Nov 2026: "include muse into agents that can assign coding to")
+- Muse follows AGENTS.md, WORKFLOW.md and this file exactly like Codex and Gemini: one claimed task, one `muse/<task-id>` branch, `Model: Muse` on every commit and PR, draft PR naming Claude as reviewer with the exact head SHA, full CI green before review.
+- Pilot scope: one small, isolated task outside lane R (for example a Contacts, Layout or Calendar fix). Lane R (Roster/D1) stays with Codex until the pilot is reviewed.
+- Never claim another model's approval or a test run that is not in CI. After the pilot the coordinator reports quality and the owner decides which lanes open to Muse.
 
 ## Gemini pilot
 - First job: **row C**, Contacts Edit Info "Find by TTb name" filter (PENDING_CHANGELOG 31 Oct). Small, lane C only.

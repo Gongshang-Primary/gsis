@@ -4,6 +4,7 @@ on:
     branches:
       - 'codex/**'
       - 'gemini/**'
+      - 'muse/**'
       - 'claude/**'
   workflow_dispatch:
 permissions:
