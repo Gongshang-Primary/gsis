@@ -40,3 +40,7 @@ The new browser test failed first because the own-duty line was absent. It now p
 The initial full CI exposed browser fixtures that classified any new Home operations read as a mutation or working-Stapler read. Their adapters now allow only the existing read/view=duties query; mutation and draft-plan assertions stay strict. The report-warm performance assertion still permits exactly one report read and separately checks exactly one own-duty read. The generic API helper now captures own-duty identity context only for own-duty queries, preserving its standalone/background-read contract. No production query is removed to satisfy a fixture. A fresh full CI is required.
 
 The corrected source passes 16 focused programs, including all seven initial Home checks and all failed browser/transport cases from the first CI. Report warming still performs one report read; Home makes exactly one separate own-duty read when no reusable result exists. No test was disabled or broadened to permit arbitrary operations.
+
+## Rebase after peer-quota merge
+
+Peer-quota PR #64 merged while Home CI ran. Rebased the Home-only delta on current main 6fa0d82ce8c0abfbd80e445526b06aa6c32df45a, preserving the peer fix and both changelog entries. All generated output comes from a fresh npm run build. All 20 combined focused programs pass, including Home browser cases, the peer approval regression, exact automatic-ranking parity and the real D1 path. LORD passes 39/39. The final head requires fresh combined full CI.

@@ -56,7 +56,7 @@ async function verifyPeerRoute(){
    O.apply(t.f.state,t.f.ctx,{operation:'requestMutual',absenceId,date:t.f.ctx.today,requests:[{recipientId:'bob',demandIds:[absenceId+':2'],combination:false}]});t.f.state.revision++;
    await t.w.RosterOpsUI.render('Assign Relief',t.ctx);const cell=()=>t.$('[data-relief-period="2"]');assert.match(cell().textContent,/Peer arranged · awaiting reply/);assert.equal(cell().querySelector('.ops-peer-approved'),null);
    t.f.state.requests[0].status='superseded';t.f.state.revision++;await t.$('[data-ops-refresh]').onclick();assert.equal(cell().querySelector('.ops-peer-pending'),null);
-   t.f.state.requests[0].status='pending';O.apply(t.f.state,{...t.f.ctx,user:{...t.f.ctx.user,staffId:'bob',email:'bob@gsps.edu.sg'}},{operation:'respondMutual',id:t.f.state.requests[0].id,decision:'approve'});t.f.state.revision++;await t.$('[data-ops-refresh]').onclick();assert.match(cell().querySelector('.ops-peer-approved')?.textContent||'',/Peer approved/);assert.equal(cell().querySelector('.ops-peer-pending'),null);
+   t.f.state.requests[0].status='pending';t.f.day.teachers.find(t=>t.staffId==='bob').R=0;O.apply(t.f.state,{...t.f.ctx,user:{...t.f.ctx.user,staffId:'bob',email:'bob@gsps.edu.sg'}},{operation:'respondMutual',id:t.f.state.requests[0].id,decision:'approve'});t.f.state.revision++;await t.$('[data-ops-refresh]').onclick();assert.match(cell().querySelector('.ops-peer-approved')?.textContent||'',/Peer approved/);assert.equal(cell().querySelector('.ops-peer-pending'),null);assert.match(cell().querySelector('[data-peer-r-override]')?.textContent||'',/Approved by colleague above weekly R/);assert(cell().querySelector('[data-peer-r-override]').classList.contains('ops-warning'));
   }finally{t.dom.window.close();}
  }
  {

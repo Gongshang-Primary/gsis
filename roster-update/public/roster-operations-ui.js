@@ -581,7 +581,7 @@ var RosterOpsUI = (() => {
   const source=assignmentSource(s,id,a);if(!source)return '';
   const peer=source==='Peer approved',meta=s.data.cellProvenance?.[id],actor=peer?(a.acceptedBy||a.createdBy):meta?.actorName||meta?.actor||a?.updatedBy||a?.createdBy,at=peer?(a.acceptedAt||a.createdAt):meta?.at||a?.updatedAt||a?.createdAt;
   const q=draftFor(s),local=a?.pending||[...(q?.inflight?.commands||[]),...(q?.commands||[])].some(c=>c.demandIds.includes(id)),provenance=detail&&!local?[actor,at?stamp(at)+' SGT':''].filter(Boolean).join(' · '):'';
-  return '<span class="ops-assignment-source'+(peer?' ops-peer-approved':'')+'" data-assignment-source="'+esc(source)+'"'+(peer?' data-peer-approved':'')+'>'+esc(source)+'</span>'+(provenance?'<span class="ops-assignment-provenance" data-assignment-provenance>'+esc(provenance)+'</span>':'');
+  return '<span class="ops-assignment-source'+(peer?' ops-peer-approved':'')+'" data-assignment-source="'+esc(source)+'"'+(peer?' data-peer-approved':'')+'>'+esc(source)+'</span>'+(peer&&a.peerROverride&&(s.data.user.smc||s.data.user.admin)?'<span class="ops-warning" data-peer-r-override>Approved by colleague above weekly R</span>':'')+(provenance?'<span class="ops-assignment-provenance" data-assignment-provenance>'+esc(provenance)+'</span>':'');
  }
 
  function showProgress(s,label){
