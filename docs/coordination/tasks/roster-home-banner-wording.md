@@ -44,3 +44,22 @@ The corrected source passes 16 focused programs, including all seven initial Hom
 ## Rebase after peer-quota merge
 
 Peer-quota PR #64 merged while Home CI ran. Rebased the Home-only delta on current main 6fa0d82ce8c0abfbd80e445526b06aa6c32df45a, preserving the peer fix and both changelog entries. All generated output comes from a fresh npm run build. All 20 combined focused programs pass, including Home browser cases, the peer approval regression, exact automatic-ranking parity and the real D1 path. LORD passes 39/39. The final head requires fresh combined full CI.
+
+## Follow-up before merge (owner 3 Nov ~11:00: "let codex work to cut down the non-blocking trade off")
+Claude's review of #65 (head d1173aa): Home makes one extra `operations read view:'duties'` per teacher on every Home load. On Google this adds read load at the 06:30-07:30 peak (timeouts seen 3 Nov). Change in the same PR:
+1. Reuse duty data already loaded on the page (e.g. My relief duties / current-duty preload / timetable preload) when it covers today.
+2. Otherwise fetch at most once per teacher per day: cache the verified result for today (memory plus sessionStorage, keyed by staff and date and revision if available); refresh only on explicit Refresh, on a known change signal, or after 10 minutes.
+3. Never block or delay the Home render on this call; start it after the main Home data has loaded.
+4. Tests: second Home visit the same day makes no new duties request; Refresh does; failure still shows the retry text.
+
+## Follow-up implementation, 3 November 2026
+
+Model: Codex. Same PR #65, based on d1173aa45d583c558a79936426e82ff6d2dc5c93. Integrated main 29a04a47738d08d216fd314c4c3e3bcf577bab4d and retained its owner follow-up above.
+
+The own-duty summary reuses the authenticated full My Relief Duties response, including when that view selected another date. Only today's validated personal periods are cached. The cache uses memory plus sessionStorage, keyed by verified account/staff/roles, Singapore date and profile revision, with a ten-minute expiry. Explicit Refresh, local writes and known affected-date invalidation discard the result. Existing profile freshness checks reuse it until expiry; there is no new timer. Failed checks retain the retry sentence and a bounded failure marker so navigation does not repeat failed requests.
+
+Home renders and unlocks before the optional background duty check. The check starts after the main current-duty request settles. Account, revision, date, request generation and Home-mount guards fence delayed replies. Stored summaries contain period numbers only, not raw duty details or other staff records. Logout clears the current summary. No backend, production authority, configuration, school record or messaging change.
+
+Regression evidence: the new real-shell jsdom test first failed because a duties request started while main Home data was held. After the change it passes deferred start, usable Home, second visit after two minutes, sessionStorage reload, staff/date/revision separation, malformed cache rejection, full-duty-list reuse, explicit Refresh, ten-minute expiry, known changes, failed-check throttling/retry and pre-Refresh response races. The existing cache fixture now supplies the unrelated Home invalidator while retaining all its timetable invalidation assertions.
+
+Local checks passed: tests/roster-home-relief-cache.cjs, tests/roster089-cache.cjs, tests/roster093a-client-cache.cjs, tests/roster093-calendar-cache-ui.cjs, tests/roster093a-home-report-warm.cjs, tests/roster702-memory-ui.cjs, tests/roster609-ui.cjs and node --check roster-update/public/roster.js. This workspace has only the relevant source files; the complete build, all Node programs, Chromium checks and LORD are verified by the exact-head PR workflow. Local Chromium installation failed because the download was truncated; no local browser pass is claimed. Claude must review the new exact head before owner merge. Rollback is the follow-up commit; no stored server data changes.

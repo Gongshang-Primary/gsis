@@ -1,3 +1,7 @@
+## Pending: Home own-duty cache follow-up, 3 November 2026
+
+Model: Codex. PR #65 reuses today's verified own-duty summary across Home visits and page reloads for ten minutes. The cache is scoped to staff, date and revision. Refresh and known changes invalidate it. Home renders before the optional background request, which waits for main Home data. Failure keeps the explicit retry wording without repeating the same request on each visit. See [task and checks](docs/coordination/tasks/roster-home-banner-wording.md). Not deployed.
+
 # Pending: clear Home timetable and relief-duty wording, 3 November 2026
 
 Model: Codex. Home distinguishes "No suspended timetable today" from the signed-in teacher's own relief periods. The existing duty roster is labelled "SMC doing Relief Allocation". Own-duty loading, none and failure states are explicit; a recent authenticated duties result is reused. No backend or authority change. See [Home banner task](docs/coordination/tasks/roster-home-banner-wording.md).
