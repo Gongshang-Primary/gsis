@@ -1,3 +1,7 @@
+# Pending: optional non-SRE daily relief cap, 4 November 2026
+
+Model: Codex. System Config adds Maximum relief periods per day (non-SRE), default 3 and Off. When enabled, automatic allocation counts distinct held and proposed relief periods, including approved peer arrangements and imported duties. All SREs are exempt. Existing duties stay; manual assignment and combination warn above the cap. See [the task](docs/coordination/tasks/roster-daily-relief-cap.md).
+
 # Pending: bounded Roster import parts and late checkpoint recovery, 4 November 2026
 
 Model: Codex. Split oversized records into verified transport segments, freeze one part per call and recover a late Google checkpoint before repeating work. Import failures distinguish bridge and Google timeouts from Google errors and retain step size. Setup shows the build label, live freeze age and saved preparation progress. The all-phase 25-second timing gate is not yet established; this draft does not clear the next cutover. No deployment or live action. See [the task](docs/coordination/tasks/roster-import-step141-bridge-timeout.md).

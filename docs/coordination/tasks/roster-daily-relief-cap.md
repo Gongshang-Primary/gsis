@@ -1,8 +1,8 @@
 # roster-daily-relief-cap: maximum relief periods per day per non-SRE teacher (changelog)
 
-- Status: authorised (owner 4 Nov: "codex work"); lane R, Codex; queue after roster-import-duplicate-audit-id
+- Status: claimed for implementation; owner v0.9.9j item 4, lane R
 - Branch: codex/roster-daily-relief-cap
-- Owner/model: Codex when authorised
+- Owner/model: Codex
 - Reviewer/model: Claude
 - Last updated (Asia/Singapore): 4 Nov 2026
 
@@ -24,3 +24,21 @@ Placement: System Config → Automatic Allocation → "Daily workload limits", a
 
 ## Related wording fix (from roster-consecutive-after-gap, Option A)
 The section text "Other duties and PD still block availability, but do not count towards these limits ... The consecutive limit still applies." must say that the consecutive limit counts every occupied period except "Periods excluded from the consecutive count". Muse's consecutive PR updates this sentence.
+
+## Bounded v0.9.9j claim
+
+Model: Codex. Reviewer: Claude at final head. Branch `codex/roster-daily-relief-cap`, base main `661e79004a274a33bdee6753507c9efa524cf007`. Owner exception permits this separate draft PR after item 3 is published for CI. The owner has ruled peer-approved duties count and manual override warns only. The new fourth workload row defaults to 3, range 1 to 17, disabled for existing and new configuration. All SRE classifications remain exempt from this non-SRE rule. Count distinct relief periods held on the selected date, including imported, approved peer, manual and proposed duties; exclude own lessons, ordinary duties and null-period aggregates. Existing assignments remain.
+
+Owned scope: shared allocator and operations configuration projections, data-driven System Config UI, generated copies, focused tests and this record. Preserve Muse's existing consecutive-count wording and logic. No cutover, freeze, import authority, live configuration or deployment change. Acceptance requires disabled parity, fourth-period automatic rejection when enabled, imported/peer accounting, SRE exemption, manual warning without refusal, persistence/validation and shared Google/D1 behavior. Build all 18 components and require exact-head full GitHub Node/LORD CI before immediate Claude handoff.
+
+## Implementation and local proof
+
+Shared workload metadata adds `dailyRelief` / `maxDailyReliefPeriods` with default 3, Off, and whole-number range 1 to 17. Existing nine rule defaults remain On. The fourth UI row follows Maximum consecutive periods; its saved value is retained when switched Off. Google and D1 use the same allocator and stored configuration.
+
+Held relief uses distinct periods from current assignments and the existing corrected/imported ledger, including approved peer and zero-cost combination or repurposed recess cover. Aliases merge into the same person. Cancelled/invalid/superseded cover and null-period aggregates do not consume slots. Own lessons, PD and ordinary duties do not count. All SRE classifications are exempt from this non-SRE cap; existing SRE verification rules still apply. Solver headroom, complete-plan validation, consecutive blocks and bounded exchanges enforce the enabled cap. Existing protected duties stay. The reason names the daily relief limit without replacing an explicit incomplete-block explanation.
+
+Manual rankings, candidate previews, ordinary saves and combination saves show the cap warning without refusing the assignment. The warning stays out of the peer acceptance gate; an approved arrangement still succeeds and counts toward later automatic headroom. Configuration validation and safe learning projection include the new setting. The existing consecutive wording and count logic are preserved.
+
+Tests first reproduced missing fourth-period enforcement, the zero-cost recess bypass, absent manual warnings and generic complete-plan explanations. The 20-case cap program covers disabled parity, imports/corrections/aliases, all SRE modes, peer reservations and approval, manual assign/combine/replacement, whole-plan flow/exchanges, PAL blocks and actual automatic/scheduled entry points. Existing rank byte digest, allocator/policy and UI/persistence/privacy checks pass. All18 components and focused Google/D1 integrations are rebuilt and checked before publishing; full exact-head GitHub Node/LORD CI is the final review gate. No live setting or records changed; not deployed.
+
+Final local integration: all18 components regenerated; the 20-case cap program passes, including Google shared versus rebuilt D1-domain output parity. Existing allocation index byte digest, workload allocator, policy, consecutive-subject, real edge SRE context, Chromium settings, backend/client persistence, learning privacy and peer-quota override programs pass.
