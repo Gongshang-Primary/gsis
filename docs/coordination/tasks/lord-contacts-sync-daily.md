@@ -28,3 +28,13 @@ Likely holder: `processSecondaryQueue_` (minute trigger, and again from `checkAn
 Add to this task:
 8. Run `scheduleTeacherWhatsApp_` and `recoverWhatsAppForceClose_` outside the ScriptLock (compute first, then take the lock only to write queue records, rechecking state), so no background job holds the lock for more than a few seconds.
 9. Log lock hold time per background job (LORD_TIMING) and test that the queue never holds the lock across a full Bookings scan.
+
+## Addendum 2 (4 Nov 11:00): owner reconfirms; user-facing lock contention
+Owner: "i want lord to hold its own contact details for 24h and update 2.03 am" (same ruling as above). Owner reports many negative user reports today.
+diagnoseLORDBackgroundWork 10:58: estimatedPropertyBytes 165,339 (limits 350k warn / 400k admission), 328 properties, 140 receipts, 159 queue tasks, 29 uncertain tasks, queue_reconciliation warning.
+10. Bug: `deliverWhatsAppAlert_` and `deliverTeacherWhatsApp_` call `checkpointWhatsAppSend_` (deliveryPending) BEFORE `sendWhatsAppTemplate_` runs `gsisRequireFreshContacts_`; a freshness refusal leaves deliveryPending, so the task becomes "unknown" (29 today) although Meta was never called. Check freshness/config before the checkpoint; a pre-provider refusal clears the checkpoint and is a retryable failure.
+11. Property-store reads under the lock: `setBoundedRuntimeProperty_`, `pruneRuntimeProperties_`, `pruneSecondaryTasks_` and `noteMaintenanceFailure_` call `props.getProperties()` (whole store, 328 keys) on most writes, several times per task. Read once per lock hold and pass the snapshot; keep the capacity check exact.
+12. Full-sheet reads inside the lock on user saves: `createBookingBatch_` (all Bookings), `ensureNoOpenLoanForCart_` (all Sessions), `findBookingConflict_`, `prepareEvidenceUploads_` manifest write. Bound them (date-filtered TextFinder or a day index) and measure lockHeldMs.
+13. User experience on contention: a lock timeout must return a clear "LORD is busy, your request was not saved, retrying" and the client retries with the SAME clientRequestId (idempotent), never a new one.
+14. Report LORD_TIMING lockWaitMs/lockHeldMs p50/p95 per action before and after, from a fixture with the background queue running.
+Priority for today's relief: 2, 8, 10 first (stop sync starvation and the queue holding the lock), then 11-13.
