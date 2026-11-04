@@ -1,0 +1,27 @@
+# roster-allocation-single-flight-j: minimal Worker admission
+
+Model: Codex. Lane R. Reviewer: Claude at the exact head. Owner directive 4 November 2026 queues this after duplicate-audit repair. Branch `codex/roster-allocation-single-flight-j`. PR #72 remains open and unchanged for next release. This task implements only Worker admission; it does not provide a backend execution bound or guarantee foreground-save latency.
+
+## Bounded scope
+
+Use a Worker-owned helper, `notification-worker/allocation-cycle.js`, around the minute-lane `scheduledRoster` call. Claim one durable jobs-database lease atomically before allocation Calendar/Google work. Keep a nine-minute uncertainty lease, covering two-minute backend admission, six-minute execution and one-minute margin. After two actual timeouts set five-minute backoff; admission waits for both lease and backoff. Record overlap as `SKIPPED_BUSY`, and backoff as `SKIPPED_BACKOFF`, without false TIMEOUT outcomes. Only confirmed successful completion clears the streak. Preserve it across transport uncertainty, explicit busy, disabled/configuration, skipped and paused results. Fence settlement by claim ID so a late result cannot release a successor or trigger follow-up dispatch.
+
+Own the new helper, `notification-worker/index.js`, safe codes/counters in `shared/edge-health.js`, one new behavioral Worker test, the eight required VM fixture dependency adapters, generated dashboard Worker pairs, this task and CHANGELOG. Keep source, domain, backend, UI, release metadata, freeze, import, authority and live configuration unchanged. Compute/network work holds no database transaction lock. Existing independent jobs, notification/provider claims, quiet checks and the audit cron contract remain.
+
+## Acceptance and validation
+
+Tests must cover cross-isolate overlap for legacy and D1, abandoned-run lease, two-timeout backoff, confirmed reset, timeout/connection-loss/timeout, upstreamStatus504, invalid or contradictory responses, disabled/configuration/skipped/paused preservation, current backend result shapes, late success and rejection, safe health counters, unavailable control storage, and quiet/audit separation. Adapt old VM fixtures explicitly; do not add a production admission bypass. Build all eighteen components canonically, verify no backend delta, run focused Worker/health integrations, obtain independent whole-branch review and require full exact-head GitHub Node/LORD CI before immediate Claude handoff.
+
+No deployment, live D1/Google/Drive command, live provider message, freeze, authority activation or preparation-session restart. Rollback is the scoped Worker change; no control-table deletion or live-data repair is part of this task.
+
+Baseline: repair PR #75 exact head `ab200514f2bee3361b1ff5fa1afabcf80dea9783`, tree `c863ac605ae7783b104a6b93f5173f19828aeb20`, full GitHub CI969Node/LORD39 per shard green before this task. The draft will be stacked for a bounded review and retargeted to main after its owner-merged predecessors.
+
+## Implementation and local evidence
+
+One atomic SQLite upsert claims the scheduler row through a primary-consistent D1 session. Network and compute run after that query completes. Uncertain results keep the lease; confirmed busy/refusal releases this invocation without clearing timeout history. Both success and error settlement require the same claim ID, so a late owner cannot change a successor or return stale notification counters. A readback race after a failed claim remains busy unless a real backoff deadline is still active.
+
+Result classification accepts current Google/D1 completions and preserves streaks across incomplete, disabled, paused and skipped work. Missing, malformed and contradictory results retain uncertainty. Completed paused, skipped and legacy allocationTimedOut calls may still queue fresh report notices; valid current counters retain their original follow-up dispatch. Invalid, busy and stale results cannot trigger that follow-up. Only actual timeout errors increment the streak. Health stores safe counters and distinguishes busy, backoff and ordinary skipped work.
+
+The new twenty-one-group real-SQLite program reproduced missing admission first, then exercises distinct isolate-local helpers against the same database, ownership races, backoff, malformed results, falsey throws, upstream504, fresh notice delivery and stale-result suppression. All eight existing VM adapter programs and nine real-module integrations pass. The adapters explicitly provide the imported dependency; production has no lease bypass.
+
+All eighteen components rebuild, all eighty-eight Apps Script files pass syntax checks, and canonical runtime parity passes for all eighteen installed components. Five focused programs passed again after the build: the new behavior test, health, quiet/audit catch-up, Venues scheduling and idle jobs. A diff against the tested baseline confirms no backend, generated Apps Script, Roster domain or frontend change. Only the two generated dashboard Worker pairs changed. Independent whole-branch review identified two unconfirmed-delivery counter/code paths; both were reproduced, fixed and passed scoped re-review with no remaining actionable findings. Exact-head GitHub Node/LORD CI and Claude review remain gates. No deployment or live action occurred.

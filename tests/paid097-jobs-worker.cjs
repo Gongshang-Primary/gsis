@@ -4,7 +4,7 @@ const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('nod
 function fixture({paused=false,paid=false,failPlanning=false,failReceived=false,stageResults={}}={}){
  const calls=[],events=[],health=[],queued=[],background=[],profiles=[];
  const scope={URL,Request,Response,AbortSignal,Date,Math,Promise,Number,Object,crypto:globalThis.crypto,console:{info:v=>events.push(JSON.parse(v)),error:v=>events.push(JSON.parse(v))},
- assertRecoveryWritable:env=>{if(env.GSIS_RECOVERY_MODE==='true')throw Object.assign(Error('private pause detail'),{code:'GSIS_RECOVERY_PAUSED',status:503});},
+ runAllocationCycle:async(_env,work)=>work(),assertRecoveryWritable:env=>{if(env.GSIS_RECOVERY_MODE==='true')throw Object.assign(Error('private pause detail'),{code:'GSIS_RECOVERY_PAUSED',status:503});},
  safeHealthError:error=>({code:error.code==='GSIS_RECOVERY_PAUSED'?'RECOVERY_PAUSED':error.status?'HTTP_ERROR':'UNKNOWN_ERROR',...(error.status?{httpStatus:error.status}:{})}),
  recordJobHealth:async(env,event)=>health.push(event),edgeRosterEnabled:env=>env.ROSTER_EDGE_AUTHORITY==='d1',backgroundJobsEnabled:env=>env.GSIS_BACKGROUND_JOBS==='true',
  requestBackgroundWork:async(env,kind)=>{queued.push(kind);return {queued:true};},enqueueDueBackgroundWork:async()=>{queued.push('due');return {queued:0};},
