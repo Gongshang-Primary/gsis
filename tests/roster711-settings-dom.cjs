@@ -10,6 +10,7 @@ const assert=require('node:assert/strict'),fs=require('node:fs'),{JSDOM}=require
  const q=s=>w.document.querySelector(s),settle=()=>new Promise(r=>setTimeout(r,0));
  await w.RosterSettingsUI.render('System Config',ctx);const calls=f.calls.length;
  assert.match(q('[data-settings-body]').textContent,/Subjects excluded from automatic relief/,q('[data-settings-message]').textContent);
+ assert.match(q('[data-workload-rules]').textContent,/consecutive limit counts every occupied period except.*Periods excluded from the consecutive count/,'consecutive limit wording (Option A)');assert.doesNotMatch(q('[data-workload-rules]').textContent,/do not count towards these limits/);
  const steps=[...w.document.querySelectorAll('.settings-exclusion-step h4')].map(h=>h.textContent);
  assert.match(steps[0],/^1\..*wildcard/i);assert.match(steps[1],/^2\..*specific/i);assert.match(q('[data-no-relief-exclusions] [data-rule-preview] h4').textContent,/^3\./);
  assert.match(q('[data-no-relief-exclusions] [data-exact-rule-chips]').textContent,/Retired Subject/);assert.match(q('[data-no-relief-exclusions] [data-rule-preview]').textContent,/automatic relief \(0\)/,'old saved rules are not presented as active-baseline subjects');
