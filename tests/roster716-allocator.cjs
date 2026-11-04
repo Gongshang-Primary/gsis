@@ -2,7 +2,7 @@
 const assert=require('node:assert/strict'),fixture=require('./roster701-fixture.cjs'),A=require('../shared/roster-allocation.js');
 let count=0;const test=(name,fn)=>{fn();count++;console.log('PASS',name);};
 const prefs=A.preferenceRules.map(r=>r.id),allOff=()=>Object.fromEntries([...prefs,'dailyTotal','adhocDailyTotal','consecutive'].map(id=>[id,false]));
-function setup(){const f=fixture();Object.assign(f.ctx,{minute:360,now:Date.parse(f.date+'T06:00:00+08:00')});f.ctx.iso=new Date(f.ctx.now).toISOString();for(const t of f.teachers){t.cells=f.blank();t.R=['bob','dora'].includes(t.staffId)?12:0;t.teachingProfile={subjects:[],levels:[]};}A.captureWeek(f.state,f.ctx,f.date);f.state.accountingYears['2026']={verified:true};return f;}
+function setup(){const f=fixture();f.state.systemConfig.consecutiveCountExclusions=[{type:'wildcard',value:'PD*'},{type:'wildcard',value:'DUTY*'}];Object.assign(f.ctx,{minute:360,now:Date.parse(f.date+'T06:00:00+08:00')});f.ctx.iso=new Date(f.ctx.now).toISOString();for(const t of f.teachers){t.cells=f.blank();t.R=['bob','dora'].includes(t.staffId)?12:0;t.teachingProfile={subjects:[],levels:[]};}A.captureWeek(f.state,f.ctx,f.date);f.state.accountingYears['2026']={verified:true};return f;}
 const row=(f,id='bob')=>f.teachers.find(t=>t.staffId===id),teacher=(f,id='bob')=>A.teacherContext(f.state,f.ctx,f.date).get(id),quota=(f,id,n)=>{row(f,id).R=n;f.state.entitlements.find(e=>e.staffId===id).quota=n;};
 const demand=(p,id='lesson')=>({id,period:p,staffId:'alice',subject:'EL',className:'4A'});
 const solve=(f,ds,options={})=>A.optimise(f.state,f.ctx,f.date,ds,options);
