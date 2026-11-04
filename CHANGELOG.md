@@ -1,3 +1,7 @@
+# Pending: optional non-SRE daily relief cap, 4 November 2026
+
+Model: Codex. System Config adds Maximum relief periods per day (non-SRE), default 3 and Off. When enabled, automatic allocation counts distinct held and proposed relief periods, including approved peer arrangements and imported duties. All SREs are exempt. Existing duties stay; manual assignment and combination warn above the cap. See [the task](docs/coordination/tasks/roster-daily-relief-cap.md).
+
 # Pending: distinct audit event identities, 4 November 2026
 
 Model: Codex. New Stapler request and decision audit events retain distinct IDs and a shared planning-request reference. Reserved identity overrides and new duplicate IDs are refused before storage. Existing audit rows and historical collisions remain unchanged pending the owner repair ruling. See [the task](docs/coordination/tasks/roster-import-duplicate-audit-id.md).
