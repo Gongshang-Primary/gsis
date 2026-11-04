@@ -85,4 +85,11 @@ test('Legacy Stapler notifications require a stable acknowledgement including re
  assert(f.state.outbox.filter(j=>j.kind==='stapler_timetable').every(j=>j.data.acknowledge===true));acknowledge(f);f.O.refreshStaplerNotifications(f.state,f.ctx);assert.equal(notice(f).id,n.id);assert.equal(notice(f).status,'acknowledged');
  plan=S.apply(plan,{type:'move',tileId,teacherId:owner,period:original.period});record.published=plan;record.publishedRevision=2;f.O.refreshStaplerNotifications(f.state,f.ctx);assert.notEqual(notice(f).id,n.id);assert.equal(notice(f).status,'pending');acknowledge(f);assert.equal(notice(f).status,'acknowledged');
 });
+test('legacy private Stapler notice remains acknowledgeable',()=>{
+ const h=adapter(),s=h.state(),S=require('../shared/roster-stapler.js');Object.assign(h.ctx,{minute:360,now:Date.parse(h.date+'T06:00:00+08:00')});h.ctx.iso=new Date(h.ctx.now).toISOString();h.ctx.baselineDays=structuredClone(h.ctx.days);
+ let plan=h.O.read(s,h.ctx,{operation:'stapler',date:h.date}).plan;const tile=plan.tiles.find(t=>t.teacherId==='alice'&&t.period===2);plan=S.apply(plan,{type:'move',tileId:tile.id,teacherId:'bob',period:2});
+ s.staplerPlans.push({date:h.date,baselineId:'baseline',revision:1,published:plan,publishedRevision:1,publishedAt:h.ctx.iso,notifiedFingerprints:{}});h.O.refreshStaplerNotifications(s,h.ctx);h.setState(s);
+ const cap={purpose:'duties',staffId:'bob',date:h.date,expiresAt:h.ctx.now+86400000},call=input=>h.scope.rosterServiceDispatch_({input:{...input,capability:cap}}),shown=call({operation:'externalDuties'});assert.equal(shown.timetableNotice.status,'pending');
+ const saved=call({operation:'externalAcknowledge',timetableNoticeId:shown.timetableNotice.id,snapshotIds:[]});assert(saved.savedIds.includes(shown.timetableNotice.id));assert.equal(call({operation:'externalDuties'}).timetableNotice.status,'acknowledged');
+});
 console.log(checks+' full timetable acknowledgement checks passed');
