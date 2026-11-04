@@ -866,10 +866,15 @@ function rosterPrivateCapability_(cap,now){
  if(cap.issuedAt!==undefined&&(!Number.isFinite(cap.issuedAt)||cap.issuedAt>now+60000||cap.expiresAt>cap.issuedAt+7*86400000+60000))error_(401,'This private link is invalid. Ask SMC for a new link.');
  GSISRosterOperations.date(cap.date);return cap;
 }
+function rosterPrivateRecipient_(s,cap,contacts){
+ if(!Array.isArray(contacts?.rosterPeople))error_(503,'Current Contacts permissions are unavailable.');
+ const matches=contacts.rosterPeople.filter(person=>person.id===cap.staffId);
+ if(matches.length!==1||matches[0].active!==true&&!s.adhoc.some(row=>row.staffId===cap.staffId&&row.date===cap.date&&!row.deletedAt))error_(403,'This recipient is no longer eligible for this private link.');
+}
 function rosterPrivateRead_(p){
- const now=Date.now(),cap=rosterPrivateCapability_(p.capability,now),s=rosterOperationsState_();if(cap.communicationId)return GSISRosterOperations.communicationProjection(s,cap);const published=s.dailyPublicationStates?.[cap.date],person=published?.teachers.find(t=>t.staffId===cap.staffId);let ctx;
+ const now=Date.now(),cap=rosterPrivateCapability_(p.capability,now),service=rosterServiceContacts_(),s=rosterOperationsState_();rosterPrivateRecipient_(s,cap,service.c);if(cap.purpose==='duties'){const resolved=GSISRosterOperations.resolveDutiesCapability(s,cap,Date.now());if(resolved.projection)return resolved.projection;}const published=s.dailyPublicationStates?.[cap.date],person=published?.teachers.find(t=>t.staffId===cap.staffId);let ctx;
  if(published&&person){const day={id:published.baselineId,schoolDay:true,verified:true,periods:published.periods,teachers:[{staffId:cap.staffId,name:person.name||'',cells:person.baseline}]};ctx={now,iso:new Date(now).toISOString(),today:new Date(now+8*3600000).toISOString().slice(0,10),days:{[cap.date]:day},baselineDays:{[cap.date]:day},people:[{id:cap.staffId,name:person.name||''}]};}
- else{const service=rosterServiceContacts_(),plan=s.staplerPlans.find(r=>r.date===cap.date)?.published,calendar=plan?{[cap.date]:{date:cap.date,schoolDay:true,parity:plan.parity}}:p.calendarByDate;ctx=rosterOperationsContext_({identity:service.identity,input:{...p,date:cap.date,calendarByDate:calendar}},service.c,s);}
+ else{const plan=s.staplerPlans.find(r=>r.date===cap.date)?.published,calendar=plan?{[cap.date]:{date:cap.date,schoolDay:true,parity:plan.parity}}:p.calendarByDate;ctx=rosterOperationsContext_({identity:service.identity,input:{...p,date:cap.date,calendarByDate:calendar}},service.c,s);}
  const mutual=cap.purpose==='mutual'?s.requests.find(r=>r.id===cap.requestId&&r.recipientId===cap.staffId&&r.date===cap.date):null;if(cap.purpose==='mutual'&&!mutual)error_(403,'This private request is unavailable.');
  ctx.user={staffId:cap.staffId,email:'external:'+cap.staffId,smc:false,admin:false};
  const notice=GSISRosterOperations.timetableNotice(s,ctx,{date:cap.date}),ids=new Set(notice?.snapshotIds||[]),snapshots=s.publicationSnapshots.filter(v=>ids.has(v.id)),rows=published?snapshots.filter(v=>v.kind!=='cancelled').map(v=>({...v.assignment,instructions:v.instructions,customInstructions:v.customInstructions})):s.assignments.filter(a=>a.staffId===cap.staffId&&a.date===cap.date&&a.status==='published'&&!a.noRelief&&!a.remove);
@@ -895,7 +900,8 @@ function rosterServiceDispatch_(req){gsisRequireBackendRole_('roster');
  // Contacts owns its own state. Fetch current authority before waiting for our
  // writer lock, as school-user requests already do. Claims and eligibility still
  // use the locked latest operational document and a new clock sample below.
- const currentContacts=['inboundMessage','claimNotifications','prepareNotification'].includes(op)?rosterServiceContacts_().c:null;
+ if(['externalAcknowledge','externalRespond'].includes(op))rosterPrivateCapability_(p.capability,Date.now());
+ const currentService=['inboundMessage','claimNotifications','prepareNotification','externalAcknowledge','externalRespond'].includes(op)?rosterServiceContacts_():null,currentContacts=currentService?.c||null;
  if(currentContacts&&['claimNotifications','prepareNotification'].includes(op)){
   try{currentContacts.rosterPendingAbsenceDates=[...new Set([...(typeof rosterAbsenceIntakePending_==='function'?rosterAbsenceIntakePending_().blockedDates:[]),...(Array.isArray(p.pendingTransportDates)?p.pendingTransportDates:[])])];}catch(_){currentContacts.rosterAbsenceIntakeUnavailable=true;}
  }
@@ -968,14 +974,14 @@ function rosterServiceDispatch_(req){gsisRequireBackendRole_('roster');
    }
    changed=rosterNotificationRetries_(s,now)||changed;result={recorded:true};
   }else{
-   const cap=rosterPrivateCapability_(p.capability,now);
+   const cap=rosterPrivateCapability_(p.capability,now);rosterPrivateRecipient_(s,cap,currentContacts);
    if(op==='externalAcknowledge'){
     const ids=p.snapshotIds||[];
     if(!Array.isArray(ids)||!ids.length&&!p.timetableNoticeId||ids.length>100||ids.some(id=>!s.publicationSnapshots.some(v=>v.id===id&&v.staffId===cap.staffId&&v.date===cap.date)))error_(403,'Acknowledge only notices covered by this private link.');
     const ctx={now,iso,today:new Date(now+8*3600000).toISOString().slice(0,10),days:{},uuid:()=>Utilities.getUuid(),user:{staffId:cap.staffId,email:'external:'+cap.staffId,smc:false,admin:false}};
-    result=cap.communicationId?GSISRosterOperations.acknowledgeCommunication(s,ctx,cap,p):GSISRosterOperations.acknowledgePublications(s,ctx,{snapshotIds:ids,...(p.timetableNoticeId!==undefined?{timetableNoticeId:p.timetableNoticeId}:{}),date:cap.date});changed=result.savedIds.length>0;domainChanged=changed;result.acknowledged={timetableNoticeId:p.timetableNoticeId||null,snapshotIds:ids,acknowledgedAt:s.acknowledgements.find(a=>a.staffId===cap.staffId&&(p.timetableNoticeId?a.timetableNoticeId===p.timetableNoticeId:ids.includes(a.snapshotId)))?.at||iso};result.publicationRevision=s.dailyPublicationStates?.[cap.date]?.revision||null;
+    result=cap.purpose==='duties'?GSISRosterOperations.acknowledgeDutiesCapability(s,ctx,cap,p):GSISRosterOperations.acknowledgePublications(s,ctx,{snapshotIds:ids,...(p.timetableNoticeId!==undefined?{timetableNoticeId:p.timetableNoticeId}:{}),date:cap.date});changed=result.savedIds.length>0;domainChanged=changed;result.acknowledged={timetableNoticeId:p.timetableNoticeId||null,snapshotIds:ids,acknowledgedAt:s.acknowledgements.find(a=>a.staffId===cap.staffId&&(p.timetableNoticeId?a.timetableNoticeId===p.timetableNoticeId:ids.includes(a.snapshotId)))?.at||iso};result.publicationRevision=s.dailyPublicationStates?.[cap.date]?.revision||null;
    }
-   else{if(cap.purpose!=='mutual'||!cap.requestId||p.id&&p.id!==cap.requestId)error_(403,'This private link cannot approve relief.');const r=s.requests.find(r=>r.id===cap.requestId&&r.recipientId===cap.staffId&&r.date===cap.date);if(!r)error_(403,'This private request is unavailable.');if(['approved','rejected'].includes(r.status)){if(['approve','reject'].includes(p.decision)&&r.status===(p.decision==='approve'?'approved':'rejected')&&String(r.reason||'')===String(p.reason||'').trim())return {recorded:true,replayed:true,status:r.status};error_(409,'A different response has already been recorded.');}const service=rosterServiceContacts_(),ctx=rosterOperationsContext_({identity:service.identity,input:{...p,date:cap.date}},service.c,s);ctx.user={staffId:cap.staffId,email:'external:'+cap.staffId,smc:false,admin:false};const beforeOutbox=s.outbox.length;GSISRosterOperations.apply(s,ctx,{operation:'respondMutual',id:cap.requestId,date:cap.date,decision:p.decision,reason:p.reason||''});GSISRosterOperations.refreshStaplerNotifications(s,ctx,beforeOutbox);changed=true;domainChanged=true;result={recorded:true,status:r.status};}
+   else{if(cap.purpose!=='mutual'||!cap.requestId||p.id&&p.id!==cap.requestId)error_(403,'This private link cannot approve relief.');const r=s.requests.find(r=>r.id===cap.requestId&&r.recipientId===cap.staffId&&r.date===cap.date);if(!r)error_(403,'This private request is unavailable.');if(['approved','rejected'].includes(r.status)){if(['approve','reject'].includes(p.decision)&&r.status===(p.decision==='approve'?'approved':'rejected')&&String(r.reason||'')===String(p.reason||'').trim())return {recorded:true,replayed:true,status:r.status};error_(409,'A different response has already been recorded.');}const ctx=rosterOperationsContext_({identity:currentService.identity,input:{...p,date:cap.date}},currentContacts,s);ctx.user={staffId:cap.staffId,email:'external:'+cap.staffId,smc:false,admin:false};const beforeOutbox=s.outbox.length;GSISRosterOperations.apply(s,ctx,{operation:'respondMutual',id:cap.requestId,date:cap.date,decision:p.decision,reason:p.reason||''});GSISRosterOperations.refreshStaplerNotifications(s,ctx,beforeOutbox);changed=true;domainChanged=true;result={recorded:true,status:r.status};}
   }
   if(changed){if(domainChanged)s.revision++;rosterOperationsCommit_(s);}return result;
  }finally{deployUnlock_(lock);}

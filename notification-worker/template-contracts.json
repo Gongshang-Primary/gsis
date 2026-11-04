@@ -31,7 +31,7 @@
           ],
           "body": "*Peer Relief Arrangement*\n\nHi {{1}}, {{2}} has requested on https://roster.gsps.edu.sg that you cover his/her lesson(s) on {{3}}: {{4}}.\n\nPlease use the button below to review and accept or reject this request.\n\nThank you.",
           "bodySha256": "8d1496eda9cb385716226219d725c2e1d43b62c23dcccdcd9b8b0ad3a2232244",
-          "submissionState": "PENDING",
+          "submissionState": "APPROVED",
           "privateLinkPurpose": "mutual",
           "urlButtons": [
             {
@@ -56,7 +56,30 @@
       "body": "*Peer Relief Arrangement Updated*\n\nHi {{1}}, Relief Team has changed the peer relief arrangement for {{2}}.\n\n{{3}}\n\nView the published arrangement here: {{4}}.\n\nThank you.",
       "bodySha256": "749edb8920ccd75bdf30526742eec67cadfe392a75878baaf80e9f67f7aae5c3",
       "submissionState": "APPROVED",
-      "privateLinkPurpose": "duties"
+      "privateLinkPurpose": "duties",
+      "variants": {
+        "buttons": {
+          "name": "gsis_relief_changed_v2",
+          "language": "en_GB",
+          "category": "UTILITY",
+          "id": "2114085432831676",
+          "fields": [
+            "recipient_name",
+            "duty_date",
+            "change_details"
+          ],
+          "body": "*Peer Relief Arrangement Updated*\n\nHi {{1}}, Relief Team has changed the peer relief arrangement for {{2}}.\n\n{{3}}\n\nView the published arrangement using the button below.\n\nThank you.",
+          "bodySha256": "e22e7a991f5672626cf3e84eef482f433d7b767786a077ce5a41563f828a81ff",
+          "submissionState": "PENDING",
+          "privateLinkPurpose": "duties",
+          "urlButtons": [
+            {
+              "text": "View arrangement",
+              "url": "https://roster.gsps.edu.sg/external.html#{{1}}"
+            }
+          ]
+        }
+      }
     },
     "contact_review": {
       "name": "gsis_contact_review_v1",
@@ -71,7 +94,16 @@
       ],
       "body": "*Contact Details for Ad Hoc External Relief*\n\nHi {{1}}.\n\nOn https://roster.gsps.edu.sg, contact details for an ad hoc external relief teacher were added or updated on {{2}}.\n\nPlease review these details as a Contacts Admin:\n\n{{3}}\n\nReview and confirm the details in Contacts: {{4}}.\n\nThank you.",
       "bodySha256": "5e0c7080d0386968c042e19b1d4a5cb968e05953eb69ca6286b87d5000914e40",
-      "submissionState": "APPROVED"
+      "submissionState": "APPROVED",
+      "pendingVariants": {
+        "buttons": {
+          "name": "gsis_contact_review_v2",
+          "id": "1512880204232296",
+          "language": "en_GB",
+          "submissionState": "PENDING",
+          "evidenceState": "MISSING_BODY_COMPONENTS"
+        }
+      }
     },
     "relief_assignment": {
       "name": "gsis_relief_assignment_v1",
@@ -87,7 +119,30 @@
       "body": "*Relief Assignment*\n\nHi {{1}}, Relief Team has assigned you relief duties on {{2}}.\n\n{{3}}\n\nView the relief instructions and acknowledge your duties here: {{4}}.\n\nThank you.",
       "bodySha256": "dbbc03f5d5d708029b5c62c7025276bfc14ab6434244a3f9ad70a4835a583dd2",
       "submissionState": "APPROVED",
-      "privateLinkPurpose": "duties"
+      "privateLinkPurpose": "duties",
+      "variants": {
+        "buttons": {
+          "name": "gsis_relief_assignment_v2",
+          "language": "en_GB",
+          "category": "UTILITY",
+          "id": "1111277344970510",
+          "fields": [
+            "recipient_name",
+            "duty_date",
+            "lessons_periods_venues"
+          ],
+          "body": "*Relief Assignment*\n\nHi {{1}}, Relief Team has assigned you relief duties on {{2}}.\n\n{{3}}\n\nView the relief instructions and acknowledge your duties using the button below.\n\nThank you.",
+          "bodySha256": "083d017fb9ea2e4d2d16728efab4b37f449bc1f8dc8fb9f6e5611b53d47ef594",
+          "submissionState": "PENDING",
+          "privateLinkPurpose": "duties",
+          "urlButtons": [
+            {
+              "text": "View and acknowledge",
+              "url": "https://roster.gsps.edu.sg/external.html#{{1}}"
+            }
+          ]
+        }
+      }
     },
     "relief_updated": {
       "name": "gsis_relief_updated_v1",
@@ -103,7 +158,30 @@
       "body": "*Relief Assignment Updated*\n\nHi {{1}}, Relief Team has changed your relief duties for {{2}}.\n\n{{3}}\n\nView your updated timetable and acknowledge the change here: {{4}}.\n\nThank you.",
       "bodySha256": "07063c548041f467f9e7b1e9159efffc26afd6ae31bc9883e80222b3fe21fc0f",
       "submissionState": "APPROVED",
-      "privateLinkPurpose": "duties"
+      "privateLinkPurpose": "duties",
+      "variants": {
+        "buttons": {
+          "name": "gsis_relief_updated_v2",
+          "language": "en_GB",
+          "category": "UTILITY",
+          "id": "1093823786983973",
+          "fields": [
+            "recipient_name",
+            "duty_date",
+            "changed_or_cancelled_duties"
+          ],
+          "body": "*Relief Assignment Updated*\n\nHi {{1}}, Relief Team has changed your relief duties for {{2}}.\n\n{{3}}\n\nView your updated timetable and acknowledge the change using the button below.\n\nThank you.",
+          "bodySha256": "8a542ed6992817e84bf4e70b7499156eec1f10e288cd438c5533e7fa022a020a",
+          "submissionState": "PENDING",
+          "privateLinkPurpose": "duties",
+          "urlButtons": [
+            {
+              "text": "View and acknowledge",
+              "url": "https://roster.gsps.edu.sg/external.html#{{1}}"
+            }
+          ]
+        }
+      }
     },
     "relief_reminder": {
       "name": "gsis_relief_reminder_v1",
@@ -119,7 +197,30 @@
       "body": "*Relief Duty Reminder*\n\nHi {{1}}, your relief duty on {{2}} starts in 20 minutes and has not been acknowledged in Roster.\n\n{{3}}\n\nView the relief instructions and acknowledge your duty here: {{4}}.\n\nThank you.",
       "bodySha256": "85faa0c817ea716fa85db1fdbce59f383ee6ad6fdce28acf16e258365629ac57",
       "submissionState": "APPROVED",
-      "privateLinkPurpose": "duties"
+      "privateLinkPurpose": "duties",
+      "variants": {
+        "buttons": {
+          "name": "gsis_relief_reminder_v2",
+          "language": "en_GB",
+          "category": "UTILITY",
+          "id": "1140063958558991",
+          "fields": [
+            "recipient_name",
+            "duty_date",
+            "lesson_period_time_venue"
+          ],
+          "body": "*Relief Duty Reminder*\n\nHi {{1}}, your relief duty on {{2}} starts in 20 minutes and has not been acknowledged in Roster.\n\n{{3}}\n\nView the relief instructions and acknowledge your duty using the button below.\n\nThank you.",
+          "bodySha256": "e7ead96c54ba5012bdde84f61fd69c8eecfd8b7b8bcb3794238d0b2dc4daa490",
+          "submissionState": "PENDING",
+          "privateLinkPurpose": "duties",
+          "urlButtons": [
+            {
+              "text": "View and acknowledge",
+              "url": "https://roster.gsps.edu.sg/external.html#{{1}}"
+            }
+          ]
+        }
+      }
     },
     "relief_unacknowledged": {
       "name": "gsis_relief_unacknowledged_v1",
@@ -135,7 +236,16 @@
       ],
       "body": "*Relief Duty Not Acknowledged*\n\nHi {{1}}, {{2}} has not acknowledged the relief duty on {{3}}.\n\n{{4}}\n\nThe lesson starts in 10 minutes. Please contact the teacher and confirm cover.\n\nView the current status here: {{5}}.\n\nThank you.",
       "bodySha256": "d998fc781f72ed863069c7171edf9bc6baa8e61e370c1544e5ec82719eece0cf",
-      "submissionState": "APPROVED"
+      "submissionState": "APPROVED",
+      "pendingVariants": {
+        "buttons": {
+          "name": "gsis_relief_unacknowledged_v2",
+          "id": "2320845038701493",
+          "language": "en_GB",
+          "submissionState": "PENDING",
+          "evidenceState": "MISSING_BODY_COMPONENTS"
+        }
+      }
     },
     "relief_urgent": {
       "name": "gsis_relief_urgent_v1",
@@ -152,7 +262,31 @@
       "body": "*Urgent Relief Assignment*\n\nHi {{1}}, Relief Team has assigned you a relief duty on {{2}} that starts in {{3}} minutes.\n\n{{4}}\n\nPlease view the relief instructions and acknowledge your duty now: {{5}}.\n\nThank you.",
       "bodySha256": "9d9e8965667a01205be101d2d85524966c194b0c1cd223a4b0f02cddb948f5da",
       "submissionState": "APPROVED",
-      "privateLinkPurpose": "duties"
+      "privateLinkPurpose": "duties",
+      "variants": {
+        "buttons": {
+          "name": "gsis_relief_urgent_v2",
+          "language": "en_GB",
+          "category": "UTILITY",
+          "id": "1068710112868282",
+          "fields": [
+            "recipient_name",
+            "duty_date",
+            "minutes_remaining",
+            "lesson_period_start_venue"
+          ],
+          "body": "*Urgent Relief Assignment*\n\nHi {{1}}, Relief Team has assigned you a relief duty on {{2}} that starts in {{3}} minutes.\n\n{{4}}\n\nPlease view the relief instructions and acknowledge your duty now using the button below.\n\nThank you.",
+          "bodySha256": "5e2043f529bdac5c651bc7f7879dfa56d37217be7773151b47fce4bd5fbd066c",
+          "submissionState": "PENDING",
+          "privateLinkPurpose": "duties",
+          "urlButtons": [
+            {
+              "text": "View and acknowledge",
+              "url": "https://roster.gsps.edu.sg/external.html#{{1}}"
+            }
+          ]
+        }
+      }
     },
     "relief_urgent_smc": {
       "name": "gsis_relief_urgent_smc_v1",
@@ -169,7 +303,16 @@
       ],
       "body": "*Urgent Relief Cover*\n\nHi {{1}}, {{2}} has been assigned relief on {{3}}. The lesson starts in {{4}} minutes.\n\n{{5}}\n\nThe duty has not yet been acknowledged. Please check that cover is confirmed.\n\nView the current status here: {{6}}.\n\nThank you.",
       "bodySha256": "04a471667a7b4ab196723faf083c03d3efa2564fe4b5e2d36e369f56c216d4c5",
-      "submissionState": "APPROVED"
+      "submissionState": "APPROVED",
+      "pendingVariants": {
+        "buttons": {
+          "name": "gsis_relief_urgent_smc_v2",
+          "id": "1746432063105141",
+          "language": "en_GB",
+          "submissionState": "PENDING",
+          "evidenceState": "MISSING_BODY_COMPONENTS"
+        }
+      }
     },
     "relief_evening": {
       "name": "gsis_relief_evening_v1",
@@ -311,7 +454,16 @@
       ],
       "body": "*School Relief Allocation Requires Action*\n\nHi {{1}}, you are on SMC relief duty at Gongshang Primary School on {{2}}.\n\nThe following issue has been recorded in the teacher relief allocation for your duty date:\n\n{{3}}\n\nPlease review the affected lessons and confirm or correct their teacher coverage in Roster: {{4}}.\n\nThank you.",
       "bodySha256": "640ce7d7db1fed87483ea77c32c5286ea473b09c42f4ac9b3fcf292652bcc43e",
-      "submissionState": "APPROVED"
+      "submissionState": "APPROVED",
+      "pendingVariants": {
+        "buttons": {
+          "name": "gsis_relief_attention_v3",
+          "id": "3330480857342320",
+          "language": "en_GB",
+          "submissionState": "PENDING",
+          "evidenceState": "MISSING_BODY_COMPONENTS"
+        }
+      }
     },
     "stapler_timetable": {
       "name": "gsis_timetable_updated_v1",

@@ -2,6 +2,10 @@
 
 Model: Muse. Consecutive limit now counts all occupied periods except configured exclusions. Automatic and manual consecutive checks use the same occupied set; only subjects matched by System Config "Periods excluded from the consecutive count" are left out, and Don't-need-relief has no effect on the count. Daily totals, workload and quota are unchanged. See [roster-consecutive-after-gap](docs/coordination/tasks/roster-consecutive-after-gap.md).
 
+# Pending: Roster message buttons and acknowledgement continuity, 4 November 2026
+
+Model: Codex. Selects approved peer-request v2 and keeps five pending private-link plus four pending staff-link templates disabled. Equivalent acknowledged duties retain receipt through first publication and republish. A valid old own-duties link shows current authorized duties; stale acknowledgement submissions require review, and current Contacts eligibility remains enforced. Capability expiry and peer-request scope stay unchanged. No live settings or messages change. See [the task](docs/coordination/tasks/roster-whatsapp-url-buttons.md).
+
 ## Pending: minimal Worker allocation single-flight, 4 November 2026
 
 Model: Codex. Add one durable Worker scheduler lease, record overlaps as SKIPPED_BUSY and back off after two timeouts. Retain uncertain execution leases and timeout history until confirmed completion; fence late results. No backend or UI change; the broader #72 remains for next release. See [bounded task](docs/coordination/tasks/roster-allocation-single-flight-j.md).

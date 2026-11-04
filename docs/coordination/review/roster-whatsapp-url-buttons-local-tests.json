@@ -1,0 +1,56 @@
+{
+  "model": "Codex",
+  "baseMain": "c46503bba1b930028f06588bdb46bfe7107a94da",
+  "componentsRebuiltTwiceStable": 18,
+  "focusedProgramsPassed": 18,
+  "continuityCases": 18,
+  "googleD1AdapterCases": 12,
+  "fullGitHubSuite": "pending-final-head",
+  "scope": "Synthetic fixtures and local adapters; no live messages or school records",
+  "independentBoundedReview": "no blockers",
+  "resumed4Nov": {
+    "baseMain": "c0789c9d37b946a782a85456d84a5ccb1402f8a9",
+    "programs": 23,
+    "passingNonBrowser": 20,
+    "browserUnavailable": [
+      "roster082-private-actions-browser.cjs",
+      "roster098h-communication-display.cjs",
+      "roster098h-current-duties-note.cjs"
+    ],
+    "restoredSenderSelectionRegressions": [
+      "roster-whatsapp-pending-staff.mjs",
+      "roster-whatsapp-url-buttons.mjs"
+    ],
+    "fullExactHeadCI": "pending",
+    "liveCalls": false,
+    "advisoryFixes": [
+      "Latest authorized source on every publication",
+      "Scoped legacy saved-notice acknowledgement"
+    ],
+    "continuityCases": 20,
+    "privateAdapterGroups": 13,
+    "acknowledgementGroups": 12
+  },
+  "latestResume": {
+    "baseMain": "4e30dd4a80054e9e31605a0179a83a28fadaf6c6",
+    "focusedProgramsPassed": 24,
+    "focusedProgramsFailed": 0,
+    "browserChecks": "pending GitHub CI",
+    "ownerPublicationAuthorization": "Owner: pls do #68, responding to the explicit publication question",
+    "deployed": false
+  },
+  "fullSuiteCorrection": {
+    "failedHead": "c96285b91f784bc8b217063ccfaaeac25e3e7fec",
+    "failingPrograms": [
+      "roster701-integrity-review.cjs",
+      "check-calendar-bundle.cjs"
+    ],
+    "fixes": [
+      "Frozen published assignment identity/status with latest captured display content",
+      "Current package label in matched/mixed real Calendar fixture"
+    ],
+    "focusedProgramsPassed": 26,
+    "focusedProgramsFailed": 0,
+    "fullSuite": "pending corrected-head CI"
+  }
+}

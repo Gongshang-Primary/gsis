@@ -101,6 +101,7 @@ if(typeof module!=='undefined'&&module.exports)module.exports=GSISRosterTimetabl
  function renderActions(data){
   const area=$('private-actions');area.replaceChildren();area.setAttribute('aria-busy','false');
   const context=document.createElement('p');context.className='private-action-context';context.textContent=[data.name||data.timetable?.daily?.name||data.timetable?.name||recordLabel(data),formatDate(data.date)].join(' · ');area.append(context);
+  if(data.updatedSinceMessage===true){const changed=document.createElement('p');changed.className='private-action-context';changed.textContent='Duties changed since this message. The current timetable is shown below.';area.append(changed);}
   const notice=data.timetableNotice,pending=(data.pendingNotices||[]).filter(v=>!notice?.snapshotIds?.includes(v.id));
   if(notice){
    const status=document.createElement('p'),done=notice.status==='acknowledged';status.dataset.timetableAckStatus='';status.className='private-ack-status '+(done?'acknowledged':'pending');status.textContent=done?'Acknowledged ✓':'Pending acknowledgement';area.append(status);
