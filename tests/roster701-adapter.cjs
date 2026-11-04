@@ -10,7 +10,7 @@ module.exports=function adapter(){
  require('./load-backend-role.cjs')(scope,'roster');
  vm.runInContext(fs.readFileSync(__dirname+'/../backend/RosterOperations.gs','utf8'),scope);
  require('./load-stapler-leases.cjs')(scope);
- scope.rosterOperationsContext_=req=>{calls.contexts.push(req.input.operation);return {...f.ctx,user:{...f.ctx.user,...req.identity},timetableEntries:[{id:'baseline',from:'2026-01-01',to:'2026-12-31'}]};};
+ scope.rosterOperationsContext_=req=>{calls.contexts.push(req.input.operation);return {...f.ctx,uuid:()=>scope.Utilities.getUuid(),user:{...f.ctx.user,...req.identity},timetableEntries:[{id:'baseline',from:'2026-01-01',to:'2026-12-31'}]};};
  // This adapter supplies context directly; immutable fixture manifests match it.
  const referenceStamp=scope.rosterOperationsReferenceStamp_;
  scope.rosterOperationsReferenceStamp_=ctx=>scope.rosterOperationsReferenceKey_(ctx);

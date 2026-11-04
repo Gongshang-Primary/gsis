@@ -30,13 +30,14 @@ function rosterOperationsPackPlans_(state,prepareTimetables=true){
   return packed;});return {...state,staplerPlans:rows(state.staplerPlans,prepareTimetables),staplerArchives:rows(state.staplerArchives)};
 }
 var rosterOperationsStorageSources_=new WeakMap();
+var rosterOperationsAuditSources_=new WeakMap();
 /* One operational document commits absence, relief, audit and notification intent together. */
 function rosterOperationsState_(skipTransport=false){
  let phase='operations-location';try{
   const id=props_().getProperty('ROSTER_OPERATIONS_FILE')||rosterFindFile_(ROSTER_DATA,'Roster operations.json');
   if(!id)return GSISRosterOperations.initial();
   phase='operations-read';const source=rosterOperationsStoredRead_(id),value=source.value;
-  phase='operations-schema';const state=GSISRosterOperations.validateState(rosterOperationsUnpackPlans_(typeof rosterAllocationAuditUnpack_==='function'?rosterAllocationAuditUnpack_(value):value));rosterOperationsStorageSources_.set(state,source);if(typeof rosterColdReceiptsUnpack_==='function')rosterColdReceiptsUnpack_(state);return skipTransport!==true&&typeof rosterNotificationOverlay_==='function'?rosterNotificationOverlay_(state):state;
+  phase='operations-schema';const state=GSISRosterOperations.validateState(rosterOperationsUnpackPlans_(typeof rosterAllocationAuditUnpack_==='function'?rosterAllocationAuditUnpack_(value):value));rosterOperationsStorageSources_.set(state,source);rosterOperationsAuditSources_.set(state,state.audit.map(row=>({id:row.id})));if(typeof rosterColdReceiptsUnpack_==='function')rosterColdReceiptsUnpack_(state);return skipTransport!==true&&typeof rosterNotificationOverlay_==='function'?rosterNotificationOverlay_(state):state;
  }catch(e){if(e.status){e.failurePhase=e.failurePhase||phase;throw e;}throw Object.assign(Error('Relief records could not be read.'),{status:503,failurePhase:e.failurePhase||phase});}
 }
 // Save ceiling for Roster operations.json. Admin may raise it in Script Properties
@@ -59,6 +60,10 @@ function rosterOperationsCommit_(state,intakeFenceDates=null,intakeFencePeers=fa
  // record while the retained intake can finish. The 12M derived-cache fallback
  // above stays first; no new storage format, authority or automatic pruning.
  const stored=props_().getProperty('ROSTER_OPERATIONS_FILE'),id=stored||rosterFindFile_(ROSTER_DATA,'Roster operations.json'),source=rosterOperationsStorageSources_.get(state),root=id?(source?.id===id?source.manifest:JSON.parse(rosterReadFile_(id))):null,split=root?.format==='gsis-roster-operations-split-v1';
+ // Compare against identities captured before the command. Existing historical
+ // collisions remain evidence; no new collision may reach a durable write.
+ const auditBefore=rosterOperationsAuditSources_.get(state)||(split?rosterOperationsStoredRead_(id).value.audit:root?.audit)||[];
+ GSISRosterAllocation.assertNewAuditIds(auditBefore,state.audit);
  if(!split&&data.length>rosterOperationsMaxChars_())throw Object.assign(Error('Relief records are full. Ask Admin to review storage capacity before retrying this same report.'),{status:507,code:'ROSTER_STORAGE_CAPACITY'});
  const prepared=split?rosterSplitPrepareDocument_(JSON.parse(data),{folderId:root.folderId,previousId:id}):null;
  const batchTicket=typeof rosterTimetableBatchCommitBegin_==='function'?rosterTimetableBatchCommitBegin_(state):null,venueTicket=typeof rosterVenuesBegin_==='function'?rosterVenuesBegin_('operations',state):null;
@@ -72,6 +77,7 @@ function rosterOperationsCommit_(state,intakeFenceDates=null,intakeFencePeers=fa
  if(!prepared)finalCheck();
  const saved=prepared?prepared.commit(finalCheck):id?(rosterDriveRequest_('https://www.googleapis.com/upload/drive/v3/files/'+encodeURIComponent(id)+'?uploadType=media&supportsAllDrives=true&fields=id',{method:'patch',contentType:'application/json; charset=UTF-8',payload:data},'operations-commit'),id):rosterCreateFile_(ROSTER_DATA,'Roster operations.json',Utilities.newBlob(data,'application/json'));
  if(prepared||!stored)props_().setProperty('ROSTER_OPERATIONS_FILE',saved);
+ rosterOperationsAuditSources_.set(state,state.audit.map(row=>({id:row.id})));
  };
  // Keep remote Venues exchanges outside the intake lock. If the final fence
  // stops this write, the derived pending marker prevents stale reuse until the
