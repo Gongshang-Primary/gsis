@@ -1,3 +1,7 @@
+## Pending: minimal Worker allocation single-flight, 4 November 2026
+
+Model: Codex. Add one durable Worker scheduler lease, record overlaps as SKIPPED_BUSY and back off after two timeouts. Retain uncertain execution leases and timeout history until confirmed completion; fence late results. No backend or UI change; the broader #72 remains for next release. See [bounded task](docs/coordination/tasks/roster-allocation-single-flight-j.md).
+
 ## Pending: repair duplicate Stapler audit identities, 4 November 2026
 
 Model: Codex. Owner ruling (a) gives each colliding Stapler decision audit the fixed `-decision` suffix and keeps the original planning-request reference on both events. The bounded repair uses one pure projection for import preparation and an Admin dry-run/apply command with a retained receipt. Preserve all other rows and raw source freshness checks; no live repair or deployment. See [repair task](docs/coordination/tasks/roster-import-duplicate-audit-repair.md).

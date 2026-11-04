@@ -6,7 +6,7 @@ const code=fs.readFileSync('notification-worker/index.js','utf8').replace(/^impo
 const deferred=()=>{let resolve;const promise=new Promise(done=>{resolve=done;});return {promise,resolve};};
 function host(overrides={}){
  const calls=[],errors=[],background=[],empty={hasMore:false,transport:{pending:0},intake:{deferred:0}};
- const scope=vm.createContext({Response,crypto:globalThis.crypto,assertRecoveryWritable:()=>{},safeHealthError:error=>({code:error.code||'UNKNOWN_ERROR'}),edgeRosterEnabled:env=>env.ROSTER_EDGE_AUTHORITY==='d1',edgeDeployEnabled:env=>env.DEPLOY_EDGE_AUTHORITY==='d1',console:{info(){},error:value=>errors.push(JSON.parse(value))},
+ const scope=vm.createContext({Response,crypto:globalThis.crypto,runAllocationCycle:async(_env,work)=>work(),assertRecoveryWritable:()=>{},safeHealthError:error=>({code:error.code||'UNKNOWN_ERROR'}),edgeRosterEnabled:env=>env.ROSTER_EDGE_AUTHORITY==='d1',edgeDeployEnabled:env=>env.DEPLOY_EDGE_AUTHORITY==='d1',console:{info(){},error:value=>errors.push(JSON.parse(value))},
   dispatchReceivedReports:async()=>{calls.push('received');return empty;},
   dispatchNotifications:async()=>{calls.push('notifications');return {pending:0};},
   dispatchPeerMail:async()=>{calls.push('peer-mail');return {sent:0};},
