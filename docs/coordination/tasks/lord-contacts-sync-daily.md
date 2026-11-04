@@ -21,3 +21,10 @@ Sync the Contacts/Deploy reference copy **once every 24 h at 02:03 SGT**. The ow
 6. OVERLORD status: show last Contacts sync time and next scheduled run.
 7. Tests: daily trigger installed and minute trigger removed (idempotent); send allowed at 25 h, refused-then-synced at 27 h; deferred lock retries; classification text; no change to consent/revocation checks other than the window.
 No deploy; owner pastes Code.gs and runs `installLORDDailyContactsSync()` once.
+
+## Addendum (4 Nov 10:50): lock starvation evidence
+Owner ran `enableLORDGSiSBridge` 10:48:59; the source fetch completed, then the publish step failed at 10:49:47: "Lock timeout: another process was holding the lock for too long" (Code.gs:433 withWriteLock_ ← 7196 referenceLock ← 7226 syncLORDGSiSReferences_). The ScriptLock is held for more than 30 s at a time.
+Likely holder: `processSecondaryQueue_` (minute trigger, and again from `checkAndSendOverdueTelegramAlerts` every 5 min) keeps the ScriptLock while it runs `scheduleTeacherWhatsApp_()` (reads every Bookings row, event rows, sessions, GSiS snapshot) and `recoverWhatsAppForceClose_()`, before even claiming tasks.
+Add to this task:
+8. Run `scheduleTeacherWhatsApp_` and `recoverWhatsAppForceClose_` outside the ScriptLock (compute first, then take the lock only to write queue records, rechecking state), so no background job holds the lock for more than a few seconds.
+9. Log lock hold time per background job (LORD_TIMING) and test that the queue never holds the lock across a full Bookings scan.
