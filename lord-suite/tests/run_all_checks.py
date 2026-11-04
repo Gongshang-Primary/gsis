@@ -16,7 +16,7 @@ commands += [['node', 'tests/'+name+'.cjs'] for name in [
     'queued-writes', 'run_behavior_checks', 'run_image_checks', 'run_reload_checks', 'run_admin_whatsapp_checks',
     'run_backend_settings_checks', 'gsis098g-shared-secret', 'run_worker_config_checks', 'run_backend_131_checks', 'run_backend_14_checks', 'run_property_policy_checks','run_maintenance_status_checks','gsis098h-background-work','gsis098h-background-ui','run_booking_speed_checks','run_evidence_upload_checks',
     'run_frontend_14_checks', 'run_frontend_141_checks', 'starlord-refresh', 'run_refactor_checks',
-    'run_v18_checks','run_v18_frontend_checks','run_school_agreement_checks','run_school_frontend_checks', 'run_v17_checks', 'run_v17_operations', 'review_compatibility', 'run_reload_browser_checks','run_gsis_bridge_checks','gsis098d-sync-contention','run_gsis_contract_checks','gsis-independent-identity-review','gsis-reference-ui-browser','gsis-direct-entry','booking-remarks-return-browser','booking-open-checks','lord-admin-booking-recovery',
+    'run_v18_checks','run_v18_frontend_checks','run_school_agreement_checks','run_school_frontend_checks', 'run_v17_checks', 'run_v17_operations', 'review_compatibility', 'run_reload_browser_checks','run_gsis_bridge_checks','gsis098d-sync-contention','lord-daily-contacts-sync','run_gsis_contract_checks','gsis-independent-identity-review','gsis-reference-ui-browser','gsis-direct-entry','booking-remarks-return-browser','booking-open-checks','lord-admin-booking-recovery',
 ]]
 env = os.environ.copy()
 if env.get('CODEX_PRIMARY_RUNTIME_NODE_MODULES') and not env.get('NODE_PATH'):

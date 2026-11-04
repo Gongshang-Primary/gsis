@@ -11,4 +11,4 @@ const assert=require('node:assert/strict'),{fixture}=require('./run_gsis_bridge_
 {
  const h=fixture();h.enable();h.failSource='contacts';assert.throws(()=>h.ctx.syncLORDGSiSReferences(),/Injected remote failure/);assert.equal(JSON.parse(h.properties.LORD_GSIS_CHECK).ok,false);
 }
-console.log('PASS LORD scheduled contention defers without freshness renewal; real source failures remain errors');
+console.log('PASS LORD scheduled contention waits and retries before deferring without freshness renewal; real source failures remain errors');

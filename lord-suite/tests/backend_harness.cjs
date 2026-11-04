@@ -93,7 +93,7 @@ function harness(options = {}) {
     Logger:{log:line=>h.warnings.push(line)},
     ContentService:{MimeType:{JSON:'application/json'},createTextOutput:content=>({content,setMimeType(){return this;}})},
     PropertiesService:{getScriptProperties:()=>props},CacheService:{getScriptCache:()=>cache},ScriptApp:scriptApp,
-    Utilities:{formatDate,getUuid:()=>`${String(++sequence).padStart(8,'0')}-0000-0000-0000-000000000000`,
+    Utilities:{formatDate,sleep:ms=>{h.now+=ms;},getUuid:()=>`${String(++sequence).padStart(8,'0')}-0000-0000-0000-000000000000`,
       DigestAlgorithm:{SHA_256:'sha256',MD5:'md5'},Charset:{UTF_8:'UTF-8'},computeDigest:(algorithm,value)=>Array.from(crypto.createHash(algorithm||'sha256').update(Array.isArray(value)?Buffer.from(value):value).digest()),
       base64Decode:data=>Array.from(Buffer.from(data,'base64')),newBlob:(bytes,mime,name)=>({bytes,mime,name})},
     SpreadsheetApp:{openById:id=>{h.opens.push(id);return id===ctx.LORD_CONFIG.SPREADSHEET_ID?h.ss:h.ref;},flush(){h.now+=2;}},

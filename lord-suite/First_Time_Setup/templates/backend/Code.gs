@@ -422,8 +422,8 @@ function scriptWriteLock_() {
 function withRuntimePropertyLock_(fn) {
   var lock = scriptWriteLock_();
   if (lock.hasLock()) return fn(false);
-  lock.waitLock(3000);
-  try { return fn(true); }
+  measureBackendPhase_('lockWaitMs', function() { lock.waitLock(3000); });
+  try { return measureBackendPhase_('lockHeldMs', function() { return fn(true); }); }
   finally { lock.releaseLock(); }
 }
 
@@ -928,6 +928,12 @@ function saveSecondaryFailure_(props, task, failure) {
 function maintenanceFailureReason_(error) {
   var message = getErrorMessage_(error), match = /^WhatsApp request failed \(HTTP (\d{3}), code (\d+)\)\.$/.exec(message);
   if (match) return {code:'WHATSAPP_PROVIDER',http:Number(match[1]),providerCode:Number(match[2])};
+  var contactsCode = String(error && error.code || '');
+  if (contactsCode === 'GSIS_CONTACT_UNAVAILABLE' || /^GSIS_SYNC_[A-Z_]+$/.test(contactsCode)) {
+    var check = {};
+    try { check = JSON.parse(PropertiesService.getScriptProperties().getProperty('LORD_GSIS_CHECK') || '{}'); } catch (ignore) {}
+    return {code:contactsCode,contactsSyncedAt:check && typeof check.contactsCheckedAt === 'string' ? check.contactsCheckedAt : ''};
+  }
   if (/quota|too many times for one day/i.test(message)) return {code:'DAILY_QUOTA'};
   if (/permission|authorization|not authorized/i.test(message)) return {code:'PERMISSION'};
   if (/storage|record exceeds|queue is full/i.test(message)) return {code:'STORAGE'};
@@ -1001,6 +1007,10 @@ function maintenanceFailurePublic_(recorded) {
   // Reconstruct display text; never return arbitrary stored error strings.
   if (reason.code === 'WHATSAPP_PROVIDER' && /^\d{3}$/.test(String(reason.http)) && /^\d+$/.test(String(reason.providerCode))) {
     details.WHATSAPP_PROVIDER = 'WhatsApp rejected the request (HTTP ' + Number(reason.http) + ', code ' + Number(reason.providerCode) + ').';
+  }
+  if (reason.code === 'GSIS_CONTACT_UNAVAILABLE' || /^GSIS_SYNC_[A-Z_]+$/.test(String(reason.code || ''))) {
+    var syncedAt = Date.parse(reason.contactsSyncedAt || '');
+    details[reason.code] = 'Contacts copy not synced since ' + (isFinite(syncedAt) && syncedAt <= Date.now() ? Utilities.formatDate(new Date(syncedAt), LORD_CONFIG.TIME_ZONE, 'HH:mm') : '--:--') + '. Use Sync Contacts now.';
   }
   var reasonCode = Object.prototype.hasOwnProperty.call(details, reason.code) ? reason.code : 'UNCLASSIFIED_FAILURE';
   return {task:taskName,at:isFinite(Date.parse(recorded.at)) ? new Date(recorded.at).toISOString() : '',reason:reasonCode,detail:details[reasonCode]};
@@ -1329,37 +1339,45 @@ function pruneSecondaryTasks_(props, snapshot) {
 }
 
 function processSecondaryQueue_(limit) {
-  var props = PropertiesService.getScriptProperties();
-  var recoverWhatsApp = whatsAppConfig_().ready;
-  // Pruning deletes records: refresh its snapshot while holding the same lock
-  // used for task claims, so an old snapshot cannot erase a fresh email lease.
-  var lock = scriptWriteLock_();
-  if (!lock.tryLock(3000)) return;
-  var tasks;
+  var ownMetrics = !executionContext_().requestMetrics;
+  var metrics = ownMetrics ? beginRequestMetrics_('BACKGROUND') : executionContext_().requestMetrics;
+  if (ownMetrics) metrics.action = 'secondaryqueue';
   try {
-    if (recoverWhatsApp) {
+    var props = PropertiesService.getScriptProperties();
+    // Compute Sheet/reference work before the queue lock. Each enqueue rechecks
+    // the durable key and capacity under its own short property-write lock.
+    if (whatsAppConfig_().ready) {
       try { scheduleTeacherWhatsApp_(); } catch (error) { noteMaintenanceFailure_('teacher_whatsapp', error); }
       try { recoverWhatsAppForceClose_(); } catch (error) { noteMaintenanceFailure_('whatsapp_recovery', error); }
     }
-    var queueSnapshot = reconcileBackgroundAuditBatch_(props);
-    tasks = pruneSecondaryTasks_(props,queueSnapshot).filter(function(task) { return !task.invalid && !secondaryTaskNeedsReconciliation_(task) && backgroundTaskState_(task) !== 'expired' && !(Number(task.leaseUntil) > Date.now()) && !(Number(task.nextAttemptAt) > Date.now()); });
-    // Operational Sheet repairs must not sit behind notification retries.
-    tasks.sort(function(a, b) { return Number(a.kind === 'whatsapp_alert') - Number(b.kind === 'whatsapp_alert') || a.createdAt - b.createdAt; });
-    tasks = tasks.slice(0, Math.max(1, Number(limit) || 10));
+    // Pruning deletes records: refresh its snapshot while holding the same lock
+    // used for task claims, so an old snapshot cannot erase a fresh email lease.
+    var lock = scriptWriteLock_();
+    if (!measureBackendPhase_('lockWaitMs', function() { return lock.tryLock(3000); })) return;
+    var tasks, heldAt = Date.now();
+    try {
+      var queueSnapshot = reconcileBackgroundAuditBatch_(props);
+      tasks = pruneSecondaryTasks_(props,queueSnapshot).filter(function(task) { return !task.invalid && !secondaryTaskNeedsReconciliation_(task) && backgroundTaskState_(task) !== 'expired' && !(Number(task.leaseUntil) > Date.now()) && !(Number(task.nextAttemptAt) > Date.now()); });
+      // Operational Sheet repairs must not sit behind notification retries.
+      tasks.sort(function(a, b) { return Number(a.kind === 'whatsapp_alert') - Number(b.kind === 'whatsapp_alert') || a.createdAt - b.createdAt; });
+      tasks = tasks.slice(0, Math.max(1, Number(limit) || 10));
+    } finally { metrics.lockHeldMs += Math.max(0,Date.now()-heldAt); lock.releaseLock(); }
+    var queueStarted = Date.now();
+    for (var i = 0; i < tasks.length && Date.now() - queueStarted < 90000; i++) processSecondaryTaskWithClaim_(props, tasks[i]._key);
+  } finally {
+    if (ownMetrics) { finishRequestMetrics_(metrics); delete executionContext_().requestMetrics; }
   }
-  finally { lock.releaseLock(); }
-  var queueStarted = Date.now();
-  for (var i = 0; i < tasks.length && Date.now() - queueStarted < 90000; i++) processSecondaryTaskWithClaim_(props, tasks[i]._key);
 }
 
 function processSecondaryTaskWithClaim_(props, key) {
   var lock = scriptWriteLock_();
   var acquired = false;
   var task = null;
-  var emailClaim = '';
+  var emailClaim = '', heldAt;
   try {
-    acquired = lock.tryLock(3000);
+    acquired = measureBackendPhase_('lockWaitMs', function() { return lock.tryLock(3000); });
     if (!acquired) return;
+    heldAt = Date.now();
     var raw = props.getProperty(key);
     if (!raw) return; // Another runner completed it after our snapshot.
     task = JSON.parse(raw);
@@ -1387,14 +1405,19 @@ function processSecondaryTaskWithClaim_(props, key) {
     noteMaintenanceFailure_('queue_retry', error, null, task);
     emailClaim = '';
   } finally {
-    if (acquired) lock.releaseLock();
+    if (acquired) {
+      var metrics = executionContext_().requestMetrics;
+      if (metrics) metrics.lockHeldMs += Math.max(0,Date.now()-heldAt);
+      lock.releaseLock();
+    }
   }
   if (!emailClaim) return;
   var sent = false, definitiveFailure = false;
   try { executeSecondaryTask_(task); sent = true; }
   catch (error) { definitiveFailure = Boolean(error.definitiveNonacceptance) || task.kind === 'booking_email' && /^(Service invoked too many times for one day: email|Limit exceeded: Email)/i.test(getErrorMessage_(error)); noteMaintenanceFailure_(task.kind === 'whatsapp_alert' ? 'whatsapp_retry' : 'email_retry', error, null, task); }
   var finishLock = scriptWriteLock_();
-  if (!finishLock.tryLock(3000)) return; // Lease expires if receipt cannot be saved.
+  if (!measureBackendPhase_('lockWaitMs', function() { return finishLock.tryLock(3000); })) return; // Lease expires if receipt cannot be saved.
+  heldAt = Date.now();
   try {
     var currentRaw = props.getProperty(key);
     var current = currentRaw ? JSON.parse(currentRaw) : null;
@@ -1415,7 +1438,11 @@ function processSecondaryTaskWithClaim_(props, key) {
       setBoundedRuntimeProperty_(props, key, JSON.stringify(current));
     }
   } catch (error) { noteMaintenanceFailure_(task.kind === 'whatsapp_alert' ? 'whatsapp_checkpoint' : 'email_checkpoint', error, null, task); }
-  finally { finishLock.releaseLock(); }
+  finally {
+    var metrics = executionContext_().requestMetrics;
+    if (metrics) metrics.lockHeldMs += Math.max(0,Date.now()-heldAt);
+    finishLock.releaseLock();
+  }
 }
 
 function deliverBookingEmail_(task) {
@@ -5784,12 +5811,15 @@ function queueWhatsAppAlert_(eventKey, templateKind, values, sessionId, createdA
     adminDirectory_().forEach(function(admin) { if (admin.active && contactHasConsent_(admin, admin.whatsappOptIn)) recipientSet[admin.email] = true; });
     var recipients = Object.keys(recipientSet);
     if (!recipients.length) return false;
-    var all = props.getProperties();
-    if (pruneSecondaryTasks_(props, all).length >= LORD_SECONDARY.MAX_ITEMS) throw new Error('WhatsApp background queue is full.');
     var task = { kind: 'whatsapp_alert', createdAt: createdAt || Date.now(), payload: { templateKind: templateKind, sessionId: sessionId,
       values: values.map(function(value) { return whatsAppText_(value, templateKind === 'forceClose' ? 300 : 60); }), remaining: recipients } };
-    setBoundedRuntimeProperty_(props, key, JSON.stringify(task), all);
-    return true;
+    return withRuntimePropertyLock_(function() {
+      if (props.getProperty(key)) return true;
+      var all = props.getProperties();
+      if (pruneSecondaryTasks_(props, all).length >= LORD_SECONDARY.MAX_ITEMS) throw new Error('WhatsApp background queue is full.');
+      setBoundedRuntimeProperty_(props, key, JSON.stringify(task), all);
+      return true;
+    });
   } catch (error) { noteMaintenanceFailure_('whatsapp_queue', error); return false; }
 }
 
@@ -5821,6 +5851,7 @@ function deliverWhatsAppAlert_(task) {
     return;
   }
   if (task.payload.sessionId && getSession_(task.payload.sessionId).status !== 'OPEN') return;
+  gsisRequireFreshContacts_();
   var start = Date.now();
   var attempts = task.payload.remaining.length;
   while (attempts-- > 0) {
@@ -5838,13 +5869,12 @@ function deliverWhatsAppAlert_(task) {
     try {
       if (eligible) messageId = sendWhatsAppTemplate_(config, admin.mobile, task.payload.templateKind, task.payload.values);
     } catch (sendError) {
+      if (sendError.preProviderRefusal) { checkpointWhatsAppSend_(task,email,true); throw sendError; }
       noteMaintenanceFailure_('whatsapp_retry', sendError, null, task);
       if (!sendError.definitiveNonacceptance) throw sendError;
       failed = true;
     }
-    var lock = scriptWriteLock_();
-    lock.waitLock(3000);
-    try {
+    withWriteLock_(function() {
       var raw = props.getProperty(task._key);
       var current = raw ? JSON.parse(raw) : null;
       if (!current || current.leaseToken !== task.leaseToken) throw new Error('WhatsApp delivery claim changed.');
@@ -5855,7 +5885,7 @@ function deliverWhatsAppAlert_(task) {
       if (messageId) current.payload.pendingAudit = { email: email, messageId: messageId };
       setBoundedRuntimeProperty_(props, task._key, JSON.stringify(current));
       flushWhatsAppAudit_(current, props);
-    } finally { lock.releaseLock(); }
+    },3000);
   }
   if (task.payload.remaining.length) throw new Error('Some WhatsApp recipients will be retried independently.');
 }
@@ -5874,14 +5904,19 @@ function flushWhatsAppAudit_(task, props) {
 }
 
 function sendWhatsAppTemplate_(config, phone, kind, values, buttonSuffix) {
-  gsisRequireFreshContacts_();
-  var components = [{ type: 'body', parameters: values.map(function(value) { return { type: 'text', text: value }; }) }];
-  if (buttonSuffix) components.push({ type: 'button', sub_type: 'url', index: '0', parameters: [{ type: 'text', text: buttonSuffix }] });
-  var response = UrlFetchApp.fetch('https://graph.facebook.com/' + config.version + '/' + config.phoneId + '/messages', {
-    method: 'post', contentType: 'application/json', headers: { Authorization: 'Bearer ' + config.token }, muteHttpExceptions: true,
-    payload: JSON.stringify({ messaging_product: 'whatsapp', recipient_type: 'individual', to: phone, type: 'template',
-      template: { name: config[kind], language: { code: config.language }, components: components } })
-  });
+  var options;
+  try {
+    gsisRequireFreshContacts_();
+    if (!config.ready) throw new Error('WhatsApp delivery is disabled or setup is incomplete.');
+    var components = [{ type: 'body', parameters: values.map(function(value) { return { type: 'text', text: value }; }) }];
+    if (buttonSuffix) components.push({ type: 'button', sub_type: 'url', index: '0', parameters: [{ type: 'text', text: buttonSuffix }] });
+    options = {
+      method: 'post', contentType: 'application/json', headers: { Authorization: 'Bearer ' + config.token }, muteHttpExceptions: true,
+      payload: JSON.stringify({ messaging_product: 'whatsapp', recipient_type: 'individual', to: phone, type: 'template',
+        template: { name: config[kind], language: { code: config.language }, components: components } })
+    };
+  } catch (error) { error.preProviderRefusal = true; throw error; }
+  var response = UrlFetchApp.fetch('https://graph.facebook.com/' + config.version + '/' + config.phoneId + '/messages', options);
   var payload;
   try { payload = JSON.parse(response.getContentText()); } catch (ignore) { payload = {}; }
   if (response.getResponseCode() < 200 || response.getResponseCode() >= 300 || !payload.messages || !payload.messages[0] || !payload.messages[0].id) {
@@ -6952,11 +6987,15 @@ function queueTeacherMessage_(kind, row, createdAt) {
   if (!contactHasConsent_(contact)) return false;
   var props = PropertiesService.getScriptProperties(), key = LORD_SECONDARY.PREFIX + 'WA_' + hashBookingValue_('teacher:' + kind + ':' + row[0] + ':' + (kind === 'bookingSuccess' ? 'created' : teacherMessageRevision_(row)), '');
   if (props.getProperty(key)) return true;
-  var all = props.getProperties();
-  if (pruneSecondaryTasks_(props, all).length >= LORD_SECONDARY.MAX_ITEMS) return false;
-  setBoundedRuntimeProperty_(props, key, JSON.stringify({ kind: 'whatsapp_alert', createdAt: createdAt || Date.now(),
-    payload: { audience: 'teacher', templateKind: kind, revision: teacherMessageRevision_(row), bookingId: row[0], ownerEmail: contact.email, sessionId: row[20] || '', remaining: [contact.email] } }), all);
-  return true;
+  var task = { kind: 'whatsapp_alert', createdAt: createdAt || Date.now(),
+    payload: { audience: 'teacher', templateKind: kind, revision: teacherMessageRevision_(row), bookingId: row[0], ownerEmail: contact.email, sessionId: row[20] || '', remaining: [contact.email] } };
+  return withRuntimePropertyLock_(function() {
+    if (props.getProperty(key)) return true;
+    var all = props.getProperties();
+    if (pruneSecondaryTasks_(props, all).length >= LORD_SECONDARY.MAX_ITEMS) return false;
+    setBoundedRuntimeProperty_(props, key, JSON.stringify(task), all);
+    return true;
+  });
 }
 function scheduleTeacherWhatsApp_() {
   var config = whatsAppConfig_();
@@ -6983,6 +7022,7 @@ function deliverTeacherWhatsApp_(task) {
   var config = whatsAppConfig_(), kind = task.payload.templateKind;
   if (!config.ready || !config.teacherEnabled) throw new Error('Teacher WhatsApp delivery is disabled.');
   if (/Followup$/.test(kind) && !config.followupsEnabled) throw new Error('Follow-up wording is awaiting approval.');
+  gsisRequireFreshContacts_();
   var found = findBookingRow_(task.payload.bookingId);
   if (!found || !teacherMessageEligible_(kind, found.values, task.createdAt)) return;
   if (kind !== 'bookingSuccess' && task.payload.revision !== teacherMessageRevision_(found.values)) return;
@@ -6994,10 +7034,11 @@ function deliverTeacherWhatsApp_(task) {
   if (task.payload.sessionId && found.values[20] !== task.payload.sessionId) return;
   var flow = { bookingSuccess: 'view', collectReminder: 'collect', returnReminder: 'return', collectionFollowup: 'collection-response', returnFollowup: 'return-response' }[kind];
   var suffix = 'bookingId=' + encodeURIComponent(task.payload.bookingId) + '&flow=' + flow;
+  var values = teacherMessageValues_(kind, found.values).map(function(v) { return whatsAppText_(v, 160); });
   checkpointWhatsAppSend_(task, contact.email);
   var messageId;
-  try { messageId = sendWhatsAppTemplate_(config, contact.mobile, kind, teacherMessageValues_(kind, found.values).map(function(v) { return whatsAppText_(v, 160); }), suffix); }
-  catch (error) { if (error.definitiveNonacceptance) checkpointWhatsAppSend_(task, contact.email, true); throw error; }
+  try { messageId = sendWhatsAppTemplate_(config, contact.mobile, kind, values, suffix); }
+  catch (error) { if (error.preProviderRefusal || error.definitiveNonacceptance) checkpointWhatsAppSend_(task, contact.email, true); throw error; }
   withWriteLock_(function() {
     var raw = props.getProperty(task._key), current = raw ? JSON.parse(raw) : null;
     if (!current || current.leaseToken !== task.leaseToken) throw new Error('WhatsApp delivery claim changed.');
@@ -7107,9 +7148,15 @@ function gsisReadSnapshot_(pointer) {
   if (raw.length < 90000) { try { cache.put(cacheKey, raw, 21600); } catch (ignore) {} }
   return snapshot;
 }
+// Daily local-copy policy: every freshness decision uses this one window.
+var LORD_GSIS_CONTACTS_FRESH_MS = 26 * 60 * 60 * 1000;
+function gsisContactsFresh_(check, key) {
+  var at = Date.parse(check.contactsCheckedAt || '');
+  return check.key === key && check.ok === true && isFinite(at) && at <= Date.now() && Date.now()-at <= LORD_GSIS_CONTACTS_FRESH_MS;
+}
 function gsisSourceStatus_(snapshot) {
   var check = gsisJSON_(PropertiesService.getScriptProperties().getProperty('LORD_GSIS_CHECK'), {});
-  var at=Date.parse(check.contactsCheckedAt || ''),healthy = check.key === snapshot.key && check.ok === true && isFinite(at) && at<=Date.now() && Date.now()-at<=300000;
+  var healthy = gsisContactsFresh_(check,snapshot.key);
   var p=snapshot.deploy.publication,today=Utilities.formatDate(new Date(),LORD_CONFIG.TIME_ZONE,'yyyy-MM-dd');
   return { enabled:true, key:snapshot.key, status:check.ok === false ? 'error' : healthy ? 'healthy' : 'stale',
     lastCheckedAt:check.checkedAt || '', updatedAt:snapshot.deploy.updatedAt || '', syncedAt:snapshot.createdAt,
@@ -7194,10 +7241,12 @@ function syncLORDGSiSReferences_(options) {
   options = options || {};
   if (!gsisEnabled_() && !options.allowDisabled) return {enabled:false};
   var referenceLock=function(fn) {
-    if (!options.scheduled) return withWriteLock_(fn);
-    var lock=scriptWriteLock_();
-    if (!lock.tryLock(250)) throw gsisError_('GSIS_SYNC_DEFERRED','Reference sync deferred while another save completes.');
-    try { return measureBackendPhase_('lockHeldMs',fn); } finally { lock.releaseLock(); }
+    var entered = false;
+    try { return withWriteLock_(function() { entered = true; return fn(); },30000); }
+    catch (error) {
+      if (!entered) throw gsisError_('GSIS_SYNC_DEFERRED','Reference sync deferred while another save completes.');
+      throw error;
+    }
   };
   var props=PropertiesService.getScriptProperties(),base='',oldPointer=null,previous=null,attempt=Utilities.getUuid();
   referenceLock(function() {
@@ -7235,7 +7284,7 @@ function syncLORDGSiSReferences_(options) {
     return {enabled:gsisEnabled_(),changed:changed,key:pointer.key,checkedAt:checkedAt};
   } catch (error) {
     if (error.code !== 'GSIS_SYNC_CHANGED' && error.code !== 'GSIS_SYNC_DEFERRED') {
-      try { referenceLock(function() { if ((props.getProperty('LORD_GSIS_SNAPSHOT') || '') === base && gsisJSON_(props.getProperty('LORD_GSIS_SYNC_LEASE'),{}).id===attempt) setBoundedRuntimeProperty_(props,'LORD_GSIS_CHECK',JSON.stringify({key:oldPointer && oldPointer.key || '',ok:false,checkedAt:new Date().toISOString(),code:'SOURCE_CHECK_FAILED'}),null,true); }); } catch (ignore) {}
+      try { referenceLock(function() { if ((props.getProperty('LORD_GSIS_SNAPSHOT') || '') === base && gsisJSON_(props.getProperty('LORD_GSIS_SYNC_LEASE'),{}).id===attempt) setBoundedRuntimeProperty_(props,'LORD_GSIS_CHECK',JSON.stringify(Object.assign({},gsisJSON_(props.getProperty('LORD_GSIS_CHECK'),{}),{key:oldPointer && oldPointer.key || '',ok:false,checkedAt:new Date().toISOString(),code:'SOURCE_CHECK_FAILED'})),null,true); }); } catch (ignore) {}
     }
     throw error;
   } finally {
@@ -7245,19 +7294,36 @@ function syncLORDGSiSReferences_(options) {
 function gsisSnapshotKey_(contacts,deploy,activities) { return 'gsis-v1-'+hashBookingValue_(JSON.stringify([contacts.key,deploy.key,activities]),'').slice(0,48); }
 function syncLORDGSiSReferences() {
   resetExecutionContext_();
-  try { return syncLORDGSiSReferences_({scheduled:true}); }
+  try { return syncLORDGSiSReferencesWaiting_({scheduled:true}); }
   catch (error) {
     if (['GSIS_SYNC_DEFERRED','GSIS_SYNC_BUSY','GSIS_SYNC_CHANGED'].indexOf(error.code)<0) throw error;
-    // Retain last successful freshness time. The existing minute trigger retries.
+    // Retain last successful freshness time after this run exhausts its retries.
     var result={enabled:gsisEnabled_(),deferred:true,code:error.code};
     console.log(JSON.stringify({event:'lord-reference-sync-deferred',code:error.code}));
     return result;
   }
 }
+function syncLORDGSiSReferencesWaiting_(options) {
+  for (var retries=0; ; retries++) {
+    try { return syncLORDGSiSReferences_(options); }
+    catch (error) {
+      if (retries >= 3 || ['GSIS_SYNC_DEFERRED','GSIS_SYNC_BUSY'].indexOf(error.code)<0) throw error;
+      Utilities.sleep(1000);
+    }
+  }
+}
+// Apps Script time triggers run approximately 02:03 SGT (within about 15 minutes).
+// Upgrade: paste Code.gs, publish the existing deployment, run this once.
+function installLORDDailyContactsSync() {
+  ScriptApp.getProjectTriggers().forEach(function(trigger) {
+    if (trigger.getHandlerFunction()==='syncLORDGSiSReferences') ScriptApp.deleteTrigger(trigger);
+  });
+  ScriptApp.newTrigger('syncLORDGSiSReferences').timeBased().atHour(2).nearMinute(3).everyDays(1).inTimezone('Asia/Singapore').create();
+  return {handler:'syncLORDGSiSReferences',time:'02:03',timeZone:'Asia/Singapore'};
+}
 function enableLORDGSiSBridge() {
-  resetExecutionContext_(); var result=syncLORDGSiSReferences_({allowDisabled:true});
-  var triggers=ScriptApp.getProjectTriggers().filter(function(t) { return t.getHandlerFunction()==='syncLORDGSiSReferences'; });
-  if (!triggers.length) ScriptApp.newTrigger('syncLORDGSiSReferences').timeBased().everyMinutes(1).create();
+  resetExecutionContext_(); var result=syncLORDGSiSReferencesWaiting_({allowDisabled:true});
+  installLORDDailyContactsSync();
   setBoundedRuntimeProperty_(PropertiesService.getScriptProperties(),'LORD_GSIS_ENABLED','true',null,true);
   executionContext_().gsisEnabled=true; delete executionContext_().gsisSnapshot;
   return {enabled:true,key:result.key,changed:result.changed};
@@ -7279,9 +7345,16 @@ function gsisRequireFreshContacts_() {
   if (ctx.gsisEnabled!==undefined && ctx.gsisEnabled!==enabled) throw gsisError_('GSIS_CONTACT_UNAVAILABLE','The Contacts source changed during delivery. Retry with the current source.');
   if (!enabled) return;
   var pointer=gsisJSON_(props.getProperty('LORD_GSIS_SNAPSHOT'),{}),check=gsisJSON_(props.getProperty('LORD_GSIS_CHECK'),{});
-  var at=Date.parse(check.contactsCheckedAt || '');
-  if (!check.ok || check.key!==pointer.key || !isFinite(at) || at>Date.now() || Date.now()-at>300000) throw gsisError_('GSIS_CONTACT_UNAVAILABLE','GSiS Contacts needs a successful recent sync before WhatsApp delivery.');
-  var pinned=executionContext_().gsisSnapshot;
+  var pinned=ctx.gsisSnapshot;
+  if (!gsisContactsFresh_(check,pointer.key)) {
+    // One waiting recovery attempt per send preflight; no provider is called if
+    // it fails. Keep the pre-sync identity pinned across a changed generation.
+    try { syncLORDGSiSReferences_({scheduled:true}); }
+    catch (error) { throw gsisError_('GSIS_CONTACT_UNAVAILABLE','GSiS Contacts needs a successful sync before WhatsApp delivery.'); }
+    pointer=gsisJSON_(props.getProperty('LORD_GSIS_SNAPSHOT'),{});
+    check=gsisJSON_(props.getProperty('LORD_GSIS_CHECK'),{});
+    if (!gsisContactsFresh_(check,pointer.key)) throw gsisError_('GSIS_CONTACT_UNAVAILABLE','GSiS Contacts needs a successful sync before WhatsApp delivery.');
+  }
   if (pinned && pinned.key!==pointer.key) throw gsisError_('GSIS_CONTACT_UNAVAILABLE','GSiS Contacts changed during delivery. Retry with the current local copy.');
 }
 function gsisPrepareReferenceRequest_(request,existing) {

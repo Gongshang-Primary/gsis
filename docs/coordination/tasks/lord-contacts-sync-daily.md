@@ -38,3 +38,43 @@ diagnoseLORDBackgroundWork 10:58: estimatedPropertyBytes 165,339 (limits 350k wa
 13. User experience on contention: a lock timeout must return a clear "LORD is busy, your request was not saved, retrying" and the client retries with the SAME clientRequestId (idempotent), never a new one.
 14. Report LORD_TIMING lockWaitMs/lockHeldMs p50/p95 per action before and after, from a fixture with the background queue running.
 Priority for today's relief: 2, 8, 10 first (stop sync starvation and the queue holding the lock), then 11-13.
+
+## PR A claim (4 Nov 2026, owner priority change)
+
+- Status: claimed; Model: Codex; reviewer: Claude at the exact PR head.
+- Base: main `437d68a0a606dab4dcfdb5a5a11571b32d807ba8`.
+- Branch: `codex/lord-contacts-sync-daily`.
+- Scope: items 1–3, 5, 8 and 10 only; canonical LORD Code.gs, focused LORD tests, runner registration and this record. Queue preparation runs outside ScriptLock; writes recheck persisted state under the lock. Measure fixture lockHeldMs before and after.
+- Checks: daily trigger idempotency, waiting sync/retries, 25 h/27 h freshness, safe classification, queue scans outside lock, concurrent queue rechecks, retryable pre-provider refusal, consent/revocation and provider uncertainty, canonical build, full Node and LORD suite.
+- Deferred: items 4, 6, 11–14 and wider LORD migration; no frontend changes, production execution or deployment.
+- Owner upgrade: paste Code.gs, publish the existing deployment, then run `installLORDDailyContactsSync()` once. The daily Apps Script trigger runs approximately 02:03 SGT, within about 15 minutes.
+
+## PR A implementation and verification
+
+- Status: review pending full CI; Model: Codex; Claude reviews the published exact head. No deployment or live data/provider calls.
+- The claim-only main ref update was rejected by automatic approval review because this turn authorises a draft task PR. The claim is recorded on this branch instead; main remains unchanged.
+- Daily trigger: the installer replaces all sync-handler triggers with one 02:03 Asia/Singapore daily trigger. Enable uses the same installer. Apps Script scheduling is approximate, within about 15 minutes.
+- Waiting sync: 30-second lock waits, initial attempt plus at most three DEFERRED/BUSY retries; no source call or freshness renewal on an exhausted busy lease. A send attempts one waiting recovery when its copy is unhealthy or older than the single 26-hour constant.
+- Queue: Bookings/Event Log/reference preparation runs outside ScriptLock. Both enqueue paths recheck the durable key and current capacity inside a short property-write lock. Existing claim, acceptance, consent/revocation and uncertainty safeguards remain.
+- Delivery: config and Contacts preflight precede recipient lookup/checkpoint. The final sender guard tags only failures before the provider call; those clear this attempt's checkpoint and retry. Provider timeouts and old unknown records retain uncertainty and never auto-resend.
+- Safe diagnostics reconstruct Contacts/sync text from the last successful Contacts check time; no raw error or recipient enters the public detail.
+- New offline program: 21/21 checks passed, including actual provider-boundary sends, stale and disabled refusal, final checkpoint cleanup, revocation/mobile changes, concurrent enqueue deduplication, retries and daily-trigger idempotency. Existing bridge 23/23 and contention checks passed.
+- Timed fixture: 500 Bookings rows; 159 queued tasks, including 29 uncertain and one runnable audit. Identical simulated Sheet/property latencies before and after. Baseline total lockHeldMs 45042, longest hold 45036; after total 10, longest 6; after LORD_TIMING agrees with measured ownership. The 45-second full Bookings scan remains outside the lock. These are deterministic fixture timings, not live performance evidence.
+- Canonical builds: `TZ=Asia/Singapore npm run build` (18 components) and `python3 lord-suite/tools/prepare_first_time.py`; root LORD backend and first-time backend template regenerated from Source/backend/Code.gs.
+- Local full Node/LORD attempts encounter missing Chromium; browser checks are not passes. Exact-head GitHub full-suite and all LORD checks remain mandatory before review handoff.
+
+## PR A upgrade and rollback
+
+Owner only: paste `lord-suite/Source/backend/Code.gs` into LORD Apps Script, publish the existing deployment, then run `installLORDDailyContactsSync()` once. No deployment performed by Codex. Retain existing settings, deployment URL, queue receipts and unknown outcomes. Rollback needs the prior Code.gs and restoration of its old reference-sync trigger; never delete uncertainty/receipt records.
+
+## PR A handoff
+
+Next: complete whole-branch advisory and exact-head full CI, open draft PR naming Claude and its head, then continue minimal allocation single-flight and #68. Items 4, 6 and 11–14 stay outside this PR.
+
+## PR A whole-branch advisory
+
+A fresh Codex advisory of local `891dd0e..0f4eecd` found two Important issues: the Admin acceptance audit lock escaped timing, and malformed sync-check metadata could prevent saving failure diagnostics. Both have regressions observed failing, then passing after correction. Admin acceptance now uses the existing timed write-lock helper; optional diagnostic timestamps use defensive parsing. Provider acceptance, unknown outcomes and original data remain retained. This advisory is not Claude approval. Final exact-head full CI is the remaining gate.
+
+## Current-main integration
+
+Main advanced to `c0789c9d37b946a782a85456d84a5ccb1402f8a9` during implementation, including the minimal allocation single-flight. Integrated the main-only files without editing or hand-merging generated bundles, then rebuilt canonically. The LORD PR remains limited to the same backend, generated copies, focused tests and record. All 34 non-browser LORD programs pass locally; four Chromium programs require CI. Original main `437d68a` remains the starting base; the final published commit also contains current main.
