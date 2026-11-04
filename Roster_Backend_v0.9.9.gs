@@ -4387,12 +4387,15 @@ function rosterOperationsStoredView_(state){
  const plans=list=>list.map(row=>{const r={...row};if(row.draft)r.draft=stored(row.draft);if(row.published)r.published=row.draft&&row.published===row.draft?{encoding:'same-as-draft-v1'}:stored(row.published);if(row.confirmedPlan)r.confirmedPlan=row.draft&&row.confirmedPlan===row.draft?{encoding:'same-as-draft-v1'}:row.published&&row.confirmedPlan===row.published?{encoding:'same-as-published-v1'}:stored(row.confirmedPlan);return r;});
  const view={...state};if(Array.isArray(state.staplerPlans))view.staplerPlans=plans(state.staplerPlans);if(Array.isArray(state.staplerArchives))view.staplerArchives=plans(state.staplerArchives);if(Array.isArray(state.optimisationRuns))view.optimisationRuns=state.optimisationRuns.map(run=>run.decisionEvidence?{...run,decisionEvidence:stored(run.decisionEvidence)}:run);return view;
 }
-function rosterOperationsCommit_(state,intakeFenceDates=null,intakeFencePeers=false,beforeWrite=null){if(typeof rosterEdgeAssertLegacyWrite_==='function')rosterEdgeAssertLegacyWrite_();gsisRequireBackendRole_('roster');
- if(typeof rosterAllocationAuditCapture_==='function')rosterAllocationAuditCapture_(state);
- const packed=rosterOperationsPackPlans_(state);let data=JSON.stringify(typeof rosterAllocationAuditPack_==='function'?rosterAllocationAuditPack_(packed):packed);
+function rosterOperationsCommit_(state,intakeFenceDates=null,intakeFencePeers=false,beforeWrite=null,preserveStored=false){if(typeof rosterEdgeAssertLegacyWrite_==='function')rosterEdgeAssertLegacyWrite_();gsisRequireBackendRole_('roster');
+ // The internal repair path retains stored bytes and checks its original source
+ // before preparation can select a newer pointer. Requests cannot set this flag.
+ const preserve=preserveStored===true;if(preserve&&beforeWrite)beforeWrite();
+ if(!preserve&&typeof rosterAllocationAuditCapture_==='function')rosterAllocationAuditCapture_(state);
+ const packed=preserve?state:rosterOperationsPackPlans_(state);let data=JSON.stringify(!preserve&&typeof rosterAllocationAuditPack_==='function'?rosterAllocationAuditPack_(packed):packed);
  // A derived read package must never consume the last space needed to save
  // authoritative work. Dropping it selects the established reader fallback.
- if(data.length>12000000){for(const row of packed.staplerPlans||[])delete row.timetablePackage;data=JSON.stringify(typeof rosterAllocationAuditPack_==='function'?rosterAllocationAuditPack_(packed):packed);}
+ if(!preserve&&data.length>12000000){for(const row of packed.staplerPlans||[])delete row.timetablePackage;data=JSON.stringify(typeof rosterAllocationAuditPack_==='function'?rosterAllocationAuditPack_(packed):packed);}
  // Existing Google document only: bounded emergency headroom preserves every
  // record while the retained intake can finish. The 12M derived-cache fallback
  // above stays first; no new storage format, authority or automatic pruning.
@@ -4403,7 +4406,10 @@ function rosterOperationsCommit_(state,intakeFenceDates=null,intakeFencePeers=fa
  GSISRosterAllocation.assertNewAuditIds(auditBefore,state.audit);
  if(!split&&data.length>rosterOperationsMaxChars_())throw Object.assign(Error('Relief records are full. Ask Admin to review storage capacity before retrying this same report.'),{status:507,code:'ROSTER_STORAGE_CAPACITY'});
  const prepared=split?rosterSplitPrepareDocument_(JSON.parse(data),{folderId:root.folderId,previousId:id}):null;
- const batchTicket=typeof rosterTimetableBatchCommitBegin_==='function'?rosterTimetableBatchCommitBegin_(state):null,venueTicket=typeof rosterVenuesBegin_==='function'?rosterVenuesBegin_('operations',state):null;
+ // Packed wrappers need server-owned lazy proofs for the source fences. Expand
+ // only a temporary row view; the authoritative payload above stays raw.
+ const fenceState=preserve?rosterOperationsUnpackPlans_({...state,staplerPlans:(state.staplerPlans||[]).map(row=>({...row})),staplerArchives:(state.staplerArchives||[]).map(row=>({...row}))}):state;
+ const batchTicket=typeof rosterTimetableBatchCommitBegin_==='function'?rosterTimetableBatchCommitBegin_(fenceState):null,venueTicket=typeof rosterVenuesBegin_==='function'?rosterVenuesBegin_('operations',fenceState):null;
  const write=()=>{
  // External preparation and file lookup can cross a period start. The allocator
  // rechecks its trusted clock inside the final write closure, never from input.
@@ -4609,11 +4615,54 @@ function rosterOperationsContext_(req,c,state,providedIndex){
 }
 function rosterOperationsDigest_(p){return Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256,JSON.stringify(p)).map(b=>('0'+((b+256)%256).toString(16)).slice(-2)).join('');}
 function rosterOperationsCommandDigest_(p){const stable={...p};delete stable.calendarByDate;delete stable.trustedNow;delete stable.notificationsReady;delete stable.schedulerAvailable;return rosterOperationsDigest_(stable);}
+// Repair deliberately reads the stored shape. General validation initialises
+// legacy settings and lazy evidence, which this bounded command must preserve.
+function rosterOperationsAuditRepairRead_(){
+ const id=props_().getProperty('ROSTER_OPERATIONS_FILE')||rosterFindFile_(ROSTER_DATA,'Roster operations.json');
+ if(!id)error_(503,'Relief records need review.');
+ const source=rosterOperationsStoredRead_(id),raw=source.value;
+ if(!raw||raw.schema!==1||!Number.isSafeInteger(raw.revision)||raw.revision<0||!Array.isArray(raw.audit)||!Array.isArray(raw.receipts))error_(503,'Relief records need review.');
+ return source;
+}
+function rosterOperationsAuditRepairReceipt_(raw,p,actor){
+ const old=raw.receipts.find(row=>row?.id===p.requestId);if(!old)return null;
+ if(typeof rosterNativeReceiptMatches_==='function'?!rosterNativeReceiptMatches_(old,p,actor):old.actor!==actor||old.digest!==rosterOperationsCommandDigest_(p))error_(409,'This request ID was used for a different save.');
+ // A matched cold receipt alone may read its verified original result. Never
+ // install getters or normalise other receipts in the authoritative raw state.
+ return old.archiveRef?{...old,result:rosterColdArchiveItem_(old.archiveRef,raw).result}:old;
+}
+function rosterOperationsAuditRepair_(req,c){
+ const user=rosterOperationsAuthority_(c,req.identity),p=req.input||{};
+ if(user.admin!==true)error_(403,'Current Admin access is required.');
+ if(!['dryRun','apply'].includes(p.mode))error_(400,'Choose dryRun or apply for the audit repair.');
+ if(p.mode==='apply'&&(typeof p.requestId!=='string'||!/^[\w-]{36}$/.test(p.requestId)||typeof p.previewDigest!=='string'||!/^[a-f0-9]{64}$/.test(p.previewDigest)))error_(400,'The repair request ID and dry-run preview are required.');
+ const rule='stapler-audit-decision-suffix',version=1,preview=raw=>rosterOperationsDigest_([rule,version,raw]);
+ if(p.mode==='dryRun'){
+  const raw=rosterOperationsAuditRepairRead_().value,repair=GSiSRosterImport.repairStaplerAuditIds(raw.audit);
+  return {rule,version,pairs:repair.pairs,revision:raw.revision,previewDigest:preview(raw)};
+ }
+ const lock=LockService.getScriptLock();if(!deployLock_(lock,8000))error_(503,'Another save is finishing. Retry this same repair request.');
+ try{
+  const source=rosterOperationsAuditRepairRead_(),raw=source.value,old=rosterOperationsAuditRepairReceipt_(raw,p,req.identity.email);
+  if(old)return {...old.result,replayed:true};
+  if(preview(raw)!==p.previewDigest)error_(409,'Relief records changed. Run a fresh audit repair dry-run.');
+  const repair=GSiSRosterImport.repairStaplerAuditIds(raw.audit);
+  if(!repair.pairs)return {rule,version,pairs:0,applied:false,revision:raw.revision};
+  if(raw.revision===Number.MAX_SAFE_INTEGER)error_(409,'The saved revision cannot be advanced. Ask Admin to review the records.');
+  const sourceCheck=()=>{if((props_().getProperty('ROSTER_OPERATIONS_FILE')||rosterFindFile_(ROSTER_DATA,'Roster operations.json'))!==source.id)error_(409,'Roster storage changed. Retry against the latest saved state.');};
+  rosterOperationsStorageSources_.set(raw,source);rosterOperationsAuditSources_.set(raw,raw.audit.map(row=>({id:row?.id})));
+  raw.audit=repair.audit;raw.revision++;
+  const result={rule,version,pairs:repair.pairs,applied:true,revision:raw.revision,requestId:p.requestId};
+  raw.receipts.push({id:p.requestId,actor:req.identity.email,digest:rosterOperationsCommandDigest_(p),result,at:new Date().toISOString(),revision:raw.revision});
+  sourceCheck();rosterOperationsCommit_(raw,null,false,sourceCheck,true);return result;
+ }finally{deployUnlock_(lock);}
+}
 function rosterOperationsReceipt_(req,c){
- rosterOperationsAuthority_(c,req.identity);const p=req.input?.command;
- const writes=['archiveColdOutput','reliefBatch','saveAbsence','deleteAbsences','saveInstructions','saveAdhoc','deleteAdhoc','saveTypes','requestMutual','respondMutual','prune','saveNameBridge','deleteNameBridge','notifyDaily','saveSystemConfig','saveDailyEmploymentSettings','sendDailyEmploymentReport','createStapler','importStapler','saveStapler','confirmStapler','publishStapler','resetStapler','requestStapler','decideStapler','renameStapler','moveStapler','deleteStapler','restoreStapler','unassign','saveRecessSettings','saveRecess','deleteRecess','setNoRelief','noRelief','publish','acknowledge','removeAssignment','saveCustomInstruction','deleteCustomInstruction','setCustomInstructionEnabled','assign','combine','undo','optimise','autoAllocate','setDutySMC','importRHistory','verifyRYear','correctRelief','confirmCompleted'];
+ const user=rosterOperationsAuthority_(c,req.identity),p=req.input?.command,repair=p?.operation==='repairStaplerAuditIds';
+ if(repair&&user.admin!==true)error_(403,'Current Admin access is required.');
+ const writes=['repairStaplerAuditIds','archiveColdOutput','reliefBatch','saveAbsence','deleteAbsences','saveInstructions','saveAdhoc','deleteAdhoc','saveTypes','requestMutual','respondMutual','prune','saveNameBridge','deleteNameBridge','notifyDaily','saveSystemConfig','saveDailyEmploymentSettings','sendDailyEmploymentReport','createStapler','importStapler','saveStapler','confirmStapler','publishStapler','resetStapler','requestStapler','decideStapler','renameStapler','moveStapler','deleteStapler','restoreStapler','unassign','saveRecessSettings','saveRecess','deleteRecess','setNoRelief','noRelief','publish','acknowledge','removeAssignment','saveCustomInstruction','deleteCustomInstruction','setCustomInstructionEnabled','assign','combine','undo','optimise','autoAllocate','setDutySMC','importRHistory','verifyRYear','correctRelief','confirmCompleted'];
  if(!p||typeof p!=='object'||Array.isArray(p)||!writes.includes(p.operation)||typeof p.requestId!=='string'||!/^[\w-]{36}$/.test(p.requestId))error_(400,'The original save command is required.');
- const s=rosterOperationsState_(true),receipt=s.receipts.find(r=>r.id===p.requestId);
+ const s=repair?rosterOperationsAuditRepairRead_().value:rosterOperationsState_(true),receipt=repair?rosterOperationsAuditRepairReceipt_(s,p,req.identity.email):s.receipts.find(r=>r.id===p.requestId);
  if(receipt&&(typeof rosterNativeReceiptMatches_==='function'?!rosterNativeReceiptMatches_(receipt,p,req.identity.email):receipt.actor!==req.identity.email||receipt.digest!==rosterOperationsCommandDigest_(p)))error_(409,'This request ID was used for a different save.');
  if(receipt?.cancelled)return {accepted:false,cancelled:true,confirmation:'cancelled',requestId:p.requestId,currentRevision:s.revision};
  // Absence of a receipt can also mean the original request is still running.
@@ -5025,6 +5074,7 @@ function rosterOperationsDispatchCore_(req,c){gsisRequireBackendRole_('roster');
  const edge=typeof rosterEdgeMigrationDispatch_==='function'?rosterEdgeMigrationDispatch_(req,c):null;if(edge?.handled)return edge.result;
  if(typeof rosterEdgeAssertLegacyWrite_==='function')rosterEdgeAssertLegacyWrite_();
  const p=req.input||{},op=p.operation||'read',staplerWrite=['createStapler','importStapler','saveStapler','confirmStapler','publishStapler','resetStapler','renameStapler','moveStapler','deleteStapler','restoreStapler'].includes(op);
+ if(op==='repairStaplerAuditIds')return rosterOperationsAuditRepair_(req,c);
  if(['archiveColdOutput','archivedItem','archiveItems'].includes(op))return rosterColdArchiveDispatch_(req,c);
  if(['timetablePreparationManifest','timetablePreparationPart','timetablePreparationCheck'].includes(op))return rosterTimetablePreparationDispatch_(req,c);
  if(p.intake===true&&['saveAbsence','requestMutual'].includes(op))return rosterAbsenceIntakeCapture_(req,c);
@@ -10534,6 +10584,33 @@ var GSiSRosterImport=(()=>{
  function utf8Bytes(value){const bytes=[];for(const char of value){const n=char.codePointAt(0);if(n<128)bytes.push(n);else if(n<2048)bytes.push(192|n>>6,128|n&63);else if(n<65536)bytes.push(224|n>>12,128|n>>6&63,128|n&63);else bytes.push(240|n>>18,128|n>>12&63,128|n>>6&63,128|n&63);}return bytes.map(value=>value>127?value-256:value);}
  function digestValue(value){return typeof value==='string'&&/^[a-f0-9]{64}$/.test(value);}
  function identity(value,name,max=200){if(typeof value!=='string'||!value||value.length>max||/[\u0000-\u001f]/.test(value))fail(400,'ROSTER_IMPORT_ID','Invalid '+name+'.');return value;}
+ function repairStaplerAuditIds(audit){
+  const refuse=()=>fail(409,'ROSTER_AUDIT_REPAIR','The audit contains an ambiguous Stapler identity repair.');
+  if(!Array.isArray(audit))refuse();
+  const own=(row,key)=>Object.prototype.hasOwnProperty.call(row,key),groups=new Map(),repairs=new Map();
+  // Match Store's explicit identity and ref fallback, including String coercion,
+  // so even an unrelated malformed row can occupy a proposed decision identity.
+  for(let index=0;index<audit.length;index++){
+   const row=audit[index];if(!row||typeof row!=='object'||Array.isArray(row))continue;
+   const candidate=row.id??row.ref;if(candidate===null||candidate===undefined||String(candidate)==='')continue;
+   const id=String(candidate);if(!groups.has(id))groups.set(id,[]);groups.get(id).push(index);
+  }
+  const validDay=value=>typeof value==='string'&&/^\d{4}-\d\d-\d\d$/.test(value)&&Number.isFinite(Date.parse(value+'T00:00:00Z'))&&new Date(value+'T00:00:00Z').toISOString().slice(0,10)===value;
+  const validAt=value=>typeof value==='string'&&/^\d{4}-\d\d-\d\dT(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z|[+-]\d\d:\d\d)$/.test(value)&&validDay(value.slice(0,10))&&Number.isFinite(Date.parse(value));
+  let pairs=0;
+  for(const [id,indexes]of groups){
+   if(indexes.length<2||!indexes.some(index=>['requestStapler','decideStapler'].includes(audit[index].operation)))continue;
+   const request=indexes.filter(index=>audit[index].operation==='requestStapler'),decision=indexes.filter(index=>audit[index].operation==='decideStapler');
+   if(indexes.length!==2||request.length!==1||decision.length!==1||!id.trim()||id.length+12>1024||/[\u0000-\u001f]/.test(id)||groups.has(id+'-decision'))refuse();
+   const first=audit[request[0]],last=audit[decision[0]];
+   for(const row of [first,last])if(row.id!==id||own(row,'archiveRef')||own(row,'planningRequestId')&&row.planningRequestId!==id||own(row,'ref')&&row.ref!==id||!validDay(row.date)||!validAt(row.at))refuse();
+   if(first.date!==last.date||Date.parse(last.at)<Date.parse(first.at))refuse();
+   repairs.set(request[0],{id,planningRequestId:id});repairs.set(decision[0],{id:id+'-decision',planningRequestId:id});pairs++;
+  }
+  // Preflight the complete array before allocating changed rows. Unrelated
+  // duplicates remain intact and still fail the strict Store encoding boundary.
+  return {audit:pairs?audit.map((row,index)=>repairs.has(index)?{...row,...repairs.get(index)}:row):audit,pairs};
+ }
  function validateFailureReason(reason){
   if(!reason||typeof reason!=='object'||Array.isArray(reason)||Object.keys(reason).some(key=>!['status','message','phase','elapsed','code','bytes','records','ordinal','partId'].includes(key))||!Number.isSafeInteger(reason.status)||reason.status<400||reason.status>599||typeof reason.message!=='string'||!reason.message||reason.message.length>800||typeof reason.phase!=='string'||!reason.phase||reason.phase.length>80||/[\u0000-\u001f]/.test(reason.phase)||!Number.isSafeInteger(reason.elapsed)||reason.elapsed<0)fail(400,'ROSTER_IMPORT_PREPARATION_RESULT','Invalid preparation failure reason.');
   for(const key of ['bytes','records','ordinal'])if(reason[key]!==undefined&&reason[key]!==null&&(!Number.isSafeInteger(reason[key])||reason[key]<0))fail(400,'ROSTER_IMPORT_PREPARATION_RESULT','Invalid preparation step size.');
@@ -10576,6 +10653,7 @@ var GSiSRosterImport=(()=>{
    if(shallow){let parent=transformed;for(const key of job.path){parent[key]=Array.isArray(parent[key])?parent[key].slice():{...parent[key]};parent=parent[key];}}
    const value=jobValue(transformed,job);if(job.kind==='baseline'){value.modelObject={...reference};value.modelObjectKey=reference.key;value.modelDigest=reference.digest;delete value.modelFile;}else if(job.kind==='audit'){value.archiveObject={...reference};delete value.archiveFileId;}else{let parent=transformed;for(const key of job.path.slice(0,-1))parent=parent[key];parent[job.path.at(-1)]={edgeObject:true,...reference};}
   }
+  if(Array.isArray(transformed.state.audit))transformed.state.audit=repairStaplerAuditIds(transformed.state.audit).audit;
   return transformed;
  }
  function prepareRecordPart(snapshot,references,batch,adapter){
@@ -10960,7 +11038,7 @@ var GSiSRosterImport=(()=>{
   }finally{checked([await c.prepare(`UPDATE ${ARCHIVES} SET lease_token='',lease_until=0 WHERE session_id=? AND lease_token=?`).bind(job.session_id,token).run()]);}
   return {archived,processed,...await archiveStatus(db)};
  }
- return {objectJobs,prepareObject,prepareRecords,prepareRecordPart,finishFreeze,freeze,validateManifest,utf8Length,open,ensure,latest,resetAfterRollback,pendingRollbackReset,archiveRetained,archiveStatus,hashText,hashBytes,stageObject,FORMAT,SCOPES,TARGET_BYTES,SEGMENT_BYTES,MAX_PART_BYTES,MAX_PARTS,MAX_MANIFEST_BYTES,MAX_TOTAL_BYTES,MAX_OBJECT_BYTES,MAX_RETAINED_SESSIONS,PREPARATION_LEASE_MS,MAX_PREPARATION_RESULT_BYTES};
+ return {repairStaplerAuditIds,objectJobs,prepareObject,prepareRecords,prepareRecordPart,finishFreeze,freeze,validateManifest,utf8Length,open,ensure,latest,resetAfterRollback,pendingRollbackReset,archiveRetained,archiveStatus,hashText,hashBytes,stageObject,FORMAT,SCOPES,TARGET_BYTES,SEGMENT_BYTES,MAX_PART_BYTES,MAX_PARTS,MAX_MANIFEST_BYTES,MAX_TOTAL_BYTES,MAX_OBJECT_BYTES,MAX_RETAINED_SESSIONS,PREPARATION_LEASE_MS,MAX_PREPARATION_RESULT_BYTES};
 })();
 if(typeof module!=='undefined'&&module.exports)module.exports=GSiSRosterImport;
 
