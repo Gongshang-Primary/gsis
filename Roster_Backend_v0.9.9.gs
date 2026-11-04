@@ -2335,7 +2335,7 @@ function rosterFailureDetail_(error){
  const t=typeof deployTrace_==='undefined'?{}:deployTrace_||{},phase=String(error?.failurePhase||t.phase||'').replace(/^roster\./,'');
  const groups={'calculations-index':'calculation-source','calculations-source':'calculation-source','calculations-history-read':'history-read','calculations-history':'history-read','contacts-authority':'contacts','state-read':'operations-read',context:'timetable','register-read':'timetable','register-json':'timetable','register-schema':'timetable','timetable-read':'timetable','timetable-json':'timetable','timetable-validation':'timetable',quota:'calculation-source',projection:'plan-read',commit:'save','response-serialize':'response','response-create':'response'};
  const operations=['nextAbsenceIntake','deferAbsenceIntake','prepareNotification','requestMutual','saveSchoolAbsence','renameStapler','scheduledRoster','sendPeerMail','peerMailReview','reviewPeerMail','claimNotifications','prepareNotifications','notificationResult','notificationResults','inboxPendingDispatch','inboxReplyPrepare','inboxReplyResult','inboxAlertPrepare','inboxAlertResult','deliveryReviewMailDispatch','dailyEmploymentMailDispatch','processAbsenceIntake','flushAbsenceIntake','captureAbsenceIntake','retryAbsenceIntake','resolveAbsenceIntake','timetableBatch','timetableDay','timetableCacheManifest','read','saveAbsence','saveInstructions','saveStapler','confirmStapler','publishStapler','resetStapler','moveStapler','restoreStapler','deleteStapler','reliefBatch','publish','notifyDaily','autoAllocate','optimise','receiptStatus'];
- const codes=['ROSTER_CUTOVER_FROZEN','ROSTER_STORAGE_CAPACITY','GSIS_SECRET_INVALID','ABSENCE_PREPARATION_RETRY','ABSENCE_INTAKE_BUSY','ABSENCE_INTAKE_PENDING','CONTACTS_RECOVERY_REQUIRED','STAPLER_BASELINE_CONFLICT','STAPLER_CONFLICT','PEER_MAIL_REVIEW_CONFLICT','TIMETABLE_BATCH_CHANGED','TIMETABLE_BATCH_TOO_LARGE','CELL_CONFLICT','ABSENCE_CONFLICT','ALLOCATION_IN_PROGRESS','ALLOCATION_UNCONFIRMED','ALLOCATION_CANCELLED','ALLOCATION_ABANDONED','ALLOCATION_CUTOFF'];
+ const codes=['VENUES_FENCE_PENDING','VENUES_FENCE_UNCONFIRMED','COMMIT_UNCERTAIN','ROSTER_CUTOVER_FROZEN','ROSTER_STORAGE_CAPACITY','GSIS_SECRET_INVALID','ABSENCE_PREPARATION_RETRY','ABSENCE_INTAKE_BUSY','ABSENCE_INTAKE_PENDING','CONTACTS_RECOVERY_REQUIRED','STAPLER_BASELINE_CONFLICT','STAPLER_CONFLICT','PEER_MAIL_REVIEW_CONFLICT','TIMETABLE_BATCH_CHANGED','TIMETABLE_BATCH_TOO_LARGE','CELL_CONFLICT','ABSENCE_CONFLICT','ALLOCATION_IN_PROGRESS','ALLOCATION_UNCONFIRMED','ALLOCATION_CANCELLED','ALLOCATION_ABANDONED','ALLOCATION_CUTOFF'];
  return {backendVersion:GSIS_DEPLOY_VERSION,failureStage:phases.includes(phase)?phase:groups[phase]||'backend',...(operations.includes(t.operation)?{operation:t.operation}:{}),...(codes.includes(error?.code)?{code:error.code}:{})};
 }
 function rosterDiagnosticLog_(record){
@@ -5015,6 +5015,7 @@ function rosterOperationsDispatch_(req,c){
  return {...result,affectedDomains,affectedDates};
 }
 function rosterOperationsDispatchCore_(req,c){gsisRequireBackendRole_('roster');
+ if(['venuesSyncStatus','recoverVenuesSync'].includes(req.input?.operation))return rosterVenuesAdminDispatch_(req,c);
  const edge=typeof rosterEdgeMigrationDispatch_==='function'?rosterEdgeMigrationDispatch_(req,c):null;if(edge?.handled)return edge.result;
  if(typeof rosterEdgeAssertLegacyWrite_==='function')rosterEdgeAssertLegacyWrite_();
  const p=req.input||{},op=p.operation||'read',staplerWrite=['createStapler','importStapler','saveStapler','confirmStapler','publishStapler','resetStapler','renameStapler','moveStapler','deleteStapler','restoreStapler'].includes(op);
@@ -5165,7 +5166,8 @@ function rosterServiceDispatch_(req){gsisRequireBackendRole_('roster');
  if(req.input?.operation==='deferAbsenceIntake')return rosterAbsenceIntakeDefer_(req);
  const transport=typeof rosterNotificationTransportDispatch_==='function'?rosterNotificationTransportDispatch_(req):null;if(transport?.handled)return transport.result;
  if(['inboxIngest','inboxReplyPrepare','inboxReplyResult','inboxDelivery','inboxAlertPrepare','inboxAlertResult','inboxPendingDispatch'].includes(req.input?.operation))return rosterInboxServiceDispatch_(req);
- const p=req.input||{},op=p.operation,allowed=['connectionStatus','allocationAuditExport','scheduledRoster','dailyEmploymentMailDispatch','deliveryReviewMailDispatch','claimNotifications','inboundMessage','inboundReplyResult','prepareNotification','notificationResult','notificationDelivery','externalDuties','externalRespond','externalAcknowledge'];if(!allowed.includes(op))error_(403,'Unknown notification service operation.');
+ const p=req.input||{},op=p.operation,allowed=['venuesSyncCheck','connectionStatus','allocationAuditExport','scheduledRoster','dailyEmploymentMailDispatch','deliveryReviewMailDispatch','claimNotifications','inboundMessage','inboundReplyResult','prepareNotification','notificationResult','notificationDelivery','externalDuties','externalRespond','externalAcknowledge'];if(!allowed.includes(op))error_(403,'Unknown notification service operation.');
+ if(op==='venuesSyncCheck')return rosterVenuesSyncCheck_();
  if(op==='allocationAuditExport')return rosterAllocationAuditExport_(p);
  if(op==='externalDuties')return rosterPrivateRead_(p);
  if(op==='connectionStatus'){rosterServiceContacts_();return {readOnly:true,backendVersion:GSIS_DEPLOY_VERSION,contactsReady:true};}
@@ -8685,6 +8687,18 @@ function rosterDeliveryReviewDispatch_(req,contacts){
  }finally{deployUnlock_(lock);}
 }
 
+/* Scheduled Venues health alerts use the notification transport lock. */
+function rosterVenuesSyncCheck_(){
+ const status=rosterVenuesSyncStatus_();props_().setProperty('ROSTER_VENUES_HEALTH',JSON.stringify({state:status.state,since:status.since}));
+ if(!status.enabled)return {enabled:false};
+ const store=rosterNotificationState_();if(!store)return {blocked:status.overdue?1:0};const lock=rosterNotificationLock_(store);if(!deployLock_(lock,1000))return {deferred:1};
+ try{const current=rosterNotificationState_();if(!current)return {blocked:status.overdue?1:0};const key='delivery:venues-sync',old=current.smcAlerts.find(a=>a.key===key);let changed=false;
+  if(status.overdue){const date=new Date(status.checkedAt+8*3600000).toISOString().slice(0,10);if(!old||old.status!=='open'||old.date!==date){const row={id:old?.id||Utilities.getUuid(),key,date,createdAt:new Date(status.checkedAt).toISOString(),recipients:(rosterOperationsState_(true).smcDutyRoster||[]).find(r=>r.date===date)?.staffIds||[],origin:'venues-sync',status:'open',summary:'Venues sync needs Admin recovery. Open System Health to inspect and recover the source fence.'};if(old)Object.assign(old,row);else current.smcAlerts.push(row);changed=true;}}
+  else if(status.state==='ready'&&old?.status==='open'){old.status='resolved';old.resolvedAt=new Date(status.checkedAt).toISOString();changed=true;}
+  if(changed)rosterNotificationCommit_(current);return {enabled:true,blocked:status.overdue?1:0,idle:!changed,...(status.overdue?{failure:{code:status.code}}:{})};
+ }finally{deployUnlock_(lock);}
+}
+
 /* GSIS_ROSTER_NOTIFICATION_MAINTENANCE_END */
 
 
@@ -8953,11 +8967,49 @@ function rosterVenuesConfig_(){
  if(!/^https:\/\/script\.google\.com\/macros\/s\/[\w-]+\/exec$/.test(url||'')||!secret||secret.length<32)venuesSourceError_(503,'VENUES_SOURCE_SETUP','Set both VENUES_APPS_SCRIPT_URL and VENUES_BRIDGE_SECRET in Roster, or remove both until Venues is installed.');return {url,secret};
 }
 function rosterVenuesMarker_(){let marker;try{marker=JSON.parse(props_().getProperty('ROSTER_VENUES_SOURCE')||'null');}catch(_){}return marker;}
+// Diagnostics have their own signed, read/recovery-only route. Normal source
+// writes and their transaction checks are unchanged.
+function rosterVenuesRecoveryCall_(input,identity){
+ const config=rosterVenuesConfig_();if(!config)venuesSourceError_(503,'VENUES_SOURCE_SETUP','Configure the Venues connection first.');
+ const payload=JSON.stringify({action:'venuesRecovery',service:'gsis-venues-recovery-v1',timestamp:Date.now(),nonce:Utilities.getUuid(),input,...(identity?{identity:{email:identity.email,subject:identity.subject,admin:true}}:{})}),signature=Utilities.computeHmacSha256Signature(payload,config.secret).map(b=>('0'+((b+256)%256).toString(16)).slice(-2)).join('');
+ let result;try{const response=UrlFetchApp.fetch(config.url,{method:'post',contentType:'application/json',payload:JSON.stringify({payload,signature}),muteHttpExceptions:true});if(response.getResponseCode()!==200)throw Error();result=JSON.parse(response.getContentText());}catch(_){venuesSourceError_(503,'VENUES_FENCE_UNCONFIRMED','Venues sync could not be checked.');}
+ if(result?.ok!==true){const code=['COMMIT_UNCERTAIN','REVISION_CONFLICT','REVIEW_REQUIRED','FORBIDDEN'].includes(result?.code)?result.code:'VENUES_FENCE_UNCONFIRMED';venuesSourceError_(result?.status===403?403:503,code,'Venues recovery refused. Keep the fence closed and review the current status.');}
+ return result.data;
+}
+function rosterVenuesSyncStatus_(){
+ const now=Date.now(),marker=rosterVenuesMarker_();let remote,code='VENUES_FENCE_UNCONFIRMED',enabled=true;
+ try{if(!rosterVenuesConfig_())enabled=false;else remote=rosterVenuesRecoveryCall_({operation:'sourceStatus',source:'roster'});}catch(error){if(error.code==='COMMIT_UNCERTAIN')code=error.code;}
+ const valid=remote&&['ready','stale','pending','unavailable'].includes(remote.status)&&typeof remote.revision==='string'&&typeof remote.pendingToken==='string'&&['ready','uncertain'].includes(remote.commit?.state);
+ const state=!enabled?'ready':!valid||remote.commit.state==='uncertain'?'uncertain':marker?.status==='ready'&&!!marker.revision&&remote.revision===marker.revision&&!remote.pendingToken&&remote.status==='ready'?'ready':'pending';
+ if(valid&&remote.commit.state==='uncertain')code='COMMIT_UNCERTAIN';else if(state==='pending')code='VENUES_FENCE_PENDING';else if(state==='ready')code='OK';
+ let observed;try{observed=JSON.parse(props_().getProperty('ROSTER_VENUES_HEALTH')||'null');}catch(_){}
+ const dates=[observed?.state!=='ready'?observed?.since:null,marker?.status!=='ready'?marker?.updatedAt:null,valid&&remote.commit.state==='uncertain'?remote.commit.at:null].map(v=>typeof v==='number'?v:Date.parse(v)).filter(v=>Number.isFinite(v)&&v<=now);
+ const since=state==='ready'?null:dates.length?Math.min(...dates):now,ageMs=since===null?0:now-since;
+ return {available:!enabled||!!valid,enabled,state,code,checkedAt:now,since,ageMs,overdue:enabled&&state!=='ready'&&ageMs>300000,rosterState:['ready','pending','committed'].includes(marker?.status)?marker.status:'unavailable',venuesState:valid?remote.status:'unavailable',commitState:valid?remote.commit.state:'unavailable',remote};
+}
+function rosterVenuesPublicStatus_(status,admin=false){const {remote,...view}=status;return {...view,recoveryAllowed:admin===true&&status.enabled===true&&status.state!=='ready'};}
+function rosterVenuesAdminDispatch_(req,c){
+ const user=rosterOperationsAuthority_(c,req.identity),p=req.input||{};if(!user.smc&&!user.admin)error_(403,'SMC or Admin access is required.');
+ if(p.operation==='venuesSyncStatus')return rosterVenuesPublicStatus_(rosterVenuesSyncStatus_(),user.admin===true);
+ if(user.admin!==true)error_(403,'Current Admin access is required.');
+ if(typeof p.evidence!=='string'||p.evidence.trim().length<20||p.evidence.length>2000)error_(400,'Record at least 20 characters of recovery evidence.');
+ if(typeof rosterEdgeAssertLegacyWrite_==='function')rosterEdgeAssertLegacyWrite_();
+ let status=rosterVenuesSyncStatus_();const steps=[],refused=(step,error)=>({complete:false,steps:[...steps,{step,state:'refused',code:['COMMIT_UNCERTAIN','REVISION_CONFLICT','REVIEW_REQUIRED','VENUES_FENCE_PENDING'].includes(error?.code)?error.code:'VENUES_FENCE_UNCONFIRMED'}]});
+ if(!status.enabled||!status.available)return refused('venues');
+ if(status.state==='ready')return {complete:true,steps:[{step:'venues',state:'not-needed'},{step:'roster',state:'not-needed'}],status:rosterVenuesPublicStatus_(status,true)};
+ if(status.remote.commit.state==='uncertain'){
+  const token=status.remote.commit.token;if(typeof token!=='string'||!token||token.length>200)return refused('venues');
+  try{const result=rosterVenuesRecoveryCall_({operation:'recoverCommit',source:'roster',token,evidence:p.evidence.trim()},req.identity);if(result?.recovered!==true||typeof result.committed!=='boolean')return refused('venues');steps.push({step:'venues',state:'recovered',committed:result.committed===true});}catch(error){return refused('venues',error);}
+  status=rosterVenuesSyncStatus_();if(!status.available||status.remote.commit.state!=='ready')return refused('venues');
+ }else steps.push({step:'venues',state:'not-needed'});
+ try{const result=recoverRosterVenuesSource();if(result?.ready!==true)return refused('roster');steps.push({step:'roster',state:'recovered'});}catch(error){return refused('roster',error);}
+ return {complete:true,steps,note:'Recovery checks completed. Refresh status; normal Venues source refresh may still be needed.'};
+}
 function rosterVenuesCall_(input){
  const config=rosterVenuesConfig_();if(!config)return null;
  const payload=JSON.stringify({action:'venuesService',service:'gsis-venues-v1',timestamp:Date.now(),nonce:Utilities.getUuid(),input}),signature=Utilities.computeHmacSha256Signature(payload,config.secret).map(b=>('0'+((b+256)%256).toString(16)).slice(-2)).join('');
  let response;try{const r=UrlFetchApp.fetch(config.url,{method:'post',contentType:'application/json',payload:JSON.stringify({payload,signature}),muteHttpExceptions:true});if(r.getResponseCode()!==200)throw Error('http');response=JSON.parse(r.getContentText());}catch(_){venuesSourceError_(503,'VENUES_FENCE_UNCONFIRMED','Venues coordination could not be confirmed. Keep the current plan and ask Admin to run recoverRosterVenuesSource.');}
- if(response?.ok!==true)venuesSourceError_(503,'VENUES_FENCE_UNCONFIRMED','Venues coordination is pending. Ask Admin to check the source fence before retrying.');
+ if(response?.ok!==true)venuesSourceError_(503,response?.code==='COMMIT_UNCERTAIN'?'COMMIT_UNCERTAIN':'VENUES_FENCE_UNCONFIRMED','Venues coordination is pending. Ask Admin to check the source fence before retrying.');
  const ack=response.data,valid=input.operation==='sourceBegin'?ack?.status==='pending'&&ack.pendingToken===input.token&&ack.revision===input.expectedRevision:input.operation==='sourceComplete'?ack?.revision===input.revision&&!ack.pendingToken&&['stale','ready'].includes(ack.status):false;
  if(!valid)venuesSourceError_(503,'VENUES_FENCE_UNCONFIRMED','Venues did not confirm the exact source change. Keep the source fence closed and recover it.');return ack;
 }
