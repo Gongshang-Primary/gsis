@@ -9,7 +9,7 @@ module.exports=function mirrorBackend(){
  const blob=raw=>{const bytes=Buffer.from(Array.isArray(raw)?raw:String(raw));return {getBytes:()=>[...bytes],getDataAsString:()=>bytes.toString()};};
  const writable=()=>{if(properties.get('ROSTER_EDGE_AUTHORITY')==='d1'&&!scope.rosterMirrorWriteAllowed_())throw Object.assign(Error('Google is fenced'),{status:409});};
  const scope={console,GSiSEdgeStore:Store,ROSTER_DATA:'data',
-  GSISRosterOperations:{initial:()=>({schema:1,revision:0}),validateState:value=>value},gsisRequireBackendRole_:()=>{},rosterStage_:()=>{},
+  GSISRosterAllocation:require('../../shared/roster-allocation.js'),GSISRosterOperations:{initial:()=>({schema:1,revision:0}),validateState:value=>value},gsisRequireBackendRole_:()=>{},rosterStage_:()=>{},
   Utilities:{newBlob:blob,getUuid:()=>crypto.randomUUID(),base64Decode:value=>[...Buffer.from(value,'base64')],base64Encode:value=>Buffer.from(value).toString('base64'),computeDigest:(_algorithm,value)=>[...crypto.createHash('sha256').update(Buffer.from(value)).digest()],DigestAlgorithm:{SHA_256:'SHA256'}},
   rosterNotificationOwner_:()=>({email:'owner@example.test',scriptId:'script'}),LockService:{getScriptLock:()=>({})},deployLock_:()=>true,deployUnlock_:()=>{},
   props_:()=>({getProperty:key=>properties.get(key)||null,getProperties:()=>Object.fromEntries(properties),setProperty:(key,value)=>properties.set(key,value),setProperties:values=>Object.entries(values).forEach(([key,value])=>properties.set(key,value)),deleteProperty:key=>properties.delete(key)}),

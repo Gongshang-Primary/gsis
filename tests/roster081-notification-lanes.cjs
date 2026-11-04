@@ -4,7 +4,7 @@ const code=fs.readFileSync('notification-worker/index.js','utf8').replace(/^impo
 const deferred=()=>{let resolve,reject;const promise=new Promise((a,b)=>{resolve=a;reject=b;});return {promise,resolve,reject};};
 function host(overrides={}){
  const calls=[],errors=[],background=[];
- const scope=vm.createContext({Response,crypto:globalThis.crypto,assertRecoveryWritable:()=>{},safeHealthError:error=>({code:error.code||'UNKNOWN_ERROR'}),console:{info(){},error:value=>errors.push(JSON.parse(value))},
+ const scope=vm.createContext({Response,crypto:globalThis.crypto,runAllocationCycle:async(_env,work)=>work(),assertRecoveryWritable:()=>{},safeHealthError:error=>({code:error.code||'UNKNOWN_ERROR'}),console:{info(){},error:value=>errors.push(JSON.parse(value))},
   dispatchNotifications:async()=>{calls.push('notify');return {sent:0};},
   dispatchInboxPending:async()=>{calls.push('inbox');},
   dispatchAllocationAudit:async()=>{},

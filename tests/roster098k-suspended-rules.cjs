@@ -30,7 +30,7 @@ test('suspended days retain annual utilisation priority in ranking and complete 
 });
 test('suspension preserves disabled settings and the saved complete preference order',()=>{
  const f=setup();f.state.systemConfig.allocationPreferences=['subjectMatch','annualUtilisation','rotation','weeklyRemaining','levelMatch','alternatives'];f.state.systemConfig.allocationRuleEnabled={annualUtilisation:false,weeklyRemaining:false,dailyTotal:false,consecutive:false};onlyBob(f);lessons(f,'alice',[7]);lessons(f,'bob',[0,1,2,3,4,5,6]);suspend(f);const ds=report(f,[7]),r=solve(f,ds);
- assert.equal(r.coverage,1);assert.deepEqual(r.preferences,['subjectMatch','rotation','levelMatch','alternatives']);assert.deepEqual(r.workloadLimits,{dailyTotal:null,adhocDailyTotal:10,consecutive:null});
+ assert.equal(r.coverage,1);assert.deepEqual(r.preferences,['subjectMatch','rotation','levelMatch','alternatives']);assert.deepEqual(r.workloadLimits,{dailyTotal:null,adhocDailyTotal:10,consecutive:null,dailyRelief:null});
 });
 test('suspended weekly quota constrains the full plan rather than each independent slot',()=>{
  const f=setup();onlyBob(f);teacher(f,'bob').R=1;lessons(f,'alice',[2,4]);suspend(f);const ds=report(f,[2,4]),r=solve(f,ds);
@@ -66,7 +66,7 @@ test('suspended automatic allocation requires verified annual accounting',()=>{
  const result=f.O.apply(f.state,f.ctx,{operation:'autoAllocate',date:f.date,requestId:'accounting-check'});assert.equal(result.paused,true);assert.equal(A.effectiveAssignments(f.state).length,0);
 });
 test('suspended decision evidence separates calculation skip from effective policy',()=>{
- const f=setup();lessons(f,'alice',[2]);suspend(f);const ds=report(f,[2]),r=solve(f,ds);assert.equal(r.decisionEvidence.policy.workloadCalculationSkipped,true);assert.deepEqual(r.decisionEvidence.policy.effectiveWorkloadLimits,{dailyTotal:8,adhocDailyTotal:10,consecutive:6});
+ const f=setup();lessons(f,'alice',[2]);suspend(f);const ds=report(f,[2]),r=solve(f,ds);assert.equal(r.decisionEvidence.policy.workloadCalculationSkipped,true);assert.deepEqual(r.decisionEvidence.policy.effectiveWorkloadLimits,{dailyTotal:8,adhocDailyTotal:10,consecutive:6,dailyRelief:null});
 });
 
 test('configured consecutive-count exclusions remain active on suspended days',()=>{
@@ -77,4 +77,8 @@ test('new non-UT contractual cap violations refuse selection and retain old SMC 
  Object.assign(f.ctx.days[f.date].teachers.find(t=>t.staffId==='bob'),{periodCap:20,capConfigured:true,capBasis:'teaching',capVerified:true,capHeadroom:0,capWorkload:20});
  f.O.reconcile(f.state,f.ctx);assert(f.state.assignments.includes(saved));assert.equal(saved.status,'draft');assert.equal(saved.invalidCover,true);assert.equal(saved.reviewRequired,true);assert.deepEqual(A.manualDecision(f.state,f.date,ds[0].id),ownership);
  assert.throws(()=>f.O.apply(f.state,f.ctx,{operation:'assign',staffId:'bob',demandIds:[ds[0].id]}),/employment cap would be exceeded/);assert.equal(solve(f,ds).coverage,0);assert(f.state.assignments.includes(saved));
+});
+
+test('enabled relief cap still limits held relief on a workload-ignored suspended day',()=>{
+ const f=setup();onlyBob(f);f.state.systemConfig.allocationRuleEnabled={dailyTotal:false,consecutive:false,dailyRelief:true};f.state.systemConfig.maxDailyReliefPeriods=2;lessons(f,'alice',[1,3,5,7]);suspend(f);const ds=report(f,[1,3,5,7]),r=solve(f,ds);assert.equal(r.coverage,2);assert.equal(r.workloadLimits.dailyRelief,2);assert.equal(r.decisionEvidence.policy.workloadCalculationSkipped,true);
 });

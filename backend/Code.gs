@@ -631,6 +631,7 @@ function doPost(e){
   if(!Number.isFinite(req.timestamp)||Math.abs(Date.now()-req.timestamp)>60000||! /^[\w-]{36}$/.test(req.nonce||''))error_(401,'Expired request');
   deployTrace_.requestId=/^[\w-]{36}$/.test(req.traceId||'')?req.traceId:/^[\w-]{36}$/.test(req.input?.requestId||'')?req.input.requestId:req.nonce;deployTrace_.action=req.action;deployTrace_.authenticated=true;deployTrace_.rosterDiagnostic=/^roster/.test(req.action);deployTrace_.operation=/^[A-Za-z][A-Za-z0-9]{0,63}$/.test(req.input?.operation||'')?req.input.operation:undefined;deployTrace_.commandId=/^[\w-]{36}$/.test(req.input?.requestId||req.input?.command?.requestId||'')?(req.input.requestId||req.input.command.requestId):undefined;
   gsisRequireBackendAction_(req.action);
+  if(req.action==='rosterOperations'&&req.input?.operation==='edgeExportManifest')deployTrace_.preparationOrdinal=req.input?.preparation?.ordinal;
   if(req.action==='publicLayout')return out_({ok:true,data:publicLayout_(req.input)});
   if(req.action==='publicCampus')return out_({ok:true,data:publicCampus_(req.input)});
   if(req.action==='deployEdge'&&req.input?.operation==='physicalRegistry'){gsisRequireBackendRole_('deploy');return out_({ok:true,data:liveLandmarkRegistry_()});}
@@ -643,10 +644,11 @@ function doPost(e){
   const c=req.action==='active'?{user:{email:req.identity.email,roles:[]}}:contacts_(req.identity,false,'deploySnapshot',{rosterProjection:req.action==='rosterOperations'&&req.input?.operation==='staplerDates'?'staplerDates':undefined,rosterAuthority:/^roster/.test(req.action),rosterDirectory:['rosterOperations','rosterInbox'].includes(req.action)||req.action==='rosterProfile'&&req.input?.view==='report',palAuthority:req.action==='change'&&(req.input?.subject==='PAL'||['removeTG','updateTG','convertLegacySubject'].includes(req.input?.operation)||req.input?.edits?.some(x=>x.subject==='PAL'||['removeTG','updateTG'].includes(x.operation))),authorityOnly:(req.action==='change'&&['saveDraft','saveVersionNote','metadata','delete','purge'].includes(req.input?.operation)&&!req.input.edits?.some(x=>['upsertTeacherProfile','setTeacherField','initReporting'].includes(x.operation)))||['acknowledgeNotices','access','receipt','delta','relief','auditPage','versionNote','rosterProfile','rosterRead','rosterUpload','rosterUpdate','rosterOperations','rosterInbox','campusProfile','renameCampusUnit','active','landmarkUnit','landmarkSearch','lease'].includes(req.action),readOnly:['sync','bootstrap'].includes(req.action)&&!req.input?.freshContacts&&!req.input?.reviewContacts,knownCatalogueHash:req.input?.knownCatalogueHash});
   rosterStage_('roster-storage');
   const data=/^roster/.test(req.action)?rosterDispatch_(req,c):req.action==='campusProfile'?campusProfile_(c):req.action==='renameCampusUnit'?renameCampusUnit_(req,c):dispatch_(req,c);
+  if(deployTrace_.operation==='edgeExportManifest'&&data?.preparationFailed===true)data.failureReason=rosterEdgeExportDiagnostic_({failureReason:data.failureReason},deployTrace_);
   rosterStage_('response-serialize');return out_({ok:true,data});
  }catch(e){
-  const importFailure=deployTrace_.authenticated&&deployTrace_.action==='rosterOperations'&&deployTrace_.operation==='edgeExportManifest'&&e.failureReason?{failureReason:e.failureReason}:{};
-  if(deployTrace_.rosterDiagnostic||!deployTrace_.action)rosterDiagnostic_('roster-backend-failed',{status:e.status||503,...rosterAbsenceFailureDetail_(e),message:rosterDiagnosticError_(e),stack:rosterDiagnosticText_(String(e.stack||'').split('\n').filter(line=>/^\s*at /.test(line)).slice(0,4).join('\n'))});
+  const importFailure=deployTrace_.authenticated&&deployTrace_.action==='rosterOperations'&&deployTrace_.operation==='edgeExportManifest'?{failureReason:rosterEdgeExportDiagnostic_(e,deployTrace_)}:{};
+  if(!importFailure.failureReason&&(deployTrace_.rosterDiagnostic||!deployTrace_.action))rosterDiagnostic_('roster-backend-failed',{status:e.status||503,...rosterAbsenceFailureDetail_(e),message:rosterDiagnosticError_(e),stack:rosterDiagnosticText_(String(e.stack||'').split('\n').filter(line=>/^\s*at /.test(line)).slice(0,4).join('\n'))});
   if(/^roster/.test(deployTrace_.action)&&(e.status||503)>=500){
    const diagnosticId=deployTrace_.requestId;
    return out_({ok:false,status:503,error:'Roster is temporarily unavailable.',diagnosticId,...rosterFailureDetail_(e),...rosterAbsenceFailureDetail_(e),...importFailure});
@@ -2605,7 +2607,7 @@ function rosterFailureDetail_(error){
  const t=typeof deployTrace_==='undefined'?{}:deployTrace_||{},phase=String(error?.failurePhase||t.phase||'').replace(/^roster\./,'');
  const groups={'calculations-index':'calculation-source','calculations-source':'calculation-source','calculations-history-read':'history-read','calculations-history':'history-read','contacts-authority':'contacts','state-read':'operations-read',context:'timetable','register-read':'timetable','register-json':'timetable','register-schema':'timetable','timetable-read':'timetable','timetable-json':'timetable','timetable-validation':'timetable',quota:'calculation-source',projection:'plan-read',commit:'save','response-serialize':'response','response-create':'response'};
  const operations=['nextAbsenceIntake','deferAbsenceIntake','prepareNotification','requestMutual','saveSchoolAbsence','renameStapler','scheduledRoster','sendPeerMail','peerMailReview','reviewPeerMail','claimNotifications','prepareNotifications','notificationResult','notificationResults','inboxPendingDispatch','inboxReplyPrepare','inboxReplyResult','inboxAlertPrepare','inboxAlertResult','deliveryReviewMailDispatch','dailyEmploymentMailDispatch','processAbsenceIntake','flushAbsenceIntake','captureAbsenceIntake','retryAbsenceIntake','resolveAbsenceIntake','timetableBatch','timetableDay','timetableCacheManifest','read','saveAbsence','saveInstructions','saveStapler','confirmStapler','publishStapler','resetStapler','moveStapler','restoreStapler','deleteStapler','reliefBatch','publish','notifyDaily','autoAllocate','optimise','receiptStatus'];
- const codes=['ROSTER_CUTOVER_FROZEN','ROSTER_STORAGE_CAPACITY','GSIS_SECRET_INVALID','ABSENCE_PREPARATION_RETRY','ABSENCE_INTAKE_BUSY','ABSENCE_INTAKE_PENDING','CONTACTS_RECOVERY_REQUIRED','STAPLER_BASELINE_CONFLICT','STAPLER_CONFLICT','PEER_MAIL_REVIEW_CONFLICT','TIMETABLE_BATCH_CHANGED','TIMETABLE_BATCH_TOO_LARGE','CELL_CONFLICT','ABSENCE_CONFLICT','ALLOCATION_IN_PROGRESS','ALLOCATION_UNCONFIRMED','ALLOCATION_CANCELLED','ALLOCATION_ABANDONED','ALLOCATION_CUTOFF'];
+ const codes=['VENUES_FENCE_PENDING','VENUES_FENCE_UNCONFIRMED','COMMIT_UNCERTAIN','ROSTER_CUTOVER_FROZEN','ROSTER_STORAGE_CAPACITY','GSIS_SECRET_INVALID','ABSENCE_PREPARATION_RETRY','ABSENCE_INTAKE_BUSY','ABSENCE_INTAKE_PENDING','CONTACTS_RECOVERY_REQUIRED','STAPLER_BASELINE_CONFLICT','STAPLER_CONFLICT','PEER_MAIL_REVIEW_CONFLICT','TIMETABLE_BATCH_CHANGED','TIMETABLE_BATCH_TOO_LARGE','CELL_CONFLICT','ABSENCE_CONFLICT','ALLOCATION_IN_PROGRESS','ALLOCATION_UNCONFIRMED','ALLOCATION_CANCELLED','ALLOCATION_ABANDONED','ALLOCATION_CUTOFF'];
  return {backendVersion:GSIS_DEPLOY_VERSION,failureStage:phases.includes(phase)?phase:groups[phase]||'backend',...(operations.includes(t.operation)?{operation:t.operation}:{}),...(codes.includes(error?.code)?{code:error.code}:{})};
 }
 function rosterDiagnosticLog_(record){
@@ -2746,7 +2748,7 @@ function rosterModelResponse_(entry,p){const known=Array.isArray(p.knownModelIds
 function rosterFile_(folderId,name,blob){return rosterFindFile_(folderId,name)||rosterCreateFile_(folderId,name,blob);}
 function rosterInput_(fn){try{return fn()}catch(e){error_(400,e.message)}}
 function rosterDispatch_(req,c){gsisRequireBackendRole_('roster');
- if(!['edgeFreeze','edgeUnfreeze','edgeExport','edgeExportManifest','edgeExportPart','edgeExportAbandon','edgeModel','edgeFence','edgeDrift','edgeReferences','edgeContactCreate','edgeAudit'].includes(req.input?.operation)&&!(req.action==='rosterOperations'&&req.input?.operation==='edgeHealthAuthority')&&typeof rosterEdgeAssertLegacyWrite_==='function')rosterEdgeAssertLegacyWrite_();
+ if(!['edgeFreeze','edgeUnfreeze','edgeExport','edgeExportManifest','edgeExportCheckpoint','edgeExportPart','edgeExportAbandon','edgeModel','edgeFence','edgeDrift','edgeReferences','edgeContactCreate','edgeAudit'].includes(req.input?.operation)&&!(req.action==='rosterOperations'&&req.input?.operation==='edgeHealthAuthority')&&typeof rosterEdgeAssertLegacyWrite_==='function')rosterEdgeAssertLegacyWrite_();
  if(typeof c?.user?.rosterSMC!=='boolean'){
   if(typeof deployTrace_!=='undefined'&&deployTrace_)deployTrace_.phase='contacts-authority';
   error_(503,'Contacts did not return verified Roster authority. Update the existing Contacts web app deployment.');
@@ -2914,7 +2916,7 @@ var GSISRosterOperations=(()=>{
   const A=allocation(),c=operationalSettings({systemConfig:copy(s.systemConfig||null)}).systemConfig,families=A.normalizeSubjectFamilies(c.subjectFamilies),enabled=A.ruleToggles(c.allocationRuleEnabled),preferences=A.preferenceOrder(c.allocationPreferences);
   const config={
    allocationRulesVersion:Number.isInteger(c.allocationRulesVersion)?c.allocationRulesVersion:null,allocationPreferences:preferences,allocationRuleEnabled:enabled,
-   maxDailyPeriods:c.maxDailyPeriods,maxConsecutivePeriods:c.maxConsecutivePeriods,
+   maxDailyPeriods:c.maxDailyPeriods,maxConsecutivePeriods:c.maxConsecutivePeriods,maxDailyReliefPeriods:c.maxDailyReliefPeriods,
    noReliefSubjects:A.normalizeSubjectPatterns(c.noReliefSubjects),consecutiveCountExclusions:A.normalizeSubjectPatterns(c.consecutiveCountExclusions),consecutiveSubjectRules:A.normalizeConsecutiveSubjectRules(c.consecutiveSubjectRules),
    subjectFamilies:families,teachingGroupOverrides:A.normalizeTeachingGroupOverrides(c.teachingGroupOverrides,families),
    employmentPeriodRestrictions:normalizeEmploymentRestrictions(c.employmentPeriodRestrictions),reliefHealthPeriods:normalizePeriods(c.reliefHealthPeriods),
@@ -3159,7 +3161,7 @@ var GSISRosterOperations=(()=>{
  function availability(s,ctx,id,d,ps,ignoreDemands=[],teachers,lessons=[],options={}){
   if(new Set(ps).size!==ps.length)fail(409,'One teacher cannot cover multiple lessons in the same period.');staff(ctx,id);day(ctx,d);const A=allocation(),t=(teachers||A.teacherContext({...s,assignments:s.assignments.filter(a=>!ignoreDemands.includes(a.demandId))},ctx,d)).get(id),values=[],added=[];
   for(const p of [...ps].sort((a,b)=>a-b)){const lesson=lessons.find(row=>row.period===p)||{period:p};values.push(A.eligibility(t,p,added,{...options,demand:lesson}));added.push(lesson);}const first=values[0]||A.eligibility(t,0),reasons=[...new Set(values.flatMap(v=>v.reasons))],warnings=[...new Set(values.flatMap(v=>v.warnings))];
-  return {...first,available:!reasons.length,autoEligible:values.every(v=>v.autoEligible),employmentPeriodRestricted:values.some(v=>v.employmentPeriodRestricted),...(values.some(v=>v.peerROverride)?{peerROverride:true}:{}),reasons,warnings,capViolation:values.some(v=>v.capViolation),capOnlyViolation:values.some(v=>v.capViolation)&&values.every(v=>v.available||v.capOnlyViolation),consecutive:Math.max(0,...values.map(v=>v.consecutive))};
+  return {...first,available:!reasons.length,autoEligible:values.every(v=>v.autoEligible),employmentPeriodRestricted:values.some(v=>v.employmentPeriodRestricted),...(values.some(v=>Object.prototype.hasOwnProperty.call(v,'dailyReliefPeriods'))?{dailyReliefPeriods:Math.max(0,...values.map(v=>v.dailyReliefPeriods||0)),dailyReliefWarning:[...new Set(values.map(v=>v.dailyReliefWarning).filter(Boolean))].join(' '),automaticReliefViolation:values.some(v=>v.automaticReliefViolation)}:{}),...(values.some(v=>v.peerROverride)?{peerROverride:true}:{}),reasons,warnings,capViolation:values.some(v=>v.capViolation),capOnlyViolation:values.some(v=>v.capViolation)&&values.every(v=>v.available||v.capOnlyViolation),consecutive:Math.max(0,...values.map(v=>v.consecutive))};
  }
  function candidates(s,ctx,ids,source){const ds=demandChoices(ctx,s).filter(d=>ids.includes(d.id));if(!ids.length||ds.length!==new Set(ids).size||new Set(ds.map(d=>d.date)).size!==1)fail(400,'Select current lessons for one date.');if(!(ctx.user.smc||ctx.user.admin)&&ds.some(d=>d.staffId!==ctx.user.staffId))fail(403,'Select your own affected lessons.');const d=ds[0].date,ps=[...new Set(ds.map(d=>d.period))],sourceIds=ds.map(d=>d.staffId),teachers=allocation().teacherContext({...s,assignments:s.assignments.filter(a=>!ids.includes(a.demandId))},ctx,d,source);return ctx.people.filter(p=>allocation().reliefCandidateEligible(p)&&!sourceIds.includes(p.id)&&(p.active||s.adhoc.some(a=>a.staffId===p.id&&a.date===d&&!a.deletedAt))).map(p=>availability(s,ctx,p.id,d,ps,ids,teachers,ds)).sort((a,b)=>Number(b.available)-Number(a.available)||Number(b.external)-Number(a.external)||a.assigned-b.assigned||a.consecutive-b.consecutive||a.name.localeCompare(b.name));}
  function protectedOwnCover(a,ids){return allocation().protectedAssignment(a)&&ids.some(id=>a.demandId===id||(a.members||[]).some(m=>m.id===id)&&!(a.status==='draft'&&a.origin==='shared-subject'&&!a.replaces));}
@@ -3584,8 +3586,8 @@ var GSISRosterOperations=(()=>{
  function staplerApply(s,ctx,p){const d=date(p.date||ctx.today),op=p.operation;if(d<ctx.today&&(!(ctx.user.smc||ctx.user.admin)||!['saveStapler','confirmStapler'].includes(op)))fail(403,'Past planning lifecycle changes are read only. Their saved history cannot be renamed, moved or deleted.');
   if(['createStapler','importStapler'].includes(op))return createOrImportStapler(s,ctx,p,d);
   if(['renameStapler','moveStapler','deleteStapler','restoreStapler'].includes(op))return staplerLifecycle(s,ctx,p,d);
-  if(op==='requestStapler'){const person=staff(ctx,ctx.user.staffId);if(!person.active)fail(403,'An active teacher identity is required.');if(!(ctx.smcIds||[]).includes(p.sponsorId)||!teacherSponsor(staff(ctx,p.sponsorId)))fail(400,'Choose an eligible SMC teacher sponsor.');const old=s.staplerRequests.find(r=>!r.retiredAt&&r.date===d&&r.staffId===person.id&&['pending','approved'].includes(r.status));if(old)return {savedIds:[old.id],unchanged:true};const row={id:ctx.uuid(),date:d,staffId:person.id,name:person.name,sponsorId:p.sponsorId,status:'pending',createdAt:ctx.iso};s.staplerRequests.push(row);queue(s,ctx,'stapler_request',row.sponsorId,d,{templateKey:'stapler_request',requesterName:person.name,planningRequestId:row.id,summary:person.name+' requests Stapler planning and publication access for '+d+'.'},null,'stapler-request:'+row.id);allocation().addAudit(s,ctx,op,{date:d,id:row.id});return {savedIds:[row.id]};}
-  if(op==='decideStapler'){smc(ctx);const row=s.staplerRequests.find(r=>r.id===p.id&&r.date===d);if(!row||row.retiredAt||row.status!=='pending')fail(409,'This planning request is no longer pending.');if(!['approve','reject'].includes(p.decision))fail(400,'Choose approve or reject.');row.status=p.decision==='approve'?'approved':'rejected';row.comment=text(p.comment||'',1000);row.decidedAt=ctx.iso;row.decidedBy=ctx.user.email;queue(s,ctx,'stapler_decision',row.staffId,d,{templateKey:'stapler_decision',requesterName:staff(ctx,row.staffId).name,planningRequestId:row.id,decision:row.status,comment:row.comment,summary:'Stapler access for '+d+' was '+row.status+(row.comment?': '+row.comment:'.')},null,'stapler-decision:'+row.id);if(row.status==='approved'&&row.sponsorId!==row.staffId)queue(s,ctx,'stapler_decision',row.sponsorId,d,{templateKey:'stapler_decision',requesterName:staff(ctx,row.staffId).name,planningRequestId:row.id,audience:'stapler-sponsor',decision:row.status,comment:row.comment,summary:row.name+' was approved to plan and publish Stapler for '+d+'.'},null,'stapler-sponsor-decision:'+row.id);allocation().addAudit(s,ctx,op,{date:d,id:row.id,decision:row.status,comment:row.comment});return {savedIds:[row.id]};}
+  if(op==='requestStapler'){const person=staff(ctx,ctx.user.staffId);if(!person.active)fail(403,'An active teacher identity is required.');if(!(ctx.smcIds||[]).includes(p.sponsorId)||!teacherSponsor(staff(ctx,p.sponsorId)))fail(400,'Choose an eligible SMC teacher sponsor.');const old=s.staplerRequests.find(r=>!r.retiredAt&&r.date===d&&r.staffId===person.id&&['pending','approved'].includes(r.status));if(old)return {savedIds:[old.id],unchanged:true};const row={id:ctx.uuid(),date:d,staffId:person.id,name:person.name,sponsorId:p.sponsorId,status:'pending',createdAt:ctx.iso};s.staplerRequests.push(row);queue(s,ctx,'stapler_request',row.sponsorId,d,{templateKey:'stapler_request',requesterName:person.name,planningRequestId:row.id,summary:person.name+' requests Stapler planning and publication access for '+d+'.'},null,'stapler-request:'+row.id);allocation().addAudit(s,ctx,op,{date:d,planningRequestId:row.id});return {savedIds:[row.id]};}
+  if(op==='decideStapler'){smc(ctx);const row=s.staplerRequests.find(r=>r.id===p.id&&r.date===d);if(!row||row.retiredAt||row.status!=='pending')fail(409,'This planning request is no longer pending.');if(!['approve','reject'].includes(p.decision))fail(400,'Choose approve or reject.');row.status=p.decision==='approve'?'approved':'rejected';row.comment=text(p.comment||'',1000);row.decidedAt=ctx.iso;row.decidedBy=ctx.user.email;queue(s,ctx,'stapler_decision',row.staffId,d,{templateKey:'stapler_decision',requesterName:staff(ctx,row.staffId).name,planningRequestId:row.id,decision:row.status,comment:row.comment,summary:'Stapler access for '+d+' was '+row.status+(row.comment?': '+row.comment:'.')},null,'stapler-decision:'+row.id);if(row.status==='approved'&&row.sponsorId!==row.staffId)queue(s,ctx,'stapler_decision',row.sponsorId,d,{templateKey:'stapler_decision',requesterName:staff(ctx,row.staffId).name,planningRequestId:row.id,audience:'stapler-sponsor',decision:row.status,comment:row.comment,summary:row.name+' was approved to plan and publish Stapler for '+d+'.'},null,'stapler-sponsor-decision:'+row.id);allocation().addAudit(s,ctx,op,{date:d,planningRequestId:row.id,decision:row.status,comment:row.comment});return {savedIds:[row.id]};}
   if(!staplerPermission(s,ctx,d))fail(403,'SMC approval is required to plan or publish this date.');const dd=ctx.baselineDays?.[d]||ctx.days[d];let record=s.staplerPlans.find(r=>r.date===d);const saved=record?.draft||record?.published,baseline=op==='resetStapler'||!saved?staplerBaseline(s,ctx,d):saved;if(saved)stapler().validate(saved);if(!Number.isInteger(p.staplerRevision)||p.staplerRevision<0||p.staplerRevision>(record?.revision||0)||p.staplerRevision!==(record?.revision||0)&&!(op==='saveStapler'&&(p.basePlan||p.planPatch!==undefined)))fail(409,'The Stapler draft changed. Compare your retained changes before saving.');if(op==='resetStapler'){if(!record||!staplerBaselineChanged(record,saved,dd))fail(409,'This draft already uses the current baseline.');const archived={...record,id:ctx.uuid(),archiveReason:'reset',archivedAt:ctx.iso,archivedBy:ctx.user.email};s.staplerArchives.push(archived);const next={date:d,name:record.name||'',baselineId:baseline.baselineId,revision:record.revision+1,draft:baseline,updatedAt:ctx.iso,updatedBy:ctx.user.email};s.staplerPlans[s.staplerPlans.indexOf(record)]=next;for(const a of s.importedRelief.filter(a=>a.origin==='stapler'&&a.date===d&&['draft','published'].includes(a.status))){a.status='cancelled';a.cancellationReason='Stapler reset after baseline replacement.';}for(const j of s.outbox.filter(j=>j.kind==='stapler_timetable'&&j.date===d&&['queued','blocked'].includes(j.status))){j.status='cancelled';j.error='Stapler reset after baseline replacement.';}allocation().addAudit(s,ctx,op,{date:d,archiveId:archived.id,previousBaselineId:record.baselineId,baselineId:baseline.baselineId,staplerRevision:next.revision});return {savedIds:[d],staplerRevision:next.revision};}
   if(op==='saveStapler'){
    const surgical=p.planPatch!==undefined;if(surgical&&(p.plan!==undefined||p.basePlan!==undefined))fail(400,'Send either Stapler changes or a full plan.');if(!surgical&&(!p.plan||unescape(encodeURIComponent(JSON.stringify(p.plan))).length>1900000))fail(400,'The plan is missing or too large.');const previous=saved||baseline;let plan;try{plan=surgical?applyStaplerPlanPatch(previous,p.planPatch):p.basePlan&&p.staplerRevision!==(record?.revision||0)?mergeStaplerPlans(p.basePlan,p.plan,previous):copy(p.plan);}catch(error){if(error.code==='STAPLER_CONFLICT'){error.staplerRevision=record?.revision||0;error.currentRevision=record?.revision||0;}throw error;}
@@ -4234,9 +4236,9 @@ const next=stapler().effectiveDay(plan,ctx.baselineDays?.[d]||ctx.days[d]);for(c
   const overrides=peerOverrides(s,ctx,ds,p.staffId),overrideIds=new Set(overrides.map(r=>r.id)),planning={...s,requests:s.requests.filter(r=>!overrideIds.has(r.id))},model=A.manualModel(planning,ctx,d),rankings=ds.map(dem=>A.manualRanks(model,dem).find(c=>c.staffId===p.staffId));
   let warnings=[];
   if(op==='combine'){
-   if(ds.length!==1)fail(400,'Combine one class and period at a time.');const c=rankings[0];if(!c?.combineAllowed)fail(409,'This teacher cannot take another class during this period. Check attendance, existing supervision and the one-additional-class limit.');
+   if(ds.length!==1)fail(400,'Combine one class and period at a time.');const c=rankings[0];if(!c?.combineAllowed)fail(409,'This teacher cannot take another class during this period. Check attendance, existing supervision and the one-additional-class limit.');warnings=c.dailyReliefWarning?[c.dailyReliefWarning]:[];
   }else{
-   const av=ds.length===1&&rankings[0]?.repurposedDuty?rankings[0]:availability(planning,ctx,p.staffId,d,ds.map(x=>x.period),ds.map(x=>x.id),undefined,ds);if(!av.available)fail(409,av.reasons.join(' '));warnings=av.warnings;
+   const av=ds.length===1&&rankings[0]?.repurposedDuty?rankings[0]:availability(planning,ctx,p.staffId,d,ds.map(x=>x.period),ds.map(x=>x.id),undefined,ds);if(!av.available)fail(409,av.reasons.join(' '));warnings=[...new Set([...av.warnings,...(av.dailyReliefWarning?[av.dailyReliefWarning]:[])])];
   }
   supersedePeerRequests(s,ctx,p,overrides);rememberAutoBaseline(s,d,existing);
   const savedIds=[];
@@ -4578,7 +4580,7 @@ const next=stapler().effectiveDay(plan,ctx.baselineDays?.[d]||ctx.days[d]);for(c
  function pruneRange(p){const from=date(p.from),to=date(p.to);if(to<from)fail(400,'The end date must follow the start.');return {from,to};}
  function read(s,ctx,p){if(p.operation==='read'&&p.view==='prune'){admin(ctx);return {revision:s.revision,user:ctx.user,storage:storageReport(s,ctx)};}if(p.operation==='read'&&p.view==='allocationLearning')return allocationLearningView(s,ctx);if(p.operation==='currentDuty'||p.operation==='read'&&p.view==='currentDuty')return currentDuty(s,ctx);operationalSettings(allocation().ensure(s));const op=p.operation;if(op==='teacherDailyUpdate')return teacherDailyUpdate(s,ctx,p);if(op==='nameBridges')return nameBridgesView(s,ctx);if(op==='dailyNotify')return dailyNotifyView(s,ctx,p);if(op==='systemConfig')return systemConfigView(s,ctx);if(op==='dailyEmployment')return dailyEmploymentView(s,ctx,p);if(op==='staplerDates')return staplerDatesView(s,ctx);if(op==='previewRestoreStapler')return previewRestoreStapler(s,ctx,p);if(op==='timetableDay')return timetableDay(s,ctx,p);if(op==='dailyTimetable')return dailyTimetable(s,ctx,p);if(op==='dutyRoster')return dutyRosterView(s,ctx,p);if(op==='stapler')return staplerView(s,ctx,p);if(op==='history')return notificationHistory(s,ctx,p);if(op==='exportDaily')return dailyExport(s,ctx,p);if(op==='allocation'){smc(ctx);return view(s,ctx,{...p,view:'allocation'});}if(op==='health')return healthRead(s,ctx,p);if(op==='accounting'){smc(ctx);return {revision:s.revision,entitlements:copy(s.entitlements),importedRelief:copy(s.importedRelief),profiles:copy(s.accountingProfiles),years:copy(s.accountingYears),corrections:copy(s.reliefCorrections),dutySMC:copy(s.smcDutyRoster),smcPeople:ctx.people.filter(x=>(ctx.smcIds||[]).includes(x.id)).map(({id,name})=>({id,name}))};}if(op==='availability')return availabilityView(s,ctx,p);if(op==='candidates'){
   if(p.previewAbsence!==undefined)return previewAbsenceCandidates(s,ctx,p);
-  let source;const project=ids=>{const ds=demandChoices(ctx,s).filter(d=>ids.includes(d.id)),combine=ds.length===1&&p.purpose==='mutual'?new Map(allocation().manualRanks(allocation().manualModel(s,ctx,ds[0].date),ds[0]).map(c=>[c.staffId,c.combineAllowed&&!c.peerReserved])):new Map();return candidates(s,ctx,ids,source).map(x=>p.purpose==='mutual'?{...x,available:x.available&&(x.external||!x.warnings.length),combineAllowed:combine.get(x.staffId)===true}:x).map(x=>(ctx.user.smc||ctx.user.admin)&&p.byPeriod!==true?x:{staffId:x.staffId,name:x.name,available:x.available,reasons:x.reasons,external:x.external,combineAllowed:x.combineAllowed===true});};
+  let source;const project=ids=>{const ds=demandChoices(ctx,s).filter(d=>ids.includes(d.id)),combine=ds.length===1&&p.purpose==='mutual'?new Map(allocation().manualRanks(allocation().manualModel(s,ctx,ds[0].date),ds[0]).map(c=>[c.staffId,c.combineAllowed&&!c.peerReserved])):new Map();return candidates(s,ctx,ids,source).map(x=>p.purpose==='mutual'?{...x,available:x.available&&(x.external||!x.warnings.length),combineAllowed:combine.get(x.staffId)===true}:{...x,warnings:[...new Set([...x.warnings,...(x.dailyReliefWarning?[x.dailyReliefWarning]:[])])]}).map(x=>(ctx.user.smc||ctx.user.admin)&&p.byPeriod!==true?x:{staffId:x.staffId,name:x.name,available:x.available,reasons:x.reasons,external:x.external,combineAllowed:x.combineAllowed===true});};
   if(p.byPeriod===true){
    if(p.purpose!=='mutual')fail(400,'Per-period candidates are available only for colleague arrangements.');
    const ds=findDemands(s,ctx,p.demandIds),d=ds[0].date,dd=day(ctx,d),groups=new Map();
@@ -4637,13 +4639,14 @@ function rosterOperationsPackPlans_(state,prepareTimetables=true){
   return packed;});return {...state,staplerPlans:rows(state.staplerPlans,prepareTimetables),staplerArchives:rows(state.staplerArchives)};
 }
 var rosterOperationsStorageSources_=new WeakMap();
+var rosterOperationsAuditSources_=new WeakMap();
 /* One operational document commits absence, relief, audit and notification intent together. */
 function rosterOperationsState_(skipTransport=false){
  let phase='operations-location';try{
   const id=props_().getProperty('ROSTER_OPERATIONS_FILE')||rosterFindFile_(ROSTER_DATA,'Roster operations.json');
   if(!id)return GSISRosterOperations.initial();
   phase='operations-read';const source=rosterOperationsStoredRead_(id),value=source.value;
-  phase='operations-schema';const state=GSISRosterOperations.validateState(rosterOperationsUnpackPlans_(typeof rosterAllocationAuditUnpack_==='function'?rosterAllocationAuditUnpack_(value):value));rosterOperationsStorageSources_.set(state,source);if(typeof rosterColdReceiptsUnpack_==='function')rosterColdReceiptsUnpack_(state);return skipTransport!==true&&typeof rosterNotificationOverlay_==='function'?rosterNotificationOverlay_(state):state;
+  phase='operations-schema';const state=GSISRosterOperations.validateState(rosterOperationsUnpackPlans_(typeof rosterAllocationAuditUnpack_==='function'?rosterAllocationAuditUnpack_(value):value));rosterOperationsStorageSources_.set(state,source);rosterOperationsAuditSources_.set(state,state.audit.map(row=>({id:row.id})));if(typeof rosterColdReceiptsUnpack_==='function')rosterColdReceiptsUnpack_(state);return skipTransport!==true&&typeof rosterNotificationOverlay_==='function'?rosterNotificationOverlay_(state):state;
  }catch(e){if(e.status){e.failurePhase=e.failurePhase||phase;throw e;}throw Object.assign(Error('Relief records could not be read.'),{status:503,failurePhase:e.failurePhase||phase});}
 }
 // Save ceiling for Roster operations.json. Admin may raise it in Script Properties
@@ -4656,19 +4659,29 @@ function rosterOperationsStoredView_(state){
  const plans=list=>list.map(row=>{const r={...row};if(row.draft)r.draft=stored(row.draft);if(row.published)r.published=row.draft&&row.published===row.draft?{encoding:'same-as-draft-v1'}:stored(row.published);if(row.confirmedPlan)r.confirmedPlan=row.draft&&row.confirmedPlan===row.draft?{encoding:'same-as-draft-v1'}:row.published&&row.confirmedPlan===row.published?{encoding:'same-as-published-v1'}:stored(row.confirmedPlan);return r;});
  const view={...state};if(Array.isArray(state.staplerPlans))view.staplerPlans=plans(state.staplerPlans);if(Array.isArray(state.staplerArchives))view.staplerArchives=plans(state.staplerArchives);if(Array.isArray(state.optimisationRuns))view.optimisationRuns=state.optimisationRuns.map(run=>run.decisionEvidence?{...run,decisionEvidence:stored(run.decisionEvidence)}:run);return view;
 }
-function rosterOperationsCommit_(state,intakeFenceDates=null,intakeFencePeers=false,beforeWrite=null){if(typeof rosterEdgeAssertLegacyWrite_==='function')rosterEdgeAssertLegacyWrite_();gsisRequireBackendRole_('roster');
- if(typeof rosterAllocationAuditCapture_==='function')rosterAllocationAuditCapture_(state);
- const packed=rosterOperationsPackPlans_(state);let data=JSON.stringify(typeof rosterAllocationAuditPack_==='function'?rosterAllocationAuditPack_(packed):packed);
+function rosterOperationsCommit_(state,intakeFenceDates=null,intakeFencePeers=false,beforeWrite=null,preserveStored=false){if(typeof rosterEdgeAssertLegacyWrite_==='function')rosterEdgeAssertLegacyWrite_();gsisRequireBackendRole_('roster');
+ // The internal repair path retains stored bytes and checks its original source
+ // before preparation can select a newer pointer. Requests cannot set this flag.
+ const preserve=preserveStored===true;if(preserve&&beforeWrite)beforeWrite();
+ if(!preserve&&typeof rosterAllocationAuditCapture_==='function')rosterAllocationAuditCapture_(state);
+ const packed=preserve?state:rosterOperationsPackPlans_(state);let data=JSON.stringify(!preserve&&typeof rosterAllocationAuditPack_==='function'?rosterAllocationAuditPack_(packed):packed);
  // A derived read package must never consume the last space needed to save
  // authoritative work. Dropping it selects the established reader fallback.
- if(data.length>12000000){for(const row of packed.staplerPlans||[])delete row.timetablePackage;data=JSON.stringify(typeof rosterAllocationAuditPack_==='function'?rosterAllocationAuditPack_(packed):packed);}
+ if(!preserve&&data.length>12000000){for(const row of packed.staplerPlans||[])delete row.timetablePackage;data=JSON.stringify(typeof rosterAllocationAuditPack_==='function'?rosterAllocationAuditPack_(packed):packed);}
  // Existing Google document only: bounded emergency headroom preserves every
  // record while the retained intake can finish. The 12M derived-cache fallback
  // above stays first; no new storage format, authority or automatic pruning.
  const stored=props_().getProperty('ROSTER_OPERATIONS_FILE'),id=stored||rosterFindFile_(ROSTER_DATA,'Roster operations.json'),source=rosterOperationsStorageSources_.get(state),root=id?(source?.id===id?source.manifest:JSON.parse(rosterReadFile_(id))):null,split=root?.format==='gsis-roster-operations-split-v1';
+ // Compare against identities captured before the command. Existing historical
+ // collisions remain evidence; no new collision may reach a durable write.
+ const auditBefore=rosterOperationsAuditSources_.get(state)||(split?rosterOperationsStoredRead_(id).value.audit:root?.audit)||[];
+ GSISRosterAllocation.assertNewAuditIds(auditBefore,state.audit);
  if(!split&&data.length>rosterOperationsMaxChars_())throw Object.assign(Error('Relief records are full. Ask Admin to review storage capacity before retrying this same report.'),{status:507,code:'ROSTER_STORAGE_CAPACITY'});
  const prepared=split?rosterSplitPrepareDocument_(JSON.parse(data),{folderId:root.folderId,previousId:id}):null;
- const batchTicket=typeof rosterTimetableBatchCommitBegin_==='function'?rosterTimetableBatchCommitBegin_(state):null,venueTicket=typeof rosterVenuesBegin_==='function'?rosterVenuesBegin_('operations',state):null;
+ // Packed wrappers need server-owned lazy proofs for the source fences. Expand
+ // only a temporary row view; the authoritative payload above stays raw.
+ const fenceState=preserve?rosterOperationsUnpackPlans_({...state,staplerPlans:(state.staplerPlans||[]).map(row=>({...row})),staplerArchives:(state.staplerArchives||[]).map(row=>({...row}))}):state;
+ const batchTicket=typeof rosterTimetableBatchCommitBegin_==='function'?rosterTimetableBatchCommitBegin_(fenceState):null,venueTicket=typeof rosterVenuesBegin_==='function'?rosterVenuesBegin_('operations',fenceState):null;
  const write=()=>{
  // External preparation and file lookup can cross a period start. The allocator
  // rechecks its trusted clock inside the final write closure, never from input.
@@ -4679,6 +4692,7 @@ function rosterOperationsCommit_(state,intakeFenceDates=null,intakeFencePeers=fa
  if(!prepared)finalCheck();
  const saved=prepared?prepared.commit(finalCheck):id?(rosterDriveRequest_('https://www.googleapis.com/upload/drive/v3/files/'+encodeURIComponent(id)+'?uploadType=media&supportsAllDrives=true&fields=id',{method:'patch',contentType:'application/json; charset=UTF-8',payload:data},'operations-commit'),id):rosterCreateFile_(ROSTER_DATA,'Roster operations.json',Utilities.newBlob(data,'application/json'));
  if(prepared||!stored)props_().setProperty('ROSTER_OPERATIONS_FILE',saved);
+ rosterOperationsAuditSources_.set(state,state.audit.map(row=>({id:row.id})));
  };
  // Keep remote Venues exchanges outside the intake lock. If the final fence
  // stops this write, the derived pending marker prevents stale reuse until the
@@ -4873,11 +4887,54 @@ function rosterOperationsContext_(req,c,state,providedIndex){
 }
 function rosterOperationsDigest_(p){return Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256,JSON.stringify(p)).map(b=>('0'+((b+256)%256).toString(16)).slice(-2)).join('');}
 function rosterOperationsCommandDigest_(p){const stable={...p};delete stable.calendarByDate;delete stable.trustedNow;delete stable.notificationsReady;delete stable.schedulerAvailable;return rosterOperationsDigest_(stable);}
+// Repair deliberately reads the stored shape. General validation initialises
+// legacy settings and lazy evidence, which this bounded command must preserve.
+function rosterOperationsAuditRepairRead_(){
+ const id=props_().getProperty('ROSTER_OPERATIONS_FILE')||rosterFindFile_(ROSTER_DATA,'Roster operations.json');
+ if(!id)error_(503,'Relief records need review.');
+ const source=rosterOperationsStoredRead_(id),raw=source.value;
+ if(!raw||raw.schema!==1||!Number.isSafeInteger(raw.revision)||raw.revision<0||!Array.isArray(raw.audit)||!Array.isArray(raw.receipts))error_(503,'Relief records need review.');
+ return source;
+}
+function rosterOperationsAuditRepairReceipt_(raw,p,actor){
+ const old=raw.receipts.find(row=>row?.id===p.requestId);if(!old)return null;
+ if(typeof rosterNativeReceiptMatches_==='function'?!rosterNativeReceiptMatches_(old,p,actor):old.actor!==actor||old.digest!==rosterOperationsCommandDigest_(p))error_(409,'This request ID was used for a different save.');
+ // A matched cold receipt alone may read its verified original result. Never
+ // install getters or normalise other receipts in the authoritative raw state.
+ return old.archiveRef?{...old,result:rosterColdArchiveItem_(old.archiveRef,raw).result}:old;
+}
+function rosterOperationsAuditRepair_(req,c){
+ const user=rosterOperationsAuthority_(c,req.identity),p=req.input||{};
+ if(user.admin!==true)error_(403,'Current Admin access is required.');
+ if(!['dryRun','apply'].includes(p.mode))error_(400,'Choose dryRun or apply for the audit repair.');
+ if(p.mode==='apply'&&(typeof p.requestId!=='string'||!/^[\w-]{36}$/.test(p.requestId)||typeof p.previewDigest!=='string'||!/^[a-f0-9]{64}$/.test(p.previewDigest)))error_(400,'The repair request ID and dry-run preview are required.');
+ const rule='stapler-audit-decision-suffix',version=1,preview=raw=>rosterOperationsDigest_([rule,version,raw]);
+ if(p.mode==='dryRun'){
+  const raw=rosterOperationsAuditRepairRead_().value,repair=GSiSRosterImport.repairStaplerAuditIds(raw.audit);
+  return {rule,version,pairs:repair.pairs,revision:raw.revision,previewDigest:preview(raw)};
+ }
+ const lock=LockService.getScriptLock();if(!deployLock_(lock,8000))error_(503,'Another save is finishing. Retry this same repair request.');
+ try{
+  const source=rosterOperationsAuditRepairRead_(),raw=source.value,old=rosterOperationsAuditRepairReceipt_(raw,p,req.identity.email);
+  if(old)return {...old.result,replayed:true};
+  if(preview(raw)!==p.previewDigest)error_(409,'Relief records changed. Run a fresh audit repair dry-run.');
+  const repair=GSiSRosterImport.repairStaplerAuditIds(raw.audit);
+  if(!repair.pairs)return {rule,version,pairs:0,applied:false,revision:raw.revision};
+  if(raw.revision===Number.MAX_SAFE_INTEGER)error_(409,'The saved revision cannot be advanced. Ask Admin to review the records.');
+  const sourceCheck=()=>{if((props_().getProperty('ROSTER_OPERATIONS_FILE')||rosterFindFile_(ROSTER_DATA,'Roster operations.json'))!==source.id)error_(409,'Roster storage changed. Retry against the latest saved state.');};
+  rosterOperationsStorageSources_.set(raw,source);rosterOperationsAuditSources_.set(raw,raw.audit.map(row=>({id:row?.id})));
+  raw.audit=repair.audit;raw.revision++;
+  const result={rule,version,pairs:repair.pairs,applied:true,revision:raw.revision,requestId:p.requestId};
+  raw.receipts.push({id:p.requestId,actor:req.identity.email,digest:rosterOperationsCommandDigest_(p),result,at:new Date().toISOString(),revision:raw.revision});
+  sourceCheck();rosterOperationsCommit_(raw,null,false,sourceCheck,true);return result;
+ }finally{deployUnlock_(lock);}
+}
 function rosterOperationsReceipt_(req,c){
- rosterOperationsAuthority_(c,req.identity);const p=req.input?.command;
- const writes=['archiveColdOutput','reliefBatch','saveAbsence','deleteAbsences','saveInstructions','saveAdhoc','deleteAdhoc','saveTypes','requestMutual','respondMutual','prune','saveNameBridge','deleteNameBridge','notifyDaily','saveSystemConfig','saveDailyEmploymentSettings','sendDailyEmploymentReport','createStapler','importStapler','saveStapler','confirmStapler','publishStapler','resetStapler','requestStapler','decideStapler','renameStapler','moveStapler','deleteStapler','restoreStapler','unassign','saveRecessSettings','saveRecess','deleteRecess','setNoRelief','noRelief','publish','acknowledge','removeAssignment','saveCustomInstruction','deleteCustomInstruction','setCustomInstructionEnabled','assign','combine','undo','optimise','autoAllocate','setDutySMC','importRHistory','verifyRYear','correctRelief','confirmCompleted'];
+ const user=rosterOperationsAuthority_(c,req.identity),p=req.input?.command,repair=p?.operation==='repairStaplerAuditIds';
+ if(repair&&user.admin!==true)error_(403,'Current Admin access is required.');
+ const writes=['repairStaplerAuditIds','archiveColdOutput','reliefBatch','saveAbsence','deleteAbsences','saveInstructions','saveAdhoc','deleteAdhoc','saveTypes','requestMutual','respondMutual','prune','saveNameBridge','deleteNameBridge','notifyDaily','saveSystemConfig','saveDailyEmploymentSettings','sendDailyEmploymentReport','createStapler','importStapler','saveStapler','confirmStapler','publishStapler','resetStapler','requestStapler','decideStapler','renameStapler','moveStapler','deleteStapler','restoreStapler','unassign','saveRecessSettings','saveRecess','deleteRecess','setNoRelief','noRelief','publish','acknowledge','removeAssignment','saveCustomInstruction','deleteCustomInstruction','setCustomInstructionEnabled','assign','combine','undo','optimise','autoAllocate','setDutySMC','importRHistory','verifyRYear','correctRelief','confirmCompleted'];
  if(!p||typeof p!=='object'||Array.isArray(p)||!writes.includes(p.operation)||typeof p.requestId!=='string'||!/^[\w-]{36}$/.test(p.requestId))error_(400,'The original save command is required.');
- const s=rosterOperationsState_(true),receipt=s.receipts.find(r=>r.id===p.requestId);
+ const s=repair?rosterOperationsAuditRepairRead_().value:rosterOperationsState_(true),receipt=repair?rosterOperationsAuditRepairReceipt_(s,p,req.identity.email):s.receipts.find(r=>r.id===p.requestId);
  if(receipt&&(typeof rosterNativeReceiptMatches_==='function'?!rosterNativeReceiptMatches_(receipt,p,req.identity.email):receipt.actor!==req.identity.email||receipt.digest!==rosterOperationsCommandDigest_(p)))error_(409,'This request ID was used for a different save.');
  if(receipt?.cancelled)return {accepted:false,cancelled:true,confirmation:'cancelled',requestId:p.requestId,currentRevision:s.revision};
  // Absence of a receipt can also mean the original request is still running.
@@ -5285,9 +5342,11 @@ function rosterOperationsDispatch_(req,c){
  return {...result,affectedDomains,affectedDates};
 }
 function rosterOperationsDispatchCore_(req,c){gsisRequireBackendRole_('roster');
+ if(['venuesSyncStatus','recoverVenuesSync'].includes(req.input?.operation))return rosterVenuesAdminDispatch_(req,c);
  const edge=typeof rosterEdgeMigrationDispatch_==='function'?rosterEdgeMigrationDispatch_(req,c):null;if(edge?.handled)return edge.result;
  if(typeof rosterEdgeAssertLegacyWrite_==='function')rosterEdgeAssertLegacyWrite_();
  const p=req.input||{},op=p.operation||'read',staplerWrite=['createStapler','importStapler','saveStapler','confirmStapler','publishStapler','resetStapler','renameStapler','moveStapler','deleteStapler','restoreStapler'].includes(op);
+ if(op==='repairStaplerAuditIds')return rosterOperationsAuditRepair_(req,c);
  if(['archiveColdOutput','archivedItem','archiveItems'].includes(op))return rosterColdArchiveDispatch_(req,c);
  if(['timetablePreparationManifest','timetablePreparationPart','timetablePreparationCheck'].includes(op))return rosterTimetablePreparationDispatch_(req,c);
  if(p.intake===true&&['saveAbsence','requestMutual'].includes(op))return rosterAbsenceIntakeCapture_(req,c);
@@ -5435,7 +5494,8 @@ function rosterServiceDispatch_(req){gsisRequireBackendRole_('roster');
  if(req.input?.operation==='deferAbsenceIntake')return rosterAbsenceIntakeDefer_(req);
  const transport=typeof rosterNotificationTransportDispatch_==='function'?rosterNotificationTransportDispatch_(req):null;if(transport?.handled)return transport.result;
  if(['inboxIngest','inboxReplyPrepare','inboxReplyResult','inboxDelivery','inboxAlertPrepare','inboxAlertResult','inboxPendingDispatch'].includes(req.input?.operation))return rosterInboxServiceDispatch_(req);
- const p=req.input||{},op=p.operation,allowed=['connectionStatus','allocationAuditExport','scheduledRoster','dailyEmploymentMailDispatch','deliveryReviewMailDispatch','claimNotifications','inboundMessage','inboundReplyResult','prepareNotification','notificationResult','notificationDelivery','externalDuties','externalRespond','externalAcknowledge'];if(!allowed.includes(op))error_(403,'Unknown notification service operation.');
+ const p=req.input||{},op=p.operation,allowed=['venuesSyncCheck','connectionStatus','allocationAuditExport','scheduledRoster','dailyEmploymentMailDispatch','deliveryReviewMailDispatch','claimNotifications','inboundMessage','inboundReplyResult','prepareNotification','notificationResult','notificationDelivery','externalDuties','externalRespond','externalAcknowledge'];if(!allowed.includes(op))error_(403,'Unknown notification service operation.');
+ if(op==='venuesSyncCheck')return rosterVenuesSyncCheck_();
  if(op==='allocationAuditExport')return rosterAllocationAuditExport_(p);
  if(op==='externalDuties')return rosterPrivateRead_(p);
  if(op==='connectionStatus'){rosterServiceContacts_();return {readOnly:true,backendVersion:GSIS_DEPLOY_VERSION,contactsReady:true};}
@@ -5857,16 +5917,17 @@ var GSISRosterAllocation = (() => {
   const workloadRules=Object.freeze([
     {id:'dailyTotal',field:'maxDailyPeriods',label:'Maximum total daily periods',defaultValue:9},
     {id:'adhocDailyTotal',field:'adhocReliefMaxPeriods',label:'Ad hoc relief max periods',defaultValue:10},
-    {id:'consecutive',field:'maxConsecutivePeriods',label:'Maximum consecutive periods',defaultValue:6}
+    {id:'consecutive',field:'maxConsecutivePeriods',label:'Maximum consecutive periods',defaultValue:6},
+    {id:'dailyRelief',field:'maxDailyReliefPeriods',label:'Maximum relief periods per day (non-SRE)',defaultValue:3,defaultEnabled:false,maxValue:17}
   ].map(Object.freeze));
   function ruleToggles(value={}){
     const ids=[...preferenceRules,...workloadRules].map(r=>r.id);
     if(!value||typeof value!=='object'||Array.isArray(value)||Object.keys(value).some(id=>!ids.includes(id)||typeof value[id]!=='boolean'))fail(400,'Set each allocation rule to On or Off.');
-    return Object.fromEntries(ids.map(id=>[id,value[id]??true]));
+    return Object.fromEntries(ids.map(id=>[id,value[id]??workloadRules.find(rule=>rule.id===id)?.defaultEnabled??true]));
   }
   function workloadLimits(config={}){
     const enabled=ruleToggles(config.allocationRuleEnabled),out={};
-    for(const rule of workloadRules){const value=config[rule.field]===undefined?rule.defaultValue:config[rule.field];if(!Number.isInteger(value)||value<1||value>40)fail(400,'Workload limits must be whole periods from 1 to 40.');out[rule.id]=enabled[rule.id]?value:null;}
+    for(const rule of workloadRules){const value=config[rule.field]===undefined?rule.defaultValue:config[rule.field],max=rule.maxValue??40;if(!Number.isInteger(value)||value<1||value>max)fail(400,'Workload limits must be whole periods from 1 to '+max+'.');out[rule.id]=enabled[rule.id]?value:null;}
     return out;
   }
   function compareCost(a,b){if(!Array.isArray(a)&&!Array.isArray(b))return Math.abs(a-b)<=EPS?0:a<b?-1:1;const aa=Array.isArray(a)?a:[a],bb=Array.isArray(b)?b:[b];for(let i=0;i<Math.max(aa.length,bb.length);i++){const x=aa[i]||0,y=bb[i]||0;if(x===y)continue;if(Math.abs(x-y)>EPS)return x<y?-1:1;}return 0;}
@@ -5901,6 +5962,9 @@ var GSISRosterAllocation = (() => {
   }
   const countsConsecutive=(t,lesson)=>!t.consecutiveExcludedDemands?.has(lesson.demandId)&&!matchesSubjectPattern(lesson.subject,t.consecutiveCountExclusions);
   function consecutivePeriods(t,added=[],workload=false){return new Set([...(workload?t.consecutiveWorkloadBase||t.workloadBase||t.base:t.consecutiveBase||t.base),...(t.consecutiveAssigned||t.assigned),...added.filter(a=>countsConsecutive(t,a)).map(a=>a.period)]);}
+  // Relief-period limits count held slots, independently of R cost or own work.
+  // Imported slots stay separate so manual replacements can rebase assigned work.
+  function heldReliefPeriods(t,added=[]){return new Set([...(t.importedReliefPeriods||[]),...t.assigned,...added.map(a=>typeof a==='number'?a:a.period)].filter(p=>Number.isInteger(p)&&p>=0&&p<t.periodCount));}
   function defaultConsecutiveSubjectRules(){return [{subject:'PAL',periods:3}];}
   function normalizeConsecutiveSubjectRules(rows=defaultConsecutiveSubjectRules()){
     if(!Array.isArray(rows)||rows.length>50)fail(400,'Choose at most 50 consecutive subject rules.');
@@ -6069,7 +6133,16 @@ var GSISRosterAllocation = (() => {
   // Each cross-project decision names the immutable published Deploy snapshot it
   // actually read. These references are evidence, not a distributed writer lock.
   function deploySource(ctx,d){const source=(ctx.baselineDays?.[d]||ctx.days?.[d])?.quotaSource;if(!source)return null;return {service:'deploy',versionId:source.versionId||null,revision:source.revision??null,commit:source.commit||'',calculationVersion:source.calculationVersion||null,from:source.from||'',to:source.to||''};}
-  function addAudit(s,ctx,operation,detail={}){const date=detail.date||ctx.today,source=deploySource(ctx,date),event={id:ctx.uuid(),at:ctx.iso,date,actor:ctx.user.email,operation,...detail,...(source?{deploySource:source}:{}),...(s.systemConfig?.verboseLogging===false?{auditExportSuppressed:true}:{})};s.audit.push(event);return event;}
+  function auditIdConflict(){throw Object.assign(new Error('A new audit event has a conflicting identity.'),{status:409,code:'ROSTER_AUDIT_ID_CONFLICT'});}
+  function assertNewAuditIds(before,after){
+    const counts=rows=>{const result=new Map();for(const row of rows||[]){const id=String(row.id);result.set(id,(result.get(id)||0)+1);}return result;},old=counts(before);
+    for(const [id,count]of counts(after))if(count>1&&count>(old.get(id)||0))auditIdConflict();
+  }
+  function addAudit(s,ctx,operation,detail={}){
+    if(['id','at','actor','operation'].some(key=>Object.prototype.hasOwnProperty.call(detail,key)))auditIdConflict();
+    const id=ctx.uuid();if(s.audit.some(row=>String(row.id)===String(id)))auditIdConflict();
+    const date=detail.date||ctx.today,source=deploySource(ctx,date),event={...detail,id,at:ctx.iso,date,actor:ctx.user.email,operation,...(source?{deploySource:source}:{}),...(s.systemConfig?.verboseLogging===false?{auditExportSuppressed:true}:{})};s.audit.push(event);return event;
+  }
   function bumpDay(s,d){s.dayRevisions[d]=(s.dayRevisions[d]||0)+1;return s.dayRevisions[d];}
   function captureWeek(s,ctx,d){
     ensure(s);const dd=ctx.days[d];if(!dd||dd.schoolDay!==true||dd.verified===false||monday(d)>monday(ctx.today))return false;
@@ -6101,15 +6174,16 @@ var GSISRosterAllocation = (() => {
   }
   function pendingPeerRequests(s,ctx,d){return (s.requests||[]).filter(r=>r.date===d&&r.status==='pending'&&!r.retiredAt&&r.expiresAt>(ctx.now||0));}
   function teacherContext(s,ctx,d,source=teacherSource(ctx,d)){
-    if(!source)return new Map();const dd=source.dd,limits=workloadLimits(s.systemConfig),bal=balances(s,ctx,d),out=new Map(),assignedById=new Map(),absentById=new Map(),peerById=new Map(),externalById=new Map(),consecutiveCountExclusions=s.systemConfig?.consecutiveCountExclusions||[];
+    if(!source)return new Map();const dd=source.dd,limits=workloadLimits(s.systemConfig),bal=balances(s,ctx,d),out=new Map(),assignedById=new Map(),importedById=new Map(),absentById=new Map(),peerById=new Map(),externalById=new Map(),consecutiveCountExclusions=s.systemConfig?.consecutiveCountExclusions||[];
     for(const a of effectiveAssignments(s))if(a.date===d&&!a.noRelief&&!a.remove){if(!assignedById.has(a.staffId))assignedById.set(a.staffId,[]);assignedById.get(a.staffId).push(a);}
+    if(limits.dailyRelief!==null){const importedIds=new Set((s.importedRelief||[]).map(a=>a.id));for(const a of accounted(s,ctx))if(importedIds.has(a.id)&&a.date===d&&Number.isInteger(a.period)&&a.period>=0&&a.period<dd.periods.length){if(!importedById.has(a.staffId))importedById.set(a.staffId,new Set());importedById.get(a.staffId).add(a.period);}}
     for(const a of s.absences)if(!a.deletedAt&&a.date===d){if(!absentById.has(a.staffId))absentById.set(a.staffId,new Set());for(const p of absencePeriods(a,dd))absentById.get(a.staffId).add(p);}
     for(const request of pendingPeerRequests(s,ctx,d)){if(!peerById.has(request.recipientId))peerById.set(request.recipientId,new Set());for(const period of request.periods)peerById.get(request.recipientId).add(period);}
     s.adhoc.forEach((row,index)=>{if(row.date===d&&!row.deletedAt&&!externalById.has(row.staffId))externalById.set(row.staffId,{row,index});});
-    for(const raw of source.rows){const {person:p,ids,t,base,workloadBase,canonicalId,identityConflict,aliasIds}=raw,peerReserved=new Set(),assigned=new Set(),consecutiveAssigned=new Set(),absent=new Set(),counted=raw.activities.filter(a=>!matchesSubjectPattern(a.subject,consecutiveCountExclusions)),consecutiveBase=new Set(counted.map(a=>a.period)),consecutiveWorkloadBase=new Set(counted.filter(a=>a.workload).map(a=>a.period));let external;
-      for(const id of ids){for(const period of peerById.get(id)||[])peerReserved.add(period);for(const a of assignedById.get(id)||[]){assigned.add(a.period);if(!matchesSubjectPattern(a.subject,consecutiveCountExclusions))consecutiveAssigned.add(a.period);}for(const period of absentById.get(id)||[])absent.add(period);const e=externalById.get(id);if(e&&(!external||e.index<external.index))external=e;}
+    for(const raw of source.rows){const {person:p,ids,t,base,workloadBase,canonicalId,identityConflict,aliasIds}=raw,peerReserved=new Set(),assigned=new Set(),importedReliefPeriods=new Set(),consecutiveAssigned=new Set(),absent=new Set(),counted=raw.activities.filter(a=>!matchesSubjectPattern(a.subject,consecutiveCountExclusions)),consecutiveBase=new Set(counted.map(a=>a.period)),consecutiveWorkloadBase=new Set(counted.filter(a=>a.workload).map(a=>a.period));let external;
+      for(const id of ids){for(const period of peerById.get(id)||[])peerReserved.add(period);for(const a of assignedById.get(id)||[]){assigned.add(a.period);if(!matchesSubjectPattern(a.subject,consecutiveCountExclusions))consecutiveAssigned.add(a.period);}for(const period of importedById.get(id)||[])importedReliefPeriods.add(period);for(const period of absentById.get(id)||[])absent.add(period);const e=externalById.get(id);if(e&&(!external||e.index<external.index))external=e;}
       const sreMode=rosterBasis(ctx,d,p.id),dailyRoster=sreMode==='daily',b={...bal.get(p.id)},otherUsed=[...ids].filter(id=>id!==p.id).reduce((n,id)=>n+(bal.get(id)?.weeklyUsed||0),0);b.weeklyUsed+=otherUsed;if(b.remaining!==null)b.remaining-=otherUsed;if(b.capRemaining!==null)b.capRemaining-=otherUsed;
-      out.set(p.id,{id:p.id,dailyRoster,sreMode,canonicalId,identityConflict,aliasIds,person:p,t,ext:external?.row,base,workloadBase,consecutiveBase,consecutiveWorkloadBase,consecutiveAssigned,consecutiveCountExclusions,assigned,peerReserved,absent,balance:b,workloadIgnored:dd.workloadIgnored===true,allocationLimits:{dailyTotal:dailyRoster?limits.adhocDailyTotal:limits.dailyTotal,consecutive:limits.consecutive},restrictedPeriods:restrictedPeriods(s,p.employment),periodCount:dd.periods.length,schoolDay:dd.schoolDay===true&&dd.verified!==false});
+      out.set(p.id,{id:p.id,dailyRoster,sreMode,canonicalId,identityConflict,aliasIds,person:p,t,ext:external?.row,base,workloadBase,consecutiveBase,consecutiveWorkloadBase,consecutiveAssigned,consecutiveCountExclusions,assigned,importedReliefPeriods,peerReserved,absent,balance:b,workloadIgnored:dd.workloadIgnored===true,allocationLimits:{dailyTotal:dailyRoster?limits.adhocDailyTotal:limits.dailyTotal,consecutive:limits.consecutive,dailyRelief:sreMode?null:limits.dailyRelief},restrictedPeriods:restrictedPeriods(s,p.employment),periodCount:dd.periods.length,schoolDay:dd.schoolDay===true&&dd.verified!==false});
     }return out;
   }
   function defaultRestrictedPeriods(){return [0,13,14,15,16];}
@@ -6132,8 +6206,8 @@ var GSISRosterAllocation = (() => {
     const additions=added.map(a=>typeof a==='number'?{period:a}:a),addedPeriods=additions.map(a=>a.period),prospective={...options.demand,period:p};const reasons=[],b=t.balance,poolMember=t.dailyRoster||mainPoolTeacher(t.person,t.t);if(!t.schoolDay)reasons.push('School date is unverified.');if(!t.ext&&(!t.person.active||!t.t))reasons.push('No active verified timetable.');if(t.person.adhocEligible===false||!t.ext&&t.person.active&&t.t&&!poolMember)reasons.push('Outside the main relief pool.');if(t.ext&&!t.ext.periods.includes(p))reasons.push('Outside activated periods.');if(t.absent.has(p))reasons.push('Reported absent.');if(t.base.has(p)&&!options.repurpose)reasons.push('Timetabled lesson or duty.');if(t.assigned.has(p)||addedPeriods.includes(p))reasons.push('Already assigned relief.');const peerReserved=t.peerReserved?.has(p)===true;if(peerReserved&&!options.peerOverride)reasons.push('Reserved for a peer arrangement awaiting approval.');
     const capped=b.capConfigured===true||b.periodCap!==null&&b.periodCap!==undefined,capViolation=!options.repurpose&&capped&&(b.capVerified!==true||b.capRemaining===null||b.capRemaining-added.length<1),capReason=capViolation?(b.capVerified!==true||b.capRemaining===null?'Weekly employment cap cannot be verified.':'Weekly employment cap would be exceeded.'):'';if(capReason&&!b.utCap)reasons.push(capReason);
     const employmentPeriodRestricted=!options.repurpose&&(t.restrictedPeriods||[]).includes(p),employmentPeriodWarning=employmentPeriodRestricted?'Employment rule: '+String(t.person.employment||'this teacher')+' is not auto-allocated P'+p+'. SMC may select this teacher manually.':'';
-    const set=consecutivePeriods(t,[...additions,prospective]),consecutive=runAt(set,p,t.periodCount),remaining=t.ext||b.remaining===null?null:b.remaining-added.length,unknown=poolMember&&!t.ext&&!t.dailyRoster&&remaining===null,weeklyRExceeded=poolMember&&!t.ext&&!t.dailyRoster&&!options.repurpose&&(unknown||remaining<1),peerROverride=options.peerApproval===true&&weeklyRExceeded,Rviolation=weeklyRExceeded&&!peerROverride,streakViolation=consecutive>=6&&!options.repurpose,limits=t.allocationLimits||workloadLimits(),workload=new Set([...(t.workloadBase||t.base),...t.assigned,...addedPeriods,p]),automaticDailyViolation=limits.dailyTotal!==null&&workload.size>limits.dailyTotal,automaticStreakViolation=limits.consecutive!==null&&longestRun(consecutivePeriods(t,[...additions,prospective],true),t.periodCount)>limits.consecutive,automaticCategory=reasons.length?4:Rviolation||employmentPeriodRestricted||capViolation||t.sreMode==='unknown'?1:automaticDailyViolation||automaticStreakViolation?2:0;
-    return {staffId:t.id,name:t.person.name,...(t.sreMode?{dailyRoster:t.dailyRoster===true,sreMode:t.sreMode}:{}),workloadIgnored:t.workloadIgnored===true,available:reasons.length===0,...(peerReserved?{peerReserved:true}:{}),autoEligible:reasons.length===0&&!capViolation&&!peerReserved&&!employmentPeriodRestricted&&(!t.ext||t.dailyRoster===true)&&t.sreMode!=='unknown'&&!t.identityConflict&&(!t.canonicalId||t.canonicalId===t.id)&&!Rviolation&&!automaticDailyViolation&&!automaticStreakViolation,automaticDailyViolation,automaticStreakViolation,automaticCategory,dailyPeriods:workload.size,employmentPeriodRestricted,override:capViolation||employmentPeriodRestricted||Rviolation||streakViolation,capViolation,capOnlyViolation:capViolation&&reasons.length===1,category:reasons.length?4:(Rviolation||employmentPeriodRestricted||capViolation)&&streakViolation?3:streakViolation?2:Rviolation||employmentPeriodRestricted||capViolation?1:0,reasons,warnings:[...(t.sreMode==='unknown'?['SRE deployment basis is unverified.']:[]),...(peerReserved?['Peer arrangement awaiting approval; an SMC choice will supersede it.']:[]),...(employmentPeriodWarning?[employmentPeriodWarning]:[]),...(capReason?[capReason]:[]),...(t.identityConflict?['Duplicate active timetable identity. Resolve Contacts before automatic allocation.']:[]),...(unknown&&!options.repurpose&&!options.peerApproval?['R is unverified.']:Rviolation?['Weekly R quota exceeded.']:[]),...(streakViolation?['Six or more consecutive occupied periods.']:[])],R:b.R,remaining:b.remaining,assigned:b.weeklyUsed,annual:b.utilisation,entitlement:b.entitlement,consecutive,Rviolation,...(peerROverride?{peerROverride:true}:{}),streakViolation,external:!!t.ext};
+    const set=consecutivePeriods(t,[...additions,prospective]),consecutive=runAt(set,p,t.periodCount),remaining=t.ext||b.remaining===null?null:b.remaining-added.length,unknown=poolMember&&!t.ext&&!t.dailyRoster&&remaining===null,weeklyRExceeded=poolMember&&!t.ext&&!t.dailyRoster&&!options.repurpose&&(unknown||remaining<1),peerROverride=options.peerApproval===true&&weeklyRExceeded,Rviolation=weeklyRExceeded&&!peerROverride,streakViolation=consecutive>=6&&!options.repurpose,limits=t.allocationLimits||workloadLimits(),workload=new Set([...(t.workloadBase||t.base),...t.assigned,...addedPeriods,p]),automaticDailyViolation=limits.dailyTotal!==null&&workload.size>limits.dailyTotal,automaticStreakViolation=limits.consecutive!==null&&longestRun(consecutivePeriods(t,[...additions,prospective],true),t.periodCount)>limits.consecutive,relief=limits.dailyRelief==null?null:heldReliefPeriods(t,[...additions,prospective]),automaticReliefViolation=relief!==null&&relief.size>limits.dailyRelief,dailyReliefWarning=automaticReliefViolation?'Daily relief limit '+limits.dailyRelief+' reached.':'',automaticCategory=reasons.length?4:Rviolation||employmentPeriodRestricted||capViolation||t.sreMode==='unknown'?1:automaticDailyViolation||automaticStreakViolation||automaticReliefViolation?2:0;
+    return {staffId:t.id,name:t.person.name,...(t.sreMode?{dailyRoster:t.dailyRoster===true,sreMode:t.sreMode}:{}),workloadIgnored:t.workloadIgnored===true,available:reasons.length===0,...(peerReserved?{peerReserved:true}:{}),autoEligible:reasons.length===0&&!capViolation&&!peerReserved&&!employmentPeriodRestricted&&(!t.ext||t.dailyRoster===true)&&t.sreMode!=='unknown'&&!t.identityConflict&&(!t.canonicalId||t.canonicalId===t.id)&&!Rviolation&&!automaticDailyViolation&&!automaticStreakViolation&&!automaticReliefViolation,automaticDailyViolation,automaticStreakViolation,...(relief!==null?{automaticReliefViolation,dailyReliefPeriods:relief.size,dailyReliefWarning}:{}),automaticCategory,dailyPeriods:workload.size,employmentPeriodRestricted,override:capViolation||employmentPeriodRestricted||Rviolation||streakViolation,capViolation,capOnlyViolation:capViolation&&reasons.length===1,category:reasons.length?4:(Rviolation||employmentPeriodRestricted||capViolation)&&streakViolation?3:streakViolation?2:Rviolation||employmentPeriodRestricted||capViolation?1:0,reasons,warnings:[...(t.sreMode==='unknown'?['SRE deployment basis is unverified.']:[]),...(peerReserved?['Peer arrangement awaiting approval; an SMC choice will supersede it.']:[]),...(employmentPeriodWarning?[employmentPeriodWarning]:[]),...(capReason?[capReason]:[]),...(t.identityConflict?['Duplicate active timetable identity. Resolve Contacts before automatic allocation.']:[]),...(unknown&&!options.repurpose&&!options.peerApproval?['R is unverified.']:Rviolation?['Weekly R quota exceeded.']:[]),...(streakViolation?['Six or more consecutive occupied periods.']:[])],R:b.R,remaining:b.remaining,assigned:b.weeklyUsed,annual:b.utilisation,entitlement:b.entitlement,consecutive,Rviolation,...(peerROverride?{peerROverride:true}:{}),streakViolation,external:!!t.ext};
   }
   function opportunities(s,ctx,d,teachers=teacherContext(s,ctx,d)){const dd=ctx.days[d];if(!dd)return [];return dd.periods.map(p=>({...p,green:[...teachers.values()].filter(t=>reliefCandidateEligible(t.person)&&eligibility(t,p.period).autoEligible).map(t=>t.id)}));}
   function health(s,ctx,d,demands,teachers){
@@ -6157,7 +6231,7 @@ var GSISRosterAllocation = (() => {
      and special-duty groups remain intact; high daily load is a soft preference. */
   function manualAssignments(s,d){return effectiveAssignments(s,true).filter(a=>a.date===d).map(a=>({id:a.id,demandId:a.demandId,staffId:a.staffId,period:a.period,className:a.className,subject:a.subject,venue:a.venue,groupName:a.groupName,combination:!!a.combination,sameClass:!!a.sameClass,repurposedDuty:!!a.repurposedDuty,noRelief:!!a.noRelief,remove:!!a.remove,rCost:cost(a),status:a.status,origin:a.origin,protected:protectedAssignment(a),peerArranged:!!(a.peerArranged||a.mutual),peerApproved:!!(a.peerApproved||a.origin==='mutual'),...(a.peerROverride?{peerROverride:true}:{}),requestId:a.requestId||null,acceptedAt:a.acceptedAt||null,acceptedBy:a.acceptedBy||null,manual:!!manualDecision(s,d,a.demandId),invalidCover:!!a.invalidCover,reviewReason:a.reviewReason||'',manualDecision:manualDecision(s,d,a.demandId)}));}
   function manualModel(s,ctx,d,teachers=teacherContext(s,ctx,d)){
-    const rows=[...teachers.values()],day=ctx.days[d]||{},baseline=ctx.baselineDays?.[d]||day,baselineTeachers=new Map((baseline.teachers||[]).map(t=>[t.staffId,t])),config=s.systemConfig||{};return {date:d,policy:{allocationPreferences:preferenceOrder(config.allocationPreferences),allocationRuleEnabled:ruleToggles(config.allocationRuleEnabled),subjectFamilies:clone(config.subjectFamilies??defaultSubjectFamilies()),teachingGroupOverrides:clone(config.teachingGroupOverrides||[])},formClasses:clone(day.formClasses||[]),teachingGroups:clone(day.teachingGroups||[]),schoolDay:ctx.days[d]?.schoolDay===true,workloadIgnored:day.workloadIgnored===true,periods:clone(ctx.days[d]?.periods||[]),rotation:rotation(s,year(d)),teachers:rows.map(t=>({id:t.id,...(t.sreMode?{dailyRoster:t.dailyRoster,sreMode:t.sreMode}:{}),teachingProfile:clone(baselineTeachers.get(t.id)?.teachingProfile||teachingProfile(baselineTeachers.get(t.id)?.weekCells||baselineTeachers.get(t.id)?.cells||[],baseline.formClasses,baseline.teachingGroups,baseline.subjectCategories,config)),canonicalId:t.canonicalId,identityConflict:t.identityConflict,aliasIds:t.aliasIds,person:{id:t.id,name:t.person.name,active:t.person.active,employment:t.person.employment,adhocEligible:t.person.adhocEligible,reliefCandidateEligible:reliefCandidateEligible(t.person)},t:t.t?{adhoc:t.t.adhoc,cells:clone(t.t.cells),recessDuties:clone(t.t.recessDuties||[])}:null,ext:t.ext?{periods:t.ext.periods}:null,base:[...t.base],workloadBase:[...(t.workloadBase||t.base)],consecutiveBase:[...(t.consecutiveBase||t.base)],consecutiveWorkloadBase:[...(t.consecutiveWorkloadBase||t.workloadBase||t.base)],consecutiveCountExclusions:t.consecutiveCountExclusions,peerReserved:[...(t.peerReserved||[])],absent:[...t.absent],balance:t.balance,workloadIgnored:t.workloadIgnored===true,allocationLimits:t.allocationLimits,restrictedPeriods:t.restrictedPeriods,periodCount:t.periodCount,schoolDay:t.schoolDay})),assignments:manualAssignments(s,d),manualDecisions:clone(manualOwnership(s,d))};
+    const rows=[...teachers.values()],day=ctx.days[d]||{},baseline=ctx.baselineDays?.[d]||day,baselineTeachers=new Map((baseline.teachers||[]).map(t=>[t.staffId,t])),config=s.systemConfig||{};return {date:d,policy:{allocationPreferences:preferenceOrder(config.allocationPreferences),allocationRuleEnabled:ruleToggles(config.allocationRuleEnabled),subjectFamilies:clone(config.subjectFamilies??defaultSubjectFamilies()),teachingGroupOverrides:clone(config.teachingGroupOverrides||[])},formClasses:clone(day.formClasses||[]),teachingGroups:clone(day.teachingGroups||[]),schoolDay:ctx.days[d]?.schoolDay===true,workloadIgnored:day.workloadIgnored===true,periods:clone(ctx.days[d]?.periods||[]),rotation:rotation(s,year(d)),teachers:rows.map(t=>({id:t.id,...(t.sreMode?{dailyRoster:t.dailyRoster,sreMode:t.sreMode}:{}),teachingProfile:clone(baselineTeachers.get(t.id)?.teachingProfile||teachingProfile(baselineTeachers.get(t.id)?.weekCells||baselineTeachers.get(t.id)?.cells||[],baseline.formClasses,baseline.teachingGroups,baseline.subjectCategories,config)),canonicalId:t.canonicalId,identityConflict:t.identityConflict,aliasIds:t.aliasIds,person:{id:t.id,name:t.person.name,active:t.person.active,employment:t.person.employment,adhocEligible:t.person.adhocEligible,reliefCandidateEligible:reliefCandidateEligible(t.person)},t:t.t?{adhoc:t.t.adhoc,cells:clone(t.t.cells),recessDuties:clone(t.t.recessDuties||[])}:null,ext:t.ext?{periods:t.ext.periods}:null,base:[...t.base],workloadBase:[...(t.workloadBase||t.base)],consecutiveBase:[...(t.consecutiveBase||t.base)],consecutiveWorkloadBase:[...(t.consecutiveWorkloadBase||t.workloadBase||t.base)],consecutiveCountExclusions:t.consecutiveCountExclusions,importedReliefPeriods:[...(t.importedReliefPeriods||[])],peerReserved:[...(t.peerReserved||[])],absent:[...t.absent],balance:t.balance,workloadIgnored:t.workloadIgnored===true,allocationLimits:t.allocationLimits,restrictedPeriods:t.restrictedPeriods,periodCount:t.periodCount,schoolDay:t.schoolDay})),assignments:manualAssignments(s,d),manualDecisions:clone(manualOwnership(s,d))};
   }
   // Rebase only changed assignment costs onto the server's weekly/yearly totals.
   // Applying this to an already projected model remains incremental, not cumulative.
@@ -6180,6 +6254,7 @@ var GSISRosterAllocation = (() => {
     const rows=model.teachers.filter(raw=>options.includeExcluded===true||raw.person.reliefCandidateEligible!==false).map(raw=>{const alias=new Set(raw.aliasIds?.length?raw.aliasIds:[raw.id]),all=select(allByStaff,alias),own=select(liveByStaff,alias),restored=select(ignoredByStaff,alias).reduce((n,a)=>n+cost(a),0),balance={...raw.balance};if(balance.remaining!==null)balance.remaining+=restored;if(balance.capRemaining!==null)balance.capRemaining+=restored;balance.weeklyUsed-=restored;
       const t={...raw,balance,base:new Set(raw.base),workloadBase:new Set(raw.workloadBase||raw.base),consecutiveBase:new Set(raw.consecutiveBase||raw.base),consecutiveWorkloadBase:new Set(raw.consecutiveWorkloadBase||raw.workloadBase||raw.base),consecutiveAssigned:new Set(own.filter(a=>countsConsecutive(raw,a)).map(a=>a.period)),absent:new Set(raw.absent),peerReserved:new Set(raw.peerReserved||[]),assigned:new Set(own.map(a=>a.period))},repurposedDuty=recessDuty(t,period,dem),e=eligibility(t,period,[],{repurpose:repurposedDuty,demand:dem,peerOverride:true}),samePerson=alias.has(dem.staffId),current=t.t?.cells[period]||['','','',''],existingOrdinary=own.find(a=>a.period===period&&!a.combination&&!a.repurposedDuty),baseLesson=isClassLesson(current)?{subject:current[0],className:current[1],venue:current[2],groupName:current[3]}:existingOrdinary||null;
       const additional=own.filter(a=>a.period===period&&a.combination&&!a.sameClass),sameClass=!!baseLesson&&norm(baseLesson.className)===norm(dem.className),combineAllowed=t.schoolDay&&t.person.active&&t.person.adhocEligible!==false&&(t.ext||mainPoolTeacher(t.person,t.t))&&!t.absent.has(period)&&!samePerson&&!!baseLesson&&(sameClass||additional.length<1)&&!t.identityConflict;
+      if(e.dailyReliefWarning)e.warnings.push(e.dailyReliefWarning);
       if(samePerson){e.available=false;e.autoEligible=false;e.category=4;e.reasons.push('This is the absent teacher.');}
       const occupied=new Set([...t.base,...t.assigned]),load=new Set([...[...t.workloadBase].filter(p=>!t.absent.has(p)),...all.filter(a=>!a.noRelief&&!a.remove&&!a.invalidCover).map(a=>a.period)]).size,nearFree=[period-2,period-1,period+1,period+2].filter(p=>p>=0&&p<t.periodCount).every(p=>!occupied.has(p)),surrounded=occupied.has(period-1)&&occupied.has(period+1),alternatives=Array.from({length:t.periodCount},(_,p)=>p).filter(p=>p!==period&&eligibility(t,p).autoEligible).length;
       const profile=raw.teachingProfile||{subjects:[],levels:[]},subjects=new Set([...(profile.subjects||[]).filter(code=>!profile.subjectLessons||!code.startsWith('family:')).map(code=>code.startsWith('family:')?code:resolve({subject:code}).key),...(profile.subjectLessons||[]).map(lesson=>resolve(lesson).key)]),subjectPenalty=wanted.subject&&!subjects.has(wanted.subject)?1:0,levelPenalty=wanted.levels.length&&!wanted.levels.every(level=>(profile.levels||[]).includes(level))?1:0;
@@ -6199,7 +6274,7 @@ var GSISRosterAllocation = (() => {
     const graph=[];const node=()=>{graph.push([]);return graph.length-1;};const source=node(),sink=node(),dn=new Map(),links=[];
     const edge=(u,v,cap,cost,tag)=>{const a={to:v,rev:graph[v].length,cap,cost,initial:cap,tag},b={to:u,rev:graph[u].length,cap:0,cost:negateCost(cost)};graph[u].push(a);graph[v].push(b);return a;};
     for(const d of demands){const n=node();dn.set(d.id,n);edge(n,sink,1,0);}
-    for(const t of teachers){if(checkBudget)checkBudget();const n=node();const daily=(t.allocationLimits||workloadLimits()).dailyTotal,headroom=daily==null?Infinity:Math.max(0,daily-new Set([...(t.workloadBase||t.base),...t.assigned]).size),capacity=Math.min(demands.length,allocationCapacity(t),headroom);for(let i=0;i<capacity;i++)edge(source,n,1,(weights.teacherCost?.(t,i)||0));
+    for(const t of teachers){if(checkBudget)checkBudget();const n=node();const limits=t.allocationLimits||workloadLimits(),daily=limits.dailyTotal,headroom=daily==null?Infinity:Math.max(0,daily-new Set([...(t.workloadBase||t.base),...t.assigned]).size),relief=limits.dailyRelief==null?null:heldReliefPeriods(t),reliefHeadroom=relief===null?Infinity:Math.max(0,limits.dailyRelief-relief.size)+[...t.eligible].filter(p=>relief.has(p)).length,capacity=Math.min(demands.length,allocationCapacity(t),headroom,reliefHeadroom);for(let i=0;i<capacity;i++)edge(source,n,1,(weights.teacherCost?.(t,i)||0));
       for(const p of new Set([...t.eligible,...(t.repurposePeriods||[])])){const key=t.id+'|'+p;if(banned.has(key))continue;const pn=node(),repurpose=t.repurposePeriods?.has(p);edge(repurpose?source:n,pn,1,repurpose?(weights.repurposeCost??-100000000):0);
         for(const d of demands)if(d.period===p&&d.staffId!==t.id&&!banned.has(t.id+'|d:'+d.id)&&(!t.eligibleDemands||t.eligibleDemands.has(d.id))&&(!repurpose||recessDuty(t,p,d))){const e=edge(pn,dn.get(d.id),1,weights.edgeCost?.(t,d,repurpose)||0,{staffId:t.id,demandId:d.id,period:p,...(repurpose?{rCost:0,repurposedDuty:true}:{})});links.push(e);}
       }
@@ -6226,6 +6301,7 @@ var GSISRosterAllocation = (() => {
     for(const t of teachers){
       const rows=by.get(t.id)||[],base=new Set([...(t.workloadBase||t.base),...t.assigned]),set=new Set([...base,...rows.map(a=>a.period)]),limits=t.allocationLimits||workloadLimits(),variables=rows.filter(a=>!base.has(a.period)),key=a=>t.id+'|d:'+a.demandId;
       if(limits.dailyTotal!==null&&set.size>limits.dailyTotal&&variables.length)return variables.map(key);
+      if(limits.dailyRelief!=null){const relief=heldReliefPeriods(t),added=rows.filter(a=>!relief.has(a.period));if(heldReliefPeriods(t,rows).size>limits.dailyRelief&&added.length)return added.map(key);}
       if(limits.consecutive===null)continue;
       const consecutive=consecutivePeriods(t,rows,true),countedBase=consecutivePeriods(t,[],true);
       for(let p=0;p<t.periodCount-limits.consecutive;p++){
@@ -6361,9 +6437,15 @@ var GSISRosterAllocation = (() => {
     const same=previous.length===next.length&&previous.every(a=>next.some(b=>a.demandId===b.demandId&&a.staffId===b.staffId&&a.period===b.period&&cost(a)===cost(b)&&!!a.repurposedDuty===!!b.repurposedDuty));
     const accept=!same&&(bestScore.coverage>originalScore.coverage||!validPrevious||bestScore.coverage===originalScore.coverage&&compareCost(bestCost,originalCost)<0);
     const accepted=accept?next:previous,selected=new Map(accepted.map(a=>[a.demandId,a])),fixedById=new Map(fixed.map(a=>[a.demandId,a]));let decisionEvidence;
-    if(s.systemConfig?.verboseLogging!==false){const candidateTeachers=new Map(teachers.map(t=>[t.id,t])),periodEvidence=[];
-    for(const period of [...new Set(demands.map(dem=>dem.period))].sort((a,b)=>a-b)){if(checkBudget)checkBudget();const eligible=[],excluded=new Map(),eligibleRanks=new Map(),lessons=demands.filter(dem=>dem.period===period);for(const t of tm.values()){const rows=lessons.map(dem=>candidates.get(t.id+'|d:'+dem.id)||{...candidates.get(t.id+'|'+period),...eligibility(t,period,[],{demand:dem})}),e=rows.find(r=>r.autoEligible)||rows[0];if(e.autoEligible&&!excludedIds.has(t.id)){eligible.push(t.id);eligibleRanks.set(t.id,e);}else {const reasons=[...(excludedIds.has(t.id)?['This staff category is not included in relief candidates.']:[]),...e.reasons,...e.warnings,...(e.automaticDailyViolation?['Configured maximum daily periods.']:[]),...(e.automaticStreakViolation?['Configured maximum consecutive periods.']:[]),...(t.ext?['External teachers are allocated manually.']:[])];const reason=reasons.join(' ')||'Not eligible for automatic allocation.';if(!excluded.has(reason))excluded.set(reason,[]);excluded.get(reason).push(t.id);}}periodEvidence.push({period,eligibleStaffIds:eligible,comparisons:eligible.map(id=>{const r=eligibleRanks.get(id);return r?{staffId:id,rank:r.rank,fairnessBand:Number.isFinite(r.fairnessBand)?r.fairnessBand:null,alternatives:r.alternatives,rotation:r.rotation}:null;}).filter(Boolean),excluded:[...excluded].map(([reason,staffIds])=>({reason,staffIds}))});}
-    decisionEvidence={version:1,inputs:{baselineId:baseline.id||null,deploySource:deploySource(ctx,d),staplerRevision:ctx.days[d]?.staplerRevision||0,allocationRevision:s.dayRevisions?.[d]||0,accountingYear:year(d),accountingVerified:s.accountingYears?.[year(d)]?.verified===true,configUpdatedAt:s.systemConfig?.updatedAt||null},policy:{preferences,ruleEnabled:enabled,workloadLimits:workloadLimits(s.systemConfig),effectiveWorkloadLimits:workloadLimits(s.systemConfig),workloadCalculationSkipped:ctx.days[d]?.workloadIgnored===true,consecutiveSubjectRules:blockPolicy.rules,consecutiveCountExclusions:clone(s.systemConfig?.consecutiveCountExclusions||[]),objective:'Maximum feasible coverage, then ordered preferences across the complete plan.'},teachers:[...tm.values()].map(t=>({staffId:t.id,name:t.person.name,remaining:t.balance.remaining,capRemaining:t.balance.capRemaining,annualUtilisation:t.balance.utilisation,entitlement:t.balance.entitlement,alternatives:candidateTeachers.get(t.id)?.eligible.size||0,teachingProfile:candidateTeachers.get(t.id)?.teachingProfile||null})),periods:periodEvidence,lessons:demands.map(dem=>{const block=blockPolicy.byDemand.get(dem.id),manual=manualDecisionForDemand(s,dem),chosen=selected.get(dem.id),existing=fixedById.get(dem.id),policy=resolve(dem),disposition=manual?'smc-choice':peerDemandIds.has(dem.id)?'peer-pending':existing?'already-covered':dem.noReliefRequired||!policy.reliefRequired?'exempt':chosen?'selected':'uncovered';return {demandId:dem.id,period:dem.period,className:dem.className||'',subject:dem.subject||'',groupName:dem.groupName||'',venue:dem.venue||'',disposition,selectedStaffId:chosen?.staffId||existing?.staffId||null,subjectPolicy:policy,...(block?{consecutiveBlock:{subject:block.subject,periods:block.periods,demandIds:block.demandIds,anchor:block.anchor},...(block.blockedReason?{reviewReason:block.blockedReason}:{})}:{}),levels:lessonLevels(dem,ctx.days[d]?.formClasses,ctx.days[d]?.teachingGroups),...(manual?{manual:clone(manual)}:{}),...(chosen?{selectionExplanation:'Selected by the complete-plan coverage and ordered-preference comparison; this does not claim an individual first rank.'}:disposition==='uncovered'?{uncoveredReason:block?(block.blockedReason||block.subject+' consecutive '+block.periods+'-period block needs one eligible teacher for all remaining periods within quota and workload limits.'):periodEvidence.find(p=>p.period===dem.period)?.eligibleStaffIds.length?'Available candidates were needed elsewhere or reached complete-plan capacity or workload constraints.':'No automatically eligible teacher for this period.'}:{})};})};}
+    if(s.systemConfig?.verboseLogging!==false){const candidateTeachers=new Map(teachers.map(t=>[t.id,t])),periodEvidence=[],reliefCapReasons=new Map();
+    if(enabled.dailyRelief){
+      const planned=new Map();for(const a of accepted){if(!planned.has(a.staffId))planned.set(a.staffId,[]);planned.get(a.staffId).push(a);}
+      for(const dem of pending){if(selected.has(dem.id))continue;const block=blockPolicy.byDemand.get(dem.id);if(block?.blockedReason)continue;const unit=block?block.pendingIds.map(id=>byDemand.get(id)):[dem],available=teachers.filter(t=>(!block?.anchor||t.id===block.anchor)&&unit.every(lesson=>t.eligibleDemands.has(lesson.id)));
+        if(available.length&&available.every(t=>t.allocationLimits.dailyRelief!=null&&heldReliefPeriods(t,[...(planned.get(t.id)||[]),...unit]).size>t.allocationLimits.dailyRelief))reliefCapReasons.set(dem.id,'Daily relief limit '+available[0].allocationLimits.dailyRelief+' reached.');
+      }
+    }
+    for(const period of [...new Set(demands.map(dem=>dem.period))].sort((a,b)=>a-b)){if(checkBudget)checkBudget();const eligible=[],excluded=new Map(),eligibleRanks=new Map(),lessons=demands.filter(dem=>dem.period===period);for(const t of tm.values()){const rows=lessons.map(dem=>candidates.get(t.id+'|d:'+dem.id)||{...candidates.get(t.id+'|'+period),...eligibility(t,period,[],{demand:dem})}),e=rows.find(r=>r.autoEligible)||rows[0];if(e.autoEligible&&!excludedIds.has(t.id)){eligible.push(t.id);eligibleRanks.set(t.id,e);}else {const reasons=[...(excludedIds.has(t.id)?['This staff category is not included in relief candidates.']:[]),...e.reasons,...e.warnings,...(e.dailyReliefWarning?[e.dailyReliefWarning]:[]),...(e.automaticDailyViolation?['Configured maximum daily periods.']:[]),...(e.automaticStreakViolation?['Configured maximum consecutive periods.']:[]),...(t.ext?['External teachers are allocated manually.']:[])];const reason=reasons.join(' ')||'Not eligible for automatic allocation.';if(!excluded.has(reason))excluded.set(reason,[]);excluded.get(reason).push(t.id);}}periodEvidence.push({period,eligibleStaffIds:eligible,comparisons:eligible.map(id=>{const r=eligibleRanks.get(id);return r?{staffId:id,rank:r.rank,fairnessBand:Number.isFinite(r.fairnessBand)?r.fairnessBand:null,alternatives:r.alternatives,rotation:r.rotation}:null;}).filter(Boolean),excluded:[...excluded].map(([reason,staffIds])=>({reason,staffIds}))});}
+    decisionEvidence={version:1,inputs:{baselineId:baseline.id||null,deploySource:deploySource(ctx,d),staplerRevision:ctx.days[d]?.staplerRevision||0,allocationRevision:s.dayRevisions?.[d]||0,accountingYear:year(d),accountingVerified:s.accountingYears?.[year(d)]?.verified===true,configUpdatedAt:s.systemConfig?.updatedAt||null},policy:{preferences,ruleEnabled:enabled,workloadLimits:workloadLimits(s.systemConfig),effectiveWorkloadLimits:workloadLimits(s.systemConfig),workloadCalculationSkipped:ctx.days[d]?.workloadIgnored===true,consecutiveSubjectRules:blockPolicy.rules,consecutiveCountExclusions:clone(s.systemConfig?.consecutiveCountExclusions||[]),objective:'Maximum feasible coverage, then ordered preferences across the complete plan.'},teachers:[...tm.values()].map(t=>({staffId:t.id,name:t.person.name,remaining:t.balance.remaining,capRemaining:t.balance.capRemaining,annualUtilisation:t.balance.utilisation,entitlement:t.balance.entitlement,alternatives:candidateTeachers.get(t.id)?.eligible.size||0,teachingProfile:candidateTeachers.get(t.id)?.teachingProfile||null})),periods:periodEvidence,lessons:demands.map(dem=>{const block=blockPolicy.byDemand.get(dem.id),manual=manualDecisionForDemand(s,dem),chosen=selected.get(dem.id),existing=fixedById.get(dem.id),policy=resolve(dem),disposition=manual?'smc-choice':peerDemandIds.has(dem.id)?'peer-pending':existing?'already-covered':dem.noReliefRequired||!policy.reliefRequired?'exempt':chosen?'selected':'uncovered';return {demandId:dem.id,period:dem.period,className:dem.className||'',subject:dem.subject||'',groupName:dem.groupName||'',venue:dem.venue||'',disposition,selectedStaffId:chosen?.staffId||existing?.staffId||null,subjectPolicy:policy,...(block?{consecutiveBlock:{subject:block.subject,periods:block.periods,demandIds:block.demandIds,anchor:block.anchor},...(block.blockedReason?{reviewReason:block.blockedReason}:{})}:{}),levels:lessonLevels(dem,ctx.days[d]?.formClasses,ctx.days[d]?.teachingGroups),...(manual?{manual:clone(manual)}:{}),...(chosen?{selectionExplanation:'Selected by the complete-plan coverage and ordered-preference comparison; this does not claim an individual first rank.'}:disposition==='uncovered'?{uncoveredReason:reliefCapReasons.get(dem.id)||(block?(block.blockedReason||block.subject+' consecutive '+block.periods+'-period block needs one eligible teacher for all remaining periods within quota and workload limits.'):periodEvidence.find(p=>p.period===dem.period)?.eligibleStaffIds.length?'Available candidates were needed elsewhere or reached complete-plan capacity or workload constraints.':'No automatically eligible teacher for this period.')}:{})};})};}
     if(checkBudget)checkBudget();
     const consecutiveBlockWarnings=blockPolicy.blocks.filter(block=>block.blockedReason||block.pendingIds.some(id=>!selected.has(id))).map(block=>({subject:block.subject,periods:block.periods,demandIds:block.demandIds,reason:block.blockedReason||block.subject+' needs one eligible teacher across the whole '+block.periods+'-period block. Remaining lessons are unfilled for review.'}));
     return {date:d,decisionEvidence,consecutiveBlockWarnings,preferences,ruleEnabled:enabled,workloadLimits:workloadLimits(s.systemConfig),policyScore:{before:originalCost,after:accept?bestCost:originalCost},assignments:accept?next:previous.map(({demandId,staffId,period,rCost,repurposedDuty})=>({demandId,staffId,period,rCost,repurposedDuty})),changed:accept,coverage:accept?bestScore.coverage:originalScore.coverage,fixedCoverage:fixed.filter(a=>!a.noRelief).length,manualUncovered:demands.filter(dem=>manualDecisionForDemand(s,dem)&&!fixedById.has(dem.id)&&!dem.noReliefRequired&&resolve(dem).reliefRequired).length,uncovered:pending.length-(accept?bestScore.coverage:originalScore.coverage)+demands.filter(dem=>peerDemandIds.has(dem.id)&&!fixed.some(a=>a.demandId===dem.id)).length+demands.filter(dem=>manualDecisionForDemand(s,dem)&&!fixedById.has(dem.id)&&!dem.noReliefRequired&&resolve(dem).reliefRequired).length,coverageProven:result.proven&&(!validPrevious||result.coverage>=previous.length),upperBound:result.upper,fairness:{before:originalScore.spread,after:accept?bestScore.spread:originalScore.spread,improvement:accept?originalScore.spread-bestScore.spread:0,population:[...population].sort(),changes:accept?bestScore.changes:0,search:'ordered allocation preferences; spread diagnostic only'},solver:{nodes:result.nodes,improvementPasses,preferencesProven:result.preferencesProven,searchComplete:result.searchComplete,status:result.preferencesProven?'optimal':'bounded',limits:{maxNodes:options.maxNodes||256}},candidates:teachers.map(t=>({staffId:t.id,annual:t.balance.utilisation,remaining:t.balance.remaining,alternatives:t.eligible.size,entitlement:t.balance.entitlement})),reason:same?'unchanged':accept?bestScore.coverage>originalScore.coverage?'higher coverage':!validPrevious?'invalid draft repaired':'saved allocation preferences improved':'retain stable draft: no ordered preference improvement'};
@@ -6382,7 +6464,7 @@ var GSISRosterAllocation = (() => {
   }
   function mayOptimise(ctx,d){const start=Date.parse(addDays(d,-1)+'T16:00:00+08:00'),end=Date.parse(d+'T06:29:59.999+08:00');return ctx.now>=start&&ctx.now<=end;}
   function warningEvents(s,ctx,summary){ensure(s);const quiet=schedule(ctx.now).quiet,events=[];for(const p of summary.periods){if(periodStarted(ctx,summary.date,p.period))continue;const key=summary.date+':'+p.period,old=s.healthWarningState[key]||{seen:[],episode:0};if(p.green.length>2){s.healthWarningState[key]={seen:[],episode:old.seen.length?old.episode+1:old.episode,last:p.green.length};continue;}if(!old.seen.includes(p.green.length)){events.push({key:'capacity:'+key+':'+old.episode+':'+p.green.length,period:p.period,count:p.green.length,date:summary.date,quiet});old.seen.push(p.green.length);}old.last=p.green.length;s.healthWarningState[key]=old;}return events;}
-  return {deploymentTeachingEvidence,sreBasis,dailyRosterCalculation,reliefCandidateEligible,normalizeSubjectPatterns,matchesSubjectPattern,absencePeriods,defaultConsecutiveSubjectRules,normalizeConsecutiveSubjectRules,manualDecision,manualDecisionForDemand,manualOwnership,defaultSubjectFamilies,normalizeSubjectFamilies,normalizeTeachingGroupOverrides,subjectResolver,lessonSubject,teachingProfile,defaultRestrictedPeriods,defaultEmploymentRestrictions,preferenceRules,workloadRules,ruleToggles,workloadLimits,preferenceOrder,sameVenue,teacherSource,recessDuty,manualAssignments,manualModel,withManualAssignments,manualRanks,isClassLesson,ensure,clone,fail,norm,addDays,monday,year,cost,active,protectedAssignment,effectiveAssignments,accounted,corrected,initialiseHistory,annual,balances,weekQuota,captureWeek,addAudit,bumpDay,periodStarted,periodEnded,reliefCompleted,teacherContext,eligibility,runAt,opportunities,health,rotation,ranked,optimise,score,solveCoverage,schedule,mayOptimise,warningEvents,pendingPeerRequests};
+  return {deploymentTeachingEvidence,sreBasis,dailyRosterCalculation,reliefCandidateEligible,normalizeSubjectPatterns,matchesSubjectPattern,absencePeriods,defaultConsecutiveSubjectRules,normalizeConsecutiveSubjectRules,manualDecision,manualDecisionForDemand,manualOwnership,defaultSubjectFamilies,normalizeSubjectFamilies,normalizeTeachingGroupOverrides,subjectResolver,lessonSubject,teachingProfile,defaultRestrictedPeriods,defaultEmploymentRestrictions,preferenceRules,workloadRules,ruleToggles,workloadLimits,preferenceOrder,sameVenue,teacherSource,recessDuty,manualAssignments,manualModel,withManualAssignments,manualRanks,isClassLesson,ensure,clone,fail,norm,addDays,monday,year,cost,active,protectedAssignment,effectiveAssignments,accounted,corrected,initialiseHistory,annual,balances,weekQuota,captureWeek,addAudit,assertNewAuditIds,bumpDay,periodStarted,periodEnded,reliefCompleted,teacherContext,eligibility,runAt,opportunities,health,rotation,ranked,optimise,score,solveCoverage,schedule,mayOptimise,warningEvents,pendingPeerRequests};
 })();
 if(typeof module!=='undefined'&&module.exports)module.exports=GSISRosterAllocation;
 
@@ -8955,6 +9037,18 @@ function rosterDeliveryReviewDispatch_(req,contacts){
  }finally{deployUnlock_(lock);}
 }
 
+/* Scheduled Venues health alerts use the notification transport lock. */
+function rosterVenuesSyncCheck_(){
+ const status=rosterVenuesSyncStatus_();props_().setProperty('ROSTER_VENUES_HEALTH',JSON.stringify({state:status.state,since:status.since}));
+ if(!status.enabled)return {enabled:false};
+ const store=rosterNotificationState_();if(!store)return {blocked:status.overdue?1:0};const lock=rosterNotificationLock_(store);if(!deployLock_(lock,1000))return {deferred:1};
+ try{const current=rosterNotificationState_();if(!current)return {blocked:status.overdue?1:0};const key='delivery:venues-sync',old=current.smcAlerts.find(a=>a.key===key);let changed=false;
+  if(status.overdue){const date=new Date(status.checkedAt+8*3600000).toISOString().slice(0,10);if(!old||old.status!=='open'||old.date!==date){const row={id:old?.id||Utilities.getUuid(),key,date,createdAt:new Date(status.checkedAt).toISOString(),recipients:(rosterOperationsState_(true).smcDutyRoster||[]).find(r=>r.date===date)?.staffIds||[],origin:'venues-sync',status:'open',summary:'Venues sync needs Admin recovery. Open System Health to inspect and recover the source fence.'};if(old)Object.assign(old,row);else current.smcAlerts.push(row);changed=true;}}
+  else if(status.state==='ready'&&old?.status==='open'){old.status='resolved';old.resolvedAt=new Date(status.checkedAt).toISOString();changed=true;}
+  if(changed)rosterNotificationCommit_(current);return {enabled:true,blocked:status.overdue?1:0,idle:!changed,...(status.overdue?{failure:{code:status.code}}:{})};
+ }finally{deployUnlock_(lock);}
+}
+
 /* GSIS_ROSTER_NOTIFICATION_MAINTENANCE_END */
 
 /* GSIS_ASC_EXPORT_BEGIN */
@@ -9371,11 +9465,49 @@ function rosterVenuesConfig_(){
  if(!/^https:\/\/script\.google\.com\/macros\/s\/[\w-]+\/exec$/.test(url||'')||!secret||secret.length<32)venuesSourceError_(503,'VENUES_SOURCE_SETUP','Set both VENUES_APPS_SCRIPT_URL and VENUES_BRIDGE_SECRET in Roster, or remove both until Venues is installed.');return {url,secret};
 }
 function rosterVenuesMarker_(){let marker;try{marker=JSON.parse(props_().getProperty('ROSTER_VENUES_SOURCE')||'null');}catch(_){}return marker;}
+// Diagnostics have their own signed, read/recovery-only route. Normal source
+// writes and their transaction checks are unchanged.
+function rosterVenuesRecoveryCall_(input,identity){
+ const config=rosterVenuesConfig_();if(!config)venuesSourceError_(503,'VENUES_SOURCE_SETUP','Configure the Venues connection first.');
+ const payload=JSON.stringify({action:'venuesRecovery',service:'gsis-venues-recovery-v1',timestamp:Date.now(),nonce:Utilities.getUuid(),input,...(identity?{identity:{email:identity.email,subject:identity.subject,admin:true}}:{})}),signature=Utilities.computeHmacSha256Signature(payload,config.secret).map(b=>('0'+((b+256)%256).toString(16)).slice(-2)).join('');
+ let result;try{const response=UrlFetchApp.fetch(config.url,{method:'post',contentType:'application/json',payload:JSON.stringify({payload,signature}),muteHttpExceptions:true});if(response.getResponseCode()!==200)throw Error();result=JSON.parse(response.getContentText());}catch(_){venuesSourceError_(503,'VENUES_FENCE_UNCONFIRMED','Venues sync could not be checked.');}
+ if(result?.ok!==true){const code=['COMMIT_UNCERTAIN','REVISION_CONFLICT','REVIEW_REQUIRED','FORBIDDEN'].includes(result?.code)?result.code:'VENUES_FENCE_UNCONFIRMED';venuesSourceError_(result?.status===403?403:503,code,'Venues recovery refused. Keep the fence closed and review the current status.');}
+ return result.data;
+}
+function rosterVenuesSyncStatus_(){
+ const now=Date.now(),marker=rosterVenuesMarker_();let remote,code='VENUES_FENCE_UNCONFIRMED',enabled=true;
+ try{if(!rosterVenuesConfig_())enabled=false;else remote=rosterVenuesRecoveryCall_({operation:'sourceStatus',source:'roster'});}catch(error){if(error.code==='COMMIT_UNCERTAIN')code=error.code;}
+ const valid=remote&&['ready','stale','pending','unavailable'].includes(remote.status)&&typeof remote.revision==='string'&&typeof remote.pendingToken==='string'&&['ready','uncertain'].includes(remote.commit?.state);
+ const state=!enabled?'ready':!valid||remote.commit.state==='uncertain'?'uncertain':marker?.status==='ready'&&!!marker.revision&&remote.revision===marker.revision&&!remote.pendingToken&&remote.status==='ready'?'ready':'pending';
+ if(valid&&remote.commit.state==='uncertain')code='COMMIT_UNCERTAIN';else if(state==='pending')code='VENUES_FENCE_PENDING';else if(state==='ready')code='OK';
+ let observed;try{observed=JSON.parse(props_().getProperty('ROSTER_VENUES_HEALTH')||'null');}catch(_){}
+ const dates=[observed?.state!=='ready'?observed?.since:null,marker?.status!=='ready'?marker?.updatedAt:null,valid&&remote.commit.state==='uncertain'?remote.commit.at:null].map(v=>typeof v==='number'?v:Date.parse(v)).filter(v=>Number.isFinite(v)&&v<=now);
+ const since=state==='ready'?null:dates.length?Math.min(...dates):now,ageMs=since===null?0:now-since;
+ return {available:!enabled||!!valid,enabled,state,code,checkedAt:now,since,ageMs,overdue:enabled&&state!=='ready'&&ageMs>300000,rosterState:['ready','pending','committed'].includes(marker?.status)?marker.status:'unavailable',venuesState:valid?remote.status:'unavailable',commitState:valid?remote.commit.state:'unavailable',remote};
+}
+function rosterVenuesPublicStatus_(status,admin=false){const {remote,...view}=status;return {...view,recoveryAllowed:admin===true&&status.enabled===true&&status.state!=='ready'};}
+function rosterVenuesAdminDispatch_(req,c){
+ const user=rosterOperationsAuthority_(c,req.identity),p=req.input||{};if(!user.smc&&!user.admin)error_(403,'SMC or Admin access is required.');
+ if(p.operation==='venuesSyncStatus')return rosterVenuesPublicStatus_(rosterVenuesSyncStatus_(),user.admin===true);
+ if(user.admin!==true)error_(403,'Current Admin access is required.');
+ if(typeof p.evidence!=='string'||p.evidence.trim().length<20||p.evidence.length>2000)error_(400,'Record at least 20 characters of recovery evidence.');
+ if(typeof rosterEdgeAssertLegacyWrite_==='function')rosterEdgeAssertLegacyWrite_();
+ let status=rosterVenuesSyncStatus_();const steps=[],refused=(step,error)=>({complete:false,steps:[...steps,{step,state:'refused',code:['COMMIT_UNCERTAIN','REVISION_CONFLICT','REVIEW_REQUIRED','VENUES_FENCE_PENDING'].includes(error?.code)?error.code:'VENUES_FENCE_UNCONFIRMED'}]});
+ if(!status.enabled||!status.available)return refused('venues');
+ if(status.state==='ready')return {complete:true,steps:[{step:'venues',state:'not-needed'},{step:'roster',state:'not-needed'}],status:rosterVenuesPublicStatus_(status,true)};
+ if(status.remote.commit.state==='uncertain'){
+  const token=status.remote.commit.token;if(typeof token!=='string'||!token||token.length>200)return refused('venues');
+  try{const result=rosterVenuesRecoveryCall_({operation:'recoverCommit',source:'roster',token,evidence:p.evidence.trim()},req.identity);if(result?.recovered!==true||typeof result.committed!=='boolean')return refused('venues');steps.push({step:'venues',state:'recovered',committed:result.committed===true});}catch(error){return refused('venues',error);}
+  status=rosterVenuesSyncStatus_();if(!status.available||status.remote.commit.state!=='ready')return refused('venues');
+ }else steps.push({step:'venues',state:'not-needed'});
+ try{const result=recoverRosterVenuesSource();if(result?.ready!==true)return refused('roster');steps.push({step:'roster',state:'recovered'});}catch(error){return refused('roster',error);}
+ return {complete:true,steps,note:'Recovery checks completed. Refresh status; normal Venues source refresh may still be needed.'};
+}
 function rosterVenuesCall_(input){
  const config=rosterVenuesConfig_();if(!config)return null;
  const payload=JSON.stringify({action:'venuesService',service:'gsis-venues-v1',timestamp:Date.now(),nonce:Utilities.getUuid(),input}),signature=Utilities.computeHmacSha256Signature(payload,config.secret).map(b=>('0'+((b+256)%256).toString(16)).slice(-2)).join('');
  let response;try{const r=UrlFetchApp.fetch(config.url,{method:'post',contentType:'application/json',payload:JSON.stringify({payload,signature}),muteHttpExceptions:true});if(r.getResponseCode()!==200)throw Error('http');response=JSON.parse(r.getContentText());}catch(_){venuesSourceError_(503,'VENUES_FENCE_UNCONFIRMED','Venues coordination could not be confirmed. Keep the current plan and ask Admin to run recoverRosterVenuesSource.');}
- if(response?.ok!==true)venuesSourceError_(503,'VENUES_FENCE_UNCONFIRMED','Venues coordination is pending. Ask Admin to check the source fence before retrying.');
+ if(response?.ok!==true)venuesSourceError_(503,response?.code==='COMMIT_UNCERTAIN'?'COMMIT_UNCERTAIN':'VENUES_FENCE_UNCONFIRMED','Venues coordination is pending. Ask Admin to check the source fence before retrying.');
  const ack=response.data,valid=input.operation==='sourceBegin'?ack?.status==='pending'&&ack.pendingToken===input.token&&ack.revision===input.expectedRevision:input.operation==='sourceComplete'?ack?.revision===input.revision&&!ack.pendingToken&&['stale','ready'].includes(ack.status):false;
  if(!valid)venuesSourceError_(503,'VENUES_FENCE_UNCONFIRMED','Venues did not confirm the exact source change. Keep the source fence closed and recover it.');return ack;
 }
@@ -10160,8 +10292,9 @@ function rosterEdgeReferences_(c,adminVerified){
  return {contacts,adminVerified:adminVerified===true,contactsSource:rosterOperationsDigest_(contacts),checkedAt:new Date().toISOString(),cutoverFreeze:rosterCutoverStatus_(),legacyWritesDisabled:props_().getProperty('ROSTER_EDGE_AUTHORITY')==='d1'};
 }
 function rosterEdgeMigrationDispatch_(req,c){
- const p=req.input||{},op=p.operation;if(op==='edgeHealthAuthority')return {handled:true,result:{user:rosterOperationsAuthority_(c,req.identity)}};if(!['edgeFreeze','edgeUnfreeze','edgeExport','edgeExportManifest','edgeExportPart','edgeModel','edgeFence','edgeDrift','edgeReferences','edgeContactCreate','edgeAudit','edgeExportAbandon'].includes(op))return null;if(op==='edgeContactCreate'){if(!c?.user?.rosterSMC&&!c?.user?.rosterAdmin)error_(403,'SMC or Admin access is required.');}else rosterEdgeAdmin_(c);
+ const p=req.input||{},op=p.operation;if(op==='edgeHealthAuthority')return {handled:true,result:{user:rosterOperationsAuthority_(c,req.identity)}};if(!['edgeFreeze','edgeUnfreeze','edgeExport','edgeExportManifest','edgeExportCheckpoint','edgeExportPart','edgeModel','edgeFence','edgeDrift','edgeReferences','edgeContactCreate','edgeAudit','edgeExportAbandon'].includes(op))return null;if(op==='edgeContactCreate'){if(!c?.user?.rosterSMC&&!c?.user?.rosterAdmin)error_(403,'SMC or Admin access is required.');}else rosterEdgeAdmin_(c);
  if(['edgeFreeze','edgeUnfreeze'].includes(op))return {handled:true,result:rosterCutoverDispatch_(req)};
+ if(op==='edgeExportCheckpoint')return {handled:true,result:rosterEdgeExportCheckpoint_(req)};
  if(op==='edgeExportManifest')return {handled:true,result:rosterEdgeExportManifest_(req)};
  if(op==='edgeExportPart')return {handled:true,result:rosterEdgeExportPart_(req)};
  if(op==='edgeExportAbandon')return {handled:true,result:rosterEdgeExportAbandon_(req)};
@@ -10264,7 +10397,7 @@ function rosterEdgeExportPartLegacy_(req){const binding=rosterEdgeExportBinding_
 
 /* Resumable preparation v2. Only capture holds production locks. Later writes
  * are immutable; the gateway's D1 step lease fences the accepted checkpoint. */
-const ROSTER_EXPORT_V2='gsis-roster-export-v2',ROSTER_EXPORT_BATCH_BYTES=524288,ROSTER_EXPORT_STEP_MS=60000;
+const ROSTER_EXPORT_V2='gsis-roster-export-v2',ROSTER_EXPORT_BATCH_BYTES=262157;
 function rosterEdgeExportBindingV2_(req){
  const p=req.input||{};if(Object.keys(p).some(key=>!['operation','requestId','sessionId','partId','preparation','resetRequestId'].includes(key)))error_(400,'Export file IDs and byte ranges are selected only by the backend.');
  const input={operation:p.operation,requestId:p.requestId,...(p.sessionId!==undefined?{sessionId:p.sessionId}:{}),...(p.partId!==undefined?{partId:p.partId}:{})};return rosterEdgeExportBinding_({...req,input});
@@ -10298,10 +10431,12 @@ function rosterEdgeExportFilesNamed_(name){
  const folder=rosterFolder_(ROSTER_DATA),quote=value=>String(value).replace(/\\/g,'\\\\').replace(/'/g,"\\'"),child=rosterEdgeExportImportFolder_(false),parents=[ROSTER_DATA,...(child?[child]:[])],query='('+parents.map(id=>"'"+quote(id)+"' in parents").join(' or ')+") and name = '"+quote(name)+"' and trashed = false",url='https://www.googleapis.com/drive/v3/files?supportsAllDrives=true&includeItemsFromAllDrives=true&pageSize=100&fields='+encodeURIComponent('files(id,name,size),nextPageToken,incompleteSearch')+'&q='+encodeURIComponent(query)+(folder.driveId?'&corpora=drive&driveId='+encodeURIComponent(folder.driveId):'&corpora=user');
  const value=rosterDriveJson_(rosterDriveRequest_(url,{},'export-file-recovery'),'export-file-recovery');if(!Array.isArray(value.files)||value.nextPageToken||value.incompleteSearch)error_(503,'The preparation recovery listing is incomplete.');return value.files.filter(file=>!file.name||file.name===name).sort((a,b)=>String(a.id).localeCompare(String(b.id)));
 }
-function rosterEdgeExportCreateImmutable_(name,raw,type='application/json'){
+function rosterEdgeExportCreateImmutable_(name,raw,type='application/json',options={}){
  const digest=rosterEdgeExportHash_(raw),bytes=Utilities.newBlob(raw).getBytes().length;
- for(const file of rosterEdgeExportFilesNamed_(name)){if(Number(file.size)!==bytes)continue;try{rosterEdgeExportPrivateText_({fileId:file.id,digest});return {fileId:file.id,digest};}catch(error){if(error.status!==503)throw error;}}
- const fileId=rosterCreateFile_(rosterEdgeExportImportFolder_(true),name,Utilities.newBlob(raw,type));return {fileId,digest};
+ if(!options.knownMissing)for(const file of rosterEdgeExportFilesNamed_(name)){if(Number(file.size)!==bytes)continue;try{rosterEdgeExportPrivateText_({fileId:file.id,digest});return {fileId:file.id,digest};}catch(error){if(error.status!==503)throw error;}}
+ const fileId=rosterCreateFile_(rosterEdgeExportImportFolder_(true),name,Utilities.newBlob(raw,type));
+ if(options.verify){const saved=rosterReadFile_(fileId);if(Utilities.newBlob(saved).getBytes().length!==bytes||rosterEdgeExportHash_(saved)!==digest)error_(503,'The new immutable part failed readback verification.');}
+ return {fileId,digest};
 }
 function rosterEdgeExportCheckpointName_(binding,ordinal){return 'Roster import '+binding.sessionId+' checkpoint '+String(ordinal).padStart(5,'0')+'.json';}
 function rosterEdgeExportReadCheckpoint_(binding,ref){
@@ -10318,14 +10453,26 @@ function rosterEdgeExportAssertCheckpointV2_(binding,checkpoint,descriptor){
  }
 }
 function rosterEdgeExportRecoveredCheckpoint_(binding,step){
+ let unreadable;
  for(const file of rosterEdgeExportFilesNamed_(rosterEdgeExportCheckpointName_(binding,step.ordinal))){
-  if(Number(file.size)>2097152)continue;let raw,checkpoint;try{raw=rosterReadFile_(file.id);checkpoint=JSON.parse(raw);}catch(error){continue;}
+  if(Number(file.size)>2097152)continue;let raw,checkpoint;try{raw=rosterReadFile_(file.id);checkpoint=JSON.parse(raw);}catch(error){unreadable=error;continue;}
   if(checkpoint.schema===ROSTER_EXPORT_V2&&checkpoint.actor===binding.actor&&checkpoint.requestId===binding.requestId&&checkpoint.sessionId===binding.sessionId&&checkpoint.ordinal===step.ordinal&&JSON.stringify(checkpoint.previous||null)===JSON.stringify(step.checkpoint||null))return {checkpoint,ref:{fileId:file.id,digest:rosterEdgeExportHash_(raw)}};
- }return null;
+ }if(unreadable)error_(503,'The retained preparation checkpoint could not be read. Retry its read before repeating work.');return null;
+}
+function rosterEdgeExportCheckpoint_(req){
+ const binding=rosterEdgeExportBindingV2_(req),step=rosterEdgeExportPreparation_(req.input);
+ if(rosterEdgeExportAbandoned_(binding))error_(409,'This preparation was abandoned.');
+ const descriptor=rosterEdgeExportDescriptor_(binding),recovered=rosterEdgeExportRecoveredCheckpoint_(binding,step);
+ if(!recovered)return {adminVerified:true,sessionId:binding.sessionId,completed:false};
+ rosterEdgeExportAssertCheckpointV2_(binding,recovered.checkpoint,descriptor);
+ return {...rosterEdgeExportReplyV2_(recovered.checkpoint,recovered.ref),completed:true};
 }
 function rosterEdgeExportReplyV2_(checkpoint,ref){
- const uploaded=checkpoint.parts.length,remaining=checkpoint.stage==='ready'?0:(checkpoint.work?Math.ceil((checkpoint.work.parts-checkpoint.work.next)/2):0)+Math.max(0,checkpoint.jobs-checkpoint.jobIndex)+(checkpoint.stage==='records'||checkpoint.stage==='objects'?2:1);
- const value={adminVerified:true,sessionId:checkpoint.sessionId,requestId:checkpoint.requestId,sourceDigest:checkpoint.sourceDigest,preparation:{ordinal:checkpoint.ordinal+1,checkpoint:ref},step:checkpoint.ordinal+1,phase:checkpoint.lastStep,done:checkpoint.ordinal+1,total:checkpoint.ordinal+1+remaining,elapsedMs:checkpoint.elapsedMs||checkpoint.timing?.elapsedMs||0,stepElapsedMs:checkpoint.timing?.elapsedMs||0,preparedParts:uploaded};
+ const uploaded=checkpoint.parts.length,part=checkpoint.work?.header?.partMetadata[checkpoint.work.next],pending=checkpoint.batch?Math.max(0,checkpoint.batch.total-checkpoint.batch.next):0;
+ const remaining=checkpoint.stage==='ready'?0:checkpoint.budgetVersion===1?(pending?pending*2-(checkpoint.work?1:0):0)+Math.max(0,checkpoint.jobs-checkpoint.jobIndex-(pending&&checkpoint.stage==='objects'?1:0))*4+(checkpoint.stage==='objects'?5:1):(checkpoint.work?Math.ceil((checkpoint.work.parts-checkpoint.work.next)/2):0)+Math.max(0,checkpoint.jobs-checkpoint.jobIndex)+(checkpoint.stage==='records'||checkpoint.stage==='objects'?2:1);
+ const nextStep=part?{phase:'Freeze parts',bytes:part.bytes,records:part.records,partId:part.id}:{phase:checkpoint.stage==='finalize'?'Manifest':'Prepare source',bytes:checkpoint.sourceBytes??null,records:null};
+ const checkpointInputDigest=rosterEdgeExportHash_(JSON.stringify({sessionId:checkpoint.sessionId,ordinal:checkpoint.ordinal,checkpoint:checkpoint.previous||null}));
+ const value={adminVerified:true,sessionId:checkpoint.sessionId,requestId:checkpoint.requestId,sourceDigest:checkpoint.sourceDigest,preparation:{ordinal:checkpoint.ordinal+1,checkpoint:ref},checkpointInputDigest,step:checkpoint.ordinal+1,phase:checkpoint.lastStep,nextStep,stepSize:checkpoint.stepSize||null,done:checkpoint.ordinal+1,total:checkpoint.ordinal+1+remaining,elapsedMs:checkpoint.elapsedMs||checkpoint.timing?.elapsedMs||0,stepElapsedMs:checkpoint.timing?.elapsedMs||0,preparedParts:uploaded};
  return checkpoint.stage==='ready'?{...value,manifest:checkpoint.manifest,manifestDigest:checkpoint.manifestDigest}:{...value,preparing:true,retryAfterMs:2000};
 }
 function rosterEdgeExportReadCapturedAudit_(envelope,date,fileId){
@@ -10339,7 +10486,20 @@ function rosterEdgeExportPhaseV2_(descriptor,phase){
 }
 function rosterEdgeExportFailureV2_(descriptor,error){
  const now=Date.now(),status=Number(error?.status);descriptor.failureReason={status:Number.isInteger(status)&&status>=400&&status<=599?status:503,message:String(error?.message||'Preparation failed. Retry the same import.').slice(0,800),phase:String(error?.failurePhase||descriptor.lastPhase||'Preparation').slice(0,80),elapsed:Math.max(0,now-(descriptor.stepStartedAt||descriptor.createdAt||now))};
+ if(descriptor.stepSize)Object.assign(descriptor.failureReason,descriptor.stepSize);
  descriptor.failedAt=now;rosterEdgeExportSave_(descriptor);return descriptor.failureReason;
+}
+function rosterEdgeExportDiagnostic_(error,trace){
+ const reason=error?.failureReason||{},integer=value=>Number.isSafeInteger(value)&&value>=0?value:null;
+ const supplied=reason.code||error?.code,timeout=error?.status===504||/timed?\s*out|timeout|deadline|maximum execution time/i.test(String(reason.message||error?.message||''));
+ const code=typeof supplied==='string'&&/^(?:ROSTER_IMPORT_[A-Z0-9_]{1,50}|ROSTER_GOOGLE_(?:ERROR|TIMEOUT)|ROSTER_CUTOVER_FROZEN|EDGE_RECORD_TOO_LARGE)$/.test(supplied)?supplied:timeout?'ROSTER_GOOGLE_TIMEOUT':'ROSTER_GOOGLE_ERROR';
+ const phase=reason.phase||error?.failurePhase||trace.phase,phases=['Preparation','Capture snapshot','Serialize packed source','Hash packed source','Upload packed source','Recover checkpoint','Freeze parts','Prepare baseline','Prepare audit','Prepare stapler','Prepare records','Snapshot checks','Recover cached job','Scope digests','Save checkpoint','Manifest'];
+ const ordinal=integer(trace.preparationOrdinal),diagnostic={code,ordinal:ordinal!==null&&ordinal<=8192?ordinal:null,phase:phases.includes(phase)?phase:'Preparation',bytes:integer(reason.bytes),records:integer(reason.records),elapsed:integer(reason.elapsed)??Math.max(0,Date.now()-trace.started)};
+ // Log one allowlisted record at the response boundary, never raw errors,
+ // stack traces, staff records, private file identifiers or request payloads.
+ rosterDiagnosticLog_(diagnostic);
+ const status=reason.status??error?.status;
+ return {status:Number.isSafeInteger(status)&&status>=400&&status<=599?status:503,message:'Preparation failed. Retry the same import.',...diagnostic,...(/^part-\d{5}$/.test(reason.partId||'')?{partId:reason.partId}:{})};
 }
 function rosterEdgeExportCaptureV2_(binding){
  let descriptor=rosterEdgeExportDescriptor_(binding);if(descriptor){
@@ -10359,8 +10519,8 @@ function rosterEdgeExportCaptureV2_(binding){
   const retained=new Set(Object.keys(props_().getProperties()).filter(key=>key.startsWith('ROSTER_EDGE_EXPORT:')||key.startsWith('ROSTER_EDGE_EXPORT_ABANDONED:')).map(key=>key.slice(key.indexOf(':')+1)));
   if(retained.size>=GSiSRosterImport.MAX_RETAINED_SESSIONS)error_(409,'Preparation has 24 retained sessions. Reviewed archival and cleanup are required before a new capture; existing sessions remain resumable.');
   rosterEdgeAssertLegacyWrite_(true);user=typeof rosterNotificationLock_==='function'?rosterNotificationLock_():LockService.getUserLock();if(!deployLock_(user,8000))error_(503,'Notification delivery is finishing. Retry the same import.');
-  descriptor={schema:2,...binding,state:'capturing',createdAt:Date.now(),stepStartedAt:Date.now(),sourceName:'Roster import '+binding.sessionId+' source.json'};rosterEdgeExportPhaseV2_(descriptor,'Capture snapshot');
-  const snapshot=rosterEdgeSnapshot_();rosterEdgeRememberSnapshotParts_(snapshot);envelope={schema:ROSTER_EXPORT_V2,...binding,sourceDigest:snapshot.sourceDigest,snapshot};
+  descriptor={schema:2,...binding,state:'capturing',preparationOrdinal:0,createdAt:Date.now(),stepStartedAt:Date.now(),sourceName:'Roster import '+binding.sessionId+' source.json'};rosterEdgeExportPhaseV2_(descriptor,'Capture snapshot');
+  const snapshot=rosterEdgeSnapshot_();envelope={schema:ROSTER_EXPORT_V2,...binding,sourceDigest:snapshot.sourceDigest,snapshot};
   rosterEdgeExportPhaseV2_(descriptor,'Serialize packed source');raw=JSON.stringify(envelope);
   rosterEdgeExportPhaseV2_(descriptor,'Hash packed source');Object.assign(descriptor,{sourceDigest:snapshot.sourceDigest,sourceHash:rosterEdgeExportHash_(raw),sourceBytes:Utilities.newBlob(raw).getBytes().length,jobs:GSiSRosterImport.objectJobs(snapshot).length});if(descriptor.sourceBytes>67108864)error_(413,'The frozen source exceeds its 64 MiB bound.');rosterEdgeExportSave_(descriptor);
  }catch(error){if(descriptor){descriptor.state='failed';rosterEdgeExportFailureV2_(descriptor,error);}throw error;}finally{if(user)deployUnlock_(user);deployUnlock_(script);}
@@ -10375,13 +10535,48 @@ function rosterEdgeExportSourceV2_(binding,source){
  const envelope=JSON.parse(rosterEdgeExportPrivateText_(source));if(envelope.schema!==ROSTER_EXPORT_V2||envelope.actor!==binding.actor||envelope.requestId!==binding.requestId||envelope.sessionId!==binding.sessionId||envelope.sourceDigest!==envelope.snapshot?.sourceDigest)error_(409,'The frozen source belongs to another session.');return envelope;
 }
 function rosterEdgeExportAdapterV2_(envelope){return {hash:rosterEdgeExportHash_,gzip:value=>Utilities.gzip(Utilities.newBlob(value,'application/json')).getBytes(),base64:bytes=>Utilities.base64Encode(bytes),readModel:entry=>GSISRoster.validate(rosterEdgeExportObject_(entry.modelFile)),readArchive:(date,id)=>rosterEdgeExportReadCapturedAudit_(envelope,date,id)};}
-function rosterEdgeExportWorkV2_(binding,ordinal,prepared,kind,job){
- const metadata=prepared.partMetadata,base=metadata[0]?.offset||0,header={schema:ROSTER_EXPORT_V2,...binding,kind,job:job||null,partMetadata:metadata,reference:prepared.reference||null,scopes:prepared.scopes||null,position:prepared.position,base},json=JSON.stringify(header),headerBytes=Utilities.newBlob(json).getBytes().length;
+function rosterEdgeExportWorkV2_(binding,ordinal,prepared,kind,job,cached=false,next=0){
+ const metadata=prepared.partMetadata,base=metadata[0]?.offset||0,chunks=[];let offset=0;
+ const payloads=cached?prepared.parts.map(payload=>{const encoded=Utilities.base64Encode(Utilities.gzip(Utilities.newBlob(payload,'application/json')).getBytes());chunks.push({offset,bytes:encoded.length,digest:rosterEdgeExportHash_(encoded)});offset+=encoded.length;return encoded;}):prepared.parts;
+ const header={schema:ROSTER_EXPORT_V2,...binding,ordinal,kind,job:job||null,partMetadata:metadata,reference:prepared.reference||null,scopes:prepared.scopes||null,position:prepared.position,base,...(cached?{encoding:'gzip-base64-parts-v1',chunks}:{})},json=JSON.stringify(header),headerBytes=Utilities.newBlob(json).getBytes().length;
  if(headerBytes>GSiSRosterImport.MAX_MANIFEST_BYTES+2000)error_(413,'The preparation work header exceeds its size bound.');
- const raw=String(headerBytes).padStart(8,'0')+'\n'+json+prepared.parts.join(''),ref=rosterEdgeExportCreateImmutable_('Roster import '+binding.sessionId+' work '+String(ordinal).padStart(5,'0')+'.bin',raw,'application/octet-stream');
- return {...ref,headerDigest:rosterEdgeExportHash_(json),headerBytes,totalBytes:Utilities.newBlob(raw).getBytes().length,parts:metadata.length,next:0};
+ const raw=String(headerBytes).padStart(8,'0')+'\n'+json+payloads.join(''),name='Roster import '+binding.sessionId+' work '+String(ordinal).padStart(5,'0')+'.bin',headerDigest=rosterEdgeExportHash_(json),totalBytes=Utilities.newBlob(raw).getBytes().length;
+ const descriptor=cached?rosterEdgeExportDescriptor_(binding):null,prior=descriptor?.workIntent;
+ if(descriptor){if(prior?.ordinal===ordinal&&prior.headerDigest!==headerDigest)error_(409,'The cached job plan changed.');descriptor.workIntent={ordinal,name,digest:rosterEdgeExportHash_(raw),headerDigest,headerBytes,totalBytes,parts:metadata.length,next};rosterEdgeExportSave_(descriptor);}
+ const ref=rosterEdgeExportCreateImmutable_(name,raw,'application/octet-stream',{knownMissing:cached&&prior?.ordinal!==ordinal});
+ return {...ref,header,headerDigest,headerBytes,totalBytes,parts:metadata.length,next};
+}
+function rosterEdgeExportRecoverWorkV2_(binding,ordinal,descriptor){
+ const intent=descriptor?.workIntent;if(!intent||intent.ordinal!==ordinal)return null;
+ for(const file of rosterEdgeExportFilesNamed_(intent.name)){
+  if(Number(file.size)!==intent.totalBytes)continue;
+  const work={...intent,fileId:file.id},header=rosterEdgeExportWorkHeaderV2_(binding,work);
+  if(header.ordinal!==ordinal||header.encoding!=='gzip-base64-parts-v1'||header.chunks?.length!==intent.parts)error_(409,'The retained cached job plan is invalid.');
+  return {...work,header};
+ }
+ return null;
+}
+function rosterEdgeExportCachedPayload_(header,index,encoded){
+ const chunk=header.chunks[index];if(encoded.length!==chunk.bytes||rosterEdgeExportHash_(encoded)!==chunk.digest)error_(503,'The cached part failed its digest check.');
+ const payload=Utilities.ungzip(Utilities.newBlob(Utilities.base64Decode(encoded),'application/x-gzip','roster-import-part.json.gz')).getDataAsString('UTF-8');if(Utilities.newBlob(payload).getBytes().length!==header.partMetadata[index].bytes)error_(503,'The cached part length changed.');return payload;
+}
+function rosterEdgeExportCachedScopes_(binding,work){
+ const header=rosterEdgeExportWorkHeaderV2_(binding,work),raw=rosterEdgeExportPrivateText_(work),data=Utilities.newBlob(Utilities.newBlob(raw).getBytes().slice(9+work.headerBytes)).getDataAsString('UTF-8'),rows={roster:[],'roster-register':[]},segments={};
+ for(let i=0;i<header.partMetadata.length;i++){
+  const part=header.partMetadata[i],chunk=header.chunks[i],body=JSON.parse(rosterEdgeExportCachedPayload_(header,i,data.slice(chunk.offset,chunk.offset+chunk.bytes)));
+  if(part.kind==='segment')segments[part.id]=Utilities.base64Decode(body.base64);
+  else if(part.kind==='records')rows[part.scope].push(...body.rows);
+  else if(part.kind==='record'){
+   const bytes=body.segments.flatMap(id=>{if(!segments[id])error_(503,'A cached record segment is missing.');return segments[id];});
+   if(bytes.length!==body.bytes||rosterEdgeExportHash_(bytes)!==body.digest)error_(503,'The cached record assembly changed.');rows[part.scope].push(...JSON.parse(Utilities.newBlob(bytes).getDataAsString('UTF-8')).rows);
+  }else error_(503,'The cached record job has an invalid part kind.');
+ }
+ const scopes={};for(const scope of ['roster','roster-register']){if(rows[scope].length!==header.scopes[scope].records)error_(503,'The cached scope record count changed.');scopes[scope]={records:rows[scope].length,digest:rosterEdgeExportHash_(GSiSEdgeStore.canonicalJson(GSiSEdgeStore.decode(rows[scope])))};}return scopes;
 }
 function rosterEdgeExportWorkHeaderV2_(binding,work){
+ // The immutable checkpoint authenticates this header. Avoid fetching it three
+ // times for every part; old checkpoints still use the verified Drive path.
+ if(work.header&&rosterEdgeExportHash_(JSON.stringify(work.header))===work.headerDigest)return work.header;
  const meta=rosterEdgeExportPrivateMeta_(work.fileId);if(Number(meta.size)!==work.totalBytes)error_(503,'The preparation work file length changed.');
  const prefix=rosterEdgeExportRange_(work.fileId,0,9,work.totalBytes);if(!/^\d{8}\n$/.test(prefix)||Number(prefix.slice(0,8))!==work.headerBytes)error_(503,'The preparation work header is invalid.');
  const raw=rosterEdgeExportRange_(work.fileId,9,work.headerBytes,work.totalBytes);if(rosterEdgeExportHash_(raw)!==work.headerDigest)error_(503,'The preparation work header failed verification.');const value=JSON.parse(raw);if(value.schema!==ROSTER_EXPORT_V2||value.actor!==binding.actor||value.requestId!==binding.requestId||value.sessionId!==binding.sessionId||!Array.isArray(value.partMetadata)||value.partMetadata.length!==work.parts)error_(409,'The work file belongs to another preparation.');return value;
@@ -10390,29 +10585,68 @@ function rosterEdgeExportManifestV2_(req){
  const binding=rosterEdgeExportBindingV2_(req),started=Date.now();if(rosterEdgeExportAbandoned_(binding))error_(409,'This preparation was abandoned. Start with a new request ID.');
  const existing=rosterEdgeExportDescriptor_(binding);if(existing&&existing.schema!==2){const input={...req.input};delete input.preparation;return rosterEdgeExportManifestLegacy_({...req,input});}
  const step=rosterEdgeExportPreparation_(req.input);
- if(existing?.schema===2&&step.ordinal>0){existing.stepStartedAt=started;rosterEdgeExportPhaseV2_(existing,'Recover checkpoint');}
- const recovered=rosterEdgeExportRecoveredCheckpoint_(binding,step);if(recovered){rosterEdgeExportAssertCheckpointV2_(binding,recovered.checkpoint,existing);return rosterEdgeExportReplyV2_(recovered.checkpoint,recovered.ref);}
+ if(existing?.schema===2&&step.ordinal>0){existing.stepStartedAt=started;existing.stepSize={bytes:null,records:null};rosterEdgeExportPhaseV2_(existing,'Recover checkpoint');}
+ // A new ordinal has never uploaded its checkpoint. Retries still search and
+ // verify the immutable checkpoint before doing any work.
+ const recovering=existing&&(existing.preparationOrdinal===undefined||existing.preparationOrdinal>=step.ordinal);
+ const recovered=recovering?rosterEdgeExportRecoveredCheckpoint_(binding,step):null;if(recovered){rosterEdgeExportAssertCheckpointV2_(binding,recovered.checkpoint,existing);return rosterEdgeExportReplyV2_(recovered.checkpoint,recovered.ref);}
  let checkpoint;
  if(step.ordinal===0){
   const descriptor=rosterEdgeExportCaptureV2_(binding);if(descriptor.state==='failed')return {adminVerified:true,sessionId:binding.sessionId,requestId:binding.requestId,preparationFailed:true,requiresRestart:true,failureReason:descriptor.failureReason,lastPhase:descriptor.lastPhase};
   const source={fileId:descriptor.sourceFileId,digest:descriptor.sourceHash},catalogue=descriptor.catalogue||rosterEdgeExportCatalogueV2_(rosterEdgeExportSourceV2_(binding,source));
-  checkpoint={schema:ROSTER_EXPORT_V2,...binding,ordinal:0,previous:null,source,sourceDigest:descriptor.sourceDigest,stage:'objects',jobs:catalogue.jobs.length,catalogue,jobIndex:0,parts:[],partFiles:{},references:[],scopes:{},totalBytes:0,work:null,lastStep:'Snapshot'};
+  checkpoint={schema:ROSTER_EXPORT_V2,...binding,ordinal:0,previous:null,source,sourceBytes:descriptor.sourceBytes,budgetVersion:2,snapshotPartsPending:true,sourceDigest:descriptor.sourceDigest,stage:'objects',jobs:catalogue.jobs.length,catalogue,jobIndex:0,parts:[],partFiles:{},references:[],scopes:{},totalBytes:0,work:null,lastStep:'Snapshot'};
  }else{
   checkpoint=rosterEdgeExportReadCheckpoint_(binding,step.checkpoint);rosterEdgeExportAssertCheckpointV2_(binding,checkpoint,existing);if(checkpoint.ordinal!==step.ordinal-1)error_(409,'The preparation step does not follow its checkpoint.');
   if(checkpoint.stage==='ready')return rosterEdgeExportReplyV2_(checkpoint,step.checkpoint);
   checkpoint={...checkpoint,ordinal:step.ordinal,previous:step.checkpoint};
-  if(checkpoint.work){
+  existing.preparationOrdinal=step.ordinal;rosterEdgeExportSave_(existing);
+  if(checkpoint.snapshotPartsPending){
+   rosterEdgeExportPhaseV2_(existing,'Snapshot checks');const envelope=rosterEdgeExportSourceV2_(binding,checkpoint.source);rosterEdgeRememberSnapshotParts_(envelope.snapshot);delete checkpoint.snapshotPartsPending;checkpoint.lastStep='Snapshot checks';
+  }else if(checkpoint.work){
    rosterEdgeExportPhaseV2_(existing,'Freeze parts');
-   const work=checkpoint.work,header=rosterEdgeExportWorkHeaderV2_(binding,work);let bytes=0;
-   while(work.next<header.partMetadata.length){const part=header.partMetadata[work.next];if(bytes&&bytes+part.bytes>ROSTER_EXPORT_BATCH_BYTES||bytes&&Date.now()-started>=ROSTER_EXPORT_STEP_MS)break;
-    const payload=rosterEdgeExportRange_(work.fileId,9+work.headerBytes+part.offset-header.base,part.bytes,work.totalBytes);if(rosterEdgeExportHash_(payload)!==part.digest)error_(503,'The prepared part failed its digest check.');
-    const ref=rosterEdgeExportCreateImmutable_('Roster import '+binding.sessionId+' '+part.id+' '+part.digest+'.json',payload);const verified=rosterEdgeExportPrivateText_(ref,GSiSRosterImport.MAX_PART_BYTES);if(Utilities.newBlob(verified).getBytes().length!==part.bytes)error_(503,'The frozen part length changed.');checkpoint.parts.push(part);checkpoint.partFiles[part.id]={fileId:ref.fileId,digest:part.digest,bytes:part.bytes};checkpoint.totalBytes+=part.bytes;work.next++;bytes+=part.bytes;
+   const work=checkpoint.work,header=rosterEdgeExportWorkHeaderV2_(binding,work),cached=header.encoding==='gzip-base64-parts-v1';let bytes=0;
+   let count=1,encoded='';if(cached){let encodedBytes=header.chunks[work.next].bytes;while(count<2&&work.next+count<header.partMetadata.length&&encodedBytes+header.chunks[work.next+count].bytes<=262157&&header.partMetadata.slice(work.next,work.next+count+1).reduce((n,p)=>n+p.bytes,0)<=524314){encodedBytes+=header.chunks[work.next+count].bytes;count++;}encoded=rosterEdgeExportRange_(work.fileId,9+work.headerBytes+header.chunks[work.next].offset,encodedBytes,work.totalBytes);}
+   const first=work.next,end=first+count;
+   while(work.next<header.partMetadata.length&&work.next<end){const declared=header.partMetadata[work.next],part={...declared};if(bytes&&Date.now()-started>35000)break;
+    checkpoint.stepSize=existing.stepSize={bytes:part.bytes,records:part.records,partId:part.id};rosterEdgeExportSave_(existing);
+    if(checkpoint.budgetVersion>=1&&part.bytes>ROSTER_EXPORT_BATCH_BYTES)error_(413,'The prepared part exceeds the 262157-byte step budget.');
+    let payload;if(cached){const chunk=header.chunks[work.next],value=encoded.slice(chunk.offset-header.chunks[first].offset,chunk.offset-header.chunks[first].offset+chunk.bytes);payload=rosterEdgeExportCachedPayload_(header,work.next,value);}
+    else payload=rosterEdgeExportRange_(work.fileId,9+work.headerBytes+part.offset-header.base,part.bytes,work.totalBytes);
+    const digest=rosterEdgeExportHash_(payload);if(Utilities.newBlob(payload).getBytes().length!==part.bytes||part.digest&&digest!==part.digest||!part.digest&&!cached)error_(503,'The prepared part failed its digest check.');part.digest=digest;
+    const ref=rosterEdgeExportCreateImmutable_('Roster import '+binding.sessionId+' '+part.id+' '+part.digest+'.json',payload,'application/json',{verify:true});checkpoint.parts.push(part);checkpoint.partFiles[part.id]={fileId:ref.fileId,digest:part.digest,bytes:part.bytes};checkpoint.totalBytes+=part.bytes;work.next++;bytes+=part.bytes;
    }
-   checkpoint.lastStep='Freeze parts';if(work.next===header.partMetadata.length){if(header.kind==='object'){checkpoint.references.push({job:header.job,reference:header.reference});checkpoint.jobIndex++;}else{checkpoint.scopes=header.scopes;checkpoint.stage='finalize';}checkpoint.work=null;}
+   checkpoint.lastStep='Freeze parts';if(work.next===header.partMetadata.length){
+    if(checkpoint.batch)checkpoint.batch.next+=header.partMetadata.length;
+    if(!checkpoint.batch||checkpoint.batch.next===checkpoint.batch.total){
+     if(header.kind==='object'){checkpoint.references.push({job:header.job,reference:header.reference});checkpoint.jobIndex++;}else if(cached&&!header.scopes.roster.digest){checkpoint.scopeWork=work;checkpoint.stage='record-scopes';}else{checkpoint.scopes=header.scopes;checkpoint.stage='finalize';}
+     checkpoint.batch=null;
+    }
+    checkpoint.work=null;
+   }
   }else if(checkpoint.stage==='objects'||checkpoint.stage==='records'){
+   existing.stepSize={bytes:checkpoint.sourceBytes??null,records:null};
    const catalogue=checkpoint.catalogue,jobs=catalogue.jobs,position={ordinal:checkpoint.parts.length,offset:checkpoint.totalBytes};
-   if(checkpoint.jobIndex<jobs.length){rosterEdgeExportPhaseV2_(existing,'Prepare '+jobs[checkpoint.jobIndex].kind);const job=jobs[checkpoint.jobIndex],envelope=job.kind==='stapler'?rosterEdgeExportSourceV2_(binding,checkpoint.source):{snapshot:{sourceDigest:checkpoint.sourceDigest,index:{entries:catalogue.modelEntries},state:{allocationAuditExports:catalogue.auditFiles}}};if(job.kind==='stapler'&&typeof rosterOperationsUnpackPlans_==='function'){const row=envelope.snapshot.state[job.path[1]][job.path[2]];rosterOperationsUnpackPlans_({[job.path[1]]:[row]});}const prepared=GSiSRosterImport.prepareObject(envelope.snapshot,job,position,rosterEdgeExportAdapterV2_(envelope));checkpoint.work=rosterEdgeExportWorkV2_(binding,step.ordinal,prepared,'object',job);checkpoint.lastStep='Prepare '+job.kind;}
-   else{rosterEdgeExportPhaseV2_(existing,'Prepare records');const envelope=rosterEdgeExportSourceV2_(binding,checkpoint.source),prepared=GSiSRosterImport.prepareRecords(envelope.snapshot,checkpoint.references,position,rosterEdgeExportAdapterV2_(envelope));checkpoint.work=rosterEdgeExportWorkV2_(binding,step.ordinal,prepared,'records');checkpoint.stage='records';checkpoint.lastStep='Prepare records';}
+   const retained=rosterEdgeExportRecoverWorkV2_(binding,step.ordinal,existing);
+   if(retained){checkpoint.work=retained;checkpoint.batch=null;checkpoint.budgetVersion=2;checkpoint.lastStep='Recover cached job';}
+   else{
+   // Build and compress every part once. The cached index authenticates each
+   // bounded range; later ordinals neither read the source nor rebuild the job.
+   const batch=checkpoint.batch||{base:position,next:0},selection={start:0,limit:GSiSRosterImport.MAX_PARTS,deferDigests:true,deferScopes:true};let prepared,kind,job;
+   if(checkpoint.jobIndex<jobs.length){
+    job=jobs[checkpoint.jobIndex];kind='object';rosterEdgeExportPhaseV2_(existing,'Prepare '+job.kind);
+    const envelope=job.kind==='stapler'?rosterEdgeExportSourceV2_(binding,checkpoint.source):{snapshot:{sourceDigest:checkpoint.sourceDigest,index:{entries:catalogue.modelEntries},state:{allocationAuditExports:catalogue.auditFiles}}};
+    if(job.kind==='stapler'&&typeof rosterOperationsUnpackPlans_==='function'){const row=envelope.snapshot.state[job.path[1]][job.path[2]];rosterOperationsUnpackPlans_({[job.path[1]]:[row]});}
+    prepared=GSiSRosterImport.prepareObject(envelope.snapshot,job,batch.base,rosterEdgeExportAdapterV2_(envelope),selection);checkpoint.lastStep='Prepare '+job.kind;
+   }else{
+    kind='records';rosterEdgeExportPhaseV2_(existing,'Prepare records');const envelope=rosterEdgeExportSourceV2_(binding,checkpoint.source);
+    prepared=GSiSRosterImport.prepareRecords(envelope.snapshot,checkpoint.references,batch.base,rosterEdgeExportAdapterV2_(envelope),selection);checkpoint.stage='records';checkpoint.lastStep='Prepare records';
+   }
+   if(!prepared.partMetadata.length||prepared.totalParts<=batch.next)error_(503,'The cached preparation index is incomplete.');
+   const part=prepared.partMetadata[batch.next];existing.stepSize={bytes:part.bytes,records:part.records,partId:part.id};rosterEdgeExportSave_(existing);
+   checkpoint.work=rosterEdgeExportWorkV2_(binding,step.ordinal,prepared,kind,job,true,batch.next);checkpoint.batch=null;checkpoint.budgetVersion=2;
+   }
+  }else if(checkpoint.stage==='record-scopes'){
+   existing.stepSize={bytes:checkpoint.scopeWork.totalBytes,records:checkpoint.parts.reduce((n,p)=>n+p.records,0)};rosterEdgeExportPhaseV2_(existing,'Scope digests');checkpoint.scopes=rosterEdgeExportCachedScopes_(binding,checkpoint.scopeWork);delete checkpoint.scopeWork;checkpoint.stage='finalize';checkpoint.lastStep='Scope digests';
   }else if(checkpoint.stage==='finalize'){
    rosterEdgeExportPhaseV2_(existing,'Manifest');
    const ready=GSiSRosterImport.finishFreeze({sourceDigest:checkpoint.sourceDigest},binding,checkpoint.parts,checkpoint.scopes,{hash:rosterEdgeExportHash_});checkpoint.manifest=ready.manifest;checkpoint.manifestDigest=ready.manifestDigest;checkpoint.stage='ready';checkpoint.lastStep='Manifest';
@@ -10421,7 +10655,7 @@ function rosterEdgeExportManifestV2_(req){
  if(rosterEdgeExportAbandoned_(binding))error_(409,'This preparation was abandoned. Its generated files remain retained.');
  checkpoint.timing={startedAt:started,finishedAt:Date.now(),elapsedMs:Date.now()-started};checkpoint.elapsedMs=(checkpoint.elapsedMs||0)+checkpoint.timing.elapsedMs;
  const current=rosterEdgeExportDescriptor_(binding);rosterEdgeExportPhaseV2_(current,'Save checkpoint');
- const ref=rosterEdgeExportCreateImmutable_(rosterEdgeExportCheckpointName_(binding,step.ordinal),JSON.stringify(checkpoint));return rosterEdgeExportReplyV2_(checkpoint,ref);
+ const ref=rosterEdgeExportCreateImmutable_(rosterEdgeExportCheckpointName_(binding,step.ordinal),JSON.stringify(checkpoint),'application/json',{knownMissing:true});return rosterEdgeExportReplyV2_(checkpoint,ref);
 }
 function rosterEdgeExportManifest_(req){const binding=rosterEdgeExportBindingV2_(req);if(rosterEdgeExportAbandoned_(binding))error_(409,'This preparation was abandoned. Start with a new request ID.');try{return req.input?.preparation!==undefined?rosterEdgeExportManifestV2_(req):rosterEdgeExportManifestLegacy_(req);}catch(error){const descriptor=rosterEdgeExportDescriptor_(binding);if(descriptor?.schema===2){error.failureReason=rosterEdgeExportFailureV2_(descriptor,error);error.failurePhase=error.failureReason.phase;}throw error;}}
 function rosterEdgeExportPart_(req){
@@ -10622,10 +10856,10 @@ CREATE TABLE IF NOT EXISTS gsis_edge_import_resets (
  function serialize(value){let result;try{result=JSON.stringify(value);}catch{fail(400,'EDGE_STATE','State must contain JSON values.');}if(result===undefined)fail(400,'EDGE_STATE','State must contain JSON values.');if((typeof TextEncoder!=='undefined'?new TextEncoder().encode(result).length:Utilities.newBlob(result).getBytes().length)>MAX_RECORD_BYTES)fail(413,'EDGE_RECORD_TOO_LARGE','Store large immutable content in R2 and retain its reference.');return result;}
  const key=(collection,id)=>JSON.stringify([collection,id]);
  const recordDate=(value,id)=>typeof value?.date==='string'&&/^20\d\d-\d\d-\d\d$/.test(value.date)?value.date:/^20\d\d-\d\d-\d\d$/.test(id)?id:'';
- function encode(state){
+ function visitRecords(state,visit){
   if(!state||typeof state!=='object'||Array.isArray(state))fail(400,'EDGE_STATE','A state object is required.');
-  const records=new Map(),put=(collection,id,value,position=0,date='')=>{
-   text(collection,'collection',250);text(id,'record identity',1024);const k=key(collection,id);if(records.has(k))fail(409,'EDGE_RECORD_ID','Duplicate record identity.');records.set(k,{collection,record_id:id,position,record_date:date,value_json:serialize(value)});
+  const ids=new Set(),put=(collection,id,value,position=0,date='')=>{
+   text(collection,'collection',250);text(id,'record identity',1024);const k=key(collection,id);if(ids.has(k))fail(409,'EDGE_RECORD_ID','Duplicate record identity.');ids.add(k);visit(k,{collection,record_id:id,position,record_date:date},value);
   };
   const names=Object.keys(state);if(names.includes(ROOT))fail(400,'EDGE_STATE','Reserved state property.');put(ROOT,'$',{keys:names});
   for(const collection of names){const value=state[collection];
@@ -10637,7 +10871,14 @@ CREATE TABLE IF NOT EXISTS gsis_edge_import_resets (
     put(collection,'$',{kind:'map'});Object.keys(value).forEach(id=>put(collection,'key:'+id,value[id],0,recordDate(value[id],id)));
    }else put(collection,'$',{kind:'value',value:value===undefined?null:value});
   }
-  return records;
+ }
+ function encode(state){
+  const records=new Map();visitRecords(state,(key,row,value)=>records.set(key,{...row,value_json:serialize(value)}));return records;
+ }
+ function recordRange(state,start,count){
+  if(!Number.isSafeInteger(start)||start<0||!Number.isSafeInteger(count)||count<1)fail(400,'EDGE_INPUT','Invalid encoded record range.');
+  let index=0;const rows=[];visitRecords(state,(_key,row,value)=>{if(index>=start&&index<start+count)rows.push({...row,value_json:serialize(value)});index++;});
+  if(rows.length!==count)fail(409,'EDGE_STATE','The captured record range is incomplete.');return rows;
  }
  function decode(rows){
   const root=rows.find(row=>row.collection===ROOT&&row.record_id==='$');if(!root)return null;
@@ -10744,7 +10985,7 @@ CREATE TABLE IF NOT EXISTS gsis_edge_import_resets (
   async function exportState(){const snapshot=await load();return {schema:'gsis-edge-state-v1',...snapshot,capturedAt:new Date().toISOString(),stateDigest:snapshot.state===null?null:await digest(snapshot.state)};}
   return {scope,ensure,head,load,receipt,commit,importState,resetImport,transition,rows,exportState};
  }
- return {open,encode,decode,digest,canonicalJson,SCHEMA,ROSTER_MIRROR_SCHEMA,rosterWriteGuard,MAX_RECORD_BYTES};
+ return {open,encode,recordRange,decode,digest,canonicalJson,SCHEMA,ROSTER_MIRROR_SCHEMA,rosterWriteGuard,MAX_RECORD_BYTES};
 })();
 if(typeof module!=='undefined'&&module.exports)module.exports=GSiSEdgeStore;
 
@@ -10760,19 +11001,51 @@ var GSiSRosterImport=(()=>{
  const PENDING_CLEANUP="s.state='abandoned' AND s.reset_request<>'' AND NOT EXISTS(SELECT 1 FROM gsis_roster_import_preparation p WHERE p.session_id=s.session_id AND p.cleanup_request=s.reset_request)";
  const fail=(status,code,message)=>{throw Object.assign(Error(message),{status,code});};
  function utf8Length(value){let size=0;for(const char of value){const n=char.codePointAt(0);size+=n<128?1:n<2048?2:n<65536?3:4;}return size;}
+ function utf8Bytes(value){const bytes=[];for(const char of value){const n=char.codePointAt(0);if(n<128)bytes.push(n);else if(n<2048)bytes.push(192|n>>6,128|n&63);else if(n<65536)bytes.push(224|n>>12,128|n>>6&63,128|n&63);else bytes.push(240|n>>18,128|n>>12&63,128|n>>6&63,128|n&63);}return bytes.map(value=>value>127?value-256:value);}
  function digestValue(value){return typeof value==='string'&&/^[a-f0-9]{64}$/.test(value);}
  function identity(value,name,max=200){if(typeof value!=='string'||!value||value.length>max||/[\u0000-\u001f]/.test(value))fail(400,'ROSTER_IMPORT_ID','Invalid '+name+'.');return value;}
+ function repairStaplerAuditIds(audit){
+  const refuse=()=>fail(409,'ROSTER_AUDIT_REPAIR','The audit contains an ambiguous Stapler identity repair.');
+  if(!Array.isArray(audit))refuse();
+  const own=(row,key)=>Object.prototype.hasOwnProperty.call(row,key),groups=new Map(),repairs=new Map();
+  // Match Store's explicit identity and ref fallback, including String coercion,
+  // so even an unrelated malformed row can occupy a proposed decision identity.
+  for(let index=0;index<audit.length;index++){
+   const row=audit[index];if(!row||typeof row!=='object'||Array.isArray(row))continue;
+   const candidate=row.id??row.ref;if(candidate===null||candidate===undefined||String(candidate)==='')continue;
+   const id=String(candidate);if(!groups.has(id))groups.set(id,[]);groups.get(id).push(index);
+  }
+  const validDay=value=>typeof value==='string'&&/^\d{4}-\d\d-\d\d$/.test(value)&&Number.isFinite(Date.parse(value+'T00:00:00Z'))&&new Date(value+'T00:00:00Z').toISOString().slice(0,10)===value;
+  const validAt=value=>typeof value==='string'&&/^\d{4}-\d\d-\d\dT(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z|[+-]\d\d:\d\d)$/.test(value)&&validDay(value.slice(0,10))&&Number.isFinite(Date.parse(value));
+  let pairs=0;
+  for(const [id,indexes]of groups){
+   if(indexes.length<2||!indexes.some(index=>['requestStapler','decideStapler'].includes(audit[index].operation)))continue;
+   const request=indexes.filter(index=>audit[index].operation==='requestStapler'),decision=indexes.filter(index=>audit[index].operation==='decideStapler');
+   if(indexes.length!==2||request.length!==1||decision.length!==1||!id.trim()||id.length+12>1024||/[\u0000-\u001f]/.test(id)||groups.has(id+'-decision'))refuse();
+   const first=audit[request[0]],last=audit[decision[0]];
+   for(const row of [first,last])if(row.id!==id||own(row,'archiveRef')||own(row,'planningRequestId')&&row.planningRequestId!==id||own(row,'ref')&&row.ref!==id||!validDay(row.date)||!validAt(row.at))refuse();
+   if(first.date!==last.date||Date.parse(last.at)<Date.parse(first.at))refuse();
+   repairs.set(request[0],{id,planningRequestId:id});repairs.set(decision[0],{id:id+'-decision',planningRequestId:id});pairs++;
+  }
+  // Preflight the complete array before allocating changed rows. Unrelated
+  // duplicates remain intact and still fail the strict Store encoding boundary.
+  return {audit:pairs?audit.map((row,index)=>repairs.has(index)?{...row,...repairs.get(index)}:row):audit,pairs};
+ }
  function validateFailureReason(reason){
-  if(!reason||typeof reason!=='object'||Array.isArray(reason)||Object.keys(reason).some(key=>!['status','message','phase','elapsed'].includes(key))||!Number.isSafeInteger(reason.status)||reason.status<400||reason.status>599||typeof reason.message!=='string'||!reason.message||reason.message.length>800||typeof reason.phase!=='string'||!reason.phase||reason.phase.length>80||/[\u0000-\u001f]/.test(reason.phase)||!Number.isSafeInteger(reason.elapsed)||reason.elapsed<0)fail(400,'ROSTER_IMPORT_PREPARATION_RESULT','Invalid preparation failure reason.');return reason;
+  if(!reason||typeof reason!=='object'||Array.isArray(reason)||Object.keys(reason).some(key=>!['status','message','phase','elapsed','code','bytes','records','ordinal','partId'].includes(key))||!Number.isSafeInteger(reason.status)||reason.status<400||reason.status>599||typeof reason.message!=='string'||!reason.message||reason.message.length>800||typeof reason.phase!=='string'||!reason.phase||reason.phase.length>80||/[\u0000-\u001f]/.test(reason.phase)||!Number.isSafeInteger(reason.elapsed)||reason.elapsed<0)fail(400,'ROSTER_IMPORT_PREPARATION_RESULT','Invalid preparation failure reason.');
+  for(const key of ['bytes','records','ordinal'])if(reason[key]!==undefined&&reason[key]!==null&&(!Number.isSafeInteger(reason[key])||reason[key]<0))fail(400,'ROSTER_IMPORT_PREPARATION_RESULT','Invalid preparation step size.');
+  if(reason.code!==undefined&&!/^[A-Z][A-Z0-9_]{0,79}$/.test(reason.code)||reason.partId!==undefined&&(typeof reason.partId!=='string'||reason.partId.length>80))fail(400,'ROSTER_IMPORT_PREPARATION_RESULT','Invalid preparation error code or part.');return reason;
  }
  function freezeBinding(snapshot,binding){
   const {actor,requestId,sessionId}=binding;identity(actor,'actor',320);identity(requestId,'request');if(!digestValue(sessionId)||!digestValue(snapshot.sourceDigest))fail(400,'ROSTER_IMPORT_DIGEST','Invalid import digest.');
  }
- function partWriter(position,adapter){
+ function partWriter(position,adapter,selection){
   let {ordinal,offset}=position;if(!Number.isSafeInteger(ordinal)||ordinal<0||!Number.isSafeInteger(offset)||offset<0)fail(400,'ROSTER_IMPORT_POSITION','Invalid preparation position.');
-  const parts=[],partMetadata=[];
-  function add(kind,body,scope='',records=0){const payload=JSON.stringify(body),bytes=utf8Length(payload);if(bytes>MAX_PART_BYTES||ordinal>=MAX_PARTS||offset+bytes>MAX_TOTAL_BYTES)fail(413,'ROSTER_IMPORT_LIMIT','The immutable export exceeds a documented part/container limit.');const id='part-'+String(ordinal++).padStart(5,'0');partMetadata.push({id,kind,scope,records,offset,bytes,digest:adapter.hash(payload)});parts.push(payload);offset+=bytes;return id;}
-  return {add,result:()=>({parts,partMetadata,position:{ordinal,offset}})};
+  const first=ordinal;
+  if(selection&&(!Number.isSafeInteger(selection.start)||selection.start<0||!Number.isSafeInteger(selection.limit)||selection.limit<1))fail(400,'ROSTER_IMPORT_POSITION','Invalid preparation part window.');
+  const parts=[],partMetadata=[],partPlan=[];
+  function add(kind,body,scope='',records=0,source){const payload=JSON.stringify(body),bytes=utf8Length(payload);if(bytes>MAX_PART_BYTES||ordinal>=MAX_PARTS||offset+bytes>MAX_TOTAL_BYTES)fail(413,'ROSTER_IMPORT_LIMIT','The immutable export exceeds a documented part/container limit.');const index=ordinal-first,id='part-'+String(ordinal++).padStart(5,'0'),selected=!selection||index>=selection.start&&index<selection.start+selection.limit;let part;if(selected||selection?.plan)part={id,kind,scope,records,offset,bytes,...(!selection?.deferDigests?{digest:adapter.hash(payload)}:{})};if(selected){partMetadata.push(part);parts.push(payload);}if(selection?.plan)partPlan.push({part,source});offset+=bytes;return id;}
+  return {add,result:()=>({parts,partMetadata,position:{ordinal,offset},...(selection?{totalParts:ordinal-first}:{}),...(selection?.plan?{partPlan}:{})})};
  }
  function objectJobs(snapshot){
   const jobs=[];
@@ -10785,27 +11058,52 @@ var GSiSRosterImport=(()=>{
   if(!job||!['baseline','audit','stapler'].includes(job.kind)||!Array.isArray(job.path)||!job.path.length)fail(400,'ROSTER_IMPORT_OBJECT','Invalid preparation object job.');
   let value=snapshot;for(const key of job.path){if(!value||!Object.prototype.hasOwnProperty.call(value,key))fail(409,'ROSTER_IMPORT_OBJECT','The captured object job is unavailable.');value=value[key];}return value;
  }
- function prepareObject(snapshot,job,position,adapter){
+ function prepareObject(snapshot,job,position,adapter,selection){
   const source=jobValue(snapshot,job),value=job.kind==='baseline'?adapter.readModel(JSON.parse(JSON.stringify(source))):job.kind==='audit'?adapter.readArchive(job.id,source.archiveFileId):source;
   const json=JSON.stringify(value);if(utf8Length(json)>MAX_OBJECT_BYTES)fail(413,'ROSTER_IMPORT_OBJECT_LIMIT','A captured object exceeds the supported 32 MiB source-object bound.');
-  const digest=adapter.hash(json),reference={key:'gsis/roster/'+job.kind+'/'+encodeURIComponent(job.id)+'/'+digest+'.json.gz',digest,encoding:'gzip-json-v1'},gzip=adapter.gzip(json),writer=partWriter(position,adapter),segments=[];
+  const digest=adapter.hash(json),reference={key:'gsis/roster/'+job.kind+'/'+encodeURIComponent(job.id)+'/'+digest+'.json.gz',digest,encoding:'gzip-json-v1'},gzip=adapter.gzip(json),writer=partWriter(position,adapter,selection),segments=[];
   for(let n=0;n<gzip.length;n+=SEGMENT_BYTES)segments.push(writer.add('segment',{base64:adapter.base64(gzip.slice(n,n+SEGMENT_BYTES))}));
   writer.add('object',{reference,kind:job.kind,gzipBytes:gzip.length,segments});return {...writer.result(),reference};
  }
- function prepareRecords(snapshot,references,position,adapter){
+ function recordsSnapshot(snapshot,references,shallow=false){
   const jobs=objectJobs(snapshot);if(!Array.isArray(references)||references.length!==jobs.length)fail(409,'ROSTER_IMPORT_OBJECT','Captured object references are incomplete.');
-  const transformed={state:JSON.parse(JSON.stringify(snapshot.state)),index:JSON.parse(JSON.stringify(snapshot.index))};
+  const transformed=shallow?{state:{...snapshot.state},index:{...snapshot.index}}:{state:JSON.parse(JSON.stringify(snapshot.state)),index:JSON.parse(JSON.stringify(snapshot.index))};
   for(let i=0;i<jobs.length;i++){
    const job=jobs[i],item=references[i],reference=item?.reference;if(JSON.stringify(item?.job)!==JSON.stringify(job)||!reference||reference.encoding!=='gzip-json-v1'||!digestValue(reference.digest)||reference.key!=='gsis/roster/'+job.kind+'/'+encodeURIComponent(job.id)+'/'+reference.digest+'.json.gz')fail(409,'ROSTER_IMPORT_OBJECT','A captured object reference does not match its job.');
+   if(shallow){let parent=transformed;for(const key of job.path){parent[key]=Array.isArray(parent[key])?parent[key].slice():{...parent[key]};parent=parent[key];}}
    const value=jobValue(transformed,job);if(job.kind==='baseline'){value.modelObject={...reference};value.modelObjectKey=reference.key;value.modelDigest=reference.digest;delete value.modelFile;}else if(job.kind==='audit'){value.archiveObject={...reference};delete value.archiveFileId;}else{let parent=transformed;for(const key of job.path.slice(0,-1))parent=parent[key];parent[job.path.at(-1)]={edgeObject:true,...reference};}
   }
-  const writer=partWriter(position,adapter),scopes={};
+  if(Array.isArray(transformed.state.audit))transformed.state.audit=repairStaplerAuditIds(transformed.state.audit).audit;
+  return transformed;
+ }
+ function prepareRecordPart(snapshot,references,batch,adapter){
+  const entry=batch.plan[batch.next];if(!entry?.source||!SCOPES.includes(entry.source.scope))fail(409,'ROSTER_IMPORT_PART','The record preparation index is incomplete.');
+  const source=entry.source,state=recordsSnapshot(snapshot,references,true),rows=Store.recordRange(source.scope==='roster'?state.state:state.index,source.start,source.count);
+  let body={rows};if(entry.part.kind==='segment'){const bytes=utf8Bytes(JSON.stringify(body));body={base64:adapter.base64(bytes.slice(source.segment*SEGMENT_BYTES,(source.segment+1)*SEGMENT_BYTES))};}else if(entry.part.kind==='record')body=source.assembly;
+  const payload=JSON.stringify(body);if(utf8Length(payload)!==entry.part.bytes||adapter.hash(payload)!==entry.part.digest)fail(409,'ROSTER_IMPORT_PART','The reconstructed record part changed from its immutable index.');
+  return {parts:[payload],partMetadata:[entry.part],position:batch.end,totalParts:batch.total,scopes:batch.scopes};
+ }
+ function prepareRecords(snapshot,references,position,adapter,selection){
+  const transformed=recordsSnapshot(snapshot,references,!!selection?.plan);
+  const writer=partWriter(position,adapter,selection),scopes={};
   for(const [scope,value]of [['roster',transformed.state],['roster-register',transformed.index]]){
    // Encode each complete scope once. Natural-key multiplicity and positions are
    // global; the prepared payloads are then persisted and uploaded in small batches.
-   const records=Store.encode(value);scopes[scope]={records:records.size,digest:adapter.hash(Store.canonicalJson(value))};let rows=[],bytes=12;
-   for(const row of records.values()){const size=utf8Length(JSON.stringify(row))+1;if(rows.length&&bytes+size>TARGET_BYTES){writer.add('records',{rows},scope,rows.length);rows=[];bytes=12;}rows.push(row);bytes+=size;}
-   if(rows.length)writer.add('records',{rows},scope,rows.length);
+   const records=Store.encode(value);scopes[scope]={records:records.size,...(!selection?.deferScopes?{digest:adapter.hash(Store.canonicalJson(value))}:{})};let rows=[],bytes=12,start=0,index=0;
+   for(const row of records.values()){
+    const size=utf8Length(JSON.stringify(row))+1;
+    if(rows.length&&bytes+size>TARGET_BYTES){writer.add('records',{rows},scope,rows.length,{scope,start,count:rows.length});rows=[];bytes=12;}
+    if(!rows.length)start=index;
+    if(size+12>TARGET_BYTES){
+     // Split transport bytes, never the logical record or its natural key.
+     const payload=JSON.stringify({rows:[row]}),data=utf8Bytes(payload),segments=[];
+     if(data.length>MAX_PART_BYTES)fail(413,'ROSTER_IMPORT_LIMIT','The immutable record exceeds its documented limit.');
+     for(let n=0;n<data.length;n+=SEGMENT_BYTES)segments.push(writer.add('segment',{base64:adapter.base64(data.slice(n,n+SEGMENT_BYTES))},'',0,{scope,start:index,count:1,segment:n/SEGMENT_BYTES}));
+     const assembly={segments,bytes:data.length,digest:adapter.hash(payload)};writer.add('record',assembly,scope,1,{scope,start:index,count:1,assembly});index++;continue;
+    }
+    rows.push(row);bytes+=size;index++;
+   }
+   if(rows.length)writer.add('records',{rows},scope,rows.length,{scope,start,count:rows.length});
   }
   return {...writer.result(),scopes};
  }
@@ -10821,7 +11119,7 @@ var GSiSRosterImport=(()=>{
  function validateManifest(manifest){
   if(!manifest||manifest.schema!==FORMAT||!digestValue(manifest.sessionId)||!digestValue(manifest.sourceDigest)||utf8Length(JSON.stringify(manifest))>MAX_MANIFEST_BYTES)fail(400,'ROSTER_IMPORT_MANIFEST','Invalid or oversized immutable manifest.');
   identity(manifest.actor,'actor',320);identity(manifest.requestId,'request');if(!Array.isArray(manifest.parts)||!manifest.parts.length||manifest.parts.length>MAX_PARTS||!manifest.scopes||Object.keys(manifest.scopes).sort().join(',')!==[...SCOPES].sort().join(','))fail(400,'ROSTER_IMPORT_MANIFEST','Invalid manifest scopes or parts.');
-  let offset=0;const ids=new Set(),counts={roster:0,'roster-register':0};for(const part of manifest.parts){identity(part.id,'part',80);if(ids.has(part.id)||!['records','segment','object'].includes(part.kind)||part.offset!==offset||!Number.isSafeInteger(part.bytes)||part.bytes<1||part.bytes>MAX_PART_BYTES||!digestValue(part.digest)||!Number.isSafeInteger(part.records)||part.records<0||part.kind==='records'&&!SCOPES.includes(part.scope)||part.kind!=='records'&&(part.scope!==''||part.records!==0))fail(400,'ROSTER_IMPORT_MANIFEST','Duplicate, missing or invalid manifest part.');ids.add(part.id);offset+=part.bytes;if(part.kind==='records')counts[part.scope]+=part.records;}
+  let offset=0;const ids=new Set(),counts={roster:0,'roster-register':0};for(const part of manifest.parts){identity(part.id,'part',80);const records=['records','record'].includes(part.kind);if(ids.has(part.id)||!['records','record','segment','object'].includes(part.kind)||part.offset!==offset||!Number.isSafeInteger(part.bytes)||part.bytes<1||part.bytes>MAX_PART_BYTES||!digestValue(part.digest)||!Number.isSafeInteger(part.records)||part.records<0||records&&!SCOPES.includes(part.scope)||!records&&(part.scope!==''||part.records!==0)||part.kind==='record'&&part.records!==1)fail(400,'ROSTER_IMPORT_MANIFEST','Duplicate, missing or invalid manifest part.');ids.add(part.id);offset+=part.bytes;if(records)counts[part.scope]+=part.records;}
   if(offset!==manifest.totalBytes||offset>MAX_TOTAL_BYTES||SCOPES.some(scope=>!digestValue(manifest.scopes[scope]?.digest)||manifest.scopes[scope]?.records!==counts[scope]||counts[scope]<1))fail(400,'ROSTER_IMPORT_MANIFEST','Manifest lengths or record counts do not match.');return manifest;
  }
  const SQL=`CREATE TABLE IF NOT EXISTS gsis_roster_import_sessions (
@@ -10910,6 +11208,11 @@ var GSiSRosterImport=(()=>{
    // Keep the active lease: a transport failure does not prove that Apps Script stopped.
    checked(await connection().batch([connection().prepare("UPDATE gsis_roster_import_preparation SET result_json=json_set(CASE WHEN result_json='' THEN '{}' ELSE result_json END,'$.failureReason',json(?),'$.lastPhase',?),updated_at=? WHERE session_id=? AND ordinal=? AND claim_token=? AND lease_until>? AND EXISTS(SELECT 1 FROM gsis_roster_import_sessions WHERE session_id=? AND state='preparing')").bind(JSON.stringify(reason),reason.phase,now,sessionId,claim.ordinal,claim.token,now,sessionId)]));
   }
+  async function adoptPreparation(claim,result){
+   const row=await connection().prepare('SELECT * FROM gsis_roster_import_preparation WHERE session_id=?').bind(sessionId).first();
+   if(!row||row.ordinal!==claim.ordinal||row.checkpoint_json!==JSON.stringify(claim.checkpoint)||!row.claim_token)fail(409,'ROSTER_IMPORT_PREPARATION_STALE','The checkpoint changed before reconciliation.');
+   return commitPreparation({...claim,token:row.claim_token},result);
+  }
   async function restartCleanupStatus(resetRequest){
    const row=await connection().prepare('SELECT cleanup_request FROM gsis_roster_import_preparation WHERE session_id=?').bind(sessionId).first();return {resetRequestId:resetRequest,cleanupPending:row?.cleanup_request!==resetRequest};
   }
@@ -10936,7 +11239,7 @@ var GSiSRosterImport=(()=>{
    try{checked(await c.batch(statements));}catch(error){const saved=await read();if(saved?.manifest_digest===manifestDigest)return progress();throw error;}return progress();
   }
   async function progress(){const row=await read();if(!row)return null;const c=connection(),count=await c.prepare('SELECT COUNT(*) total,SUM(receipt_json IS NOT NULL) completed FROM gsis_roster_import_parts WHERE session_id=?').bind(sessionId).first(),next=await c.prepare('SELECT part_id id,kind,scope,digest,bytes,records FROM gsis_roster_import_parts WHERE session_id=? AND receipt_json IS NULL ORDER BY ordinal LIMIT 1').bind(sessionId).first(),preparation=await preparationStatus(),detail={};
-   if(row.state==='preparing')for(const key of ['step','done','total','elapsedMs','preparing','retryAfterMs'])if(preparation?.result?.[key]!==undefined)detail[key]=preparation.result[key];
+   if(['preparing','failed'].includes(row.state))for(const key of ['step','done','total','elapsedMs','preparing','retryAfterMs','phase','stepSize','nextStep'])if(preparation?.result?.[key]!==undefined)detail[key]=preparation.result[key];
    for(const key of ['failureReason','lastPhase'])if(preparation?.result?.[key]!==undefined)detail[key]=preparation.result[key];
    if(row.state==='abandoned')Object.assign(detail,await restartCleanupStatus(row.reset_request));
    return {sessionId,requestId,actor,state:row.state,sourceDigest:row.source_digest||null,manifestDigest:row.manifest_digest||null,completedParts:count.completed||0,totalParts:count.total,imported:row.state==='imported',referencesReady:!!row.references_ready,nextPart:next||null,requiresRestart:['failed','abandoned'].includes(row.state),next:row.state==='preparing'?'prepare':next?'part':!row.references_ready?'references':row.state==='imported'?'complete':'finalize',...detail};}
@@ -10947,7 +11250,7 @@ var GSiSRosterImport=(()=>{
    await read();const rows=(await connection().prepare('SELECT part_id id,kind,scope,digest,bytes,records FROM gsis_roster_import_parts WHERE session_id=? AND receipt_json IS NULL ORDER BY ordinal LIMIT ?').bind(sessionId,Math.max(1,Math.min(4,limit))).all()).results;
    // Object assembly consumes earlier segment receipts. Keep that dependency
    // barrier out of a parallel batch, even when it is the fourth selected part.
-   const barrier=rows.findIndex(part=>part.kind==='object');return barrier===0?rows.slice(0,1):barrier>0?rows.slice(0,barrier):rows;
+   const barrier=rows.findIndex(part=>['object','record'].includes(part.kind));return barrier===0?rows.slice(0,1):barrier>0?rows.slice(0,barrier):rows;
   }
   async function segmentReceipts(ids){
    if(!Array.isArray(ids)||!ids.length||ids.length>MAX_PARTS||new Set(ids).size!==ids.length)fail(409,'ROSTER_IMPORT_OBJECT','Invalid segment dependency list.');await read();const found=await connection().prepare("SELECT part_id,receipt_json FROM gsis_roster_import_parts WHERE session_id=? AND kind='segment' AND receipt_json IS NOT NULL AND part_id IN (SELECT value FROM json_each(?))").bind(sessionId,JSON.stringify(ids)).all(),byId=new Map(found.results.map(row=>[row.part_id,JSON.parse(row.receipt_json)]));if(found.results.length!==ids.length)fail(409,'ROSTER_IMPORT_OBJECT','Object segments are incomplete.');return ids.map(id=>byId.get(id));
@@ -10959,8 +11262,14 @@ var GSiSRosterImport=(()=>{
   }
   async function stage(partId,payload,objectReceipt){
    const {part,body}=await validatePart(partId,payload);if(part.receipt_json)return JSON.parse(part.receipt_json);
-   let rows=[];if(part.kind==='records'){
-    rows=body.rows;if(!Array.isArray(rows)||rows.length!==part.records)fail(409,'ROSTER_IMPORT_PART','The export record count is invalid.');const ids=new Set();
+   let rows=[];if(['records','record'].includes(part.kind)){
+    rows=part.kind==='record'?objectReceipt?.rows:body.rows;
+    if(part.kind==='record'){
+     const raw=JSON.stringify({rows});
+     if(objectReceipt?.verified!==true||utf8Length(raw)!==body.bytes||await hashText(raw)!==body.digest)fail(409,'ROSTER_IMPORT_PART','The assembled record failed its length or digest check.');
+     await segmentReceipts(body.segments);
+    }
+    if(!Array.isArray(rows)||rows.length!==part.records)fail(409,'ROSTER_IMPORT_PART','The export record count is invalid.');const ids=new Set();
     for(const r of rows){identity(r.collection,'collection',250);identity(r.record_id,'record',1024);if(!Number.isSafeInteger(r.position)||r.position<0||typeof r.record_date!=='string'||!/^$|^20\d\d-\d\d-\d\d$/.test(r.record_date)||typeof r.value_json!=='string'||utf8Length(r.value_json)>Store.MAX_RECORD_BYTES)fail(409,'ROSTER_IMPORT_PART','Invalid exported record.');try{JSON.parse(r.value_json);}catch{fail(409,'ROSTER_IMPORT_PART','Invalid exported record JSON.');}const id=JSON.stringify([r.collection,r.record_id]);if(ids.has(id))fail(409,'ROSTER_IMPORT_DUPLICATE','Duplicate record identity in import part.');ids.add(id);}
    }else{
     if(!objectReceipt||objectReceipt.verified!==true||typeof objectReceipt.key!=='string'||!Number.isSafeInteger(objectReceipt.bytes)||objectReceipt.bytes<1)fail(409,'ROSTER_IMPORT_OBJECT','The private object write has no verified receipt.');
@@ -10969,7 +11278,7 @@ var GSiSRosterImport=(()=>{
      const dependencies=await connection().prepare("SELECT part_id,receipt_json FROM gsis_roster_import_parts WHERE session_id=? AND kind='segment' AND part_id IN (SELECT value FROM json_each(?))").bind(sessionId,JSON.stringify(body.segments)).all();if(dependencies.results.length!==body.segments.length||dependencies.results.some(row=>!row.receipt_json)||dependencies.results.reduce((n,row)=>n+(JSON.parse(row.receipt_json).object?.bytes||0),0)!==body.gzipBytes)fail(409,'ROSTER_IMPORT_OBJECT','The object segments are incomplete.');
     }else if(objectReceipt.key!=='gsis/roster/import-staging/'+sessionId+'/'+partId||objectReceipt.bytes>SEGMENT_BYTES||!digestValue(objectReceipt.digest))fail(409,'ROSTER_IMPORT_OBJECT','Invalid private object segment.');
    }
-   const receipt={partId,digest:part.digest,records:rows.length,...(objectReceipt?{object:objectReceipt}:{} )},c=connection(),token=crypto.randomUUID(),now=Date.now();
+   const receipt={partId,digest:part.digest,records:rows.length,...(part.kind==='record'?{assembly:{digest:body.digest,bytes:body.bytes}}:objectReceipt?{object:objectReceipt}:{} )},c=connection(),token=crypto.randomUUID(),now=Date.now();
    const statements=[c.prepare("UPDATE gsis_roster_import_sessions SET write_token=?,updated_at=? WHERE session_id=? AND state='staging' AND EXISTS(SELECT 1 FROM gsis_roster_import_parts WHERE session_id=? AND part_id=? AND receipt_json IS NULL)").bind(token,now,sessionId,sessionId,partId)];
    if(rows.length)statements.push(c.prepare(`INSERT INTO gsis_roster_import_rows (session_id,scope,collection,record_id,position,record_date,value_json) SELECT ?,?,json_extract(value,'$.collection'),json_extract(value,'$.record_id'),json_extract(value,'$.position'),json_extract(value,'$.record_date'),json_extract(value,'$.value_json') FROM json_each(?) WHERE ${guard}`).bind(sessionId,part.scope,JSON.stringify(rows),sessionId,token));
    statements.push(c.prepare('UPDATE gsis_roster_import_parts SET receipt_json=? WHERE session_id=? AND part_id=? AND receipt_json IS NULL AND '+guard).bind(JSON.stringify(receipt),sessionId,partId,sessionId,token));
@@ -10998,11 +11307,20 @@ var GSiSRosterImport=(()=>{
    statements.push(c.prepare("UPDATE gsis_edge_heads SET revision=0,mode='legacy',source_digest='',imported_records=0,metadata_json='{}',write_token=?,updated_at=? WHERE scope IN ('roster','roster-register') AND "+guard).bind(token,Date.now(),sessionId,token),c.prepare('DELETE FROM gsis_roster_import_locks WHERE session_id=? AND '+guard).bind(sessionId,sessionId,token));
    try{checked(await c.batch(statements));}catch(error){if((await read())?.reset_request===resetRequest)return restartResult(resetRequest);throw error;}if((await read())?.reset_request!==resetRequest)fail(409,'ROSTER_RESTART_ACTIVE','An active, paused or changed authority cannot be reset.');return restartResult(resetRequest,{evidence:{sessionId,manifestDigest:row.manifest_digest,sourceDigest:row.source_digest},next:'Use a new request ID to capture a new Google source.'});
   }
-  return {reserve,preparationStatus,claimPreparation,commitPreparation,recordPreparationFailure,assertRestartable,recordRestartCleanup,bind,progress,manifest,validatePart,partReceipt,pendingParts,segmentReceipts,stage,referencesReady,failPreparation,finalize,evidence,restart};
+  return {reserve,preparationStatus,claimPreparation,commitPreparation,adoptPreparation,recordPreparationFailure,assertRestartable,recordRestartCleanup,bind,progress,manifest,validatePart,partReceipt,pendingParts,segmentReceipts,stage,referencesReady,failPreparation,finalize,evidence,restart};
  }
  async function hashBytes(bytes){return Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',bytes)),n=>n.toString(16).padStart(2,'0')).join('');}
  async function stageObject(bucket,store,sessionId,part,body){
   if(!bucket?.put||!bucket?.head||!bucket?.get)fail(503,'ROSTER_IMPORT_BUCKET','Private R2 storage with verified readback is required.');
+  if(part.kind==='record'){
+   if(!Number.isSafeInteger(body.bytes)||body.bytes<1||body.bytes>MAX_PART_BYTES||!digestValue(body.digest))fail(409,'ROSTER_IMPORT_PART','Invalid split record descriptor.');
+   const receipts=await store.segmentReceipts(body.segments);
+   if(receipts.reduce((n,row)=>n+row.object.bytes,0)!==body.bytes)fail(409,'ROSTER_IMPORT_PART','The record segments are incomplete.');
+   const bytes=new Uint8Array(body.bytes);let offset=0;
+   for(const receipt of receipts){const segment=receipt.object,file=await bucket.get(segment.key);if(!file||file.size!==segment.bytes||file.size>SEGMENT_BYTES)fail(503,'ROSTER_IMPORT_PART','A record segment is missing or altered.');const raw=new Uint8Array(await file.arrayBuffer());if(raw.length!==segment.bytes||await hashBytes(raw)!==segment.digest)fail(503,'ROSTER_IMPORT_PART','A record segment failed its digest check.');bytes.set(raw,offset);offset+=raw.length;}
+   if(await hashBytes(bytes)!==body.digest)fail(409,'ROSTER_IMPORT_PART','The assembled record failed its digest check.');
+   const value=JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(bytes));return {verified:true,rows:value.rows};
+  }
   if(part.kind==='segment'){
    if(typeof body.base64!=='string'||body.base64.length>4*Math.ceil(SEGMENT_BYTES/3)||! /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(body.base64))fail(409,'ROSTER_IMPORT_OBJECT','Invalid compressed object segment.');
    const bytes=Uint8Array.from(atob(body.base64),char=>char.charCodeAt(0));if(!bytes.length||bytes.length>SEGMENT_BYTES)fail(409,'ROSTER_IMPORT_OBJECT','Invalid compressed object segment size.');const digest=await hashBytes(bytes),key='gsis/roster/import-staging/'+sessionId+'/'+part.id;
@@ -11140,7 +11458,7 @@ var GSiSRosterImport=(()=>{
   }finally{checked([await c.prepare(`UPDATE ${ARCHIVES} SET lease_token='',lease_until=0 WHERE session_id=? AND lease_token=?`).bind(job.session_id,token).run()]);}
   return {archived,processed,...await archiveStatus(db)};
  }
- return {objectJobs,prepareObject,prepareRecords,finishFreeze,freeze,validateManifest,utf8Length,open,ensure,latest,resetAfterRollback,pendingRollbackReset,archiveRetained,archiveStatus,hashText,hashBytes,stageObject,FORMAT,SCOPES,TARGET_BYTES,SEGMENT_BYTES,MAX_PART_BYTES,MAX_PARTS,MAX_MANIFEST_BYTES,MAX_TOTAL_BYTES,MAX_OBJECT_BYTES,MAX_RETAINED_SESSIONS,PREPARATION_LEASE_MS,MAX_PREPARATION_RESULT_BYTES};
+ return {repairStaplerAuditIds,objectJobs,prepareObject,prepareRecords,prepareRecordPart,finishFreeze,freeze,validateManifest,utf8Length,open,ensure,latest,resetAfterRollback,pendingRollbackReset,archiveRetained,archiveStatus,hashText,hashBytes,stageObject,FORMAT,SCOPES,TARGET_BYTES,SEGMENT_BYTES,MAX_PART_BYTES,MAX_PARTS,MAX_MANIFEST_BYTES,MAX_TOTAL_BYTES,MAX_OBJECT_BYTES,MAX_RETAINED_SESSIONS,PREPARATION_LEASE_MS,MAX_PREPARATION_RESULT_BYTES};
 })();
 if(typeof module!=='undefined'&&module.exports)module.exports=GSiSRosterImport;
 

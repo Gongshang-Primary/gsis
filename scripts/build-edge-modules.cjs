@@ -26,7 +26,7 @@ for(const file of ['edge-deploy.js','edge-deploy-domain.js','edge-deploy-sha256.
 for(const folder of ['public','roster-update/public'])fs.copyFileSync(path.join(root,'shared/edge-venues-fence.js'),path.join(root,folder,'edge-venues-fence.js'));
 for(const [folder,domain,label] of [['public','deploy','Deploy'],['roster-update/public','roster','Roster']]){
  for(const ext of ['js','css'])fs.copyFileSync(path.join(root,'shared','edge-setup.'+ext),path.join(root,folder,'edge-setup.'+ext));
- const html=fs.readFileSync(path.join(root,'shared/edge-setup.html'),'utf8').replaceAll('__DOMAIN__',domain).replaceAll('__DOMAIN_LABEL__',label);
+ const html=fs.readFileSync(path.join(root,'shared/edge-setup.html'),'utf8').replaceAll('__DOMAIN__',domain).replaceAll('__DOMAIN_LABEL__',label).replaceAll('__BUILD_LABEL__',require('../package.json').gsisBuildLabel);
  fs.writeFileSync(path.join(root,folder,'edge-setup.html'),html);
 }
 console.log('Generated shared Worker modules from canonical models');

@@ -169,3 +169,15 @@ function rosterDeliveryReviewDispatch_(req,contacts){
   rosterNotificationCommit_(state);return {...rosterDeliveryReviewView_(state,user.admin),...result};
  }finally{deployUnlock_(lock);}
 }
+
+/* Scheduled Venues health alerts use the notification transport lock. */
+function rosterVenuesSyncCheck_(){
+ const status=rosterVenuesSyncStatus_();props_().setProperty('ROSTER_VENUES_HEALTH',JSON.stringify({state:status.state,since:status.since}));
+ if(!status.enabled)return {enabled:false};
+ const store=rosterNotificationState_();if(!store)return {blocked:status.overdue?1:0};const lock=rosterNotificationLock_(store);if(!deployLock_(lock,1000))return {deferred:1};
+ try{const current=rosterNotificationState_();if(!current)return {blocked:status.overdue?1:0};const key='delivery:venues-sync',old=current.smcAlerts.find(a=>a.key===key);let changed=false;
+  if(status.overdue){const date=new Date(status.checkedAt+8*3600000).toISOString().slice(0,10);if(!old||old.status!=='open'||old.date!==date){const row={id:old?.id||Utilities.getUuid(),key,date,createdAt:new Date(status.checkedAt).toISOString(),recipients:(rosterOperationsState_(true).smcDutyRoster||[]).find(r=>r.date===date)?.staffIds||[],origin:'venues-sync',status:'open',summary:'Venues sync needs Admin recovery. Open System Health to inspect and recover the source fence.'};if(old)Object.assign(old,row);else current.smcAlerts.push(row);changed=true;}}
+  else if(status.state==='ready'&&old?.status==='open'){old.status='resolved';old.resolvedAt=new Date(status.checkedAt).toISOString();changed=true;}
+  if(changed)rosterNotificationCommit_(current);return {enabled:true,blocked:status.overdue?1:0,idle:!changed,...(status.overdue?{failure:{code:status.code}}:{})};
+ }finally{deployUnlock_(lock);}
+}
