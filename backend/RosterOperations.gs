@@ -547,6 +547,16 @@ function rosterOperationsMergePrepared_(base,next,current){
  };
  return merge(base,next,current);
 }
+// Hotfix 5 Nov 2026: a slow preparation that crosses a clock minute stays valid
+// unless the date changed or a period started in between (started periods are
+// what the minute protects). Previously any minute change discarded the plan.
+function rosterOperationsClockMoved_(ctx,preparedClock,finalClock){
+ const [day,minute]=[preparedClock.slice(0,10),Number(preparedClock.slice(11))];
+ if(finalClock.today!==day)return true;if(finalClock.minute===minute)return false;
+ const periods=ctx&&ctx.days&&ctx.days[day]&&Array.isArray(ctx.days[day].periods)?ctx.days[day].periods:null;
+ if(!periods)return true;
+ return periods.some(p=>Number.isFinite(p.startMinutes)&&p.startMinutes>minute&&p.startMinutes<=finalClock.minute);
+}
 function rosterOperationsClock_(ctx){const stamp=Date.now(),sg=new Date(stamp+8*3600000);Object.assign(ctx,{now:stamp,iso:new Date(stamp).toISOString(),today:sg.toISOString().slice(0,10),minute:sg.getUTCHours()*60+sg.getUTCMinutes()});}
 function rosterAbsenceContextKey_(state,ctx){
  // Only inputs used to build immutable teacher/timetable context belong here.
@@ -684,7 +694,7 @@ function rosterOperationsPreparedCore_(req,c){gsisRequireBackendRole_('roster');
      rosterOperationsPreparedCheck_(current,ctx,p);
      if(['autoAllocate','optimise'].includes(op)&&typeof rosterAbsenceIntakeGate_==='function')rosterAbsenceIntakeGate_([p.date||ctx.today],['autoAllocate','optimise'].includes(op));
      if(rosterOperationsReferenceStamp_(ctx)!==references||rosterOperationsDependencies_(rosterOperationsPackPlans_(current),p,ctx)!==dependencies)rosterOperationsConflict_('PREPARED_RETRY','Shared planning inputs changed during preparation.');
-     const finalClock={};rosterOperationsClock_(finalClock);if(finalClock.today+':'+finalClock.minute!==preparedClock)rosterOperationsConflict_('PREPARED_RETRY','The school-day clock changed during preparation.');
+     const finalClock={};rosterOperationsClock_(finalClock);if(rosterOperationsClockMoved_(ctx,preparedClock,finalClock))rosterOperationsConflict_('PREPARED_RETRY','The school-day clock changed during preparation.');
      const merged=rosterOperationsMergePrepared_(base,next,rosterOperationsPackedSnapshot_(current));merged.revision=current.revision+1;
      // sourceRevision is a document marker, not the publication conflict token.
      const publicationDate=p.date||ctx.today;if(op==='publish'&&merged.dailyPublicationStates?.[publicationDate])merged.dailyPublicationStates[publicationDate].sourceRevision=merged.revision;
