@@ -67,3 +67,10 @@ Do **not** press Update backup repeatedly; it now only requests a Worker run.
 - Never force activation or set the Apps Script fence by hand (the tools file only lifts it).
 - Never activate without "parity OK", or after a "Changed" drift result.
 - Never leave the freeze on past 02:30 without activation.
+
+## Attempt 4 notes (4 Nov 2026, v0.9.9j, freeze 16:57)
+- Setup gap found: the server import (#55) runs in Worker `gsis-roster-notifications` and needs the R2 binding `ROSTER_TIMETABLE_SNAPSHOTS` (same bucket as Pages gsps-roster). Missing until 22:5x; staging failed with ROSTER_EDGE_OBJECTS ("Bind the private Roster timetable bucket"). Owner added it; staging resumed. **Pre-flight check for every future attempt.**
+- Retrying "Import / retry same import" after a freeze cancel resumes the OLD session; start a new session with section 3 Restart incomplete import.
+- Preparation: 240 steps (record parts split by #69), one ROSTER_GOOGLE_ERROR at step 103 cleared by one retry.
+- Staging rate about 1 part per minute (316 parts): the write stage is minute-cron limited. Follow-up: drive staging continuously, not one part per tick.
+- Owner deadline: rollback begins 05:00; Claude hard check 04:00 (parts not done → Cancel freeze so Google can allocate 5 Nov before 06:30).
