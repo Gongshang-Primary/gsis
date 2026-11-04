@@ -52,6 +52,14 @@ test('read mass-cancel guard preserves six mismatched rows and deduplicates its 
   reconcile(f.state,f.ctx,false);assert(f.state.assignments.every(a=>a.status==='cancelled'));
  }
 });
+test('read mass guard leaves six published SMC decisions untouched without review annotations',()=>{
+ for(const reconcile of adapters(setup().O)){
+  const f=setup();assignments(f,6,'published');for(const row of f.state.assignments){row.origin='smc';row.protected=true;}
+  const before=structuredClone(f.state.assignments);reconcile(f.state,f.ctx,true);
+  assert.deepEqual(f.state.assignments,before);assert.equal(f.state.smcAlerts[0].affectedCount,6);assert.equal(f.state.outbox.length,0);
+  assert.equal(reconcile(f.state,f.ctx,true),false);assert.deepEqual(f.state.assignments,before);
+ }
+});
 test('published guard reports every affected row, stays unchanged on repeat, and saves newly affected rows',()=>{
  for(const reconcile of adapters(setup().O)){
   const f=setup();assignments(f,4,'published');assert.equal(reconcile(f.state,f.ctx,true),true);

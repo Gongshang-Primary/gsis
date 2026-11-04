@@ -1,6 +1,6 @@
 # roster-d1-timetable-reconcile-cancels: on D1, every read cancels relief assignments ("effective timetable changed")
 
-- Status: claimed; Codex, lane R, TOP PRIORITY (blocks the D1 cutover)
+- Status: implemented; full-suite verification and exact-head review gate, Codex, lane R
 - Reviewer/model: Claude
 - Last updated (Asia/Singapore): 5 Nov 2026 05:10
 
@@ -58,4 +58,10 @@ The main-branch claim was rejected by automatic approval review. The claim is re
 
 ## Verification and deployment
 
-Canonical baseline build passed. Initial full-suite run stopped after browser tests reported that Chromium was missing; no assertion was weakened. Local runtime repair and focused regression work are in progress. No live data was read or written; no deployment performed.
+Canonical build passed. Fourteen targeted regression scenarios, the broader shared/backend checks and browser cache checks passed before the full-suite run. Independent local review found a replacement-chain guard bypass and incomplete published-row alert counts; both were fixed and rechecked. Original Google/D1 plan and publication evidence stays intact.
+
+The first exact-source CI run (`4f1ee8ecdd1e4b04caafe128eecd376b199527ca`, run `41918684389`) passed three shards. The fourth found three assertions in `roster701-integrity-review.cjs`: one still expected the now-forbidden published cancellation, and two required retained SMC review annotations. The follow-up preserves the annotations, replaces the obsolete cancellation expectation with published retention/no cancellation notice, and retains the concurrent delivery assertions. The final full-suite outcome and exact head are recorded in this branch's draft PR; all four Node/LORD jobs must pass before review handoff.
+
+Local full-suite clones lack historical Git objects `2efd6e0` and `e2bfe2c`; their packaging/comparison programs cannot establish those comparisons locally. CI uses the real repository history and runs them without exclusion. Missing local browser and generated ZIP prerequisites were repaired; the packaged-worker checks then passed. No current test was dropped or marked historical.
+
+No live data was read or written. No deployment, authority switch, live allocation or message was performed. Claude's exact-head review and the owner's merge remain required.

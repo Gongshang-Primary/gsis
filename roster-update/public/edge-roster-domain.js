@@ -1054,8 +1054,8 @@ const next=stapler().effectiveDay(plan,ctx.baselineDays?.[d]||ctx.days[d]);for(c
   if(!['draft','published','completed'].includes(a.status))return false;
   const publishedPrior=publishedPredecessor(s,a);
   if(ctx.reconcilePreflight){ctx.reconcilePreflight.set(a.id,a);if(publishedPrior)ctx.reconcilePreflight.set(publishedPrior.id,publishedPrior);return false;}
-  if(ctx.readTriggeredReconcile&&(a.status==='published'||publishedPrior)){if(reconcileAlert(s,ctx,a.date,publishedPrior?[a,publishedPrior]:[a],reason))ctx.reconcileAlertChanged=true;return false;}
   if(ctx.manualMutation!==true&&(allocation().manualDecision(s,a.date,a.demandId)||a.origin==='smc')){if(a.reviewReason===reason&&a.invalidCover)return false;a.invalidCover=true;a.reviewReason=reason;a.reviewRequired=true;a.reviewAt=ctx.iso;allocation().bumpDay(s,a.date);allocation().addAudit(s,ctx,'manual-choice-invalid',{date:a.date,ids:[a.id],reason});return true;}
+  if(ctx.readTriggeredReconcile&&(a.status==='published'||publishedPrior)){if(reconcileAlert(s,ctx,a.date,publishedPrior?[a,publishedPrior]:[a],reason))ctx.reconcileAlertChanged=true;return false;}
   if(ctx.draftBatch&&a.remove)return false;
   // A started automatic replacement remains a reviewable duty, not a removal tombstone.
   if((ctx.draftBatch||a.replaces)&&(['published','completed'].includes(a.status)||a.replaces)&&!(ctx.manualMutation!==true&&a.origin==='automatic'&&allocation().periodStarted(ctx,a.date,a.period,a))){
