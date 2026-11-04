@@ -142,10 +142,10 @@ async function backgroundPost(command){const payload=await apiJsonV1(API.transac
 async function openBackgroundWork(){
   if($('backgroundWorkModal'))return;
   const modal=document.createElement('dialog');modal.id='backgroundWorkModal';modal.className='modal-backdrop';modal.setAttribute('aria-labelledby','backgroundHeading');
-  modal.innerHTML=`<section class="editor-card background-card"><div class="editor-heading"><h2 id="backgroundHeading">Background work</h2><button id="closeBackground" aria-label="Close background work">×</button></div><p>Review notification recipients individually. Acceptance is not delivery. Retiring stops future attempts; it cannot recall a submitted message.</p><div class="background-toolbar"><label for="backgroundView">Show<select id="backgroundView"><option value="attention">Needs attention</option><option value="all">All work and reviewed receipts</option></select></label><button id="refreshBackground" type="button">Refresh list</button></div><p id="backgroundStatus" role="status" aria-live="polite">Loading background work…</p><div id="backgroundRows"></div><section class="settings-section"><div class="background-toolbar"><label for="backgroundOperation">Selected recipient action<select id="backgroundOperation"><option value="retry">Retry recoverable work</option><option value="cancel">Cancel unsent notification</option><option value="retire">Review and retire without resend</option></select></label><button id="previewBackground" type="button">Preview selected</button></div><p>Select up to 20 recipients. Record repairs cannot be cancelled here.</p><div id="backgroundPreview" aria-live="polite"></div><button id="recoverBackground" type="button" hidden>Recover last command</button></section><section id="backgroundHistory" class="settings-section"></section></section>`;
+  modal.innerHTML=`<section class="editor-card background-card"><div class="editor-heading"><h2 id="backgroundHeading">Background work</h2><button id="closeBackground" aria-label="Close background work">×</button></div><p>Review notification recipients individually. Acceptance is not delivery. Retiring stops future attempts; it cannot recall a submitted message.</p><div class="background-toolbar"><label for="backgroundView">Show<select id="backgroundView"><option value="attention">Needs attention</option><option value="all">All work and reviewed receipts</option></select></label><button id="refreshBackground" type="button">Refresh list</button><button id="selectPastBookings" type="button">Select past bookings</button></div><p id="backgroundStatus" role="status" aria-live="polite">Loading background work…</p><div id="backgroundRows"></div><section class="settings-section"><div class="background-toolbar"><label for="backgroundOperation">Selected recipient action<select id="backgroundOperation"><option value="retry">Retry recoverable work</option><option value="cancel">Cancel unsent notification</option><option value="retire">Review and retire without resend</option></select></label><button id="previewBackground" type="button">Preview selected</button></div><p>Select up to 20 recipients. Record repairs cannot be cancelled here.</p><div id="backgroundPreview" aria-live="polite"></div><button id="recoverBackground" type="button" hidden>Recover last command</button></section><section id="backgroundHistory" class="settings-section"></section></section>`;
   showManagedDialog(modal);$('closeBackground').onclick=()=>closeManagedDialog(modal);
   $('backgroundView').onchange=$('refreshBackground').onclick=loadBackgroundWork;
-  $('previewBackground').onclick=previewBackgroundWork;
+  $('previewBackground').onclick=previewBackgroundWork;$('selectPastBookings').onclick=selectPastBookings;
   $('backgroundOperation').onchange=()=>{$('backgroundPreview').textContent='';backgroundPreviewCommand=null;};
   $('recoverBackground').onclick=async()=>{try{const saved=JSON.parse(sessionStorage.getItem(BACKGROUND_COMMAND_KEY)||'null');if(saved)await applyBackgroundWork(saved);}catch(error){$('backgroundStatus').textContent=error.message;}};
   try{$('recoverBackground').hidden=!sessionStorage.getItem(BACKGROUND_COMMAND_KEY);}catch(ignore){}
@@ -166,6 +166,44 @@ async function loadBackgroundWork(){
     status.textContent=`${backgroundRows.length} recipient${backgroundRows.length===1?'':'s'} shown.${response.data.unreadable?' '+response.data.unreadable+' unreadable records require maintainer review.':''}`;
   }catch(error){status.textContent=error.message;}
 }
+
+function backgroundDateString(value){if(!value)return '';const match=String(value).match(/^(\d{4})-(\d{2})-(\d{2})/);return match?match[0]:'';}
+function backgroundBookingDateString(item){return item?backgroundDateString(item.bookingDate||item.booking_date||item.date):'';}
+function backgroundTodaySgt(){return new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Singapore',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());}
+async function backgroundBookingDateFor(item){const direct=backgroundBookingDateString(item);if(direct)return direct;if(!item||!item.bookingId)return '';try{const payload=await apiJsonV1(`${API.transaction}?action=bookingGet&bookingId=${encodeURIComponent(item.bookingId)}&admin=true`,{},{retries:0});if(payload&&payload.booking&&payload.booking.date)return backgroundDateString(payload.booking.date);}catch(ignore){}return '';}
+async function selectPastBookings(){
+  const status=$('backgroundStatus');if(!status||!$('backgroundWorkModal'))return;
+  const button=$('selectPastBookings');if(button)button.disabled=true;
+  status.textContent='Checking booking dates…';$('backgroundPreview').textContent='';backgroundPreviewCommand=null;
+  try{
+    const today=backgroundTodaySgt();
+    const inputs=Array.from(document.querySelectorAll('[data-background-index]'));
+    let selectedCount=0,pastUnknown=0,pastExpired=0,pastFailed=0,overflow=0;
+    for(const input of inputs){
+      const item=backgroundRows[Number(input.dataset.backgroundIndex)];
+      if(!item||input.disabled){input.checked=false;continue;}
+      const date=await backgroundBookingDateFor(item);
+      const past=Boolean(date)&&date<today;
+      if(!past){input.checked=false;continue;}
+      if(item.state==='failed'){pastFailed++;input.checked=false;continue;}
+      if(!(item.actions||[]).includes('retire')){input.checked=false;continue;}
+      if(selectedCount>=20){overflow++;input.checked=false;continue;}
+      if(item.state==='unknown')pastUnknown++;else if(item.state==='expired')pastExpired++;
+      input.checked=true;selectedCount++;
+    }
+    const plural=n=>n===1?'':'s';
+    if($('backgroundOperation')&&selectedCount>0)$('backgroundOperation').value='retire';
+    if(selectedCount>0){
+      $('backgroundPreview').innerHTML=`<h3>Mark ${selectedCount} past-booking item${plural(selectedCount)} as reviewed? This sends nothing.</h3><p>${pastUnknown} Outcome unknown${plural(pastUnknown)} and ${pastExpired} expired item${plural(pastExpired)} selected. Evidence is kept. No resend.</p>${pastFailed?`<p>Confirmed failure: ${pastFailed} past item${plural(pastFailed)} shown separately and not selected by this control. They need a different action.</p>`:''}${overflow?`<p>${overflow} further past item${plural(overflow)} not selected because the 20-recipient limit was reached.</p>`:''}<p>Use Preview selected, then Apply reviewed action, to mark the selected items reviewed through the existing review path.</p>`;
+      status.textContent=`${selectedCount} past booking${plural(selectedCount)} selected.`;
+    }else{
+      $('backgroundPreview').innerHTML=`<h3>No past bookings to review.</h3><p>This sends nothing. Future and undated items were not selected.${pastFailed?` Confirmed failure: ${pastFailed} past item${plural(pastFailed)} shown separately and not selected by this control.`:''}</p>`;
+      status.textContent='No past bookings selected.';
+    }
+  }catch(error){status.textContent=error.message||'Could not check booking dates.';}
+  finally{if(button)button.disabled=false;}
+}
+
 async function previewBackgroundWork(){
   const status=$('backgroundStatus'),indices=Array.from(document.querySelectorAll('[data-background-index]:checked')).map(input=>Number(input.dataset.backgroundIndex));
   if(!indices.length||indices.length>20){status.textContent='Select between 1 and 20 recipients.';return;}

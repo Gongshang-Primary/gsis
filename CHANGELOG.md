@@ -6,6 +6,14 @@ Model: Codex. PR #65 reuses today's verified own-duty summary across Home visits
 
 Model: Codex. Home distinguishes "No suspended timetable today" from the signed-in teacher's own relief periods. The existing duty roster is labelled "SMC doing Relief Allocation". Own-duty loading, none and failure states are explicit; a recent authenticated duties result is reused. No backend or authority change. See [Home banner task](docs/coordination/tasks/roster-home-banner-wording.md).
 
+## Pending: Venues sync diagnostics and Admin recovery, 3 November 2026
+
+Model: Codex. Roster save failures now identify a pending or uncertain Venues fence. System Health shows both source states and a five-minute warning through the existing SMC/Admin alert records. A confirmed Admin action runs the existing Venues transaction recovery, when needed, then Roster source recovery, and stops on either refusal. No save or commit algorithm changed. See [task and evidence](docs/coordination/tasks/roster-venues-fence-after-rollback.md). Not deployed.
+
+# Pending: bounded Roster import parts and late checkpoint recovery, 4 November 2026
+
+Model: Codex. Split oversized records into verified transport segments, freeze one part per call and recover a late Google checkpoint before repeating work. Import failures distinguish bridge and Google timeouts from Google errors and retain step size. Setup shows the build label, live freeze age and saved preparation progress. The all-phase 25-second timing gate is not yet established; this draft does not clear the next cutover. No deployment or live action. See [the task](docs/coordination/tasks/roster-import-step141-bridge-timeout.md).
+
 # Pending: recipient-approved peer relief can exceed weekly R, 3 November 2026
 
 Model: Codex. A colleague may approve a peer request when weekly R is exhausted or unverified. Timetable, attendance, employment and consecutive-period checks remain enforced. The relief still counts toward R. An essential audit and an SMC warning record the exception; automatic allocation is unchanged. See [peer quota override](docs/coordination/tasks/roster-peer-quota-override.md).

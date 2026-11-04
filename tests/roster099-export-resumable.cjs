@@ -9,7 +9,7 @@ function harness(){
  files.set('model',{name:'model',bytes:Buffer.from(JSON.stringify(model))});files.set('audit',{name:'audit',bytes:Buffer.from(JSON.stringify(archive)),revision:'r1',revisions:{r1:Buffer.from(JSON.stringify(archive))}});
  const blob=(value,type='application/json')=>{const b=Buffer.from(value);return {getBytes:()=>[...b],getDataAsString:()=>b.toString(),getContentType:()=>type};};
  const response=(body,status=200,headers={})=>{const b=Buffer.isBuffer(body)?body:Buffer.from(JSON.stringify(body));return {getResponseCode:()=>status,getAllHeaders:()=>headers,getContent:()=>[...b],getContentText:()=>b.toString()};};
- const scope={rosterOperationsDigest_:value=>hash(JSON.stringify(value)),Date:class extends Date{constructor(...args){super(...(args.length?args:[now]));}static now(){return now;}},console,GSiSRosterImport:Import,GSiSEdgeStore:Store,ROSTER_DATA:'private',GSISRoster:{validate:v=>v},GSISRosterOperations:{validateState:v=>v,date:v=>v},Utilities:{newBlob:blob,gzip:b=>blob(zlib.gzipSync(Buffer.from(b.getBytes()))),base64Encode:b=>Buffer.from(b).toString('base64'),computeDigest:(_,value)=>[...crypto.createHash('sha256').update(Buffer.from(value)).digest()],DigestAlgorithm:{SHA_256:'sha256'}},props_:()=>({getProperty:k=>properties.get(k)||null,setProperty:(k,v)=>{assert(Buffer.byteLength(v)<9000);properties.set(k,v);},deleteProperty:k=>properties.delete(k),getProperties:()=>Object.fromEntries(properties)}),LockService:{getScriptLock:()=>({}),getUserLock:()=>({})},deployLock_:()=>{locks++;return true;},deployUnlock_:()=>{assert(locks>0);locks--;},error_:(status,message)=>{throw Object.assign(Error(message),{status});},rosterFolder_:()=>({}),rosterFindFile_:(_folder,name)=>name==='Roster import files'?'import-folder':null,rosterReadFile_:id=>{assert.equal(locks,0);assert(files.has(id));return files.get(id).bytes.toString();},rosterCreateFile_:(folder,name,b)=>{assert.equal(locks,0,'all import uploads release both production locks');assert.equal(folder,'import-folder','new import files use the dedicated child folder');const id='output-'+(++uploads);files.set(id,{name,parents:[folder],bytes:Buffer.from(b.getBytes())});if(loseName&&name.includes(loseName)){loseName=null;throw Error('lost upload acknowledgement');}return id;},rosterDriveJson_:r=>JSON.parse(r.getContentText()),rosterDriveRequest_:(url,options={})=>{
+ const scope={rosterOperationsDigest_:value=>hash(JSON.stringify(value)),Date:class extends Date{constructor(...args){super(...(args.length?args:[now]));}static now(){return now;}},console,GSiSRosterImport:Import,GSiSEdgeStore:Store,ROSTER_DATA:'private',GSISRoster:{validate:v=>v},GSISRosterOperations:{validateState:v=>v,date:v=>v},Utilities:{newBlob:blob,gzip:b=>blob(zlib.gzipSync(Buffer.from(b.getBytes()))),ungzip:b=>blob(zlib.gunzipSync(Buffer.from(b.getBytes()))),base64Decode:b=>[...Buffer.from(b,'base64')],base64Encode:b=>Buffer.from(b).toString('base64'),computeDigest:(_,value)=>[...crypto.createHash('sha256').update(Buffer.from(value)).digest()],DigestAlgorithm:{SHA_256:'sha256'}},props_:()=>({getProperty:k=>properties.get(k)||null,setProperty:(k,v)=>{assert(Buffer.byteLength(v)<9000);properties.set(k,v);},deleteProperty:k=>properties.delete(k),getProperties:()=>Object.fromEntries(properties)}),LockService:{getScriptLock:()=>({}),getUserLock:()=>({})},deployLock_:()=>{locks++;return true;},deployUnlock_:()=>{assert(locks>0);locks--;},error_:(status,message)=>{throw Object.assign(Error(message),{status});},rosterFolder_:()=>({}),rosterFindFile_:(_folder,name)=>name==='Roster import files'?'import-folder':null,rosterReadFile_:id=>{assert.equal(locks,0);assert(files.has(id));return files.get(id).bytes.toString();},rosterCreateFile_:(folder,name,b)=>{assert.equal(locks,0,'all import uploads release both production locks');assert.equal(folder,'import-folder','new import files use the dedicated child folder');const id='output-'+(++uploads);files.set(id,{name,parents:[folder],bytes:Buffer.from(b.getBytes())});if(loseName&&name.includes(loseName)){loseName=null;throw Error('lost upload acknowledgement');}return id;},rosterDriveJson_:r=>JSON.parse(r.getContentText()),rosterDriveRequest_:(url,options={})=>{
   const u=new URL(url),path=u.pathname.split('/'),isRevision=path.includes('revisions'),id=decodeURIComponent(isRevision?path[path.indexOf('files')+1]:path.at(-1));
   if(u.pathname.endsWith('/files')){assert.equal(locks,0);const name=/name = '([^']+)'/.exec(u.searchParams.get('q')||'')?.[1];return response({files:[...files].filter(([,f])=>!name||f.name===name).map(([id,f])=>({id,name:f.name,size:String(f.bytes.length)}))});}
   const file=files.get(id);assert(file,'missing '+id);
@@ -21,7 +21,7 @@ function harness(){
  const input={operation:'edgeExportManifest',requestId:'request',preparation:{ordinal:0,checkpoint:null}};
  const call=p=>scope.rosterEdgeMigrationDispatch_({identity:{email:'admin@example.test'},input:p},{user:{rosterAdmin:true}}).result;
  function finish(start=call(input)){let r=start;for(let n=0;n<100&&r.preparing;n++)r=call({...input,preparation:r.preparation});assert(r.manifest,'preparation must reach manifest');return r;}
- return {scope,snapshot,model,archive,files,properties,pinned,input,call,finish,stats:()=>({captures,uploads,locks}),lose:name=>loseName=name,advance:()=>now+=700000};
+ return {scope,snapshot,model,archive,files,properties,pinned,input,call,finish,stats:()=>({captures,uploads,locks}),lose:name=>loseName=name,advance:(ms=700000)=>now+=ms,clock:()=>now};
 }
 {
  const h=harness(),initial=h.call(h.input);assert(initial.preparing);assert.equal(initial.step,1);assert.equal(initial.phase,'Snapshot');assert.equal(h.stats().captures,1);const before=h.stats().uploads;
@@ -47,16 +47,16 @@ function harness(){
  assert(h.finish().manifest,'the next poll recovers the same uploaded source');assert.equal(h.stats().captures,1);assert.equal(h.stats().locks,0);
 }
 {
- const h=harness(),first=h.call(h.input);h.lose('work');const next={...h.input,preparation:first.preparation};assert.throws(()=>h.call(next),/lost upload/);const ready=h.finish(h.call(next));assert.equal(h.stats().captures,1);assert(ready.manifest);
+ const h=harness(),first=h.call(h.input),checked=h.call({...h.input,preparation:first.preparation});h.lose('work');const next={...h.input,preparation:checked.preparation};assert.throws(()=>h.call(next),/lost upload/);const ready=h.finish(h.call(next));assert.equal(h.stats().captures,1);assert(ready.manifest);
 }
 {
  const h=harness(),first=h.call(h.input),next={...h.input,preparation:first.preparation};h.lose('checkpoint 00001');assert.throws(()=>h.call(next),/lost upload/);const count=h.stats().uploads,replayed=h.call(next);assert.equal(h.stats().uploads,count,'lost checkpoint acknowledgement recovers existing output');assert(replayed.preparing);
  const abandon={operation:'edgeExportAbandon',requestId:'request',resetRequestId:'restart'};assert(h.call(abandon).abandoned);assert(h.call(abandon).abandoned);assert.equal(h.properties.has('ROSTER_EDGE_EXPORT:'+first.sessionId),false);assert(h.files.size>0,'restart retains frozen evidence');assert.throws(()=>h.call(next),e=>e.status===409);assert.throws(()=>h.call({operation:'edgeExportManifest',requestId:'request'}),e=>e.status===409,'older callers cannot revive an abandoned identity');assert.throws(()=>h.call({...abandon,resetRequestId:'different'}),e=>e.status===409);
 }
 {
- const h=harness(),first=h.call(h.input),work=h.call({...h.input,preparation:first.preparation}),file=[...h.files.values()].find(f=>f.name.includes('work'));
- const raw=file.bytes.toString(),headerLength=Number(raw.slice(0,8)),header=JSON.parse(raw.slice(9,9+headerLength));header.partMetadata[0].digest='b'.repeat(64);const replacement=JSON.stringify(header);assert.equal(Buffer.byteLength(replacement),headerLength);file.bytes=Buffer.from(raw.slice(0,9)+replacement+raw.slice(9+headerLength));
- assert.throws(()=>h.call({...h.input,preparation:work.preparation}),e=>e.status===503&&/header failed verification/.test(e.message));
+ const h=harness(),first=h.call(h.input),checked=h.call({...h.input,preparation:first.preparation}),work=h.call({...h.input,preparation:checked.preparation}),file=[...h.files.values()].find(f=>f.name.includes('work'));
+ const raw=file.bytes.toString(),headerLength=Number(raw.slice(0,8));file.bytes=Buffer.from(raw.slice(0,9+headerLength)+'!'+raw.slice(10+headerLength));
+ assert.throws(()=>h.call({...h.input,preparation:work.preparation}),e=>e.status===503&&/part failed its digest/.test(e.message),'the checkpoint-authenticated header still rejects altered payload bytes');
 }
 // A lost final acknowledgement must not let recovered checkpoint contents
 // redefine the already captured source, even with a self-consistent manifest.
@@ -146,3 +146,32 @@ console.log('PASS unlocked source upload, private import subfolder, pinned in-me
  assert.equal(h.properties.has('ROSTER_EDGE_EXPORT:'+sessionId),false);assert(h.properties.has('ROSTER_EDGE_EXPORT_ABANDONED:'+sessionId));
  assert([...h.files.values()].some(file=>file.name.endsWith('source.json')),'late source upload remains retained evidence');
 }
+
+// Charge deterministic Drive transfer costs to the fake clock. This checks
+// bounded work under a 20 ms/KiB + 250 ms/call latency model, not live latency.
+{
+ const h=harness();h.model.payload=crypto.randomBytes(600000).toString('base64');h.files.get('model').bytes=Buffer.from(JSON.stringify(h.model));h.snapshot.state.rows=[];h.snapshot.state.history=[{id:'wide',text:'中文'.repeat(150000)}];h.snapshot.state.staplerPlans=[];h.snapshot.state.allocationAuditExports={};
+ let objectPreparations=0,recordPreparations=0,sourceReads=0;h.scope.GSiSRosterImport={...Import,prepareObject(...args){objectPreparations++;return Import.prepareObject(...args);},prepareRecords(...args){recordPreparations++;return Import.prepareRecords(...args);}};
+ const create=h.scope.rosterCreateFile_,read=h.scope.rosterReadFile_,request=h.scope.rosterDriveRequest_;
+ const charge=bytes=>h.advance(250+Math.ceil(bytes/1024)*20);
+ h.scope.rosterCreateFile_=(folder,name,blob)=>{charge(blob.getBytes().length);return create(folder,name,blob);};
+ h.scope.rosterReadFile_=id=>{if(h.files.get(id)?.name.endsWith('source.json'))sourceReads++;const raw=read(id);charge(Buffer.byteLength(raw));return raw;};
+ h.scope.rosterDriveRequest_=(...args)=>{const response=request(...args);charge(response.getContent().length);return response;};
+ let current=h.call(h.input),steps=0;
+ while(current.preparing){const start=h.clock();current=h.call({...h.input,preparation:current.preparation});if(current.phase==='Freeze parts'){assert(h.clock()-start<25000,'one freeze step stays below 25 s in the recorded latency model');assert(current.stepSize.bytes<=262157);steps++;}}
+ assert(steps>=4,'the oversized record must span several bounded steps');
+ const parts=current.manifest.parts;assert(parts.every(part=>part.bytes<=262157));
+ const caches=[...h.files.values()].filter(file=>file.name.includes(' work '));assert.equal(caches.length,2,'one immutable cache per object or records job');
+ for(const file of caches){const raw=file.bytes.toString(),length=Number(raw.slice(0,8)),header=JSON.parse(raw.slice(9,9+length));assert.equal(header.encoding,'gzip-base64-parts-v1');assert.equal(header.chunks.length,header.partMetadata.length);assert(header.chunks.every(chunk=>chunk.bytes<=355000),'cached payloads have individually bounded compressed ranges');}
+ assert.equal(objectPreparations,1,'later object parts reuse their cached plan');assert.equal(recordPreparations,1,'later record parts reuse their cached plan');assert.equal(sourceReads,2,'only snapshot checks and the initial record job read the source');
+}
+{
+ const h=harness(),initial=h.call(h.input),checked=h.call({...h.input,preparation:initial.preparation}),work=h.call({...h.input,preparation:checked.preparation}),request={...h.input,preparation:work.preparation};
+ h.lose(' part-');assert.throws(()=>h.call(request),/lost upload/);
+ const before=[...h.files.entries()].filter(([,file])=>file.name.includes(' part-'));
+ const recovered=h.call(request),names=[...h.files.values()].filter(file=>file.name.includes(' part-')).map(file=>file.name);
+ assert.equal(names.length,2,'the retry adopts the first part, then may finish the second part in the bounded batch');assert(before.every(([id,file])=>h.files.get(id)===file),'the unacknowledged part file is retained');assert.equal(new Set(names).size,names.length,'retry never duplicates a part file');
+ const checkpoint=h.call({operation:'edgeExportCheckpoint',requestId:'request',preparation:request.preparation});
+ assert(checkpoint.completed);assert.equal(checkpoint.preparation.checkpoint.digest,recovered.preparation.checkpoint.digest);
+}
+console.log('PASS bounded freeze-step latency model, split metadata and duplicate-free lost part/checkpoint recovery');

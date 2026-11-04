@@ -16,9 +16,9 @@ Date.now=()=>event.scheduledTime;
 async function scheduled(module,settings){let pending;await module.default.scheduled(event,settings,{waitUntil(promise){pending=promise;}});await pending;}
 let calls=[];
 const independentOperations=[];
-globalThis.fetch=async(url,init)=>{const input=JSON.parse(JSON.parse(init.body).payload).input;assert.equal(String(url),env.APPS_SCRIPT_URL);assert(['nextAbsenceIntake','sendPeerMail'].includes(input.operation),'recovery retains report capture and peer mail while auxiliary jobs stay paused');independentOperations.push(input.operation);if(input.operation==='nextAbsenceIntake')return Response.json({ok:true,data:{job:null}});if(input.operation==='sendPeerMail')return Response.json({ok:true,data:{sent:0,pending:0}});if(input.operation==='deliveryReviewMailDispatch'){assert.equal(input.monitor.state,'disabled');return Response.json({ok:true,data:{sent:0,pending:0,uncertain:0}});}return Response.json({ok:true,data:{exported:[],pending:0,failures:[]}});};
+globalThis.fetch=async(url,init)=>{const input=JSON.parse(JSON.parse(init.body).payload).input;assert.equal(String(url),env.APPS_SCRIPT_URL);assert(['nextAbsenceIntake','sendPeerMail','venuesSyncCheck'].includes(input.operation),'recovery retains report capture, peer mail and bounded Venues health while auxiliary jobs stay paused');independentOperations.push(input.operation);if(input.operation==='venuesSyncCheck')return Response.json({ok:true,data:{enabled:true,idle:true,blocked:0}});if(input.operation==='nextAbsenceIntake')return Response.json({ok:true,data:{job:null}});if(input.operation==='sendPeerMail')return Response.json({ok:true,data:{sent:0,pending:0}});if(input.operation==='deliveryReviewMailDispatch'){assert.equal(input.monitor.state,'disabled');return Response.json({ok:true,data:{sent:0,pending:0,uncertain:0}});}return Response.json({ok:true,data:{exported:[],pending:0,failures:[]}});};
 await scheduled(bundled,env);
-assert.deepEqual(independentOperations.sort(),['nextAbsenceIntake','sendPeerMail']);
+assert.deepEqual(independentOperations.sort(),['nextAbsenceIntake','sendPeerMail','venuesSyncCheck']);
 assert.equal((await bundled.default.fetch(new Request('https://worker.example.test/diagnostics'),env)).status,404);
 assert.deepEqual(await bundled.diagnoseNotificationConnections(env),{enabled:false,readOnly:true});
 const inactive=gateway.notificationStatus(env);
@@ -85,6 +85,7 @@ for(const module of [gateway,bundled]){
   if(url.includes('/message_templates?'))return Response.json({data:[{...c,status:'APPROVED',components:[{type:'BODY',text:c.body}]}]});
   if(url.endsWith('/messages')){messages++;const p=JSON.parse(init.body);assert.equal(p.template.name,c.name);assert.equal(p.template.components[0].parameters.length,c.fields.length);return Response.json({messages:[{id:'wamid.test'}]});}
   const p=JSON.parse(JSON.parse(init.body).payload).input;operations.push(p);
+  if(p.operation==='venuesSyncCheck')return Response.json({ok:true,data:{enabled:true,idle:true,blocked:0}});
   if(p.operation==='nextAbsenceIntake')return Response.json({ok:true,data:{job:null}});
   if(p.operation==='sendPeerMail')return Response.json({ok:true,data:{sent:0,pending:0}});
   if(p.operation==='inboxPendingDispatch')return Response.json({ok:true,data:{replies:[],alerts:[]}});
@@ -95,7 +96,7 @@ for(const module of [gateway,bundled]){
   assert.equal(p.operation,'notificationResult');assert.equal(p.state,'sent');assert.equal(p.messageId,'wamid.test');return Response.json({ok:true,data:{}});
  };
  if(module===gateway)assert.equal((await module.dispatchNotifications(enabled)).sent,1);else await scheduled(module,enabled);
- assert.equal(messages,1);assert.deepEqual(operations.map(p=>p.operation).filter(op=>!['inboxPendingDispatch','allocationAuditExport','deliveryReviewMailDispatch','nextAbsenceIntake','sendPeerMail'].includes(op)),['claimNotifications','prepareNotification','notificationResult','claimNotifications']);for(const auxiliary of ['deliveryReviewMailDispatch','allocationAuditExport'])assert.equal(operations.filter(p=>p.operation===auxiliary).length,0,'recovery suspends auxiliary jobs');
+ assert.equal(messages,1);assert.equal(operations.filter(p=>p.operation==='venuesSyncCheck').length,module===bundled?1:0,'only the scheduled Worker runs its independent Venues health job');assert.deepEqual(operations.map(p=>p.operation).filter(op=>!['inboxPendingDispatch','allocationAuditExport','deliveryReviewMailDispatch','nextAbsenceIntake','sendPeerMail','venuesSyncCheck'].includes(op)),['claimNotifications','prepareNotification','notificationResult','claimNotifications']);for(const auxiliary of ['deliveryReviewMailDispatch','allocationAuditExport'])assert.equal(operations.filter(p=>p.operation===auxiliary).length,0,'recovery suspends auxiliary jobs');
 }
 
 const snapshot=JSON.parse(fs.readFileSync('notification-worker/template-observation-20261016.json'));
