@@ -1,3 +1,7 @@
+## Pending: repair duplicate Stapler audit identities, 4 November 2026
+
+Model: Codex. Owner ruling (a) gives each colliding Stapler decision audit the fixed `-decision` suffix and keeps the original planning-request reference on both events. The bounded repair uses one pure projection for import preparation and an Admin dry-run/apply command with a retained receipt. Preserve all other rows and raw source freshness checks; no live repair or deployment. See [repair task](docs/coordination/tasks/roster-import-duplicate-audit-repair.md).
+
 ## Pending: Home own-duty cache follow-up, 3 November 2026
 
 Model: Codex. PR #65 reuses today's verified own-duty summary across Home visits and page reloads for ten minutes. The cache is scoped to staff, date and revision. Refresh and known changes invalidate it. Home renders before the optional background request, which waits for main Home data. Failure keeps the explicit retry wording without repeating the same request on each visit. See [task and checks](docs/coordination/tasks/roster-home-banner-wording.md). Not deployed.
