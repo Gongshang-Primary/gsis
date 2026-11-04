@@ -35,7 +35,7 @@ try{
  // any JSON response. A failed read must not claim that it attempted a save.
  const app=fs.readFileSync('roster-update/public/roster.js','utf8'),start=app.indexOf('function api('),end=app.indexOf('\n function errorText',start);
  assert(start>=0&&end>start);
- const browser=vm.createContext({timedRead:request=>request(),window:{},profile:null,location:{origin},sessionEpoch:0,sequence:0,apiReadGeneration:0,preloadSchedule:0,preloadCheckedAt:0,timetablePreload:{invalidate(){}},apiReads:new Map(),timetableDays:new Map(),AbortController,setTimeout,clearTimeout,fetch:async()=>{throw Error('offline');}});
+ const browser=vm.createContext({invalidateHomeRelief(){},timedRead:request=>request(),window:{},profile:null,location:{origin},sessionEpoch:0,sequence:0,apiReadGeneration:0,preloadSchedule:0,preloadCheckedAt:0,timetablePreload:{invalidate(){}},apiReads:new Map(),timetableDays:new Map(),AbortController,setTimeout,clearTimeout,fetch:async()=>{throw Error('offline');}});
  vm.runInContext(app.slice(app.indexOf(' function cacheOwner('),app.indexOf(' function clear(){'))+'\n'+app.slice(start,end),browser);
  for(const operation of reads){await assert.rejects(()=>browser.api('operations',{operation}),e=>!e.message.includes('save could not be confirmed'),operation);}
  for(const operation of ['saveAbsence','requestMutual','assign'])await assert.rejects(()=>browser.api('operations',{operation}),/save could not be confirmed/);

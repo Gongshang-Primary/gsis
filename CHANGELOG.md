@@ -1,3 +1,27 @@
+## Pending: minimal Worker allocation single-flight, 4 November 2026
+
+Model: Codex. Add one durable Worker scheduler lease, record overlaps as SKIPPED_BUSY and back off after two timeouts. Retain uncertain execution leases and timeout history until confirmed completion; fence late results. No backend or UI change; the broader #72 remains for next release. See [bounded task](docs/coordination/tasks/roster-allocation-single-flight-j.md).
+
+## Pending: repair duplicate Stapler audit identities, 4 November 2026
+
+Model: Codex. Owner ruling (a) gives each colliding Stapler decision audit the fixed `-decision` suffix and keeps the original planning-request reference on both events. The bounded repair uses one pure projection for import preparation and an Admin dry-run/apply command with a retained receipt. Preserve all other rows and raw source freshness checks; no live repair or deployment. See [repair task](docs/coordination/tasks/roster-import-duplicate-audit-repair.md).
+
+## Pending: Home own-duty cache follow-up, 3 November 2026
+
+Model: Codex. PR #65 reuses today's verified own-duty summary across Home visits and page reloads for ten minutes. The cache is scoped to staff, date and revision. Refresh and known changes invalidate it. Home renders before the optional background request, which waits for main Home data. Failure keeps the explicit retry wording without repeating the same request on each visit. See [task and checks](docs/coordination/tasks/roster-home-banner-wording.md). Not deployed.
+
+# Pending: clear Home timetable and relief-duty wording, 3 November 2026
+
+Model: Codex. Home distinguishes "No suspended timetable today" from the signed-in teacher's own relief periods. The existing duty roster is labelled "SMC doing Relief Allocation". Own-duty loading, none and failure states are explicit; a recent authenticated duties result is reused. No backend or authority change. See [Home banner task](docs/coordination/tasks/roster-home-banner-wording.md).
+
+# Pending: optional non-SRE daily relief cap, 4 November 2026
+
+Model: Codex. System Config adds Maximum relief periods per day (non-SRE), default 3 and Off. When enabled, automatic allocation counts distinct held and proposed relief periods, including approved peer arrangements and imported duties. All SREs are exempt. Existing duties stay; manual assignment and combination warn above the cap. See [the task](docs/coordination/tasks/roster-daily-relief-cap.md).
+
+# Pending: distinct audit event identities, 4 November 2026
+
+Model: Codex. New Stapler request and decision audit events retain distinct IDs and a shared planning-request reference. Reserved identity overrides and new duplicate IDs are refused before storage. Existing audit rows and historical collisions remain unchanged pending the owner repair ruling. See [the task](docs/coordination/tasks/roster-import-duplicate-audit-id.md).
+
 ## Pending: Venues sync diagnostics and Admin recovery, 3 November 2026
 
 Model: Codex. Roster save failures now identify a pending or uncertain Venues fence. System Health shows both source states and a five-minute warning through the existing SMC/Admin alert records. A confirmed Admin action runs the existing Venues transaction recovery, when needed, then Roster source recovery, and stops on either refusal. No save or commit algorithm changed. See [task and evidence](docs/coordination/tasks/roster-venues-fence-after-rollback.md). Not deployed.

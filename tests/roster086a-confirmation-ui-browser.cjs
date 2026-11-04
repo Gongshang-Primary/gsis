@@ -31,6 +31,7 @@ const model=R.validate({layoutMode:'single-week',single:week,timing:{startMinute
    window.review={state:'missing',calls:[]};window.RosterTimetablePreload={create:()=>({start(){},clear(){},invalidate(){},getBaseline(){return null;},getPlan(){return null;},snapshot(){return null;}})};
    window.fetch=async(url,args={})=>{const name=String(url).split('/').pop(),input=JSON.parse(args.body||'{}'),ok=data=>({ok:true,status:200,json:async()=>({ok:true,data})});review.calls.push({name,input});
     if(name==='config')return {ok:true,status:200,json:async()=>({clientId:'fixture'})};if(name==='session')return ok({});if(name==='profile')return ok(profile);if(name==='read')return ok({...profile,modelId:'base',model,calendar:{available:false}});
+    if(input.operation==='read'&&input.view==='duties')return ok({date:input.date,today:date,user:profile.user,myDuties:[]});
     if(input.operation==='currentDuty')return ok({date,available:true,people:[]});
     if(input.operation==='timetableDay')return ok({date,baselineId:'base',source:'baseline',sourceRevision:1,publicationRevision:0,periods:[],teachers:[],...(review.state==='missing'?{suspension:{status:'needs-reconfirmation',date,name:'<img src=x onerror=alert(1)>'}}:{})});
     throw Error('Unexpected '+name+' '+input.operation);
@@ -42,7 +43,7 @@ const model=R.validate({layoutMode:'single-week',single:week,timing:{startMinute
   const notice=shell.locator('#timetableDayStatus');assert.match(await notice.innerText(),/Ask SMC/);assert.doesNotMatch(await notice.innerText(),/No confirmed or published/);assert.equal(await notice.locator('img').count(),0,'server plan names never become markup');
   assert.equal(await shell.locator('#content').evaluate(el=>el.inert),false);assert.equal(await shell.locator('#viewDate').isEnabled(),true);
   await shell.evaluate(()=>{review.state='none';});await shell.locator('#refresh').click();await shell.waitForFunction(()=>document.querySelector('#timetableDayStatus')?.textContent.includes('No confirmed or published'));
-  assert.doesNotMatch(await notice.innerText(),/reconfirmation/,'new baseline result clears stale warning');assert.deepEqual(shellErrors,[]);assert.equal(await shell.evaluate(()=>review.calls.some(call=>call.name==='operations'&&!['currentDuty','timetableDay'].includes(call.input.operation))),false,'viewing never sends a mutation');
+  assert.doesNotMatch(await notice.innerText(),/reconfirmation/,'new baseline result clears stale warning');assert.deepEqual(shellErrors,[]);assert.equal(await shell.evaluate(()=>review.calls.some(call=>call.name==='operations'&&!['currentDuty','timetableDay'].includes(call.input.operation)&&!(call.input.operation==='read'&&call.input.view==='duties'))),false,'viewing never sends a mutation');
   console.log('PASS confirmation UI: actual confirmed revision, manager/teacher recovery labels, preload metadata, real Timetable source response and stale-warning clearing; no writes.');
  }finally{await browser.close();}
 })().catch(error=>{console.error(error);process.exitCode=1;});

@@ -135,5 +135,20 @@ test('Refreshed revocation or mobile change cannot send using the old resolved i
     h.ctx.processSecondaryTaskWithClaim_(h.props,key);current=JSON.parse(h.properties[key]);assert.equal(calls,0);assert(!current.payload.deliveryPending);assert.equal(h.ctx.backgroundTaskState_(current),'failed');
   }
 });
+test('Queue timing includes the admin provider-acceptance audit lock', () => {
+  const h=fixture();h.enable();configured(h);const c=h.ctx,key=task(h);let sends=0;
+  c.UrlFetchApp.fetch=()=>{sends++;return {getResponseCode:()=>200,getContentText:()=>JSON.stringify({messages:[{id:'fixture-timing'}]})};};
+  for(const name of ['getProperty','getProperties','setProperty','deleteProperty']){const call=h.props[name];h.props[name]=(...args)=>{h.now+=2;return call(...args);};}
+  const flush=c.SpreadsheetApp.flush;c.SpreadsheetApp.flush=()=>{h.now+=1000;flush();};
+  const native=c.LockService.getScriptLock,holds=[];
+  c.LockService.getScriptLock=()=>{const lock=native();let started;return {hasLock:lock.hasLock,waitLock(ms){lock.waitLock(ms);started=h.now;},tryLock(ms){const ok=lock.tryLock(ms);if(ok)started=h.now;return ok;},releaseLock(){holds.push(h.now-started);lock.releaseLock();}};};
+  c.processSecondaryQueue_(1);assert.equal(sends,1);assert(JSON.parse(h.properties[key]).completedAt);
+  const timing=h.logs.map(s=>JSON.parse(s)).find(r=>r.event==='LORD_TIMING'&&r.action==='secondaryqueue');assert.equal(timing.lockHeldMs,holds.reduce((a,b)=>a+b,0));assert(timing.lockHeldMs>=1000);
+});
+test('Malformed Contacts metadata still records a retryable actionable failure', () => {
+  const h=fixture();h.enable();configured(h);const key=task(h);h.properties.LORD_GSIS_CHECK='{';h.ctx.processSecondaryTaskWithClaim_(h.props,key);
+  const current=JSON.parse(h.properties[key]);assert(!current.payload.deliveryPending);assert.equal(current.lastFailure.reason.code,'GSIS_SYNC_UNAVAILABLE');assert.equal(h.ctx.getLORDMaintenanceStatus_().counts.failedTasks,1);assert.match(h.ctx.getLORDMaintenanceStatus_().lastFailure.detail,/Contacts copy not synced since --:--. Use Sync Contacts now./);
+  for(const raw of ['{','null','true','42','[]']){h.properties.LORD_GSIS_CHECK=raw;assert.doesNotThrow(()=>h.ctx.maintenanceFailureReason_(Object.assign(Error('PRIVATE'),{code:'GSIS_SYNC_UNAVAILABLE'})));}
+});
 console.log(JSON.stringify({passed:results.filter(r=>r.ok).length,failed:results.filter(r=>!r.ok).length,total:results.length}));
 process.exitCode=results.some(r=>!r.ok)?1:0;

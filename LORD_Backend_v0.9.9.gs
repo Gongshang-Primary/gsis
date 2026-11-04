@@ -930,8 +930,9 @@ function maintenanceFailureReason_(error) {
   if (match) return {code:'WHATSAPP_PROVIDER',http:Number(match[1]),providerCode:Number(match[2])};
   var contactsCode = String(error && error.code || '');
   if (contactsCode === 'GSIS_CONTACT_UNAVAILABLE' || /^GSIS_SYNC_[A-Z_]+$/.test(contactsCode)) {
-    var check = gsisJSON_(PropertiesService.getScriptProperties().getProperty('LORD_GSIS_CHECK'), {});
-    return {code:contactsCode,contactsSyncedAt:check.contactsCheckedAt || ''};
+    var check = {};
+    try { check = JSON.parse(PropertiesService.getScriptProperties().getProperty('LORD_GSIS_CHECK') || '{}'); } catch (ignore) {}
+    return {code:contactsCode,contactsSyncedAt:check && typeof check.contactsCheckedAt === 'string' ? check.contactsCheckedAt : ''};
   }
   if (/quota|too many times for one day/i.test(message)) return {code:'DAILY_QUOTA'};
   if (/permission|authorization|not authorized/i.test(message)) return {code:'PERMISSION'};
@@ -5873,9 +5874,7 @@ function deliverWhatsAppAlert_(task) {
       if (!sendError.definitiveNonacceptance) throw sendError;
       failed = true;
     }
-    var lock = scriptWriteLock_();
-    lock.waitLock(3000);
-    try {
+    withWriteLock_(function() {
       var raw = props.getProperty(task._key);
       var current = raw ? JSON.parse(raw) : null;
       if (!current || current.leaseToken !== task.leaseToken) throw new Error('WhatsApp delivery claim changed.');
@@ -5886,7 +5885,7 @@ function deliverWhatsAppAlert_(task) {
       if (messageId) current.payload.pendingAudit = { email: email, messageId: messageId };
       setBoundedRuntimeProperty_(props, task._key, JSON.stringify(current));
       flushWhatsAppAudit_(current, props);
-    } finally { lock.releaseLock(); }
+    },3000);
   }
   if (task.payload.remaining.length) throw new Error('Some WhatsApp recipients will be retried independently.');
 }

@@ -37,7 +37,7 @@ const worker=fs.readFileSync('notification-worker/index.js','utf8');
 for(const flag of ['true','false',undefined]){
  let release,reportCalls=0,settled=false;
  const gate=new Promise(resolve=>{release=resolve;}),background=[],errors=[];
- const scope=vm.createContext({Response,crypto:globalThis.crypto,rosterRecoveryEnvironment,assertRecoveryWritable,safeHealthError,console:{info(){},error:value=>errors.push(JSON.parse(value))},edgeRosterEnabled:()=>false,
+ const scope=vm.createContext({Response,crypto:globalThis.crypto,rosterRecoveryEnvironment,runAllocationCycle:async(_env,work)=>work(),assertRecoveryWritable,safeHealthError,console:{info(){},error:value=>errors.push(JSON.parse(value))},edgeRosterEnabled:()=>false,
   dispatchNotifications:async()=>({sent:0}),dispatchInboxPending:async()=>({}),dispatchAllocationAudit:async()=>({}),
   dispatchReceivedReports:async()=>({hasMore:false}),dispatchPeerMail:async()=>({sent:0}),dispatchDeliveryReviewReports:async()=>({}),
   scheduledRoster:async()=>({notificationsQueued:0}),dispatchDailyEmploymentReports:async()=>{reportCalls++;await gate;return {sent:1};}
