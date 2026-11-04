@@ -6,6 +6,14 @@ Model: Codex. PR #65 reuses today's verified own-duty summary across Home visits
 
 Model: Codex. Home distinguishes "No suspended timetable today" from the signed-in teacher's own relief periods. The existing duty roster is labelled "SMC doing Relief Allocation". Own-duty loading, none and failure states are explicit; a recent authenticated duties result is reused. No backend or authority change. See [Home banner task](docs/coordination/tasks/roster-home-banner-wording.md).
 
+# Pending: optional non-SRE daily relief cap, 4 November 2026
+
+Model: Codex. System Config adds Maximum relief periods per day (non-SRE), default 3 and Off. When enabled, automatic allocation counts distinct held and proposed relief periods, including approved peer arrangements and imported duties. All SREs are exempt. Existing duties stay; manual assignment and combination warn above the cap. See [the task](docs/coordination/tasks/roster-daily-relief-cap.md).
+
+# Pending: distinct audit event identities, 4 November 2026
+
+Model: Codex. New Stapler request and decision audit events retain distinct IDs and a shared planning-request reference. Reserved identity overrides and new duplicate IDs are refused before storage. Existing audit rows and historical collisions remain unchanged pending the owner repair ruling. See [the task](docs/coordination/tasks/roster-import-duplicate-audit-id.md).
+
 ## Pending: Venues sync diagnostics and Admin recovery, 3 November 2026
 
 Model: Codex. Roster save failures now identify a pending or uncertain Venues fence. System Health shows both source states and a five-minute warning through the existing SMC/Admin alert records. A confirmed Admin action runs the existing Venues transaction recovery, when needed, then Roster source recovery, and stops on either refusal. No save or commit algorithm changed. See [task and evidence](docs/coordination/tasks/roster-venues-fence-after-rollback.md). Not deployed.
