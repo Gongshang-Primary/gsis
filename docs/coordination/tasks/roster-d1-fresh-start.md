@@ -33,3 +33,13 @@ Google stays frozen and read-only as the archive (records are kept, not migrated
 
 ## When to use
 Best at a natural break: the school holidays or the new school year (January 2027), when the accounting year resets anyway and new baselines are uploaded. Owner decides; this is the fallback if full imports keep failing.
+
+## Owner ruling (5 Nov 2026): opening balances, entered by Admin
+"give admin only place to enter. should be a filterable list of teachers with cumulative quota to date and cumulative relief done to date, like an excel sheet interface"
+- Fairness option (b): one opening balance per teacher, entered by an **Admin only** (SMC can view, not edit).
+- Screen: Roster → Admin → **Opening balances** (fresh start only, also usable later to correct a balance with an audit reason).
+- Spreadsheet-like grid: one row per active teacher from Contacts; columns **Teacher**, **Cumulative quota to date (periods)**, **Cumulative relief done to date (periods)**, **As of date**, **Last edited by/at**. Filter box (name, department/role), sortable columns, keyboard entry (Tab/Enter moves cells), paste a block from Excel (two numeric columns aligned by teacher name, with a preview of matches and mismatches before saving), CSV export.
+- Validation: whole numbers 0 to 9999; done may exceed quota (warn, not block); unknown or duplicate names in a paste are listed and not saved.
+- Save: one Admin command with a receipt; each changed row becomes an audited "opening balance" record (as-of date, values, actor, reason); fairness (R% and allocation order) = opening balance + relief recorded on D1 after the as-of date. Never double-count: relief dated on or before the as-of date is ignored for fairness.
+- Prefill option: a one-off read of the frozen Google Roster to propose current values (Admin reviews, then saves), so manual typing is only for corrections.
+- Tests: Admin-only edit (SMC 403, teacher hidden), paste preview and mismatch handling, audit per row, fairness ordering uses balances, no double count across the as-of date, CSV round trip.
