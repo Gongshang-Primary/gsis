@@ -55,7 +55,7 @@ if(!historicalComparison)console.log('HISTORICAL COMPARISON NOT RUN: v0.7.17; se
  const ready=page=>page.waitForFunction(()=>document.querySelector('[data-absence-form]')&&document.getElementById('content').getAttribute('aria-busy')==='false'&&!document.querySelector('.ops-progress')&&!document.querySelector('[data-log-absence]')?.disabled);
  const idle=page=>page.waitForFunction(()=>document.getElementById('content').getAttribute('aria-busy')==='false'&&!document.querySelector('.ops-progress'));
  const reviewAbsence=async page=>{await page.locator('[data-log-absence]').click();};
- const reads=page=>page.evaluate(()=>__network.filter(c=>c.route==='operations'&&c.p.operation==='read'&&!['reportForm','intake'].includes(c.p.view)).length);
+ const reads=page=>page.evaluate(()=>__network.filter(c=>c.route==='operations'&&c.p.operation==='read'&&!['reportForm','intake','duties'].includes(c.p.view)).length);
  try{
   for(let run=1;run<=3;run++)for(const before of comparisonModes)for(const signed of [false,true]){
    const page=await setup({before,signed});await ready(page);
@@ -74,7 +74,7 @@ if(!historicalComparison)console.log('HISTORICAL COMPARISON NOT RUN: v0.7.17; se
   // Home warms missing dated context automatically; intent signals still coalesce.
   for(const before of comparisonModes){
    const page=await setup({before,landing:''});await page.locator('[data-page="Report Absence"]').waitFor();await page.waitForTimeout(delayMs+25);
-   const initial=await reads(page);assert.equal(initial,1,'Home automatically starts one report warm before pointer intent');
+   const initial=await reads(page);assert.equal(initial,1,'Home automatically starts one report warm before pointer intent');if(!before)assert.equal(await page.evaluate(()=>__network.filter(c=>c.route==='operations'&&c.p.operation==='read'&&c.p.view==='duties').length),1,'Home makes one separate own-duty read');
    await page.evaluate(()=>{const tile=document.querySelector('[data-page="Report Absence"]');for(const kind of ['pointerenter','focus','pointerdown'])tile.dispatchEvent(new Event(kind));tile.click();});
    await ready(page);assert.equal(await reads(page),1);await page.close();
   }

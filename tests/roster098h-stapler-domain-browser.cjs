@@ -26,6 +26,7 @@ const day={date,baselineId:'baseline',source:'confirmed',sourceRevision:1,confir
    window.review={calls:[]};
    window.fetch=async(url,args={})=>{const name=String(url).split('/').pop(),input=JSON.parse(args.body||'{}'),ok=data=>({ok:true,status:200,json:async()=>({ok:true,data})});review.calls.push({name,input});
     if(name==='config')return {ok:true,status:200,json:async()=>({clientId:'fixture'})};if(name==='session')return ok({});if(name==='profile')return ok(profile);if(name==='read')return ok({...profile,modelId:missing?null:'replacement',model:missing?null:model,calendar:{available:false}});
+    if(input.operation==='read'&&input.view==='duties')return ok({date:input.date,today,user:profile.user,myDuties:[]});
     if(input.operation==='currentDuty')return ok({date:today,available:true,people:[]});
     if(input.operation==='staplerDates')return ok(list);
     if(input.operation==='timetableDay'){if(input.date!==date)throw Error('Shortcut ignored its selected date');return ok(day);}
@@ -47,7 +48,7 @@ const day={date,baselineId:'baseline',source:'confirmed',sourceRevision:1,confir
   if(!missing)assert.match(await page.locator('[data-timetable-source="baseline"]').innerText(),/Baseline room/);else assert.equal(await page.locator('#exportExcel').isEnabled(),true);
   const calls=await page.evaluate(()=>review.calls.filter(c=>c.name==='operations').map(c=>c.input));
   assert(calls.some(c=>c.operation==='timetableDay'&&c.date===date));
-  assert(calls.every(c=>['currentDuty','staplerDates','timetableDay'].includes(c.operation)),'Opening the shortcut sends only existing read operations');
+  assert(calls.every(c=>['currentDuty','staplerDates','timetableDay'].includes(c.operation)||(c.operation==='read'&&c.view==='duties')),'Opening the shortcut sends only existing read operations');
   assert.deepEqual(errors,[]);
   await page.close();
   console.log('PASS H teacher Stapler independent baseline'+(bridged?' with Name Bridge':'')+': confirmed dates only, no edit controls, date-specific own timetable shortcut, signed-in staff selection, baseline comparison and read-only API flow.');
