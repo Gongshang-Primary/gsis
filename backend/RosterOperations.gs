@@ -684,6 +684,7 @@ function rosterOperationsDispatch_(req,c){
  return {...result,affectedDomains,affectedDates};
 }
 function rosterOperationsDispatchCore_(req,c){gsisRequireBackendRole_('roster');
+ if(['venuesSyncStatus','recoverVenuesSync'].includes(req.input?.operation))return rosterVenuesAdminDispatch_(req,c);
  const edge=typeof rosterEdgeMigrationDispatch_==='function'?rosterEdgeMigrationDispatch_(req,c):null;if(edge?.handled)return edge.result;
  if(typeof rosterEdgeAssertLegacyWrite_==='function')rosterEdgeAssertLegacyWrite_();
  const p=req.input||{},op=p.operation||'read',staplerWrite=['createStapler','importStapler','saveStapler','confirmStapler','publishStapler','resetStapler','renameStapler','moveStapler','deleteStapler','restoreStapler'].includes(op);
@@ -834,7 +835,8 @@ function rosterServiceDispatch_(req){gsisRequireBackendRole_('roster');
  if(req.input?.operation==='deferAbsenceIntake')return rosterAbsenceIntakeDefer_(req);
  const transport=typeof rosterNotificationTransportDispatch_==='function'?rosterNotificationTransportDispatch_(req):null;if(transport?.handled)return transport.result;
  if(['inboxIngest','inboxReplyPrepare','inboxReplyResult','inboxDelivery','inboxAlertPrepare','inboxAlertResult','inboxPendingDispatch'].includes(req.input?.operation))return rosterInboxServiceDispatch_(req);
- const p=req.input||{},op=p.operation,allowed=['connectionStatus','allocationAuditExport','scheduledRoster','dailyEmploymentMailDispatch','deliveryReviewMailDispatch','claimNotifications','inboundMessage','inboundReplyResult','prepareNotification','notificationResult','notificationDelivery','externalDuties','externalRespond','externalAcknowledge'];if(!allowed.includes(op))error_(403,'Unknown notification service operation.');
+ const p=req.input||{},op=p.operation,allowed=['venuesSyncCheck','connectionStatus','allocationAuditExport','scheduledRoster','dailyEmploymentMailDispatch','deliveryReviewMailDispatch','claimNotifications','inboundMessage','inboundReplyResult','prepareNotification','notificationResult','notificationDelivery','externalDuties','externalRespond','externalAcknowledge'];if(!allowed.includes(op))error_(403,'Unknown notification service operation.');
+ if(op==='venuesSyncCheck')return rosterVenuesSyncCheck_();
  if(op==='allocationAuditExport')return rosterAllocationAuditExport_(p);
  if(op==='externalDuties')return rosterPrivateRead_(p);
  if(op==='connectionStatus'){rosterServiceContacts_();return {readOnly:true,backendVersion:GSIS_DEPLOY_VERSION,contactsReady:true};}

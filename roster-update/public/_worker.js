@@ -369,6 +369,7 @@ function rosterFailure(action,diagnosticId,detail){
  console.error(JSON.stringify({event:'roster-request-failed',action,diagnosticId,...detail}));
  const saving=action==='rosterUpload'||action==='rosterUpdate',reading=action==='rosterOperations'&&['archiveItems','archivedItem','statistics','statisticsCalendar','acknowledgementStatus','deliveryReview','calculations','read','directory','candidates','availability','audit','prunePreview','externalLink','health','accounting','allocation','allocationVersion','history','exportDaily','dailyTimetable','teacherDailyUpdate','currentDuty','timetableBatch','timetableDay','timetablePreparationManifest','timetablePreparationPart','timetablePreparationCheck','stapler','staplerDates','dutyRoster','systemConfig','dailyEmployment','dailyNotify','nameBridges'].includes(detail.operation);
  let error=saving?'The timetable save could not be confirmed. Retry the same save.':action==='rosterOperations'?(reading?'Roster records could not load. Retry loading.':'The Roster save could not be confirmed. Retry the same save.'):'Roster is temporarily unavailable. Use Retry or Refresh to try again.';
+ if(['VENUES_FENCE_PENDING','VENUES_FENCE_UNCONFIRMED','COMMIT_UNCERTAIN'].includes(detail.code)||['VENUES_FENCE_PENDING','VENUES_FENCE_UNCONFIRMED','COMMIT_UNCERTAIN'].includes(detail.backendCode))error='Venues sync needs Admin recovery. Open System Health to check the source fence.';
  if(reading&&detail.operation==='stapler')error+=' Keep the saved date; share the reference with Admin.';
  if(detail.code==='UPSTREAM_TIMEOUT')error+=' The backend took too long to respond.';
  else if(detail.code==='BACKEND_AUTHENTICATION')error+=' The Roster connection could not be verified. Ask Admin to check the backend deployment and shared secret.';
@@ -398,8 +399,13 @@ export async function systemHealthRoute(req,env,authorityEnv=env){
  if(req.method!=='POST'||req.headers.get('Origin')!==origin)return json({ok:false,error:'Same-origin POST required.'},403);
  let who;try{who=await requestIdentity(req,env);}catch{return json({ok:false,error:'Sign in with your school account.'},401);}
  const raw=await req.text();if(enc.encode(raw).byteLength>4000)return json({ok:false,error:'Request too large.'},413);
- let input;try{input=JSON.parse(raw);if(!input||Array.isArray(input)||typeof input!=='object'||!['read','retryBackgroundJob','recordRecoveryCheckpoint','peerMailReview','reviewPeerMail'].includes(input.operation))throw Error();}catch{return json({ok:false,error:'Choose a supported health operation.'},400);}
+ let input;try{input=JSON.parse(raw);if(!input||Array.isArray(input)||typeof input!=='object'||!['read','retryBackgroundJob','recordRecoveryCheckpoint','peerMailReview','reviewPeerMail','recoverVenuesSync'].includes(input.operation))throw Error();}catch{return json({ok:false,error:'Choose a supported health operation.'},400);}
+ const venuesStatus=async()=>{try{const reply=(await backend(rosterRecoveryEnvironment(env),'rosterOperations',{operation:'venuesSyncStatus'},who,crypto.randomUUID())).result;if([401,403].includes(reply?.status))throw Object.assign(Error('Current authority required.'),{status:403});return reply?.ok?reply.data:{available:false};}catch(error){if(error.status===403)throw error;return {available:false};}};
  try{
+  if(input.operation==='recoverVenuesSync'){
+   const result=(await backend(rosterRecoveryEnvironment(env),'rosterOperations',{operation:'recoverVenuesSync',evidence:input.evidence},who,crypto.randomUUID())).result;
+   return json(result,result.ok?200:result.status||503);
+  }
   if(['peerMailReview','reviewPeerMail'].includes(input.operation)){
    // The backend verifies current Admin authority under its notification lock.
    // This separate command cannot route into the retired operational authority.
@@ -418,7 +424,7 @@ export async function systemHealthRoute(req,env,authorityEnv=env){
    if(!auth?.ok)return json({ok:false,...safeHealthError(auth),error:'Current school authority could not be confirmed.'},[401,403].includes(auth?.status)?403:503);
    if(auth.data?.user?.smc!==true&&auth.data?.user?.admin!==true)return json({ok:false,error:'SMC or Admin access is required.'},403);
    const statusEnv=typeof resolveRosterAuthorityEnvironment==='function'?await resolveRosterAuthorityEnvironment(authorityEnv):env;
-   const snapshot={...await readSystemHealth(statusEnv,{jobsOnly:true}),googleBackup:await readRosterMirrorStatus(statusEnv)},jobs=new Set(['google-backup','allocation','notifications','received-reports','inbox','webhook','peer-mail','r2-cleanup','audit-export']);
+   const snapshot={...await readSystemHealth(statusEnv,{jobsOnly:true}),googleBackup:await readRosterMirrorStatus(statusEnv),venuesSync:await venuesStatus()},jobs=new Set(['venues-sync','google-backup','allocation','notifications','received-reports','inbox','webhook','peer-mail','r2-cleanup','audit-export']);
    snapshot.jobs=snapshot.jobs.filter(row=>jobs.has(row.job));snapshot.recentFailures=snapshot.recentFailures.filter(row=>jobs.has(row.job));
    const reports={available:false,transportAvailable:false,href:'/'};let peerMailReviewAllowed=false;
    try{
@@ -432,6 +438,7 @@ export async function systemHealthRoute(req,env,authorityEnv=env){
    }catch(error){if([401,403].includes(error?.status)||[401,403].includes(error?.upstreamStatus))return json({ok:false,error:'Current school authority could not be confirmed.'},403);/* A report read outage must stay unavailable, never become zero. */}
    return json({ok:true,data:{...snapshot,readOnly:true,profile:'google-recovery',reports,peerMailReviewAllowed}});
   }
+  if(result.ok&&input.operation==='read')result.data={...result.data,venuesSync:await venuesStatus()};
   return json(result,result.ok?200:result.status||503);
  }catch(error){return json({ok:false,...safeHealthError(error),error:'System Health could not be confirmed.'},[401,403].includes(error.status)?403:503);}
 }
@@ -1246,6 +1253,10 @@ export async function dispatchAllocationAudit(env){
  // file identifiers, staff facts or provider/backend error text here.
  const failed=data.failures.length,code=data.disabled?'AUDIT_LOGGING_DISABLED':data.busy?'AUDIT_EXPORT_BUSY':data.deferred==='notification-priority'?'AUDIT_NOTIFICATION_PRIORITY':Number.isSafeInteger(data.deferred)&&data.deferred>0?'AUDIT_EXPORT_PENDING':undefined;
  return {exported:exported.length,pending:data.pending,failed,enabled:data.disabled!==true,...(code?{skipped:true,code}:{}),...(failed?{failure:{code:'AUDIT_EXPORT_PENDING',operation:'allocationAuditExport'}}:{})};
+}
+export async function dispatchVenuesSync(env){
+ if(edgeRosterEnabled(env))return {skipped:true,code:'SKIPPED'};
+ const result=await serviceBackend(env,{operation:'venuesSyncCheck'});if(!result.ok)throw Object.assign(Error('Venues sync status unavailable.'),safeHealthError(result));return result.data;
 }
 
 export function menuReply(reply,env){

@@ -6,7 +6,7 @@ import {readQuietMode} from '../shared/roster-quiet-mode.js';
 import {readRosterCutoverFreeze} from '../shared/roster-cutover-freeze.js';
 // Test harnesses load this file with its imports removed; treat quiet mode as off there.
 const quietMode=(db,at)=>typeof readQuietMode==='function'?readQuietMode(db,at):Promise.resolve({active:false});
-import {dispatchNotifications,scheduledRoster,diagnoseNotificationConnections,dispatchInboxPending,dispatchWebhookJobs,dispatchReceivedReports,dispatchPeerMail,dispatchAllocationAudit,dispatchGoogleBackup,dispatchRosterImports,dispatchReferencesRefresh} from '../roster-update/public/_worker.js';
+import {dispatchNotifications,scheduledRoster,diagnoseNotificationConnections,dispatchInboxPending,dispatchWebhookJobs,dispatchReceivedReports,dispatchPeerMail,dispatchAllocationAudit,dispatchVenuesSync,dispatchGoogleBackup,dispatchRosterImports,dispatchReferencesRefresh} from '../roster-update/public/_worker.js';
 /* GSIS_API_SECRET_BEGIN */
 // First-party API credentials share one operator-selected setting. Browser
 // sessions, private relief links and third-party credentials stay independent.
@@ -124,6 +124,9 @@ export default {
     if(result?.notificationsQueued>0||receiptResult?.intake?.notificationsQueued>0){await notifications;await send();}
    })();
    await Promise.all([imports,backup,received,notifications,inbox,ingress,peerMail,planning]);
+   // Venues has its own five-minute job after the minute work. Re-read quiet
+   // mode at dispatch so an SMC can pause it while those earlier jobs finish.
+   if(Math.floor(event.scheduledTime/60000)%5===0&&typeof dispatchVenuesSync==='function'&&!await quietNow())await run('venues-sync','roster-venues-sync',async()=>await quietNow()?{skipped:true}:dispatchVenuesSync(env));
   })());
  },
  async queue(batch,env){

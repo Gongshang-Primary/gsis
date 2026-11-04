@@ -2335,7 +2335,7 @@ function rosterFailureDetail_(error){
  const t=typeof deployTrace_==='undefined'?{}:deployTrace_||{},phase=String(error?.failurePhase||t.phase||'').replace(/^roster\./,'');
  const groups={'calculations-index':'calculation-source','calculations-source':'calculation-source','calculations-history-read':'history-read','calculations-history':'history-read','contacts-authority':'contacts','state-read':'operations-read',context:'timetable','register-read':'timetable','register-json':'timetable','register-schema':'timetable','timetable-read':'timetable','timetable-json':'timetable','timetable-validation':'timetable',quota:'calculation-source',projection:'plan-read',commit:'save','response-serialize':'response','response-create':'response'};
  const operations=['nextAbsenceIntake','deferAbsenceIntake','prepareNotification','requestMutual','saveSchoolAbsence','renameStapler','scheduledRoster','sendPeerMail','peerMailReview','reviewPeerMail','claimNotifications','prepareNotifications','notificationResult','notificationResults','inboxPendingDispatch','inboxReplyPrepare','inboxReplyResult','inboxAlertPrepare','inboxAlertResult','deliveryReviewMailDispatch','dailyEmploymentMailDispatch','processAbsenceIntake','flushAbsenceIntake','captureAbsenceIntake','retryAbsenceIntake','resolveAbsenceIntake','timetableBatch','timetableDay','timetableCacheManifest','read','saveAbsence','saveInstructions','saveStapler','confirmStapler','publishStapler','resetStapler','moveStapler','restoreStapler','deleteStapler','reliefBatch','publish','notifyDaily','autoAllocate','optimise','receiptStatus'];
- const codes=['ROSTER_CUTOVER_FROZEN','ROSTER_STORAGE_CAPACITY','GSIS_SECRET_INVALID','ABSENCE_PREPARATION_RETRY','ABSENCE_INTAKE_BUSY','ABSENCE_INTAKE_PENDING','CONTACTS_RECOVERY_REQUIRED','STAPLER_BASELINE_CONFLICT','STAPLER_CONFLICT','PEER_MAIL_REVIEW_CONFLICT','TIMETABLE_BATCH_CHANGED','TIMETABLE_BATCH_TOO_LARGE','CELL_CONFLICT','ABSENCE_CONFLICT','ALLOCATION_IN_PROGRESS','ALLOCATION_UNCONFIRMED','ALLOCATION_CANCELLED','ALLOCATION_ABANDONED','ALLOCATION_CUTOFF'];
+ const codes=['VENUES_FENCE_PENDING','VENUES_FENCE_UNCONFIRMED','COMMIT_UNCERTAIN','ROSTER_CUTOVER_FROZEN','ROSTER_STORAGE_CAPACITY','GSIS_SECRET_INVALID','ABSENCE_PREPARATION_RETRY','ABSENCE_INTAKE_BUSY','ABSENCE_INTAKE_PENDING','CONTACTS_RECOVERY_REQUIRED','STAPLER_BASELINE_CONFLICT','STAPLER_CONFLICT','PEER_MAIL_REVIEW_CONFLICT','TIMETABLE_BATCH_CHANGED','TIMETABLE_BATCH_TOO_LARGE','CELL_CONFLICT','ABSENCE_CONFLICT','ALLOCATION_IN_PROGRESS','ALLOCATION_UNCONFIRMED','ALLOCATION_CANCELLED','ALLOCATION_ABANDONED','ALLOCATION_CUTOFF'];
  return {backendVersion:GSIS_DEPLOY_VERSION,failureStage:phases.includes(phase)?phase:groups[phase]||'backend',...(operations.includes(t.operation)?{operation:t.operation}:{}),...(codes.includes(error?.code)?{code:error.code}:{})};
 }
 function rosterDiagnosticLog_(record){
@@ -3314,8 +3314,8 @@ var GSISRosterOperations=(()=>{
  function staplerApply(s,ctx,p){const d=date(p.date||ctx.today),op=p.operation;if(d<ctx.today&&(!(ctx.user.smc||ctx.user.admin)||!['saveStapler','confirmStapler'].includes(op)))fail(403,'Past planning lifecycle changes are read only. Their saved history cannot be renamed, moved or deleted.');
   if(['createStapler','importStapler'].includes(op))return createOrImportStapler(s,ctx,p,d);
   if(['renameStapler','moveStapler','deleteStapler','restoreStapler'].includes(op))return staplerLifecycle(s,ctx,p,d);
-  if(op==='requestStapler'){const person=staff(ctx,ctx.user.staffId);if(!person.active)fail(403,'An active teacher identity is required.');if(!(ctx.smcIds||[]).includes(p.sponsorId)||!teacherSponsor(staff(ctx,p.sponsorId)))fail(400,'Choose an eligible SMC teacher sponsor.');const old=s.staplerRequests.find(r=>!r.retiredAt&&r.date===d&&r.staffId===person.id&&['pending','approved'].includes(r.status));if(old)return {savedIds:[old.id],unchanged:true};const row={id:ctx.uuid(),date:d,staffId:person.id,name:person.name,sponsorId:p.sponsorId,status:'pending',createdAt:ctx.iso};s.staplerRequests.push(row);queue(s,ctx,'stapler_request',row.sponsorId,d,{templateKey:'stapler_request',requesterName:person.name,planningRequestId:row.id,summary:person.name+' requests Stapler planning and publication access for '+d+'.'},null,'stapler-request:'+row.id);allocation().addAudit(s,ctx,op,{date:d,planningRequestId:row.id});return {savedIds:[row.id]};}
-  if(op==='decideStapler'){smc(ctx);const row=s.staplerRequests.find(r=>r.id===p.id&&r.date===d);if(!row||row.retiredAt||row.status!=='pending')fail(409,'This planning request is no longer pending.');if(!['approve','reject'].includes(p.decision))fail(400,'Choose approve or reject.');row.status=p.decision==='approve'?'approved':'rejected';row.comment=text(p.comment||'',1000);row.decidedAt=ctx.iso;row.decidedBy=ctx.user.email;queue(s,ctx,'stapler_decision',row.staffId,d,{templateKey:'stapler_decision',requesterName:staff(ctx,row.staffId).name,planningRequestId:row.id,decision:row.status,comment:row.comment,summary:'Stapler access for '+d+' was '+row.status+(row.comment?': '+row.comment:'.')},null,'stapler-decision:'+row.id);if(row.status==='approved'&&row.sponsorId!==row.staffId)queue(s,ctx,'stapler_decision',row.sponsorId,d,{templateKey:'stapler_decision',requesterName:staff(ctx,row.staffId).name,planningRequestId:row.id,audience:'stapler-sponsor',decision:row.status,comment:row.comment,summary:row.name+' was approved to plan and publish Stapler for '+d+'.'},null,'stapler-sponsor-decision:'+row.id);allocation().addAudit(s,ctx,op,{date:d,planningRequestId:row.id,decision:row.status,comment:row.comment});return {savedIds:[row.id]};}
+  if(op==='requestStapler'){const person=staff(ctx,ctx.user.staffId);if(!person.active)fail(403,'An active teacher identity is required.');if(!(ctx.smcIds||[]).includes(p.sponsorId)||!teacherSponsor(staff(ctx,p.sponsorId)))fail(400,'Choose an eligible SMC teacher sponsor.');const old=s.staplerRequests.find(r=>!r.retiredAt&&r.date===d&&r.staffId===person.id&&['pending','approved'].includes(r.status));if(old)return {savedIds:[old.id],unchanged:true};const row={id:ctx.uuid(),date:d,staffId:person.id,name:person.name,sponsorId:p.sponsorId,status:'pending',createdAt:ctx.iso};s.staplerRequests.push(row);queue(s,ctx,'stapler_request',row.sponsorId,d,{templateKey:'stapler_request',requesterName:person.name,planningRequestId:row.id,summary:person.name+' requests Stapler planning and publication access for '+d+'.'},null,'stapler-request:'+row.id);allocation().addAudit(s,ctx,op,{date:d,id:row.id});return {savedIds:[row.id]};}
+  if(op==='decideStapler'){smc(ctx);const row=s.staplerRequests.find(r=>r.id===p.id&&r.date===d);if(!row||row.retiredAt||row.status!=='pending')fail(409,'This planning request is no longer pending.');if(!['approve','reject'].includes(p.decision))fail(400,'Choose approve or reject.');row.status=p.decision==='approve'?'approved':'rejected';row.comment=text(p.comment||'',1000);row.decidedAt=ctx.iso;row.decidedBy=ctx.user.email;queue(s,ctx,'stapler_decision',row.staffId,d,{templateKey:'stapler_decision',requesterName:staff(ctx,row.staffId).name,planningRequestId:row.id,decision:row.status,comment:row.comment,summary:'Stapler access for '+d+' was '+row.status+(row.comment?': '+row.comment:'.')},null,'stapler-decision:'+row.id);if(row.status==='approved'&&row.sponsorId!==row.staffId)queue(s,ctx,'stapler_decision',row.sponsorId,d,{templateKey:'stapler_decision',requesterName:staff(ctx,row.staffId).name,planningRequestId:row.id,audience:'stapler-sponsor',decision:row.status,comment:row.comment,summary:row.name+' was approved to plan and publish Stapler for '+d+'.'},null,'stapler-sponsor-decision:'+row.id);allocation().addAudit(s,ctx,op,{date:d,id:row.id,decision:row.status,comment:row.comment});return {savedIds:[row.id]};}
   if(!staplerPermission(s,ctx,d))fail(403,'SMC approval is required to plan or publish this date.');const dd=ctx.baselineDays?.[d]||ctx.days[d];let record=s.staplerPlans.find(r=>r.date===d);const saved=record?.draft||record?.published,baseline=op==='resetStapler'||!saved?staplerBaseline(s,ctx,d):saved;if(saved)stapler().validate(saved);if(!Number.isInteger(p.staplerRevision)||p.staplerRevision<0||p.staplerRevision>(record?.revision||0)||p.staplerRevision!==(record?.revision||0)&&!(op==='saveStapler'&&(p.basePlan||p.planPatch!==undefined)))fail(409,'The Stapler draft changed. Compare your retained changes before saving.');if(op==='resetStapler'){if(!record||!staplerBaselineChanged(record,saved,dd))fail(409,'This draft already uses the current baseline.');const archived={...record,id:ctx.uuid(),archiveReason:'reset',archivedAt:ctx.iso,archivedBy:ctx.user.email};s.staplerArchives.push(archived);const next={date:d,name:record.name||'',baselineId:baseline.baselineId,revision:record.revision+1,draft:baseline,updatedAt:ctx.iso,updatedBy:ctx.user.email};s.staplerPlans[s.staplerPlans.indexOf(record)]=next;for(const a of s.importedRelief.filter(a=>a.origin==='stapler'&&a.date===d&&['draft','published'].includes(a.status))){a.status='cancelled';a.cancellationReason='Stapler reset after baseline replacement.';}for(const j of s.outbox.filter(j=>j.kind==='stapler_timetable'&&j.date===d&&['queued','blocked'].includes(j.status))){j.status='cancelled';j.error='Stapler reset after baseline replacement.';}allocation().addAudit(s,ctx,op,{date:d,archiveId:archived.id,previousBaselineId:record.baselineId,baselineId:baseline.baselineId,staplerRevision:next.revision});return {savedIds:[d],staplerRevision:next.revision};}
   if(op==='saveStapler'){
    const surgical=p.planPatch!==undefined;if(surgical&&(p.plan!==undefined||p.basePlan!==undefined))fail(400,'Send either Stapler changes or a full plan.');if(!surgical&&(!p.plan||unescape(encodeURIComponent(JSON.stringify(p.plan))).length>1900000))fail(400,'The plan is missing or too large.');const previous=saved||baseline;let plan;try{plan=surgical?applyStaplerPlanPatch(previous,p.planPatch):p.basePlan&&p.staplerRevision!==(record?.revision||0)?mergeStaplerPlans(p.basePlan,p.plan,previous):copy(p.plan);}catch(error){if(error.code==='STAPLER_CONFLICT'){error.staplerRevision=record?.revision||0;error.currentRevision=record?.revision||0;}throw error;}
@@ -4367,14 +4367,13 @@ function rosterOperationsPackPlans_(state,prepareTimetables=true){
   return packed;});return {...state,staplerPlans:rows(state.staplerPlans,prepareTimetables),staplerArchives:rows(state.staplerArchives)};
 }
 var rosterOperationsStorageSources_=new WeakMap();
-var rosterOperationsAuditSources_=new WeakMap();
 /* One operational document commits absence, relief, audit and notification intent together. */
 function rosterOperationsState_(skipTransport=false){
  let phase='operations-location';try{
   const id=props_().getProperty('ROSTER_OPERATIONS_FILE')||rosterFindFile_(ROSTER_DATA,'Roster operations.json');
   if(!id)return GSISRosterOperations.initial();
   phase='operations-read';const source=rosterOperationsStoredRead_(id),value=source.value;
-  phase='operations-schema';const state=GSISRosterOperations.validateState(rosterOperationsUnpackPlans_(typeof rosterAllocationAuditUnpack_==='function'?rosterAllocationAuditUnpack_(value):value));rosterOperationsStorageSources_.set(state,source);rosterOperationsAuditSources_.set(state,state.audit.map(row=>({id:row.id})));if(typeof rosterColdReceiptsUnpack_==='function')rosterColdReceiptsUnpack_(state);return skipTransport!==true&&typeof rosterNotificationOverlay_==='function'?rosterNotificationOverlay_(state):state;
+  phase='operations-schema';const state=GSISRosterOperations.validateState(rosterOperationsUnpackPlans_(typeof rosterAllocationAuditUnpack_==='function'?rosterAllocationAuditUnpack_(value):value));rosterOperationsStorageSources_.set(state,source);if(typeof rosterColdReceiptsUnpack_==='function')rosterColdReceiptsUnpack_(state);return skipTransport!==true&&typeof rosterNotificationOverlay_==='function'?rosterNotificationOverlay_(state):state;
  }catch(e){if(e.status){e.failurePhase=e.failurePhase||phase;throw e;}throw Object.assign(Error('Relief records could not be read.'),{status:503,failurePhase:e.failurePhase||phase});}
 }
 // Save ceiling for Roster operations.json. Admin may raise it in Script Properties
@@ -4397,10 +4396,6 @@ function rosterOperationsCommit_(state,intakeFenceDates=null,intakeFencePeers=fa
  // record while the retained intake can finish. The 12M derived-cache fallback
  // above stays first; no new storage format, authority or automatic pruning.
  const stored=props_().getProperty('ROSTER_OPERATIONS_FILE'),id=stored||rosterFindFile_(ROSTER_DATA,'Roster operations.json'),source=rosterOperationsStorageSources_.get(state),root=id?(source?.id===id?source.manifest:JSON.parse(rosterReadFile_(id))):null,split=root?.format==='gsis-roster-operations-split-v1';
- // Compare against identities captured before the command. Existing historical
- // collisions remain evidence; no new collision may reach a durable write.
- const auditBefore=rosterOperationsAuditSources_.get(state)||(split?rosterOperationsStoredRead_(id).value.audit:root?.audit)||[];
- GSISRosterAllocation.assertNewAuditIds(auditBefore,state.audit);
  if(!split&&data.length>rosterOperationsMaxChars_())throw Object.assign(Error('Relief records are full. Ask Admin to review storage capacity before retrying this same report.'),{status:507,code:'ROSTER_STORAGE_CAPACITY'});
  const prepared=split?rosterSplitPrepareDocument_(JSON.parse(data),{folderId:root.folderId,previousId:id}):null;
  const batchTicket=typeof rosterTimetableBatchCommitBegin_==='function'?rosterTimetableBatchCommitBegin_(state):null,venueTicket=typeof rosterVenuesBegin_==='function'?rosterVenuesBegin_('operations',state):null;
@@ -4414,7 +4409,6 @@ function rosterOperationsCommit_(state,intakeFenceDates=null,intakeFencePeers=fa
  if(!prepared)finalCheck();
  const saved=prepared?prepared.commit(finalCheck):id?(rosterDriveRequest_('https://www.googleapis.com/upload/drive/v3/files/'+encodeURIComponent(id)+'?uploadType=media&supportsAllDrives=true&fields=id',{method:'patch',contentType:'application/json; charset=UTF-8',payload:data},'operations-commit'),id):rosterCreateFile_(ROSTER_DATA,'Roster operations.json',Utilities.newBlob(data,'application/json'));
  if(prepared||!stored)props_().setProperty('ROSTER_OPERATIONS_FILE',saved);
- rosterOperationsAuditSources_.set(state,state.audit.map(row=>({id:row.id})));
  };
  // Keep remote Venues exchanges outside the intake lock. If the final fence
  // stops this write, the derived pending marker prevents stale reuse until the
@@ -5021,6 +5015,7 @@ function rosterOperationsDispatch_(req,c){
  return {...result,affectedDomains,affectedDates};
 }
 function rosterOperationsDispatchCore_(req,c){gsisRequireBackendRole_('roster');
+ if(['venuesSyncStatus','recoverVenuesSync'].includes(req.input?.operation))return rosterVenuesAdminDispatch_(req,c);
  const edge=typeof rosterEdgeMigrationDispatch_==='function'?rosterEdgeMigrationDispatch_(req,c):null;if(edge?.handled)return edge.result;
  if(typeof rosterEdgeAssertLegacyWrite_==='function')rosterEdgeAssertLegacyWrite_();
  const p=req.input||{},op=p.operation||'read',staplerWrite=['createStapler','importStapler','saveStapler','confirmStapler','publishStapler','resetStapler','renameStapler','moveStapler','deleteStapler','restoreStapler'].includes(op);
@@ -5171,7 +5166,8 @@ function rosterServiceDispatch_(req){gsisRequireBackendRole_('roster');
  if(req.input?.operation==='deferAbsenceIntake')return rosterAbsenceIntakeDefer_(req);
  const transport=typeof rosterNotificationTransportDispatch_==='function'?rosterNotificationTransportDispatch_(req):null;if(transport?.handled)return transport.result;
  if(['inboxIngest','inboxReplyPrepare','inboxReplyResult','inboxDelivery','inboxAlertPrepare','inboxAlertResult','inboxPendingDispatch'].includes(req.input?.operation))return rosterInboxServiceDispatch_(req);
- const p=req.input||{},op=p.operation,allowed=['connectionStatus','allocationAuditExport','scheduledRoster','dailyEmploymentMailDispatch','deliveryReviewMailDispatch','claimNotifications','inboundMessage','inboundReplyResult','prepareNotification','notificationResult','notificationDelivery','externalDuties','externalRespond','externalAcknowledge'];if(!allowed.includes(op))error_(403,'Unknown notification service operation.');
+ const p=req.input||{},op=p.operation,allowed=['venuesSyncCheck','connectionStatus','allocationAuditExport','scheduledRoster','dailyEmploymentMailDispatch','deliveryReviewMailDispatch','claimNotifications','inboundMessage','inboundReplyResult','prepareNotification','notificationResult','notificationDelivery','externalDuties','externalRespond','externalAcknowledge'];if(!allowed.includes(op))error_(403,'Unknown notification service operation.');
+ if(op==='venuesSyncCheck')return rosterVenuesSyncCheck_();
  if(op==='allocationAuditExport')return rosterAllocationAuditExport_(p);
  if(op==='externalDuties')return rosterPrivateRead_(p);
  if(op==='connectionStatus'){rosterServiceContacts_();return {readOnly:true,backendVersion:GSIS_DEPLOY_VERSION,contactsReady:true};}
@@ -5805,16 +5801,7 @@ var GSISRosterAllocation = (() => {
   // Each cross-project decision names the immutable published Deploy snapshot it
   // actually read. These references are evidence, not a distributed writer lock.
   function deploySource(ctx,d){const source=(ctx.baselineDays?.[d]||ctx.days?.[d])?.quotaSource;if(!source)return null;return {service:'deploy',versionId:source.versionId||null,revision:source.revision??null,commit:source.commit||'',calculationVersion:source.calculationVersion||null,from:source.from||'',to:source.to||''};}
-  function auditIdConflict(){throw Object.assign(new Error('A new audit event has a conflicting identity.'),{status:409,code:'ROSTER_AUDIT_ID_CONFLICT'});}
-  function assertNewAuditIds(before,after){
-    const counts=rows=>{const result=new Map();for(const row of rows||[]){const id=String(row.id);result.set(id,(result.get(id)||0)+1);}return result;},old=counts(before);
-    for(const [id,count]of counts(after))if(count>1&&count>(old.get(id)||0))auditIdConflict();
-  }
-  function addAudit(s,ctx,operation,detail={}){
-    if(['id','at','actor','operation'].some(key=>Object.prototype.hasOwnProperty.call(detail,key)))auditIdConflict();
-    const id=ctx.uuid();if(s.audit.some(row=>String(row.id)===String(id)))auditIdConflict();
-    const date=detail.date||ctx.today,source=deploySource(ctx,date),event={...detail,id,at:ctx.iso,date,actor:ctx.user.email,operation,...(source?{deploySource:source}:{}),...(s.systemConfig?.verboseLogging===false?{auditExportSuppressed:true}:{})};s.audit.push(event);return event;
-  }
+  function addAudit(s,ctx,operation,detail={}){const date=detail.date||ctx.today,source=deploySource(ctx,date),event={id:ctx.uuid(),at:ctx.iso,date,actor:ctx.user.email,operation,...detail,...(source?{deploySource:source}:{}),...(s.systemConfig?.verboseLogging===false?{auditExportSuppressed:true}:{})};s.audit.push(event);return event;}
   function bumpDay(s,d){s.dayRevisions[d]=(s.dayRevisions[d]||0)+1;return s.dayRevisions[d];}
   function captureWeek(s,ctx,d){
     ensure(s);const dd=ctx.days[d];if(!dd||dd.schoolDay!==true||dd.verified===false||monday(d)>monday(ctx.today))return false;
@@ -6127,7 +6114,7 @@ var GSISRosterAllocation = (() => {
   }
   function mayOptimise(ctx,d){const start=Date.parse(addDays(d,-1)+'T16:00:00+08:00'),end=Date.parse(d+'T06:29:59.999+08:00');return ctx.now>=start&&ctx.now<=end;}
   function warningEvents(s,ctx,summary){ensure(s);const quiet=schedule(ctx.now).quiet,events=[];for(const p of summary.periods){if(periodStarted(ctx,summary.date,p.period))continue;const key=summary.date+':'+p.period,old=s.healthWarningState[key]||{seen:[],episode:0};if(p.green.length>2){s.healthWarningState[key]={seen:[],episode:old.seen.length?old.episode+1:old.episode,last:p.green.length};continue;}if(!old.seen.includes(p.green.length)){events.push({key:'capacity:'+key+':'+old.episode+':'+p.green.length,period:p.period,count:p.green.length,date:summary.date,quiet});old.seen.push(p.green.length);}old.last=p.green.length;s.healthWarningState[key]=old;}return events;}
-  return {deploymentTeachingEvidence,sreBasis,dailyRosterCalculation,reliefCandidateEligible,normalizeSubjectPatterns,matchesSubjectPattern,absencePeriods,defaultConsecutiveSubjectRules,normalizeConsecutiveSubjectRules,manualDecision,manualDecisionForDemand,manualOwnership,defaultSubjectFamilies,normalizeSubjectFamilies,normalizeTeachingGroupOverrides,subjectResolver,lessonSubject,teachingProfile,defaultRestrictedPeriods,defaultEmploymentRestrictions,preferenceRules,workloadRules,ruleToggles,workloadLimits,preferenceOrder,sameVenue,teacherSource,recessDuty,manualAssignments,manualModel,withManualAssignments,manualRanks,isClassLesson,ensure,clone,fail,norm,addDays,monday,year,cost,active,protectedAssignment,effectiveAssignments,accounted,corrected,initialiseHistory,annual,balances,weekQuota,captureWeek,addAudit,assertNewAuditIds,bumpDay,periodStarted,periodEnded,reliefCompleted,teacherContext,eligibility,runAt,opportunities,health,rotation,ranked,optimise,score,solveCoverage,schedule,mayOptimise,warningEvents,pendingPeerRequests};
+  return {deploymentTeachingEvidence,sreBasis,dailyRosterCalculation,reliefCandidateEligible,normalizeSubjectPatterns,matchesSubjectPattern,absencePeriods,defaultConsecutiveSubjectRules,normalizeConsecutiveSubjectRules,manualDecision,manualDecisionForDemand,manualOwnership,defaultSubjectFamilies,normalizeSubjectFamilies,normalizeTeachingGroupOverrides,subjectResolver,lessonSubject,teachingProfile,defaultRestrictedPeriods,defaultEmploymentRestrictions,preferenceRules,workloadRules,ruleToggles,workloadLimits,preferenceOrder,sameVenue,teacherSource,recessDuty,manualAssignments,manualModel,withManualAssignments,manualRanks,isClassLesson,ensure,clone,fail,norm,addDays,monday,year,cost,active,protectedAssignment,effectiveAssignments,accounted,corrected,initialiseHistory,annual,balances,weekQuota,captureWeek,addAudit,bumpDay,periodStarted,periodEnded,reliefCompleted,teacherContext,eligibility,runAt,opportunities,health,rotation,ranked,optimise,score,solveCoverage,schedule,mayOptimise,warningEvents,pendingPeerRequests};
 })();
 if(typeof module!=='undefined'&&module.exports)module.exports=GSISRosterAllocation;
 
@@ -8700,6 +8687,18 @@ function rosterDeliveryReviewDispatch_(req,contacts){
  }finally{deployUnlock_(lock);}
 }
 
+/* Scheduled Venues health alerts use the notification transport lock. */
+function rosterVenuesSyncCheck_(){
+ const status=rosterVenuesSyncStatus_();props_().setProperty('ROSTER_VENUES_HEALTH',JSON.stringify({state:status.state,since:status.since}));
+ if(!status.enabled)return {enabled:false};
+ const store=rosterNotificationState_();if(!store)return {blocked:status.overdue?1:0};const lock=rosterNotificationLock_(store);if(!deployLock_(lock,1000))return {deferred:1};
+ try{const current=rosterNotificationState_();if(!current)return {blocked:status.overdue?1:0};const key='delivery:venues-sync',old=current.smcAlerts.find(a=>a.key===key);let changed=false;
+  if(status.overdue){const date=new Date(status.checkedAt+8*3600000).toISOString().slice(0,10);if(!old||old.status!=='open'||old.date!==date){const row={id:old?.id||Utilities.getUuid(),key,date,createdAt:new Date(status.checkedAt).toISOString(),recipients:(rosterOperationsState_(true).smcDutyRoster||[]).find(r=>r.date===date)?.staffIds||[],origin:'venues-sync',status:'open',summary:'Venues sync needs Admin recovery. Open System Health to inspect and recover the source fence.'};if(old)Object.assign(old,row);else current.smcAlerts.push(row);changed=true;}}
+  else if(status.state==='ready'&&old?.status==='open'){old.status='resolved';old.resolvedAt=new Date(status.checkedAt).toISOString();changed=true;}
+  if(changed)rosterNotificationCommit_(current);return {enabled:true,blocked:status.overdue?1:0,idle:!changed,...(status.overdue?{failure:{code:status.code}}:{})};
+ }finally{deployUnlock_(lock);}
+}
+
 /* GSIS_ROSTER_NOTIFICATION_MAINTENANCE_END */
 
 
@@ -8968,11 +8967,49 @@ function rosterVenuesConfig_(){
  if(!/^https:\/\/script\.google\.com\/macros\/s\/[\w-]+\/exec$/.test(url||'')||!secret||secret.length<32)venuesSourceError_(503,'VENUES_SOURCE_SETUP','Set both VENUES_APPS_SCRIPT_URL and VENUES_BRIDGE_SECRET in Roster, or remove both until Venues is installed.');return {url,secret};
 }
 function rosterVenuesMarker_(){let marker;try{marker=JSON.parse(props_().getProperty('ROSTER_VENUES_SOURCE')||'null');}catch(_){}return marker;}
+// Diagnostics have their own signed, read/recovery-only route. Normal source
+// writes and their transaction checks are unchanged.
+function rosterVenuesRecoveryCall_(input,identity){
+ const config=rosterVenuesConfig_();if(!config)venuesSourceError_(503,'VENUES_SOURCE_SETUP','Configure the Venues connection first.');
+ const payload=JSON.stringify({action:'venuesRecovery',service:'gsis-venues-recovery-v1',timestamp:Date.now(),nonce:Utilities.getUuid(),input,...(identity?{identity:{email:identity.email,subject:identity.subject,admin:true}}:{})}),signature=Utilities.computeHmacSha256Signature(payload,config.secret).map(b=>('0'+((b+256)%256).toString(16)).slice(-2)).join('');
+ let result;try{const response=UrlFetchApp.fetch(config.url,{method:'post',contentType:'application/json',payload:JSON.stringify({payload,signature}),muteHttpExceptions:true});if(response.getResponseCode()!==200)throw Error();result=JSON.parse(response.getContentText());}catch(_){venuesSourceError_(503,'VENUES_FENCE_UNCONFIRMED','Venues sync could not be checked.');}
+ if(result?.ok!==true){const code=['COMMIT_UNCERTAIN','REVISION_CONFLICT','REVIEW_REQUIRED','FORBIDDEN'].includes(result?.code)?result.code:'VENUES_FENCE_UNCONFIRMED';venuesSourceError_(result?.status===403?403:503,code,'Venues recovery refused. Keep the fence closed and review the current status.');}
+ return result.data;
+}
+function rosterVenuesSyncStatus_(){
+ const now=Date.now(),marker=rosterVenuesMarker_();let remote,code='VENUES_FENCE_UNCONFIRMED',enabled=true;
+ try{if(!rosterVenuesConfig_())enabled=false;else remote=rosterVenuesRecoveryCall_({operation:'sourceStatus',source:'roster'});}catch(error){if(error.code==='COMMIT_UNCERTAIN')code=error.code;}
+ const valid=remote&&['ready','stale','pending','unavailable'].includes(remote.status)&&typeof remote.revision==='string'&&typeof remote.pendingToken==='string'&&['ready','uncertain'].includes(remote.commit?.state);
+ const state=!enabled?'ready':!valid||remote.commit.state==='uncertain'?'uncertain':marker?.status==='ready'&&!!marker.revision&&remote.revision===marker.revision&&!remote.pendingToken&&remote.status==='ready'?'ready':'pending';
+ if(valid&&remote.commit.state==='uncertain')code='COMMIT_UNCERTAIN';else if(state==='pending')code='VENUES_FENCE_PENDING';else if(state==='ready')code='OK';
+ let observed;try{observed=JSON.parse(props_().getProperty('ROSTER_VENUES_HEALTH')||'null');}catch(_){}
+ const dates=[observed?.state!=='ready'?observed?.since:null,marker?.status!=='ready'?marker?.updatedAt:null,valid&&remote.commit.state==='uncertain'?remote.commit.at:null].map(v=>typeof v==='number'?v:Date.parse(v)).filter(v=>Number.isFinite(v)&&v<=now);
+ const since=state==='ready'?null:dates.length?Math.min(...dates):now,ageMs=since===null?0:now-since;
+ return {available:!enabled||!!valid,enabled,state,code,checkedAt:now,since,ageMs,overdue:enabled&&state!=='ready'&&ageMs>300000,rosterState:['ready','pending','committed'].includes(marker?.status)?marker.status:'unavailable',venuesState:valid?remote.status:'unavailable',commitState:valid?remote.commit.state:'unavailable',remote};
+}
+function rosterVenuesPublicStatus_(status,admin=false){const {remote,...view}=status;return {...view,recoveryAllowed:admin===true&&status.enabled===true&&status.state!=='ready'};}
+function rosterVenuesAdminDispatch_(req,c){
+ const user=rosterOperationsAuthority_(c,req.identity),p=req.input||{};if(!user.smc&&!user.admin)error_(403,'SMC or Admin access is required.');
+ if(p.operation==='venuesSyncStatus')return rosterVenuesPublicStatus_(rosterVenuesSyncStatus_(),user.admin===true);
+ if(user.admin!==true)error_(403,'Current Admin access is required.');
+ if(typeof p.evidence!=='string'||p.evidence.trim().length<20||p.evidence.length>2000)error_(400,'Record at least 20 characters of recovery evidence.');
+ if(typeof rosterEdgeAssertLegacyWrite_==='function')rosterEdgeAssertLegacyWrite_();
+ let status=rosterVenuesSyncStatus_();const steps=[],refused=(step,error)=>({complete:false,steps:[...steps,{step,state:'refused',code:['COMMIT_UNCERTAIN','REVISION_CONFLICT','REVIEW_REQUIRED','VENUES_FENCE_PENDING'].includes(error?.code)?error.code:'VENUES_FENCE_UNCONFIRMED'}]});
+ if(!status.enabled||!status.available)return refused('venues');
+ if(status.state==='ready')return {complete:true,steps:[{step:'venues',state:'not-needed'},{step:'roster',state:'not-needed'}],status:rosterVenuesPublicStatus_(status,true)};
+ if(status.remote.commit.state==='uncertain'){
+  const token=status.remote.commit.token;if(typeof token!=='string'||!token||token.length>200)return refused('venues');
+  try{const result=rosterVenuesRecoveryCall_({operation:'recoverCommit',source:'roster',token,evidence:p.evidence.trim()},req.identity);if(result?.recovered!==true||typeof result.committed!=='boolean')return refused('venues');steps.push({step:'venues',state:'recovered',committed:result.committed===true});}catch(error){return refused('venues',error);}
+  status=rosterVenuesSyncStatus_();if(!status.available||status.remote.commit.state!=='ready')return refused('venues');
+ }else steps.push({step:'venues',state:'not-needed'});
+ try{const result=recoverRosterVenuesSource();if(result?.ready!==true)return refused('roster');steps.push({step:'roster',state:'recovered'});}catch(error){return refused('roster',error);}
+ return {complete:true,steps,note:'Recovery checks completed. Refresh status; normal Venues source refresh may still be needed.'};
+}
 function rosterVenuesCall_(input){
  const config=rosterVenuesConfig_();if(!config)return null;
  const payload=JSON.stringify({action:'venuesService',service:'gsis-venues-v1',timestamp:Date.now(),nonce:Utilities.getUuid(),input}),signature=Utilities.computeHmacSha256Signature(payload,config.secret).map(b=>('0'+((b+256)%256).toString(16)).slice(-2)).join('');
  let response;try{const r=UrlFetchApp.fetch(config.url,{method:'post',contentType:'application/json',payload:JSON.stringify({payload,signature}),muteHttpExceptions:true});if(r.getResponseCode()!==200)throw Error('http');response=JSON.parse(r.getContentText());}catch(_){venuesSourceError_(503,'VENUES_FENCE_UNCONFIRMED','Venues coordination could not be confirmed. Keep the current plan and ask Admin to run recoverRosterVenuesSource.');}
- if(response?.ok!==true)venuesSourceError_(503,'VENUES_FENCE_UNCONFIRMED','Venues coordination is pending. Ask Admin to check the source fence before retrying.');
+ if(response?.ok!==true)venuesSourceError_(503,response?.code==='COMMIT_UNCERTAIN'?'COMMIT_UNCERTAIN':'VENUES_FENCE_UNCONFIRMED','Venues coordination is pending. Ask Admin to check the source fence before retrying.');
  const ack=response.data,valid=input.operation==='sourceBegin'?ack?.status==='pending'&&ack.pendingToken===input.token&&ack.revision===input.expectedRevision:input.operation==='sourceComplete'?ack?.revision===input.revision&&!ack.pendingToken&&['stale','ready'].includes(ack.status):false;
  if(!valid)venuesSourceError_(503,'VENUES_FENCE_UNCONFIRMED','Venues did not confirm the exact source change. Keep the source fence closed and recover it.');return ack;
 }
