@@ -39,3 +39,23 @@ Full suite green. Draft PR with the exact head for Claude. No deploy, no live D1
 - Out of scope: deployment, live D1/Google/R2 writes, authority switches, fresh-start implementation (next task).
 - Acceptance: reproduce the pruned-entry mismatch; one resolver and timetable-scoped day caches; published and mass-cancel guard; Google/D1 parity; Auto-allocate then reload twice unchanged; canonical build and full Node/LORD suite.
 - Handoff: Claude reviews exact PR head; owner merges. No deployment.
+
+## Root-cause investigation (local reproduction)
+
+Both adapters resolve the active, non-pruned register entry correctly. D1 preloads it in `buildEdgeRosterContext` and selects it in `edgeRosterContextFromReferences`; Google selects it in `rosterOperationsContext_`. The shared `composeStaplerContext` then applies a retained confirmed/published plan. `GSISRosterStapler.effectiveDay` replaces `day.id` and `day.modelId` with that plan's original `baselineId`. Allocation copies that stale ID into every assignment. Reconcile compares it against the active register entry and invalidates it.
+
+An unchanged-code fixture with active `active-low`, pruned `pruned-high`, and a retained confirmed plan based on `pruned-high` produced two draft assignments stamped `pruned-high`; shared reconcile cancelled both with the incident's exact message. This proves the mechanism. The incident record does not contain the retained production plan, so the specific live origin remains an inference.
+
+Google's baseline resolver and cache are correct, but Google shares this composition defect and is not structurally immune. A register-only test would miss it. The regression must retain the old confirmed plan and compare both adapters.
+
+D1's immutable model cache uses R2 object key plus digest. Its context adapter disables the Google day cache. Google's allocation baseline cache includes register entries and current reference identities; timetable read packages include resolved date mappings and register revision. No date-only allocation cache was found.
+
+## Implementation decisions
+
+Preserve confirmed Stapler lesson content and its original baseline provenance. Resolve the operational timetable identity through `GSISRoster.active`, so pruned entries cannot become allocation identities. Protect read reconciliation in the shared domain as well as both adapters. Preflight all release reasons with a limit of five affected rows per date; a larger group remains untouched and raises a retained SMC/health alert. Published rows need an explicit SMC mutation before cancellation. Browser effective-day, report-day and timetable-status caches bind their resolved baseline mapping and retain the plan's original `staplerBaselineId` separately.
+
+The main-branch claim was rejected by automatic approval review. The claim is retained on the requested task branch; main remains unchanged.
+
+## Verification and deployment
+
+Canonical baseline build passed. Initial full-suite run stopped after browser tests reported that Chromium was missing; no assertion was weakened. Local runtime repair and focused regression work are in progress. No live data was read or written; no deployment performed.

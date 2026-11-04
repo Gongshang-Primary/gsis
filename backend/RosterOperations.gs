@@ -155,7 +155,7 @@ function rosterOperationsAllocationLearning_(req,c){
 }
 function rosterOperationsAllocationReference_(state,people,index,p,source,today,dates){
  const calendar=Object.fromEntries(dates.map(date=>{const c=p.calendarByDate?.[date];return [date,c?{date:c.date,schoolDay:c.schoolDay,parity:c.parity,reason:c.reason,warning:c.warning,sourceRevision:c.sourceRevision}:null];}));
- return rosterOperationsDigest_({schema:2,backendVersion:typeof GSIS_DEPLOY_VERSION==='string'?GSIS_DEPLOY_VERSION:null,today,dates,entries:index.entries,deploy:{book:source.book.getId(),entry:source.entry||null,calculationVersion:GSISRelief.model},calendar,people,nameBridges:state.nameBridges,systemConfig:state.systemConfig});
+ return rosterOperationsDigest_({schema:2,backendVersion:typeof GSIS_DEPLOY_VERSION==='string'?GSIS_DEPLOY_VERSION:null,today,dates,resolvedTimetables:dates.map(d=>[d,GSISRoster.active(index.entries,d)?.id||null]),entries:index.entries,deploy:{book:source.book.getId(),entry:source.entry||null,calculationVersion:GSISRelief.model},calendar,people,nameBridges:state.nameBridges,systemConfig:state.systemConfig});
 }
 // Cache only prepared baseline inputs. Live authority, absences, assignments,
 // suspended plans and weekly balances are applied again on every read.
@@ -841,18 +841,14 @@ function rosterOperationsDispatchCore_(req,c){gsisRequireBackendRole_('roster');
  return rosterOperationsPlanningAttach_(rosterOperationsAttachDayToken_(rosterOperationsSavedCandidates_(response,s,ctx,p,result),s,ctx,p),ctx.user,p,s,ctx);
 }
 
-function rosterOperationsReconcile_(s,ctx){
- let changed=false;const beforeOutbox=s.outbox.length;
- for(const plan of s.staplerPlans||[]){if(!(plan.confirmed||plan.published)||plan.date<ctx.today)continue;const active=GSISRoster.active(ctx.timetableEntries,plan.date);if(active?.id===plan.baselineId)continue;for(const row of s.importedRelief.filter(a=>a.origin==='stapler'&&a.date===plan.date&&['draft','published'].includes(a.status))){row.status='cancelled';row.cancellationReason='The active baseline timetable changed.';changed=true;}for(const job of s.outbox.filter(j=>j.kind==='stapler_timetable'&&j.date===plan.date&&['queued','blocked'].includes(j.status))){job.status='cancelled';job.error='The active baseline timetable changed.';changed=true;}}
- for(const a of s.assignments){if(a.date<ctx.today||!['draft','published'].includes(a.status))continue;const active=GSISRoster.active(ctx.timetableEntries,a.date);if(!active||active.id!==a.timetableId){changed=GSISRosterOperations.invalidate(s,ctx,a,'The effective timetable changed. Review and reassign this lesson.')||changed;}}
- for(const r of s.requests){if(r.status!=='pending'||r.date<ctx.today)continue;const active=GSISRoster.active(ctx.timetableEntries,r.date);if(!active||r.lessons.some(l=>l.timetableId!==active.id)){r.status='cancelled';r.reason='The effective timetable changed.';r.updatedAt=ctx.iso;changed=true;}}
- changed=GSISRosterOperations.reconcile(s,ctx)||changed;if(changed)GSISRosterOperations.refreshStaplerNotifications(s,ctx,beforeOutbox);return changed;
+function rosterOperationsReconcile_(s,ctx,readTriggered=false){
+ return GSISRosterOperations.reconcileOperational(s,ctx,readTriggered);
 }
 function rosterOperationsReadReconcile_(s,ctx){
- if(!rosterOperationsReconcile_(s,ctx))return;
+ if(!rosterOperationsReconcile_(s,ctx,true))return;
  const lock=LockService.getScriptLock();if(!deployLock_(lock,5000))error_(503,'Relief assignments are being reconciled. Retry.');
  try{const current=rosterOperationsState_();if(current.revision!==s.revision)error_(409,'Relief records changed. Refresh.');
-  if(rosterOperationsReconcile_(current,ctx)){current.revision++;current.audit.push({id:ctx.uuid(),date:ctx.today,at:ctx.iso,actor:'system',operation:'reconcile',ids:current.assignments.filter(a=>a.updatedAt===ctx.iso&&a.status==='invalidated').map(a=>a.id)});rosterOperationsCommit_(current);}
+  if(rosterOperationsReconcile_(current,ctx,true)){current.revision++;current.audit.push({id:ctx.uuid(),date:ctx.today,at:ctx.iso,actor:'system',operation:'reconcile',ids:current.assignments.filter(a=>a.updatedAt===ctx.iso&&a.status==='invalidated').map(a=>a.id)});rosterOperationsCommit_(current);}
   Object.assign(s,current);
  }finally{deployUnlock_(lock);}
 }

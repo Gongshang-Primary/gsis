@@ -1,3 +1,7 @@
+# Pending: stable timetable identity and guarded read reconciliation, 5 November 2026
+
+Model: Codex. Resolve operational timetable identity from the active, non-pruned register entry while preserving confirmed Stapler lesson content and original baseline provenance. Google and D1 share read reconciliation protection: retain published rows and timetable-mismatch groups above five rows per date, and record an SMC health alert. Timetable day caches follow the resolved identity and register changes. The cutover acceptance check now requires Auto-allocate followed by two reloads with unchanged assignment count. See [task and evidence](docs/coordination/tasks/roster-d1-timetable-reconcile-cancels.md). Not deployed; no live records changed.
+
 # Pending: consecutive limit counts occupied periods, 4 November 2026
 
 Model: Muse. Consecutive limit now counts all occupied periods except configured exclusions. Automatic and manual consecutive checks use the same occupied set; only subjects matched by System Config "Periods excluded from the consecutive count" are left out, and Don't-need-relief has no effect on the count. Daily totals, workload and quota are unchanged. See [roster-consecutive-after-gap](docs/coordination/tasks/roster-consecutive-after-gap.md).
