@@ -1,6 +1,6 @@
 # roster-d1-timetable-reconcile-cancels: on D1, every read cancels relief assignments ("effective timetable changed")
 
-- Status: open; Codex, lane R, TOP PRIORITY (blocks the D1 cutover)
+- Status: claimed; Codex, lane R, TOP PRIORITY (blocks the D1 cutover)
 - Reviewer/model: Claude
 - Last updated (Asia/Singapore): 5 Nov 2026 05:10
 
@@ -29,3 +29,13 @@ roster-register entries:
 4. Tests: a register with a pruned higher-priority entry and an active lower-priority entry on the same dates → Auto-allocate then read: zero cancellations. Day cache keyed per timetable. The mass-cancel guard triggers. Google/D1 parity.
 5. Add to the cutover acceptance test: Auto-allocate, reload twice, count unchanged.
 Full suite green. Draft PR with the exact head for Claude. No deploy, no live D1 writes.
+
+## Implementation claim
+
+- Owner/model: Codex
+- Branch: `codex/roster-d1-timetable-reconcile`
+- Base SHA: `39b96c2ce0344d456f4867bbe02d6d007edfc3ac`
+- Files/domains owned: shared Roster timetable/domain code, D1 edge day/reference resolution and reconcile health, focused tests, cutover acceptance documentation, canonical generated copies.
+- Out of scope: deployment, live D1/Google/R2 writes, authority switches, fresh-start implementation (next task).
+- Acceptance: reproduce the pruned-entry mismatch; one resolver and timetable-scoped day caches; published and mass-cancel guard; Google/D1 parity; Auto-allocate then reload twice unchanged; canonical build and full Node/LORD suite.
+- Handoff: Claude reviews exact PR head; owner merges. No deployment.
