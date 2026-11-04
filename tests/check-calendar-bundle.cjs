@@ -206,10 +206,11 @@ try {
   assert.ok(fs.existsSync(realWorker), 'real Calendar job Worker must exist in the repo checkout');
   assert.ok(fs.existsSync(path.join(realPublic, 'index.html')), 'real Calendar frontend must exist in the repo checkout');
   const realIndex = fs.readFileSync(path.join(realPublic, 'index.html'), 'utf8');
-  assert.match(realIndex, /0\.9\.9i/, 'real frontend index.html must carry the 0.9.9i build label at test time');
+  const CURRENT_LABEL = require('../package.json').gsisBuildLabel;
+  assert.ok(realIndex.includes(CURRENT_LABEL), 'real frontend index.html must carry the current build label ' + CURRENT_LABEL + ' at test time');
   function writeRealBundle(dir, frontendLabel) {
     fs.mkdirSync(dir, { recursive: true });
-    fs.writeFileSync(path.join(dir, 'LABEL.txt'), '0.9.9i\n');
+    fs.writeFileSync(path.join(dir, 'LABEL.txt'), CURRENT_LABEL + '\n');
     fs.copyFileSync(realBackend, path.join(dir, 'C1_Calendar_Backend.gs'));
     fs.copyFileSync(realWorker, path.join(dir, 'C2_gsis-calendar-jobs_worker.js'));
     const entries = [];
@@ -217,13 +218,13 @@ try {
       const full = path.join(realPublic, name);
       if (!fs.statSync(full).isFile()) continue;
       let data = fs.readFileSync(full);
-      if (name === 'index.html') data = Buffer.from(data.toString('utf8').replaceAll('0.9.9i', frontendLabel), 'utf8');
+      if (name === 'index.html') data = Buffer.from(data.toString('utf8').replaceAll(CURRENT_LABEL, frontendLabel), 'utf8');
       entries.push([name, data]);
     }
     fs.writeFileSync(path.join(dir, 'C3_Calendar_Frontend.zip'), zipBuffer(entries));
   }
   const realMatched = path.join(root, 'real-matched');
-  writeRealBundle(realMatched, '0.9.9i');
+  writeRealBundle(realMatched, CURRENT_LABEL);
   const realOk = run(realMatched);
   assert.strictEqual(realOk.status, 0, `real matched bundle must exit 0, got ${realOk.status}: ${realOk.stdout} ${realOk.stderr}`);
   assert.match(realOk.stdout, /MATCH/);
@@ -233,7 +234,7 @@ try {
   assert.strictEqual(realBad.status, 1, `real mixed bundle (0.9.9f frontend, 0.9.9i backend/Worker) must exit 1, got ${realBad.status}: ${realBad.stdout}`);
   assert.match(realBad.stdout, /MISMATCH/);
   assert.match(realBad.stdout, /frontend release label 0\.9\.9f/);
-  assert.match(realBad.stdout, /bundle LABEL\.txt 0\.9\.9i/);
+  assert.ok(realBad.stdout.includes('bundle LABEL.txt ' + CURRENT_LABEL), realBad.stdout);
 
   console.log('check-calendar-bundle: matched, mixed, protocol, missing-piece and usage cases pass');
 
