@@ -1,0 +1,23 @@
+# lord-contacts-sync-daily: LORD GSiS Contacts sync once a day at 02:03; stop sync starvation blocking WhatsApp
+
+- Status: authorised (owner 4 Nov 2026: "codex work but sync contact list every 24h at 2.03 am"); lane L (LORD backend), Codex
+- Branch: codex/lord-contacts-sync-daily
+- Reviewer/model: Claude
+- Files: lord-suite/Source/backend/Code.gs (GSiS bridge, WhatsApp send guard, triggers, setup/upgrade notes), OVERLORD/LORD admin status text, lord-suite tests
+
+## Incident (4 Nov 2026)
+- OVERLORD: WhatsApp notifications 10:25 SGT "Confirmed failure", detail UNCLASSIFIED_FAILURE. Meta side healthy (all lord_*_v18 APPROVED, number linked; Roster WhatsApp sent the same morning).
+- Cause: `gsisRequireFreshContacts_` refuses every provider send unless `LORD_GSIS_CHECK.contactsCheckedAt` is within 300000 ms. The minute trigger `syncLORDGSiSReferences` uses `tryLock(250)` (scheduled path) and logs `{"event":"lord-reference-sync-deferred","code":"GSIS_SYNC_DEFERRED"}` when the ScriptLock is busy (owner manual run 10:48:14). On a busy morning it is starved, Contacts goes stale, all sends fail. The error code is not classified, so OVERLORD shows "check the execution log".
+
+## Owner ruling
+Sync the Contacts/Deploy reference copy **once every 24 h at 02:03 SGT**. The owner accepts that a Contacts change (deactivation, new staff, changed mobile) reaches LORD at the next 02:03 run or an admin manual refresh, not within minutes.
+
+## Build
+1. Trigger: replace the every-minute `syncLORDGSiSReferences` trigger with a daily one: `ScriptApp.newTrigger('syncLORDGSiSReferences').timeBased().atHour(2).nearMinute(3).everyDays(1).inTimezone('Asia/Singapore')`. Apps Script runs it within about 15 minutes of 02:03; document that. Provide an idempotent editor function `installLORDDailyContactsSync()` that removes the minute trigger and installs the daily one; `enableLORDGSiSBridge` installs the daily trigger, not the minute one.
+2. The daily run waits for the lock (e.g. `waitLock` up to 30 s), never `tryLock(250)`; on GSIS_SYNC_DEFERRED/BUSY it retries up to 3 times within that run.
+3. Freshness: `gsisRequireFreshContacts_` and `gsisSourceStatus_` accept a check up to **26 h** old (constant, one place). Older than 26 h: before refusing a send, run one waiting sync; if it succeeds, send.
+4. Manual refresh: OVERLORD admin "Refresh suite data" (suiterefresh) remains the immediate path after a Contacts change; label it so ("Sync Contacts now").
+5. Classify `GSIS_CONTACT_UNAVAILABLE` / `GSIS_SYNC_*` in `maintenanceFailureReason_`: show "Contacts copy not synced since HH:MM. Use Sync Contacts now." instead of UNCLASSIFIED_FAILURE.
+6. OVERLORD status: show last Contacts sync time and next scheduled run.
+7. Tests: daily trigger installed and minute trigger removed (idempotent); send allowed at 25 h, refused-then-synced at 27 h; deferred lock retries; classification text; no change to consent/revocation checks other than the window.
+No deploy; owner pastes Code.gs and runs `installLORDDailyContactsSync()` once.
