@@ -24,6 +24,21 @@ properties.delete('ROSTER_EDGE_SNAPSHOT_PARTS');assert.equal(call({operation:'ed
 assert.throws(()=>call({operation:'edgeFence',sourceDigest:snapshot.sourceDigest}),error=>error.status===409&&error.message.includes('no longer current'));
 properties.set('ROSTER_EDGE_SNAPSHOT_PARTS','null');assert.equal(call({operation:'edgeDrift',sourceDigest:snapshot.sourceDigest}).changed,null,'malformed metadata never changes the fence decision');
 properties.set('ROSTER_EDGE_SNAPSHOT_PARTS',JSON.stringify({...stored,sourceDigest:'f'.repeat(64)}));assert.equal(call({operation:'edgeDrift',sourceDigest:snapshot.sourceDigest}).changed,null,'another capture never supplies misleading names');
+// Import may project a captured audit pair, but a stored Admin repair still
+// changes the authoritative source through audit identities, revision and receipt.
+state.revision=8;state.receipts=[];state.audit=[
+ {id:'synthetic-planning-pair',date:'2026-11-06',at:'2026-11-03T00:00:00Z',actor:'fixture-teacher@example.test',operation:'requestStapler'},
+ {id:'synthetic-planning-pair',date:'2026-11-06',at:'2026-11-03T00:02:00Z',actor:'fixture-smc@example.test',operation:'decideStapler'}
+];
+const beforeRepair=call({operation:'edgeExport'}),repair=require('../shared/roster-import.js').repairStaplerAuditIds(state.audit);
+assert.equal(repair.pairs,1);state.audit=repair.audit;state.revision++;
+state.receipts.push({id:'synthetic-repair-request',actor:'fixture-admin@example.test',digest:hash({operation:'repairStaplerAuditIds',mode:'apply'}),at:'2026-11-04T00:00:00Z',revision:state.revision,result:{rule:'stapler-audit-decision-suffix',version:1,pairs:1,applied:true,revision:state.revision,requestId:'synthetic-repair-request'}});
+count=writes.length;
+const afterRepairDrift=call({operation:'edgeDrift',sourceDigest:beforeRepair.sourceDigest});
+assert.equal(afterRepairDrift.current,false);assert.deepEqual(Array.from(afterRepairDrift.changed).sort(),['audit','receipts','revision']);
+assert.throws(()=>call({operation:'edgeFence',sourceDigest:beforeRepair.sourceDigest}),error=>error.status===409&&error.message.includes('no longer current'));
+assert.equal(writes.length,count,'stored repair cannot hide source drift or write an activation property');assert.equal(properties.get('ROSTER_EDGE_AUTHORITY'),undefined);
+assert.equal(beforeRepair.state.audit[1].id,'synthetic-planning-pair','the old captured source remains unchanged');
 const fresh=call({operation:'edgeExport'});assert.equal(call({operation:'edgeFence',sourceDigest:fresh.sourceDigest}).legacyWritesDisabled,true,'unchanged activation still uses the full digest');
 function snapshotChecks(h,captured=h.call(h.input)){
  assert(captured.preparing,'capture remains resumable');

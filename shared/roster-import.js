@@ -10,6 +10,33 @@ var GSiSRosterImport=(()=>{
  function utf8Bytes(value){const bytes=[];for(const char of value){const n=char.codePointAt(0);if(n<128)bytes.push(n);else if(n<2048)bytes.push(192|n>>6,128|n&63);else if(n<65536)bytes.push(224|n>>12,128|n>>6&63,128|n&63);else bytes.push(240|n>>18,128|n>>12&63,128|n>>6&63,128|n&63);}return bytes.map(value=>value>127?value-256:value);}
  function digestValue(value){return typeof value==='string'&&/^[a-f0-9]{64}$/.test(value);}
  function identity(value,name,max=200){if(typeof value!=='string'||!value||value.length>max||/[\u0000-\u001f]/.test(value))fail(400,'ROSTER_IMPORT_ID','Invalid '+name+'.');return value;}
+ function repairStaplerAuditIds(audit){
+  const refuse=()=>fail(409,'ROSTER_AUDIT_REPAIR','The audit contains an ambiguous Stapler identity repair.');
+  if(!Array.isArray(audit))refuse();
+  const own=(row,key)=>Object.prototype.hasOwnProperty.call(row,key),groups=new Map(),repairs=new Map();
+  // Match Store's explicit identity and ref fallback, including String coercion,
+  // so even an unrelated malformed row can occupy a proposed decision identity.
+  for(let index=0;index<audit.length;index++){
+   const row=audit[index];if(!row||typeof row!=='object'||Array.isArray(row))continue;
+   const candidate=row.id??row.ref;if(candidate===null||candidate===undefined||String(candidate)==='')continue;
+   const id=String(candidate);if(!groups.has(id))groups.set(id,[]);groups.get(id).push(index);
+  }
+  const validDay=value=>typeof value==='string'&&/^\d{4}-\d\d-\d\d$/.test(value)&&Number.isFinite(Date.parse(value+'T00:00:00Z'))&&new Date(value+'T00:00:00Z').toISOString().slice(0,10)===value;
+  const validAt=value=>typeof value==='string'&&/^\d{4}-\d\d-\d\dT(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z|[+-]\d\d:\d\d)$/.test(value)&&validDay(value.slice(0,10))&&Number.isFinite(Date.parse(value));
+  let pairs=0;
+  for(const [id,indexes]of groups){
+   if(indexes.length<2||!indexes.some(index=>['requestStapler','decideStapler'].includes(audit[index].operation)))continue;
+   const request=indexes.filter(index=>audit[index].operation==='requestStapler'),decision=indexes.filter(index=>audit[index].operation==='decideStapler');
+   if(indexes.length!==2||request.length!==1||decision.length!==1||!id.trim()||id.length+12>1024||/[\u0000-\u001f]/.test(id)||groups.has(id+'-decision'))refuse();
+   const first=audit[request[0]],last=audit[decision[0]];
+   for(const row of [first,last])if(row.id!==id||own(row,'archiveRef')||own(row,'planningRequestId')&&row.planningRequestId!==id||own(row,'ref')&&row.ref!==id||!validDay(row.date)||!validAt(row.at))refuse();
+   if(first.date!==last.date||Date.parse(last.at)<Date.parse(first.at))refuse();
+   repairs.set(request[0],{id,planningRequestId:id});repairs.set(decision[0],{id:id+'-decision',planningRequestId:id});pairs++;
+  }
+  // Preflight the complete array before allocating changed rows. Unrelated
+  // duplicates remain intact and still fail the strict Store encoding boundary.
+  return {audit:pairs?audit.map((row,index)=>repairs.has(index)?{...row,...repairs.get(index)}:row):audit,pairs};
+ }
  function validateFailureReason(reason){
   if(!reason||typeof reason!=='object'||Array.isArray(reason)||Object.keys(reason).some(key=>!['status','message','phase','elapsed','code','bytes','records','ordinal','partId'].includes(key))||!Number.isSafeInteger(reason.status)||reason.status<400||reason.status>599||typeof reason.message!=='string'||!reason.message||reason.message.length>800||typeof reason.phase!=='string'||!reason.phase||reason.phase.length>80||/[\u0000-\u001f]/.test(reason.phase)||!Number.isSafeInteger(reason.elapsed)||reason.elapsed<0)fail(400,'ROSTER_IMPORT_PREPARATION_RESULT','Invalid preparation failure reason.');
   for(const key of ['bytes','records','ordinal'])if(reason[key]!==undefined&&reason[key]!==null&&(!Number.isSafeInteger(reason[key])||reason[key]<0))fail(400,'ROSTER_IMPORT_PREPARATION_RESULT','Invalid preparation step size.');
@@ -52,6 +79,7 @@ var GSiSRosterImport=(()=>{
    if(shallow){let parent=transformed;for(const key of job.path){parent[key]=Array.isArray(parent[key])?parent[key].slice():{...parent[key]};parent=parent[key];}}
    const value=jobValue(transformed,job);if(job.kind==='baseline'){value.modelObject={...reference};value.modelObjectKey=reference.key;value.modelDigest=reference.digest;delete value.modelFile;}else if(job.kind==='audit'){value.archiveObject={...reference};delete value.archiveFileId;}else{let parent=transformed;for(const key of job.path.slice(0,-1))parent=parent[key];parent[job.path.at(-1)]={edgeObject:true,...reference};}
   }
+  if(Array.isArray(transformed.state.audit))transformed.state.audit=repairStaplerAuditIds(transformed.state.audit).audit;
   return transformed;
  }
  function prepareRecordPart(snapshot,references,batch,adapter){
@@ -436,6 +464,6 @@ var GSiSRosterImport=(()=>{
   }finally{checked([await c.prepare(`UPDATE ${ARCHIVES} SET lease_token='',lease_until=0 WHERE session_id=? AND lease_token=?`).bind(job.session_id,token).run()]);}
   return {archived,processed,...await archiveStatus(db)};
  }
- return {objectJobs,prepareObject,prepareRecords,prepareRecordPart,finishFreeze,freeze,validateManifest,utf8Length,open,ensure,latest,resetAfterRollback,pendingRollbackReset,archiveRetained,archiveStatus,hashText,hashBytes,stageObject,FORMAT,SCOPES,TARGET_BYTES,SEGMENT_BYTES,MAX_PART_BYTES,MAX_PARTS,MAX_MANIFEST_BYTES,MAX_TOTAL_BYTES,MAX_OBJECT_BYTES,MAX_RETAINED_SESSIONS,PREPARATION_LEASE_MS,MAX_PREPARATION_RESULT_BYTES};
+ return {repairStaplerAuditIds,objectJobs,prepareObject,prepareRecords,prepareRecordPart,finishFreeze,freeze,validateManifest,utf8Length,open,ensure,latest,resetAfterRollback,pendingRollbackReset,archiveRetained,archiveStatus,hashText,hashBytes,stageObject,FORMAT,SCOPES,TARGET_BYTES,SEGMENT_BYTES,MAX_PART_BYTES,MAX_PARTS,MAX_MANIFEST_BYTES,MAX_TOTAL_BYTES,MAX_OBJECT_BYTES,MAX_RETAINED_SESSIONS,PREPARATION_LEASE_MS,MAX_PREPARATION_RESULT_BYTES};
 })();
 if(typeof module!=='undefined'&&module.exports)module.exports=GSiSRosterImport;
