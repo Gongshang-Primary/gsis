@@ -4,7 +4,7 @@ const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('nod
 const hash=text=>crypto.createHash('sha256').update(text).digest('hex');
 function fixture(){
  const files=new Map(),events=[],properties=new Map();let next=0,failName='';
- const scope=vm.createContext({console,Date,Map,Set,WeakMap,ROSTER_DATA:'data',GSISRosterOperations:{initial:()=>({schema:1,revision:0}),validateState:value=>value},gsisRequireBackendRole_:()=>{},rosterStage_:()=>{},
+ const scope=vm.createContext({GSISRosterAllocation:require('../shared/roster-allocation.js'),console,Date,Map,Set,WeakMap,ROSTER_DATA:'data',GSISRosterOperations:{initial:()=>({schema:1,revision:0}),validateState:value=>value},gsisRequireBackendRole_:()=>{},rosterStage_:()=>{},
   Utilities:{DigestAlgorithm:{SHA_256:'sha256'},computeDigest:(_,text)=>[...crypto.createHash('sha256').update(text).digest()],newBlob:text=>({getDataAsString:()=>text}),getUuid:()=>crypto.randomUUID()},
   props_:()=>({getProperty:key=>properties.get(key)||null,setProperty:(key,value)=>properties.set(key,value)}),
   rosterReadFile_:id=>{if(!files.has(id)||files.get(id).trashed)throw Object.assign(Error('missing file'),{status:404});return files.get(id).text;},
