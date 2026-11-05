@@ -1,6 +1,6 @@
 # roster-d1-backup-ledger: D1 backup to Google Drive with an auditable ledger
 
-- Status: changelog (owner 5 Nov: "maintain a separate ledger i want to 'audit' / specify the amount of backup data that is written on Google Drive"); lane R; Codex when authorised
+- Status: authorised (owner "codex work", 5 Nov evening); Codex, lane R; priority 1 of the Drive work
 - Reviewer/model: Claude
 
 ## Finding (Claude, 5 Nov)

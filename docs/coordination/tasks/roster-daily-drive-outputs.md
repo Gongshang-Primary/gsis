@@ -1,6 +1,6 @@
 # roster-daily-drive-outputs: daily Excel + LLM-readable decisions log on the GSiS Drive home base
 
-- Status: changelog (owner 5 Nov); lane R; Codex when authorised. Spec by Claude under the standing rule (owner intent, Claude specifies).
+- Status: authorised (owner "codex work", 5 Nov evening); Codex, lane R; priority 2 of the Drive work. Spec by Claude under the standing rule (owner intent, Claude specifies).
 - Reviewer/model: Claude. Related: roster-d1-backup-ledger (same writer, ledger and home base).
 
 ## Owner intent (verbatim, 5 Nov)
@@ -56,3 +56,6 @@
    - Backups (roster-d1-backup-ledger): `01 Live Data/Roster/Backups/` (owner sets its Drive permissions).
    The `06 Roster Daily` / `07 Roster Backups` names above are withdrawn.
 4. The credentials note is not a GSiS output: those two items were placed in the home base by hand. GSiS never writes credentials, tokens or private links to Drive (tested).
+
+## Small addition (5 Nov 20:46 message)
+The "Relief Capacity Warning" WhatsApp read "Relief capacity: P1 has 2 eligible opportunities. Health 100.0%. 46 uncovered periods. Relief Health: 100.0%". "Health 100%" beside 46 uncovered periods contradicts itself and the P1 line is unclear. Fix the wording in the same PR (template body is approved; change only the variable text): name what is short ("46 periods uncovered; fewest eligible teachers: P1 with 2"), and either define Relief Health in plain words or drop it when uncovered > 0.
