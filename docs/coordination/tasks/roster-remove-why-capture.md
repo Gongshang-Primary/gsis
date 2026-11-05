@@ -82,3 +82,7 @@ GitHub was refreshed at main `e7d4f028ec1f6db499b44f14c0fea798fec55eca`; its onl
 ## Publication approved (6 Nov 2026, 02:36 SGT)
 
 The owner explicitly replied "approve" to uploading both prepared branches and opening draft PRs in `helper-gsps/gsis`. This resolves the earlier publication approval blocker. The destination was rechecked as the private owner repository with push access. Proceed with the approved uploads, remote exact-head verification and draft PRs for Claude. No merge or deployment is authorised by this approval. Product code is unchanged from the local verification above.
+
+## Published recovery (6 Nov 2026, Model: Codex)
+
+The approved upload is complete. Implementation head: `2467e028ee8181e1bd93106af2e31e2fe7be0b77`; published tree `9cfb91e6929d939460d83c7eb0ba23f163566e30` exactly matches the previously tested local tree. The remote branch now contains all prepared product changes. This documentation-only handoff follows that implementation commit. GitHub full CI is running; open the draft PR after green CI and give Claude its final exact head. Earlier publication-blocker entries above are historical and resolved. No merge, deployment, live backfill or notification occurred.
