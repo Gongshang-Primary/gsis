@@ -1,7 +1,3 @@
-# Pending: Deploy publish reports the Contacts step and offers a retry, 6 November 2026
-
-Model: Muse. A Deploy publish now reports the Contacts catalogue sync separately: "Published; Contacts updated" on success and "Published; Contacts not updated: <reason>" on failure, with a Retry Contacts sync button on the version row that re-sends the same revision and payload (idempotent; Contacts returns duplicate when already applied). The publish no longer throws away the Contacts result after the version is persisted. The Contacts viewport invalidates its cached tables by catalogue revision, so a normal Refresh shows the new catalogues after a successful sync. See [deploy-contacts-catalogue-sync](docs/coordination/tasks/deploy-contacts-catalogue-sync.md). No deployment or live write.
-
 # Pending: daily relief workbook and Allocation Audit Drive outputs, 5 November 2026
 
 Model: Codex. Add a background D1 date queue for the existing teacher-timetable workbook and Allocation Audit TXT. Daily files retain their IDs, coalesce committed changes, verify Drive readback and close once as FINAL after Singapore midnight. The workbook uses four rows per active/ad-hoc teacher, frozen headings and Stapler colours. The audit keeps its full event trail and adds a privacy-safe summary, glossary and captured decision checks/R%. Shared ledger, per-date health and failure alerts work with the fresh-start mirror off. Capacity-warning variables now name uncovered periods and the smallest eligible teacher count without contradictory 100% health. See [setup and recovery](docs/ROSTER_DAILY_OUTPUTS_RUNBOOK.md) and [task](docs/coordination/tasks/roster-daily-drive-outputs.md). No deployment or live write.
@@ -13,6 +9,10 @@ Model: Codex. Add hourly school-record increments and daily 02:15 full backups w
 # Pending: fresh D1 start with retained Google history and Admin opening balances, 5 November 2026
 
 Model: Codex. Prepare empty Roster and timetable-register states from a signed settings-only source while Google remains the frozen archive. The setup path verifies its config digest before activation and keeps original Google pointers for a guarded switch back. Admin can enter, paste, review and correct dated opening balances with per-row audit evidence; SMC can view them. Annual fairness respects each as-of cutoff, while weekly capacity and real duty history remain intact. History views identify their D1 start date and link to authenticated, read-only Google records. See [design and verification](docs/coordination/tasks/roster-d1-fresh-start.md). No live cutover or deployment performed.
+
+# Pending: Deploy publish reports the Contacts step and offers a retry, 6 November 2026
+
+Model: Muse. A Deploy publish now reports the Contacts catalogue sync separately: "Published; Contacts updated" on success and "Published; Contacts not updated: <reason>" on failure, with a Retry Contacts sync button on the version row that re-sends the same revision and payload (idempotent; Contacts returns duplicate when already applied). The publish no longer throws away the Contacts result after the version is persisted. The Contacts viewport invalidates its cached tables by catalogue revision, so a normal Refresh shows the new catalogues after a successful sync. See [deploy-contacts-catalogue-sync](docs/coordination/tasks/deploy-contacts-catalogue-sync.md). No deployment or live write.
 
 # Pending: independent Stapler days and guarded timetable reconciliation, 5 November 2026
 
