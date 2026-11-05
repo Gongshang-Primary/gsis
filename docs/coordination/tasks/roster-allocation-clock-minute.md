@@ -27,3 +27,17 @@ Owner's explicit high-priority assignment supersedes the serial queue default; e
 Scope: shared allocator clock validation, Google prepared/scheduled paths, equivalent D1 commit checks, allocation run timing, existing UI/System Health projections and regression tests; canonical generated copies rebuilt. No deployment, authority changes, or live records.
 
 Plan: reproduce harmless minute failures; centralise semantic boundary checks using the prepared allocator day; retain one recomputation and specific terminal errors; record preparation duration and the 45-second Google warning; run canonical build, targeted Google/D1/browser regressions and full Node/LORD CI before draft handoff.
+
+## Implementation and review evidence
+
+The old Google interactive and scheduled checks compared `today:minute` before and after preparation. The D1 mutation coordinator did the same at its final write. All now call the shared allocator clock snapshot/check using the composed `ctx.days` consumed by planning, including suspended timetable periods. The snapshot is captured before reconcile and apply, then checked immediately before the authoritative write. Compact Publish and ordinary absence saves use the same final guard. A true boundary permits one new preparation; a second returns `PLANNING_CLOCK_CHANGED` with the date, period, missing-time or cutoff reason.
+
+Relevant cutoffs include pending peer expiry, relief completion, absence coverage period ends and the scheduled 06:30 stop. Manual Auto-allocate keeps its existing all-day availability. Existing source/version fences, cancellation, scheduled freshness and time budgets remain enforced. D1 now also rechecks its existing two-minute tick age at the final write.
+
+Preparation duration covers state/context loading and planning, accumulates across recomputation, and is recorded on failures as well as success. It excludes final commit/projection time. Each existing per-date run status retains its duration and attempt count; its bounded log and System Health expose that evidence. Health uses the existing authorized Google report read or a bounded D1 SELECT, without operational hydration or schema writes. The Google warning starts after 45 seconds for the active Auto-allocate run and does not reuse a previous run's elapsed time.
+
+Internal review found and corrected four issues before handoff: compact Publish lacked the final guard; D1 did not recheck stale scheduled ticks; early preparation failures lost duration; and a new run could display the previous run's slow warning. Added regression coverage for these cases. Follow-up review also caught and fixed a last-period absence resubmission cutoff, report-only D1 ticks overwriting a prior allocation duration, and storage retry exhaustion losing timing metadata. Each was reproduced with a failing test before its fix.
+
+Verification: canonical 18-component build and targeted allocator lifecycle, clock parity, publication, run-monitor and System Health checks. Full repository Node/LORD CI is required at the handed-off remote head. No test exclusions, live allocation, deployment, or hotfix branch merge.
+
+Rollback: revert this PR and run the canonical build. No schema migration or data rewrite is introduced.

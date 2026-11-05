@@ -428,10 +428,11 @@ export async function systemHealthRoute(req,env,authorityEnv=env){
    snapshot.jobs=snapshot.jobs.filter(row=>jobs.has(row.job));snapshot.recentFailures=snapshot.recentFailures.filter(row=>jobs.has(row.job));
    const reports={available:false,transportAvailable:false,href:'/'};let peerMailReviewAllowed=false;
    try{
-    const review=(await backend(env,'rosterOperations',{operation:'read',view:'intake'},who,crypto.randomUUID())).result;
+    const review=(await backend(env,'rosterOperations',{operation:'read',view:'intake',includeAllocationPreparation:true},who,crypto.randomUUID())).result;
     if([401,403].includes(review?.status)||review?.ok&&review.data?.user?.smc!==true&&review.data?.user?.admin!==true)return json({ok:false,error:'Current SMC or Admin access is required.'},403);
     if(review?.ok&&(review.data?.user?.smc===true||review.data?.user?.admin===true)){
      peerMailReviewAllowed=review.data.user.admin===true;
+     if(statusEnv.ROSTER_EDGE_AUTHORITY!=='d1')snapshot.allocationPreparation=review.data.allocationPreparation||{available:false};
      const count=value=>Number.isSafeInteger(value)&&value>=0&&value<=1e9;
      if(count(review.data.pendingCaptureCount)&&count(review.data.peerReviewCount))Object.assign(reports,{available:true,pendingCaptureCount:review.data.pendingCaptureCount,peerReviewCount:review.data.peerReviewCount,checkedAt:Date.now()});
     }
