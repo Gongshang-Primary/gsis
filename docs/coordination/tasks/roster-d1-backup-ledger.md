@@ -59,7 +59,7 @@ A Google Sheet SMC can open if Cloudflare/D1 is down: per date from today to +5 
 - Last updated (Asia/Singapore): 2026-11-05 22:22 +08.
 - Branch: `codex/roster-d1-backup-ledger`.
 - Base SHA: `5d2d1aca1a41371625e45f73bfe56b1969625f54` (refreshed current main, including fresh-start #79).
-- Implementation base: accepted claim `75fb5d4c642c920a01c63d6d56b6e2af68dada2f`. Exact implementation SHA will be recorded after the implementation commit; PR head is recorded in the PR handoff.
+- Implementation base: accepted claim `75fb5d4c642c920a01c63d6d56b6e2af68dada2f`. Exact implementation SHA: `2c6879ec8fb17de2e689f27a873270804a312529`. The following documentation-only commit records this SHA; the PR body names the final review head.
 - User-authorised scope: implement every binding backup Decision, scheduled Drive writer, shared retained ledger, continuity Sheet, restore verification/drill, System Config and System Health. Then take the separately claimed daily-output task on this shared infrastructure.
 - Files/domains owned: lane R canonical `shared/edge-*.js`, new `shared/roster-backup*.js`, `backend/Roster*.gs`, `roster-update/public/`, notification timer/queue integration, schema/migrations, tests/runbook, and their canonical generated backend/Worker copies. Build wiring only where needed for the new sources; no release version or deployment change.
 - Out of scope: live D1/Drive/Google/R2 writes, authority/freeze changes, deployment, notification sends, merges, other products and frozen Google archive files.
