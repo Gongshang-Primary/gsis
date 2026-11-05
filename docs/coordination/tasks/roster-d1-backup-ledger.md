@@ -14,3 +14,31 @@ In the fresh-start mode (#79), the ordinary Google mirror is **suppressed** by d
 5. Restore drill: an Admin "verify backup" reads the latest file back, checks the digest and record counts against D1, writes the result to the ledger.
 6. No effect on the UI: no write in the user's request path; Apps Script work bounded and lock-free against Roster (Google is archive-only in fresh mode); skip when the previous run is still running.
 7. Tests: backup runs and ledger rows; digest verify; failure recorded and alerted; no mirror into the frozen archive; a request during a backup stays fast.
+
+## Owner (5 Nov): no Drive backup is acceptable for Fri 6 Nov; spec what must be saved on Google in production
+Draft spec (Claude). Collections as they exist in the D1 `roster` scope today.
+
+### Tier 1: school records (restore-grade; daily full at 02:15 + hourly increment by revision)
+absences, assignments, importedRelief, reliefCorrections, requests, adhoc, staplerPlans, staplerArchives, dailyPublicationStates, publicationSnapshots, acknowledgements, entitlements, openingBalances, accountingYears, accountingProfiles, rotationEvents, smcDutyRoster, recessActivations, manualDecisions, cellDecisionVersions, manualAuditBaselines, dayRevisions, types, systemConfig, customInstructions, nameBridges, recessSettings, dailyEmploymentSettings, inboxThreads, inboxMessages; plus the `roster-register` scope (timetable register) and the timetable day models/packages held in R2.
+
+### Tier 2: accountability evidence (daily full; needed for disputes and audits)
+audit, inboxAudit, outbox (message content and status), deliveryEvents (WhatsApp delivery proof), massPublications, peerMail, optimisationRuns (allocation decisions), allocationAuditExports, dailyEmploymentMail, dailyEmploymentSnapshots, deliveryReview, quiet-mode log, job-health history.
+
+### Tier 3: machine state (not backed up; rebuilt or transient)
+receipts, scheduleReceipts, inboxReceipts, inboundEvents (raw webhooks), inboxDeliveryEvents, healthWarningState, notificationWatermarks, inboundSessions, smcAlerts, leases and cycle locks. **Never export `privateLinks` or any capability/token.**
+
+### Operational continuity sheet (human-readable, for an outage)
+A Google Sheet SMC can open if Cloudflare/D1 is down: per date from today to +5 school days: absences (teacher, periods, type without medical detail), relief assignments (period, class, absent teacher, relief teacher, status), Stapler-day flag; plus a fairness tab (quota, done, R% per teacher). Rewritten after every publish ("Let teachers see") and at 02:15. It is a view, not a restore source.
+
+### Rules
+- Destination: a new restricted Drive folder ("GSiS Roster D1 backups"), never the frozen archive files. Monthly subfolders; file names carry date, tier, revision range, digest.
+- Format: gzip JSON per tier (restore-grade) with SHA-256; manifest with record counts per collection.
+- Retention: keep all (owner rule: keep records). Ledger never pruned.
+- Privacy: absence reasons and medical types stay in Tier 1 JSON (restricted folder) but are left out of the continuity sheet; no phone numbers beyond what records already hold.
+- Restore path: an Admin "restore from backup" into an empty D1 (reuses the import/stage machinery), tested in a drill; Time Travel stays the first-line recovery.
+- Ledger and alerts as in the requirement above; each run records bytes per tier.
+
+### Open owner questions
+1. Continuity sheet: wanted? (Claude recommends yes.)
+2. Folder access: Admin only, or SMC read too?
+3. Hourly increments, or daily full only?
