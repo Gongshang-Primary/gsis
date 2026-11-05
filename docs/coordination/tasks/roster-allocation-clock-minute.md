@@ -1,6 +1,6 @@
 # roster-allocation-clock-minute: slow preparations are discarded whenever the clock minute changes (incident 5 Nov)
 
-- Status: in progress; Codex, lane R, high priority (with roster-assign-relief-load-regression)
+- Status: merged (#80 at bb15ae5 as b72fb48, owner "merge 80", 5 Nov); not yet in a release bundle
 - Reviewer/model: Claude
 - Last updated (Asia/Singapore): 5 Nov 2026 06:20
 
@@ -61,3 +61,12 @@ A live manual run makes the Google or D1 scheduled cycle return SKIPPED_BUSY. Go
 Addendum review identified imported-relief corrections that change period eligibility without changing quota totals or the day revision. The dependency digest and day token now retain every correction for a relief record whose original date or any corrected date touches the planned date, including subsequent corrections that move it away again. Regression tests use the real correction command.
 
 Verification: ten new dependency/priority regressions, 28 clock/UI checks, the 18 day-transaction checks including cross-date caps, allocator lifecycle and run-once tests, actual D1 integration, publication and System Health checks. Full CI at the updated head remains the final handoff gate. Main's new task-document changes are retained in the merge; no product work from other tasks is included.
+
+## Claude review of PR #80 at exact head bb15ae5 (5 Nov)
+- Verdict: approve for merge (owner decides). CI full-suite green (run 41944141074). Claude locally: clock-minute, dependencies, clock-ui and day-transactions tests pass; canonical `npm run build` at bb15ae5 leaves no diff (generated files current).
+- Checked: `prepareClock`/`preparedClockConflict` (shared/roster-allocation.js) commit harmless minute changes, conflict only on date change, period start, passed cutoff or missing period times; Google and D1 both use it at the final write. The dependency digest now covers dated planning facts plus derived balances and rotation, so unrelated writes merge. The scheduled cycle returns SKIPPED_BUSY while a manual run owns the date (Google and D1).
+- Risks to watch after deploy (not blockers):
+  1. Speed: the new digest computes `balances` per planned date and `rotation` per year, twice per run (prepare and final check). No production timing was measured. Google is already slow (roster-assign-relief-load-regression). Watch the new System Health preparation durations on the first day; if preparation grows, this is the first suspect.
+  2. `saveAbsence` treats every period end of today as a cutoff, so an absence save that spans a period end gets one silent re-preparation, then a clock-conflict message. Acceptable; tell SMC the message means "try again".
+  3. The day token still uses `baseline: active||ctx.days[d].id`. Under the owner's Stapler delink ruling (roster-d1-timetable-reconcile-cancels) the Stapler-day id must come from the plan; the #78 rework must update this token too.
+- Supersedes `claude/hotfix-clock-minute` (134816a). After #80 is merged and deployed, the hand-edited hotfix in Apps Script is replaced by the bundle; do not merge the hotfix branch.
