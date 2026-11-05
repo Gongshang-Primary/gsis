@@ -39,7 +39,7 @@ vm.runInContext(`{
  let projections=[],failProjection=false;
  contacts_=(identity,authority,action,input)=>{if(action==='applyDeployCatalogues'){if(failProjection)error_(503,'Projection interrupted');projections.push(clone(input));return {saved:true}}return c};
  const publishRequest={operation:'publish',key:'meta',versionId:plan,clientId:'v04',expectedRevision:call('sync',{versionId:plan}).versions.find(v=>v.id===plan).revision,requestId:Utilities.getUuid()};
- failProjection=true;rejects(()=>call('change',publishRequest),503);failProjection=false;
+ failProjection=true;const interrupted=call('change',publishRequest);assert(interrupted.saved&&interrupted.contactsSync&&interrupted.contactsSync.status==='failed'&&interrupted.contactsSync.code===503&&interrupted.contactsSync.reason==='Projection interrupted','Interrupted projection is reported on the publish result, not swallowed');failProjection=false;
  assert(call('change',publishRequest).saved,'Publication retry completes after interrupted projection');
  assert(projections.at(-1).membership[0][12]==='HOD','Published membership reaches Contacts');
  const publishedRevision=index_(book_()).revision;call('change',publishRequest);assert(index_(book_()).revision===publishedRevision,'Publication retry does not append another version');
