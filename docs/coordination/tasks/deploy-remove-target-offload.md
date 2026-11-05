@@ -13,5 +13,8 @@ The Deploy workload ledger shows a "Target offload %" column = (1 − targetReta
 4. Canonical build so generated Deploy/Layout bundles follow.
 5. Tests: column absent in table and exports; Target/status/R unchanged.
 
-## Noted, not in scope (Claude, for the owner)
-shared/workload.js hard-codes FAJT 65/84 while relief reads the configurable `fajtWeeklyPeriods`/`weeklyPeriods`; if an Admin changes the FAJT budget, the ledger Target and relief R disagree. Separate task if the owner wants it.
+## Added scope (owner 6 Nov: "yes target retained is necessary and should be variable driven, not hardcoded. remove target offload %")
+6. FAJT `targetRetained` must come from the same configurable settings relief uses: `fajtWeeklyPeriods / weeklyPeriods` (shared/relief.js defaults 65 and 84), not the literal `65/84` in shared/workload.js line 213 and its copies (public/app.js ~1848, backend/Code.gs ~1729, generated edge-deploy-domain.js). One source of truth: pass the relief settings into the workload analysis (or a shared accessor); never duplicate the numbers.
+7. If the settings are missing or invalid, Target shows "Needs configuration" for FAJT (no silent fallback to 65/84).
+8. Help text "FAJT retains 65/84 with no appointment stacking" shows the configured values (e.g. "FAJT retains <fajtWeeklyPeriods>/<weeklyPeriods>").
+9. Tests: with defaults, Target/At-load/Load status identical to today; changing `fajtWeeklyPeriods` (e.g. to 60) changes FAJT Target and relief R consistently; invalid settings → "Needs configuration"; no literal 65/84 left in workload code (grep test).
