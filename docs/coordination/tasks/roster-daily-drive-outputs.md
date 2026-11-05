@@ -93,3 +93,12 @@ Build correction: the Drive output source duplicated the builder-owned BEGIN/END
 GitHub implementation commit: `c022d88b6131bc1dacd2b1925d82a81bcc72680c`. Its tree `42a2c3de7d00aea50a0dd0d08c07a0979728b134` exactly matches local handoff `394ec0a3fb73e35a48958737ac344ae2cc2f7dcf`; the final commit only records this handoff. The separate draft PR targets `codex/roster-d1-backup-ledger` and names the exact final review head. No force-push, main merge, deployment, live record change or provider message is authorised by this handoff.
 
 Next exact action: Claude reviews the exact PR head, then the owner decides integration after backup PR #81. Retarget the follow-on to main after #81 merges and rebuild/retest any integration delta. Main was refreshed at `9fdcffd97d7d3b2e898371718271a5668d470afe`; its two newer changes are documentation only, including a separate unclaimed absence-submit task outside this work. Live permission, timing and provider acceptance remain the documented post-deployment drill.
+
+## Owner decision (6 Nov ~01:15): remove the "Why" capture and keep the audit log as it was
+Owner (verbatim): "wait, what is the why capture? the current LLM text log is sufficient for my use"
+Claude added the summary/glossary/"Why" extension to the spec on its own; the owner did not ask for it. Follow-up (Codex, before build n):
+1. Remove `captureDecisionWhy` and every call (backend/RosterOperations.gs, backend/RosterAuditExport.gs, roster-update/public/edge-roster.js, edge-roster-output-renderers.js, shared/roster-allocation.js and generated copies). Nothing extra runs inside saves.
+2. Restore the Allocation Audit TXT to its pre-#82 format exactly (no Day summary, no rules glossary, no Why block); keep #82's queue/ledger/coalescing only if the unchanged text needs them.
+3. Keep the daily relief workbook and the capacity-warning wording fix.
+4. Tests: audit text byte-identical to the pre-#82 renderer for a fixture day; no allocationWhy written; workbook tests unchanged.
+This replaces the "captureDecisionWhy guard" requirement in docs/coordination/review/pr82-claude-review.md.
