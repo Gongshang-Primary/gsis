@@ -1,6 +1,6 @@
 # roster-allocation-clock-minute: slow preparations are discarded whenever the clock minute changes (incident 5 Nov)
 
-- Status: open; Codex, lane R, high priority (with roster-assign-relief-load-regression)
+- Status: in progress; Codex, lane R, high priority (with roster-assign-relief-load-regression)
 - Reviewer/model: Claude
 - Last updated (Asia/Singapore): 5 Nov 2026 06:20
 
@@ -18,3 +18,12 @@ Branch `claude/hotfix-clock-minute` (134816a, on top of v0.9.9j 20d0783): new `r
 4. Tests: a preparation spanning a minute with no period start commits; spanning a period start conflicts; crossing midnight conflicts; missing period data stays strict; the scheduled path the same; Google/D1 parity.
 5. Fold in or supersede branch claude/hotfix-clock-minute (do not merge it as is). Base on main.
 Full suite green. Draft PR with the exact head for Claude. No deploy.
+
+## Implementation claim (5 Nov 2026)
+Model: Codex. Branch: `codex/roster-allocation-clock-minute`. Base: `b374d18878c7520339874bec11e2cedcb93a2f6e`. Reviewer: Claude.
+
+Owner's explicit high-priority assignment supersedes the serial queue default; existing PRs #78/#79 remain untouched. This PR supersedes `claude/hotfix-clock-minute` (134816a) without merging it.
+
+Scope: shared allocator clock validation, Google prepared/scheduled paths, equivalent D1 commit checks, allocation run timing, existing UI/System Health projections and regression tests; canonical generated copies rebuilt. No deployment, authority changes, or live records.
+
+Plan: reproduce harmless minute failures; centralise semantic boundary checks using the prepared allocator day; retain one recomputation and specific terminal errors; record preparation duration and the 45-second Google warning; run canonical build, targeted Google/D1/browser regressions and full Node/LORD CI before draft handoff.
