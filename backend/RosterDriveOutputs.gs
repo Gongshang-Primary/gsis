@@ -9,7 +9,7 @@ function rosterDriveOutputFetch_(url,options={}){
  if(response.getResponseCode()<200||response.getResponseCode()>=300)rosterDriveOutputFail_('Drive output failed (HTTP '+response.getResponseCode()+').',503);return response;
 }
 function rosterDriveOutputJson_(url,options){let value;try{value=JSON.parse(rosterDriveOutputFetch_(url,options).getContentText());}catch(e){if(e.code)throw e;rosterDriveOutputFail_('Drive output returned an invalid response.',503);}return value;}
-function rosterDriveOutputMeta_(id){return rosterDriveOutputJson_('https://www.googleapis.com/drive/v3/files/'+encodeURIComponent(rosterDriveOutputId_(id))+'?supportsAllDrives=true&fields=id,name,mimeType,parents,trashed,version,size');}
+function rosterDriveOutputMeta_(id){return rosterDriveOutputJson_('https://www.googleapis.com/drive/v3/files/'+encodeURIComponent(rosterDriveOutputId_(id))+'?supportsAllDrives=true&fields=id,name,mimeType,parents,trashed,version,size,appProperties');}
 function rosterDriveOutputDescendant_(id,home){
  const seen=new Set();for(let n=0;n<20;n++){if(id===home)return true;if(seen.has(id))break;seen.add(id);const meta=rosterDriveOutputMeta_(id);if(meta.trashed||meta.mimeType!=='application/vnd.google-apps.folder'||meta.parents?.length!==1)break;id=meta.parents[0];}
  return false;
@@ -36,13 +36,13 @@ function rosterDriveOutputNotArchive_(id){
  const properties=props_().getProperties();if(Object.entries(properties).some(([key,value])=>/ROSTER_.*(?:FILE|MANIFEST|HEAD|ARCHIVE)/.test(key)&&value===id))rosterDriveOutputFail_('Frozen archive files cannot be used as output files.');
 }
 function rosterDriveOutputFile_(id,parent,name){rosterDriveOutputNotArchive_(id);const meta=rosterDriveOutputMeta_(id);if(meta.trashed||meta.parents?.length!==1||meta.parents[0]!==parent||name&&meta.name!==name||meta.mimeType==='application/vnd.google-apps.shortcut')rosterDriveOutputFail_('The output file is outside its intended folder.');return meta;}
-function rosterDriveOutputCreate_(parent,name,mimeType,bytes){
- const boundary='gsis_output_'+Utilities.getUuid().replace(/-/g,''),meta={name,mimeType,parents:[parent]},payload='--'+boundary+'\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n'+JSON.stringify(meta)+'\r\n--'+boundary+'\r\nContent-Type: '+mimeType+'\r\nContent-Transfer-Encoding: base64\r\n\r\n'+Utilities.base64Encode(bytes)+'\r\n--'+boundary+'--';
- return rosterDriveOutputJson_('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&supportsAllDrives=true&fields=id,version',{method:'post',contentType:'multipart/related; boundary='+boundary,payload:Utilities.newBlob(payload).getBytes()}).id;
+function rosterDriveOutputCreate_(parent,name,mimeType,bytes,appProperties,id){
+ const boundary='gsis_output_'+Utilities.getUuid().replace(/-/g,''),meta={name,mimeType,...(!id?{parents:[parent]}:{}),...(appProperties?{appProperties}:{})},payload='--'+boundary+'\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n'+JSON.stringify(meta)+'\r\n--'+boundary+'\r\nContent-Type: '+mimeType+'\r\nContent-Transfer-Encoding: base64\r\n\r\n'+Utilities.base64Encode(bytes)+'\r\n--'+boundary+'--';
+ return rosterDriveOutputJson_('https://www.googleapis.com/upload/drive/v3/files'+(id?'/'+encodeURIComponent(id):'')+'?uploadType=multipart&supportsAllDrives=true&fields=id,version',{method:id?'patch':'post',contentType:'multipart/related; boundary='+boundary,payload:Utilities.newBlob(payload).getBytes()}).id;
 }
 function rosterDriveOutputBytes_(id){return rosterDriveOutputFetch_('https://www.googleapis.com/drive/v3/files/'+encodeURIComponent(id)+'?supportsAllDrives=true&alt=media').getContent();}
 function rosterDriveOutputPrivacy_(value){
- if(typeof value==='string'){if(/https?:\/\/[^\s<>"']*(?:#[^\s<>"']+|[?&](?:token|cap|key|auth|signature)=)/i.test(value))rosterDriveOutputFail_('A private link cannot be written to Drive.');return;}
+ if(typeof value==='string'){if(/https?:\/\/[^\s<>"']*(?:#[^\s<>"']+|[?&](?:amp;)?(?:token|cap|key|auth|signature)=|\/(?:external|private)(?:[./?]|$))/i.test(value)||/\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b/.test(value))rosterDriveOutputFail_('A private link cannot be written to Drive.');return;}
  if(!value||typeof value!=='object')return;
  if(value.encoding==='gzip-audit-v1'){rosterDriveOutputPrivacy_(JSON.parse(Utilities.ungzip(Utilities.newBlob(Utilities.base64Decode(value.data))).getDataAsString()));return;}
  for(const [key,child] of Object.entries(value)){if(/(?:token|capabilit|secret|password|authorization|private.?link|private.?url|signature|nonce)/i.test(key))rosterDriveOutputFail_('Credentials and private capabilities cannot be written to Drive.');if(['value_json','json'].includes(key)&&typeof child==='string')rosterDriveOutputPrivacy_(JSON.parse(child));else rosterDriveOutputPrivacy_(child);}
@@ -90,10 +90,34 @@ function rosterDriveOutputContinuity_(p){
  // One atomic Sheets batch: a failure leaves the previous readable view intact.
  rosterDriveOutputJson_(url+':batchUpdate',{method:'post',contentType:'application/json',payload:JSON.stringify({requests})});return {fileId:id,verified:true,rows:relief.length+fairness.length};
 }
+function rosterDriveOutputDaily_(p){
+ if(!['excel','log'].includes(p.kind)||!Number.isSafeInteger(p.revision)||p.revision<0||typeof p.final!=='boolean'||!/^20\d\d-\d\d-\d\d$/.test(p.date||'')||! /^[a-f0-9]{64}$/.test(p.digest||''))rosterDriveOutputFail_('Invalid daily output identity.',400);
+ const today=new Date(Date.now()+28800000).toISOString().slice(0,10);if(p.final&&p.date>=today||!p.final&&p.date<today)throw Object.assign(Error('The output date closed; prepare its FINAL snapshot.'),{status:409,code:'DAILY_OUTPUT_DAY_CLOSED'});
+ const root=rosterDriveOutputGuard_(p.config,'daily'),folderName=p.kind==='excel'?'Daily Relief':'Allocation Audit',configured=p.kind==='excel'?p.config.folderId:p.config.auditFolderId;
+ const parent=configured||rosterDriveOutputFolder_(root,folderName),meta=rosterDriveOutputMeta_(parent);
+ if(meta.trashed||meta.mimeType!=='application/vnd.google-apps.folder'||meta.name!==folderName||meta.parents?.length!==1||meta.parents[0]!==root)rosterDriveOutputFail_('Use the '+folderName+' folder directly under 01 Live Data/Roster.');
+ if(typeof p.data!=='string'||p.data.length>11184816)rosterDriveOutputFail_('The daily output exceeds its transfer limit.',413);
+ const bytes=Utilities.ungzip(Utilities.newBlob(Utilities.base64Decode(p.data))).getBytes();
+ if(bytes.length!==p.bytesRaw||bytes.length>16777216||rosterDriveOutputDigest_(bytes)!==p.digest)rosterDriveOutputFail_('Daily output digest verification failed.');
+ if(p.kind==='log')rosterDriveOutputPrivacy_(Utilities.newBlob(bytes).getDataAsString());else {const parts=Utilities.unzip(Utilities.newBlob(bytes));if(!parts.length||parts.length>200)rosterDriveOutputFail_('Invalid daily workbook.');for(const part of parts)rosterDriveOutputPrivacy_(part.getDataAsString());}
+ // The existing output-only UserLock serialises provider retries. No planner
+ // ScriptLock, frozen state read, or UserLock -> ScriptLock nesting is used.
+ const lock=LockService.getUserLock();if(!lock.tryLock(1))throw Object.assign(Error('Another Drive output is still running.'),{status:503,code:'DAILY_OUTPUT_BUSY'});
+ try{
+  const folder=rosterDriveOutputMonth_(parent,p.date),name=p.date+(p.kind==='excel'?' Relief.xlsx':'.txt'),mime=p.kind==='excel'?'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet':'text/plain',id=rosterDriveOutputFind_(folder,name),old=id?rosterDriveOutputFile_(id,folder,name):null,prior=old?.appProperties||{};
+  if(old&&old.mimeType!==mime)rosterDriveOutputFail_('An output with a different file type already uses this name.');
+  const verify=(savedId,expected,alreadyFinal=false)=>{const actual=rosterDriveOutputFile_(savedId,folder,name),read=rosterDriveOutputBytes_(savedId);if(rosterDriveOutputDigest_(read)!==expected)rosterDriveOutputFail_('Daily output read-back failed.');return {fileId:savedId,version:actual.version||'',verified:true,digest:expected,revision:Number(actual.appProperties?.gsis_revision)||0,bytes:read.length,final:actual.appProperties?.gsis_final==='true',alreadyFinal};};
+  if(prior.gsis_final==='true'){if(!/^[a-f0-9]{64}$/.test(prior.gsis_digest||''))rosterDriveOutputFail_('The final output lacks its verification digest.');return verify(id,prior.gsis_digest,true);}
+  if(Number(prior.gsis_revision)>p.revision)throw Object.assign(Error('A newer daily output already exists.'),{status:409,code:'DAILY_OUTPUT_STALE'});
+  if(prior.gsis_digest===p.digest&&prior.gsis_final===String(p.final)&&Number(prior.gsis_revision)===p.revision)return verify(id,p.digest);
+  const saved=rosterDriveOutputCreate_(folder,name,mime,bytes,{gsis_revision:String(p.revision),gsis_final:String(p.final),gsis_digest:p.digest,gsis_kind:p.kind},id);
+  return verify(saved,p.digest);
+ }finally{lock.releaseLock();}
+}
 function rosterDriveOutputsDispatch_(req,serviceVerified=false){
  const p=req?.input||{};if(p.operation!=='edgeDriveOutput')return null;
  if(serviceVerified!==true)rosterDriveOutputFail_('Only the signed Worker output service may access Drive outputs.',403);
  if(props_().getProperty('ROSTER_EDGE_AUTHORITY')!=='d1')rosterDriveOutputFail_('Scheduled D1 outputs require D1 authority.');
- let result;if(['writeBackup','writeManifest'].includes(p.step))result=rosterDriveOutputBackup_(p);else if(p.step==='readBackup')result=rosterDriveOutputRead_(p);else if(p.step==='continuity')result=rosterDriveOutputContinuity_(p);else rosterDriveOutputFail_('Choose a supported Drive output operation.',400);
+ let result;if(['writeBackup','writeManifest'].includes(p.step))result=rosterDriveOutputBackup_(p);else if(p.step==='readBackup')result=rosterDriveOutputRead_(p);else if(p.step==='continuity')result=rosterDriveOutputContinuity_(p);else if(p.step==='daily')result=rosterDriveOutputDaily_(p);else rosterDriveOutputFail_('Choose a supported Drive output operation.',400);
  return {handled:true,result};
 }

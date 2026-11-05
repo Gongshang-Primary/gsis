@@ -7,7 +7,7 @@ workers_dev = false
 enabled = true
 
 [triggers]
-crons = ["* * * * *", "15 18 * * *", "2-57/5 * * * *", "1-59/2 * * * *"]
+crons = ["* * * * *", "15 18 * * *", "2-57/5 * * * *", "1-59/2 * * * *", "0-58/2 * * * *"]
 
 [vars]
 WHATSAPP_ENABLED = "false"

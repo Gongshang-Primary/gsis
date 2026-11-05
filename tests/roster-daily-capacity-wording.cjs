@@ -1,0 +1,6 @@
+'use strict';
+const assert=require('node:assert/strict'),fixture=require('./roster701-fixture.cjs'),A=require('../shared/roster-allocation.js'),{O,state,ctx,date,teachers}=fixture();
+ctx.minute=360;ctx.now=Date.parse(date+'T06:00:00+08:00');ctx.iso=new Date(ctx.now).toISOString();ctx.notificationsConfigured=true;ctx.adminRecipients=['alice'];ctx.dutySources={[date]:{available:true,staffIds:['alice']}};state.smcDutyRoster=[{date,staffIds:['alice']}];state.accountingYears['2026']={verified:true};A.captureWeek(state,ctx,date);
+for(const p of [2,3])teachers[3].cells[p]=['MA','5A','Room',''];O.apply(state,ctx,{operation:'saveAbsence',date,staffId:'alice',typeId:'mc',periods:[2,3]});
+const notices=state.outbox.filter(j=>j.kind==='capacity_warning');assert(notices.length);for(const j of notices){assert.match(j.data.summary,/2 periods uncovered; fewest eligible teachers: P2 with 2/);assert.match(j.data.healthSummary,/Cover still needed for 2 periods/);assert(!j.data.healthSummary.includes('100'));}assert(!JSON.stringify(notices).includes('eligible opportunities'));
+console.log('capacity warning names uncovered periods and smallest eligible teacher count; no contradictory 100 percent health');

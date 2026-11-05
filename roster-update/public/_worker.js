@@ -1,7 +1,8 @@
+import {dailyOutputStatus,readDailyConfig} from './edge-roster-daily-outputs.js';
 import {backupStatus,readBackupConfig} from './edge-roster-backup.js';
 import {recoveryTimetableSnapshot} from './roster-recovery-timetable-cache.js';
 import {dispatchEdgeDeliveryReview,edgeDeliveryReportRead,edgeDeliveryReviewBackend} from './edge-notification-review.js';
-import {driveOutputsEdgeRoster,driveBackupAdmin,edgeRosterEnabled,edgeRosterService,edgeRosterBackend,edgeRosterArchive,edgeRosterMigration,startEdgeRosterImport,runEdgeRosterImports,readEdgeRosterReferences,refreshEdgeRosterReferences,mirrorEdgeRoster,readRosterMirrorStatus} from './edge-roster.js';
+import {dailyOutputsEdgeRoster,driveOutputsEdgeRoster,driveBackupAdmin,edgeRosterEnabled,edgeRosterService,edgeRosterBackend,edgeRosterArchive,edgeRosterMigration,startEdgeRosterImport,runEdgeRosterImports,readEdgeRosterReferences,refreshEdgeRosterReferences,mirrorEdgeRoster,readRosterMirrorStatus} from './edge-roster.js';
 import {edgeNotificationService,edgeInboxBackend,supportsEdgeNotificationOperation,dispatchEdgePeerMail,dispatchEdgeEmploymentMail,reserveEdgeWhatsAppSend,recordEdgeWhatsAppThrottle,edgeDispatchHasWork} from './edge-notifications.js';
 import {backendAvailable,callOperationalBackend,forwardOperationalRequest} from '../../shared/backend-service.js';
 import {assertRecoveryWritable} from '../../shared/edge-recovery.js';
@@ -427,7 +428,7 @@ export async function systemHealthRoute(req,env,authorityEnv=env){
    if(!auth?.ok)return json({ok:false,...safeHealthError(auth),error:'Current school authority could not be confirmed.'},[401,403].includes(auth?.status)?403:503);
    if(auth.data?.user?.smc!==true&&auth.data?.user?.admin!==true)return json({ok:false,error:'SMC or Admin access is required.'},403);
    const statusEnv=typeof resolveRosterAuthorityEnvironment==='function'?await resolveRosterAuthorityEnvironment(authorityEnv):env;
-   const snapshot={...await readSystemHealth(statusEnv,{jobsOnly:true}),googleBackup:await readRosterMirrorStatus(statusEnv),driveBackup:await driveBackupHealth(statusEnv,auth.data.user.admin===true),venuesSync:await venuesStatus()},jobs=new Set(['drive-outputs','venues-sync','google-backup','allocation','notifications','received-reports','inbox','webhook','peer-mail','r2-cleanup','audit-export']);
+   const snapshot={...await readSystemHealth(statusEnv,{jobsOnly:true}),googleBackup:await readRosterMirrorStatus(statusEnv),driveBackup:await driveBackupHealth(statusEnv,auth.data.user.admin===true),venuesSync:await venuesStatus()},jobs=new Set(['daily-outputs','drive-outputs','venues-sync','google-backup','allocation','notifications','received-reports','inbox','webhook','peer-mail','r2-cleanup','audit-export']);
    snapshot.jobs=snapshot.jobs.filter(row=>jobs.has(row.job));snapshot.recentFailures=snapshot.recentFailures.filter(row=>jobs.has(row.job));
    const reports={available:false,transportAvailable:false,href:'/'};let peerMailReviewAllowed=false;
    try{
@@ -1696,6 +1697,7 @@ export async function dispatchReferencesRefresh(env){if(!edgeRosterEnabled(env))
 export async function dispatchGoogleBackup(env){const result=await mirrorEdgeRoster(env);if(result.enabled===false)return result;const status=await readRosterMirrorStatus(env);return {...result,pending:status.pending,failed:status.behindThreshold?1:0,code:status.behindThreshold?'ROSTER_MIRROR_LAG':status.pending?'ROSTER_MIRROR_PENDING':'OK'};}
 
 export async function dispatchDriveOutputs(env){return driveOutputsEdgeRoster(env);}
+export async function dispatchDailyOutputs(env){return dailyOutputsEdgeRoster(env);}
 async function backupLedgerRoute(req,env){
  const origin=new URL(req.url).origin;if(req.method!=='POST')return json({ok:false,error:'POST required.'},405);if(req.headers.get('Origin')!==origin)return json({ok:false,error:'Origin not allowed.'},403);
  let who;try{who=await requestIdentity(req,env);}catch{return json({ok:false,error:'Sign in with your school account.'},401);}
@@ -1703,4 +1705,4 @@ async function backupLedgerRoute(req,env){
  catch(error){return json({ok:false,error:error.status===403?'Current Admin access is required.':error.status===401?'Sign in with your school account.':'The backup action could not be confirmed. Retry the same request.',code:/^[A-Z0-9_]+$/.test(error.code||'')?error.code:'BACKUP_UNAVAILABLE'},error.status||503);}
 }
 
-async function driveBackupHealth(env,admin){if(env.ROSTER_EDGE_AUTHORITY!=='d1')return {enabled:false,admin};try{const c=await readBackupConfig(env.GSIS_JOBS);return {...await backupStatus(env.GSIS_JOBS),enabled:c.enabled,admin};}catch{return {enabled:true,available:false,admin};}}
+async function driveBackupHealth(env,admin){if(env.ROSTER_EDGE_AUTHORITY!=='d1')return {enabled:false,admin};try{const c=await readBackupConfig(env.GSIS_JOBS);const dailyConfig=await readDailyConfig(env.GSIS_JOBS);return {...await backupStatus(env.GSIS_JOBS),enabled:c.enabled,admin,daily:{...await dailyOutputStatus(env.GSIS_JOBS),enabled:dailyConfig.enabled}};}catch{return {enabled:true,available:false,admin};}}

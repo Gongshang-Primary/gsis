@@ -114,24 +114,7 @@ window.RosterStaplerExport=(()=>{
   if(summary){
    const read=(id,p)=>{const row=teacherRows.get(id);if(row===undefined)fail('An operational teacher is missing from the workbook. Refresh Name Bridge and retry.');return Array.from({length:4},(_,i)=>cellText(cells.get(column(startColumn+p)+(row+i))));};
    const period=p=>{if(!Number.isInteger(p)||p<0||p>=perDay)fail('An operational period does not match this timetable.');};
-   const byDemand=new Map(summary.assignments.map(a=>[a.demandId,a])),absent=new Set(),covered=new Set();
-   const demands=new Map();for(const group of summary.demands)for(const dem of group.members||[group]){const slot=key(dem.staffId,dem.period);if(!demands.has(slot))demands.set(slot,[]);demands.get(slot).push({dem,assignment:byDemand.get(group.id)});}
-   for(const absence of summary.absences)for(const p of absence.periods){
-    period(p);const values=read(absence.staffId,p),reason=absence.reason||'Unspecified',checks=demands.get(key(absence.staffId,p))||[];
-    const unresolved=checks.some(({assignment:a})=>!a||a.remove),noRelief=checks.length&&checks.every(({assignment:a})=>a?.noRelief);
-    values[0]=(values.some(Boolean)?(values[0]||'Lesson')+' (absent — '+reason+')':'Absent — '+reason)+(unresolved?' [UNASSIGNED]':noRelief?' [No Relief Needed]':'');
-    write(absence.staffId,p,values,'grey');absent.add(key(absence.staffId,p));
-   }
-   // Ordinary cover must still be free; approved combinations and repurposed duties keep their explicit meaning.
-   const assignments=summary.assignments.filter(a=>!a.noRelief&&!a.remove).sort((a,b)=>Number(!!a.combination)-Number(!!b.combination));
-   for(const a of assignments){
-    period(a.period);const slot=key(a.staffId,a.period),current=read(a.staffId,a.period),combined=a.combination===true;
-    if(absent.has(slot)||covered.has(slot)&&!combined||current.some(Boolean)&&!combined&&!a.repurposedDuty)fail('Relief clashes detected: '+(a.relieverName||a.staffId)+', period '+a.period+'. Review this allocation before exporting.');
-    const absentName=a.absentName||[...new Set((a.members||[]).map(m=>m.name).filter(Boolean))].join(', ');
-    const label=(a.subject||'Relief')+(absentName?' (for '+absentName+')':'')+(combined?' [Combined]':'')+(a.repurposedDuty?' [Repurposed recess duty]':'')+(a.status==='completed'?' [Completed]':a.status==='draft'?'':' [Published]');
-    const next=[label,a.className||'',a.venue||'',a.groupName||''];
-    write(a.staffId,a.period,combined?current.map((v,i)=>[v,next[i]].filter(Boolean).join(' + ')):next,'orange');covered.add(slot);
-   }
+   window.RosterExport.applyReliefSummary(summary,{read,write,periodCount:perDay});
    const setHeader=(address,text)=>{const cell=cells.get(address);cell.replaceChildren();cell.setAttribute('t','inlineStr');cell.setAttribute('s',style(Number(cell.getAttribute('s')||0),'clear'));const is=doc.createElementNS(ns,'is'),t=doc.createElementNS(ns,'t');t.setAttributeNS('http://www.w3.org/XML/1998/namespace','xml:space','preserve');t.textContent=text;is.append(t);cell.append(is);};
    const planStatus=({confirmed:'Confirmed suspended timetable, not yet published',published:'Published suspended timetable',baseline:'Baseline timetable'})[summary.staplerStatus]||'Baseline timetable';
    setHeader('A1','All teachers · '+plan.date+' · '+(options.snapshotLabel||'Current saved plan and allocations')+' · '+planStatus);

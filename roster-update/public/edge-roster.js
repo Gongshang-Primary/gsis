@@ -21,16 +21,19 @@ import {beginEdgeVenuesChange,completeEdgeVenuesChange,inspectEdgeVenuesFence,re
 import {edgeDeployRosterReference,edgeDeployPersonalCalculation} from './edge-deploy.js';
 import {runRosterMirror,rosterMirrorStatus,releaseRosterMirror} from './edge-roster-mirror.js';
 import {runBackupJobs,buildContinuityView,queueBackupRequest,backupRequests} from './edge-roster-backup-jobs.js';
-import {backupLedger,backupStatus,readBackupConfig} from './edge-roster-backup.js';
+import {backupLedger,backupStatus,readBackupConfig,sanitizeBackup} from './edge-roster-backup.js';
+import {runDailyOutputs,readDailyConfig} from './edge-roster-daily-outputs.js';
+import {RosterExport,GSISExcel,rosterAllocationAuditAccepted_,rosterAllocationAuditCapture_,rosterAllocationAuditText_} from './edge-roster-output-renderers.js';
+import {readQuietMode} from '../../shared/roster-quiet-mode.js';
 import {queueRosterImport,rosterImportRunnerStatus,drainRosterImports} from './edge-roster-import-runner.js';
 import {readRosterCutoverFreeze,beginRosterCutoverFreeze,cancelRosterCutoverFreeze,syncRosterCutoverFreeze} from '../../shared/roster-cutover-freeze.js';
 const clone=value=>structuredClone(value), textEncoder=new TextEncoder(), modelFlights=new Map();
 const fail=(status,code,message)=>{throw Object.assign(Error(message),{status,code});};
 const packedAuditEvidence=new WeakMap();
 function storedAuditState(state){return {...state,optimisationRuns:(state.optimisationRuns||[]).map(run=>packedAuditEvidence.has(run.decisionEvidence)?{...run,decisionEvidence:packedAuditEvidence.get(run.decisionEvidence)}:run)};}
-async function hydrateAuditEvidence(state,dates){
+async function hydrateAuditEvidence(state,dates,{all=false}={}){
  const wanted=new Set(dates||[]),latest=new Map();for(const run of state.optimisationRuns||[])if(wanted.has(run.date)&&run.decisionEvidence)latest.set(run.date,run);
- for(const run of latest.values()){
+ for(const run of all?(state.optimisationRuns||[]).filter(run=>wanted.has(run.date)&&run.decisionEvidence):latest.values()){
   const value=run.decisionEvidence;if(value.encoding!=='gzip-audit-v1')continue;
   try{
    if(!Number.isInteger(value.bytes)||value.bytes<2||value.bytes>2000000||typeof value.data!=='string'||value.data.length>2800000||! /^[a-f0-9]{64}$/.test(value.digest||''))throw Error('identity');
@@ -111,6 +114,7 @@ export async function mutateEdgeRoster(env,{actor,requestId,command,who,apply,ne
    if(run&&result.allocatorRun?.id===run.id){Object.assign(run,timing);run.log.push({seq:(run.log.at(-1)?.seq||0)+1,at:new Date().toISOString(),message:'Preparation took '+(preparationMs/1000).toFixed(1)+' s across '+(attempt+1)+' attempt(s).'});}
   }
   state.revision=(loaded.rawState.revision||0)+(domainChanged?1:0);
+  if(domainChanged&&needsContext)rosterAllocationAuditAccepted_(state,loaded.rawState,ctx,{...command,requestId});
   const accepted={...result,revision:state.revision,requestId,acceptedRevision:state.revision,acceptedAt:ctx.iso};
   const receiptValue=textEncoder.encode(JSON.stringify(accepted)).length>250000?{edgeResultObject:true,reference:await objectWrite(env,'receipts',sha256Hex(actor)+'/'+requestId,accepted),revision:state.revision,requestId}:accepted;
   const packed=needsContext?await pack(env,state,loaded.rawState):storedAuditState(state);
@@ -260,6 +264,7 @@ async function auditAvailability(env,date){
  return {enabled:!!(row.optional||row.essential),optional:!!row.optional,notifications:!!row.notifications};
 }
 async function exportEdgeAudit(env,p){
+ if((await readDailyConfig(database(env))).enabled){const result=await dailyOutputsEdgeRoster(env,{selected:p.date,limit:p.limit||1});return {exported:result.exports?.length||0,exports:result.exports||[],pending:result.pending||0,failures:result.failed?[{error:'Daily Drive output is pending and will retry.'}]:[],...(result.skipped?{deferred:result.code||'busy'}:{})};}
  const selected=p.date?GSISRoster.date(p.date):null,limit=Math.max(1,Math.min(5,Number.isInteger(p.limit)?p.limit:1)),available=await auditAvailability(env,selected);
  if(!available.enabled)return {exported:0,exports:[],pending:0,failures:[],disabled:true};
  await auditSchema(env);
@@ -561,16 +566,45 @@ export async function driveOutputsEdgeRoster(env,options={}){
   if(dates.length!==6)fail(503,'BACKUP_CALENDAR','The next five school days are unavailable.');
   const loaded=await loadEdgeRoster(env,{hydrate:true,dates}),ctx=await buildEdgeRosterContext(env,loaded.state,{operation:'exportDaily',fullTeachers:true,dates});
   return buildContinuityView(loaded.state,ctx,dates);
- },alert:async health=>{
+ },alert:health=>queueDriveOutputAlert(env,health)});
+}
+async function queueDriveOutputAlert(env,health){
   if(!health.warnings.length)return {queued:false};if(GSISRosterAllocation.schedule(Date.now()).quiet||env.WHATSAPP_ENABLED!=='true')return {queued:false};
   const fingerprint=sha256Hex(JSON.stringify(health.warnings)),message='Roster Drive outputs need Admin attention: '+health.warnings.join(', ')+'. Open System Health and the backup ledger.';
   try{return await mutateEdgeRoster(env,{actor:'roster-service',requestId:'backup-alert-'+health.alertId,command:{operation:'currentDuty'},domainChanged:false,apply(state,ctx){const key='drive-backup:'+health.alertId;GSISRosterOperations.smcAlert(state,ctx,ctx.today,key,message,true);const duty=GSISRosterOperations.dutySMC(state,ctx,ctx.today);for(const id of (ctx.adminIds||[]).filter(id=>!duty.includes(id)&&ctx.people.some(p=>p.id===id&&p.active&&/^[1-9]\d{7,14}$/.test(GSISRosterOperations.mobile(p.mobile)))))GSISRosterOperations.queue(state,ctx,'smc_alert',id,ctx.today,{summary:message,audience:'backup-admin',templateKey:'smc_attention'},null,key+':'+id);if(!state.outbox.some(j=>j.key?.startsWith(key+':')))throw Object.assign(Error('Backup alert is awaiting a recipient.'),{code:'BACKUP_ALERT_PENDING'});return {queued:true,alertRecorded:true};}});}catch(error){if(error.code==='BACKUP_ALERT_PENDING')return {queued:false};throw error;}
- }});
 }
+
 export async function driveBackupAdmin(env,input,who){
  if(!edgeRosterEnabled(env))fail(409,'BACKUP_AUTHORITY','D1 must own Roster before using its backup ledger.');
  const refs=await readEdgeRosterReferences(env),contacts=actorContacts(refs,who);if(contacts.user.rosterAdmin!==true)fail(403,'ROSTER_ADMIN_REQUIRED','Current Admin access is required.');
  if(input.operation==='read')return {status:await backupStatus(database(env)),config:await readBackupConfig(database(env)),rows:await backupLedger(database(env),input.filters||{}),requests:await backupRequests(database(env))};
  if(['verify','restore'].includes(input.operation))return queueBackupRequest(database(env),{id:input.requestId,kind:input.operation,manifestFileId:input.manifestFileId,retry:input.retry===true,actor:who.email});
  fail(400,'BACKUP_OPERATION','Choose a supported backup action.');
+}
+
+
+// Existing Allocation Audit TXT and the daily workbook share one captured revision.
+export async function dailyOutputsEdgeRoster(env,options={}){
+ return runDailyOutputs(env,{...options,bridge:p=>signedBridge(env,p),quiet:async()=> (await readQuietMode(database(env))).active||(await auditAvailability(env)).notifications,alert:health=>queueDriveOutputAlert(env,health),seed:async today=>{
+  const db=database(env);if(await db.prepare('SELECT 1 found FROM gsis_roster_daily_outputs WHERE date=?').bind(today).first())return;
+  const refs=await readEdgeRosterReferences(env);if(refs.calendarByDate?.[today]?.available!==true||refs.calendarByDate[today].schoolDay!==true)return;
+  const register=await readEdgeRosterRegister(env),plan=await db.prepare("SELECT 1 found FROM gsis_edge_records WHERE scope='roster' AND collection='staplerPlans' AND record_date=? AND (json_extract(value_json,'$.confirmedRevision') IS NOT NULL OR json_extract(value_json,'$.publishedRevision') IS NOT NULL)").bind(today).first();
+  if(!GSISRoster.active(register.state.entries,today)&&!plan)return;
+  await db.prepare("INSERT OR IGNORE INTO gsis_roster_daily_outputs(date,desired_revision) SELECT ?,revision FROM gsis_edge_heads WHERE scope='roster' AND mode='active'").bind(today).run();
+ },prepare:async(date,{now,final})=>{
+  const refs=await readEdgeRosterReferences(env),calendar=refs.calendarByDate?.[date];if(calendar?.available!==true)fail(503,'DAILY_OUTPUT_CALENDAR','The school date is not verified.');if(calendar.schoolDay!==true)return {schoolDay:false};
+  const loaded=await loadEdgeRoster(env,{hydrate:true,dates:[date]}),state=loaded.state,ctx=await buildEdgeRosterContext(env,state,{operation:'exportDaily',date,fullTeachers:true,dailyDrive:true});
+  const originalCount=state.audit.filter(r=>r.date===date&&!r.auditExportSuppressed||r.date===date&&r.essential).length;
+  await auditSchema(env);const previous=await database(env).prepare('SELECT reference_json FROM gsis_roster_audit_exports WHERE date=?').bind(date).first(),reference=state.allocationAuditExports?.[date]?.archiveObject||(previous?JSON.parse(previous.reference_json):null);
+  if(reference){const old=await objectRead(env,reference);if(old.date!==date||!Array.isArray(old.audit))fail(503,'DAILY_OUTPUT_AUDIT','The retained audit evidence could not be verified.');for(const collection of ['audit','optimisationRuns']){const merged=new Map((old[collection]||[]).map(r=>[r.id,r]));for(const row of state[collection].filter(r=>r.date===date)){const prior=merged.get(row.id);merged.set(row.id,row.archiveRef&&prior?prior:{...prior,...row,...(!row.decisionEvidence&&prior?.decisionEvidence?{decisionEvidence:prior.decisionEvidence}:{})});}state[collection]=state[collection].filter(r=>r.date!==date).concat([...merged.values()]);}}
+  if([...state.audit,...state.optimisationRuns].some(r=>r.date===date&&(r.archiveRef||r.decisionEvidenceArchive&&!r.decisionEvidence)))fail(503,'DAILY_OUTPUT_AUDIT_ARCHIVE','Original audit evidence is unavailable; the full trail was not truncated.');
+  await hydrateAuditEvidence(state,[date],{all:true});rosterAllocationAuditCapture_(state);
+  const daily=await sanitizeBackup(GSISRosterOperations.read(state,{...ctx,iso:new Date(now).toISOString()},{operation:'exportDaily',date,fullTeachers:true,dailyDrive:true}));daily.timetableName=daily.teacherSummary.staplerStatus==='baseline'?(ctx.timetableEntries.find(e=>e.id===ctx.days[date]?.id)?.name||'Baseline timetable'):'Stapler plan';
+  const page=RosterExport.dailyTeacherPage(daily,{final}),book=RosterExport.workbookFiles([page]),bytes=new Uint8Array(await GSISExcel.packageFiles(book.files).arrayBuffer()),text=rosterAllocationAuditText_(state,date,new Date(now).toISOString(),{daily,final});
+  const guards=[{scope:'roster',revision:loaded.revision,mode:'active'},...ctx.edgeGuards],checks=await database(env).batch([...guards.map(g=>database(env).prepare('SELECT revision,mode FROM gsis_edge_heads WHERE scope=?').bind(g.scope)),database(env).prepare("SELECT COALESCE(MAX(revision),0) revision FROM gsis_edge_records WHERE scope='roster' AND collection='audit' AND record_date=? AND record_id<>'$'").bind(date)]);
+  if(guards.some((g,i)=>checks[i].results?.[0]?.revision!==g.revision||checks[i].results?.[0]?.mode!==g.mode))return {deferred:'source-advanced'};
+  const audit=checks.at(-1).results[0];
+  const evidence=text?await objectWrite(env,'audit',date,{schema:1,date,revision:state.revision,audit:state.audit.filter(r=>r.date===date),optimisationRuns:state.optimisationRuns.filter(r=>r.date===date)}):null;
+  return {schoolDay:true,revision:state.revision,sourceRevision:loaded.revision,metadata:{auditReference:evidence,sourceCount:originalCount,sourceRevision:audit.revision},files:[{kind:'excel',bytes,records:page.rows.filter(r=>r.teacherId&&r.field===0).length},...(text?[{kind:'log',bytes:new TextEncoder().encode(text),records:state.audit.filter(r=>r.date===date).length+state.optimisationRuns.filter(r=>r.date===date).length}]:[])]};
+ },onComplete:async pending=>{const m=pending.metadata;if(!m?.auditReference||!pending.files.some(f=>f.kind==='log'&&f.done&&!f.alreadyFinal))return;await auditSchema(env);await database(env).prepare('INSERT INTO gsis_roster_audit_exports(date,source_count,source_revision,reference_json,exported_at) VALUES(?,?,?,?,?) ON CONFLICT(date) DO UPDATE SET source_count=excluded.source_count,source_revision=excluded.source_revision,reference_json=excluded.reference_json,exported_at=excluded.exported_at WHERE source_revision<=excluded.source_revision').bind(pending.date,m.sourceCount,m.sourceRevision,JSON.stringify(m.auditReference),Date.now()).run();}});
 }

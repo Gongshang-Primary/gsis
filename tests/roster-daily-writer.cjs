@@ -1,0 +1,11 @@
+'use strict';
+const assert=require('node:assert/strict'),drive=require('./helpers/roster-daily-drive.cjs'),f=drive(),p=f.payload('original event trail');
+assert.throws(()=>f.call({...p,config:{...p.config,auditFolderId:'outside'}}),/folder|Roster/i);
+assert.throws(()=>f.call(f.payload('https://roster.gsps.edu.sg/external.html#PRIVATE')),/private/i);
+let saved=f.call(p);const id=saved.fileId;assert.equal(saved.verified,true);assert.equal(f.call(p).fileId,id);assert.equal(f.files.get(id).version,'1');
+const update=f.payload('same original trail plus newest event',{revision:2});f.loseResponse();assert.throws(()=>f.call(update),/invalid response/);assert.equal(f.call(update).fileId,id);assert.equal(f.files.get(id).version,'2','uncertain retry does not create another version');
+f.corrupt(true);assert.throws(()=>f.call(update),/read-back/);f.corrupt(false);f.busy(true);assert.throws(()=>f.call(update),/still running/);f.busy(false);
+f.clock(Date.parse('2026-10-15T00:01:00+08:00'));assert.throws(()=>f.call(update),/date closed/);saved=f.call(f.payload('FINAL trail',{revision:2,final:true}));assert.equal(saved.fileId,id);assert.equal(saved.final,true);const version=f.files.get(id).version;
+const late=f.call(f.payload('late correction must not replace FINAL',{revision:3,final:true}));assert.equal(late.alreadyFinal,true);assert.equal(f.files.get(id).bytes.toString(),'FINAL trail');assert.equal(f.files.get(id).version,version);
+f.props.set('ROSTER_ARCHIVE_FILE',id);assert.throws(()=>f.call(f.payload('blocked',{final:true})),/Frozen archive/);assert.equal(f.files.get('frozen').bytes.toString(),'{}');
+console.log('daily writer preserves file ID/history, guards folders/privacy/archive, verifies readback, retries uncertainty and never replaces FINAL');
