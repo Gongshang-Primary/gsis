@@ -18,3 +18,11 @@ Branch `claude/hotfix-clock-minute` (134816a, on top of v0.9.9j 20d0783): new `r
 4. Tests: a preparation spanning a minute with no period start commits; spanning a period start conflicts; crossing midnight conflicts; missing period data stays strict; the scheduled path the same; Google/D1 parity.
 5. Fold in or supersede branch claude/hotfix-clock-minute (do not merge it as is). Base on main.
 Full suite green. Draft PR with the exact head for Claude. No deploy.
+
+## Addendum (5 Nov ~08:35): clock hotfix live, Auto-allocate still stops
+Owner deployed the hand-edited clock hotfix. SMC Auto-allocate log: 06:39 preparing → 06:39 calculating → 06:40 "Planning inputs changed; recalculating" → 06:42 "Allocation stopped. Review current records before retrying." Apps Script executions all Completed (no 6-minute timeout). Quiet mode was OFF (scheduled allocation active); absences kept arriving (uncovered 38 → 67).
+Remaining cause: the commit-time `rosterOperationsDependencies_(state,p,ctx)` digest covers the WHOLE operations state except a small ignore list (revision, outbox, audit, receipts, deliveryEvents, smcAlerts, acknowledgements, scheduleReceipts, notificationWatermarks, inboundSessions, inboundEvents, dailyEmploymentMail, deliveryReview, allocationAuditExports, privateLinks). Any unrelated write during a 1-2 minute preparation (scheduled allocation, absence intake for other dates, inbox threads, peer mail, Stapler, etc.) discards the plan; one retry, then stop.
+Add to the PR:
+6. Scope the dependency digest to the inputs of the date being planned: that date's absences/demands, assignments, requests/peer arrangements, Stapler plan, day revision, timetable/quota references and allocation settings. Unrelated collections and other dates must not invalidate the plan; merge them at commit (rosterOperationsMergePrepared_) as today.
+7. Interactive Auto-allocate must win against the scheduled cycle for the same date: while an SMC run is preparing, the scheduled run for that date skips (SKIPPED_BUSY), using the existing allocation run record.
+8. Tests: an unrelated write during preparation commits; a same-date absence/assignment change conflicts; scheduled run defers to an active SMC run.
