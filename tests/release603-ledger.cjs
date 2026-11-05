@@ -2,6 +2,7 @@ const assert=require('assert/strict'),fs=require('fs'),vm=require('vm');
 const W=require('../shared/workload'),R=require('../shared/teaching-rules');
 const d={teachers:[['f',''],['g',''],['j','FAJT'],['p','4/5'],['r','RT']].map(([id,employment])=>({id,name:id,active:true,employment})),classes:[{level:'1',shortName:'A'}],groups:[],loads:Object.fromEntries([1,2,3,4,5,6].map(l=>[l,{EL:20,Assembly:1,FTGP:2,FTT:2,Admin:3}])),assignments:['f','g','j','p','r'].map(teacher=>({teacher,target:'1A',subject:'EL'})),organisations:{plt:[{id:'pd',slots:['f']}]},duties:[{days:['Mon'],teachers:{Mon:'f'}}],workload:{categories:{Admin:'Non-teaching'}}};
 d.assignments.push({teacher:'f',target:'1A',subject:'FT'},{teacher:'f',target:'1A',subject:'Admin'});
+d.relief=require('../shared/relief').defaults();
 const calc=()=>W.analyse(d,t=>R.calculate(t,d.offload));
 const before=JSON.stringify(d);let w=calc();assert.equal(JSON.stringify(d),before,'read-only calculation');
 assert.equal(w.fullTimeN,2);assert.equal(w.totals.Teaching,100);assert.equal(w.teachingReference,50);

@@ -1,3 +1,7 @@
+# Deploy ledger update, 6 November 2026
+
+The ledger omits the Target offload % indicator. Target, At-load range and Load status remain. FAJT Target uses the same saved weekly budgets as relief: `fajtWeeklyPeriods / weeklyPeriods`. Current schema settings must provide finite positive budgets and a finite ratio; missing, invalid or legacy-only budgets show Needs configuration. The calculation guide displays the configured values. Default settings preserve prior results. This supersedes fixed-budget descriptions in the historical sections below.
+
 # Current workload policy, v0.6.08
 
 This section supersedes the historical target and TG demand rules below. Workload quantification is separate from relief W and R.
@@ -6,7 +10,7 @@ Schoolwide demand D is total planned weekly man-periods divided by active eligib
 
 For teacher i, A_i is actual FTT + PD + duties, individual load is all actual deployed periods, and B_i = (1 - OF_i)(D - A_i) + A_i. At load is the inclusive interval [floor(0.9 B_i), ceil(1.1 B_i)]. Unstaffed demand does not create an individual's actual load. Missing required values withhold a benchmark.
 
-FAJT, 4/5 and RT provision stays in demand but these staff are excluded from the full-time denominator. FAJT retains 65/84 without appointment stacking; 4/5 retains configured employment and appointment rules; RT has no benchmark or load status. Specialist averages use assigned specialist periods divided by assigned teacher headcount, including supplementary staff. The three individual columns show specialist periods, subject average and percentage of that average. Tamil membership requires a TL assignment and includes TL, HTL and CCE TL. These indicators do not determine relief or overall load status.
+FAJT, 4/5 and RT provision stays in demand but these staff are excluded from the full-time denominator. FAJT retains the configured relief `fajtWeeklyPeriods / weeklyPeriods` without appointment stacking; 4/5 retains configured employment and appointment rules; RT has no benchmark or load status. Specialist averages use assigned specialist periods divided by assigned teacher headcount, including supplementary staff. The three individual columns show specialist periods, subject average and percentage of that average. Tamil membership requires a TL assignment and includes TL, HTL and CCE TL. These indicators do not determine relief or overall load status.
 
 Relief retains the PDF formula and floors final nonnegative R to an integer. No relief formula, actual deployment assignment or published snapshot changes in v0.6.08. See CHANGELOG_v0.6.08.md and VALIDATION.md.
 
