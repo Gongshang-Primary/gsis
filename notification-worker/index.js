@@ -7,7 +7,7 @@ import {readQuietMode} from '../shared/roster-quiet-mode.js';
 import {readRosterCutoverFreeze} from '../shared/roster-cutover-freeze.js';
 // Test harnesses load this file with its imports removed; treat quiet mode as off there.
 const quietMode=(db,at)=>typeof readQuietMode==='function'?readQuietMode(db,at):Promise.resolve({active:false});
-import {dispatchNotifications,scheduledRoster,diagnoseNotificationConnections,dispatchInboxPending,dispatchWebhookJobs,dispatchReceivedReports,dispatchPeerMail,dispatchAllocationAudit,dispatchVenuesSync,dispatchGoogleBackup,dispatchRosterImports,dispatchReferencesRefresh} from '../roster-update/public/_worker.js';
+import {dispatchNotifications,scheduledRoster,diagnoseNotificationConnections,dispatchInboxPending,dispatchWebhookJobs,dispatchReceivedReports,dispatchPeerMail,dispatchAllocationAudit,dispatchVenuesSync,dispatchGoogleBackup,dispatchDriveOutputs,dispatchDailyOutputs,dispatchRosterImports,dispatchReferencesRefresh} from '../roster-update/public/_worker.js';
 /* GSIS_API_SECRET_BEGIN */
 // First-party API credentials share one operator-selected setting. Browser
 // sessions, private relief links and third-party credentials stay independent.
@@ -94,6 +94,8 @@ export default {
    const quiet=await quietMode(env.GSIS_JOBS,event.scheduledTime).catch(()=>({active:false}));
    // Daily private-cache pruning reads only bounded cache metadata and objects.
    // No timetable build or Google roster read runs in this maintenance lane.
+   if(event.cron==='0-58/2 * * * *'){await run('daily-outputs','roster-daily-outputs',()=>dispatchDailyOutputs(env));return;}
+   if(event.cron==='1-59/2 * * * *'){await run('drive-outputs','roster-drive-outputs',()=>dispatchDriveOutputs(env));return;}
    if(event.cron==='15 18 * * *'){
     await run('r2-cleanup','roster-r2-cleanup',()=>runRecoveryTimetableCleanup(env,{now:event.scheduledTime}));return;
    }
