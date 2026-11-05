@@ -27,3 +27,11 @@
 - Acceptance: realistic renderer workbook through fake Drive writer; private cell/TXT rejection; sanitised Google message/code in ledger and health; expired-run retry; per-kind/day alerts and disabled silence; canonical build and full Node/LORD CI.
 - Owner's priority-1 instruction authorises this bounded work while #84 awaits review and #83 remains separate. No edits to allocator priority or Contacts work.
 - Out of scope: deployment, live Drive/D1 writes, authority/config changes, notifications, release-label assembly and merging. Intended release is v0.9.9o with #84; owner merges after Claude review.
+
+## Bug (owner 6 Nov ~06:10): Admins receive the duty-SMC message
+Owner: "faizal received messages from WhatsApp meant for those on duty for assigning relief smc, but his name isn't checked in the SMC duty roster".
+Evidence (D1 outbox): the Drive outputs alert at 2026-11-05T21:49:37Z (05:49 SGT) went as `smc_alert` / template `smc_attention` to the 8 duty SMCs of 6 Nov **and** all Admins (Faizal, Vivian (AE), Jay, Eric …). The template opens "you are on SMC relief duty at … on <date>", wrong for Admins not on duty. Faizal is correctly not on the 6 Nov duty list.
+Required (same PR):
+6. Operational/system alerts (Drive outputs, backups, restore drill, job health) go to **Admins only**, never to duty SMCs, using an Admin wording (no "you are on SMC relief duty"; e.g. "GSiS system alert for Admin: …"). Use an approved Admin template if one exists; otherwise use the existing generic template without the duty sentence, and list the new template text for Claude to submit to Meta.
+7. Duty-SMC alerts (allocation/coverage issues) go only to that date's duty SMCs (plus Admins only where the existing rule explicitly says so, and then with Admin wording).
+8. Tests: a Drive failure alerts Admins only with Admin wording; a coverage issue alerts the duty list only; an Admin who is not on duty never receives "you are on SMC relief duty".
