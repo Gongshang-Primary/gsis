@@ -68,3 +68,11 @@ Open question for the owner: on days WITHOUT a Stapler plan, when the active bas
 - Boundaries: no deploy, live D1/Google/R2 writes, authority changes, messages, baseline deletion, or unrelated lane work.
 - Plan: establish failing retained-plan and removed-lesson fixtures; implement shared snapshot and resolver; add digest-bound Admin migration and informational difference UI; align reconciliation and notice withdrawal; verify both adapters and full suite; hand off #78 to Claude.
 - The later owner rulings above replace the previous PR's active-baseline identity design. Existing published-row safeguards remain except where the owner explicitly authorises releasing removed lessons after confirmation.
+
+## Claude check of PR #78 (head 640d2b6, 5 Nov): needs rework to the owner ruling
+#78 was built before the root cause and the owner rulings above. It conflicts with them:
+1. #78 makes "operational IDs follow the active non-pruned register entry" on Stapler days. The ruling says the opposite: on a Stapler day the plan is the effective timetable; baseline changes never affect it.
+2. #78 never lets a read cancel published rows and holds back any date with more than 5 affected rows. The ruling says lessons removed by a baseline change on non-Stapler days are released (including published ones, with the notice withdrawn); the mass-cancel guard stays, but as "a large share of the day", confirmed by SMC/Admin.
+3. #78 has no plan day-copy, no migration and no difference view.
+4. #78 is now in conflict with main (`dirty`). #79 is stacked on it.
+Action: Codex reworks on the same branch (or a new PR that supersedes #78) to the prompt of 5 Nov; keep its good parts (shared Google/D1 reconcile path, preflight, idempotent health alert, reload-twice acceptance). Rebase #79 afterwards. Lane R stays serial: merge #80 first, then the reworked #78, then #79.
