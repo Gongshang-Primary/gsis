@@ -1,6 +1,6 @@
 # roster-d1-backup-ledger: D1 backup to Google Drive with an auditable ledger
 
-- Status: authorised (owner "codex work", 5 Nov evening); Codex, lane R; priority 1 of the Drive work
+- Status: claimed; Model: Codex; lane R; priority 1 of the owner-authorised Drive work
 - Reviewer/model: Claude
 
 ## Finding (Claude, 5 Nov)
@@ -51,3 +51,19 @@ A Google Sheet SMC can open if Cloudflare/D1 is down: per date from today to +5 
 - Verification: every run reads its file back and checks digest and counts (ledger row "verified"); automated weekly restore test into a scratch D1 database; a documented manual restore drill within 2 weeks of go-live, then each term.
 - Alerting: System Health and SMC/Admin alert when the last verified backup is older than 2 hours (increment) or 26 hours (full), or two runs fail.
 - Status: authorised for Codex when the owner says "codex work"; priority above the Google speed fix (D1 is the operational store from 6 Nov).
+
+
+## Implementation claim
+
+- Owner/model: Codex. Reviewer/model: Claude at the exact PR head; owner merges.
+- Last updated (Asia/Singapore): 2026-11-05 21:20 +08.
+- Branch: `codex/roster-d1-backup-ledger`.
+- Base SHA: `5d2d1aca1a41371625e45f73bfe56b1969625f54` (refreshed current main, including fresh-start #79).
+- Current head SHA: claim commit; implementation not started. PR: not opened.
+- User-authorised scope: implement every binding backup Decision, scheduled Drive writer, shared retained ledger, continuity Sheet, restore verification/drill, System Config and System Health. Then take the separately claimed daily-output task on this shared infrastructure.
+- Files/domains owned: lane R canonical `shared/edge-*.js`, new `shared/roster-backup*.js`, `backend/Roster*.gs`, `roster-update/public/`, notification timer/queue integration, schema/migrations, tests/runbook, and their canonical generated backend/Worker copies. Build wiring only where needed for the new sources; no release version or deployment change.
+- Out of scope: live D1/Drive/Google/R2 writes, authority/freeze changes, deployment, notification sends, merges, other products and frozen Google archive files.
+- Acceptance: hourly Tier 1 increments; daily Tier 1/2 full at 02:15 SGT; no Tier 3/capabilities; gzip SHA-256/count readback; retained ledger; safe home-base destination; age/failure alerts; Admin filters/CSV/restore; private continuity view; scratch restore drill; overlapping runs skip; no Drive work on requests; canonical build and complete Node/LORD CI.
+- Coordination: refreshed open PRs and main claims. Earlier Codex work remains held or already merged; this owner's explicit priority assigns this bounded work next. No takeover of another implementer. Daily outputs are a separate follow-on branch/PR, sharing this ledger.
+- Verification: none for implementation yet. No deployment or live action.
+- Next action: inspect storage/bridge/timer contracts, record the implementation plan here, add failing focused regressions, then implement and run the full suite.
