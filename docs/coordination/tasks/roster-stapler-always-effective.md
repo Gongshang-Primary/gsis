@@ -14,3 +14,6 @@
 4. Show the effective source on Assign Relief and Daily Notify: "Timetable: Stapler plan rev N (confirmed HH:MM)" or "Baseline <name>".
 5. Absence reports for a teacher present in the Stapler day are matched against the Stapler day (fix "No timetable applies yet" when a Stapler plan exists).
 6. Tests: save-without-confirm keeps the last confirmed version effective (no reconcile releases, no guard); confirm switches and reconciles only changed lessons; never-confirmed draft shows the banner and baseline; Report Absence uses Stapler periods; Google and D1 parity.
+
+## Owner confirmation (6 Nov): "always load confirmed stapler"
+Confirmed: the effective timetable is always the latest **confirmed** Stapler version; unconfirmed drafts never drive allocation or teacher-facing output (banner + Confirm shortcut only).
