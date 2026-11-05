@@ -43,3 +43,10 @@ Best at a natural break: the school holidays or the new school year (January 202
 - Save: one Admin command with a receipt; each changed row becomes an audited "opening balance" record (as-of date, values, actor, reason); fairness (R% and allocation order) = opening balance + relief recorded on D1 after the as-of date. Never double-count: relief dated on or before the as-of date is ignored for fairness.
 - Prefill option: a one-off read of the frozen Google Roster to propose current values (Admin reviews, then saves), so manual typing is only for corrections.
 - Tests: Admin-only edit (SMC 403, teacher hidden), paste preview and mismatch handling, audit per row, fairness ordering uses balances, no double count across the as-of date, CSV round trip.
+
+## Owner decision (5 Nov 2026, afternoon): route C chosen
+After v0.9.9l timed out on the Google Assign Relief read (UPSTREAM_TIMEOUT, 6 Nov, about 30 s; l rolled back to j), the owner chose the D1 fresh start ("C") as the way to restore a working allocator, instead of a fresh Google file (B, rejected) or archive-only (A, still allowed as a stopgap).
+- Status: authorised; Codex, lane R, TOP PRIORITY (ahead of the Google speed fix, which stays next).
+- Step 1 (now): rebase PR #79 onto main (now containing #80 b72fb48 and #78 324062a; release label 1f759a9), retarget its base to `main`, resolve conflicts with the Stapler delink (#78) and the clock/dependency scope (#80), keep the canonical build current, full CI green, exact head for Claude.
+- Add the opening-balance prefill from the frozen Google Roster (in the ruling above; #79 as built has entry/paste/export but no prefill).
+- Open owner questions (Claude asked 5 Nov): cutover night; whether future-dated absences (on or after the start date, including long leave) are carried from Google automatically.
