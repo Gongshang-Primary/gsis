@@ -76,3 +76,13 @@ Open question for the owner: on days WITHOUT a Stapler plan, when the active bas
 3. #78 has no plan day-copy, no migration and no difference view.
 4. #78 is now in conflict with main (`dirty`). #79 is stacked on it.
 Action: Codex reworks on the same branch (or a new PR that supersedes #78) to the prompt of 5 Nov; keep its good parts (shared Google/D1 reconcile path, preflight, idempotent health alert, reload-twice acceptance). Rebase #79 afterwards. Lane R stays serial: merge #80 first, then the reworked #78, then #79.
+
+## Claude review of PR #78 at exact head a233adb (5 Nov)
+- Verdict: approve for merge (owner decides). Matches the owner rulings. CI full-suite green at a233adb (run 41955612198, 987/987 Node, 40/40 LORD). Claude locally at a233adb: the 8 new delink/reconcile/publication tests plus clock-minute, dependencies and day-transactions pass; canonical build leaves no diff.
+- Checked: `effectiveDay` now takes timetable cells, teachers, timing and classes only from the plan's own `daySnapshot` (id `stapler:<date>`); only quota/cap evidence comes from the runtime day. The plan id and snapshot cannot be edited after save. `baselineChanged` is always false; the comparison returns an informational `differences` list (added/removed/changed). Non-Stapler days release only lessons missing by period, class and teacher; the guard (more than 5, or at least 3 and half the day) raises a TIMETABLE_RECONCILE_BLOCKED alert with a preview digest and needs explicit confirmation. #80's day token now uses the Stapler plan id on Stapler days.
+- Correction to Claude's earlier note: the 5 Nov D1 row looked like an overlay because plans are stored packed. Each plan already held its original day in `plan.baseline` (tiles, teachers, classes, periods). The migration rebuilds `daySnapshot` from those embedded originals, not from the register, so pruned baselines are not needed.
+- Release steps needed (Claude adds them to the release doc):
+  1. After deploying the Roster backend and frontend: Admin opens Timetable review → Stapler migration → preview → check the digest → apply. Until then, legacy plans are snapshotted on their next save from their embedded originals.
+  2. System Health: no TIMETABLE_RECONCILE_BLOCKED alerts left unexplained.
+- Watch after deploy (not blockers): every plan now stores a full day copy (`daySnapshot`), so the Google operations state grows. Google speed is already an issue; check Assign Relief load time and the #80 preparation times on the first day.
+- Doc fix for Claude after merge: the cutover acceptance line "each assignment uses the active, non-pruned timetable ID" must read "non-Stapler days use the active baseline ID; Stapler days use `stapler:<date>`".
