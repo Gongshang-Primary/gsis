@@ -20,6 +20,8 @@ import {sha256Hex} from './edge-deploy-sha256.js';
 import {beginEdgeVenuesChange,completeEdgeVenuesChange,inspectEdgeVenuesFence,revokeEdgeVenuesChange} from './edge-venues-fence.js';
 import {edgeDeployRosterReference,edgeDeployPersonalCalculation} from './edge-deploy.js';
 import {runRosterMirror,rosterMirrorStatus,releaseRosterMirror} from './edge-roster-mirror.js';
+import {runBackupJobs,buildContinuityView,queueBackupRequest,backupRequests} from './edge-roster-backup-jobs.js';
+import {backupLedger,backupStatus,readBackupConfig} from './edge-roster-backup.js';
 import {queueRosterImport,rosterImportRunnerStatus,drainRosterImports} from './edge-roster-import-runner.js';
 import {readRosterCutoverFreeze,beginRosterCutoverFreeze,cancelRosterCutoverFreeze,syncRosterCutoverFreeze} from '../../shared/roster-cutover-freeze.js';
 const clone=value=>structuredClone(value), textEncoder=new TextEncoder(), modelFlights=new Map();
@@ -486,7 +488,7 @@ export async function edgeRosterMigration(env,input,who,internal={}){const bridg
   }catch(error){throw Object.assign(Error('D1 import reservations are reset. Restart cleanup is not yet confirmed. Retry the same restart request: '+input.requestId+'.'),{status:error.status===403?403:409,code:'ROSTER_IMPORT_CLEANUP_PENDING',sessionId:prior.sessionId,importRequestId:prior.requestId,requestId:input.requestId});}
   return {...reset,...cleanup};
  }
- if(operation==='activate'){const sourceDigest=input.sourceDigest;if(!/^[a-f0-9]{64}$/.test(sourceDigest||''))fail(400,'ROSTER_MIGRATION_DIGEST','Use the verified legacy export digest.');for(const scope of ['roster','roster-register']){const loaded=await migrationHead(env,scope);if(!['imported','active'].includes(loaded.mode)||loaded.head.metadata?.source?.sourceDigest!==sourceDigest)fail(409,'ROSTER_IMPORT_SOURCE_MISMATCH','Both imported scopes must match the exact legacy source digest before disabling any legacy writer.');}const proof=await bridge(env,{operation:'edgeFence',sourceDigest},who);if(proof.adminVerified!==true||proof.legacyWritesDisabled!==true||proof.sourceDigest!==sourceDigest)fail(503,'ROSTER_FENCE_UNVERIFIED','Legacy writers were not verifiably fenced. D1 remains inactive.');const states=[];for(const scope of ['roster-register','roster']){const loaded=await migrationHead(env,scope);if(loaded.mode==='active'){states.push(loaded.head);continue;}if(loaded.mode!=='imported')fail(409,'ROSTER_MIGRATION_STATE','Import and verify every Roster scope before activation.');states.push(await loaded.store.transition({from:'imported',to:'active',expectedRevision:loaded.revision,actor:who.email,proof:{legacyWritesDisabled:true,sourceDigest:loaded.head.sourceDigest,verifiedRecords:loaded.head.importedRecords,legacySourceDigest:sourceDigest}}));}
+ if(operation==='activate'){const sourceDigest=input.sourceDigest;if(!/^[a-f0-9]{64}$/.test(sourceDigest||''))fail(400,'ROSTER_MIGRATION_DIGEST','Use the verified legacy export digest.');for(const scope of ['roster','roster-register']){const loaded=await migrationHead(env,scope);if(!['imported','active'].includes(loaded.mode)||loaded.head.metadata?.source?.sourceDigest!==sourceDigest)fail(409,'ROSTER_IMPORT_SOURCE_MISMATCH','Both imported scopes must match the exact legacy source digest before disabling any legacy writer.');}const restored=(await migrationHeads(env)).every(h=>h.metadata?.backupRestore?.sourceDigest===sourceDigest&&h.metadata.backupRestore.verified===true);const proof=await bridge(env,{operation:restored?'edgeFenceStatus':'edgeFence',...(restored?{}:{sourceDigest})},restored?undefined:who);if((!restored&&proof.adminVerified!==true)||proof.legacyWritesDisabled!==true||(!restored&&proof.sourceDigest!==sourceDigest))fail(503,'ROSTER_FENCE_UNVERIFIED','Legacy writers were not verifiably fenced. D1 remains inactive.');const states=[];for(const scope of ['roster-register','roster']){const loaded=await migrationHead(env,scope);if(loaded.mode==='active'){states.push(loaded.head);continue;}if(loaded.mode!=='imported')fail(409,'ROSTER_MIGRATION_STATE','Import and verify every Roster scope before activation.');states.push(await loaded.store.transition({from:'imported',to:'active',expectedRevision:loaded.revision,actor:who.email,proof:{legacyWritesDisabled:true,sourceDigest:loaded.head.sourceDigest,verifiedRecords:loaded.head.importedRecords,legacySourceDigest:sourceDigest}}));}
   let cutoverFreeze;if(proof.cutoverFreeze?.active){const held=await readRosterCutoverFreeze(env),done=await bridge(env,{operation:'edgeCutoverComplete',freezeId:proof.cutoverFreeze.requestId,sourceDigest});cutoverFreeze=await syncRosterCutoverFreeze(env,done.cutoverFreeze,{expectedRevision:held.revision});}
   else if(proof.cutoverFreeze?.state==='activated'){const held=await readRosterCutoverFreeze(env);if(held.requestId===proof.cutoverFreeze.requestId)cutoverFreeze=await syncRosterCutoverFreeze(env,proof.cutoverFreeze,{expectedRevision:held.revision});}
   return {active:true,legacyWritesDisabled:true,scopes:states,...(cutoverFreeze?{cutoverFreeze}: {})};}
@@ -549,4 +551,26 @@ async function rosterMirrorQuiescent(env){
  if(records.n)return false;
  const exists=await db.prepare("SELECT 1 ok FROM sqlite_master WHERE type='table' AND name='gsis_absence_transport'").first();if(!exists)return true;
  const transport=await db.prepare("SELECT COUNT(*) n FROM gsis_absence_transport WHERE state NOT IN ('forwarded','withdrawn')").first();return transport.n===0;
+}
+
+// Output work is entered only by the notification Worker timer/queue.
+export async function driveOutputsEdgeRoster(env,options={}){
+ return runBackupJobs(env,{...options,bridge:p=>signedBridge(env,p),continuity:async now=>{
+  const refs=await readEdgeRosterReferences(env),today=edgeRosterClock(now).today,dates=[today];
+  for(let n=1;n<=366&&dates.length<6;n++){const date=GSISRosterAllocation.addDays(today,n),day=refs.calendarByDate?.[date];if(day?.available!==true)fail(503,'BACKUP_CALENDAR','Verified school dates are required for the continuity Sheet.');if(day.schoolDay)dates.push(date);}
+  if(dates.length!==6)fail(503,'BACKUP_CALENDAR','The next five school days are unavailable.');
+  const loaded=await loadEdgeRoster(env,{hydrate:true,dates}),ctx=await buildEdgeRosterContext(env,loaded.state,{operation:'exportDaily',fullTeachers:true,dates});
+  return buildContinuityView(loaded.state,ctx,dates);
+ },alert:async health=>{
+  if(!health.warnings.length)return {queued:false};if(GSISRosterAllocation.schedule(Date.now()).quiet||env.WHATSAPP_ENABLED!=='true')return {queued:false};
+  const fingerprint=sha256Hex(JSON.stringify(health.warnings)),message='Roster Drive outputs need Admin attention: '+health.warnings.join(', ')+'. Open System Health and the backup ledger.';
+  try{return await mutateEdgeRoster(env,{actor:'roster-service',requestId:'backup-alert-'+health.alertId,command:{operation:'currentDuty'},domainChanged:false,apply(state,ctx){const key='drive-backup:'+health.alertId;GSISRosterOperations.smcAlert(state,ctx,ctx.today,key,message,true);const duty=GSISRosterOperations.dutySMC(state,ctx,ctx.today);for(const id of (ctx.adminIds||[]).filter(id=>!duty.includes(id)&&ctx.people.some(p=>p.id===id&&p.active&&/^[1-9]\d{7,14}$/.test(GSISRosterOperations.mobile(p.mobile)))))GSISRosterOperations.queue(state,ctx,'smc_alert',id,ctx.today,{summary:message,audience:'backup-admin',templateKey:'smc_attention'},null,key+':'+id);if(!state.outbox.some(j=>j.key?.startsWith(key+':')))throw Object.assign(Error('Backup alert is awaiting a recipient.'),{code:'BACKUP_ALERT_PENDING'});return {queued:true,alertRecorded:true};}});}catch(error){if(error.code==='BACKUP_ALERT_PENDING')return {queued:false};throw error;}
+ }});
+}
+export async function driveBackupAdmin(env,input,who){
+ if(!edgeRosterEnabled(env))fail(409,'BACKUP_AUTHORITY','D1 must own Roster before using its backup ledger.');
+ const refs=await readEdgeRosterReferences(env),contacts=actorContacts(refs,who);if(contacts.user.rosterAdmin!==true)fail(403,'ROSTER_ADMIN_REQUIRED','Current Admin access is required.');
+ if(input.operation==='read')return {status:await backupStatus(database(env)),config:await readBackupConfig(database(env)),rows:await backupLedger(database(env),input.filters||{}),requests:await backupRequests(database(env))};
+ if(['verify','restore'].includes(input.operation))return queueBackupRequest(database(env),{id:input.requestId,kind:input.operation,manifestFileId:input.manifestFileId,retry:input.retry===true,actor:who.email});
+ fail(400,'BACKUP_OPERATION','Choose a supported backup action.');
 }
