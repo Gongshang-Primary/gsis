@@ -1,3 +1,7 @@
+# Pending: restore the existing Allocation Audit TXT, 6 November 2026
+
+Model: Codex. Remove #82's Why capture and report-only eligibility calculations from allocation and saves. Restore the exact pre-#82 TXT renderer and lean Google audit snapshots; remove the added D1 save hook. Existing event facts and audit markers remain. Daily relief workbooks, background output queue/ledger, capacity-warning wording and #81 are retained. See [task and verification](docs/coordination/tasks/roster-remove-why-capture.md). No deployment or live action.
+
 # Pending: daily relief workbook and Allocation Audit Drive outputs, 5 November 2026
 
 Model: Codex. Add a background D1 date queue for the existing teacher-timetable workbook and Allocation Audit TXT. Daily files retain their IDs, coalesce committed changes, verify Drive readback and close once as FINAL after Singapore midnight. The workbook uses four rows per active/ad-hoc teacher, frozen headings and Stapler colours. The audit keeps its full event trail and adds a privacy-safe summary, glossary and captured decision checks/R%. Shared ledger, per-date health and failure alerts work with the fresh-start mirror off. Capacity-warning variables now name uncovered periods and the smallest eligible teacher count without contradictory 100% health. See [setup and recovery](docs/ROSTER_DAILY_OUTPUTS_RUNBOOK.md) and [task](docs/coordination/tasks/roster-daily-drive-outputs.md). No deployment or live write.

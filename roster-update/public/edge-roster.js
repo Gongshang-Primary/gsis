@@ -23,7 +23,7 @@ import {runRosterMirror,rosterMirrorStatus,releaseRosterMirror} from './edge-ros
 import {runBackupJobs,buildContinuityView,queueBackupRequest,backupRequests} from './edge-roster-backup-jobs.js';
 import {backupLedger,backupStatus,readBackupConfig,sanitizeBackup} from './edge-roster-backup.js';
 import {runDailyOutputs,readDailyConfig} from './edge-roster-daily-outputs.js';
-import {RosterExport,GSISExcel,rosterAllocationAuditAccepted_,rosterAllocationAuditCapture_,rosterAllocationAuditText_} from './edge-roster-output-renderers.js';
+import {RosterExport,GSISExcel,rosterAllocationAuditCapture_,rosterAllocationAuditText_} from './edge-roster-output-renderers.js';
 import {readQuietMode} from '../../shared/roster-quiet-mode.js';
 import {queueRosterImport,rosterImportRunnerStatus,drainRosterImports} from './edge-roster-import-runner.js';
 import {readRosterCutoverFreeze,beginRosterCutoverFreeze,cancelRosterCutoverFreeze,syncRosterCutoverFreeze} from '../../shared/roster-cutover-freeze.js';
@@ -114,7 +114,6 @@ export async function mutateEdgeRoster(env,{actor,requestId,command,who,apply,ne
    if(run&&result.allocatorRun?.id===run.id){Object.assign(run,timing);run.log.push({seq:(run.log.at(-1)?.seq||0)+1,at:new Date().toISOString(),message:'Preparation took '+(preparationMs/1000).toFixed(1)+' s across '+(attempt+1)+' attempt(s).'});}
   }
   state.revision=(loaded.rawState.revision||0)+(domainChanged?1:0);
-  if(domainChanged&&needsContext)rosterAllocationAuditAccepted_(state,loaded.rawState,ctx,{...command,requestId});
   const accepted={...result,revision:state.revision,requestId,acceptedRevision:state.revision,acceptedAt:ctx.iso};
   const receiptValue=textEncoder.encode(JSON.stringify(accepted)).length>250000?{edgeResultObject:true,reference:await objectWrite(env,'receipts',sha256Hex(actor)+'/'+requestId,accepted),revision:state.revision,requestId}:accepted;
   const packed=needsContext?await pack(env,state,loaded.rawState):storedAuditState(state);
@@ -600,7 +599,7 @@ export async function dailyOutputsEdgeRoster(env,options={}){
   if([...state.audit,...state.optimisationRuns].some(r=>r.date===date&&(r.archiveRef||r.decisionEvidenceArchive&&!r.decisionEvidence)))fail(503,'DAILY_OUTPUT_AUDIT_ARCHIVE','Original audit evidence is unavailable; the full trail was not truncated.');
   await hydrateAuditEvidence(state,[date],{all:true});rosterAllocationAuditCapture_(state);
   const daily=await sanitizeBackup(GSISRosterOperations.read(state,{...ctx,iso:new Date(now).toISOString()},{operation:'exportDaily',date,fullTeachers:true,dailyDrive:true}));daily.timetableName=daily.teacherSummary.staplerStatus==='baseline'?(ctx.timetableEntries.find(e=>e.id===ctx.days[date]?.id)?.name||'Baseline timetable'):'Stapler plan';
-  const page=RosterExport.dailyTeacherPage(daily,{final}),book=RosterExport.workbookFiles([page]),bytes=new Uint8Array(await GSISExcel.packageFiles(book.files).arrayBuffer()),text=rosterAllocationAuditText_(state,date,new Date(now).toISOString(),{daily,final});
+  const page=RosterExport.dailyTeacherPage(daily,{final}),book=RosterExport.workbookFiles([page]),bytes=new Uint8Array(await GSISExcel.packageFiles(book.files).arrayBuffer()),text=rosterAllocationAuditText_(state,date,new Date(now).toISOString());
   const guards=[{scope:'roster',revision:loaded.revision,mode:'active'},...ctx.edgeGuards],checks=await database(env).batch([...guards.map(g=>database(env).prepare('SELECT revision,mode FROM gsis_edge_heads WHERE scope=?').bind(g.scope)),database(env).prepare("SELECT COALESCE(MAX(revision),0) revision FROM gsis_edge_records WHERE scope='roster' AND collection='audit' AND record_date=? AND record_id<>'$'").bind(date)]);
   if(guards.some((g,i)=>checks[i].results?.[0]?.revision!==g.revision||checks[i].results?.[0]?.mode!==g.mode))return {deferred:'source-advanced'};
   const audit=checks.at(-1).results[0];
