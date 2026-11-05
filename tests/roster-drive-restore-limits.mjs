@@ -1,0 +1,12 @@
+import assert from 'node:assert/strict';
+import {createRequire} from 'node:module';
+import {restoreBackupChain} from '../roster-update/public/edge-roster-backup-restore.js';
+const require=createRequire(import.meta.url),database=require('./helpers/chunked-import-db.cjs'),Ops=require('../shared/roster-operations.js');
+const source=database(),raw=database();await source.prepare('CREATE TABLE gsis_backup_identity(id INTEGER,identity TEXT)').run();await source.prepare("INSERT INTO gsis_backup_identity VALUES(1,'production')").run();
+let calls=0;const count=()=>{if(++calls>1000)throw Error('D1 query limit');},target={...raw,withSession(){return this;},prepare(sql){const wrap=s=>({...s,bind(...args){return wrap(s.bind(...args));},async first(){count();return s.first();},async all(){count();return s.all();},async run(){count();return s.run();}});return wrap(raw.prepare(sql));},async batch(statements){count();return raw.batch(statements);}};
+const objects=new Map(),bucket={put:async(k,v)=>objects.set(k,v),get:async k=>objects.has(k)?{arrayBuffer:async()=>objects.get(k)}:null};
+const state=Ops.initial();state.absences=Array.from({length:200},(_,i)=>({id:'absence'+i,reason:'x'.repeat(100000)}));delete state.receipts;
+const chain={state,index:{schema:1,revision:1,entries:[]},objects:[],manifests:[{fileId:'large'}],sourceDigest:'b'.repeat(64),evidence:[{scope:'cache',collection:'recoveryPackages',record_id:'baseline',value_json:JSON.stringify({day:'x'.repeat(3000000)})}]};
+let result,turns=0;do{calls=0;result=await restoreBackupChain({sourceDb:source,targetDb:target,targetBucket:bucket,chain,actor:'admin',requestId:'large-resume'});assert(calls<500,'bounded restore leaves budget for source/ledger work');assert(++turns<10);if(result.pending)assert.equal(raw.sql.prepare("SELECT json_extract(metadata_json,'$.backupRestore.verified') v FROM gsis_edge_heads WHERE scope='roster'").get().v||0,0);}while(result.pending);
+assert(result.verified);assert(turns>1);const evidence=raw.sql.prepare('SELECT value_json FROM gsis_backup_restored_evidence').get();assert(Buffer.byteLength(evidence.value_json)<2000000);assert.equal(objects.size,1);assert.equal(JSON.parse(evidence.value_json).encoding,'gzip-json-v1');assert.equal(raw.sql.prepare("SELECT json_extract(metadata_json,'$.backupRestore.verified') v FROM gsis_edge_heads WHERE scope='roster'").get().v,1);
+console.log('19 MiB restore resumes below 500 D1 calls per turn; 3 MB evidence is retained and verified in R2');

@@ -91,7 +91,12 @@ var GSiSRosterImport=(()=>{
  }
  function prepareRecords(snapshot,references,position,adapter,selection){
   const transformed=recordsSnapshot(snapshot,references,!!selection?.plan);
-  const writer=partWriter(position,adapter,selection),scopes={};
+  return prepareStoredRecords(transformed.state,transformed.index,position,adapter,selection);
+ }
+ // Verified Drive backups already contain immutable R2 references. Reuse the
+ // same row splitting and stage contract without recapturing Google models.
+ function prepareStoredRecords(state,index,position,adapter,selection){
+  const transformed={state,index},writer=partWriter(position,adapter,selection),scopes={};
   for(const [scope,value]of [['roster',transformed.state],['roster-register',transformed.index]]){
    // Encode each complete scope once. Natural-key multiplicity and positions are
    // global; the prepared payloads are then persisted and uploaded in small batches.
@@ -115,6 +120,7 @@ var GSiSRosterImport=(()=>{
  }
  function finishFreeze(snapshot,binding,partMetadata,scopes,adapter){
   freezeBinding(snapshot,binding);const {sessionId,actor,requestId}=binding,manifest={schema:FORMAT,sessionId,actor,requestId,sourceDigest:snapshot.sourceDigest,parts:partMetadata,scopes,totalBytes:partMetadata.reduce((n,p)=>n+p.bytes,0)};
+  if(snapshot.backupRestore)manifest.backupRestore=JSON.parse(JSON.stringify(snapshot.backupRestore));
   if(snapshot.freshStart){manifest.freshStart=true;manifest.freshStartDetails=JSON.parse(JSON.stringify(snapshot.freshStart));manifest.freshStartInputDigest=snapshot.freshStartInputDigest;}
   validateManifest(manifest);return {manifest,manifestDigest:adapter.hash(JSON.stringify(manifest))};
  }
@@ -295,7 +301,7 @@ var GSiSRosterImport=(()=>{
   async function referencesReady(){await read();checked([await connection().prepare("UPDATE gsis_roster_import_sessions SET references_ready=1,updated_at=? WHERE session_id=? AND state='staging' AND NOT EXISTS(SELECT 1 FROM gsis_roster_import_parts WHERE session_id=? AND receipt_json IS NULL)").bind(Date.now(),sessionId,sessionId).run()]);return progress();}
   async function failPreparation(){await read();const c=connection();checked(await c.batch([c.prepare("UPDATE gsis_roster_import_sessions SET state='failed',updated_at=? WHERE session_id=? AND state='preparing'").bind(Date.now(),sessionId),c.prepare("UPDATE gsis_roster_import_preparation SET claim_token='',lease_until=0 WHERE session_id=? AND EXISTS(SELECT 1 FROM gsis_roster_import_sessions WHERE session_id=? AND state='failed')").bind(sessionId,sessionId)]));return progress();}
   async function finalize(){
-   const row=await read();if(row?.state==='imported')return progress();if(!row?.manifest_json)fail(409,'ROSTER_IMPORT_INCOMPLETE','The immutable export is incomplete.');const m=JSON.parse(row.manifest_json),c=connection(),token=crypto.randomUUID(),now=Date.now(),metadata=JSON.stringify({source:{kind:m.freshStart?'fresh-start':'apps-script',sourceDigest:m.sourceDigest,manifestDigest:row.manifest_digest},...(m.freshStart?{freshStart:m.freshStartDetails}:{}),importedAt:now,importSession:sessionId,digestFormat:FORMAT});
+   const row=await read();if(row?.state==='imported')return progress();if(!row?.manifest_json)fail(409,'ROSTER_IMPORT_INCOMPLETE','The immutable export is incomplete.');const m=JSON.parse(row.manifest_json),c=connection(),token=crypto.randomUUID(),now=Date.now(),metadata=JSON.stringify({source:{kind:m.backupRestore?'drive-backup':m.freshStart?'fresh-start':'apps-script',sourceDigest:m.sourceDigest,manifestDigest:row.manifest_digest},...(m.freshStart?{freshStart:m.freshStartDetails}:{}),...(m.backupRestore?{backupRestore:m.backupRestore}:{}),importedAt:now,importSession:sessionId,digestFormat:FORMAT});
    const conditions=SCOPES.map(()=>" AND EXISTS(SELECT 1 FROM gsis_edge_heads h JOIN gsis_roster_import_locks l ON l.scope=h.scope WHERE h.scope=? AND l.session_id=? AND h.revision=l.base_revision AND h.mode='legacy') AND (SELECT COUNT(*) FROM gsis_roster_import_rows WHERE session_id=? AND scope=?)=?").join('');
    const statements=[c.prepare(`UPDATE gsis_roster_import_sessions SET state='imported',write_token=?,updated_at=? WHERE session_id=? AND state='staging' AND references_ready=1
     AND (SELECT COUNT(*) FROM gsis_roster_import_parts WHERE session_id=?)=? AND NOT EXISTS(SELECT 1 FROM gsis_roster_import_parts WHERE session_id=? AND receipt_json IS NULL)
@@ -465,6 +471,6 @@ var GSiSRosterImport=(()=>{
   }finally{checked([await c.prepare(`UPDATE ${ARCHIVES} SET lease_token='',lease_until=0 WHERE session_id=? AND lease_token=?`).bind(job.session_id,token).run()]);}
   return {archived,processed,...await archiveStatus(db)};
  }
- return {repairStaplerAuditIds,objectJobs,prepareObject,prepareRecords,prepareRecordPart,finishFreeze,freeze,validateManifest,utf8Length,open,ensure,latest,resetAfterRollback,pendingRollbackReset,archiveRetained,archiveStatus,hashText,hashBytes,stageObject,FORMAT,SCOPES,TARGET_BYTES,SEGMENT_BYTES,MAX_PART_BYTES,MAX_PARTS,MAX_MANIFEST_BYTES,MAX_TOTAL_BYTES,MAX_OBJECT_BYTES,MAX_RETAINED_SESSIONS,PREPARATION_LEASE_MS,MAX_PREPARATION_RESULT_BYTES};
+ return {repairStaplerAuditIds,objectJobs,prepareObject,prepareRecords,prepareStoredRecords,prepareRecordPart,finishFreeze,freeze,validateManifest,utf8Length,open,ensure,latest,resetAfterRollback,pendingRollbackReset,archiveRetained,archiveStatus,hashText,hashBytes,stageObject,FORMAT,SCOPES,TARGET_BYTES,SEGMENT_BYTES,MAX_PART_BYTES,MAX_PARTS,MAX_MANIFEST_BYTES,MAX_TOTAL_BYTES,MAX_OBJECT_BYTES,MAX_RETAINED_SESSIONS,PREPARATION_LEASE_MS,MAX_PREPARATION_RESULT_BYTES};
 })();
 if(typeof module!=='undefined'&&module.exports)module.exports=GSiSRosterImport;

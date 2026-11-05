@@ -1,3 +1,7 @@
+# Pending: scheduled D1 Drive backups and retained ledger, 5 November 2026
+
+Model: Codex. Add hourly school-record increments and daily 02:15 full backups with gzip hashes, counts and Drive readback; a dedicated home-base writer leaves the frozen Google archive intact. Admin configuration, filtered ledger/CSV, age/failure alerts, a private continuity Sheet and isolated weekly/manual restore staging work in fresh-start mode. Restore preserves the archive identity and archives pending historical sends. See [setup and drill](docs/ROSTER_DRIVE_BACKUP_RUNBOOK.md) and [task](docs/coordination/tasks/roster-d1-backup-ledger.md). No deployment, activation or live data write.
+
 # Pending: fresh D1 start with retained Google history and Admin opening balances, 5 November 2026
 
 Model: Codex. Prepare empty Roster and timetable-register states from a signed settings-only source while Google remains the frozen archive. The setup path verifies its config digest before activation and keeps original Google pointers for a guarded switch back. Admin can enter, paste, review and correct dated opening balances with per-row audit evidence; SMC can view them. Annual fairness respects each as-of cutoff, while weekly capacity and real duty history remain intact. History views identify their D1 start date and link to authenticated, read-only Google records. See [design and verification](docs/coordination/tasks/roster-d1-fresh-start.md). No live cutover or deployment performed.
