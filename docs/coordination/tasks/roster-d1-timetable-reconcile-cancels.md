@@ -1,6 +1,6 @@
 # roster-d1-timetable-reconcile-cancels: on D1, every read cancels relief assignments ("effective timetable changed")
 
-- Status: authorised (owner "codex work", 5 Nov); Codex, lane R, TOP PRIORITY (blocks the D1 cutover). Scope: owner rulings below (Stapler delink, release removed lessons, show-only diff)
+- Status: claimed; Codex, lane R, TOP PRIORITY. Updating existing draft PR #78 to the final owner rulings. Other lane R implementation is paused for this task.
 - Reviewer/model: Claude
 - Last updated (Asia/Singapore): 5 Nov 2026
 
@@ -56,3 +56,15 @@ Open question for the owner: on days WITHOUT a Stapler plan, when the active bas
 ## Owner answers, 5 Nov
 1. Days WITHOUT a Stapler plan: when a baseline change removes a lesson, its relief assignment is released (the lesson no longer exists). Release only the rows whose lesson is gone; lessons that still exist on the new baseline (same day, period, class, teacher) keep their assignment. Released rows show "Lesson no longer in the timetable" in the audit and to SMC; the teacher's relief notice is withdrawn. The mass-cancel guard still applies (if a swap would release a large share of the day, stop and ask SMC/Admin to confirm).
 2. Stapler difference view: show only. No per-cell copy action.
+
+## Updated implementation claim (5 Nov 2026)
+
+- Owner/model: Codex
+- Reviewer: Claude, exact final head
+- Branch: `codex/roster-d1-timetable-reconcile`; existing PR #78, one PR for this task
+- Current main: `a2079f62241b8d4643da9410d7638a025a31b372`; previous PR head: `640d2b67515ff868a4cd0cf2902e7478d29cd133`
+- Scope: shared Stapler full-day snapshots and effective-day resolver; Google/D1 adapters; lesson-specific reconciliation and guarded SMC confirmation; Admin dry-run/apply migration with preview digest; display-only cell differences; System Health; regression tests and canonical generated outputs.
+- Acceptance: all five required scenarios in the owner's request on both routes; canonical build; full Node and LORD suite with counts; exact-head task handoff.
+- Boundaries: no deploy, live D1/Google/R2 writes, authority changes, messages, baseline deletion, or unrelated lane work.
+- Plan: establish failing retained-plan and removed-lesson fixtures; implement shared snapshot and resolver; add digest-bound Admin migration and informational difference UI; align reconciliation and notice withdrawal; verify both adapters and full suite; hand off #78 to Claude.
+- The later owner rulings above replace the previous PR's active-baseline identity design. Existing published-row safeguards remain except where the owner explicitly authorises releasing removed lessons after confirmation.
