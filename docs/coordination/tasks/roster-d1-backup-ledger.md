@@ -42,3 +42,12 @@ A Google Sheet SMC can open if Cloudflare/D1 is down: per date from today to +5 
 1. Continuity sheet: wanted? (Claude recommends yes.)
 2. Folder access: Admin only, or SMC read too?
 3. Hourly increments, or daily full only?
+
+## Decisions (Claude, under the owner's standing rule of 5 Nov: "i say what i want, and you spec what a proper production-class webapp should have")
+- Targets: RPO 1 hour (data loss at most one hour), RTO 2 hours for a restore into D1; continuity sheet usable within minutes of an outage.
+- Cadence: hourly increment by revision (Tier 1) + daily full of Tiers 1 and 2 at 02:15 SGT.
+- Continuity sheet: yes.
+- Access: backup folder Admin only (holds absence reasons); SMC get read access to the continuity sheet only. Folder sharing off for everyone else; ownership by the school service account/Admin, not a personal account.
+- Verification: every run reads its file back and checks digest and counts (ledger row "verified"); automated weekly restore test into a scratch D1 database; a documented manual restore drill within 2 weeks of go-live, then each term.
+- Alerting: System Health and SMC/Admin alert when the last verified backup is older than 2 hours (increment) or 26 hours (full), or two runs fail.
+- Status: authorised for Codex when the owner says "codex work"; priority above the Google speed fix (D1 is the operational store from 6 Nov).

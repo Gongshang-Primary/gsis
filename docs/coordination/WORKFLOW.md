@@ -49,3 +49,6 @@ Follow README staging guidance. Deployment timing is the owner's decision (see O
 
 ## Enforcement limits
 These files are a coordination protocol, not an automatic lock service or background model-to-model chat. Both agents must read GitHub at the start and before handoff. Existing branch protection and CI remain unchanged. If enforcing PR-only main later, use an owner-merged claim PR before implementation instead of the claim-only direct commit. Set required checks only after a real workflow successfully produces them; do not invent a green check. Do not grant bots deployment secrets merely for code review.
+
+## Owner standing rule (5 Nov 2026): owner states intent, Claude specifies
+"i say what i want, and you spec what a proper production-class webapp should have". Claude turns each owner request into a full production-class specification (security, privacy, reliability targets, monitoring, backup/restore, testing, accessibility) and decides technical details itself. Claude asks the owner only for genuine owner choices: school policy, people and roles, money, timing of deploys, and anything irreversible.
