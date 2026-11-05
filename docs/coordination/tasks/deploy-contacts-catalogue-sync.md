@@ -1,8 +1,14 @@
 # deploy-contacts-catalogue-sync: published Deploy version not reflected in the Contacts viewport
 
-- Status: assigned to **Muse** (owner 6 Nov ~00:50: "let muse work on this"); lane: Deploy/Contacts (not lane R)
+- Status: claimed by **Muse**, 6 Nov 2026 (Asia/Singapore); lane: Deploy/Contacts (not lane R)
 - Reviewer/model: Claude
+- Branch: muse/deploy-contacts-catalogue-sync
+- Base SHA: 4323f9bfc5b35e27dc4b1e75f6d6391b644ccb88
+- Model: Muse
 - Owner report (verbatim): "deploy-viewport: existing in-force version was saved and published but changes not reflected on contacts viewport"
+
+## Claim note
+WORKFLOW describes a claim-only commit to main, but the pilot rule is never push to main. As with Tasks 1-3, the claim is recorded on the task branch only, not on main. The assignment commit 4323f9b is already on main.
 
 ## What Claude found so far (5 Nov evening, code reading; live cause not yet confirmed)
 - Deploy publish (backend/Code.gs `dispatch_`, about line 722-727): the version is persisted first, then `syncPublishedCatalogues_(b,idx,identity)` (backend/Code.gs about line 1462) calls Contacts with `contacts_(identity,false,'applyDeployCatalogues',{revision,options,membership})`.
