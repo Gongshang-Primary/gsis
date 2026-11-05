@@ -21,7 +21,7 @@ The Deploy workload ledger shows a "Target offload %" column = (1 − targetReta
 
 ## Claim (6 Nov 2026, Model: Codex)
 
-- Status: implemented; full-suite verification in progress.
+- Status: implemented and submitted for full CI; Claude reviews before owner merge.
 - Owner/model: Codex; lane D (Deploy).
 - Reviewer/model: Claude; owner merges.
 - Last updated (Asia/Singapore): 6 Nov 2026, 02:58.
@@ -59,3 +59,12 @@ No deploy or live action. Claude reviews; owner merges.
 - Existing ledger 603, workload 605/607, relief UI and relief API programs passed.
 - Default results are compared with outputs captured before this change, including FT, 4/5, FAJT and RT targets/bands/status, plus numeric R for eligible employment categories. Changing the FAJT budget to 60 lowers its Target and R by their respective existing formulas.
 - Full Node/LORD CI is pending. No completion or Claude approval is claimed yet.
+
+## Final implementation handoff (6 Nov 2026, Model: Codex)
+
+- Exact implementation head: `02067bd4989dd58e8eaa1abb3534d08e6bc0577f` (canonical source, generated copies and final regression tests). The following commit records this handoff only; the PR names its exact final branch head.
+- Corresponding local head: `a808d4f3c2383703f762ad0b351f8095db7bdabe`. Remote and local tree hashes match: `cb105fe9e48c426e2877f6cd04c6df91eebd3367`.
+- The full local run covered 1,013 current Node programs. Shards 1/2/4 passed 254/254, 253/253 and 253/253, with all 40 LORD programs passing in each. Shard 3 passed 252/253; its sole failure was the old `workload414-ui.cjs` fixture assuming a FAJT default without saved settings. The fixture now explicitly configures defaults, with every original status/filter/export assertion unchanged, and passes. No product code changed for that correction. New domain and UI programs passed again after the final canonical build. A complete shard 3 rerun follows; GitHub runs all shards at the final PR head.
+- Six optional historical comparisons remain excluded by the unchanged runner, not counted as passes. Current behavior assertions remain selected. Local Chromium was supplied for browser checks.
+- Separate Codex advisory review found no actionable issue. It also exercised the persisted KP snapshot, Admin save, filtered KP delta and browser delta application with changed budgets, while private settings remained omitted. This is not Claude approval. No live verification was performed.
+- Required merge gate: full exact-head GitHub CI green, Claude review, then owner merge. The PR records the CI result and final head. Product work is complete; no deployment, live configuration, school-data write or message was performed.
