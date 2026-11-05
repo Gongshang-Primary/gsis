@@ -1,6 +1,6 @@
 # roster-daily-drive-outputs: daily Excel + LLM-readable decisions log on the GSiS Drive home base
 
-- Status: claimed; Model: Codex; lane R; priority 2 of the owner-authorised Drive work. Spec by Claude under the standing rule (owner intent, Claude specifies).
+- Status: implemented; local full suite passed; ready for exact-head Claude review; Model: Codex; lane R; priority 2 of the owner-authorised Drive work. Spec by Claude under the standing rule (owner intent, Claude specifies).
 - Reviewer/model: Claude. Related: roster-d1-backup-ledger (same writer, ledger and home base).
 
 ## Owner intent (verbatim, 5 Nov)
@@ -64,7 +64,7 @@ The "Relief Capacity Warning" WhatsApp read "Relief capacity: P1 has 2 eligible 
 ## Implementation claim (Model: Codex)
 
 Owner/model: Codex. Reviewer: Claude at the exact PR head. Owner merges.
-Updated: 2026-11-05 22:36 SGT.
+Updated: 2026-11-05 (resumed verification; Asia/Singapore).
 Branch: `codex/roster-daily-drive-outputs`.
 Base main: `75fb5d4c642c920a01c63d6d56b6e2af68dada2f`.
 Dependency: backup PR #81 at `644108ffc2eac254aa4b4f560b5105d51d7f591c`. The owner explicitly ordered this follow-on after the backup work. The same implementer works serially; #81 is frozen for review. This branch starts from the accepted claim, brings in that shared implementation, and targets its branch as a separate stacked PR. No duplicated ledger or writer.
@@ -80,4 +80,25 @@ Plan:
 4. Add Admin output configuration and System Health results/alerts; correct the approved warning variables. Test triggers, provider failure/retry, fresh-start, quiet mode, finalisation and save latency.
 5. Rebuild canonical copies; run focused checks, full Node/LORD CI and advisory review; open a draft PR naming Claude and its exact head.
 
-Current outcome: claimed only, implementation not started. No live actions.
+Current outcome: implementation complete and local full verification passed. After the review corrections, `TZ=Asia/Singapore npm run build` rebuilt all 18 components and ten focused programs passed. A fresh full `TZ=Asia/Singapore npm test` run at local implementation `fdaf16143efb14397dd56f28c7d28620912763f4` passed all 1,011 current Node programs across four isolated shards (253/253/253/252, no omissions or duplicates), Chromium checks, and all 40 LORD programs in every shard. The runner’s existing historical exclusions are unchanged. This final documentation update changes no product code. No live actions.
+
+Implementation: a dedicated even-minute timer renders from one checked Roster/register/reference/Deploy revision. Transactional D1 date intents, two-minute coalescing, a separate lease, retained gzip payloads, read-back SHA-256 and shared ledger isolate provider work from requests. The existing output-only Drive writer updates the same IDs and independently refuses FINAL replacement. Existing Allocation Audit text and evidence archives are reused; no second log or ledger was created. Settings are Admin-only; daily outputs can be enabled while backup scheduling and the ordinary mirror are off. Setup/recovery: `docs/ROSTER_DAILY_OUTPUTS_RUNBOOK.md`.
+
+Limits: 16 MiB raw / 8 MiB gzip per daily file; missing cold audit evidence or source authority fails visibly rather than claiming a complete export. Historical allocation checks remain explicitly unknown. No live size, permission or delivery assertion is made.
+
+Resume review: the internal Codex advisory found one Important issue and no other actionable findings. Past allocator demands deliberately omit current subject-policy flags; the new FINAL summary therefore counted an exempt TL lesson as uncovered after midnight. `tests/roster-daily-audit.cjs` reproduced the false count before the fix, then passed with both the exempt lesson and a genuinely uncovered EL lesson. The daily output projection now supplies missing cover-policy flags from its effective source context, and the shared workbook overlay respects exemptions. Historical allocator demands and captured allocation checks are unchanged. This advisory is not Claude approval.
+
+Build correction: the Drive output source duplicated the builder-owned BEGIN/END wrapper, adding a closing marker on every build. Removed only those source wrappers and regenerated their backend copies. Repeated canonical builds are byte-identical; runtime text is unchanged by this packaging correction.
+
+GitHub implementation commit: `c022d88b6131bc1dacd2b1925d82a81bcc72680c`. Its tree `42a2c3de7d00aea50a0dd0d08c07a0979728b134` exactly matches local handoff `394ec0a3fb73e35a48958737ac344ae2cc2f7dcf`; the final commit only records this handoff. The separate draft PR targets `codex/roster-d1-backup-ledger` and names the exact final review head. No force-push, main merge, deployment, live record change or provider message is authorised by this handoff.
+
+Next exact action: Claude reviews the exact PR head, then the owner decides integration after backup PR #81. Retarget the follow-on to main after #81 merges and rebuild/retest any integration delta. Main was refreshed at `9fdcffd97d7d3b2e898371718271a5668d470afe`; its two newer changes are documentation only, including a separate unclaimed absence-submit task outside this work. Live permission, timing and provider acceptance remain the documented post-deployment drill.
+
+## Owner decision (6 Nov ~01:15): remove the "Why" capture and keep the audit log as it was
+Owner (verbatim): "wait, what is the why capture? the current LLM text log is sufficient for my use"
+Claude added the summary/glossary/"Why" extension to the spec on its own; the owner did not ask for it. Follow-up (Codex, before build n):
+1. Remove `captureDecisionWhy` and every call (backend/RosterOperations.gs, backend/RosterAuditExport.gs, roster-update/public/edge-roster.js, edge-roster-output-renderers.js, shared/roster-allocation.js and generated copies). Nothing extra runs inside saves.
+2. Restore the Allocation Audit TXT to its pre-#82 format exactly (no Day summary, no rules glossary, no Why block); keep #82's queue/ledger/coalescing only if the unchanged text needs them.
+3. Keep the daily relief workbook and the capacity-warning wording fix.
+4. Tests: audit text byte-identical to the pre-#82 renderer for a fixture day; no allocationWhy written; workbook tests unchanged.
+This replaces the "captureDecisionWhy guard" requirement in docs/coordination/review/pr82-claude-review.md.
