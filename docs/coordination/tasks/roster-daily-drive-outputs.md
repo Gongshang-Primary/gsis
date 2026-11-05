@@ -1,6 +1,6 @@
 # roster-daily-drive-outputs: daily Excel + LLM-readable decisions log on the GSiS Drive home base
 
-- Status: implemented; local full suite passed; awaiting publication and exact-head Claude review; Model: Codex; lane R; priority 2 of the owner-authorised Drive work. Spec by Claude under the standing rule (owner intent, Claude specifies).
+- Status: implemented; local full suite passed; ready for exact-head Claude review; Model: Codex; lane R; priority 2 of the owner-authorised Drive work. Spec by Claude under the standing rule (owner intent, Claude specifies).
 - Reviewer/model: Claude. Related: roster-d1-backup-ledger (same writer, ledger and home base).
 
 ## Owner intent (verbatim, 5 Nov)
@@ -90,4 +90,6 @@ Resume review: the internal Codex advisory found one Important issue and no othe
 
 Build correction: the Drive output source duplicated the builder-owned BEGIN/END wrapper, adding a closing marker on every build. Removed only those source wrappers and regenerated their backend copies. Repeated canonical builds are byte-identical; runtime text is unchanged by this packaging correction.
 
-Next exact action: publish this fully verified branch with a non-force expected-head update from remote `ea86f5690cef3af3376d0f61c1e1f0317d26fd63`, and open the separate draft PR against `codex/roster-d1-backup-ledger`. Claude reviews its exact head; the owner merges. Main was refreshed at `9fdcffd97d7d3b2e898371718271a5668d470afe`; its two newer changes are documentation only, including a separate unclaimed absence-submit task outside this work.
+GitHub implementation commit: `c022d88b6131bc1dacd2b1925d82a81bcc72680c`. Its tree `42a2c3de7d00aea50a0dd0d08c07a0979728b134` exactly matches local handoff `394ec0a3fb73e35a48958737ac344ae2cc2f7dcf`; the final commit only records this handoff. The separate draft PR targets `codex/roster-d1-backup-ledger` and names the exact final review head. No force-push, main merge, deployment, live record change or provider message is authorised by this handoff.
+
+Next exact action: Claude reviews the exact PR head, then the owner decides integration after backup PR #81. Retarget the follow-on to main after #81 merges and rebuild/retest any integration delta. Main was refreshed at `9fdcffd97d7d3b2e898371718271a5668d470afe`; its two newer changes are documentation only, including a separate unclaimed absence-submit task outside this work. Live permission, timing and provider acceptance remain the documented post-deployment drill.
