@@ -1,0 +1,93 @@
+{
+  "mixed": [
+    {
+      "id": "ft",
+      "target": 28.5,
+      "band": {
+        "lower": 25,
+        "upper": 32
+      },
+      "status": "Below standard",
+      "R": null
+    },
+    {
+      "id": "ft2",
+      "target": 28.5,
+      "band": {
+        "lower": 25,
+        "upper": 32
+      },
+      "status": "Below standard",
+      "R": null
+    },
+    {
+      "id": "fajt",
+      "target": 22.505952380952383,
+      "band": {
+        "lower": 20,
+        "upper": 25
+      },
+      "status": "Below standard",
+      "R": null
+    },
+    {
+      "id": "part",
+      "target": 22.8,
+      "band": {
+        "lower": 20,
+        "upper": 26
+      },
+      "status": "Below standard",
+      "R": null
+    },
+    {
+      "id": "rt",
+      "target": null,
+      "band": null,
+      "status": "No target",
+      "R": null
+    }
+  ],
+  "eligible": [
+    {
+      "id": "ft",
+      "target": 23.5,
+      "band": {
+        "lower": 21,
+        "upper": 26
+      },
+      "status": "Below standard",
+      "R": 42
+    },
+    {
+      "id": "ft2",
+      "target": 23.5,
+      "band": {
+        "lower": 21,
+        "upper": 26
+      },
+      "status": "Below standard",
+      "R": 42
+    },
+    {
+      "id": "fajt",
+      "target": 18.636904761904763,
+      "band": {
+        "lower": 16,
+        "upper": 21
+      },
+      "status": "Below standard",
+      "R": 38
+    },
+    {
+      "id": "part",
+      "target": 18.8,
+      "band": {
+        "lower": 16,
+        "upper": 21
+      },
+      "status": "Below standard",
+      "R": 30
+    }
+  ]
+}

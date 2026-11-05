@@ -15,7 +15,7 @@ function reliefAdminDetail_(result){
 }
 function reliefView_(copy,source,c,calculated){
  const result=calculated||reliefAnalysis_(source);
- const details=c.user.roles.some(r=>r==='Admin'||r==='KP');copy.reliefResults={schema:3,calculationVersion:result.calculationVersion,reference:details?result.reference:null,units:'periods/week',teachers:reliefResultRows_(result,details)};
+ const details=c.user.roles.some(r=>r==='Admin'||r==='KP');copy.reliefResults={schema:3,calculationVersion:result.calculationVersion,targetSettings:GSISWorkload.fajtTargetSettings(source.relief),reference:details?result.reference:null,units:'periods/week',teachers:reliefResultRows_(result,details)};
  if(c.user.roles.includes('Admin'))copy.reliefAdmin=reliefAdminDetail_(result);
  else {delete copy.relief;delete copy.reliefAdmin;delete copy.reliefLegacy;}
  return copy;

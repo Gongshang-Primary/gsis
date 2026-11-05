@@ -1,3 +1,7 @@
+# Pending: Deploy ledger targets use configured relief budgets, 6 November 2026
+
+Model: Codex. Remove the Target offload % column from both ledger views and their shared Excel/print output. FAJT Target now uses the saved relief fajtWeeklyPeriods / weeklyPeriods ratio; missing or invalid budgets show Needs configuration. Help shows the configured values. The public projection includes only these two budgets and their schema, retaining the server-only relief engine and Admin-only settings. Defaults preserve Target, at-load bands, load status and R. See [task and verification](docs/coordination/tasks/deploy-remove-target-offload.md). No deployment or live action.
+
 # Pending: restore the existing Allocation Audit TXT, 6 November 2026
 
 Model: Codex. Remove #82's Why capture and report-only eligibility calculations from allocation and saves. Restore the exact pre-#82 TXT renderer and lean Google audit snapshots; remove the added D1 save hook. Existing event facts and audit markers remain. The background queue also backfills missing Drive TXT files from D1 audit rows and retained R2 audit archives since the fresh start, with verified per-file ledger entries. Daily relief workbooks, background output queue/ledger, capacity-warning wording and #81 are retained. See [task and verification](docs/coordination/tasks/roster-remove-why-capture.md). No deployment or live action.

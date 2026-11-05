@@ -1,5 +1,6 @@
 const fs=require('fs'),assert=require('assert/strict'),make=require('./dom-helper.cjs');
 const {dom,w,run}=make();try{
+run(`v().relief=${JSON.stringify(require('../shared/relief').defaults())};`);
 run(`v().teachers=[{id:'t1',name:'Alpha FAJT',active:true,employment:'FAJT'},{id:'t2',name:'Beta',active:true},{id:'t3',name:'Dormant',active:false}];v().loads=Object.fromEntries([1,2,3,4,5,6].map(l=>[l,{Assembly:1,FTGP:2,FTT:2,EL:15}]));v().classes=[{ref:'c1',level:'1',shortName:'P'}];v().assignments=[{teacher:'t1',target:'1P',subject:'EL'}];tab='Workload';render();`);
 assert.equal(run('workloadData().fullTimeN'),1);assert.match(w.document.querySelector('.workload-guide').textContent,/FAJT/);
 run("tab='Ledger';render()");let table=w.document.querySelector('.workload-ledger');assert.equal(table.tHead.rows[0].cells[1].textContent.replace(/[↕▴▾]/g,'').trim(),'Load status');assert.equal(table.tBodies[0].rows[0].cells[0].querySelector('.workload-pill'),null);assert.equal(table.tBodies[0].rows[0].cells[1].textContent,'at load');assert.equal(table.tBodies[0].rows[1].cells[1].textContent,'under load');

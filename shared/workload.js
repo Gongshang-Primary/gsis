@@ -105,7 +105,14 @@ var GSISWorkload=(function(){
   const total=entries.reduce((n,e)=>n+(e.periods||0),0);
   return {entries,total,complete:!issues.length,issues:[...new Set(issues)]};
  }
- function analyse(d,rules){
+ // Only the two configured budgets are needed by the public ledger. No private
+ // relief defaults or legacy timetable budgets may substitute for missing input.
+ function fajtTargetSettings(value){
+  const weeklyPeriods=value?.weeklyPeriods,fajtWeeklyPeriods=value?.fajtWeeklyPeriods;
+  return value?.schema===3&&[weeklyPeriods,fajtWeeklyPeriods].every(n=>typeof n==='number'&&Number.isFinite(n)&&n>0)&&Number.isFinite(fajtWeeklyPeriods/weeklyPeriods)?{schema:3,weeklyPeriods,fajtWeeklyPeriods}:null;
+ }
+ function analyse(d,rules,reliefSettings=d.relief){
+  const targetSettings=fajtTargetSettings(reliefSettings);
   const subs=subjects(d),levels=['1','2','3','4','5','6'],reportLevels=[...levels,...((d.groups||[]).some(g=>tg().levels(g).length>1)?['multi']:[])],totals=empty(),byLevel=Object.fromEntries(reportLevels.map(l=>[l,{...empty(),subjects:{}}])),issues=[],seen=new Set(),rows=[],ledger=[];
   let activities=[],activityError='';try{activities=nonTeachingActivities(d);}catch(e){activityError=e.message;issues.push(activityError);totals.incomplete=true;}
   const groupMap=new Map((d.groups||[]).map(g=>[g.id,g])),groups=[...groupMap.values()],pltMap=new Map((d.organisations?.plt||[]).map(g=>[g.id,g])),plts=[...pltMap.values()];
@@ -210,8 +217,8 @@ var GSISWorkload=(function(){
    row.fttAllowance=row.noFTT?0:F;
    row.employment=employment(row.teacher);
    row.nonTeachingActual=row.FTT+row['Non-teaching'];
-   row.targetRetained=row.employment==='RT'?null:row.employment==='FAJT'?65/84:row.rules.retained;
-   row.targetPending=row.employment!=='FAJT'&&row.rules.pending.length>0;
+   row.targetRetained=row.employment==='RT'?null:row.employment==='FAJT'?(targetSettings?targetSettings.fajtWeeklyPeriods/targetSettings.weeklyPeriods:null):row.rules.retained;
+   row.targetPending=row.employment==='FAJT'?!targetSettings:row.rules.pending.length>0;
    row.quota=D!==null&&!row.incomplete&&row.rules.eligible&&!row.targetPending&&Number.isFinite(row.targetRetained)?row.nonTeachingActual+row.targetRetained*(D-row.nonTeachingActual):null;
    row.band=band(row.quota);
    row.status=!row.active?'Inactive':row.employment==='RT'?'No target':row.incomplete||D===null?'Incomplete':row.quota===null?'Target pending':row.total<row.band.lower-1e-9?'Below standard':row.total>row.band.upper+1e-9?'Above standard':'Standard';
@@ -229,8 +236,8 @@ var GSISWorkload=(function(){
 
   if(!N)issues.push('No active eligible teachers.');if(conflicts.length)issues.push('Art + Music assignments: multiple specialist indicators shown separately; never add percentages together.');
   if(!fullTimeN)issues.push('No active eligible full-time teachers for the Ledger target.');
-  return {demand:planned,D,subjects:subs,teachingIncomplete,rows,ledger,byLevel,totals,F,fByLevel,fttUnequal,N,standard,fullTimeN,teachingReference,special,issues:[...new Set(issues)],fttSubjects};
+  return {demand:planned,D,subjects:subs,teachingIncomplete,rows,ledger,byLevel,totals,F,fByLevel,fttUnequal,N,standard,fullTimeN,teachingReference,special,issues:[...new Set(issues)],fttSubjects,targetSettings};
  }
- return {analyse,validate,nonTeachingActivities,subjectIdentity,category,rate,subjects,KINDS,specialists,modal,band,isPD,employment,isFormSubject,subjectType,subjectTypeSubjects,validateSubjectType,isGroupSubject};
+ return {analyse,fajtTargetSettings,validate,nonTeachingActivities,subjectIdentity,category,rate,subjects,KINDS,specialists,modal,band,isPD,employment,isFormSubject,subjectType,subjectTypeSubjects,validateSubjectType,isGroupSubject};
 })();
 if(typeof module!=='undefined'&&module.exports)module.exports=GSISWorkload;
