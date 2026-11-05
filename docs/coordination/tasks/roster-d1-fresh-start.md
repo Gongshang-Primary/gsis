@@ -1,8 +1,8 @@
 # roster-d1-fresh-start: start Roster on D1 without history and without baseline timetables
 
-- Status: implementing route C continuation; Codex, lane R; PR #79 targets main
+- Status: route C implemented; full CI and exact-head review tracked on PR #79; Codex, lane R
 - Reviewer/model: Claude
-- Last updated (Asia/Singapore): 5 Nov 2026 16:25
+- Last updated (Asia/Singapore): 5 Nov 2026 16:49
 
 ## Owner request
 "write up also D1 start from no history no baseline timetable". Context: the owner is ready to forgo historical records ("not much as I just started this project") and re-upload baselines and redo Stapler plans, instead of a full import.
@@ -144,3 +144,16 @@ The continuation recovered local candidate `dad0fbea123a7a5313f3be090d993978056b
 The full regression evidence exposed one remaining product failure: ordinary imported-state evidence export called the fresh rollback metadata check before activation. Reproduced in `roster094-edge-roster.mjs`, then also covered for a fresh import with D1 routing enabled before activation. Export now checks for a retained release before requesting its re-entry report. Missing release tables are treated as no release; database failures and active fresh-owner mismatches still fail. Export does not change either prepared head. Canonical build and the ordinary import, fresh lifecycle, metadata and private-backend regression programs pass after this correction. Full-suite and published-head results follow below.
 
 An internal review also reproduced a manual-entry cutoff defect: an untouched opening grid defaulted to the first D1 day and excluded that day's duties from annual fairness. New rows now default to the preceding day, including at accounting-year rollover. Saved and explicitly entered dates are preserved. A failing-then-passing regression exercises the ordinary grid defaults, confirmation and a completed first-day duty. The canonical build, accounting, full synthetic fresh lifecycle, all 14 dependency checks and Chromium opening-grid test pass after this correction.
+### Exact implementation for review
+
+Model: Codex. Reviewer: Claude. Owner merges.
+
+Exact implementation head: `50ca8c9e97caafcb69ea8398c937656cba66861c`.
+Source tree: `962ccc0fa0f5721b007c5cc45a801df708f059ac`.
+Rebased base: `205b2e88c051ddf15ed856f3acb7de4f362bbb5f`, including #78, #80 and the owner's confirmed rollback to j. A documentation-only handoff commit records these immutable identifiers; the final branch head and its completed CI run are identified on [PR #79](https://github.com/helper-gsps/gsis/pull/79).
+
+Fresh local checks passed after the final source change: `npm run build`, `roster-fresh-start-accounting.cjs`, `roster-fresh-start-worker.mjs`, all 14 `roster-allocation-dependencies.cjs` checks and `roster-opening-balances-browser.cjs`. Earlier in this continuation, the failing ordinary import export was reproduced, fixed and verified with `roster094-edge-roster.mjs`, `roster-fresh-metadata.mjs` and `paid097-backend.mjs`.
+
+The full four-shard Node/LORD matrix and browser portability checks are required on the final PR head; PR #79 records the completed result and run URL. The runner's six optional historical comparison branches remain excluded; current behavior assertions stay selected. Initial local test setup failures from missing generated ZIPs and an unset Chromium path were corrected by running the canonical build in every isolated worktree and supplying the installed browser, without changing tests or assertions.
+
+No deployment, live Google/D1/R2 write, provider send, authority flag change or merge was performed. Remaining gate: Claude reviews the exact final head, then the owner decides the merge and cutover. Future absences are re-entered by the owner; within-week usage, rotation and SRE history are not imported.
