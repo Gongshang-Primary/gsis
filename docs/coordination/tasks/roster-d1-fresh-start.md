@@ -45,7 +45,7 @@ Best at a natural break: the school holidays or the new school year (January 202
 - Tests: Admin-only edit (SMC 403, teacher hidden), paste preview and mismatch handling, audit per row, fairness ordering uses balances, no double count across the as-of date, CSV round trip.
 
 ## Owner decision (5 Nov 2026, afternoon): route C chosen
-After v0.9.9l timed out on the Google Assign Relief read (UPSTREAM_TIMEOUT, 6 Nov, about 30 s; Claude advised rollback to j, owner confirmation pending), the owner chose the D1 fresh start ("C") as the way to restore a working allocator, instead of a fresh Google file (B, rejected) or archive-only (A, still allowed as a stopgap).
+After v0.9.9l timed out on the Google Assign Relief read (UPSTREAM_TIMEOUT, 6 Nov, about 30 s; owner rolled back to j the same afternoon), the owner chose the D1 fresh start ("C") as the way to restore a working allocator, instead of a fresh Google file (B, rejected) or archive-only (A, still allowed as a stopgap).
 - Status: authorised; Codex, lane R, TOP PRIORITY (ahead of the Google speed fix, which stays next).
 - Step 1 (now): rebase PR #79 onto main (now containing #80 b72fb48 and #78 324062a; release label 1f759a9), retarget its base to `main`, resolve conflicts with the Stapler delink (#78) and the clock/dependency scope (#80), keep the canonical build current, full CI green, exact head for Claude.
 - Add the opening-balance prefill from the frozen Google Roster (in the ruling above; #79 as built has entry/paste/export but no prefill).
