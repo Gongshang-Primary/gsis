@@ -1,6 +1,6 @@
 # roster-drive-outputs-bridge-error: Drive writes fail with ROSTER_BRIDGE_ERROR on v0.9.9n (live, 6 Nov)
 
-- Status: authorised (owner on v0.9.9n, 6 Nov ~06:00, outputs disabled to stop alerts); Codex; lane R; priority 1 (blocks backups and daily outputs)
+- Status: claimed (owner on v0.9.9n, 6 Nov ~06:00, outputs disabled to stop alerts); Codex; lane R; priority 1 (blocks backups and daily outputs)
 - Reviewer/model: Claude
 
 ## Evidence (Claude, D1 read-only + owner's Apps Script checks)
@@ -17,3 +17,13 @@
 4. Alerts: one SMC/Admin alert per kind per day (e.g. "Daily Drive outputs failing: N dates"), not per date; no alert while the feature is disabled.
 5. Tests: realistic workbook passes the writer end to end (fake Drive); error text reaches the ledger; stuck run recovers; alert dedupe.
 6. Canonical build; full CI; exact head. Ships as v0.9.9o with #84 (and the Codex Contacts PR if ready).
+
+## Codex claim (6 November 2026, Asia/Singapore)
+
+- Owner/model: Codex; reviewer: Claude; lane R; priority 1.
+- Branch: `codex/roster-drive-outputs-bridge-error`.
+- Base: `65f82acceb90e3a1aa44fadac301cc39923444c1`.
+- Scope: real Drive writer/privacy guard; backup and daily-output ledger, leases and alerts; signed bridge error projection; ledger/System Health UI; focused tests; canonical generated copies; task and changelog.
+- Acceptance: realistic renderer workbook through fake Drive writer; private cell/TXT rejection; sanitised Google message/code in ledger and health; expired-run retry; per-kind/day alerts and disabled silence; canonical build and full Node/LORD CI.
+- Owner's priority-1 instruction authorises this bounded work while #84 awaits review and #83 remains separate. No edits to allocator priority or Contacts work.
+- Out of scope: deployment, live Drive/D1 writes, authority/config changes, notifications, release-label assembly and merging. Intended release is v0.9.9o with #84; owner merges after Claude review.
