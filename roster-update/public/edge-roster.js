@@ -23,7 +23,7 @@ import {runRosterMirror,rosterMirrorStatus,releaseRosterMirror} from './edge-ros
 import {runBackupJobs,buildContinuityView,queueBackupRequest,backupRequests} from './edge-roster-backup-jobs.js';
 import {backupLedger,backupStatus,readBackupConfig,sanitizeBackup} from './edge-roster-backup.js';
 import {runDailyOutputs,readDailyConfig} from './edge-roster-daily-outputs.js';
-import {RosterExport,GSISExcel,rosterAllocationAuditAccepted_,rosterAllocationAuditCapture_,rosterAllocationAuditText_} from './edge-roster-output-renderers.js';
+import {RosterExport,GSISExcel,rosterAllocationAuditCapture_,rosterAllocationAuditText_} from './edge-roster-output-renderers.js';
 import {readQuietMode} from '../../shared/roster-quiet-mode.js';
 import {queueRosterImport,rosterImportRunnerStatus,drainRosterImports} from './edge-roster-import-runner.js';
 import {readRosterCutoverFreeze,beginRosterCutoverFreeze,cancelRosterCutoverFreeze,syncRosterCutoverFreeze} from '../../shared/roster-cutover-freeze.js';
@@ -114,7 +114,6 @@ export async function mutateEdgeRoster(env,{actor,requestId,command,who,apply,ne
    if(run&&result.allocatorRun?.id===run.id){Object.assign(run,timing);run.log.push({seq:(run.log.at(-1)?.seq||0)+1,at:new Date().toISOString(),message:'Preparation took '+(preparationMs/1000).toFixed(1)+' s across '+(attempt+1)+' attempt(s).'});}
   }
   state.revision=(loaded.rawState.revision||0)+(domainChanged?1:0);
-  if(domainChanged&&needsContext)rosterAllocationAuditAccepted_(state,loaded.rawState,ctx,{...command,requestId});
   const accepted={...result,revision:state.revision,requestId,acceptedRevision:state.revision,acceptedAt:ctx.iso};
   const receiptValue=textEncoder.encode(JSON.stringify(accepted)).length>250000?{edgeResultObject:true,reference:await objectWrite(env,'receipts',sha256Hex(actor)+'/'+requestId,accepted),revision:state.revision,requestId}:accepted;
   const packed=needsContext?await pack(env,state,loaded.rawState):storedAuditState(state);
@@ -586,25 +585,48 @@ export async function driveBackupAdmin(env,input,who){
 // Existing Allocation Audit TXT and the daily workbook share one captured revision.
 export async function dailyOutputsEdgeRoster(env,options={}){
  return runDailyOutputs(env,{...options,bridge:p=>signedBridge(env,p),quiet:async()=> (await readQuietMode(database(env))).active||(await auditAvailability(env)).notifications,alert:health=>queueDriveOutputAlert(env,health),seed:async today=>{
-  const db=database(env);if(await db.prepare('SELECT 1 found FROM gsis_roster_daily_outputs WHERE date=?').bind(today).first())return;
+  const db=database(env);await auditSchema(env);
+  // Recover dates written before the Drive queue existed, including R2-only
+  // audit archives. A verified Drive ledger entry, not an R2 export, closes this gap.
+  await db.prepare(`WITH start AS (SELECT COALESCE((SELECT json_extract(value_json,'$') FROM gsis_edge_records WHERE scope='roster' AND collection='freshStart' AND record_id='key:effectiveDate'),'') date),
+   dates AS (SELECT DISTINCT record_date date FROM gsis_edge_records WHERE scope='roster' AND collection='audit' AND record_id<>'$' UNION SELECT date FROM gsis_roster_audit_exports)
+   INSERT INTO gsis_roster_daily_outputs(date,desired_revision)
+   SELECT dates.date,heads.revision FROM dates,start,gsis_edge_heads heads WHERE heads.scope='roster' AND heads.mode='active' AND dates.date GLOB '20??-??-??' AND dates.date>=start.date
+   AND (COALESCE((SELECT value_json FROM gsis_edge_records WHERE scope='roster' AND collection='systemConfig' AND record_id='key:verboseLogging'),'true')<>'false' OR EXISTS(SELECT 1 FROM gsis_edge_records WHERE scope='roster' AND collection='audit' AND record_date=dates.date AND json_type(value_json,'$.essential')='true'))
+   AND NOT EXISTS(SELECT 1 FROM gsis_backup_ledger ledger WHERE ledger.kind='log' AND ledger.date=dates.date AND ledger.status='verified' AND ledger.started_at>=COALESCE(strftime('%s',start.date||'T00:00:00+08:00')*1000,0))
+   ON CONFLICT(date) DO UPDATE SET finalized=0,written_revision=-1 WHERE finalized=1`).run();
+  if(await db.prepare('SELECT 1 found FROM gsis_roster_daily_outputs WHERE date=?').bind(today).first())return;
   const refs=await readEdgeRosterReferences(env);if(refs.calendarByDate?.[today]?.available!==true||refs.calendarByDate[today].schoolDay!==true)return;
   const register=await readEdgeRosterRegister(env),plan=await db.prepare("SELECT 1 found FROM gsis_edge_records WHERE scope='roster' AND collection='staplerPlans' AND record_date=? AND (json_extract(value_json,'$.confirmedRevision') IS NOT NULL OR json_extract(value_json,'$.publishedRevision') IS NOT NULL)").bind(today).first();
   if(!GSISRoster.active(register.state.entries,today)&&!plan)return;
   await db.prepare("INSERT OR IGNORE INTO gsis_roster_daily_outputs(date,desired_revision) SELECT ?,revision FROM gsis_edge_heads WHERE scope='roster' AND mode='active'").bind(today).run();
  },prepare:async(date,{now,final})=>{
-  const refs=await readEdgeRosterReferences(env),calendar=refs.calendarByDate?.[date];if(calendar?.available!==true)fail(503,'DAILY_OUTPUT_CALENDAR','The school date is not verified.');if(calendar.schoolDay!==true)return {schoolDay:false};
-  const loaded=await loadEdgeRoster(env,{hydrate:true,dates:[date]}),state=loaded.state,ctx=await buildEdgeRosterContext(env,state,{operation:'exportDaily',date,fullTeachers:true,dailyDrive:true});
+  const loaded=await loadEdgeRoster(env);let state=loaded.state,ctx,workbookError='';
   const originalCount=state.audit.filter(r=>r.date===date&&!r.auditExportSuppressed||r.date===date&&r.essential).length;
   await auditSchema(env);const previous=await database(env).prepare('SELECT reference_json FROM gsis_roster_audit_exports WHERE date=?').bind(date).first(),reference=state.allocationAuditExports?.[date]?.archiveObject||(previous?JSON.parse(previous.reference_json):null);
   if(reference){const old=await objectRead(env,reference);if(old.date!==date||!Array.isArray(old.audit))fail(503,'DAILY_OUTPUT_AUDIT','The retained audit evidence could not be verified.');for(const collection of ['audit','optimisationRuns']){const merged=new Map((old[collection]||[]).map(r=>[r.id,r]));for(const row of state[collection].filter(r=>r.date===date)){const prior=merged.get(row.id);merged.set(row.id,row.archiveRef&&prior?prior:{...prior,...row,...(!row.decisionEvidence&&prior?.decisionEvidence?{decisionEvidence:prior.decisionEvidence}:{})});}state[collection]=state[collection].filter(r=>r.date!==date).concat([...merged.values()]);}}
   if([...state.audit,...state.optimisationRuns].some(r=>r.date===date&&(r.archiveRef||r.decisionEvidenceArchive&&!r.decisionEvidence)))fail(503,'DAILY_OUTPUT_AUDIT_ARCHIVE','Original audit evidence is unavailable; the full trail was not truncated.');
   await hydrateAuditEvidence(state,[date],{all:true});rosterAllocationAuditCapture_(state);
-  const daily=await sanitizeBackup(GSISRosterOperations.read(state,{...ctx,iso:new Date(now).toISOString()},{operation:'exportDaily',date,fullTeachers:true,dailyDrive:true}));daily.timetableName=daily.teacherSummary.staplerStatus==='baseline'?(ctx.timetableEntries.find(e=>e.id===ctx.days[date]?.id)?.name||'Baseline timetable'):'Stapler plan';
-  const page=RosterExport.dailyTeacherPage(daily,{final}),book=RosterExport.workbookFiles([page]),bytes=new Uint8Array(await GSISExcel.packageFiles(book.files).arrayBuffer()),text=rosterAllocationAuditText_(state,date,new Date(now).toISOString(),{daily,final});
-  const guards=[{scope:'roster',revision:loaded.revision,mode:'active'},...ctx.edgeGuards],checks=await database(env).batch([...guards.map(g=>database(env).prepare('SELECT revision,mode FROM gsis_edge_heads WHERE scope=?').bind(g.scope)),database(env).prepare("SELECT COALESCE(MAX(revision),0) revision FROM gsis_edge_records WHERE scope='roster' AND collection='audit' AND record_date=? AND record_id<>'$'").bind(date)]);
+  const text=rosterAllocationAuditText_(state,date,new Date(now).toISOString()),files=text?[{kind:'log',bytes:new TextEncoder().encode(text),records:state.audit.filter(r=>r.date===date).length+state.optimisationRuns.filter(r=>r.date===date).length}]:[];
+  try{
+   const refs=await readEdgeRosterReferences(env),calendar=refs.calendarByDate?.[date];if(calendar?.available!==true)fail(503,'DAILY_OUTPUT_CALENDAR','The school date is not verified.');
+   ctx={edgeGuards:[{scope:'roster-references',revision:refs.headRevision,mode:'active'}]};
+   if(calendar.schoolDay===true){
+    const workbookState=await hydrate(env,state,[date]);ctx=await buildEdgeRosterContext(env,workbookState,{operation:'exportDaily',date,fullTeachers:true,dailyDrive:true});
+    const daily=await sanitizeBackup(GSISRosterOperations.read(workbookState,{...ctx,iso:new Date(now).toISOString()},{operation:'exportDaily',date,fullTeachers:true,dailyDrive:true}));daily.timetableName=daily.teacherSummary.staplerStatus==='baseline'?(ctx.timetableEntries.find(e=>e.id===ctx.days[date]?.id)?.name||'Baseline timetable'):'Stapler plan';
+    const page=RosterExport.dailyTeacherPage(daily,{final}),book=RosterExport.workbookFiles([page]),bytes=new Uint8Array(await GSISExcel.packageFiles(book.files).arrayBuffer());files.unshift({kind:'excel',bytes,records:page.rows.filter(r=>r.teacherId&&r.field===0).length});
+   }else if(!text)return {schoolDay:false};
+  }catch(error){
+   // The historical TXT needs only retained audit evidence. Recover it once even
+   // when workbook inputs are unavailable; keep the workbook failure retryable.
+   const since=Date.parse((state.freshStart?.effectiveDate||'1970-01-01')+'T00:00:00+08:00');
+   if(!text||await database(env).prepare("SELECT 1 found FROM gsis_backup_ledger WHERE kind='log' AND date=? AND status='verified' AND started_at>=? LIMIT 1").bind(date,since).first())throw error;
+   workbookError=/^[A-Z][A-Z0-9_]{0,79}$/.test(error?.code||'')?error.code:'DAILY_OUTPUT_SOURCE';ctx=null;
+  }
+  const guards=[{scope:'roster',revision:loaded.revision,mode:'active'},...(ctx?.edgeGuards||[])],checks=await database(env).batch([...guards.map(g=>database(env).prepare('SELECT revision,mode FROM gsis_edge_heads WHERE scope=?').bind(g.scope)),database(env).prepare("SELECT COALESCE(MAX(revision),0) revision FROM gsis_edge_records WHERE scope='roster' AND collection='audit' AND record_date=? AND record_id<>'$'").bind(date)]);
   if(guards.some((g,i)=>checks[i].results?.[0]?.revision!==g.revision||checks[i].results?.[0]?.mode!==g.mode))return {deferred:'source-advanced'};
   const audit=checks.at(-1).results[0];
   const evidence=text?await objectWrite(env,'audit',date,{schema:1,date,revision:state.revision,audit:state.audit.filter(r=>r.date===date),optimisationRuns:state.optimisationRuns.filter(r=>r.date===date)}):null;
-  return {schoolDay:true,revision:state.revision,sourceRevision:loaded.revision,metadata:{auditReference:evidence,sourceCount:originalCount,sourceRevision:audit.revision},files:[{kind:'excel',bytes,records:page.rows.filter(r=>r.teacherId&&r.field===0).length},...(text?[{kind:'log',bytes:new TextEncoder().encode(text),records:state.audit.filter(r=>r.date===date).length+state.optimisationRuns.filter(r=>r.date===date).length}]:[])]};
+  return {schoolDay:true,auditOnly:!files.some(f=>f.kind==='excel'),workbookError,revision:state.revision,sourceRevision:loaded.revision,metadata:{auditReference:evidence,sourceCount:originalCount,sourceRevision:audit.revision},files};
  },onComplete:async pending=>{const m=pending.metadata;if(!m?.auditReference||!pending.files.some(f=>f.kind==='log'&&f.done&&!f.alreadyFinal))return;await auditSchema(env);await database(env).prepare('INSERT INTO gsis_roster_audit_exports(date,source_count,source_revision,reference_json,exported_at) VALUES(?,?,?,?,?) ON CONFLICT(date) DO UPDATE SET source_count=excluded.source_count,source_revision=excluded.source_revision,reference_json=excluded.reference_json,exported_at=excluded.exported_at WHERE source_revision<=excluded.source_revision').bind(pending.date,m.sourceCount,m.sourceRevision,JSON.stringify(m.auditReference),Date.now()).run();}});
 }

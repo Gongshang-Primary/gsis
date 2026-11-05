@@ -648,7 +648,7 @@ function rosterAbsenceDispatch_(req,c){gsisRequireBackendRole_('roster');
       if(req.intakeAcceptedAt&&p.operation==='saveAbsence'){ctx.reportedAt=req.intakeAcceptedAt;ctx.reportToday=new Date(Date.parse(req.intakeAcceptedAt)+8*3600000).toISOString().slice(0,10);ctx.attendanceOnly=req.intakeProjection===true;ctx.resubmission=req.intakeProjection===true&&!p.id;ctx.reportSequence=req.intakeSequence||0;if(req.intakeOverlapChoice){if(req.intakeOverlapChoice.token!==rosterAbsenceOverlapKey_(state,p))rosterOperationsConflict_('ABSENCE_SHORTER_CONFIRMATION','Saved absence details changed. Review the shorter report again.');ctx.resubmissionChoice=req.intakeOverlapChoice.value;}}
       if(req.intakeInstructionSource){rosterAbsenceIntakeInstructionCheck_(state,ctx,p,req.intakeInstructionSource);ctx.intakeInstructions=true;ctx.reportedAt=req.intakeAcceptedAt;ctx.reportSequence=req.intakeSequence||0;}
       GSISRosterOperations.seedNameBridges(state,ctx.people);
-      const before=state.outbox.length,auditBefore={...state,assignments:state.assignments.map(a=>({...a})),audit:state.audit.map(e=>({id:e.id})),optimisationRuns:state.optimisationRuns.map(e=>({id:e.id}))};
+      const before=state.outbox.length,auditBefore={audit:state.audit.map(e=>({id:e.id})),optimisationRuns:state.optimisationRuns.map(e=>({id:e.id}))};
       ctx.intakePeer=req.intakeProjection===true;
       const attendanceProjection=ctx.attendanceOnly===true,peerProjection=p.operation==='requestMutual'&&p.proposalOnly===true;
       if(!attendanceProjection&&!peerProjection){rosterOperationsPhase_('absence-reconcile',()=>rosterOperationsReconcile_(state,ctx));for(const d of Object.keys(ctx.days)){GSISRosterAllocation.initialiseHistory(state,ctx,d);GSISRosterAllocation.captureWeek(state,ctx,d);}}
@@ -698,7 +698,7 @@ function rosterOperationsPublishDispatch_(req,c){gsisRequireBackendRole_('roster
    // Apply to the latest locked records. Only immutable baseline preparation
    // happens outside the lock; saved plan/absence/assignment facts stay current.
    GSISRosterOperations.seedNameBridges(state,ctx.people);rosterOperationsRefreshClock_(ctx);
-   const current=GSISRosterOperations.composeStaplerContext(state,{...ctx,days:ctx.baselineDays||ctx.days}),before={...state,assignments:state.assignments.map(a=>({...a})),audit:state.audit.map(e=>({id:e.id})),optimisationRuns:state.optimisationRuns.map(e=>({id:e.id}))};
+   const current=GSISRosterOperations.composeStaplerContext(state,{...ctx,days:ctx.baselineDays||ctx.days}),before={audit:state.audit.map(e=>({id:e.id})),optimisationRuns:state.optimisationRuns.map(e=>({id:e.id}))};
    const preparedClock=GSISRosterAllocation.prepareClock(current,state,p);
    const result=rosterOperationsPhase_('publication-apply',()=>GSISRosterOperations.apply(state,current,{...p,notifyMode:'none'}));state.revision++;
    state.dailyPublicationStates[p.date||current.today].sourceRevision=state.revision;
@@ -878,7 +878,7 @@ function rosterOperationsDispatchCore_(req,c){gsisRequireBackendRole_('roster');
  const lock=LockService.getScriptLock();if(!rosterOperationsPhase_('lock-wait',()=>deployLock_(lock,8000)))error_(503,'Another save is running. Retry the same save.');
  let s,ctx,result,replayed=false,notificationsQueued,cellMutation=false,auditBefore;
  try{
-  s=rosterOperationsPhase_('state-read',()=>rosterOperationsState_());auditBefore={...s,assignments:s.assignments.map(a=>({...a})),audit:s.audit.map(e=>({id:e.id})),optimisationRuns:s.optimisationRuns.map(e=>({id:e.id}))};const old=s.receipts.find(r=>r.id===p.requestId);
+  s=rosterOperationsPhase_('state-read',()=>rosterOperationsState_());auditBefore={audit:s.audit.map(e=>({id:e.id})),optimisationRuns:s.optimisationRuns.map(e=>({id:e.id}))};const old=s.receipts.find(r=>r.id===p.requestId);
   if(old){
    if(old.actor!==req.identity.email||old.digest!==digest)error_(409,'This request ID was used for a different save.');
    cellMutation=old.cellMutation===true&&old.revision===s.revision&&rosterOperationsCellMutation_(p,s);

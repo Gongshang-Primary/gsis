@@ -76,9 +76,9 @@ export async function runDailyOutputs(env,{now=Date.now(),bridge,prepare,seed,on
      const view=await prepare(row.date,{now,final});
      if(view.deferred){await db.prepare('UPDATE gsis_roster_daily_outputs SET next_attempt_at=? WHERE date=?').bind(now+INTERVAL,row.date).run();continue;}
      if(view.schoolDay===false){await db.prepare('UPDATE gsis_roster_daily_outputs SET next_attempt_at=? WHERE date=?').bind(now+86400000,row.date).run();continue;}
-     if(view.schoolDay!==true||!Number.isSafeInteger(view.revision)||!Number.isSafeInteger(view.sourceRevision)||!Array.isArray(view.files)||!view.files.some(f=>f.kind==='excel'))fail('DAILY_OUTPUT_SOURCE','The daily source could not be verified.');
+     if(view.schoolDay!==true||!Number.isSafeInteger(view.revision)||!Number.isSafeInteger(view.sourceRevision)||!Array.isArray(view.files)||!(view.files.some(f=>f.kind==='excel')||view.auditOnly===true&&view.files.length===1&&view.files[0].kind==='log'))fail('DAILY_OUTPUT_SOURCE','The daily source could not be verified.');
      const bucket=env.ROSTER_TIMETABLE_SNAPSHOTS;if(!bucket?.put||!bucket?.get)fail('DAILY_OUTPUT_BUCKET','Bind the private Roster output bucket.');
-     pending={date:row.date,revision:view.revision,sourceRevision:view.sourceRevision,final,metadata:view.metadata||{},files:[]};
+     pending={date:row.date,revision:view.revision,sourceRevision:view.sourceRevision,final,workbookError:view.workbookError||'',metadata:view.metadata||{},files:[]};
      for(const file of view.files)pending.files.push(await encodedFile(bucket,row.date,view.sourceRevision,file));
      await guard();await db.prepare('UPDATE gsis_roster_daily_outputs SET pending_json=? WHERE date=? AND finalized=0').bind(JSON.stringify(pending),row.date).run();
     }
@@ -95,6 +95,7 @@ export async function runDailyOutputs(env,{now=Date.now(),bridge,prepare,seed,on
     }
     if(pending.files.every(f=>f.done)){
      if(onComplete)await onComplete(pending);
+     if(pending.workbookError){await failureRow(db,row.date,pending.revision,now,{code:pending.workbookError});result.failed++;await db.prepare("UPDATE gsis_roster_daily_outputs SET pending_json='',failure_count=failure_count+1,last_attempt_at=?,next_attempt_at=?,last_error=? WHERE date=?").bind(now,now+INTERVAL,pending.workbookError,row.date).run();continue;}
      await db.prepare("UPDATE gsis_roster_daily_outputs SET written_revision=MAX(written_revision,?),last_success_at=?,next_attempt_at=0,pending_json='',failure_count=0,last_error='',finalized=? WHERE date=?").bind(pending.sourceRevision,now,pending.final||pending.files.every(f=>f.alreadyFinal)?1:0,row.date).run();result.exports.push({date:row.date,revision:pending.revision,final:pending.final});
     }
    }catch(error){
