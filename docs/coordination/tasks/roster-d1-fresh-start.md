@@ -1,8 +1,8 @@
 # roster-d1-fresh-start: start Roster on D1 without history and without baseline timetables
 
-- Status: design draft; Codex, lane R; after roster-d1-timetable-reconcile-cancels
+- Status: implementing route C continuation; Codex, lane R; PR #79 targets main
 - Reviewer/model: Claude
-- Last updated (Asia/Singapore): 5 Nov 2026 05:10
+- Last updated (Asia/Singapore): 5 Nov 2026 16:25
 
 ## Owner request
 "write up also D1 start from no history no baseline timetable". Context: the owner is ready to forgo historical records ("not much as I just started this project") and re-upload baselines and redo Stapler plans, instead of a full import.
@@ -55,13 +55,13 @@ After v0.9.9l timed out on the Google Assign Relief read (UPSTREAM_TIMEOUT, 6 No
 
 - Owner/model: Codex
 - Branch: `codex/roster-d1-fresh-start`
-- Dependency: the exact reviewed timetable-reconciliation head; stack this PR on `codex/roster-d1-timetable-reconcile` until that PR merges.
+- Dependency: #78 and #80 are now on main. PR #79 was retargeted to main and rebased onto `f84f8196761f8ca53c57cf8a2e8e26477348dbb7` for the route C continuation.
 - Scope: Roster's signed Google migration bridge, D1 import/fence/rollback, accounting and history projections, edge setup and read-only archive UI, focused and end-to-end tests, canonical generated copies.
 - Excluded: deployment, live freeze/import/reset/activation, live messages, full historical migration, Deploy authority changes, Cloudflare flags or bindings.
 
 ### Small source capture and empty import
 
-Add an Admin-only signed `edgeFreshStartSource` operation. It requires the confirmed freeze and binds its retained receipt to the actor, request, freeze and Singapore start date. Read only settings and name bridges. Capture `systemConfig`, `nameBridges`, `nameBridgesSeeded` and `dailyEmploymentSettings` (notification settings outside `systemConfig`); leave secrets in their existing environment. Record the original Google document identities. Do not call the full-history snapshot builder or prepare any baseline/Stapler objects. A separate optional signed read may propose opening totals for Admin review; that proposal never saves balances automatically.
+Add an Admin-only signed `edgeFreshStartSource` operation. It requires the confirmed freeze and binds its retained receipt to the actor, request, freeze and Singapore start date. Read only settings and name bridges. Capture `systemConfig`, `nameBridges`, `nameBridgesSeeded`, `dailyEmploymentSettings` (notification settings outside `systemConfig`), and absence `types`/`typeDetailsVersion`; leave secrets in their existing environment. Normalize the copied settings through an empty schema-valid state and compare the actual D1 settings digest after validation. Record the original Google document identities. Do not call the full-history snapshot builder or prepare any baseline/Stapler objects. A separate optional signed read may propose opening totals for Admin review; that proposal never saves balances automatically.
 
 The Worker `freshStart` action accepts that server-selected source, verifies its digest, and refuses active/paused heads, incomplete reset cleanup or a conflicting retained import. Reuse the existing reserve/stage/finalize transaction so both scopes become `imported` together at head revision 1. The operational document also starts at revision 1. Create an empty `GSISRosterOperations.initial()` document plus validated settings, a fresh-start audit event and metadata; create `{schema:1,revision:1,entries:[],receipts:[]}` for the register. No historical absences, duties, messages, plans, audit rows or receipts enter D1.
 
@@ -102,3 +102,45 @@ The fairness question is resolved by the later owner ruling: Admin enters and co
 5. Regenerate all canonical outputs, run the complete Node and LORD suite, and hand Claude the exact head.
 
 The design draft precedes implementation. No live Google, D1, R2 or messaging action is part of this task.
+
+## Implementation evidence
+
+The design-only checkpoint was published as draft PR #79 at `9779a8dea776fa10ed20997238ce1b43d1461088`, stacked on draft PR #78 at `640d2b67515ff868a4cd0cf2902e7478d29cd133`. The latter passed the complete 977-program Node suite and all LORD checks before this build started.
+
+The implementation adds the signed small-source capture, atomic empty import and fresh manifest, config-specific activation and read-only drift proofs, authenticated fixed archive projections, archive-safe mirror refusal and paused D1 rollback report. Fresh drift checks do not call the full-history snapshot builder. Original Google document identities are read strictly: a missing captured file or pointer race refuses instead of falling back to a current document. Future start dates refuse. Initial opening balances require explicit Admin confirmation, and later corrections use row versions, a reason, a durable receipt and before/after audit evidence. January proposals use the target accounting year separately from the frozen cutoff, preventing prior-year totals from carrying forward.
+
+The UI includes Start fresh, the Admin/SMC opening-balance grid, paste preview, CSV export/round trip, retained retry identity, Google proposals, since-date notices and read-only archive views. No normal Google mirror is permitted during a fresh epoch. System Health identifies the frozen archive rather than claiming Google remains the operational record.
+
+Focused verification uses synthetic records only:
+
+1. `roster-fresh-start-backend.cjs`: source/freeze/identity/digest checks, bounded Unicode capture, uncertain upload/release replay, strict original-document reads, archive permissions and January prefill.
+2. `roster-fresh-start-worker.mjs`: real D1/R2 test bindings through empty import, activation, first baseline upload, Admin opening save, absence, Auto-allocate, two stable reloads, publication and WhatsApp queued; archive/mirror/rollback and retained re-entry evidence.
+3. `roster-fresh-start-accounting.cjs`: 11 scenarios covering roles, complete initial confirmation, row conflict/validation/audit, annual and weekly cutoffs, no double count, year rollover and reviewed prefill.
+4. `roster-fresh-start-gateway.mjs`: actual Pages route, signed sessions, same-origin POST, input/size bounds, fixed archive identity, current backend roles and no operational mutation.
+5. `roster-fresh-start-ui.cjs`, `roster-fresh-start-retry-ui.cjs`, `roster-fresh-coverage-ui.cjs`, `roster-opening-balances-browser.cjs` and `roster-d1-archive-ui.cjs`: setup/retry, confirmed restart/reset recovery, uncertain outcomes, filtering/sorting/paste/CSV, real browser navigation, role boundaries, empty-history notices and archive recovery. Desktop/mobile views were inspected.
+
+Canonical build and 40 LORD programs passed locally. The exact final implementation head and full CI result are recorded on PR #79; the design checkpoint alone is not implementation evidence. No deployment, real messages, production flags, or live Google/D1/R2 writes were performed. Old within-week usage, rotation and SRE history remain outside the fresh epoch and must be considered when choosing the live start date.
+
+## Route C continuation (5 Nov 2026, afternoon)
+
+Codex resumed the existing lane R claim on PR #79 at the owner's instruction. The PR now targets `main`, observed at `f84f8196761f8ca53c57cf8a2e8e26477348dbb7`. The original PR head was `39bde6a1629342a21cc8a283db549d8ae6bfe3cb`. The runtime approval reviewer rejected the documentation-only main claim update; continuation was therefore recorded in the existing PR discussion and this branch, with no main update.
+
+The rebase preserves #78's independent Stapler day snapshots, migration/reconciliation controls and #80's boundary clock and derived balance/rotation dependency checks. Empty import collections and the normal first-timetable upload remain unchanged. Future absences are not copied; the owner re-enters them on D1.
+
+Code inspection found that the original PR already contained a signed, manually requested Google proposal route. This continuation completes the review experience: choose a cutoff, compare current and proposed values, match Google's stable staff IDs, apply reviewed values to the editable grid, then explicitly save with the existing reason, row versions, receipts and audit records. Same-name teachers with distinct IDs are supported; ambiguous pasted names still require correction. Fractional source totals remain visible for Admin correction to the required whole-number balances, never silently rounded.
+
+Six failures from the original PR's CI were reproduced. Fresh metadata/status reads now use SELECT only and do not create D1 tables during Google recovery; unavailable or inconsistent active storage still refuses. A confirmed preactivation state reports the Google backup as unavailable without creating operational heads; running a mirror still refuses. Drift checking handles a captured preparation before its manifest exists. Two backend fixtures implement the real `deleteProperty` operation and verify removal of the stale fresh-epoch marker.
+
+Final review also reproduced an incomplete-activation rollback defect: D1 could be active before Google marked the freeze complete, and releasing D1 alone left Google frozen. Rollback now writes a cancellation tombstone for its matching freeze before removing the authority fence. Lost acknowledgements are retryable; newer freezes and newer D1 owners remain protected. The backend regression checks the actual legacy write guard after rollback.
+
+Synthetic acceptance now checks exact assignment IDs across reloads, a newly created Stapler snapshot before confirmation, a differing replacement baseline plus pruning of the origin, unchanged plan/assignments after two reads, and rollback re-entry entries for every tested write. Opening-balance corrections change fairness and cause one replan; metadata-only edits do not. Rotation remains a separate dependency.
+
+Verification of the final candidate and exact review head will be recorded below and on PR #79. No deploy, live data mutation, real notification, or flag change is authorised by this work. Claude reviews; the owner merges.
+
+### Resumed verification and import-evidence correction
+
+The continuation recovered local candidate `dad0fbea123a7a5313f3be090d993978056be17b`; GitHub still held `39bde6a1629342a21cc8a283db549d8ae6bfe3cb`. Current main remained `f84f8196761f8ca53c57cf8a2e8e26477348dbb7`. The existing claim was refreshed in PR #79 before further edits.
+
+The full regression evidence exposed one remaining product failure: ordinary imported-state evidence export called the fresh rollback metadata check before activation. Reproduced in `roster094-edge-roster.mjs`, then also covered for a fresh import with D1 routing enabled before activation. Export now checks for a retained release before requesting its re-entry report. Missing release tables are treated as no release; database failures and active fresh-owner mismatches still fail. Export does not change either prepared head. Canonical build and the ordinary import, fresh lifecycle, metadata and private-backend regression programs pass after this correction. Full-suite and published-head results follow below.
+
+An internal review also reproduced a manual-entry cutoff defect: an untouched opening grid defaulted to the first D1 day and excluded that day's duties from annual fairness. New rows now default to the preceding day, including at accounting-year rollover. Saved and explicitly entered dates are preserved. A failing-then-passing regression exercises the ordinary grid defaults, confirmation and a completed first-day duty. The canonical build, accounting, full synthetic fresh lifecycle, all 14 dependency checks and Chromium opening-grid test pass after this correction.

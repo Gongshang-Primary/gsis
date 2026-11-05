@@ -172,17 +172,11 @@ function rosterPersonalCalculations_(req,c){
   // reliefConfirmed_ already checked the source after its last read. The own-row
   // projection above is pure; repeating that spreadsheet read adds no evidence.
  }
- try{output.completion=rosterOperationsPhase_('calculations-history',()=>rosterPersonalCompletion_(rosterOperationsPhase_('calculations-history-read',()=>rosterOperationsState_()),user.staffId,today));}
+ try{const state=rosterOperationsPhase_('calculations-history-read',()=>rosterOperationsState_());output.completion=rosterOperationsPhase_('calculations-history',()=>rosterPersonalCompletion_(state,user.staffId,today));const coverage=GSISRosterOperations.historyCoverage(state);if(coverage)output.historyCoverage=coverage;}
  catch(e){if(e.status!==503)throw e;output.completion={from:today.slice(0,4)+'-01-01',to:today,throughWeek:GSISRosterAllocation.monday(today),completed:null,entitlement:null,percentage:null,historyVerified:false,recordedWeeks:null,excludedWeeks:null,reason:'Relief history could not be read. Use Refresh to retry; ask Admin to review if this continues.'};}
  return GSISRosterAllocation.dailyRosterCalculation(output,people[0]);
 }
 function rosterPersonalCompletion_(state,staffId,today,now=Date.now()){
- const sg=new Date(now+28800000),ctx={today,minute:sg.getUTCHours()*60+sg.getUTCMinutes(),days:state.dailyPublicationStates||{}};
- const A=GSISRosterAllocation,year=today.slice(0,4),week=A.monday(today),history=state.accountingYears?.[year],seen=new Set();
- const rows=(state.entitlements||[]).filter(r=>r.staffId===staffId&&r.year===year&&r.week<=week).sort((a,b)=>String(a.week).localeCompare(String(b.week)));
- let valid=true,entitlement=0;for(const row of rows){if(!/^\d{4}-\d{2}-\d{2}$/.test(row.week)||seen.has(row.week)||!Number.isFinite(row.quota)||row.quota<0){valid=false;continue;}seen.add(row.week);entitlement+=row.excluded?0:row.quota;}
  // Shared accounting resolves replacements, duplicates, corrections and zero-cost duties.
- const completed=A.accounted(state,ctx).filter(a=>a.staffId===staffId&&(a.accountingYear||A.year(a.date))===year&&a.date<=today&&A.reliefCompleted(a,ctx)).reduce((n,a)=>n+A.cost(a),0);
- const verified=history?.verified===true,currentWeekRecorded=seen.has(week),reason=!valid?'Recorded weekly quotas need review.':!verified?'Relief history has not been verified.':!rows.length?'No weekly quota history is recorded.':!currentWeekRecorded?'This week’s quota has not been recorded yet.':entitlement===0?'No relief quota is recorded for this period.':'';
- return {from:year+'-01-01',to:today,throughWeek:week,completed,entitlement:valid&&rows.length?entitlement:null,percentage:!reason?100*completed/entitlement:null,reason,historyVerified:verified,currentWeekRecorded,recordedWeeks:seen.size,excludedWeeks:rows.filter(r=>r.excluded).length,firstWeek:rows[0]?.week||null,lastWeek:rows.at(-1)?.week||null,zeroStart:history?.mode==='zero-start',startedAt:history?.mode==='zero-start'?history.at:null};
+ return GSISRosterAllocation.personalCompletion(state,staffId,today,now);
 }

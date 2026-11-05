@@ -41,6 +41,8 @@ const db=database(),contacts={rosterPeople:[{id:'admin',name:'Administrator',act
 await activate(db,'roster-references',{contacts,contactsCheckedAt:Date.now(),calendarByDate:{}});
 const client={...base,GSIS_REQUEST_ORIGIN:origin,GSIS_BACKEND:binding};
 const health=await callOperationalBackend(client,'health',{input:{operation:'read'},identity:who});assert.equal(health.ok,true);assert.ok(health.data.checkedAt);assert.equal(JSON.stringify(health).includes(who.email),false);
+assert.equal(health.data.googleBackup.enabled,false);assert.equal(health.data.googleBackup.available,false,'preactivation health does not claim a working Google backup');
+assert.equal(db.sql.prepare("SELECT COUNT(*) n FROM gsis_edge_heads WHERE scope IN ('roster','roster-register')").get().n,0,'preactivation health does not create operational heads');
 await assert.rejects(callOperationalBackend(client,'health',{input:{operation:'recordRecoveryCheckpoint',label:'arbitrary'},identity:who}),e=>e.status===400,'checkpoint aliases remain constrained to approved reasons');
 db.sql.prepare("UPDATE gsis_edge_records SET value_json=? WHERE scope='roster-references' AND collection='contactsCheckedAt' AND record_id='$'").run(JSON.stringify({kind:'value',value:Date.now()-7*86400000}));
 const {requireHealthAdmin}=await import('../operations-worker/index.js');

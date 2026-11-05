@@ -116,6 +116,23 @@ var GSiSRosterMirror=(()=>{
   const g=await readGeneration(db,proof?.generationId);if(s.control.phase!=='paused'||s.control.release_request!==requestId||!g||g.state!=='mirrored'||g.epoch!==s.control.epoch||g.revisions.roster!==s.revisions.roster||g.revisions.register!==s.revisions.register||g.transportRevision!==s.control.transport_revision||g.manifestDigest!==proof.manifestDigest)fail('ROSTER_RELEASE_LAG','The final Google backup has not caught up with paused D1.');
   const result=await c.prepare("UPDATE gsis_roster_mirror_control SET phase='released',updated_at=? WHERE id=1 AND phase='paused' AND release_request=? AND epoch=? AND transport_revision=? AND EXISTS(SELECT 1 FROM gsis_edge_heads WHERE scope='roster' AND mode='paused' AND revision=?) AND EXISTS(SELECT 1 FROM gsis_edge_heads WHERE scope='roster-register' AND mode='paused' AND revision=?)").bind(Date.now(),requestId,g.epoch,g.transportRevision,g.revisions.roster,g.revisions.register).run();checked([result]);if(!result.meta?.changes)fail('ROSTER_RELEASE_LAG','D1 changed before release could be confirmed.');return status(db);
  }
- return {ensure,status,capture,page,advance,releaseLease,cleanup,acknowledge,beginRelease,cancelRelease,sealRelease,finishRelease,hash,seed,writeGate:Store?.rosterWriteGuard,MAX_PAGE_BYTES};
+ function freshReleaseGuard(input){
+  if(!validHash(input?.sourceDigest)||!validHash(input?.archiveId)||!validHash(input?.reentry?.digest)||input.reentry.encoding!=='gzip-json-v1'||typeof input.reentry.key!=='string'||!input.reentry.key.startsWith('gsis/roster/fresh-start-reentry/'))fail('ROSTER_FRESH_RELEASE_PROOF','A retained fresh-start re-entry report is required.');
+  return "(SELECT COUNT(*) FROM gsis_edge_heads WHERE scope IN ('roster','roster-register') AND mode='paused' AND json_extract(metadata_json,'$.freshStart.sourceDigest')=? AND json_extract(metadata_json,'$.freshStart.archiveId')=?)=2";
+ }
+ async function retainFreshRelease(db,requestId,input){
+  await ensure(db);request(requestId);const guard=freshReleaseGuard(input),store=Store.open(db,'roster'),digest=await Store.digest(input),prior=await store.receipt('fresh-start-release',requestId,digest);if(prior)return prior;
+  const c=connection(db),result={sourceDigest:input.sourceDigest,archiveId:input.archiveId,reentry:input.reentry};
+  const statements=[c.prepare("INSERT INTO gsis_edge_receipts(scope,actor,request_id,digest,revision,result_json,created_at) SELECT 'roster','fresh-start-release',?,?,revision,?,? FROM gsis_edge_heads WHERE scope='roster' AND "+guard+" AND EXISTS(SELECT 1 FROM gsis_roster_mirror_control WHERE id=1 AND phase='paused' AND release_request=?) ON CONFLICT(scope,actor,request_id) DO NOTHING").bind(requestId,digest,JSON.stringify(result),Date.now(),input.sourceDigest,input.archiveId,requestId)];
+  try{checked(await c.batch(statements));}catch(error){const recovered=await store.receipt('fresh-start-release',requestId,digest);if(recovered)return recovered;throw error;}
+  const saved=await store.receipt('fresh-start-release',requestId,digest);if(!saved)fail('ROSTER_FRESH_RELEASE_PROOF','Pause the matching fresh-start owner before retaining the re-entry report.');return saved;
+ }
+ async function finishFreshRelease(db,requestId,input){
+  await ensure(db);request(requestId);const guard=freshReleaseGuard(input),store=Store.open(db,'roster'),receipt=await store.receipt('fresh-start-release',requestId,await Store.digest(input));
+  if(!receipt)fail('ROSTER_FRESH_RELEASE_PROOF','Retain the D1 re-entry report before releasing Google.');
+  const s=await state(db);if(s.control.release_request===requestId&&s.control.phase==='released')return status(db);
+  const result=await connection(db).prepare("UPDATE gsis_roster_mirror_control SET phase='released',updated_at=? WHERE id=1 AND phase='paused' AND release_request=? AND "+guard).bind(Date.now(),requestId,input.sourceDigest,input.archiveId).run();checked([result]);if(!result.meta?.changes)fail('ROSTER_FRESH_RELEASE_PROOF','The paused fresh-start owner changed before release was confirmed.');return status(db);
+ }
+ return {ensure,status,capture,page,advance,releaseLease,cleanup,acknowledge,beginRelease,cancelRelease,sealRelease,finishRelease,retainFreshRelease,finishFreshRelease,hash,seed,writeGate:Store?.rosterWriteGuard,MAX_PAGE_BYTES};
 })();
 if(typeof module!=='undefined'&&module.exports)module.exports=GSiSRosterMirror;

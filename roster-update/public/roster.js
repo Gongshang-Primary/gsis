@@ -53,7 +53,7 @@
   {name:'System Config',icon:'system-config',description:'View subject rules and automatic allocation; Admin can change',smc:true,accessLabel:'SMC / Admin'}
  ];
  const operations=()=>window.RosterOpsUI?.pages(profile)||[];
- const homeOrder=['Report Absence','Manage reported absences','Assign Relief','Daily Notify','Absences by Date','Manage Ad-hoc relief','Stapler','WhatsApp Inbox','Check Availability','Timetable','Daily Updates','Statistics','Baseline Timetable','My Relief Duties','Learn about Auto Allocation','Recess Regression','SMC Duty Roster','Custom Notifications','Manage Absence Type','System Config','Prune records'];
+ const homeOrder=['Report Absence','Manage reported absences','Assign Relief','Daily Notify','Absences by Date','Manage Ad-hoc relief','Stapler','WhatsApp Inbox','Check Availability','Timetable','Daily Updates','Statistics','Baseline Timetable','My Relief Duties','Learn about Auto Allocation','Recess Regression','SMC Duty Roster','Custom Notifications','Manage Absence Type','System Config','Opening balances','Prune records'];
  const allowedFunctions=()=>[...operations(),...functions].filter(f=>(!f.smc||profile?.user.smc||profile?.user.admin)&&(!f.admin||profile?.user.admin)&&(!f.baseline||profile?.user.smc||profile?.user.admin)).sort((a,b)=>homeOrder.indexOf(a.name)-homeOrder.indexOf(b.name));
  const isOperations=()=>operations().some(f=>(f.name||f.id)===page);
  const activePlanner=()=>page==='Stapler'&&window.RosterStaplerUI?.isPlanning?.()===true;
@@ -64,7 +64,7 @@
  // Share only identical in-flight reads. A write creates a new generation, so
  // a later refresh cannot attach to a response started before that write.
  function api(route,input={},method='POST',token,options={}){
-  const readonly=route==='profile'||route==='read'||route==='operations'&&['currentDuty','nextSchoolDay','calculations','allocationVersion','teacherDailyUpdate','read','directory','candidates','availability','audit','archiveItems','archivedItem','prunePreview','accounting','allocation','history','exportDaily','stapler','dutyRoster','dailyTimetable','timetableBatch','timetableDay','previewRestoreStapler','staplerDates','systemConfig','dailyEmployment','dailyNotify','nameBridges','inboxList','inboxThread','inboxTemplates','receiptStatus','statistics','statisticsCalendar','acknowledgementStatus'].includes(input.operation);
+  const readonly=route==='profile'||route==='read'||route==='operations'&&['openingBalances','currentDuty','nextSchoolDay','calculations','allocationVersion','teacherDailyUpdate','read','directory','candidates','availability','audit','archiveItems','archivedItem','prunePreview','accounting','allocation','history','exportDaily','stapler','dutyRoster','dailyTimetable','timetableBatch','timetableDay','previewRestoreStapler','staplerDates','systemConfig','dailyEmployment','dailyNotify','nameBridges','inboxList','inboxThread','inboxTemplates','receiptStatus','statistics','statisticsCalendar','acknowledgementStatus'].includes(input.operation);
   if(!readonly){
    // Absence, Inbox and delivery writes do not change immutable timetable content.
    const baselineWrite=['upload','update','remove'].includes(route),timetableWrite=['saveStapler','confirmStapler','resetStapler','publishStapler','renameStapler','moveStapler','deleteStapler','restoreStapler','publish'].includes(input.operation);
@@ -166,7 +166,7 @@
  }
  function nav(){
   const allowed=['Home',...allowedFunctions().map(f=>f.name)];if(!allowed.includes(page))page='Home';
-  const section=['Report Absence','Manage reported absences','Absences by Date'].includes(page)?'Absences':['Assign Relief','Daily Notify','My Relief Duties','Manage Ad-hoc relief','Custom Notifications','Recess Regression','SMC Duty Roster','Daily Updates','Statistics','WhatsApp Inbox'].includes(page)?'Relief':['Manage Absence Type','Prune records','System Config'].includes(page)?'Admin':'';
+  const section=['Report Absence','Manage reported absences','Absences by Date'].includes(page)?'Absences':['Assign Relief','Daily Notify','My Relief Duties','Manage Ad-hoc relief','Custom Notifications','Recess Regression','SMC Duty Roster','Daily Updates','Statistics','WhatsApp Inbox'].includes(page)?'Relief':['Manage Absence Type','Prune records','System Config','Opening balances'].includes(page)?'Admin':'';
   const detail=page==='Timetable'?{teacher:'Teacher timetables',class:'Class timetables',tg:'TG timetables',export:'Export'}[timetablePage]:page==='Baseline Timetable'?{saved:'Saved timetables',upload:'Baseline upload'}[baselinePage]:'';
   const crumbs=[{label:'Home',target:page==='Home'?'':'Home'},...(section?[{label:section}]:[]),...(page==='Home'?[]:[{label:allowedFunctions().find(f=>f.name===page)?.label||page}]),...(detail?[{label:detail}]:[])];
   $('nav').hidden=false;$('navToggle').hidden=true;$('nav').innerHTML='<ol class="breadcrumbs">'+crumbs.map((c,i)=>'<li>'+(c.target?'<button data-page="'+c.target+'">'+esc(c.label)+'</button>':'<span'+(i===crumbs.length-1?' aria-current="page"':'')+'>'+esc(c.label)+'</span>')+'</li>').join('')+'</ol>';

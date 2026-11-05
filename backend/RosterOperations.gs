@@ -146,7 +146,7 @@ function rosterOperationsQuota_(dates,source){
  const {book:b,index:idx,entry:en}=source||rosterOperationsQuotaSource_();if(!en)return {from:'',to:'',rows:[]};const value=reliefRosterQuota_(b,idx,en);
  return value.from&&value.to&&dates.some(day=>day>=value.from&&day<=value.to)?value:{...value,rows:[],formClasses:[],teachingGroups:[],smcIds:[],venues:[]};
 }
-function rosterOperationsPeople_(c){return c.rosterPeople.map(p=>({id:String(p.id),name:String(p.name||''),active:p.active===true,mobile:String(p.mobile||''),email:String(p.email||''),emails:Array.isArray(p.emails)?p.emails:[],employment:String(p.employment||''),mk:String(p.mk||''),appointmentLevel:String(p.appointmentLevel||''),adhocEligible:p.adhocEligible===true,role:String(p.role||''),groups:Array.isArray(p.groups)?p.groups:[]}));}
+function rosterOperationsPeople_(c){return c.rosterPeople.map(p=>({id:String(p.id),name:String(p.name||''),active:p.active===true,mobile:String(p.mobile||''),email:String(p.email||''),emails:Array.isArray(p.emails)?p.emails:[],employment:String(p.employment||''),mk:String(p.mk||''),appointmentLevel:String(p.appointmentLevel||''),adhocEligible:p.adhocEligible===true,role:String(p.role||''),department:String(p.department||''),groups:Array.isArray(p.groups)?p.groups:[]}));}
 function rosterOperationsAllocationLearning_(req,c){
  const user=rosterOperationsAuthority_(c,req.identity),people=c.rosterPeople.map(p=>({id:String(p.id),active:p.active===true}));
  if(!user.smc&&!user.admin&&!(user.staffId&&people.some(p=>p.id===user.staffId&&p.active)))error_(403,'A linked staff account, SMC or Admin access is required.');
@@ -442,7 +442,7 @@ function rosterOperationsDayToken_(s,ctx,d){
 // Display invalidation includes accounting inputs across dates. Command day
 // tokens remain scoped to the edited date and keep their existing semantics.
 function rosterOperationsAllocationChangeKey_(s,dayToken){
- const inputs={};for(const key of ['assignments','importedRelief','reliefCorrections','entitlements','accountingYears','accountingProfiles','rotationEvents','absences'])inputs[key]=s[key]||[];
+ const inputs={};for(const key of ['assignments','importedRelief','reliefCorrections','entitlements','accountingYears','accountingProfiles','openingBalances','rotationEvents','absences'])inputs[key]=s[key]||[];
  inputs.periods=Object.fromEntries(Object.entries(s.dailyPublicationStates||{}).map(([date,value])=>[date,value.periods||[]]));
  return rosterOperationsDigest_({schema:1,dayToken,inputs});
 }
@@ -769,6 +769,24 @@ function rosterOperationsPrimaryRead_(p){
  const op=p.operation||'read';
  return ['stapler','staplerDates','currentDuty','dutyRoster','accounting','availability','candidates'].includes(op)||op==='read'&&(['reportForm','mine','currentDuty','dutyRoster','staplerDates','stapler','schoolAbsences'].includes(p.view)||p.compact===true&&['report','entry'].includes(p.view));
 }
+// Opening balances use Contacts and the operational document only. A fresh D1
+// epoch has no baseline yet; these commands must not prepare day models.
+function rosterOpeningBalancesDispatch_(req,c){
+ const p=req.input||{},user=rosterOperationsAuthority_(c,req.identity),saving=p.operation==='saveOpeningBalances';
+ if(saving?!user.admin:!user.admin&&!user.smc)error_(403,saving?'Contacts Admin access is required.':'SMC or Admin access is required.');
+ const ctx={user,people:rosterOperationsPeople_(c),days:{},uuid:()=>Utilities.getUuid()};rosterOperationsClock_(ctx);
+ if(!saving)return GSISRosterOperations.read(rosterOperationsState_(true),ctx,p);
+ if(typeof p.requestId!=='string'||! /^[\w-]{36}$/.test(p.requestId))error_(400,'A save request ID is required.');
+ const digest=rosterOperationsCommandDigest_(p),lock=LockService.getScriptLock();if(!deployLock_(lock,8000))error_(503,'Another save is running. Retry the same save.');
+ try{
+  const state=rosterOperationsState_(),prior=state.receipts.find(row=>row.id===p.requestId);
+  if(prior){if(prior.actor!==req.identity.email||prior.digest!==digest)error_(409,'This request ID was used for a different save.');return {...prior.result,replayed:true};}
+  if(!Number.isSafeInteger(p.revision)||p.revision!==state.revision)error_(409,'Relief records changed. Refresh before saving.');
+  const result=GSISRosterOperations.apply(state,ctx,p);state.revision++;Object.assign(result,{revision:state.revision,acceptedRevision:state.revision,requestId:p.requestId,notificationsQueued:0});
+  state.receipts.push({id:p.requestId,actor:req.identity.email,digest,result,at:ctx.iso,revision:state.revision});rosterOperationsCommit_(state);return result;
+ }finally{deployUnlock_(lock);}
+}
+
 // Success describes only changed domains. Clients keep immutable timetable
 // content for unrelated delivery, acknowledgement and absence commands.
 function rosterOperationsDispatch_(req,c){
@@ -800,6 +818,7 @@ function rosterOperationsDispatchCore_(req,c){gsisRequireBackendRole_('roster');
  if(['archiveColdOutput','archivedItem','archiveItems'].includes(op))return rosterColdArchiveDispatch_(req,c);
  if(['timetablePreparationManifest','timetablePreparationPart','timetablePreparationCheck'].includes(op))return rosterTimetablePreparationDispatch_(req,c);
  if(p.intake===true&&['saveAbsence','requestMutual'].includes(op))return rosterAbsenceIntakeCapture_(req,c);
+ if(['openingBalances','saveOpeningBalances'].includes(op))return rosterOpeningBalancesDispatch_(req,c);
  if(op==='receiptStatus'&&p.command?.intake===true)return rosterAbsenceIntakeReceipt_(req,c);
  if(op==='read'&&p.view==='intake'){
   const user=rosterOperationsAuthority_(c,req.identity),result={...rosterAbsenceIntakeVisible_(req,c),user};

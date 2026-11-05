@@ -332,6 +332,7 @@ var GSiSRosterImport=(()=>{
  }
  function finishFreeze(snapshot,binding,partMetadata,scopes,adapter){
   freezeBinding(snapshot,binding);const {sessionId,actor,requestId}=binding,manifest={schema:FORMAT,sessionId,actor,requestId,sourceDigest:snapshot.sourceDigest,parts:partMetadata,scopes,totalBytes:partMetadata.reduce((n,p)=>n+p.bytes,0)};
+  if(snapshot.freshStart){manifest.freshStart=true;manifest.freshStartDetails=JSON.parse(JSON.stringify(snapshot.freshStart));manifest.freshStartInputDigest=snapshot.freshStartInputDigest;}
   validateManifest(manifest);return {manifest,manifestDigest:adapter.hash(JSON.stringify(manifest))};
  }
  function freeze(snapshot,binding,adapter){
@@ -511,7 +512,7 @@ var GSiSRosterImport=(()=>{
   async function referencesReady(){await read();checked([await connection().prepare("UPDATE gsis_roster_import_sessions SET references_ready=1,updated_at=? WHERE session_id=? AND state='staging' AND NOT EXISTS(SELECT 1 FROM gsis_roster_import_parts WHERE session_id=? AND receipt_json IS NULL)").bind(Date.now(),sessionId,sessionId).run()]);return progress();}
   async function failPreparation(){await read();const c=connection();checked(await c.batch([c.prepare("UPDATE gsis_roster_import_sessions SET state='failed',updated_at=? WHERE session_id=? AND state='preparing'").bind(Date.now(),sessionId),c.prepare("UPDATE gsis_roster_import_preparation SET claim_token='',lease_until=0 WHERE session_id=? AND EXISTS(SELECT 1 FROM gsis_roster_import_sessions WHERE session_id=? AND state='failed')").bind(sessionId,sessionId)]));return progress();}
   async function finalize(){
-   const row=await read();if(row?.state==='imported')return progress();if(!row?.manifest_json)fail(409,'ROSTER_IMPORT_INCOMPLETE','The immutable export is incomplete.');const m=JSON.parse(row.manifest_json),c=connection(),token=crypto.randomUUID(),now=Date.now(),metadata=JSON.stringify({source:{kind:'apps-script',sourceDigest:m.sourceDigest,manifestDigest:row.manifest_digest},importedAt:now,importSession:sessionId,digestFormat:FORMAT});
+   const row=await read();if(row?.state==='imported')return progress();if(!row?.manifest_json)fail(409,'ROSTER_IMPORT_INCOMPLETE','The immutable export is incomplete.');const m=JSON.parse(row.manifest_json),c=connection(),token=crypto.randomUUID(),now=Date.now(),metadata=JSON.stringify({source:{kind:m.freshStart?'fresh-start':'apps-script',sourceDigest:m.sourceDigest,manifestDigest:row.manifest_digest},...(m.freshStart?{freshStart:m.freshStartDetails}:{}),importedAt:now,importSession:sessionId,digestFormat:FORMAT});
    const conditions=SCOPES.map(()=>" AND EXISTS(SELECT 1 FROM gsis_edge_heads h JOIN gsis_roster_import_locks l ON l.scope=h.scope WHERE h.scope=? AND l.session_id=? AND h.revision=l.base_revision AND h.mode='legacy') AND (SELECT COUNT(*) FROM gsis_roster_import_rows WHERE session_id=? AND scope=?)=?").join('');
    const statements=[c.prepare(`UPDATE gsis_roster_import_sessions SET state='imported',write_token=?,updated_at=? WHERE session_id=? AND state='staging' AND references_ready=1
     AND (SELECT COUNT(*) FROM gsis_roster_import_parts WHERE session_id=?)=? AND NOT EXISTS(SELECT 1 FROM gsis_roster_import_parts WHERE session_id=? AND receipt_json IS NULL)
@@ -806,7 +807,24 @@ var GSiSRosterMirror=(()=>{
   const g=await readGeneration(db,proof?.generationId);if(s.control.phase!=='paused'||s.control.release_request!==requestId||!g||g.state!=='mirrored'||g.epoch!==s.control.epoch||g.revisions.roster!==s.revisions.roster||g.revisions.register!==s.revisions.register||g.transportRevision!==s.control.transport_revision||g.manifestDigest!==proof.manifestDigest)fail('ROSTER_RELEASE_LAG','The final Google backup has not caught up with paused D1.');
   const result=await c.prepare("UPDATE gsis_roster_mirror_control SET phase='released',updated_at=? WHERE id=1 AND phase='paused' AND release_request=? AND epoch=? AND transport_revision=? AND EXISTS(SELECT 1 FROM gsis_edge_heads WHERE scope='roster' AND mode='paused' AND revision=?) AND EXISTS(SELECT 1 FROM gsis_edge_heads WHERE scope='roster-register' AND mode='paused' AND revision=?)").bind(Date.now(),requestId,g.epoch,g.transportRevision,g.revisions.roster,g.revisions.register).run();checked([result]);if(!result.meta?.changes)fail('ROSTER_RELEASE_LAG','D1 changed before release could be confirmed.');return status(db);
  }
- return {ensure,status,capture,page,advance,releaseLease,cleanup,acknowledge,beginRelease,cancelRelease,sealRelease,finishRelease,hash,seed,writeGate:Store?.rosterWriteGuard,MAX_PAGE_BYTES};
+ function freshReleaseGuard(input){
+  if(!validHash(input?.sourceDigest)||!validHash(input?.archiveId)||!validHash(input?.reentry?.digest)||input.reentry.encoding!=='gzip-json-v1'||typeof input.reentry.key!=='string'||!input.reentry.key.startsWith('gsis/roster/fresh-start-reentry/'))fail('ROSTER_FRESH_RELEASE_PROOF','A retained fresh-start re-entry report is required.');
+  return "(SELECT COUNT(*) FROM gsis_edge_heads WHERE scope IN ('roster','roster-register') AND mode='paused' AND json_extract(metadata_json,'$.freshStart.sourceDigest')=? AND json_extract(metadata_json,'$.freshStart.archiveId')=?)=2";
+ }
+ async function retainFreshRelease(db,requestId,input){
+  await ensure(db);request(requestId);const guard=freshReleaseGuard(input),store=Store.open(db,'roster'),digest=await Store.digest(input),prior=await store.receipt('fresh-start-release',requestId,digest);if(prior)return prior;
+  const c=connection(db),result={sourceDigest:input.sourceDigest,archiveId:input.archiveId,reentry:input.reentry};
+  const statements=[c.prepare("INSERT INTO gsis_edge_receipts(scope,actor,request_id,digest,revision,result_json,created_at) SELECT 'roster','fresh-start-release',?,?,revision,?,? FROM gsis_edge_heads WHERE scope='roster' AND "+guard+" AND EXISTS(SELECT 1 FROM gsis_roster_mirror_control WHERE id=1 AND phase='paused' AND release_request=?) ON CONFLICT(scope,actor,request_id) DO NOTHING").bind(requestId,digest,JSON.stringify(result),Date.now(),input.sourceDigest,input.archiveId,requestId)];
+  try{checked(await c.batch(statements));}catch(error){const recovered=await store.receipt('fresh-start-release',requestId,digest);if(recovered)return recovered;throw error;}
+  const saved=await store.receipt('fresh-start-release',requestId,digest);if(!saved)fail('ROSTER_FRESH_RELEASE_PROOF','Pause the matching fresh-start owner before retaining the re-entry report.');return saved;
+ }
+ async function finishFreshRelease(db,requestId,input){
+  await ensure(db);request(requestId);const guard=freshReleaseGuard(input),store=Store.open(db,'roster'),receipt=await store.receipt('fresh-start-release',requestId,await Store.digest(input));
+  if(!receipt)fail('ROSTER_FRESH_RELEASE_PROOF','Retain the D1 re-entry report before releasing Google.');
+  const s=await state(db);if(s.control.release_request===requestId&&s.control.phase==='released')return status(db);
+  const result=await connection(db).prepare("UPDATE gsis_roster_mirror_control SET phase='released',updated_at=? WHERE id=1 AND phase='paused' AND release_request=? AND "+guard).bind(Date.now(),requestId,input.sourceDigest,input.archiveId).run();checked([result]);if(!result.meta?.changes)fail('ROSTER_FRESH_RELEASE_PROOF','The paused fresh-start owner changed before release was confirmed.');return status(db);
+ }
+ return {ensure,status,capture,page,advance,releaseLease,cleanup,acknowledge,beginRelease,cancelRelease,sealRelease,finishRelease,retainFreshRelease,finishFreshRelease,hash,seed,writeGate:Store?.rosterWriteGuard,MAX_PAGE_BYTES};
 })();
 if(typeof module!=='undefined'&&module.exports)module.exports=GSiSRosterMirror;
 

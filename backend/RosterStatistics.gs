@@ -4,7 +4,7 @@ function rosterStatisticsStamp_(state){
  const pick=(row,keys)=>keys.map(k=>row[k]??null);
  const absences=(state.absences||[]).map(r=>pick(r,['id','staffId','name','staffName','date','deletedAt','periods','coverage','periodSnapshot','timetablePending','typeLabel','reasonDetail','reportedAt','createdAt','updatedAt']));
  const periods=Object.entries(state.dailyPublicationStates||{}).map(([date,row])=>[date,row.periods||[]]).sort(([a],[b])=>a.localeCompare(b));
- return rosterOperationsPlanDigest_(JSON.stringify([1,absences,state.assignments||[],state.importedRelief||[],state.reliefCorrections||[],periods,state.statisticsArchive||{},state.statisticsTrackingFrom||null]));
+ return rosterOperationsPlanDigest_(JSON.stringify([1,absences,state.assignments||[],state.importedRelief||[],state.reliefCorrections||[],periods,state.statisticsArchive||{},state.statisticsTrackingFrom||null,state.freshStart||null]));
 }
 function rosterStatisticsMarker_(){
  try{const row=JSON.parse(props_().getProperty('ROSTER_TIMETABLE_CACHE')||'null');return row?.schema===2&&row.statisticsReady===true&&/^[a-f0-9]{64}$/.test(row.statisticsSource)&&Number.isSafeInteger(row.statisticsRevision)?{source:row.statisticsSource,revision:row.statisticsRevision}:null;}catch(_){return null;}

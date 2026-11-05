@@ -57,6 +57,8 @@ function showCutoverFreeze(snapshot){
 function showGoogleBackup(snapshot){
  const box=$('google-backup');box.replaceChildren();box.dataset.tone='info';const backup=snapshot.googleBackup;
  if(!object(backup)){unavailable(box);return;}
+ const archived=backup.archiveOnly===true;if($('google-backup-title'))$('google-backup-title').textContent=archived?'Google archive':'Google backup';if($('google-backup-hint'))$('google-backup-hint').textContent=archived?'Switching back retains a D1 re-entry report and restores the original Google records.':'The backup is updated after D1 commits. Switching back requires matching revisions and verified digests.';
+ if(archived){box.append(element('p',backup.phase==='released'?'Original Google records restored. Download the D1 re-entry report and complete the routing change in ownership setup.':'D1 owns new records. Original Google records remain the frozen read-only archive. Normal backup mirroring is disabled for this fresh start.'));return;}
  if(backup.enabled!==true){box.append(element('p',backup.phase==='released'?'Verified Google backup restored. Complete the routing change in ownership setup.':'Google is the record. Mirroring starts after D1 activation.'));return;}
  const versions=backup.mirroredRevisions||{},revision=value=>number(value)??'not recorded';
  box.append(element('p','Google backup: Roster revision '+revision(versions.roster)+' · Timetable revision '+revision(versions.register)+'.'));

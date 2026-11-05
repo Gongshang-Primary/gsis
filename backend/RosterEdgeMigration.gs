@@ -83,8 +83,119 @@ function rosterEdgeReferences_(c,adminVerified){
  if(!Array.isArray(contacts.rosterPeople)||!Array.isArray(contacts.rosterSMCIds)||!Array.isArray(contacts.rosterAdminIds))error_(503,'Contacts did not supply complete reference authority.');
  return {contacts,adminVerified:adminVerified===true,contactsSource:rosterOperationsDigest_(contacts),checkedAt:new Date().toISOString(),cutoverFreeze:rosterCutoverStatus_(),legacyWritesDisabled:props_().getProperty('ROSTER_EDGE_AUTHORITY')==='d1'};
 }
+// Fresh-start evidence contains settings and file identities only. Historical
+// arrays, baseline models and plans never enter this capture or its digest.
+function rosterFreshStartJson_(value){
+ const stable=item=>item===null||typeof item!=='object'?item:Array.isArray(item)?item.map(stable):Object.fromEntries(Object.keys(item).sort().map(key=>[key,stable(item[key])]));
+ return JSON.stringify(stable(value));
+}
+function rosterFreshStartHash_(value){return rosterEdgeExportHash_(rosterFreshStartJson_(value));}
+function rosterFreshStartPointers_(){
+ const names={ROSTER_OPERATIONS_FILE:'Roster operations.json',ROSTER_INDEX_FILE:'Roster register.json',ROSTER_NOTIFICATION_TRANSPORT_FILE:'Roster notification transport.json',ROSTER_INBOX_FILE:'Roster WhatsApp Inbox.json',ROSTER_ABSENCE_INTAKE_FILE:'Roster absence intake.json',ROSTER_D1_RECEIPTS_FILE:'',ROSTER_D1_TRANSPORT_FILE:''};
+ return Object.fromEntries(Object.entries(names).map(([key,name])=>[key,props_().getProperty(key)||(name?rosterFindFile_(ROSTER_DATA,name):'')||'']));
+}
+function rosterFreshStartSettings_(pointers,copyConfig){
+ if(!copyConfig)return {};
+ const stored=pointers.ROSTER_OPERATIONS_FILE?rosterSplitReadDocument_(pointers.ROSTER_OPERATIONS_FILE,false,false).value:GSISRosterOperations.initial(),defaults=GSISRosterOperations.initial(),settings={};
+ for(const field of ['systemConfig','nameBridges','nameBridgesSeeded','dailyEmploymentSettings','types','typeDetailsVersion'])settings[field]=stored[field]===undefined?(field==='nameBridgesSeeded'?false:defaults[field]):stored[field];
+ if(!settings.systemConfig||typeof settings.systemConfig!=='object'||Array.isArray(settings.systemConfig)||!Array.isArray(settings.nameBridges)||typeof settings.nameBridgesSeeded!=='boolean'||!settings.dailyEmploymentSettings||typeof settings.dailyEmploymentSettings!=='object'||Array.isArray(settings.dailyEmploymentSettings)||!Array.isArray(settings.types))error_(503,'The saved Roster settings need review before a fresh start.');
+ const normalized=GSISRosterOperations.validateState(Object.assign(GSISRosterOperations.initial(),JSON.parse(rosterFreshStartJson_(settings))));
+ return Object.fromEntries(Object.keys(settings).map(field=>[field,normalized[field]]));
+}
+function rosterFreshStartRecord_(archiveId){
+ if(typeof archiveId!=='string'||!/^[a-f0-9]{64}$/.test(archiveId))error_(400,'Use the retained fresh-start archive identity.');
+ const raw=props_().getProperty('ROSTER_FRESH_START_SOURCE:'+archiveId);if(!raw)return null;let record;
+ try{const descriptor=JSON.parse(raw);record=descriptor.reference?JSON.parse(rosterEdgeExportPrivateText_(descriptor.reference,262144)):descriptor;}catch(error){if(error.status)throw error;error_(503,'The retained fresh-start source is unavailable.');}
+ if(record?.source?.schema!=='gsis-roster-fresh-start-source-v1'||record.source.archiveId!==archiveId||record.sourceDigest!==rosterFreshStartHash_(record.source)||record.source.configDigest!==rosterFreshStartHash_(record.source.settings))error_(503,'The retained fresh-start source failed verification.');return record;
+}
+function rosterFreshStartFind_(sourceDigest){
+ if(typeof sourceDigest!=='string'||!/^[a-f0-9]{64}$/.test(sourceDigest))return null;
+ const archiveId=props_().getProperty('ROSTER_FRESH_START_DIGEST:'+sourceDigest);if(!archiveId)return null;const record=rosterFreshStartRecord_(archiveId);if(!record||record.sourceDigest!==sourceDigest)error_(503,'The retained fresh-start source failed verification.');return record;
+}
+function rosterFreshStartSource_(req){
+ const p=req.input||{},actor=req.identity?.email,requestId=rosterCutoverId_(p.requestId);
+ if(Object.keys(p).some(key=>!['operation','requestId','effectiveDate','copyConfig'].includes(key))||typeof p.copyConfig!=='boolean')error_(400,'Choose a start date and whether to copy the saved settings.');
+ const effectiveDate=GSISRosterOperations.date(p.effectiveDate);if(effectiveDate>rosterToday_())error_(400,'The fresh-start date cannot be later than today.');if(typeof actor!=='string'||!actor||actor.length>254)error_(403,'Current administrator identity is required.');
+ const archiveId=rosterFreshStartHash_(['fresh-start',actor,requestId]);
+ return rosterCutoverLocked_(()=>{
+  const freeze=rosterCutoverStatus_();if(!freeze.active||freeze.state!=='frozen'||props_().getProperty('ROSTER_EDGE_AUTHORITY')==='d1')error_(409,'Freeze Google before preparing a fresh D1 start.');
+  const prior=rosterFreshStartRecord_(archiveId);if(prior){if(prior.source.actor!==actor||prior.source.requestId!==requestId||prior.source.effectiveDate!==effectiveDate||prior.source.copyConfig!==p.copyConfig)error_(409,'This fresh-start request was already used for different settings.');if(prior.source.freezeId!==freeze.requestId)error_(409,'The original fresh-start freeze is no longer current.');props_().setProperty('ROSTER_FRESH_START_DIGEST:'+prior.sourceDigest,archiveId);return {adminVerified:true,...prior,replayed:true};}
+  if(Object.keys(props_().getProperties()).filter(key=>key.startsWith('ROSTER_FRESH_START_SOURCE:')).length>=24)error_(409,'Review the retained fresh-start sources before preparing another one.');
+  const intentKey='ROSTER_FRESH_START_INTENT:'+archiveId,intentRaw=props_().getProperty(intentKey),intent=intentRaw?JSON.parse(intentRaw):null;
+  if(intent&&(intent.actor!==actor||intent.requestId!==requestId||intent.effectiveDate!==effectiveDate||intent.copyConfig!==p.copyConfig||intent.freezeId!==freeze.requestId))error_(409,'This fresh-start request already captured another source.');
+  const originalPointers=rosterFreshStartPointers_(),settings=rosterFreshStartSettings_(originalPointers,p.copyConfig),source={schema:'gsis-roster-fresh-start-source-v1',actor,requestId,effectiveDate,copyConfig:p.copyConfig,freezeId:freeze.requestId,archiveId,originalPointers,settings,configDigest:rosterFreshStartHash_(settings),capturedAt:intent?.capturedAt||new Date().toISOString()},record={source,sourceDigest:rosterFreshStartHash_(source)},encoded=rosterFreshStartJson_(record);
+  if(rosterFreshStartJson_(rosterFreshStartPointers_())!==rosterFreshStartJson_(originalPointers))error_(409,'The original Google records changed during fresh-start capture.');
+  const bytes=Utilities.newBlob(encoded).getBytes().length;if(bytes>262144)error_(413,'The saved settings exceed the fresh-start size limit.');
+  if(intent&&intent.sourceDigest!==record.sourceDigest)error_(409,'The saved settings changed after this fresh-start capture began.');
+  // Persist the tiny intent before uploading larger settings. An uncertain
+  // upload then reconstructs the same timestamp and bytes on its next retry.
+  if(!intent)props_().setProperty(intentKey,JSON.stringify({actor,requestId,effectiveDate,copyConfig:p.copyConfig,freezeId:freeze.requestId,capturedAt:source.capturedAt,sourceDigest:record.sourceDigest}));
+  const descriptor=bytes<=7500?encoded:JSON.stringify({reference:rosterEdgeExportCreateImmutable_('Roster fresh start '+archiveId+'.json',encoded,'application/json',{verify:true})});
+  props_().setProperties({['ROSTER_FRESH_START_SOURCE:'+archiveId]:descriptor,['ROSTER_FRESH_START_DIGEST:'+record.sourceDigest]:archiveId});return {adminVerified:true,...record};
+ });
+}
+function rosterFreshStartVerify_(record,active=false){
+ const source=record.source,freeze=rosterCutoverStatus_(),authority=props_().getProperty('ROSTER_EDGE_AUTHORITY');
+ if(freeze.requestId!==source.freezeId||(active?!['frozen','activated'].includes(freeze.state):freeze.state!=='frozen'))error_(409,'The original fresh-start freeze is no longer current.');
+ if(rosterFreshStartJson_(rosterFreshStartPointers_())!==rosterFreshStartJson_(source.originalPointers))error_(409,'The original Google records changed. Review the fresh-start source.');
+ if(active){const marker=JSON.parse(props_().getProperty('ROSTER_FRESH_START_ACTIVE')||'null');if(authority!=='d1'||props_().getProperty('ROSTER_EDGE_SOURCE_DIGEST')!==record.sourceDigest||marker?.archiveId!==source.archiveId||marker?.sourceDigest!==record.sourceDigest)error_(409,'This archive does not belong to the active fresh D1 owner.');}
+ else if(authority==='d1'&&props_().getProperty('ROSTER_EDGE_SOURCE_DIGEST')!==record.sourceDigest)error_(409,'A different D1 owner is already active.');
+ return source;
+}
+function rosterFreshStartFence_(record){return rosterCutoverLocked_(()=>{
+ const active=props_().getProperty('ROSTER_EDGE_AUTHORITY')==='d1',source=rosterFreshStartVerify_(record,active);
+ if(rosterFreshStartHash_(rosterFreshStartSettings_(source.originalPointers,source.copyConfig))!==source.configDigest)error_(409,'The saved settings changed after fresh-start capture.');
+ rosterFreshStartVerify_(record,active);
+ if(!active)props_().setProperties({ROSTER_EDGE_AUTHORITY:'d1',ROSTER_EDGE_SOURCE_DIGEST:record.sourceDigest,ROSTER_EDGE_FENCED_AT:new Date().toISOString(),ROSTER_FRESH_START_ACTIVE:JSON.stringify({archiveId:source.archiveId,sourceDigest:record.sourceDigest})});
+ return {legacyWritesDisabled:true,sourceDigest:record.sourceDigest,adminVerified:true,freshStart:true,cutoverFreeze:rosterCutoverStatus_()};
+});}
+function rosterFreshStartDrift_(p){
+ if(Object.keys(p).some(key=>!['operation','sourceDigest'].includes(key))||typeof p.sourceDigest!=='string'||!/^[a-f0-9]{64}$/.test(p.sourceDigest))error_(400,'Use the retained fresh-start source digest.');
+ const changed=new Set();let record;
+ try{
+  record=rosterFreshStartFind_(p.sourceDigest);if(!record)error_(409,'The retained fresh-start source is unavailable.');const source=record.source;
+  const inspect=()=>{
+   const freeze=rosterCutoverStatus_(),active=props_().getProperty('ROSTER_EDGE_AUTHORITY')==='d1',marker=active?JSON.parse(props_().getProperty('ROSTER_FRESH_START_ACTIVE')||'null'):null;
+   if(freeze.requestId!==source.freezeId||(active?!['frozen','activated'].includes(freeze.state):freeze.state!=='frozen')||active&&(props_().getProperty('ROSTER_EDGE_SOURCE_DIGEST')!==record.sourceDigest||marker?.archiveId!==source.archiveId||marker?.sourceDigest!==record.sourceDigest))changed.add('freeze');
+   if(rosterFreshStartJson_(rosterFreshStartPointers_())!==rosterFreshStartJson_(source.originalPointers))changed.add('pointers');
+  };
+  inspect();if(!changed.has('pointers')&&rosterFreshStartHash_(rosterFreshStartSettings_(source.originalPointers,source.copyConfig))!==source.configDigest)changed.add('settings');inspect();
+ }catch(error){error_(409,'The retained fresh-start source could not be verified. Reload the source status before activation.');}
+ return {current:changed.size===0,sourceDigest:p.sourceDigest,changed:[...changed].sort(),checkedAt:new Date().toISOString(),freshStart:true};
+}
+function rosterFreshStartArchive_(req,c){
+ const p=req.input||{},allowed=['operation','archiveId','view','from','to','offset','limit','asOfDate'];if(Object.keys(p).some(key=>!allowed.includes(key))||!['history','statistics','calculations','openingBalances'].includes(p.view))error_(400,'Choose a supported read-only archive view.');
+ const record=rosterFreshStartRecord_(p.archiveId);if(!record)error_(404,'The fresh-start archive is unavailable.');const source=rosterFreshStartVerify_(record,true),user=rosterOperationsAuthority_(c,req.identity),prior=new Date(Date.parse(source.effectiveDate)-86400000).toISOString().slice(0,10),throughDate=p.asOfDate===undefined?prior:GSISRosterOperations.date(p.asOfDate);
+ if(throughDate>prior)error_(400,'Archive reads end before the fresh-start date.');if(p.view==='statistics'&&!user.smc&&!user.admin||p.view==='openingBalances'&&!user.admin)error_(403,'This archive view requires current administrator or SMC access.');if(['history','calculations'].includes(p.view)&&!user.staffId)error_(403,'Link this account to Contacts before opening personal history.');
+ const state=GSISRosterOperations.validateState(source.originalPointers.ROSTER_OPERATIONS_FILE?rosterSplitReadDocument_(source.originalPointers.ROSTER_OPERATIONS_FILE,false,false).value:GSISRosterOperations.initial()),ctx={user,people:c.rosterPeople||[],today:throughDate,accountingYear:source.effectiveDate.slice(0,4),iso:throughDate+'T15:59:59.999Z',now:Date.parse(throughDate+'T15:59:59.999Z'),minute:1439,days:state.dailyPublicationStates||{}},archive={id:source.archiveId,throughDate,readOnly:true};let result;
+ if(p.view==='history'){state.publicationSnapshots=state.publicationSnapshots.filter(row=>row.date<=throughDate);result=GSISRosterOperations.notificationHistory(state,ctx,{offset:p.offset,limit:p.limit});}
+ else if(p.view==='statistics'){const from=GSISRosterOperations.date(p.from),to=p.to===undefined?throughDate:GSISRosterOperations.date(p.to);if(from>throughDate)error_(400,'Choose dates before the fresh-start date.');result=GSISRosterStatistics.project(state,ctx,{from,to:to<throughDate?to:throughDate});}
+ else if(p.view==='openingBalances'){if(typeof GSISRosterAllocation.freshStartOpeningBalances!=='function')error_(503,'Opening-balance proposals are not available in this backend.');const rows=GSISRosterAllocation.freshStartOpeningBalances(state,ctx,throughDate);result=Array.isArray(rows)?{rows,proposed:true}:rows;}
+ else result={completion:rosterPersonalCompletion_(state,user.staffId,throughDate,ctx.now)};
+ rosterFreshStartVerify_(record,true);return {...result,archive};
+}
+function rosterFreshStartRelease_(p){
+ if(Object.keys(p).some(key=>!['operation','requestId','sourceDigest','archiveId','proof'].includes(key)))error_(400,'Use the retained fresh-start release request.');const requestId=rosterCutoverId_(p.requestId);
+ if(p.proof?.paused!==true)error_(409,'Pause D1 writes before restoring the original Google owner.');
+ return rosterCutoverLocked_(()=>{
+  const key='ROSTER_FRESH_START_RELEASE:'+requestId,raw=props_().getProperty(key),prior=raw?JSON.parse(raw):null;
+  if(prior){if(prior.sourceDigest!==p.sourceDigest||prior.archiveId!==p.archiveId)error_(409,'This release request was already used for another fresh start.');if(props_().getProperty('ROSTER_EDGE_AUTHORITY')==='d1'&&(props_().getProperty('ROSTER_EDGE_SOURCE_DIGEST')!==prior.sourceDigest||props_().getProperty('ROSTER_EDGE_FENCED_AT')!==prior.fencedAt))error_(409,'A newer D1 owner superseded this release.');}
+  const record=rosterFreshStartRecord_(p.archiveId);if(!record||record.sourceDigest!==p.sourceDigest)error_(409,'The fresh-start release source could not be verified.');
+  const freeze=rosterCutoverStatus_();if(freeze.requestId!==record.source.freezeId)error_(409,'A newer cutover freeze superseded this release.');
+  if(prior?.released&&!freeze.active)return prior;
+  if(!prior)rosterFreshStartVerify_(record,true);else if(rosterFreshStartJson_(rosterFreshStartPointers_())!==rosterFreshStartJson_(record.source.originalPointers))error_(409,'The original Google records changed before release.');
+  const result=prior||{released:false,requestId,sourceDigest:p.sourceDigest,archiveId:p.archiveId,googleWritable:false,fencedAt:props_().getProperty('ROSTER_EDGE_FENCED_AT')};props_().setProperty(key,JSON.stringify(result));
+  // Activation can leave its freeze unfinished after D1 becomes active. Retire
+  // that same freeze, receipt first, before making Google writable again.
+  if(freeze.active){const row=JSON.parse(props_().getProperty('ROSTER_CUTOVER_FREEZE'));rosterCutoverStore_({...row,state:'cancelled',cancelledAt:Date.now(),cancelledBy:record.source.actor,cancelRequestId:requestId,reason:'fresh-start-release'});}
+  props_().deleteProperty('ROSTER_EDGE_AUTHORITY');result.released=true;result.googleWritable=true;props_().setProperty(key,JSON.stringify(result));return result;
+ });
+}
 function rosterEdgeMigrationDispatch_(req,c){
- const p=req.input||{},op=p.operation;if(op==='edgeHealthAuthority')return {handled:true,result:{user:rosterOperationsAuthority_(c,req.identity)}};if(!['edgeFreeze','edgeUnfreeze','edgeExport','edgeExportManifest','edgeExportCheckpoint','edgeExportPart','edgeModel','edgeFence','edgeDrift','edgeReferences','edgeContactCreate','edgeAudit','edgeExportAbandon'].includes(op))return null;if(op==='edgeContactCreate'){if(!c?.user?.rosterSMC&&!c?.user?.rosterAdmin)error_(403,'SMC or Admin access is required.');}else rosterEdgeAdmin_(c);
+ const p=req.input||{},op=p.operation;if(op==='edgeHealthAuthority')return {handled:true,result:{user:rosterOperationsAuthority_(c,req.identity)}};if(op==='edgeArchiveRead')return {handled:true,result:rosterFreshStartArchive_(req,c)};if(!['edgeFreeze','edgeUnfreeze','edgeExport','edgeExportManifest','edgeExportCheckpoint','edgeExportPart','edgeModel','edgeFence','edgeDrift','edgeReferences','edgeContactCreate','edgeAudit','edgeExportAbandon','edgeFreshStartSource','edgeFreshStartDrift'].includes(op))return null;if(op==='edgeContactCreate'){if(!c?.user?.rosterSMC&&!c?.user?.rosterAdmin)error_(403,'SMC or Admin access is required.');}else rosterEdgeAdmin_(c);
+ if(op==='edgeFreshStartSource')return {handled:true,result:rosterFreshStartSource_(req)};
+ if(op==='edgeFreshStartDrift')return {handled:true,result:rosterFreshStartDrift_(p)};
+ if(op==='edgeFence'){const fresh=rosterFreshStartFind_(p.sourceDigest);if(fresh)return {handled:true,result:rosterFreshStartFence_(fresh)};}
  if(['edgeFreeze','edgeUnfreeze'].includes(op))return {handled:true,result:rosterCutoverDispatch_(req)};
  if(op==='edgeExportCheckpoint')return {handled:true,result:rosterEdgeExportCheckpoint_(req)};
  if(op==='edgeExportManifest')return {handled:true,result:rosterEdgeExportManifest_(req)};
@@ -102,11 +213,12 @@ function rosterEdgeMigrationDispatch_(req,c){
   let tolerated=[];
   if(typeof p.sourceDigest!=='string'||!/^[a-f0-9]{64}$/.test(p.sourceDigest))error_(409,'The imported snapshot is no longer current. Legacy writers remain enabled; migrate the latest source before cutover.');
   if(p.sourceDigest!==snapshot.sourceDigest){const changed=rosterEdgeChangedParts_(snapshot,p.sourceDigest);if(!(Array.isArray(changed)&&changed.length&&changed.every(part=>ROSTER_EDGE_EPHEMERAL_PARTS_.includes(part))))error_(409,'The imported snapshot is no longer current. Legacy writers remain enabled; migrate the latest source before cutover.'+(changed?.length?' Changed since the snapshot: '+changed.join(', ')+'.':''));tolerated=changed;}
-  props_().setProperties({ROSTER_EDGE_AUTHORITY:'d1',ROSTER_EDGE_SOURCE_DIGEST:p.sourceDigest,ROSTER_EDGE_FENCED_AT:new Date().toISOString(),...(tolerated.length?{ROSTER_EDGE_FENCE_TOLERATED:JSON.stringify({parts:tolerated,currentDigest:snapshot.sourceDigest,at:new Date().toISOString()})}:{})});
+  props_().setProperties({ROSTER_EDGE_AUTHORITY:'d1',ROSTER_EDGE_SOURCE_DIGEST:p.sourceDigest,ROSTER_EDGE_FENCED_AT:new Date().toISOString(),...(tolerated.length?{ROSTER_EDGE_FENCE_TOLERATED:JSON.stringify({parts:tolerated,currentDigest:snapshot.sourceDigest,at:new Date().toISOString()})}:{})});props_().deleteProperty('ROSTER_FRESH_START_ACTIVE');
   return {handled:true,result:{legacyWritesDisabled:true,sourceDigest:p.sourceDigest,toleratedParts:tolerated,adminVerified:true,cutoverFreeze:rosterCutoverStatus_()}};
  }finally{if(user)deployUnlock_(user);deployUnlock_(script);}
 }
 function rosterEdgeServiceMigrationDispatch_(req){
+ if(req.input?.operation==='edgeFreshStartRelease')return {handled:true,result:rosterFreshStartRelease_(req.input)};
  if(req.input?.operation==='edgeDeployPublication')return {handled:true,result:deployEdgeRosterPublication_(req.input)};
  const op=req.input?.operation;if(op==='edgeReferences'){const fresh=rosterServiceContacts_();return {handled:true,result:rosterEdgeReferences_(fresh.c,false)};}
  if(op==='edgeFenceStatus')return {handled:true,result:{legacyWritesDisabled:props_().getProperty('ROSTER_EDGE_AUTHORITY')==='d1',sourceDigest:props_().getProperty('ROSTER_EDGE_SOURCE_DIGEST')||null,cutoverFreeze:rosterCutoverStatus_()}};
