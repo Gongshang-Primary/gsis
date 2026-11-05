@@ -38,6 +38,7 @@ function edge(time='06:00:59'){
  const scope=vm.createContext({Date:f.scope.Date,GSISRosterAllocation:A,crypto,TextEncoder,textEncoder:new TextEncoder(),clone:structuredClone,canonicalCommand:x=>x,validRequest(){},GSiSEdgeStore:{digest:async()=> 'digest'},guardPendingAttendance:async()=>{},storedAuditState:x=>x,pack:async(_,s)=>s,
   loadEdgeRoster:async()=>({state:structuredClone(state),rawState:structuredClone(state),revision:writes,store:{receipt:async()=>null,commit:async input=>{f.ctx.now+=delay;if(input.beforeWrite)input.beforeWrite();state=structuredClone(input.after);writes++;}}}),
   buildEdgeRosterContext:async()=>({...f.ctx,days:structuredClone(f.ctx.days)}),edgeRosterClock:()=>{const now=f.ctx.now,sg=new Date(now+28800000);return {now,today:sg.toISOString().slice(0,10),minute:sg.getUTCHours()*60+sg.getUTCMinutes(),iso:new Date(now).toISOString()};},fail:(status,code,message)=>{throw Object.assign(Error(message),{status,code});}});
+ vm.runInContext(fs.readFileSync('backend/RosterAuditExport.gs','utf8'),scope);
  const source=fs.readFileSync('roster-update/public/edge-roster.js','utf8');vm.runInContext(source.slice(source.indexOf('export async function mutateEdgeRoster('),source.indexOf('\nfunction publicEntry')).replace('export ',''),scope);
  return {...f,scope,writes:()=>writes,state:()=>state,writeDelay:ms=>{delay=ms;},run:apply=>scope.mutateEdgeRoster({}, {actor:'test',requestId:crypto.randomUUID(),command:{operation:'autoAllocate',date:f.date},apply})};
 }
