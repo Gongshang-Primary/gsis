@@ -1,6 +1,6 @@
 # roster-d1-timetable-reconcile-cancels: on D1, every read cancels relief assignments ("effective timetable changed")
 
-- Status: claimed; Codex, lane R, TOP PRIORITY. Updating existing draft PR #78 to the final owner rulings. Other lane R implementation is paused for this task.
+- Status: handoff; Codex, lane R. Final owner rulings implemented in draft PR #78. Full CI green at implementation head `6bd5f702ac3aff2170e3b7599d67507526d496ea`; awaiting Claude review and owner release decisions. No deployment or live migration.
 - Reviewer/model: Claude
 - Last updated (Asia/Singapore): 5 Nov 2026
 
@@ -67,7 +67,7 @@ Open question for the owner: on days WITHOUT a Stapler plan, when the active bas
 - Acceptance: all five required scenarios in the owner's request on both routes; canonical build; full Node and LORD suite with counts; exact-head task handoff.
 - Boundaries: no deploy, live D1/Google/R2 writes, authority changes, messages, baseline deletion, or unrelated lane work.
 - Plan: establish failing retained-plan and removed-lesson fixtures; implement shared snapshot and resolver; add digest-bound Admin migration and informational difference UI; align reconciliation and notice withdrawal; verify both adapters and full suite; hand off #78 to Claude.
-- The later owner rulings above replace the previous PR's active-baseline identity design. Existing published-row safeguards remain except where the owner explicitly authorises releasing removed lessons after confirmation.
+- The later owner rulings above replace the previous PR's active-baseline identity design. Published-row safeguards remain for unrelated changes. Small removed-lesson releases follow the final owner ruling directly; large releases require confirmation.
 
 ## Claude check of PR #78 (head 640d2b6, 5 Nov): needs rework to the owner ruling
 #78 was built before the root cause and the owner rulings above. It conflicts with them:
@@ -76,3 +76,104 @@ Open question for the owner: on days WITHOUT a Stapler plan, when the active bas
 3. #78 has no plan day-copy, no migration and no difference view.
 4. #78 is now in conflict with main (`dirty`). #79 is stacked on it.
 Action: Codex reworks on the same branch (or a new PR that supersedes #78) to the prompt of 5 Nov; keep its good parts (shared Google/D1 reconcile path, preflight, idempotent health alert, reload-twice acceptance). Rebase #79 afterwards. Lane R stays serial: merge #80 first, then the reworked #78, then #79.
+
+## Implementation handoff, 5 November 2026
+
+Model: Codex. Reviewer: Claude. Status: implemented in draft PR #78; awaiting review and owner release decisions.
+
+### Exact implementation and validation
+
+- Accepted claim: `8914b6868ae0c9339351ae2d303af55e34234590`, task-only expected-head update before implementation.
+- Main incorporated: `568576725f7656a9db2633ec92682a848a4d5d6f`, including #80. No clock fix was reverted.
+- Exact implementation head: `6bd5f702ac3aff2170e3b7599d67507526d496ea`.
+- Implementation tree: `6daf3b7fb4b6260e41b9d71bfc1566e16161250b`.
+- Full CI: [run 41954352651](https://github.com/helper-gsps/gsis/actions/runs/41954352651), on that exact implementation head.
+- Canonical `npm run build`: all 18 components regenerated.
+- Full `npm test`, `TZ=Asia/Singapore`: 987/987 current Node programs passed across four shards (247, 247, 247, 246); 40/40 LORD check programs passed. No runner exclusion or CI gate was changed.
+- Final focused checks: 126/126 passed after the final canonical build; additional publication/privacy set 116/116 passed, including 26 withdrawal tests and a 36-case ID/order/removal matrix. Includes real Publish + Notify flows, old/new communication captures, Google/D1 eligibility, exact-origin migration, private/public projection boundaries and repeated-read stability.
+- This handoff follows the implementation in a documentation-only commit. The final PR head is recorded in the PR description for Claude; the code tree above is the tested implementation.
+
+### Root cause and parity
+
+The allocator composed the confirmed Stapler day from its saved plan while both legacy adapter reconciliation loops compared assignments and Stapler notices to the raw active baseline. On 5 November the origin was soft-pruned `1d28c523`, while the active register entry was `14a50c1e`. The mismatch was an identity/design error, not evidence that the independent Stapler day should be rebased.
+
+Google also contained the same raw-baseline comparison (`rosterOperationsReconcile_`); it was not inherently correct. Compact report/entry, record-only and Stapler reads can bypass that path. The retained incident evidence does not establish which Google requests ran on 5 November, so this PR does not claim a proven operational explanation for its absence of cancellations. Both adapters now delegate to the same effective-day resolver and guarded reconciliation.
+
+### Resulting behavior
+
+1. New and confirmed Stapler plans retain a complete private day copy and their own timetable identity. Allocation, demands, exports, preload, Venues and notification eligibility use that saved day. Baseline add/swap/prune does not change it.
+2. Admin migration previews all retained plan representations, including archived/confirmed/published copies, reads the exact origin including soft-pruned entries, and binds apply to the preview digest and request receipt. Missing or ambiguous source/native payloads block apply. Working tiles remain intact. Rerunning is a no-op; normal reads use no origin model cells afterwards.
+3. Stapler comparison lists changed cells against the current active baseline. It is informational only; no stale status, rebase, reset or cell-copy action is exposed.
+4. Ordinary baseline swaps release only absent-teacher lessons missing at the same date, period and class, with reason `Lesson no longer in the timetable`. Surviving cover remains; newly introduced workload conflicts are flagged for review.
+5. More than five releases, or at least three releases comprising half the active assignments for the date, holds the entire date unchanged and creates a System Health review item. SMC/Admin confirms a fresh digest-bound preview. Other published changes triggered by reads retain their existing review gate.
+6. Small removed published lessons are released under the final owner ruling. Saved publications and private links withdraw only those duties. Captured sent/provider evidence remains immutable. Unsent draft edits never become published through reconciliation. Combined duties retain surviving lesson details, instructions and the teacher's own lesson. Each further withdrawal needs a new acknowledgement; legacy grouped pending notices keep surviving duties. Withdrawal evidence binds already captured notices across assignment replacements and recipient changes; later restored and newly captured duties stay independent.
+7. The cutover acceptance now requires Allocate, reload twice, and verify unchanged assignment count/identity. Regression fixtures repeat reads twenty times and cover both adapters plus local SQLite D1/R2 integration.
+
+### Files changed from incorporated main
+
+The implementation changes these files; this task record is the additional handoff-only change.
+
+```text
+CHANGELOG.md
+Deploy_Backend_v0.9.9.gs
+Roster_Backend_v0.9.9.gs
+backend/Code.gs
+backend/RosterOperations.gs
+backend/RosterTimetableBatch.gs
+backend/RosterTimetablePreparation.gs
+backend/RosterVenues.gs
+docs/v099/ROSTER_D1_CUTOVER_ATTEMPT3.md
+notification-worker/dashboard-worker.mjs
+notification-worker/dashboard-worker.txt
+operations-worker/dashboard-worker.mjs
+operations-worker/dashboard-worker.txt
+roster-update/public/edge-roster-context.js
+roster-update/public/edge-roster-domain.js
+roster-update/public/edge-roster.js
+roster-update/public/edge-timetable-cache.js
+roster-update/public/roster-operations-model.js
+roster-update/public/roster-stapler-model.js
+roster-update/public/roster-stapler-ui.js
+roster-update/public/roster-timetable-preload.js
+roster-update/public/system-health.html
+roster-update/public/system-health.js
+roster-update/public/timetable-review.html
+roster-update/public/timetable-review.js
+shared/edge-notification-model.js
+shared/roster-operations.js
+shared/roster-stapler.js
+tests/paid097-health-ui.cjs
+tests/roster-d1-timetable-reconcile.cjs
+tests/roster-stapler-delink-adapters.cjs
+tests/roster-stapler-delink-domain.cjs
+tests/roster-stapler-delink-preload.cjs
+tests/roster-stapler-delink-storage.mjs
+tests/roster-stapler-delink-venues.mjs
+tests/roster-stapler-removed-publication.cjs
+tests/roster-stapler-review-ui.cjs
+tests/roster-venues-health-ui.cjs
+tests/roster089-source-read.cjs
+tests/roster090-multiple-absence.cjs
+tests/roster093a-preload-local.cjs
+tests/roster097-batch-backend.cjs
+tests/roster097-confirmed-view.cjs
+tests/roster098b-health-ui.cjs
+tests/roster098h-stapler-domain.cjs
+tests/roster098i-rehearsal.mjs
+tests/roster098j-publication-compact.cjs
+tests/roster098o-timetable-worker.mjs
+tests/roster701-integrity-review.cjs
+tests/roster707-backend-domain.cjs
+tests/roster719-suspended-report-load.cjs
+tests/stapler080-dates-contacts.cjs
+tests/stapler098h-recovery-browser.cjs
+tests/stapler716-canonical.cjs
+tests/stapler717-reopen.cjs
+timetable-prep-worker/domain.mjs
+```
+
+### Remaining evidence and release gates
+
+No product decision is left open. The precise historical Google request sequence remains unverified as described above. No live retained-plan payload was read or migrated in this implementation session; Admin must review the production migration preview after an owner-approved release. Claude must review the exact PR head. The owner decides merge, deployment and cutover.
+
+No deployment, live D1/Google/R2 write, real message, authority change, source-baseline deletion or live migration was performed. No approval is claimed. Existing cutover/rollback procedures remain in force; this change does not execute rollback or remove retained data.
