@@ -402,10 +402,12 @@ function rosterTimetableDay_(req,c){
 function rosterOperationsConflict_(code,message){throw Object.assign(Error(message),{status:409,code});}
 function rosterOperationsPackedSnapshot_(s){return JSON.parse(JSON.stringify(rosterOperationsPackPlans_(s)));}
 function rosterOperationsDayToken_(s,ctx,d){
- d=GSISRosterOperations.date(d);const packed=rosterOperationsPackPlans_(s,false),excluded=new Set(['outbox','audit','receipts','deliveryEvents','smcAlerts','acknowledgements','publicationSnapshots','optimisationRuns','inboundEvents','dailyEmploymentMail','dailyEmploymentSnapshots']);
+ d=GSISRosterOperations.date(d);const packed=rosterOperationsPackPlans_(s,false),scoped=new Set(['absences','adhoc','assignments','requests','importedRelief','reliefCorrections','rotationEvents','smcDutyRoster','recessActivations','staplerPlans','staplerRequests','staplerArchives']);
  // A regenerated read package has no authority over saved content. Its clock
  // and compression work must not change a compare token or delay publication.
- const rows={};for(const [key,value] of Object.entries(packed))if(Array.isArray(value)&&!excluded.has(key))rows[key]=value.filter(r=>r&&typeof r==='object'&&(r.date===d||r.actual?.date===d)).map(row=>{if(!['staplerPlans','staplerArchives'].includes(key))return row;const {timetablePackage,...saved}=row;return saved;});
+ const reliefIds=new Set([...(s.assignments||[]),...(s.importedRelief||[])].filter(row=>row.date===d).map(row=>row.id));
+ for(const row of s.reliefCorrections||[])if(row.date===d||row.actual?.date===d)reliefIds.add(row.assignmentId);
+ const rows={};for(const [key,value] of Object.entries(packed))if(Array.isArray(value)&&scoped.has(key))rows[key]=value.filter(r=>r&&typeof r==='object'&&(r.date===d||r.actual?.date===d||key==='reliefCorrections'&&reliefIds.has(r.assignmentId))).map(row=>{if(!['staplerPlans','staplerArchives'].includes(key))return row;const {timetablePackage,...saved}=row;return saved;});
  const active=GSISRoster.active(ctx.timetableEntries||[],d),bridges={...s,nameBridges:s.nameBridges.slice()};GSISRosterOperations.seedNameBridges(bridges,ctx.people||[]);
  return rosterOperationsDigest_({schema:1,date:d,rows,dayRevision:s.dayRevisions[d]||0,publication:s.dailyPublicationStates?.[d]?.revision||0,baseline:active||ctx.days[d]?.id||null,customInstructions:s.customInstructions.filter(r=>!r.deletedAt),systemConfig:s.systemConfig,nameBridges:bridges.nameBridges,types:s.types,recessSettings:s.recessSettings});
 }
@@ -524,9 +526,26 @@ function rosterOperationsReferenceStamp_(ctx){
  return rosterOperationsDigest_({entries:index.entries,quota});
 }
 function rosterOperationsDependencies_(state,p,ctx){
- const ignored=new Set(['revision','outbox','audit','receipts','deliveryEvents','smcAlerts','acknowledgements','scheduleReceipts','notificationWatermarks','inboundSessions','inboundEvents','dailyEmploymentMail','deliveryReview','allocationAuditExports','privateLinks']);
- const values=Object.fromEntries(Object.entries(state).filter(([key])=>!ignored.has(key)));
- if(p.operation==='scheduledRoster')values.notificationInputs=state.outbox.filter(j=>j.kind==='smc_report'||j.date===ctx.today&&j.data?.dailyPublication);
+ const A=GSISRosterAllocation,dates=new Set(p.date?[p.date,...(Array.isArray(p.dates)?p.dates:[]),...(p.actualDate?[p.actualDate]:[])]:Object.keys(ctx.days)),scheduled=p.operation==='scheduledRoster';if(scheduled)dates.add(ctx.today);
+ const weeks=new Set([...dates].map(A.monday)),years=new Set([...dates].map(A.year)),values={schema:2,dates:[...dates].sort()};
+ const dated=row=>dates.has(row.date)||dates.has(row.actual?.date),pickDates=value=>Object.fromEntries(Object.entries(value||{}).filter(([key,row])=>dates.has(key)||dates.has(key.slice(0,10))||row&&dated(row)));
+ // Only planning facts belong here. Inbox, delivery, audit and unrelated dated
+ // records merge against the latest document without invalidating the solver.
+ for(const key of ['types','systemConfig','nameBridges','recessSettings','customInstructions','accountingProfiles'])values[key]=state[key]??null;
+ for(const key of ['absences','assignments','importedRelief','requests','adhoc','recessActivations','publicationSnapshots','staplerRequests','optimisationRuns','smcDutyRoster'])values[key]=(state[key]||[]).filter(dated);
+ const reliefIds=new Set([...values.assignments,...values.importedRelief].map(row=>row.id));for(const row of state.reliefCorrections||[])if(dated(row))reliefIds.add(row.assignmentId);values.reliefCorrections=(state.reliefCorrections||[]).filter(row=>reliefIds.has(row.assignmentId));
+ values.staplerPlans=(state.staplerPlans||[]).filter(dated).map(({timetablePackage,...saved})=>saved);
+ for(const key of ['dayRevisions','manualDecisions','manualAuditBaselines','cellDecisionVersions','massPublications','dailyPublicationStates','healthWarningState'])values[key]=pickDates(state[key]);
+ values.accountingYears=Object.fromEntries(Object.entries(state.accountingYears||{}).filter(([year])=>years.has(year)));
+ values.weekEntitlements=(state.entitlements||[]).filter(row=>weeks.has(row.week));
+ values.weekLeave=(state.absences||[]).filter(row=>!row.deletedAt&&weeks.has(A.monday(row.date))&&((state.types||[]).some(type=>type.id===row.typeId&&type.extendedLeave)||['parental','hospital','npl'].includes(row.typeId))).map(({staffId,date,typeId,coverage,periods})=>({staffId,date,typeId,coverage,periods}));
+ // Other dates can genuinely change this day's cap or fairness. Compare the
+ // allocator's derived values, not every field of every historical record.
+ // Unpack only the weeks needed by UT workload, retaining packed merge inputs.
+ const accounting=rosterOperationsUnpackPlans_({...state,staplerPlans:(state.staplerPlans||[]).filter(row=>weeks.has(A.monday(row.date))).map(row=>({...row})),staplerArchives:[]});
+ values.balances=Object.fromEntries([...dates].map(date=>[date,[...A.balances(accounting,ctx,date)]]));
+ values.rotation=Object.fromEntries([...years].map(year=>[year,A.rotation(accounting,year)]));
+ if(scheduled){values.dailyEmploymentSettings=state.dailyEmploymentSettings;values.dailyEmploymentAutomatic=pickDates(state.dailyEmploymentAutomatic);values.dailyEmploymentSnapshots=(state.dailyEmploymentSnapshots||[]).filter(dated);values.acknowledgements=(state.acknowledgements||[]).filter(row=>(state.publicationSnapshots||[]).some(snapshot=>snapshot.id===row.snapshotId&&dated(snapshot)));values.notificationInputs=state.outbox.filter(j=>dates.has(j.date)&&(j.kind==='smc_report'||j.data?.dailyPublication));}
  return rosterOperationsDigest_(values);
 }
 function rosterOperationsMergePrepared_(base,next,current){
@@ -1092,11 +1111,12 @@ function rosterScheduledFastSkip_(slot,gate,today){
 function rosterScheduledDispatch_(req){gsisRequireBackendRole_('roster');
  const p=req.input||{},stamp=p.scheduledTime,started=Date.now();if(!Number.isFinite(stamp)||stamp>started+60000||started-stamp>120000)error_(400,'Scheduled tick is stale.');
  const slot={...GSISRosterAllocation.schedule(stamp),stamp},today=new Date(started+8*3600000).toISOString().slice(0,10),tracked=typeof rosterScheduledAllocationGate_==='function';
+ if(typeof rosterAllocationManualBusy_==='function'&&rosterAllocationManualBusy_(rosterAllocationRunRead_(slot.date)))return {code:'SKIPPED_BUSY',skipped:true,allocationSkipped:true};
  if(tracked)rosterScheduledAllocationRecover_(slot);const gate=tracked?rosterScheduledAllocationGate_(slot):{allocate:slot.optimise};
  if(tracked&&slot.allocationKey){const visible=rosterAllocationRunRead_(slot.date);if(visible?.scheduleKey===slot.allocationKey&&(visible.tickKey||visible.scheduleKey)===slot.key){if(visible.state==='completed')return {replayed:true,allocationSkipped:true};if(gate.allocationInProgress)throw Object.assign(Error('An allocator is already running for this date.'),{status:409,code:'ALLOCATION_IN_PROGRESS'});}}
  const fast=rosterScheduledFastSkip_(slot,gate,today);if(fast)return fast;
  const execute=(run,reportOnly=false)=>{
-  const executionStarted=Date.now();
+  const executionStarted=Date.now();if(typeof rosterScheduledManualGuard_==='function')rosterScheduledManualGuard_(slot.date);
   if(typeof rosterAbsenceIntakeGate_==='function')rosterAbsenceIntakeGate_([slot.date],!!run||slot.optimise&&!reportOnly);
   const version=props_().getProperty('ROSTER_VERSION_HINT');let initial=rosterOperationsState_();rosterScheduledHintWrite_(initial,version);
   if(run&&rosterAllocationRunAccepted_(run,initial)){rosterAllocationRunLocked_(()=>rosterAllocationRunComplete_(run,initial));return {replayed:true};}
@@ -1123,7 +1143,7 @@ function rosterScheduledDispatch_(req){gsisRequireBackendRole_('roster');
     try{
      if(typeof rosterAbsenceIntakeGate_==='function')rosterAbsenceIntakeGate_([slot.date],allocating);
      const current=rosterOperationsState_();if(run&&current.scheduleReceipts[run.scheduleKey]?.cancelled)rosterAllocationRunCancellation_();if(current.scheduleReceipts[slot.key]&&(!current.scheduleReceipts[slot.key].cancelled||current.scheduleReceipts[slot.key].reportComplete))return {replayed:true};
-     const checkClock=()=>{const clock={};rosterOperationsClock_(clock);if(run)rosterScheduledAllocationBudget_(run,true);if(clock.now-stamp>120000)error_(400,'Scheduled tick is stale.');rosterOperationsCheckClock_(preparedClock);if(allocating&&!s.scheduleReceipts[ctx.scheduledAllocationKey]?.cancelled&&s.systemConfig.scheduledAllocationEnabled&&ctx.days[slot.date]?.schoolDay&&clock.now>Date.parse(slot.date+'T06:29:59.999+08:00'))rosterOperationsConflict_('ALLOCATION_CUTOFF','Optimisation crossed the morning cut-off. No draft changes were saved.');};
+     const checkClock=()=>{if(typeof rosterScheduledManualGuard_==='function')rosterScheduledManualGuard_(slot.date);const clock={};rosterOperationsClock_(clock);if(run)rosterScheduledAllocationBudget_(run,true);if(clock.now-stamp>120000)error_(400,'Scheduled tick is stale.');rosterOperationsCheckClock_(preparedClock);if(allocating&&!s.scheduleReceipts[ctx.scheduledAllocationKey]?.cancelled&&s.systemConfig.scheduledAllocationEnabled&&ctx.days[slot.date]?.schoolDay&&clock.now>Date.parse(slot.date+'T06:29:59.999+08:00'))rosterOperationsConflict_('ALLOCATION_CUTOFF','Optimisation crossed the morning cut-off. No draft changes were saved.');};
      checkClock();if(rosterOperationsReferenceStamp_(ctx)!==references||rosterOperationsDependencies_(rosterOperationsPackPlans_(current),command,ctx)!==dependencies)rosterOperationsConflict_('PREPARED_RETRY','Planning inputs changed during allocation.');
      const merged=rosterOperationsMergePrepared_(base,next,rosterOperationsPackedSnapshot_(current));merged.revision=current.revision+(domainChanged?1:0);
      const committed=GSISRosterOperations.validateState(rosterOperationsUnpackPlans_(merged));if(typeof rosterAllocationAuditAccepted_==='function')rosterAllocationAuditAccepted_(committed,current,ctx,{scheduleKey:run?.scheduleKey||slot.key});
@@ -1134,7 +1154,7 @@ function rosterScheduledDispatch_(req){gsisRequireBackendRole_('roster');
   }
  };
  try{return gate.allocate&&tracked?rosterAllocationRunExecute_(req,null,execute,{trigger:'scheduled',date:slot.date,scheduleKey:slot.allocationKey,tickKey:slot.key,budgetDeadline:Math.min(started+75000,stamp+90000),saveDeadline:Math.min(started+110000,stamp+115000)}):execute(null,!gate.allocate);}
- catch(error){if(!['ALLOCATION_SLOT_DONE','ALLOCATION_CANCELLED','ALLOCATION_IN_PROGRESS','ALLOCATION_UNCONFIRMED'].includes(error.code))throw error;const active=rosterAllocationRunRead_(slot.date);if(!['ALLOCATION_SLOT_DONE','ALLOCATION_CANCELLED'].includes(error.code)&&active?.trigger==='scheduled'&&active.scheduleKey===slot.allocationKey)throw error;
+ catch(error){if(error.code==='SKIPPED_BUSY')return {code:'SKIPPED_BUSY',skipped:true,allocationSkipped:true};if(!['ALLOCATION_SLOT_DONE','ALLOCATION_CANCELLED','ALLOCATION_IN_PROGRESS','ALLOCATION_UNCONFIRMED'].includes(error.code))throw error;const active=rosterAllocationRunRead_(slot.date);if(!['ALLOCATION_SLOT_DONE','ALLOCATION_CANCELLED'].includes(error.code)&&active?.trigger==='scheduled'&&active.scheduleKey===slot.allocationKey)throw error;
   const currentGate=tracked?rosterScheduledAllocationGate_(slot):gate,skip=rosterScheduledFastSkip_(slot,currentGate,today);return skip||execute(null,true);
  }
 }

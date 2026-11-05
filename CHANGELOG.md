@@ -1,6 +1,6 @@
 # Pending: Roster preparation clocks follow real boundaries, 5 November 2026
 
-Model: Codex. Google and D1 prepared saves accept harmless minute changes. The shared allocator clock checks school-date changes, composed timetable period starts and relevant cutoffs, with one recomputation and a specific terminal message. Missing period times retain strict minute checks. Allocation runs record preparation duration, System Health shows the recent per-date timings, and Google Auto-allocate warns after 45 seconds. Supersedes unmerged hotfix `134816a`. See [the task](docs/coordination/tasks/roster-allocation-clock-minute.md). No deployment or live action.
+Model: Codex. Google and D1 prepared saves accept harmless minute changes. The shared allocator clock checks school-date changes, composed timetable period starts and relevant cutoffs, with one recomputation and a specific terminal message. Missing period times retain strict minute checks. Allocation runs record preparation duration, System Health shows the recent per-date timings, and Google Auto-allocate warns after 45 seconds. Prepared Google operations compare dated planning facts and derived quota/fairness inputs, so unrelated records merge without another solve. Scheduled Google and D1 cycles return SKIPPED_BUSY while a manual run owns the date. Supersedes unmerged hotfix `134816a`. See [the task](docs/coordination/tasks/roster-allocation-clock-minute.md). No deployment or live action.
 
 # Pending: consecutive limit counts occupied periods, 4 November 2026
 

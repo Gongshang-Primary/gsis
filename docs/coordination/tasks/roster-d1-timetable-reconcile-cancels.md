@@ -1,8 +1,8 @@
 # roster-d1-timetable-reconcile-cancels: on D1, every read cancels relief assignments ("effective timetable changed")
 
-- Status: open; Codex, lane R, TOP PRIORITY (blocks the D1 cutover)
+- Status: authorised (owner "codex work", 5 Nov); Codex, lane R, TOP PRIORITY (blocks the D1 cutover). Scope: owner rulings below (Stapler delink, release removed lessons, show-only diff)
 - Reviewer/model: Claude
-- Last updated (Asia/Singapore): 5 Nov 2026 05:10
+- Last updated (Asia/Singapore): 5 Nov 2026
 
 ## Incident: cutover attempt 4 (v0.9.9j), 5 Nov 2026
 - Import completed 01:54 (316/316 parts; roster 18,905 records, roster-register 21). Activated 04:38:27 (both scopes active r2). Owner rolled back by the emergency route about 05:00 (Cloudflare legacy x3, edgeAuthorityRollbackToLegacy, venuesFenceDiagnose). D1 heads remain `active` (reset with "Reset D1 after manual rollback" before the next attempt). Evidence kept in D1.
@@ -29,3 +29,30 @@ roster-register entries:
 4. Tests: a register with a pruned higher-priority entry and an active lower-priority entry on the same dates → Auto-allocate then read: zero cancellations. Day cache keyed per timetable. The mass-cancel guard triggers. Google/D1 parity.
 5. Add to the cutover acceptance test: Auto-allocate, reload twice, count unchanged.
 Full suite green. Draft PR with the exact head for Claude. No deploy, no live D1 writes.
+
+## Root cause found (Claude, 5 Nov ~09:00, read-only D1 + code)
+- D1 `staplerPlans` for 2026-11-05: **confirmed, baselineId 1d28c523 (pruned)**. Neighbouring plans (2, 4, 6 Nov) use 14a50c1e (active).
+- Allocation builds the Stapler-composed day: demands get `timetableId: d.id` (shared/roster-operations.js about line 241), and `composeStaplerContext` makes `d.id` the plan's baseline (1d28c523). So every 5 Nov assignment carries 1d28c523.
+- The D1 read reconcile (`reconcileOperationalState`, roster-update/public/edge-roster.js about lines 403-406) compares `row.timetableId` with `GSISRoster.active(ctx.timetableEntries,row.date).id` (14a50c1e, the active baseline, ignoring the Stapler composition) and invalidates every row → mass cancellation on each read.
+- The same function's first loop also treats a confirmed Stapler plan whose `baselineId` is not the active baseline as stale ("The active baseline timetable changed") for importedRelief/notifications, consistent with the plan being stale.
+- So two defects: (A) **data**: the 5 Nov plan was confirmed on a pruned baseline (the Stapler should refuse or flag confirm/save on a non-active baseline, and existing such plans need an SMC "rebase or redo"); (B) **D1 reconcile** compares against the raw active baseline while allocation uses the Stapler-composed day; it must use the same effective day id as allocation, or treat the Stapler-plan mismatch as one SMC-visible issue, never a silent mass cancel. Check whether Google's reconcile has the same comparison (Google did not cancel on 5 Nov) and align both.
+- Fix list: (1) one resolver for the effective timetable id (Stapler-composed) used by allocation, demands and reconcile on Google and D1; (2) Stapler plan on a non-active baseline: block confirm, show "Rebase to the current baseline", and list existing stale plans in System Health; (3) the mass-cancel guard; (4) tests with a confirmed Stapler plan on a pruned baseline.
+
+## Owner ruling, 5 Nov: Stapler plans are delinked from baselines
+Owner (verbatim): "i need stapler plans to be totally delinked from baseline, it is like a baseline duplicate of the day, then later cell-by-cell comparison for user to note only. any other baselines should be free to swap out, don't need to tie to baseline"
+
+This replaces fix items (1)-(2) above for Stapler days:
+1. A Stapler plan is a self-contained copy of the day's timetable, taken when it was created. It holds every cell it needs, so it never reads the baseline again. `baselineId` stays only as a record of where the copy came from (origin), never as a validity key.
+2. On a date with a Stapler plan, the plan is the effective timetable. Allocation, demands, reconcile, export and notifications use the plan's own id on Google and D1. A baseline change, swap or prune never invalidates, cancels or marks stale a Stapler plan, its assignments, its imported relief or its outbox rows.
+3. Baselines are free to be added, swapped, reprioritised or pruned at any time, even while Stapler plans refer to them as their origin.
+4. Comparison is information only: Stapler shows a cell-by-cell difference against the current active baseline for that date (added, removed, changed cells), with no blocking, no automatic rebase and no "stale" status. An optional user action "copy this cell from baseline" may follow later; it is not in scope now.
+5. Days without a Stapler plan keep today's behaviour (see the open question below).
+6. Keep the mass-cancel guard (item 3) and the tests (item 4). Add tests: prune the origin baseline of a confirmed plan → no row changes on Google or D1; swap the active baseline → Stapler day unchanged, the difference view lists the changed cells; reload after allocate on a Stapler day → no invalidation.
+7. Migration: existing plans (including 5 Nov on pruned 1d28c523) must already hold their full day copy; check this, and if any plan reads cells from its baseline, copy them into the plan once (before pruning ever removes the source).
+
+Open question for the owner: on days WITHOUT a Stapler plan, when the active baseline changes, should existing assignments for lessons that no longer exist still be invalidated (current behaviour), or kept and flagged?
+- Evidence for item 7 (Claude, D1 read-only): the 5 Nov plan record is only 1151 bytes (date, baselineId, revision, workloadWarnings, ...). It holds no day copy; it is an overlay that reads cells from its baseline. So delinking needs (a) the plan to store the full day snapshot at create/confirm, and (b) a one-time migration that copies each existing plan's day from its origin baseline. Pruned baselines are soft-pruned (`pruned=1`, entries kept), so the source for 1d28c523 still exists. Do not hard-delete any baseline before this migration runs.
+
+## Owner answers, 5 Nov
+1. Days WITHOUT a Stapler plan: when a baseline change removes a lesson, its relief assignment is released (the lesson no longer exists). Release only the rows whose lesson is gone; lessons that still exist on the new baseline (same day, period, class, teacher) keep their assignment. Released rows show "Lesson no longer in the timetable" in the audit and to SMC; the teacher's relief notice is withdrawn. The mass-cancel guard still applies (if a swap would release a large share of the day, stop and ask SMC/Admin to confirm).
+2. Stapler difference view: show only. No per-cell copy action.

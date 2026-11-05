@@ -3,6 +3,8 @@
 function rosterAllocationRunKey_(date){return 'ROSTER_ALLOCATION_RUN:'+GSISRosterOperations.date(date);}
 function rosterAllocationRunRead_(date){const text=props_().getProperty(rosterAllocationRunKey_(date));if(!text)return null;try{const row=JSON.parse(text);if(row.schema!==1||row.date!==date||typeof row.id!=='string'||!Array.isArray(row.log))throw Error('shape');return row;}catch(_){error_(503,'Allocation status could not be read. Refresh before starting another run.');}}
 function rosterAllocationRunExpired_(row){return Date.now()-Date.parse(row.trigger==='scheduled'?row.startedAt:row.updatedAt)>(row.trigger==='scheduled'?150000:10*60000);}
+function rosterAllocationManualBusy_(row){return row?.trigger==='manual'&&['running','cancelling','committing','uncertain'].includes(row.state)&&!rosterAllocationRunExpired_(row);}
+function rosterScheduledManualGuard_(date){if(rosterAllocationManualBusy_(rosterAllocationRunRead_(date)))throw Object.assign(Error('Scheduled allocation deferred while an SMC run owns this date.'),{status:409,code:'SKIPPED_BUSY'});}
 function rosterAllocationRunPublic_(row,state){
  if(!row)return null;let status=row.state;if(state&&rosterAllocationRunCancelled_(row,state))status='cancelled';else if(state&&rosterAllocationRunAccepted_(row,state))status='completed';
  else if(rosterAllocationRunExpired_(row)&&['running','cancelling','committing'].includes(status))status=status==='committing'?'uncertain':'abandoned';
@@ -63,6 +65,7 @@ function rosterScheduledAllocationStart_(req,descriptor){
  const date=GSISRosterOperations.date(descriptor.date),scheduleKey=descriptor.scheduleKey,tickKey=descriptor.tickKey||scheduleKey,id=rosterOperationsDigest_({date,actor:'roster-service',key:scheduleKey});
  return rosterAllocationRunLocked_(()=>{
   const ledger=rosterScheduledAllocationLedger_(date),key=scheduleKey.slice(11);let slot=ledger.slots[key],prior=rosterAllocationRunRead_(date),state;
+  if(rosterAllocationManualBusy_(prior))throw Object.assign(Error('Scheduled allocation deferred while an SMC run owns this date.'),{status:409,code:'SKIPPED_BUSY'});
   const read=()=>state||(state=rosterOperationsState_(true)),done=()=>{throw Object.assign(Error('This scheduled allocation slot is finished.'),{status:409,code:'ALLOCATION_SLOT_DONE'});};
   if(slot&&['completed','stopped'].includes(slot.state))done();
   if(prior&&['running','cancelling','committing','uncertain'].includes(prior.state)){
