@@ -1,6 +1,6 @@
 # deploy-remove-target-offload: remove the "Target offload %" indicator from the Deploy ledger
 
-- Status: authorised (owner 6 Nov ~01:30: "log for codex to remove the target offload indicator totally"); Codex; lane Deploy (not Roster). Small.
+- Status: merged (#86 at a1d0941 as 35bdbb9; conflicts with #85 resolved by Claude: CHANGELOG both entries, worker bundles regenerated); owner "merge 85 86", 6 Nov; for release build n
 - Reviewer/model: Claude
 
 ## Today

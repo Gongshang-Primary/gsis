@@ -1,6 +1,6 @@
 # roster-remove-why-capture: remove the "Why" capture; restore the Allocation Audit TXT format
 
-- Status: implemented and locally verified; owner approved publication; Model: Codex; lane R; owner authorised 6 Nov 2026; must land before release build n
+- Status: merged (#85 at a79f4a3 as 05a2558, owner "merge 85 86", 6 Nov); for release build n
 - Reviewer/model: Claude
 - Source: owner decision recorded in tasks/roster-daily-drive-outputs.md ("Owner decision (6 Nov ~01:15)"), review notes in review/pr82-claude-review.md
 
