@@ -52,3 +52,7 @@ This replaces fix items (1)-(2) above for Stapler days:
 
 Open question for the owner: on days WITHOUT a Stapler plan, when the active baseline changes, should existing assignments for lessons that no longer exist still be invalidated (current behaviour), or kept and flagged?
 - Evidence for item 7 (Claude, D1 read-only): the 5 Nov plan record is only 1151 bytes (date, baselineId, revision, workloadWarnings, ...). It holds no day copy; it is an overlay that reads cells from its baseline. So delinking needs (a) the plan to store the full day snapshot at create/confirm, and (b) a one-time migration that copies each existing plan's day from its origin baseline. Pruned baselines are soft-pruned (`pruned=1`, entries kept), so the source for 1d28c523 still exists. Do not hard-delete any baseline before this migration runs.
+
+## Owner answers, 5 Nov
+1. Days WITHOUT a Stapler plan: when a baseline change removes a lesson, its relief assignment is released (the lesson no longer exists). Release only the rows whose lesson is gone; lessons that still exist on the new baseline (same day, period, class, teacher) keep their assignment. Released rows show "Lesson no longer in the timetable" in the audit and to SMC; the teacher's relief notice is withdrawn. The mass-cancel guard still applies (if a swap would release a large share of the day, stop and ask SMC/Admin to confirm).
+2. Stapler difference view: show only. No per-cell copy action.
