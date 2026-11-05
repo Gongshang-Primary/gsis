@@ -1,3 +1,7 @@
+# Pending: Deploy publish reports the Contacts step and offers a retry, 6 November 2026
+
+Model: Muse. A Deploy publish now reports the Contacts catalogue sync separately: "Published; Contacts updated" on success and "Published; Contacts not updated: <reason>" on failure, with a Retry Contacts sync button on the version row that re-sends the same revision and payload (idempotent; Contacts returns duplicate when already applied). The publish no longer throws away the Contacts result after the version is persisted. The Contacts viewport invalidates its cached tables by catalogue revision, so a normal Refresh shows the new catalogues after a successful sync. See [deploy-contacts-catalogue-sync](docs/coordination/tasks/deploy-contacts-catalogue-sync.md). No deployment or live write.
+
 # Pending: Deploy ledger targets use configured relief budgets, 6 November 2026
 
 Model: Codex. Remove the Target offload % column from both ledger views and their shared Excel/print output. FAJT Target now uses the saved relief fajtWeeklyPeriods / weeklyPeriods ratio; missing or invalid budgets show Needs configuration. Help shows the configured values. The public projection includes only these two budgets and their schema, retaining the server-only relief engine and Admin-only settings. Defaults preserve Target, at-load bands, load status and R. See [task and verification](docs/coordination/tasks/deploy-remove-target-offload.md). No deployment or live action.
