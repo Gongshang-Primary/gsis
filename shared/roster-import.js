@@ -115,6 +115,7 @@ var GSiSRosterImport=(()=>{
  }
  function finishFreeze(snapshot,binding,partMetadata,scopes,adapter){
   freezeBinding(snapshot,binding);const {sessionId,actor,requestId}=binding,manifest={schema:FORMAT,sessionId,actor,requestId,sourceDigest:snapshot.sourceDigest,parts:partMetadata,scopes,totalBytes:partMetadata.reduce((n,p)=>n+p.bytes,0)};
+  if(snapshot.freshStart){manifest.freshStart=true;manifest.freshStartDetails=JSON.parse(JSON.stringify(snapshot.freshStart));manifest.freshStartInputDigest=snapshot.freshStartInputDigest;}
   validateManifest(manifest);return {manifest,manifestDigest:adapter.hash(JSON.stringify(manifest))};
  }
  function freeze(snapshot,binding,adapter){
@@ -294,7 +295,7 @@ var GSiSRosterImport=(()=>{
   async function referencesReady(){await read();checked([await connection().prepare("UPDATE gsis_roster_import_sessions SET references_ready=1,updated_at=? WHERE session_id=? AND state='staging' AND NOT EXISTS(SELECT 1 FROM gsis_roster_import_parts WHERE session_id=? AND receipt_json IS NULL)").bind(Date.now(),sessionId,sessionId).run()]);return progress();}
   async function failPreparation(){await read();const c=connection();checked(await c.batch([c.prepare("UPDATE gsis_roster_import_sessions SET state='failed',updated_at=? WHERE session_id=? AND state='preparing'").bind(Date.now(),sessionId),c.prepare("UPDATE gsis_roster_import_preparation SET claim_token='',lease_until=0 WHERE session_id=? AND EXISTS(SELECT 1 FROM gsis_roster_import_sessions WHERE session_id=? AND state='failed')").bind(sessionId,sessionId)]));return progress();}
   async function finalize(){
-   const row=await read();if(row?.state==='imported')return progress();if(!row?.manifest_json)fail(409,'ROSTER_IMPORT_INCOMPLETE','The immutable export is incomplete.');const m=JSON.parse(row.manifest_json),c=connection(),token=crypto.randomUUID(),now=Date.now(),metadata=JSON.stringify({source:{kind:'apps-script',sourceDigest:m.sourceDigest,manifestDigest:row.manifest_digest},importedAt:now,importSession:sessionId,digestFormat:FORMAT});
+   const row=await read();if(row?.state==='imported')return progress();if(!row?.manifest_json)fail(409,'ROSTER_IMPORT_INCOMPLETE','The immutable export is incomplete.');const m=JSON.parse(row.manifest_json),c=connection(),token=crypto.randomUUID(),now=Date.now(),metadata=JSON.stringify({source:{kind:m.freshStart?'fresh-start':'apps-script',sourceDigest:m.sourceDigest,manifestDigest:row.manifest_digest},...(m.freshStart?{freshStart:m.freshStartDetails}:{}),importedAt:now,importSession:sessionId,digestFormat:FORMAT});
    const conditions=SCOPES.map(()=>" AND EXISTS(SELECT 1 FROM gsis_edge_heads h JOIN gsis_roster_import_locks l ON l.scope=h.scope WHERE h.scope=? AND l.session_id=? AND h.revision=l.base_revision AND h.mode='legacy') AND (SELECT COUNT(*) FROM gsis_roster_import_rows WHERE session_id=? AND scope=?)=?").join('');
    const statements=[c.prepare(`UPDATE gsis_roster_import_sessions SET state='imported',write_token=?,updated_at=? WHERE session_id=? AND state='staging' AND references_ready=1
     AND (SELECT COUNT(*) FROM gsis_roster_import_parts WHERE session_id=?)=? AND NOT EXISTS(SELECT 1 FROM gsis_roster_import_parts WHERE session_id=? AND receipt_json IS NULL)

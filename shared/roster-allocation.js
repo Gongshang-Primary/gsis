@@ -133,6 +133,28 @@ var GSISRosterAllocation = (() => {
     const own=k=>Object.prototype.hasOwnProperty.call(s,k),record=v=>v!==null&&typeof v==='object'&&!Array.isArray(v);
     for(const k of ['entitlements','importedRelief','reliefCorrections'])if(own(k)&&!Array.isArray(s[k]))fail(503,'Annual relief accounting records could not be read. Restore the last verified records before allocating.');
     if(own('accountingYears')&&(!record(s.accountingYears)||Object.entries(s.accountingYears).some(([key,value])=>!/^20\d\d$/.test(key)||!record(value)||typeof value.verified!=='boolean')))fail(503,'Annual relief accounting status could not be read. Restore the last verified records before allocating.');
+    if(own('openingBalances')){
+      if(!Array.isArray(s.openingBalances))fail(503,'Opening balances could not be read.');
+      const seen=new Set();for(const row of s.openingBalances){const key=row?.year+'|'+row?.staffId;if(!record(row)||typeof row.staffId!=='string'||!row.staffId||!/^20\d\d$/.test(row.year)||!openingCutoff(row.asOfDate,row.year)||!openingAmount(row.cumulativeQuota)||!openingAmount(row.cumulativeDone)||!Number.isSafeInteger(row.version)||row.version<1||seen.has(key))fail(503,'Stored opening balances need review.');seen.add(key);}
+    }
+  }
+  const openingAmount=value=>Number.isSafeInteger(value)&&value>=0&&value<=9999;
+  const validOpeningDate=value=>typeof value==='string'&&/^20\d\d-\d\d-\d\d$/.test(value)&&Number.isFinite(Date.parse(value+'T12:00:00Z'))&&new Date(value+'T12:00:00Z').toISOString().slice(0,10)===value;
+  const openingCutoff=(value,Y)=>validOpeningDate(value)&&value>=(Number(Y)-1)+'-01-01'&&value<=Y+'-12-31';
+  function openingBalance(s,id,Y){return s.freshStart?(s.openingBalances||[]).find(row=>row.staffId===id&&row.year===Y)||null:null;}
+  function initialiseFreshStartAccounting(s,ctx,{effectiveDate}){
+    if(!validOpeningDate(effectiveDate))fail(400,'Choose a valid fresh-start date.');
+    if(!s.freshStart||s.freshStart.effectiveDate!==effectiveDate||s.freshStart.fairnessMode!=='opening-balances')fail(409,'Fresh-start accounting requires its verified epoch.');
+    validateAccounting(s);if((s.openingBalances||[]).length||s.freshStart.openingBalancesConfirmedAt)fail(409,'Opening accounting has already been started.');
+    s.openingBalances=[];if(!s.accountingYears)s.accountingYears={};s.accountingYears[year(effectiveDate)]={verified:false,mode:'opening-balances',at:ctx.iso,by:ctx.user.email,reason:'Admin must confirm Opening balances before Auto-allocate can run. Open Admin > Opening balances.'};return s;
+  }
+  // This is a proposal only. It never creates saved rows or a confirmation.
+  function freshStartOpeningBalances(s,ctx,asOfDate){
+    validateAccounting(s);if(!validOpeningDate(asOfDate)||asOfDate>ctx.today)fail(400,'Choose a valid opening-balance cutoff.');
+    const Y=ctx.accountingYear===undefined?year(ctx.today):ctx.accountingYear;if(typeof Y!=='string'||!/^20\d\d$/.test(Y)||!openingCutoff(asOfDate,Y))fail(400,'Choose a valid target accounting year and opening-balance cutoff.');
+    const ids=new Set(),people=(ctx.people||[]).filter(p=>p.active===true&&reliefCandidateEligible(p));for(const p of people){const name=norm(p.name);if(typeof p.id!=='string'||!p.id||!name||ids.has(p.id))fail(503,'Contacts has duplicate or missing teacher identities.');ids.add(p.id);}
+    const weeks=new Set();for(const row of s.entitlements||[])if(row.year===Y&&row.week<=asOfDate&&ids.has(row.staffId)){const key=row.staffId+'|'+row.week;if(!validOpeningDate(row.week)||monday(row.week)!==row.week||!Number.isFinite(row.quota)||row.quota<0||weeks.has(key))fail(503,'Recorded weekly quotas need review before prefill.');weeks.add(key);}
+    const rows=accounted(s,ctx);return people.map(person=>{const opening=openingBalance(s,person.id,Y),cutoff=opening?.asOfDate||'';return {staffId:person.id,year:Y,name:person.name,role:person.role||'',department:person.department||'',cumulativeQuota:(opening?.cumulativeQuota||0)+(s.entitlements||[]).filter(r=>r.staffId===person.id&&r.year===Y&&r.week<=asOfDate&&r.week>cutoff).reduce((n,r)=>n+(r.excluded?0:r.quota),0),cumulativeDone:(opening?.cumulativeDone||0)+rows.filter(a=>a.staffId===person.id&&(a.accountingYear||year(a.date))===Y&&a.date<=asOfDate&&a.date>cutoff&&reliefCompleted(a,ctx)).reduce((n,a)=>n+cost(a),0),asOfDate};});
   }
   function ensure(s){
     validateAccounting(s);
@@ -173,6 +195,7 @@ var GSISRosterAllocation = (() => {
   // An empty successfully loaded ledger starts at zero. Existing history remains intact.
   function initialiseHistory(s,ctx,d){
     validateAccounting(s);
+    if(s.freshStart?.fairnessMode==='opening-balances'&&year(d)===year(s.freshStart.effectiveDate)&&!s.freshStart.openingBalancesConfirmedAt)return false;
     const Y=year(d);if(s.accountingYears?.[Y]?.verified)return false;
     const historical=(s.entitlements||[]).some(r=>r.year===Y&&(r.mode!=='observed'||r.week<monday(ctx.today)))||accounted(s,ctx).some(a=>(a.accountingYear||year(a.date))===Y&&cost(a)>0&&(a.origin==='imported'||a.date<ctx.today||a.status==='completed'||a.completionStatus==='completed'));
     if(historical)return false;
@@ -195,10 +218,16 @@ var GSISRosterAllocation = (() => {
     return {quota:Number.isFinite(t?.R)?Math.max(0,t.R):null,source:t?.quotaSource||ctx.days[d]?.quotaSource||null,verified:Number.isFinite(t?.R),week:key};
   }
   function annual(s,ctx,id,accountYear=year(ctx.today)){
-    const maxWeek=monday(ctx.today),rows=(s.entitlements||[]).filter(r=>r.staffId===id&&r.year===accountYear&&r.week<=maxWeek),denominator=rows.reduce((n,r)=>n+(r.excluded?0:r.quota),0);
-    let completed=0,committed=0;
-    for(const a of accounted(s,ctx)){if(a.staffId!==id||(a.accountingYear||year(a.date))!==accountYear)continue;if(reliefCompleted(a,ctx))completed+=cost(a);else committed+=cost(a);}
+    const opening=openingBalance(s,id,accountYear),maxWeek=monday(ctx.today),rows=(s.entitlements||[]).filter(r=>r.staffId===id&&r.year===accountYear&&r.week<=maxWeek&&(!opening||r.week>opening.asOfDate)),denominator=(opening?.cumulativeQuota||0)+rows.reduce((n,r)=>n+(r.excluded?0:r.quota),0);
+    let completed=opening?.cumulativeDone||0,committed=0;
+    for(const a of accounted(s,ctx)){if(a.staffId!==id||(a.accountingYear||year(a.date))!==accountYear||opening&&a.date<=opening.asOfDate)continue;if(reliefCompleted(a,ctx))completed+=cost(a);else committed+=cost(a);}
     const dailyRoster=rosterBasis(ctx,ctx.today,id)==='daily';return {...(dailyRoster?{dailyRoster:true}:{}),entitlement:dailyRoster?null:denominator,completed,committed,spent:completed+committed,utilisation:dailyRoster?null:denominator>0?(completed+committed)/denominator*100:completed+committed===0?0:null,historyVerified:s.accountingYears?.[accountYear]?.verified===true};
+  }
+  function personalCompletion(s,staffId,today,now=Date.now()){
+    validateAccounting(s);const sg=new Date(now+28800000),ctx={today,minute:sg.getUTCHours()*60+sg.getUTCMinutes(),days:s.dailyPublicationStates||{}},Y=year(today),week=monday(today),history=s.accountingYears?.[Y],opening=openingBalance(s,staffId,Y),seen=new Set(),rows=(s.entitlements||[]).filter(r=>r.staffId===staffId&&r.year===Y&&r.week<=week).sort((a,b)=>String(a.week).localeCompare(String(b.week)));
+    let valid=true,entitlement=opening?.cumulativeQuota||0;for(const row of rows){if(!validOpeningDate(row.week)||seen.has(row.week)||!Number.isFinite(row.quota)||row.quota<0){valid=false;continue;}seen.add(row.week);if(!opening||row.week>opening.asOfDate)entitlement+=row.excluded?0:row.quota;}
+    const completed=(opening?.cumulativeDone||0)+accounted(s,ctx).filter(a=>a.staffId===staffId&&(a.accountingYear||year(a.date))===Y&&a.date<=today&&(!opening||a.date>opening.asOfDate)&&reliefCompleted(a,ctx)).reduce((n,a)=>n+cost(a),0),verified=history?.verified===true,currentWeekRecorded=seen.has(week),reason=!valid?'Recorded weekly quotas need review.':!verified?'Relief history has not been verified.':!rows.length&&!opening?'No weekly quota history is recorded.':!currentWeekRecorded?'This week’s quota has not been recorded yet.':entitlement===0?'No relief quota is recorded for this period.':'';
+    return {from:s.freshStart?.effectiveDate&&s.freshStart.effectiveDate.slice(0,4)===Y?s.freshStart.effectiveDate:Y+'-01-01',to:today,throughWeek:week,completed,entitlement:valid&&(rows.length||opening)?entitlement:null,percentage:!reason?100*completed/entitlement:null,reason,historyVerified:verified,currentWeekRecorded,recordedWeeks:seen.size,excludedWeeks:rows.filter(r=>r.excluded).length,firstWeek:rows[0]?.week||null,lastWeek:rows.at(-1)?.week||null,zeroStart:history?.mode==='zero-start',startedAt:history?.mode==='zero-start'?history.at:null,...(opening?{openingBalance:clone(opening)}:{})};
   }
   // Employment caps use numbered timetable-period units, exactly as capWorkload
   // and relief rCost do. No clock-duration conversion or guessed week is added.
@@ -232,8 +261,9 @@ var GSISRosterAllocation = (() => {
   }
   function balances(s,ctx,d){
     const rows=accounted(s,ctx),totals=new Map(),weekly=new Map(),denominators=new Map(),weeklyQuotas=new Map(),week=monday(d),teachers=new Map((ctx.days[d]?.teachers||[]).map(t=>[t.staffId,t])),Y=year(d),through=monday(ctx.today);
-    for(const r of s.entitlements||[])if(r.year===Y){if(r.week<=through)denominators.set(r.staffId,(denominators.get(r.staffId)||0)+(r.excluded?0:r.quota));if(r.week===week&&!weeklyQuotas.has(r.staffId))weeklyQuotas.set(r.staffId,r);}
-    for(const a of rows){if((a.accountingYear||year(a.date))===Y){const t=totals.get(a.staffId)||{completed:0,committed:0};t[reliefCompleted(a,ctx)?'completed':'committed']+=cost(a);totals.set(a.staffId,t);}if(monday(a.date)===monday(d))weekly.set(a.staffId,(weekly.get(a.staffId)||0)+cost(a));}
+    for(const row of s.freshStart?s.openingBalances||[]:[])if(row.year===Y){denominators.set(row.staffId,row.cumulativeQuota);totals.set(row.staffId,{completed:row.cumulativeDone,committed:0});}
+    for(const r of s.entitlements||[])if(r.year===Y){const opening=openingBalance(s,r.staffId,Y);if(r.week<=through&&(!opening||r.week>opening.asOfDate))denominators.set(r.staffId,(denominators.get(r.staffId)||0)+(r.excluded?0:r.quota));if(r.week===week&&!weeklyQuotas.has(r.staffId))weeklyQuotas.set(r.staffId,r);}
+    for(const a of rows){const opening=openingBalance(s,a.staffId,Y);if((a.accountingYear||year(a.date))===Y&&(!opening||a.date>opening.asOfDate)){const t=totals.get(a.staffId)||{completed:0,committed:0};t[reliefCompleted(a,ctx)?'completed':'committed']+=cost(a);totals.set(a.staffId,t);}if(monday(a.date)===monday(d))weekly.set(a.staffId,(weekly.get(a.staffId)||0)+cost(a));}
     const result=new Map();for(const p of ctx.people){const q=weekQuota(s,ctx,p.id,d,weeklyQuotas),teacher=effectiveUTTeacher(s,ctx,d,teachers.get(p.id),p),capped=teacher?.capConfigured===true||teacher?.periodCap!==null&&teacher?.periodCap!==undefined,v=totals.get(p.id)||{completed:0,committed:0},entitlement=denominators.get(p.id)||0,spent=v.completed+v.committed,used=weekly.get(p.id)||0,dailyRoster=rosterBasis(ctx,d,p.id)==='daily',quota=dailyRoster?null:q.quota;result.set(p.id,{...v,spent,...(dailyRoster?{dailyRoster:true}:{}),entitlement:dailyRoster?null:entitlement,utilisation:dailyRoster?null:entitlement>0?100*spent/entitlement:spent===0?0:null,R:quota,remaining:quota===null?null:quota-used,weeklyUsed:used,periodCap:capped?teacher.periodCap:null,utCap:capped&&teacher.capBasis==='total',capConfigured:capped,capWorkload:capped?teacher.capWorkload:null,capRemaining:capped&&teacher.capVerified===true&&Number.isFinite(teacher.capHeadroom)?teacher.capHeadroom-used:null,capVerified:!capped||teacher.capVerified===true,capVerificationReason:capped?teacher.capVerificationReason||null:null,quotaVerified:q.verified&&quota!==null,historyVerified:s.accountingYears?.[Y]?.verified===true});}return result;
   }
   // Each cross-project decision names the immutable published Deploy snapshot it
@@ -598,6 +628,6 @@ var GSISRosterAllocation = (() => {
   }
   function mayOptimise(ctx,d){const start=Date.parse(addDays(d,-1)+'T16:00:00+08:00'),end=Date.parse(d+'T06:29:59.999+08:00');return ctx.now>=start&&ctx.now<=end;}
   function warningEvents(s,ctx,summary){ensure(s);const quiet=schedule(ctx.now).quiet,events=[];for(const p of summary.periods){if(periodStarted(ctx,summary.date,p.period))continue;const key=summary.date+':'+p.period,old=s.healthWarningState[key]||{seen:[],episode:0};if(p.green.length>2){s.healthWarningState[key]={seen:[],episode:old.seen.length?old.episode+1:old.episode,last:p.green.length};continue;}if(!old.seen.includes(p.green.length)){events.push({key:'capacity:'+key+':'+old.episode+':'+p.green.length,period:p.period,count:p.green.length,date:summary.date,quiet});old.seen.push(p.green.length);}old.last=p.green.length;s.healthWarningState[key]=old;}return events;}
-  return {deploymentTeachingEvidence,sreBasis,dailyRosterCalculation,reliefCandidateEligible,normalizeSubjectPatterns,matchesSubjectPattern,absencePeriods,defaultConsecutiveSubjectRules,normalizeConsecutiveSubjectRules,manualDecision,manualDecisionForDemand,manualOwnership,defaultSubjectFamilies,normalizeSubjectFamilies,normalizeTeachingGroupOverrides,subjectResolver,lessonSubject,teachingProfile,defaultRestrictedPeriods,defaultEmploymentRestrictions,preferenceRules,workloadRules,ruleToggles,workloadLimits,preferenceOrder,sameVenue,teacherSource,recessDuty,manualAssignments,manualModel,withManualAssignments,manualRanks,isClassLesson,ensure,clone,fail,norm,addDays,monday,year,cost,active,protectedAssignment,effectiveAssignments,accounted,corrected,initialiseHistory,annual,balances,weekQuota,captureWeek,addAudit,assertNewAuditIds,bumpDay,prepareClock,preparedClockConflict,periodStarted,periodEnded,reliefCompleted,teacherContext,eligibility,runAt,opportunities,health,rotation,ranked,optimise,score,solveCoverage,schedule,mayOptimise,warningEvents,pendingPeerRequests};
+  return {initialiseFreshStartAccounting,freshStartOpeningBalances,openingBalance,openingAmount,validOpeningDate,openingCutoff,personalCompletion,deploymentTeachingEvidence,sreBasis,dailyRosterCalculation,reliefCandidateEligible,normalizeSubjectPatterns,matchesSubjectPattern,absencePeriods,defaultConsecutiveSubjectRules,normalizeConsecutiveSubjectRules,manualDecision,manualDecisionForDemand,manualOwnership,defaultSubjectFamilies,normalizeSubjectFamilies,normalizeTeachingGroupOverrides,subjectResolver,lessonSubject,teachingProfile,defaultRestrictedPeriods,defaultEmploymentRestrictions,preferenceRules,workloadRules,ruleToggles,workloadLimits,preferenceOrder,sameVenue,teacherSource,recessDuty,manualAssignments,manualModel,withManualAssignments,manualRanks,isClassLesson,ensure,clone,fail,norm,addDays,monday,year,cost,active,protectedAssignment,effectiveAssignments,accounted,corrected,initialiseHistory,annual,balances,weekQuota,captureWeek,addAudit,assertNewAuditIds,bumpDay,prepareClock,preparedClockConflict,periodStarted,periodEnded,reliefCompleted,teacherContext,eligibility,runAt,opportunities,health,rotation,ranked,optimise,score,solveCoverage,schedule,mayOptimise,warningEvents,pendingPeerRequests};
 })();
 if(typeof module!=='undefined'&&module.exports)module.exports=GSISRosterAllocation;

@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="referrer" content="same-origin"><title>GSiS Roster · Google archive</title><link rel="stylesheet" href="edge-setup.css"><link rel="stylesheet" href="system-health.css"><link rel="stylesheet" href="roster-statistics.css"><script src="roster-statistics.js" defer></script><script src="archive.js" defer></script></head>
+<body>
+<a class="skip" href="#main">Skip to archive</a>
+<header><a href="/" class="brand">GSiS <span>Roster</span></a><span class="version">Read-only archive</span></header>
+<main id="main">
+<p class="eyebrow">Earlier records</p><h1>Google archive</h1>
+<p class="lead">View the Roster records kept on Google before the fresh start on D1.</p>
+<p>These views use your current school access. <a href="/">Return to Roster</a>.</p>
+<p id="archive-coverage" class="notice" hidden></p>
+<div id="archive-status" class="notice" role="status" aria-live="polite">Loading your earlier relief history…</div>
+<a id="archive-signin" class="home-link" href="/" hidden>Open Roster to sign in →</a>
+<section id="archive-controls" aria-label="Archive views">
+<form id="archive-form" class="stats-controls" novalidate>
+<label for="archive-view">View
+<select id="archive-view" name="view"><option value="history">My relief history</option><option value="statistics">Statistics · SMC / Admin</option><option value="calculations">My Calculations</option></select></label>
+<div id="archive-range" class="stats-controls" hidden><label for="archive-from">Start date <input id="archive-from" name="from" type="date"></label><label for="archive-to">End date <input id="archive-to" name="to" type="date"></label></div>
+<button id="archive-load" type="submit">Refresh view</button>
+</form>
+<p class="muted">Statistics accepts up to 366 days at a time. Archived records cannot be edited here.</p>
+</section>
+<div id="archive-content"></div>
+<div class="actions"><button id="archive-more" type="button" hidden>More history</button></div>
+</main>
+</body>
+</html>

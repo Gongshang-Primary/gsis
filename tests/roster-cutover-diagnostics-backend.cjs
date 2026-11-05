@@ -3,7 +3,7 @@ const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('nod
 const hash=value=>crypto.createHash('sha256').update(JSON.stringify(value)).digest('hex');
 const properties=new Map(),writes=[],state={peerMail:[],inboxMessages:[],packedPlan:{encoding:'gzip',data:'stored'}},index={revision:1,entries:[]};
 const scope={console,Date,rosterOperationsState_:()=>structuredClone(state),rosterIndex_:()=>structuredClone(index),rosterOperationsStoredView_:value=>value,rosterOperationsDigest_:hash,
- props_:()=>({getProperty:key=>properties.get(key)||null,getProperties:()=>Object.fromEntries(properties),setProperty:(key,value)=>{writes.push(key);properties.set(key,value);},setProperties:values=>{for(const [key,value] of Object.entries(values)){writes.push(key);properties.set(key,value);}}}),
+ props_:()=>({getProperty:key=>properties.get(key)||null,getProperties:()=>Object.fromEntries(properties),setProperty:(key,value)=>{writes.push(key);properties.set(key,value);},setProperties:values=>{for(const [key,value] of Object.entries(values)){writes.push(key);properties.set(key,value);}},deleteProperty:key=>{writes.push(key);properties.delete(key);}}),
  LockService:{getScriptLock:()=>({}),getUserLock:()=>({})},deployLock_:()=>true,deployUnlock_:()=>{},error_:(status,message)=>{throw Object.assign(Error(message),{status});}};
 vm.createContext(scope);vm.runInContext(fs.readFileSync('backend/RosterEdgeMigration.gs','utf8'),scope);
 const call=(input,admin=true)=>scope.rosterEdgeMigrationDispatch_({input,identity:{email:'admin@example.test'}},{user:{rosterAdmin:admin}})?.result;
@@ -39,7 +39,8 @@ assert.equal(afterRepairDrift.current,false);assert.deepEqual(Array.from(afterRe
 assert.throws(()=>call({operation:'edgeFence',sourceDigest:beforeRepair.sourceDigest}),error=>error.status===409&&error.message.includes('no longer current'));
 assert.equal(writes.length,count,'stored repair cannot hide source drift or write an activation property');assert.equal(properties.get('ROSTER_EDGE_AUTHORITY'),undefined);
 assert.equal(beforeRepair.state.audit[1].id,'synthetic-planning-pair','the old captured source remains unchanged');
-const fresh=call({operation:'edgeExport'});assert.equal(call({operation:'edgeFence',sourceDigest:fresh.sourceDigest}).legacyWritesDisabled,true,'unchanged activation still uses the full digest');
+properties.set('ROSTER_FRESH_START_ACTIVE','stale-fresh-epoch');
+const fresh=call({operation:'edgeExport'});assert.equal(call({operation:'edgeFence',sourceDigest:fresh.sourceDigest}).legacyWritesDisabled,true,'unchanged activation still uses the full digest');assert.equal(properties.has('ROSTER_FRESH_START_ACTIVE'),false,'full import clears an old fresh-epoch marker');
 function snapshotChecks(h,captured=h.call(h.input)){
  assert(captured.preparing,'capture remains resumable');
  const result=h.call({...h.input,preparation:captured.preparation});

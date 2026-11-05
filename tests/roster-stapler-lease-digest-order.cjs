@@ -26,7 +26,7 @@ console.log('PASS edgeDrift is exempt from the freeze guard');
 {
  const props=new Map([['ROSTER_STAPLER_LEASE:2026-11-05','{"fence":3}']]),state={peerMail:[]};
  const s={console,Date,rosterOperationsState_:()=>structuredClone(state),rosterIndex_:()=>({revision:1,entries:[]}),rosterOperationsStoredView_:value=>value,rosterOperationsDigest_:hash,rosterCutoverStatus_:()=>({active:true}),
-  props_:()=>({getProperty:key=>props.get(key)||null,getProperties:()=>Object.fromEntries(props),setProperty:(k,v)=>props.set(k,v),setProperties:values=>{for(const [k,v] of Object.entries(values))props.set(k,v);}}),
+  props_:()=>({getProperty:key=>props.get(key)||null,getProperties:()=>Object.fromEntries(props),setProperty:(k,v)=>props.set(k,v),setProperties:values=>{for(const [k,v] of Object.entries(values))props.set(k,v);},deleteProperty:key=>props.delete(key)}),
   LockService:{getScriptLock:()=>({}),getUserLock:()=>({})},deployLock_:()=>true,deployUnlock_:()=>{},error_:(status,message)=>{throw Object.assign(Error(message),{status});}};
  vm.createContext(s);vm.runInContext(fs.readFileSync('backend/RosterEdgeMigration.gs','utf8'),s);
  const call=input=>s.rosterEdgeMigrationDispatch_({input,identity:{email:'admin@example.test'}},{user:{rosterAdmin:true}})?.result;

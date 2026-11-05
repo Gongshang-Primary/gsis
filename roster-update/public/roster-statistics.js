@@ -42,7 +42,7 @@ var GSISRosterStatistics = (() => {
   for(const value of Object.values(state.statisticsArchive||{}))for(const row of value.importedWeekly||[])if(row.week<=r.to&&row.to>=r.from)arch.importedWeekly.push({...row,source:'preserved'});
   for(const key of Object.keys(arch))facts[key]=mergeById(arch[key],facts[key]);
   const deleted=new Set((state.absences||[]).filter(a=>a.deletedAt).map(a=>a.id));facts.absenceRows=facts.absenceRows.filter(a=>!deleted.has(a.id));
-  const retainedDates=new Set([...facts.absenceRows,...facts.activityRows].map(a=>a.date)),trackingFrom=state.statisticsTrackingFrom||null;
+  const retainedDates=new Set([...facts.absenceRows,...facts.activityRows].map(a=>a.date)),trackingFrom=state.statisticsTrackingFrom||state.freshStart?.effectiveDate||null;
   const coverage=dates(r.from,r.to).map(d=>({date:d,status:d>ctx.today?'future':state.statisticsArchive?.[d]?(state.statisticsArchive[d].complete?'preserved':'partial-preserved'):trackingFrom&&d>=trackingFrom?'tracked':retainedDates.has(d)?'partial':'unknown'}));
   const warnings=[];
   if(coverage.some(d=>['partial','partial-preserved','unknown'].includes(d.status)))warnings.push('Older history may be incomplete or pruned. Missing records are not proof of zero activity.');
@@ -52,9 +52,9 @@ var GSISRosterStatistics = (() => {
   const seen=new Set([...facts.absenceRows,...facts.activityRows,...facts.importedWeekly].map(a=>a.staffId));
   const people=(ctx.people||[]).filter(p=>p.active||seen.has(p.id)).map(p=>({id:String(p.id),name:String(p.name||p.id)}));
   for(const row of [...facts.absenceRows,...facts.activityRows,...facts.importedWeekly])if(!people.some(p=>p.id===row.staffId))people.push({id:row.staffId,name:row.name});
-  return {schema:SCHEMA,from:r.from,to:r.to,today:ctx.today,checkedAt:ctx.iso,revision:state.revision,trackingFrom,people,...facts,coverage,warnings};
+  return {schema:SCHEMA,...(state.freshStart?.effectiveDate?{historyCoverage:{since:state.freshStart.effectiveDate,archiveUrl:'/archive.html'}}:{}),from:r.from,to:r.to,today:ctx.today,checkedAt:ctx.iso,revision:state.revision,trackingFrom,people,...facts,coverage,warnings};
  }
- function markTracking(state,ctx){if(!state.statisticsTrackingFrom){state.statisticsTrackingFrom=date(ctx.today);return true;}return false;}
+ function markTracking(state,ctx){if(!state.statisticsTrackingFrom){state.statisticsTrackingFrom=date(state.freshStart?.effectiveDate||ctx.today);return true;}return false;}
  function captureBeforePrune(state,selection,ctx){
   const removed=new Set();for(const key of ['absences','assignments','importedRelief'])for(const row of selection.lists?.[key]||[])if(row.date){removed.add(row.date);const corrected=key==='absences'?row:A().corrected(state,row);if(corrected.date)removed.add(corrected.date);}
   for(const d of selection.maps?.dailyPublicationStates||[])removed.add(d);

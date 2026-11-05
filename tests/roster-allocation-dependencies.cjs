@@ -57,3 +57,30 @@ test('correction chains entering then leaving the date remain fenced',()=>{
  correct(h.date);const p={operation:'scheduledRoster',date:h.date},before=h.scope.rosterOperationsDependencies_(state,p,h.ctx),token=h.scope.rosterOperationsDayToken_(state,h.ctx,h.date);
  correct(other);assert.notEqual(h.scope.rosterOperationsDependencies_(state,p,h.ctx),before);assert.notEqual(h.scope.rosterOperationsDayToken_(state,h.ctx,h.date),token);
 });
+function freshAccounting(){
+ const h=setup(),A=require('../shared/roster-allocation.js'),state=h.state();state.freshStart={effectiveDate:'2026-10-12',fairnessMode:'opening-balances'};A.initialiseFreshStartAccounting(state,h.ctx,{effectiveDate:'2026-10-12'});
+ h.O.apply(state,h.ctx,{operation:'saveOpeningBalances',confirmInitial:true,reason:'Reviewed opening totals',rows:h.people.map(person=>({staffId:person.id,cumulativeQuota:20,cumulativeDone:person.id==='charlie'?1:18,asOfDate:'2026-10-12',version:0}))});h.setState(state);return {...h,A};
+}
+test('fresh opening corrections change the derived dependency digest and fairness without inventing rotation',()=>{
+ const h=freshAccounting(),state=h.state(),command=h.command(),digest=h.scope.rosterOperationsDependencies_(state,command,h.ctx),rotation=h.A.rotation(state,'2026'),dayToken=h.scope.rosterOperationsDayToken_(state,h.ctx,h.date);
+ const first=s=>h.A.ranked(s,h.ctx,h.date,2).find(row=>row.autoEligible).staffId;assert.equal(first(state),'charlie');
+ h.O.apply(state,h.ctx,{operation:'saveOpeningBalances',reason:'Correct verified opening total',rows:[{staffId:'bob',cumulativeQuota:20,cumulativeDone:0,asOfDate:'2026-10-12',version:1}]});
+ assert.equal(first(state),'bob');assert.notEqual(h.scope.rosterOperationsDependencies_(state,command,h.ctx),digest);assert.deepEqual(h.A.rotation(state,'2026'),rotation);assert.equal(h.scope.rosterOperationsDayToken_(state,h.ctx,h.date),dayToken,'an accounting correction does not pretend the edited day changed');
+});
+test('a concurrent opening correction forces one replan and saves allocation using the corrected fairness',()=>{
+ const h=freshAccounting(),state=h.state(),proposals=[];state.absences[0].periods=[2];h.setState(state);
+ h.scope.GSISRosterOperations={...h.O,apply(s,ctx,p){const result=h.O.apply(s,ctx,p);if(p.operation==='autoAllocate'){proposals.push(Array.from(s.assignments,row=>row.staffId));if(proposals.length===1){const live=h.state();h.O.apply(live,h.ctx,{operation:'saveOpeningBalances',reason:'Correct while allocator prepares',rows:[{staffId:'bob',cumulativeQuota:20,cumulativeDone:0,asOfDate:'2026-10-12',version:1}]});live.revision++;h.setState(live);}}return result;}};
+ h.run();assert.deepEqual(proposals,[['charlie'],['bob']]);assert.equal(h.calls.writes,1);assert.equal(h.state().openingBalances.find(row=>row.staffId==='bob').cumulativeDone,0);assert.deepEqual(h.state().assignments.map(row=>row.staffId),['bob'],'the stale Charlie proposal is discarded');
+});
+test('fresh opening audit metadata does not change planning dependencies',()=>{
+ const h=freshAccounting(),state=h.state(),command=h.command(),digest=h.scope.rosterOperationsDependencies_(state,command,h.ctx);
+ state.openingBalances[0].updatedAt='2026-10-14T01:00:00Z';state.openingBalances[0].updatedBy='another-admin@gsps.edu.sg';state.openingBalances[0].version++;
+ assert.equal(h.scope.rosterOperationsDependencies_(state,command,h.ctx),digest);
+});
+test('rotation-only changes remain dependencies while opening totals are present',()=>{
+ const h=freshAccounting(),state=h.state(),command=h.command();
+ state.assignments.push({id:'prior-bob',staffId:'bob',date:'2026-10-09',period:2,status:'completed',rCost:1},{id:'prior-charlie',staffId:'charlie',date:'2026-10-09',period:3,status:'completed',rCost:1});
+ state.rotationEvents.push({id:'rotate-bob',assignmentId:'prior-bob',staffId:'bob',year:'2026',sequence:1},{id:'rotate-charlie',assignmentId:'prior-charlie',staffId:'charlie',year:'2026',sequence:2});
+ const digest=h.scope.rosterOperationsDependencies_(state,command,h.ctx),balances=[...h.A.balances(state,h.ctx,h.date)];assert.deepEqual(h.A.rotation(state,'2026'),['bob','charlie']);
+ state.rotationEvents[0].sequence=3;assert.deepEqual(h.A.rotation(state,'2026'),['charlie','bob']);assert.deepEqual([...h.A.balances(state,h.ctx,h.date)],balances);assert.notEqual(h.scope.rosterOperationsDependencies_(state,command,h.ctx),digest);
+});

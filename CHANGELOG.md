@@ -1,3 +1,7 @@
+# Pending: fresh D1 start with retained Google history and Admin opening balances, 5 November 2026
+
+Model: Codex. Prepare empty Roster and timetable-register states from a signed settings-only source while Google remains the frozen archive. The setup path verifies its config digest before activation and keeps original Google pointers for a guarded switch back. Admin can enter, paste, review and correct dated opening balances with per-row audit evidence; SMC can view them. Annual fairness respects each as-of cutoff, while weekly capacity and real duty history remain intact. History views identify their D1 start date and link to authenticated, read-only Google records. See [design and verification](docs/coordination/tasks/roster-d1-fresh-start.md). No live cutover or deployment performed.
+
 # Pending: independent Stapler days and guarded timetable reconciliation, 5 November 2026
 
 Model: Codex. Stapler keeps its complete day under its own timetable identity. Baseline swaps and pruning leave its cells, relief and notices intact. Admin can preview and apply the one-time migration with a checked digest. The difference view only shows changes against the current baseline. Ordinary dates release only removed lessons, including published duties, and withdraw their notices. Large releases require SMC/Admin review in System Health. Google and D1 share the resolver and reconciliation rules. See [the task](docs/coordination/tasks/roster-d1-timetable-reconcile-cancels.md). No deployment or live migration.
