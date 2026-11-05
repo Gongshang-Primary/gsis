@@ -1,8 +1,8 @@
 # roster-d1-timetable-reconcile-cancels: on D1, every read cancels relief assignments ("effective timetable changed")
 
-- Status: open; Codex, lane R, TOP PRIORITY (blocks the D1 cutover)
+- Status: authorised (owner "codex work", 5 Nov); Codex, lane R, TOP PRIORITY (blocks the D1 cutover). Scope: owner rulings below (Stapler delink, release removed lessons, show-only diff)
 - Reviewer/model: Claude
-- Last updated (Asia/Singapore): 5 Nov 2026 05:10
+- Last updated (Asia/Singapore): 5 Nov 2026
 
 ## Incident: cutover attempt 4 (v0.9.9j), 5 Nov 2026
 - Import completed 01:54 (316/316 parts; roster 18,905 records, roster-register 21). Activated 04:38:27 (both scopes active r2). Owner rolled back by the emergency route about 05:00 (Cloudflare legacy x3, edgeAuthorityRollbackToLegacy, venuesFenceDiagnose). D1 heads remain `active` (reset with "Reset D1 after manual rollback" before the next attempt). Evidence kept in D1.
