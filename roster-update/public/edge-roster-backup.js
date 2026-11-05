@@ -150,8 +150,7 @@ export async function backupStatus(db,{now=Date.now()}={}){
 }
 export async function runDriveBackup(env,{now=Date.now(),bridge,forceKind}={}){
  if(env.ROSTER_EDGE_AUTHORITY!=='d1')return {enabled:false,skipped:true};
- const db=env.GSIS_JOBS;await ensureBackup(db);const config=await readBackupConfig(db);if(!config.enabled)return {enabled:false,skipped:true};
- await expireBackupRuns(db,now);
+ const db=env.GSIS_JOBS;await ensureBackup(db);await expireBackupRuns(db,now);const config=await readBackupConfig(db);if(!config.enabled)return {enabled:false,skipped:true};
  const latest=await primary(db).prepare("SELECT manifest_json FROM gsis_backup_ledger WHERE kind IN ('full','increment') AND status='verified' ORDER BY started_at DESC LIMIT 1").first(),previousManifest=JSON.parse(latest?.manifest_json||'{}');
  const status=await backupStatus(db,{now}),lastFull=await primary(db).prepare("SELECT started_at FROM gsis_backup_ledger WHERE kind='full' AND status='verified' ORDER BY started_at DESC LIMIT 1").first(),today=singaporeBackupDate(now),dueFull=!lastFull||previousManifest.chainRawBytes>=96*1024*1024||status.lastCode==='BACKUP_CHAIN_LIMIT'||now>=Date.parse(today+'T02:15:00+08:00')&&lastFull.started_at<Date.parse(today+'T02:15:00+08:00');
  if(!forceKind&&status.status==='failed'&&now-status.lastAttemptAt<60000)return {enabled:true,skipped:true,code:'SKIPPED_BACKOFF'};

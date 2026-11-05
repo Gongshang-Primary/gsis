@@ -1,6 +1,6 @@
 # roster-drive-outputs-bridge-error: Drive writes fail with ROSTER_BRIDGE_ERROR on v0.9.9n (live, 6 Nov)
 
-- Status: claimed (owner on v0.9.9n, 6 Nov ~06:00, outputs disabled to stop alerts); Codex; lane R; priority 1 (blocks backups and daily outputs)
+- Status: review preparation (owner on v0.9.9n, 6 Nov ~06:00, outputs disabled to stop alerts); Codex; lane R; priority 1 (blocks backups and daily outputs)
 - Reviewer/model: Claude
 
 ## Evidence (Claude, D1 read-only + owner's Apps Script checks)
@@ -34,7 +34,7 @@ The unmodified writer accepted a 919,742-byte workbook from the existing rendere
 
 The live refusal itself is not yet reproduced. Confirmed diagnostic losses are fixed: Drive HTTP errors discarded the Google reason; the JSON wrapper mislabelled transport exceptions; doPost replaced every Roster 503 with a generic message; Worker ledgers kept only the code. Authenticated output calls now carry a sanitised message and Google code through the real envelope, ledger error/manifest, job-health diagnostics, ledger UI and System Health. Messages and displayed errors are bounded to 300 characters; URLs, credential values, JWTs, email addresses, long identifiers and stacks are removed. Ordinary Roster errors retain their existing privacy projection.
 
-Expired full/increment attempts are failed before schedule/backoff selection and retried even when a recent successful full would otherwise defer the next hour. Captured temporary items are cleaned; failed ledger evidence is retained and late completion cannot mark an expired attempt verified.
+Expired full/increment attempts are failed even while outputs are disabled, before schedule/backoff selection and retried even when a recent successful full would otherwise defer the next hour. Captured temporary items are cleaned; failed ledger evidence is retained and late completion cannot mark an expired attempt verified.
 
 Daily alerts use one stable identity per kind and Singapore date, including uncertain queue-response retries. Daily failure count covers the full queue. Backup, continuity and restore-test alerts are grouped separately. Disabled settings are checked both before enqueue and against the current mutation state. There are no healthy/empty alerts.
 
@@ -47,3 +47,10 @@ Local Chromium installation returned an empty/truncated download. The local LORD
 Base: accepted claim `0ac29a6510832493ae034c52f09a2461184dc112`, built from main tree `397b65866a990822527b11e39b2923324d0a3b06`. Direct Git authentication was unavailable, so the local source was refreshed through the GitHub connector and every tracked blob verified against that exact tree. Publishing uses the same connector and checks tree identity. Reviewer: Claude; owner merges. Release labels remain coordinator-owned for v0.9.9o with #84.
 
 Next: full exact-head GitHub CI, Claude review, owner merge. After a separately authorised deployment, inspect the next retained refusal to identify any remaining live configuration/provider cause. Do not describe this as a live-verified incident fix.
+
+
+## Review handoff
+
+All 19 focused local programs passed, including the large restore-limit regression. The final disabled-expiry addition also passed the output-error, backup-job, backup and daily-queue programs. Both local canonical builds rebuilt all 18 components. No tracked build drift remains.
+
+Implementation first published at `9ebda6a36ba6fb789a21981f9533f449f21a60a0`; follow-up adds expiry while disabled. The exact final head, full CI result and PR link are in the PR description/owner handoff. The locally reconstructed commits are not GitHub history; remote trees are hash-checked against the local tree. Claude reviews the complete final diff. No merge or deployment is authorised to Codex.

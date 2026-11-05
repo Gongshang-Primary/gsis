@@ -1,6 +1,6 @@
 // The notification Worker is the only execution owner. Admin requests enqueue.
 import {GSiSEdgeStore as Store} from './edge-store.js';
-import {ensureBackup,readBackupConfig,runDriveBackup,backupStatus,singaporeBackupDate,notifyOutputAlert} from './edge-roster-backup.js';
+import {ensureBackup,readBackupConfig,runDriveBackup,backupStatus,singaporeBackupDate,notifyOutputAlert,expireBackupRuns} from './edge-roster-backup.js';
 import {readBackupChain,restoreBackupChain} from './edge-roster-backup-restore.js';
 import {outputFailure,outputErrorText} from '../../shared/edge-output-error.js';
 import {GSISRosterAllocation as Allocation} from './edge-roster-domain.js';
@@ -69,7 +69,7 @@ async function resetScratch(sourceDb,targetDb){
 }
 export async function runBackupJobs(env,{bridge,continuity,alert,now=Date.now()}={}){
  if(env.ROSTER_EDGE_AUTHORITY!=='d1')return {enabled:false,skipped:true};
- const db=primary(env.GSIS_JOBS);await schema(db);const config=await readBackupConfig(db);if(!config.enabled)return {enabled:false,skipped:true};
+ const db=primary(env.GSIS_JOBS);await schema(db);await expireBackupRuns(db,now);const config=await readBackupConfig(db);if(!config.enabled)return {enabled:false,skipped:true};
  const token=crypto.randomUUID(),claim=await db.prepare("UPDATE gsis_backup_worker SET lease_token=?,lease_until=? WHERE id=1 AND lease_until<=?").bind(token,now+15*60000,now).run();if(!claim.meta?.changes)return {enabled:true,skipped:true,code:'SKIPPED_BUSY'};
  const started=Date.now(),rawBridge=bridge;bridge=async input=>{if(Date.now()-started>12*60000)fail('BACKUP_BUDGET','The backup work will retry within its retained time budget.');const owner=await db.prepare('SELECT lease_token FROM gsis_backup_worker WHERE id=1').first();if(owner.lease_token!==token)fail('BACKUP_LEASE','This Worker no longer owns the backup run.');return rawBridge(input);};
  let failures=0,failure;const today=singaporeBackupDate(now),result={};
