@@ -40,4 +40,19 @@ function applyPlanning_(d,x,c,idx){
   }
  }catch(e){if(e.status)throw e;error_(400,e.message);}
 }
-function syncPublishedCatalogues_(b,idx,identity){gsisRequireBackendRole_('deploy');const entry=publishedEntry_(idx),published=entry?document_(b,entry):null;if(!published)return;contacts_(identity,false,'applyDeployCatalogues',{revision:idx.revision,options:published.masterOptions||idx.masterOptions||null,membership:published.membership||null});}
+function syncPublishedCatalogues_(b,idx,identity){
+ gsisRequireBackendRole_('deploy');
+ const entry=publishedEntry_(idx),published=entry?document_(b,entry):null;
+ if(!published)return {status:'skipped',reason:'No published version.'};
+ try{
+  const result=contacts_(identity,false,'applyDeployCatalogues',{revision:idx.revision,options:published.masterOptions||idx.masterOptions||null,membership:published.membership||null});
+  if(result&&result.duplicate)return {status:'duplicate',revision:idx.revision};
+  if(result&&result.unchanged)return {status:'unchanged',revision:idx.revision};
+  return {status:'updated',revision:idx.revision};
+ }catch(e){
+  return {status:'failed',reason:(e&&e.message)||'Contacts unavailable',code:(e&&e.status)||503,revision:idx.revision};
+ }
+}
+// Idempotent retry for a publish whose Contacts step failed: the same revision and
+// payload are sent again, so Contacts returns duplicate:true when already applied.
+function retryContactsSync_(b,idx,identity){return syncPublishedCatalogues_(b,idx,identity);}

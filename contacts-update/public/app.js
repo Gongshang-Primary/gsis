@@ -2,6 +2,7 @@ import {filterPeople,emailList,whatsapp,tokens,excelWorkbook,staffRank,compareSt
 const $=id=>document.getElementById(id), esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const labels={groups:'Group',role:'Appointment',employment:'Employment',subject:'Specialism',mk:'School',teaching:'Teaching',formTeacher:'Form Teacher'};
 let state=null,token='',preview=false,filters=[],visible=[],sortAscending=true,editingFilter=-1,editingRole=null,loading=false,noticeTimer;
+let catalogueRevision=null; // Latest catalogue revision seen from the backend; cached tables are dropped when it moves.
 function notice(message){$('toast').textContent=message;$('toast').classList.remove('hidden');clearTimeout(noticeTimer);noticeTimer=setTimeout(()=>$('toast').classList.add('hidden'),5000);}
 async function api(path,body,signal,onReadStatus){
  const authAttempt=loginAttempt,credential=token,started=performance.now();
@@ -112,6 +113,18 @@ function acceptContactViewState(result){
  if(contactData)renderData();for(const kind of Object.keys(auxTables))if(auxTables[kind]?.data)renderAux(kind);
  if(contactViewPending()&&state.user.roles.includes('Admin')&&$('contactRecovery').hidden)void showContactRecovery();
 }
+function noteCatalogueRevision(revision){
+ if(!revision||revision===catalogueRevision)return;
+ catalogueRevision=revision;
+ if(contactData&&contactData.catalogueRevision&&contactData.catalogueRevision!==revision&&!dataEdits.size){
+  contactData=null;
+  if(document.querySelector('[data-page="data"]')?.classList.contains('active'))void loadContactData(true);
+ }
+ for(const kind of Object.keys(auxTables)){
+  const entry=auxTables[kind];
+  if(entry?.data?.catalogueRevision&&entry.data.catalogueRevision!==revision&&!entry.dirty&&!entry.edits?.size&&!entry.request)delete auxTables[kind];
+ }
+}
 function show(){window.setGSISViewport?.('contacts',state?.user?.roles||[]);
  const canView=privileged(),canEdit=state.user.roles.includes('Admin');
  for(const id of ['dataTab'])$(id).classList.toggle('hidden',!canView);
@@ -120,12 +133,12 @@ function show(){window.setGSISViewport?.('contacts',state?.user?.roles||[]);
  $('saveData').hidden=!canEdit;$('addContactRow').hidden=!canEdit;$('recalculateData').hidden=!canEdit;
  $('loginView').classList.add('hidden');$('loadingView').classList.add('hidden');$('app').classList.remove('hidden');$('identity').textContent=state.user.email.split('@')[0];renderContactViewState();renderContacts();renderAccess();if(contactData)renderData();for(const kind of Object.keys(auxTables))if(auxTables[kind]?.data)renderAux(kind);if($('signature').classList.contains('active'))renderSignature();if($('signatureSettings').classList.contains('active'))renderSignatureSettings();
 }
-async function refresh(){if(loading||dataSaving)return;loading=true;$('refresh').disabled=true;const owner=state?.user.email,credential=token;try{const next=await api('bootstrap');if(token!==credential||state?.user.email!==owner)return;if(next.user.email!==owner){expireContactsAuth();return;}state=next;$('refresh').title='Refresh';show();loadDeployment(state);if(contactViewPending()&&state.user.roles.includes('Admin'))await showContactRecovery();if(hasContactDrafts())notice('Contact list refreshed. Your unsaved draft is retained.');}catch(e){notice(e.message);if(state)$('refresh').title='Refresh failed · showing earlier data';else $('loginMessage').textContent=e.message;if(e.code==='CONTACTS_RECOVERY_REQUIRED')await showContactRecovery();}finally{loading=false;$('refresh').disabled=false;}}
+async function refresh(){if(loading||dataSaving)return;loading=true;$('refresh').disabled=true;const owner=state?.user.email,credential=token;try{const next=await api('bootstrap');if(token!==credential||state?.user.email!==owner)return;if(next.user.email!==owner){expireContactsAuth();return;}state=next;noteCatalogueRevision(next.catalogueRevision);$('refresh').title='Refresh';show();loadDeployment(state);if(contactViewPending()&&state.user.roles.includes('Admin'))await showContactRecovery();if(hasContactDrafts())notice('Contact list refreshed. Your unsaved draft is retained.');}catch(e){notice(e.message);if(state)$('refresh').title='Refresh failed · showing earlier data';else $('loginMessage').textContent=e.message;if(e.code==='CONTACTS_RECOVERY_REQUIRED')await showContactRecovery();}finally{loading=false;$('refresh').disabled=false;}}
 function populateValues(){const category=$('filterCategory').value;const values=category==='groups'?state.groups:[...new Set(state.people.flatMap(p=>tokens(p[category])))].sort();$('filterValue').innerHTML=values.map(v=>`<option>${esc(v)}</option>`).join('');}
 function openFilter(index=-1){editingFilter=index;$('filterCategory').value=index>=0?filters[index].category:'groups';populateValues();if(index>=0)$('filterValue').value=filters[index].value;$('filterDialog').showModal();}
 function roleTarget(){const email=$('roleAlias').value.trim().toLowerCase()+'@gsps.edu.sg';editingRole=state.access.find(p=>p.email===email)||null;$('roleName').value=state.people.find(p=>p.emails.gsps.toLowerCase()===email)?.name||'';$('roleKP').checked=!!editingRole?.roles.includes('KP');$('roleAdmin').checked=!!editingRole?.roles.includes('Admin');$('roleAdmin').disabled=$('roleAdmin').checked;}
 function openRole(email=''){$('roleAlias').value=email.split('@')[0];$('roleAlias').readOnly=!!email;roleTarget();$('roleError').textContent='';$('roleDialog').showModal();}
-function clearContactsPersonalState(){clearContactVCard();deploymentAttempt++;auxTables={};contactData=null;dataEdits.clear();newContactIds.clear();dataRequest=null;signatureRenderEpoch++;signatureReady=null;signatureSettingsDraft=null;filters=[];columnFilters={};dropdownFilters={};for(const id of ['diyGrid','dataGrid','signatureIdentity','signatureSubjectChoices'])$(id).replaceChildren();$('signatureCanvas').width=$('signatureCanvas').width;$('signatureCanvas').hidden=true;$('signatureDownload').disabled=true;}
+function clearContactsPersonalState(){clearContactVCard();deploymentAttempt++;auxTables={};contactData=null;catalogueRevision=null;dataEdits.clear();newContactIds.clear();dataRequest=null;signatureRenderEpoch++;signatureReady=null;signatureSettingsDraft=null;filters=[];columnFilters={};dropdownFilters={};for(const id of ['diyGrid','dataGrid','signatureIdentity','signatureSubjectChoices'])$(id).replaceChildren();$('signatureCanvas').width=$('signatureCanvas').width;$('signatureCanvas').hidden=true;$('signatureDownload').disabled=true;}
 function expireContactsAuth(){clearContactVCard();window.GSISContactsMobile?.close();resetContactRecovery();token='';$('app').classList.add('hidden');$('loginView').classList.remove('hidden');$('loadingView').classList.add('hidden');$('loginMessage').textContent='Session expired. Sign in again with the same account. Your draft is retained.';$('retryLogin').hidden=false;$('signInAgain').hidden=false;}
 async function signout(){if(recoveryBusy){notice('Wait for save recovery to finish before signing out.');return;}if(signatureSettingsSaving){notice('Wait for signature settings to finish saving.');return;}if(dataSaving||dataRequest){notice('Confirm the pending save with Retry Save changes before signing out.');return;}if(hasContactDrafts()&&!confirm('Discard unsaved Contacts changes and sign out?'))return;try{const r=await fetch('/api/logout',{method:'POST',signal:AbortSignal.timeout(10000)});if(!r.ok)throw Error('Could not sign out')}catch(e){notice('Sign-out failed. Please retry.');return}loginAttempt++;window.GSISContactsMobile?.close();resetContactRecovery();clearContactsPersonalState();dataEdits.clear();newContactIds.clear();auxTables={};contactData=null;$('dataGrid').replaceChildren();token='';state=null;visible=[];filters=[];$('contactRows').replaceChildren();$('accessRows').replaceChildren();$('app').classList.add('hidden');$('loginView').classList.remove('hidden');$('loginMessage').textContent='Sign in with your school Google account.';window.google?.accounts.id.disableAutoSelect();start();}
 document.querySelectorAll('[data-page]').forEach(b=>b.onclick=()=>{
@@ -176,7 +189,7 @@ const yieldGrid=()=>document.hidden?Promise.resolve():new Promise(resolve=>setTi
 async function loadContactData(force=false){
  if(!privileged()||dataSaving||dataRequest||dataEdits.size)return;
  if(dataFlight)return dataFlight;
- if(contactData&&!force&&!!contactData.viewState?.pending===contactViewPending()){renderData();return;}
+ if(contactData&&!force&&(!catalogueRevision||!contactData.catalogueRevision||contactData.catalogueRevision===catalogueRevision)&&!!contactData.viewState?.pending===contactViewPending()){renderData();return;}
  const owner=state.user.email,credential=token,started=Date.now();
  const valid=()=>token===credential&&state?.user.email===owner&&privileged()&&!dataEdits.size;
  const progress=$('dataProgress');let stage='Fetching current contacts and validation choices',attempt=1;
@@ -203,7 +216,7 @@ async function loadContactData(force=false){
    await yieldGrid();
   }
   if(!valid())return;
-  contactData=result;acceptContactViewState(result);
+  contactData=result;noteCatalogueRevision(result.catalogueRevision);acceptContactViewState(result);
   if(contactDataEditable())$('dataGrid').querySelectorAll('[data-can-edit="true"]').forEach(input=>{if(input.tagName==='SELECT')input.disabled=false;else input.readOnly=false});
   progress.value=progress.max;
   $('dataStatus').textContent='Ready · '+result.rows.length+' contacts · loaded in '+((Date.now()-started)/1000).toFixed(1)+'s'+(result.editable?'':' · read-only access');
@@ -320,7 +333,7 @@ async function authenticateContacts(credential){
   if(credential!=='session'){await api('session',{} ,loginAbort.signal);token='session';loginCredential='session';}
   const next=await api('bootstrap',undefined,loginAbort.signal);if(attempt!==loginAttempt)return;
   if(hasContactDrafts()&&priorEmail&&next.user.email!==priorEmail){token='';throw Error('Use the same account to recover your Contacts draft.')}
-  if(priorEmail&&next.user.email!==priorEmail)clearContactsPersonalState();state=next;show();console.debug('Contacts directory ready',{ms:Math.round(performance.now()-loadStarted),people:next.people.length});loadDeployment(next);if(contactViewPending()&&next.user.roles.includes('Admin'))await showContactRecovery();if(dataEdits.size)notice(contactViewPending()?'Signed in. Your draft is retained while the interrupted save is completed.':'Signed in. Draft retained; review and press Save changes.');
+  if(priorEmail&&next.user.email!==priorEmail)clearContactsPersonalState();state=next;noteCatalogueRevision(next.catalogueRevision);show();console.debug('Contacts directory ready',{ms:Math.round(performance.now()-loadStarted),people:next.people.length});loadDeployment(next);if(contactViewPending()&&next.user.roles.includes('Admin'))await showContactRecovery();if(dataEdits.size)notice(contactViewPending()?'Signed in. Your draft is retained while the interrupted save is completed.':'Signed in. Draft retained; review and press Save changes.');
  }catch(e){if(attempt!==loginAttempt)return;$('loginView').classList.remove('hidden');$('loginMessage').textContent=friendlyFailure(e);$('retryLogin').hidden=false;$('signInAgain').hidden=false;if(e.code==='CONTACTS_RECOVERY_REQUIRED')await showContactRecovery();}
  finally{clearTimeout(slow);if(attempt===loginAttempt)$('loadingView').classList.add('hidden')}
 }
@@ -387,11 +400,11 @@ function renderStaffGrid(id,data,edits,onEdit,locked=false,append=false){
  if(append)grid.querySelector('tbody').append(...holder.querySelector('tbody').children);else grid.replaceChildren(...holder.children);
 }
 async function loadAux(kind,force=false){
- const prior=auxTables[kind];if(prior?.saving||prior?.flight)return;if(!force&&prior?.data&&(prior.request||prior.dirty||prior.edits?.size||!!prior.data.viewState?.pending===contactViewPending())){renderAux(kind);return}
+ const prior=auxTables[kind];if(prior?.saving||prior?.flight)return;if(!force&&prior?.data&&(!catalogueRevision||!prior.data.catalogueRevision||prior.data.catalogueRevision===catalogueRevision)&&(prior.request||prior.dirty||prior.edits?.size||!!prior.data.viewState?.pending===contactViewPending())){renderAux(kind);return}
  if(prior?.request){renderAux(kind);notice('Confirm this pending save before reloading.');return;}
  if(force&&(prior?.dirty||prior?.edits?.size)&&!confirm('Discard this page’s draft and reload saved values?'))return;
  const entry={edits:new Map(),dirty:false,flight:true},owner=state.user.email;auxTables[kind]=entry;$(kind+'Status').textContent='Loading…';
- try{const data=await api(kind);if(state?.user.email!==owner||auxTables[kind]!==entry)return;entry.data=data;entry.rows=structuredClone(data.rows);acceptContactViewState(data);renderAux(kind)}catch(e){if(auxTables[kind]!==entry)return;if(prior?.data){auxTables[kind]=prior;renderAux(kind)}$(kind+'Status').textContent=friendlyFailure(e)+' Retry Reload.'}finally{entry.flight=false}
+ try{const data=await api(kind);if(state?.user.email!==owner||auxTables[kind]!==entry)return;entry.data=data;entry.rows=structuredClone(data.rows);noteCatalogueRevision(data.catalogueRevision);acceptContactViewState(data);renderAux(kind)}catch(e){if(auxTables[kind]!==entry)return;if(prior?.data){auxTables[kind]=prior;renderAux(kind)}$(kind+'Status').textContent=friendlyFailure(e)+' Retry Reload.'}finally{entry.flight=false}
 }
 function renderAux(kind){
  const entry=auxTables[kind],data=entry?.data;if(!data)return;const locked=!data.editable||contactViewPending()||entry.saving||!!entry.request;
