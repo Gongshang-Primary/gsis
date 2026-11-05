@@ -10,3 +10,8 @@
 4. Works from the local snapshot when the backend is unreachable (keep the behaviour of tasks/roster-export-excel-local.md; label "Local snapshot" when the revision is not confirmed online).
 5. File name: `<YYYY-MM-DD> Relief.xlsx`.
 6. Tests: one-day export only; frozen panes; 4 rows per teacher incl. empty and ad hoc; colours; byte-equivalent cell content to the Drive renderer for a fixture day; offline export path.
+
+## Addition (owner 6 Nov): "excel export no [draft] no [published]"
+Today roster-update/public/roster-export.js (line ~211) appends status tags to relief cell labels: " [Published]", " [Completed]" (draft shows nothing there, but other export paths may show "[Draft]").
+7. Remove status tags from every Excel export and the Drive daily workbook: no "[Draft]", "[Published]" or "[Completed]" in any cell. Keep content tags that describe the duty itself: "[Combined]", "[Repurposed recess duty]". Status, where needed, goes in the sheet's status line only (e.g. "Published 07:04, revision 2" or "Draft — not yet published").
+8. Test: no cell matches /\[(Draft|Published|Completed)\]/i in a fixture export with draft, published and completed relief; Combined/Repurposed tags still present.
