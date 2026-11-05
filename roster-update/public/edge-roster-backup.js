@@ -1,6 +1,7 @@
 // Scheduled restore-grade exports. No request handler calls runDriveBackup.
 import {GSiSEdgeStore as Store,GSiSRosterImport as Import} from './edge-store.js';
 import {GSISRosterOperations as Operations} from './edge-roster-domain.js';
+import {outputFailure,outputErrorText} from '../../shared/edge-output-error.js';
 import {sha256Hex} from './edge-deploy-sha256.js';
 
 export const BACKUP_FORMAT='gsis-roster-drive-backup-v1';
@@ -51,6 +52,7 @@ export async function ensureBackup(db){
    `CREATE TABLE IF NOT EXISTS gsis_backup_ledger(id TEXT PRIMARY KEY,started_at INTEGER NOT NULL,finished_at INTEGER,kind TEXT NOT NULL,date TEXT NOT NULL DEFAULT '',revision_from INTEGER NOT NULL DEFAULT 0,revision_to INTEGER NOT NULL DEFAULT 0,register_from INTEGER NOT NULL DEFAULT 0,register_to INTEGER NOT NULL DEFAULT 0,record_count INTEGER NOT NULL DEFAULT 0,bytes_raw INTEGER NOT NULL DEFAULT 0,bytes_compressed INTEGER NOT NULL DEFAULT 0,drive_file_id TEXT NOT NULL DEFAULT '',drive_version TEXT NOT NULL DEFAULT '',digest TEXT NOT NULL DEFAULT '',duration_ms INTEGER NOT NULL DEFAULT 0,status TEXT NOT NULL,error TEXT NOT NULL DEFAULT '',manifest_json TEXT NOT NULL DEFAULT '{}',lease_token TEXT NOT NULL DEFAULT '',lease_until INTEGER NOT NULL DEFAULT 0)`,
    `CREATE INDEX IF NOT EXISTS gsis_backup_ledger_history ON gsis_backup_ledger(kind,started_at DESC)`,
    `CREATE UNIQUE INDEX IF NOT EXISTS gsis_backup_one_active ON gsis_backup_ledger((1)) WHERE status='running' AND kind IN ('full','increment')`,
+   `CREATE TABLE IF NOT EXISTS gsis_output_alerts(kind TEXT NOT NULL,day TEXT NOT NULL,alert_id TEXT NOT NULL,queued INTEGER NOT NULL DEFAULT 0,PRIMARY KEY(kind,day))`,
    `CREATE TABLE IF NOT EXISTS gsis_backup_changes(scope TEXT NOT NULL,collection TEXT NOT NULL,record_id TEXT NOT NULL,revision INTEGER NOT NULL,deleted INTEGER NOT NULL,PRIMARY KEY(scope,collection,record_id))`,
    `CREATE TABLE IF NOT EXISTS gsis_backup_items(run_id TEXT NOT NULL,tier INTEGER NOT NULL,scope TEXT NOT NULL,collection TEXT NOT NULL,record_id TEXT NOT NULL,position INTEGER NOT NULL DEFAULT 0,record_date TEXT NOT NULL DEFAULT '',value_json TEXT NOT NULL DEFAULT 'null',revision INTEGER NOT NULL,deleted INTEGER NOT NULL DEFAULT 0,PRIMARY KEY(run_id,scope,collection,record_id))`,
    `CREATE TABLE IF NOT EXISTS gsis_backup_requests(id TEXT PRIMARY KEY,kind TEXT NOT NULL,manifest_file_id TEXT NOT NULL,actor TEXT NOT NULL,created_at INTEGER NOT NULL,status TEXT NOT NULL DEFAULT 'pending',result_json TEXT NOT NULL DEFAULT '{}')`
@@ -128,7 +130,8 @@ export function validateBackupPayload(payload){
 }
 export async function finishBackup(db,run,{status,manifest={},fileId='',digest='',now=Date.now(),error}={}){
  if(!['verified','failed'].includes(status))fail('BACKUP_STATUS','Invalid backup outcome.');
- const files=manifest.files||[],c=primary(db),result=checked(await c.prepare("UPDATE gsis_backup_ledger SET status=?,finished_at=?,duration_ms=MAX(0,?-started_at),record_count=?,bytes_raw=?,bytes_compressed=?,drive_file_id=?,digest=?,manifest_json=?,error=?,lease_until=0 WHERE id=? AND status='running' AND lease_token=?").bind(status,now,now,files.reduce((n,f)=>n+(f.records||0),0),files.reduce((n,f)=>n+(f.bytesRaw||0),0),files.reduce((n,f)=>n+(f.bytesCompressed||0),0),fileId,digest,JSON.stringify(manifest),error?safeCode(error):'',run.id,run.lease_token).run());
+ if(error)manifest={...manifest,outputError:outputFailure(error,'BACKUP_FAILED')};
+ const files=manifest.files||[],c=primary(db),result=checked(await c.prepare("UPDATE gsis_backup_ledger SET status=?,finished_at=?,duration_ms=MAX(0,?-started_at),record_count=?,bytes_raw=?,bytes_compressed=?,drive_file_id=?,digest=?,manifest_json=?,error=?,lease_until=0 WHERE id=? AND status='running' AND lease_token=?").bind(status,now,now,files.reduce((n,f)=>n+(f.records||0),0),files.reduce((n,f)=>n+(f.bytesRaw||0),0),files.reduce((n,f)=>n+(f.bytesCompressed||0),0),fileId,digest,JSON.stringify(manifest),error?outputErrorText(error):'',run.id,run.lease_token).run());
  if(!result.meta?.changes)fail('BACKUP_LEASE','This backup run no longer owns its lease.');
  // Only transient captured copies are removed. The ledger and Drive versions stay.
  checked(await c.prepare('DELETE FROM gsis_backup_items WHERE run_id=?').bind(run.id).run());return {id:run.id,status,verified:status==='verified'};
@@ -143,15 +146,16 @@ export async function backupStatus(db,{now=Date.now()}={}){
  const c=primary(db),latest=await c.prepare("SELECT * FROM gsis_backup_ledger WHERE kind IN ('full','increment') ORDER BY started_at DESC LIMIT 1").first(),verified=await c.prepare("SELECT * FROM gsis_backup_ledger WHERE kind IN ('full','increment') AND status='verified' ORDER BY started_at DESC LIMIT 1").first(),full=await c.prepare("SELECT * FROM gsis_backup_ledger WHERE kind='full' AND status='verified' ORDER BY started_at DESC LIMIT 1").first(),recent=(await c.prepare("SELECT status FROM gsis_backup_ledger WHERE kind IN ('full','increment') AND status<>'running' ORDER BY started_at DESC LIMIT 2").all()).results||[];
  const warnings=[];if(!verified||now-verified.started_at>2*HOUR)warnings.push('increment-overdue');if(!full||now-full.started_at>26*HOUR)warnings.push('full-overdue');if(recent.length===2&&recent.every(r=>r.status==='failed'))warnings.push('two-failures');const config=await readBackupConfig(db);if(verified?.bytes_raw>config.sizeAlertMiB*1024*1024)warnings.push('size-threshold');
  const aux=(await c.prepare("SELECT kind,status FROM (SELECT kind,status,ROW_NUMBER() OVER(PARTITION BY kind ORDER BY started_at DESC,id DESC) n FROM gsis_backup_ledger WHERE kind IN ('continuity','restore-test')) WHERE n<=2").all()).results;for(const kind of ['continuity','restore-test']){const recent=aux.filter(r=>r.kind===kind);if(recent.length===2&&recent.every(r=>r.status==='failed'))warnings.push(kind+'-failed');}
- return {available:true,lastVerifiedAt:verified?.finished_at||null,lastCapturedAt:verified?.started_at||null,lastFullAt:full?.finished_at||null,bytes:verified?.bytes_compressed||0,status:latest?.status||'not-run',lastError:latest?.error||'',lastAttemptAt:latest?.started_at||null,warnings};
+ return {available:true,lastVerifiedAt:verified?.finished_at||null,lastCapturedAt:verified?.started_at||null,lastFullAt:full?.finished_at||null,bytes:verified?.bytes_compressed||0,status:latest?.status||'not-run',lastError:latest?.error||'',lastCode:JSON.parse(latest?.manifest_json||'{}').outputError?.code||latest?.error||'',lastAttemptAt:latest?.started_at||null,warnings};
 }
 export async function runDriveBackup(env,{now=Date.now(),bridge,forceKind}={}){
  if(env.ROSTER_EDGE_AUTHORITY!=='d1')return {enabled:false,skipped:true};
  const db=env.GSIS_JOBS;await ensureBackup(db);const config=await readBackupConfig(db);if(!config.enabled)return {enabled:false,skipped:true};
+ await expireBackupRuns(db,now);
  const latest=await primary(db).prepare("SELECT manifest_json FROM gsis_backup_ledger WHERE kind IN ('full','increment') AND status='verified' ORDER BY started_at DESC LIMIT 1").first(),previousManifest=JSON.parse(latest?.manifest_json||'{}');
- const status=await backupStatus(db,{now}),lastFull=await primary(db).prepare("SELECT started_at FROM gsis_backup_ledger WHERE kind='full' AND status='verified' ORDER BY started_at DESC LIMIT 1").first(),today=singaporeBackupDate(now),dueFull=!lastFull||previousManifest.chainRawBytes>=96*1024*1024||status.lastError==='BACKUP_CHAIN_LIMIT'||now>=Date.parse(today+'T02:15:00+08:00')&&lastFull.started_at<Date.parse(today+'T02:15:00+08:00');
+ const status=await backupStatus(db,{now}),lastFull=await primary(db).prepare("SELECT started_at FROM gsis_backup_ledger WHERE kind='full' AND status='verified' ORDER BY started_at DESC LIMIT 1").first(),today=singaporeBackupDate(now),dueFull=!lastFull||previousManifest.chainRawBytes>=96*1024*1024||status.lastCode==='BACKUP_CHAIN_LIMIT'||now>=Date.parse(today+'T02:15:00+08:00')&&lastFull.started_at<Date.parse(today+'T02:15:00+08:00');
  if(!forceKind&&status.status==='failed'&&now-status.lastAttemptAt<60000)return {enabled:true,skipped:true,code:'SKIPPED_BACKOFF'};
- if(!forceKind&&!dueFull&&status.lastCapturedAt&&now-status.lastCapturedAt<HOUR)return {enabled:true,idle:true};
+ if(!forceKind&&status.status!=='failed'&&!dueFull&&status.lastCapturedAt&&now-status.lastCapturedAt<HOUR)return {enabled:true,idle:true};
  const run=await captureBackup(db,{kind:forceKind||(dueFull?'full':'increment'),now});if(run.busy)return {...run,enabled:true};
  const manifest={schema:BACKUP_FORMAT,runId:run.id,kind:run.kind,startedAt:run.started_at,revisions:{roster:run.revision_to,register:run.register_to},fromRevisions:{roster:run.revision_from,register:run.register_from},previousManifestId:JSON.parse(run.manifest_json).previousManifestId||'',chainRawBytes:run.kind==='full'?0:previousManifest.chainRawBytes||0,files:[]};
  try{
@@ -169,5 +173,22 @@ export async function runDriveBackup(env,{now=Date.now(),bridge,forceKind}={}){
   if(!saved?.verified||saved.digest!==digest||typeof saved.fileId!=='string')fail('BACKUP_VERIFY','Drive did not verify the backup manifest.');
   await finishBackup(db,run,{status:'verified',manifest,fileId:saved.fileId,digest,now:Math.max(now,Date.now())});
   return {enabled:true,verified:true,completed:1,full:run.kind==='full',sizeWarning:manifest.files.reduce((n,f)=>n+f.bytesRaw,0)>config.sizeAlertMiB*1024*1024,runId:run.id};
- }catch(error){await finishBackup(db,run,{status:'failed',manifest,error,now:Math.max(now,Date.now())});return {enabled:true,failed:1,code:safeCode(error),runId:run.id};}
+ }catch(error){await finishBackup(db,run,{status:'failed',manifest,error,now:Math.max(now,Date.now())});return {enabled:true,failed:1,code:safeCode(error),failure:{code:safeCode(error),outputError:outputFailure(error,'BACKUP_FAILED')},runId:run.id};}
+}
+
+export async function expireBackupRuns(db,now){
+ const c=primary(db);
+ await c.batch([
+  c.prepare("UPDATE gsis_backup_ledger SET status='failed',error='BACKUP_LEASE_EXPIRED',finished_at=?,duration_ms=MAX(0,?-started_at),lease_until=0 WHERE status='running' AND kind IN ('full','increment') AND lease_until<=?").bind(now,now,now),
+  c.prepare("DELETE FROM gsis_backup_items WHERE run_id IN (SELECT id FROM gsis_backup_ledger WHERE status='failed' AND error='BACKUP_LEASE_EXPIRED')")
+ ]);
+}
+export async function notifyOutputAlert(db,{kind,now,health,message,enabled},alert){
+ if(!alert||!health.warnings.length||!await enabled())return;
+ const day=singaporeBackupDate(now),id='drive-'+kind+'-'+day;
+ await db.prepare('INSERT OR IGNORE INTO gsis_output_alerts(kind,day,alert_id) VALUES(?,?,?)').bind(kind,day,id).run();
+ const row=await db.prepare('SELECT * FROM gsis_output_alerts WHERE kind=? AND day=?').bind(kind,day).first();
+ if(row.queued)return;
+ const sent=await alert({...health,kind,message,alertId:row.alert_id});
+ if(sent?.queued===true)await db.prepare('UPDATE gsis_output_alerts SET queued=1 WHERE kind=? AND day=?').bind(kind,day).run();
 }

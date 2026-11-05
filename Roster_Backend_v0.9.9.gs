@@ -648,10 +648,12 @@ function doPost(e){
   rosterStage_('response-serialize');return out_({ok:true,data});
  }catch(e){
   const importFailure=deployTrace_.authenticated&&deployTrace_.action==='rosterOperations'&&deployTrace_.operation==='edgeExportManifest'?{failureReason:rosterEdgeExportDiagnostic_(e,deployTrace_)}:{};
+  const driveOutputFailure=deployTrace_.authenticated&&deployTrace_.action==='rosterService'&&deployTrace_.operation==='edgeDriveOutput';
+  if(driveOutputFailure)e=rosterDriveOutputError_(e);
   if(!importFailure.failureReason&&(deployTrace_.rosterDiagnostic||!deployTrace_.action))rosterDiagnostic_('roster-backend-failed',{status:e.status||503,...rosterAbsenceFailureDetail_(e),message:rosterDiagnosticError_(e),stack:rosterDiagnosticText_(String(e.stack||'').split('\n').filter(line=>/^\s*at /.test(line)).slice(0,4).join('\n'))});
   if(/^roster/.test(deployTrace_.action)&&(e.status||503)>=500){
    const diagnosticId=deployTrace_.requestId;
-   return out_({ok:false,status:503,error:'Roster is temporarily unavailable.',diagnosticId,...rosterFailureDetail_(e),...rosterAbsenceFailureDetail_(e),...importFailure});
+   return out_({ok:false,status:503,error:driveOutputFailure?e.message:'Roster is temporarily unavailable.',diagnosticId,...rosterFailureDetail_(e),...rosterAbsenceFailureDetail_(e),...importFailure});
   }
   const conflict=deployTrace_.authenticated&&deployTrace_.action==='rosterOperations'&&e.status===409&&['CELL_CONFLICT','STAPLER_CONFLICT'].includes(e.code);
   const absenceFailure=deployTrace_.authenticated&&/^roster/.test(deployTrace_.action)?rosterAbsenceFailureDetail_(e):{};
@@ -2336,8 +2338,8 @@ function rosterFailureDetail_(error){
  const t=typeof deployTrace_==='undefined'?{}:deployTrace_||{},phase=String(error?.failurePhase||t.phase||'').replace(/^roster\./,'');
  const groups={'calculations-index':'calculation-source','calculations-source':'calculation-source','calculations-history-read':'history-read','calculations-history':'history-read','contacts-authority':'contacts','state-read':'operations-read',context:'timetable','register-read':'timetable','register-json':'timetable','register-schema':'timetable','timetable-read':'timetable','timetable-json':'timetable','timetable-validation':'timetable',quota:'calculation-source',projection:'plan-read',commit:'save','response-serialize':'response','response-create':'response'};
  const operations=['nextAbsenceIntake','deferAbsenceIntake','prepareNotification','requestMutual','saveSchoolAbsence','renameStapler','scheduledRoster','sendPeerMail','peerMailReview','reviewPeerMail','claimNotifications','prepareNotifications','notificationResult','notificationResults','inboxPendingDispatch','inboxReplyPrepare','inboxReplyResult','inboxAlertPrepare','inboxAlertResult','deliveryReviewMailDispatch','dailyEmploymentMailDispatch','processAbsenceIntake','flushAbsenceIntake','captureAbsenceIntake','retryAbsenceIntake','resolveAbsenceIntake','timetableBatch','timetableDay','timetableCacheManifest','read','saveAbsence','saveInstructions','saveStapler','confirmStapler','publishStapler','resetStapler','moveStapler','restoreStapler','deleteStapler','reliefBatch','publish','notifyDaily','autoAllocate','optimise','receiptStatus'];
- const codes=['VENUES_FENCE_PENDING','VENUES_FENCE_UNCONFIRMED','COMMIT_UNCERTAIN','ROSTER_CUTOVER_FROZEN','ROSTER_STORAGE_CAPACITY','GSIS_SECRET_INVALID','ABSENCE_PREPARATION_RETRY','ABSENCE_INTAKE_BUSY','ABSENCE_INTAKE_PENDING','CONTACTS_RECOVERY_REQUIRED','STAPLER_BASELINE_CONFLICT','STAPLER_CONFLICT','PEER_MAIL_REVIEW_CONFLICT','TIMETABLE_BATCH_CHANGED','TIMETABLE_BATCH_TOO_LARGE','CELL_CONFLICT','ABSENCE_CONFLICT','ALLOCATION_IN_PROGRESS','ALLOCATION_UNCONFIRMED','ALLOCATION_CANCELLED','ALLOCATION_ABANDONED','ALLOCATION_CUTOFF','PLANNING_CLOCK_CHANGED'];
- return {backendVersion:GSIS_DEPLOY_VERSION,failureStage:phases.includes(phase)?phase:groups[phase]||'backend',...(operations.includes(t.operation)?{operation:t.operation}:{}),...(codes.includes(error?.code)?{code:error.code}:{})};
+ const codes=['ROSTER_DRIVE_OUTPUT','DAILY_OUTPUT_BUSY','DAILY_OUTPUT_STALE','DAILY_OUTPUT_DAY_CLOSED','VENUES_FENCE_PENDING','VENUES_FENCE_UNCONFIRMED','COMMIT_UNCERTAIN','ROSTER_CUTOVER_FROZEN','ROSTER_STORAGE_CAPACITY','GSIS_SECRET_INVALID','ABSENCE_PREPARATION_RETRY','ABSENCE_INTAKE_BUSY','ABSENCE_INTAKE_PENDING','CONTACTS_RECOVERY_REQUIRED','STAPLER_BASELINE_CONFLICT','STAPLER_CONFLICT','PEER_MAIL_REVIEW_CONFLICT','TIMETABLE_BATCH_CHANGED','TIMETABLE_BATCH_TOO_LARGE','CELL_CONFLICT','ABSENCE_CONFLICT','ALLOCATION_IN_PROGRESS','ALLOCATION_UNCONFIRMED','ALLOCATION_CANCELLED','ALLOCATION_ABANDONED','ALLOCATION_CUTOFF','PLANNING_CLOCK_CHANGED'];
+ return {...(t.operation==='edgeDriveOutput'&&(/^[A-Z][A-Z0-9_]{0,79}$/.test(error?.googleCode||'')||Number.isInteger(error?.googleCode)&&error.googleCode>=100&&error.googleCode<=599)?{googleCode:error.googleCode}:{}),backendVersion:GSIS_DEPLOY_VERSION,failureStage:phases.includes(phase)?phase:groups[phase]||'backend',...(operations.includes(t.operation)?{operation:t.operation}:{}),...(codes.includes(error?.code)?{code:error.code}:{})};
 }
 function rosterDiagnosticLog_(record){
  const text=JSON.stringify(record);
@@ -11889,14 +11891,28 @@ function rosterNativeReceiptMatches_(receipt,command,actor){
 /* Dedicated output files only. This service never opens the frozen Roster state
  * and never takes its ScriptLock. The caller is the signed Worker service. */
 function rosterDriveOutputFail_(message,status=409){throw Object.assign(Error(message),{status,code:'ROSTER_DRIVE_OUTPUT'});}
+function rosterDriveOutputError_(error){
+ const message=String(error?.message||'Drive output failed.')
+  .replace(/https?:\/\/[^\s<>"']+/gi,'[URL removed]')
+  .replace(/\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b/g,'[credential removed]')
+  .replace(/\b(?:Bearer|Basic)\s+\S+/gi,'[credential removed]')
+  .replace(/\b(?:[\w-]*(?:token|secret|password|authorization|signature|nonce|capability)|api[_-]?key)\s*["']?\s*[:=]\s*(?:"[^"]*"|'[^']*'|[^\s,;]+)/gi,'[credential removed]')
+  .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi,'[email removed]')
+  .replace(/[A-Za-z0-9_+/=-]{32,}/g,'[identifier removed]')
+  .split(/[\r\n]/,1)[0].replace(/[\u0000-\u001f\u007f-\u009f]/g,' ').trim().slice(0,300);
+ return Object.assign(Error(message),{status:error?.status||503,code:/^[A-Z][A-Z0-9_]{0,79}$/.test(error?.code||'')?error.code:'ROSTER_DRIVE_OUTPUT',googleCode:error?.googleCode});
+}
 function rosterDriveOutputId_(value){if(typeof value!=='string'||!/^[A-Za-z0-9_-]{1,200}$/.test(value))rosterDriveOutputFail_('Invalid output file or folder ID.',400);return value;}
 function rosterDriveOutputFetch_(url,options={}){
  gsisRequireBackendRole_('roster');
  if(!/^https:\/\/(?:www\.googleapis\.com\/(?:upload\/)?drive\/v3\/files|sheets\.googleapis\.com\/v4\/spreadsheets)(?:[/?]|$)/.test(url))rosterDriveOutputFail_('Invalid output provider.');
  const response=UrlFetchApp.fetch(url,{...options,headers:{...(options.headers||{}),Authorization:'Bearer '+ScriptApp.getOAuthToken()},muteHttpExceptions:true,followRedirects:false});
- if(response.getResponseCode()<200||response.getResponseCode()>=300)rosterDriveOutputFail_('Drive output failed (HTTP '+response.getResponseCode()+').',503);return response;
+ if(response.getResponseCode()<200||response.getResponseCode()>=300){
+  let detail;try{detail=JSON.parse(response.getContentText())?.error;}catch(ignore){}
+  throw rosterDriveOutputError_({message:'Drive output failed (HTTP '+response.getResponseCode()+').'+(typeof detail?.message==='string'?' '+detail.message:''),status:503,code:'ROSTER_DRIVE_OUTPUT',googleCode:detail?.status||detail?.code||response.getResponseCode()});
+ }return response;
 }
-function rosterDriveOutputJson_(url,options){let value;try{value=JSON.parse(rosterDriveOutputFetch_(url,options).getContentText());}catch(e){if(e.code)throw e;rosterDriveOutputFail_('Drive output returned an invalid response.',503);}return value;}
+function rosterDriveOutputJson_(url,options){const response=rosterDriveOutputFetch_(url,options);try{return JSON.parse(response.getContentText());}catch(e){rosterDriveOutputFail_('Drive output returned an invalid response.',503);}}
 function rosterDriveOutputMeta_(id){return rosterDriveOutputJson_('https://www.googleapis.com/drive/v3/files/'+encodeURIComponent(rosterDriveOutputId_(id))+'?supportsAllDrives=true&fields=id,name,mimeType,parents,trashed,version,size,appProperties');}
 function rosterDriveOutputDescendant_(id,home){
  const seen=new Set();for(let n=0;n<20;n++){if(id===home)return true;if(seen.has(id))break;seen.add(id);const meta=rosterDriveOutputMeta_(id);if(meta.trashed||meta.mimeType!=='application/vnd.google-apps.folder'||meta.parents?.length!==1)break;id=meta.parents[0];}
@@ -11936,6 +11952,16 @@ function rosterDriveOutputPrivacy_(value){
  for(const [key,child] of Object.entries(value)){if(/(?:token|capabilit|secret|password|authorization|private.?link|private.?url|signature|nonce)/i.test(key))rosterDriveOutputFail_('Credentials and private capabilities cannot be written to Drive.');if(['value_json','json'].includes(key)&&typeof child==='string')rosterDriveOutputPrivacy_(JSON.parse(child));else rosterDriveOutputPrivacy_(child);}
 }
 function rosterDriveOutputCounts_(payload){const counts={};for(const row of payload.rows||[]){const key=row.scope+'.'+row.collection,value=JSON.parse(row.value_json);if(counts[key]===undefined)counts[key]=0;if(row.record_id==='$'&&['array','map'].includes(value?.kind))continue;counts[key]++;}return counts;}
+function rosterDriveOutputWorkbookPrivacy_(bytes){
+ const parts=Utilities.unzip(Utilities.newBlob(bytes));if(!parts.length||parts.length>200)rosterDriveOutputFail_('Invalid daily workbook.');
+ for(const part of parts){
+  if(!/^xl\/(?:worksheets\/[^/]+|sharedStrings)\.xml$/.test(part.getName()))continue;
+  // XML attributes include schema URLs, not cell text. Element values decode
+  // entities and join rich-text runs so a split capability still gets refused.
+  const visit=element=>{if(['c','si'].includes(element.getName()))rosterDriveOutputPrivacy_(element.getValue());else for(const child of element.getChildren())visit(child);};
+  visit(XmlService.parse(part.getDataAsString()).getRootElement());
+ }
+}
 function rosterDriveOutputVerify_(bytes,p){
  const raw=p.step==='writeBackup'?Utilities.ungzip(Utilities.newBlob(bytes)).getDataAsString():Utilities.newBlob(bytes).getDataAsString();
  if(Utilities.newBlob(raw).getBytes().length>33554432||rosterDriveOutputDigest_(raw)!==p.digest)rosterDriveOutputFail_('Backup digest verification failed.');
@@ -11987,7 +12013,7 @@ function rosterDriveOutputDaily_(p){
  if(typeof p.data!=='string'||p.data.length>11184816)rosterDriveOutputFail_('The daily output exceeds its transfer limit.',413);
  const bytes=Utilities.ungzip(Utilities.newBlob(Utilities.base64Decode(p.data))).getBytes();
  if(bytes.length!==p.bytesRaw||bytes.length>16777216||rosterDriveOutputDigest_(bytes)!==p.digest)rosterDriveOutputFail_('Daily output digest verification failed.');
- if(p.kind==='log')rosterDriveOutputPrivacy_(Utilities.newBlob(bytes).getDataAsString());else {const parts=Utilities.unzip(Utilities.newBlob(bytes));if(!parts.length||parts.length>200)rosterDriveOutputFail_('Invalid daily workbook.');for(const part of parts)rosterDriveOutputPrivacy_(part.getDataAsString());}
+ if(p.kind==='log')rosterDriveOutputPrivacy_(Utilities.newBlob(bytes).getDataAsString());else rosterDriveOutputWorkbookPrivacy_(bytes);
  // The existing output-only UserLock serialises provider retries. No planner
  // ScriptLock, frozen state read, or UserLock -> ScriptLock nesting is used.
  const lock=LockService.getUserLock();if(!lock.tryLock(1))throw Object.assign(Error('Another Drive output is still running.'),{status:503,code:'DAILY_OUTPUT_BUSY'});
@@ -12006,8 +12032,10 @@ function rosterDriveOutputsDispatch_(req,serviceVerified=false){
  const p=req?.input||{};if(p.operation!=='edgeDriveOutput')return null;
  if(serviceVerified!==true)rosterDriveOutputFail_('Only the signed Worker output service may access Drive outputs.',403);
  if(props_().getProperty('ROSTER_EDGE_AUTHORITY')!=='d1')rosterDriveOutputFail_('Scheduled D1 outputs require D1 authority.');
- let result;if(['writeBackup','writeManifest'].includes(p.step))result=rosterDriveOutputBackup_(p);else if(p.step==='readBackup')result=rosterDriveOutputRead_(p);else if(p.step==='continuity')result=rosterDriveOutputContinuity_(p);else if(p.step==='daily')result=rosterDriveOutputDaily_(p);else rosterDriveOutputFail_('Choose a supported Drive output operation.',400);
- return {handled:true,result};
+ try{
+  let result;if(['writeBackup','writeManifest'].includes(p.step))result=rosterDriveOutputBackup_(p);else if(p.step==='readBackup')result=rosterDriveOutputRead_(p);else if(p.step==='continuity')result=rosterDriveOutputContinuity_(p);else if(p.step==='daily')result=rosterDriveOutputDaily_(p);else rosterDriveOutputFail_('Choose a supported Drive output operation.',400);
+  return {handled:true,result};
+ }catch(error){throw rosterDriveOutputError_(error);}
 }
 
 /* GSIS_ROSTER_DRIVE_OUTPUTS_END */

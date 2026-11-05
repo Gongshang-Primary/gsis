@@ -1,12 +1,11 @@
 // Committed date intents only; rendering and all provider calls belong to the timer.
-import {ensureBackup,base64,singaporeBackupDate} from './edge-roster-backup.js';
+import {ensureBackup,base64,singaporeBackupDate,notifyOutputAlert} from './edge-roster-backup.js';
 import {GSISRosterOperations as Operations} from './edge-roster-domain.js';
-import {sha256Hex} from './edge-deploy-sha256.js';
+import {outputFailure,outputErrorText} from '../../shared/edge-output-error.js';
 
 const INTERVAL=120000,LEASE=15*60000,MAX_RAW=16*1024*1024,MAX_GZIP=8*1024*1024;
 const primary=db=>db.withSession?.('first-primary')||db;
 const fail=(code,message)=>{throw Object.assign(Error(message),{code,status:503});};
-const safe=e=>/^[A-Z][A-Z0-9_]{0,79}$/.test(e?.code||'')?e.code:'DAILY_OUTPUT_FAILED';
 const collections="'absences','assignments','importedRelief','reliefCorrections','adhoc','staplerPlans','dayRevisions','dailyPublicationStates','optimisationRuns','manualDecisions'";
 export const dailyBytesDigest=async bytes=>Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',bytes)),n=>n.toString(16).padStart(2,'0')).join('');
 export async function readDailyConfig(db){
@@ -45,13 +44,14 @@ async function readEncoded(bucket,file){
  const raw=new Uint8Array(size);let at=0;for(const chunk of chunks){raw.set(chunk,at);at+=chunk.length;}if(size!==file.bytesRaw||await dailyBytesDigest(raw)!==file.digest)fail('DAILY_OUTPUT_INTEGRITY','The retained daily output digest changed.');return compressed;
 }
 async function failureRow(db,date,revision,now,error,kind='excel'){
- await db.prepare("INSERT INTO gsis_backup_ledger(id,started_at,finished_at,kind,date,revision_to,status,error) VALUES(?,?,?,?,?,?,'failed',?)").bind(crypto.randomUUID(),now,now,kind,date,revision,safe(error)).run();
+ await db.prepare("INSERT INTO gsis_backup_ledger(id,started_at,finished_at,kind,date,revision_to,status,error,manifest_json) VALUES(?,?,?,?,?,?,'failed',?,?)").bind(crypto.randomUUID(),now,now,kind,date,revision,outputErrorText(error),JSON.stringify({outputError:outputFailure(error,'DAILY_OUTPUT_FAILED')})).run();
 }
 export async function dailyOutputStatus(db,{now=Date.now()}={}){
  if(!await primary(db).prepare("SELECT 1 found FROM sqlite_master WHERE type='table' AND name='gsis_roster_daily_outputs'").first())return {available:false,dates:[],warnings:[]};
  const dates=(await primary(db).prepare('SELECT date,desired_revision,written_revision,last_attempt_at,last_success_at,next_attempt_at,finalized,failure_count,last_error FROM gsis_roster_daily_outputs ORDER BY date DESC LIMIT 90').all()).results||[];
  const files=(await primary(db).prepare("SELECT date,kind,status,revision_to,drive_file_id,drive_version,digest,finished_at,error FROM (SELECT *,ROW_NUMBER() OVER(PARTITION BY date,kind ORDER BY started_at DESC,id DESC) n FROM gsis_backup_ledger WHERE kind IN ('excel','log')) WHERE n=1 ORDER BY date DESC LIMIT 180").all()).results||[];
- return {available:true,dates:dates.map(d=>({...d,files:files.filter(f=>f.date===d.date)})),warnings:dates.filter(d=>d.failure_count>=2).map(d=>'daily-output-failed:'+d.date)};
+ const failingDates=(await primary(db).prepare('SELECT COUNT(*) n FROM gsis_roster_daily_outputs WHERE failure_count>=2').first()).n;
+ return {available:true,failingDates,dates:dates.map(d=>({...d,files:files.filter(f=>f.date===d.date)})),warnings:dates.filter(d=>d.failure_count>=2).map(d=>'daily-output-failed:'+d.date)};
 }
 export async function runDailyOutputs(env,{now=Date.now(),bridge,prepare,seed,onComplete,quiet=async()=>false,alert,selected,limit=2}={}){
  if(env.ROSTER_EDGE_AUTHORITY!=='d1')return {enabled:false,skipped:true,exports:[],failed:0};
@@ -91,7 +91,7 @@ export async function runDailyOutputs(env,{now=Date.now(),bridge,prepare,seed,on
       if(!saved?.verified||!saved.fileId||(!saved.alreadyFinal&&saved.digest!==file.digest))fail('DAILY_OUTPUT_READBACK','Daily output read-back was not confirmed.');
       await guard();await db.prepare("UPDATE gsis_backup_ledger SET status='verified',finished_at=?,duration_ms=?,drive_file_id=?,drive_version=?,digest=?,revision_to=?,bytes_raw=? WHERE id=?").bind(Date.now(),Math.max(0,Date.now()-started),saved.fileId,String(saved.version||''),saved.digest,saved.revision??pending.revision,saved.bytes??file.bytesRaw,id).run();
       file.done=true;file.fileId=saved.fileId;file.version=saved.version||'';file.alreadyFinal=saved.alreadyFinal===true;result.completed++;await db.prepare('UPDATE gsis_roster_daily_outputs SET pending_json=? WHERE date=?').bind(JSON.stringify(pending),row.date).run();
-     }catch(error){await db.prepare("UPDATE gsis_backup_ledger SET status='failed',finished_at=?,duration_ms=?,error=? WHERE id=?").bind(Date.now(),Math.max(0,Date.now()-started),safe(error),id).run();throw error;}
+     }catch(error){await db.prepare("UPDATE gsis_backup_ledger SET status='failed',finished_at=?,duration_ms=?,error=?,manifest_json=json_set(manifest_json,'$.outputError',json(?)) WHERE id=?").bind(Date.now(),Math.max(0,Date.now()-started),outputErrorText(error),JSON.stringify(outputFailure(error,'DAILY_OUTPUT_FAILED')),id).run();throw error;}
     }
     if(pending.files.every(f=>f.done)){
      if(onComplete)await onComplete(pending);
@@ -100,11 +100,11 @@ export async function runDailyOutputs(env,{now=Date.now(),bridge,prepare,seed,on
     }
    }catch(error){
     if(!attempted)await failureRow(db,row.date,pending?.revision||0,now,error);
-    result.failed++;await db.prepare('UPDATE gsis_roster_daily_outputs SET failure_count=failure_count+1,last_attempt_at=?,next_attempt_at=?,last_error=? WHERE date=?').bind(now,now+Math.min(3600000,INTERVAL*2**Math.min(row.failure_count,4)),safe(error),row.date).run();
+    result.failed++;result.failure={code:error.code,outputError:outputFailure(error,'DAILY_OUTPUT_FAILED')};await db.prepare('UPDATE gsis_roster_daily_outputs SET failure_count=failure_count+1,last_attempt_at=?,next_attempt_at=?,last_error=? WHERE date=?').bind(now,now+Math.min(3600000,INTERVAL*2**Math.min(row.failure_count,4)),outputErrorText(error),row.date).run();
    }
   }
-  const health=await dailyOutputStatus(db,{now}),control=await db.prepare('SELECT * FROM gsis_daily_output_worker WHERE id=1').first(),fingerprint=sha256Hex(JSON.stringify(health.warnings));
-  if(alert&&fingerprint!==control.alert_fingerprint){let id=control.pending_id;if(control.pending_fingerprint!==fingerprint||!id){id=crypto.randomUUID();await db.prepare('UPDATE gsis_daily_output_worker SET pending_fingerprint=?,pending_id=? WHERE id=1 AND lease_token=?').bind(fingerprint,id,token).run();}const sent=await alert({...health,alertId:id});if(!health.warnings.length||sent?.queued===true)await db.prepare('UPDATE gsis_daily_output_worker SET alert_fingerprint=? WHERE id=1 AND lease_token=?').bind(fingerprint,token).run();}
+  const health=await dailyOutputStatus(db,{now});
+  await notifyOutputAlert(db,{kind:'daily',now,health:{...health,warnings:health.failingDates?['daily-output-failed']:[]},message:'Daily Drive outputs failing: '+health.failingDates+' dates',enabled:async()=>(await readDailyConfig(db)).enabled},alert);
   result.pending=(await db.prepare('SELECT COUNT(*) n FROM gsis_roster_daily_outputs WHERE finalized=0 AND (pending_json<>\'\' OR desired_revision>written_revision OR date<?)').bind(today).first()).n;return result;
  }finally{await db.prepare("UPDATE gsis_daily_output_worker SET lease_token='',lease_until=0 WHERE id=1 AND lease_token=?").bind(token).run();}
 }

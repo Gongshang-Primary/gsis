@@ -1,3 +1,7 @@
+# Pending: Drive output failure diagnostics and recovery, 6 November 2026
+
+Model: Codex. Preserve sanitised Apps Script/Google errors in the output ledger and System Health, scan workbook cell/shared-string text instead of Office XML metadata, recover expired backup attempts before scheduling, and group alerts by kind and Singapore date while respecting disabled settings. The existing renderer workbook passes the fake-Drive writer; the precise live refusal remains unconfirmed. See [task and verification](docs/coordination/tasks/roster-drive-outputs-bridge-error.md). No deployment or live action.
+
 # Pending: Deploy ledger targets use configured relief budgets, 6 November 2026
 
 Model: Codex. Remove the Target offload % column from both ledger views and their shared Excel/print output. FAJT Target now uses the saved relief fajtWeeklyPeriods / weeklyPeriods ratio; missing or invalid budgets show Needs configuration. Help shows the configured values. The public projection includes only these two budgets and their schema, retaining the server-only relief engine and Admin-only settings. Defaults preserve Target, at-load bands, load status and R. See [task and verification](docs/coordination/tasks/deploy-remove-target-offload.md). No deployment or live action.
