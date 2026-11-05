@@ -3,10 +3,19 @@
 function rosterAllocationRunKey_(date){return 'ROSTER_ALLOCATION_RUN:'+GSISRosterOperations.date(date);}
 function rosterAllocationRunRead_(date){const text=props_().getProperty(rosterAllocationRunKey_(date));if(!text)return null;try{const row=JSON.parse(text);if(row.schema!==1||row.date!==date||typeof row.id!=='string'||!Array.isArray(row.log))throw Error('shape');return row;}catch(_){error_(503,'Allocation status could not be read. Refresh before starting another run.');}}
 function rosterAllocationRunExpired_(row){return Date.now()-Date.parse(row.trigger==='scheduled'?row.startedAt:row.updatedAt)>(row.trigger==='scheduled'?150000:10*60000);}
+function rosterAllocationManualBusy_(row){return row?.trigger==='manual'&&['running','cancelling','committing','uncertain'].includes(row.state)&&!rosterAllocationRunExpired_(row);}
+function rosterScheduledManualGuard_(date){if(rosterAllocationManualBusy_(rosterAllocationRunRead_(date)))throw Object.assign(Error('Scheduled allocation deferred while an SMC run owns this date.'),{status:409,code:'SKIPPED_BUSY'});}
 function rosterAllocationRunPublic_(row,state){
  if(!row)return null;let status=row.state;if(state&&rosterAllocationRunCancelled_(row,state))status='cancelled';else if(state&&rosterAllocationRunAccepted_(row,state))status='completed';
  else if(rosterAllocationRunExpired_(row)&&['running','cancelling','committing'].includes(status))status=status==='committing'?'uncertain':'abandoned';
- return {id:row.id,date:row.date,state:status,trigger:row.trigger,...(row.trigger==='scheduled'?{attempts:row.attempts||1,allocationStopped:row.state==='failed'&&(row.attempts>=2||row.slotStopped===true)}:{}),...(row.allocationMode?{allocationMode:row.allocationMode}:{}),requestId:row.trigger==='manual'?row.requestId:null,actorName:row.actorName,startedAt:row.startedAt,updatedAt:row.updatedAt,log:row.log,canCancel:['running','cancelling'].includes(status)};
+ return {id:row.id,date:row.date,state:status,authority:'google',preparationMs:row.preparationMs??null,preparationAttempts:row.preparationAttempts||0,trigger:row.trigger,...(row.trigger==='scheduled'?{attempts:row.attempts||1,allocationStopped:row.state==='failed'&&(row.attempts>=2||row.slotStopped===true)}:{}),...(row.allocationMode?{allocationMode:row.allocationMode}:{}),requestId:row.trigger==='manual'?row.requestId:null,actorName:row.actorName,startedAt:row.startedAt,updatedAt:row.updatedAt,log:row.log,canCancel:['running','cancelling'].includes(status)};
+}
+function rosterAllocationPreparationStatus_(){
+ const properties=props_().getProperties();
+ return {available:true,runs:Object.keys(properties).filter(key=>key.startsWith('ROSTER_ALLOCATION_RUN:')).sort().reverse().slice(0,60).map(key=>{
+  const row=rosterAllocationRunRead_(key.slice('ROSTER_ALLOCATION_RUN:'.length));
+  return {date:row.date,state:row.state,authority:'google',startedAt:row.startedAt,preparationMs:row.preparationMs??null,preparationAttempts:row.preparationAttempts||0};
+ })};
 }
 function rosterAllocationRunReceipt_(row,state){return row.trigger==='scheduled'?state.scheduleReceipts?.[row.scheduleKey]:state.receipts?.find(r=>r.id===row.requestId&&r.actor===row.actor&&r.digest===row.digest);}
 function rosterAllocationRunAccepted_(row,state){const receipt=rosterAllocationRunReceipt_(row,state);return !!receipt&&!receipt.cancelled&&(row.trigger!=='scheduled'||receipt.allocationStatus==='complete'||receipt.allocationStatus===undefined&&receipt.optimise!==false);}
@@ -56,6 +65,7 @@ function rosterScheduledAllocationStart_(req,descriptor){
  const date=GSISRosterOperations.date(descriptor.date),scheduleKey=descriptor.scheduleKey,tickKey=descriptor.tickKey||scheduleKey,id=rosterOperationsDigest_({date,actor:'roster-service',key:scheduleKey});
  return rosterAllocationRunLocked_(()=>{
   const ledger=rosterScheduledAllocationLedger_(date),key=scheduleKey.slice(11);let slot=ledger.slots[key],prior=rosterAllocationRunRead_(date),state;
+  if(rosterAllocationManualBusy_(prior))throw Object.assign(Error('Scheduled allocation deferred while an SMC run owns this date.'),{status:409,code:'SKIPPED_BUSY'});
   const read=()=>state||(state=rosterOperationsState_(true)),done=()=>{throw Object.assign(Error('This scheduled allocation slot is finished.'),{status:409,code:'ALLOCATION_SLOT_DONE'});};
   if(slot&&['completed','stopped'].includes(slot.state))done();
   if(prior&&['running','cancelling','committing','uncertain'].includes(prior.state)){
@@ -129,6 +139,13 @@ function rosterAllocationRunCheck_(run){
  if(row.state!=='running')throw Object.assign(Error('Allocation save confirmation is pending. Refresh the current draft.'),{status:409,code:'ALLOCATION_UNCONFIRMED'});
  return row;
 }
+// Timing is diagnostic only: a status-store outage cannot invalidate a save.
+function rosterAllocationRunPreparation_(run,duration){
+ if(!run)return;try{rosterAllocationRunLocked_(()=>{const row=rosterAllocationRunRead_(run.date);if(row?.id!==run.id||row.fence!==run.fence)return;
+  const preparationMs=(row.preparationMs||0)+Math.max(0,duration),preparationAttempts=(row.preparationAttempts||0)+1;
+  rosterAllocationRunWrite_({...row,authority:'google',preparationMs,preparationAttempts},'Preparation '+preparationAttempts+' took '+(duration/1000).toFixed(1)+' s; total '+(preparationMs/1000).toFixed(1)+' s.');
+ });}catch(_){}
+}
 function rosterAllocationRunStage_(run,message){if(run)rosterAllocationRunLocked_(()=>rosterAllocationRunWrite_(rosterAllocationRunCheck_(run),message));}
 // Called only while the existing operational writer lock is held.
 function rosterAllocationRunBeforeCommit_(run,checkBeforeWrite){
@@ -145,6 +162,7 @@ function rosterAllocationRunComplete_(run,state){if(!run)return;try{const row=ro
 function rosterAllocationRunExecute_(req,c,work,descriptor){
  const run=rosterAllocationRunStart_(req,c,descriptor);
  try{const result=work(run);if(run)try{rosterAllocationRunLocked_(()=>{const row=rosterAllocationRunRead_(run.date);if(row?.fence!==run.fence||row.state==='completed')return;const state=rosterOperationsState_(true);if(rosterAllocationRunCancelled_(row,state))rosterAllocationRunWrite_({...row,state:'cancelled'},'Cancelled before saving the proposed allocation.');else if(rosterAllocationRunAccepted_(row,state))rosterAllocationRunComplete_(run,state);else if(['running','cancelling'].includes(row.state)||result.allocationTimedOut&&rosterAllocationRunReceipt_(row,state)?.allocationStatus==='budget')rosterAllocationRunWrite_({...row,state:row.state==='cancelling'?'cancelled':'failed'},row.state==='cancelling'?'Cancelled before saving the proposed allocation.':result.allocationTimedOut?'Time budget reached; the last saved draft is retained.':'No allocation draft was saved by this run.');});}catch(_){}return result;}catch(error){
+  if(run)try{if(!rosterAllocationRunRead_(run.date)?.preparationAttempts)rosterAllocationRunPreparation_(run,Math.max(0,Date.now()-Date.parse(run.startedAt)));}catch(_){}
   if(run)try{rosterAllocationRunLocked_(()=>{
    const row=rosterAllocationRunRead_(run.date);if(row?.id!==run.id||row.fence!==run.fence)return;
    const state=rosterOperationsState_(true);if(rosterAllocationRunAccepted_(row,state)){rosterAllocationRunComplete_(run,state);return;}

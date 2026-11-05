@@ -2150,6 +2150,34 @@ var GSISRosterAllocation = (() => {
       if(existing){if(existing.mode==='observed'&&existing.excluded!==wholeLeave){const before=existing.excluded;existing.excluded=wholeLeave;existing.exclusion=wholeLeave?'Complete week of extended leave':'';addAudit(s,ctx,'weekly-applicability',{date:d,staffId:t.staffId,week:w,before,after:wholeLeave,quota:existing.quota});changed=true;}continue;}s.entitlements.push({id:ctx.uuid(),staffId:t.staffId,week:w,year:Y,quota:Math.max(0,t.originalR??t.R),excluded:wholeLeave,exclusion:wholeLeave?'Complete week of extended leave':'',source:t.quotaSource||dd.quotaSource||{timetableId:dd.id},capturedAt:ctx.iso,parity:dd.parity,mode:'observed'});changed=true;
     }return changed;
   }
+  // Capture the same composed days used by the allocator, before any planning.
+  // A missing or partially timed day cannot prove a clock advance harmless.
+  function prepareClock(ctx,state={},command={}){
+    const days=Object.entries(ctx.days||{}),starts=[],cutoffs=[];
+    let timed=days.length>0&&days.every(([,day])=>Array.isArray(day.periods)&&day.periods.length>0&&day.periods.every(p=>Number.isFinite(p.startMinutes)&&p.startMinutes>=0&&p.startMinutes<1440));
+    for(const [date,day] of days)if(date===ctx.today){
+      for(const p of day.periods||[])if(Number.isFinite(p.startMinutes))starts.push(p.startMinutes);
+      // End boundaries affect retained absence coverage, relief edits and
+      // cumulative fairness, including the last period with no following start.
+      const ending=new Set([...(state.assignments||[]),...(state.importedRelief||[])].filter(a=>a.date===date&&(['draft','published'].includes(a.status)||a.actualReviewRequired)&&!a.completionStatus).map(a=>a.period));
+      for(const p of day.periods||[])if(command.operation==='saveAbsence'||ending.has(p.period)){
+        if(Number.isFinite(p.endMinutes)&&p.endMinutes>=0&&p.endMinutes<=1440)cutoffs.push(Date.parse(date+'T00:00:00+08:00')+p.endMinutes*60000);
+        else timed=false;
+      }
+    }
+    for(const r of state.requests||[])if(r.status==='pending'&&!r.retiredAt&&ctx.days?.[r.date]&&Number.isFinite(r.expiresAt))cutoffs.push(r.expiresAt);
+    if(command.operation==='scheduledRoster'&&!ctx.skipScheduledAllocation&&state.systemConfig?.scheduledAllocationEnabled)cutoffs.push(Date.parse((command.date||ctx.today)+'T06:30:00+08:00'));
+    return {today:ctx.today,minute:ctx.minute,now:ctx.now,timed,starts,cutoffs};
+  }
+  function preparedClockConflict(prepared,current){
+    const conflict=(reasonCode,message)=>({code:'PLANNING_CLOCK_CHANGED',reasonCode,message});
+    if(prepared.today!==current.today)return conflict('SCHOOL_DATE_CHANGED','The school date changed while planning; re-run.');
+    if(prepared.cutoffs.some(at=>prepared.now<at&&at<=current.now))return conflict('PLANNING_CUTOFF_PASSED','A planning cutoff passed while planning; re-run.');
+    if(prepared.minute===current.minute)return null;
+    if(!prepared.timed)return conflict('PERIOD_DATA_MISSING','Period times are unavailable and the clock changed while planning; re-run.');
+    if(prepared.starts.some(start=>prepared.minute<start&&start<=current.minute))return conflict('PERIOD_STARTED','A period started while planning; re-run.');
+    return null;
+  }
   function periodStarted(ctx,d,p,snapshot){const start=ctx.days[d]?.periods.find(x=>x.period===p)?.startMinutes;const label=snapshot?.timeStart||snapshot?.start;const n=Number.isFinite(start)?start:/^\d\d:\d\d$/.test(label||'')?Number(label.slice(0,2))*60+Number(label.slice(3)):null;return d<ctx.today||d===ctx.today&&(n===null||ctx.minute>=n);}
   function periodEnded(ctx,d,p,snapshot){const end=ctx.days[d]?.periods.find(x=>x.period===p)?.endMinutes,label=snapshot?.timeEnd||snapshot?.end,n=Number.isFinite(end)?end:/^\d\d:\d\d$/.test(label||'')?Number(label.slice(0,2))*60+Number(label.slice(3)):null;return d<ctx.today||d===ctx.today&&n!==null&&ctx.minute>=n;}
   // Classify counted records without rewriting publication or notification history.
@@ -2458,7 +2486,7 @@ var GSISRosterAllocation = (() => {
   }
   function mayOptimise(ctx,d){const start=Date.parse(addDays(d,-1)+'T16:00:00+08:00'),end=Date.parse(d+'T06:29:59.999+08:00');return ctx.now>=start&&ctx.now<=end;}
   function warningEvents(s,ctx,summary){ensure(s);const quiet=schedule(ctx.now).quiet,events=[];for(const p of summary.periods){if(periodStarted(ctx,summary.date,p.period))continue;const key=summary.date+':'+p.period,old=s.healthWarningState[key]||{seen:[],episode:0};if(p.green.length>2){s.healthWarningState[key]={seen:[],episode:old.seen.length?old.episode+1:old.episode,last:p.green.length};continue;}if(!old.seen.includes(p.green.length)){events.push({key:'capacity:'+key+':'+old.episode+':'+p.green.length,period:p.period,count:p.green.length,date:summary.date,quiet});old.seen.push(p.green.length);}old.last=p.green.length;s.healthWarningState[key]=old;}return events;}
-  return {deploymentTeachingEvidence,sreBasis,dailyRosterCalculation,reliefCandidateEligible,normalizeSubjectPatterns,matchesSubjectPattern,absencePeriods,defaultConsecutiveSubjectRules,normalizeConsecutiveSubjectRules,manualDecision,manualDecisionForDemand,manualOwnership,defaultSubjectFamilies,normalizeSubjectFamilies,normalizeTeachingGroupOverrides,subjectResolver,lessonSubject,teachingProfile,defaultRestrictedPeriods,defaultEmploymentRestrictions,preferenceRules,workloadRules,ruleToggles,workloadLimits,preferenceOrder,sameVenue,teacherSource,recessDuty,manualAssignments,manualModel,withManualAssignments,manualRanks,isClassLesson,ensure,clone,fail,norm,addDays,monday,year,cost,active,protectedAssignment,effectiveAssignments,accounted,corrected,initialiseHistory,annual,balances,weekQuota,captureWeek,addAudit,assertNewAuditIds,bumpDay,periodStarted,periodEnded,reliefCompleted,teacherContext,eligibility,runAt,opportunities,health,rotation,ranked,optimise,score,solveCoverage,schedule,mayOptimise,warningEvents,pendingPeerRequests};
+  return {deploymentTeachingEvidence,sreBasis,dailyRosterCalculation,reliefCandidateEligible,normalizeSubjectPatterns,matchesSubjectPattern,absencePeriods,defaultConsecutiveSubjectRules,normalizeConsecutiveSubjectRules,manualDecision,manualDecisionForDemand,manualOwnership,defaultSubjectFamilies,normalizeSubjectFamilies,normalizeTeachingGroupOverrides,subjectResolver,lessonSubject,teachingProfile,defaultRestrictedPeriods,defaultEmploymentRestrictions,preferenceRules,workloadRules,ruleToggles,workloadLimits,preferenceOrder,sameVenue,teacherSource,recessDuty,manualAssignments,manualModel,withManualAssignments,manualRanks,isClassLesson,ensure,clone,fail,norm,addDays,monday,year,cost,active,protectedAssignment,effectiveAssignments,accounted,corrected,initialiseHistory,annual,balances,weekQuota,captureWeek,addAudit,assertNewAuditIds,bumpDay,prepareClock,preparedClockConflict,periodStarted,periodEnded,reliefCompleted,teacherContext,eligibility,runAt,opportunities,health,rotation,ranked,optimise,score,solveCoverage,schedule,mayOptimise,warningEvents,pendingPeerRequests};
 })();
 if(typeof module!=='undefined'&&module.exports)module.exports=GSISRosterAllocation;
 

@@ -100,10 +100,10 @@ test('cancelled final optimisation preserves report-only commit across 06:30 cut
  const tick=h.O.scheduledTick;let first=true;h.scope.GSISRosterOperations={...h.O,scheduledTick(s,ctx,stamp){const result=tick(s,ctx,stamp);if(first){first=false;h.cancel();h.ctx.now+=1000;}return result;}};
  const result=h.scope.rosterScheduledDispatch_({input:{operation:'scheduledRoster',date:h.date,scheduledTime:h.ctx.now}});assert.equal(result.allocationSkipped,true);assert.equal(h.state().assignments.length,0);assert.equal(h.state().outbox.filter(j=>j.kind==='smc_report').length,1);assert.equal(h.row().state,'cancelled');
 });
-test('scheduled report runs while manual allocation is active without changing its fence',()=>{
+test('scheduled cycle defers while manual allocation is active without changing its fence',()=>{
  const h=setup();h.ctx.notificationsConfigured=true;const state=h.state();state.smcDutyRoster=[{date:h.date,staffIds:['alice']}];h.setState(state);
  const run=h.scope.rosterAllocationRunStart_({identity:h.ctx.user,input:h.command()},h.c),request={input:{operation:'scheduledRoster',date:h.date,scheduledTime:h.ctx.now}};
- assert.equal(h.scope.rosterScheduledDispatch_(request).allocationSkipped,true);assert.equal(h.row().id,run.id);assert.equal(h.row().fence,run.fence);assert.equal(h.row().state,'running');assert.equal(h.state().assignments.length,0);assert.equal(h.state().outbox.filter(j=>j.kind==='smc_report').length,1);assert.equal(h.scope.rosterScheduledDispatch_(request).replayed,true);
+ assert.equal(h.scope.rosterScheduledDispatch_(request).code,'SKIPPED_BUSY');assert.equal(h.row().id,run.id);assert.equal(h.row().fence,run.fence);assert.equal(h.row().state,'running');assert.equal(h.state().assignments.length,0);assert.equal(h.state().outbox.filter(j=>j.kind==='smc_report').length,0);assert.equal(h.scope.rosterScheduledDispatch_(request).code,'SKIPPED_BUSY');assert.equal(h.calls.writes,0);
 });
 test('duplicate same-slot scheduler delivery cannot replace an in-flight allocation with a report-only receipt',()=>{
  const h=setup(),request={input:{operation:'scheduledRoster',date:h.date,scheduledTime:h.ctx.now}},tick=h.O.scheduledTick;let injected=false;

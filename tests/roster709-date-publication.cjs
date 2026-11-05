@@ -38,7 +38,7 @@ test('Future planning, sponsorship, save and Confirm remain available without pu
 test('Backend refreshes Singapore clock after slow preparation before the explicit notification commit',()=>{
  const h=ready(adapter()),f={...h,state:h.state()};draftRelief(f);h.setState(f.state);h.ctx.now=Date.parse(h.date+'T23:59:59+08:00');const original=h.scope.rosterOperationsContext_;
  h.scope.rosterOperationsContext_=req=>{assert.equal(h.locked(),false);const old=original(req);h.ctx.now+=2000;return old;};
- assert.throws(()=>h.call({operation:'notifyDaily',date:h.date,revision:f.state.revision,requestId:crypto.randomUUID()}),/current or a future day/);assert.equal(h.calls.writes,0);assert.equal(h.state().revision,f.state.revision);assert.equal(h.locked(),false);
+ assert.throws(()=>h.call({operation:'notifyDaily',date:h.date,revision:f.state.revision,requestId:crypto.randomUUID()}),error=>error.code==='PLANNING_CLOCK_CHANGED'&&error.reasonCode==='SCHOOL_DATE_CHANGED'&&/school date changed while planning; re-run/.test(error.message));assert.equal(h.calls.writes,0);assert.equal(h.state().revision,f.state.revision);assert.equal(h.locked(),false);
 });
 test('A committed publication retries exactly once even after midnight',()=>{
  const h=ready(adapter()),f={...h,state:h.state()};draftRelief(f);h.setState(f.state);const p={operation:'publish',date:h.date,allocationRevision:f.state.dayRevisions[h.date],revision:f.state.revision,requestId:crypto.randomUUID()};
