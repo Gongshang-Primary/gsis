@@ -1,6 +1,6 @@
 # roster-d1-fresh-start: start Roster on D1 without history and without baseline timetables
 
-- Status: changelog / design (owner request 5 Nov 2026); Codex, lane R; after roster-d1-timetable-reconcile-cancels
+- Status: design draft; Codex, lane R; after roster-d1-timetable-reconcile-cancels
 - Reviewer/model: Claude
 - Last updated (Asia/Singapore): 5 Nov 2026 05:10
 
@@ -51,3 +51,54 @@ After v0.9.9l timed out on the Google Assign Relief read (UPSTREAM_TIMEOUT, 6 No
 - Add the opening-balance prefill from the frozen Google Roster (in the ruling above; #79 as built has entry/paste/export but no prefill).
 - Open owner questions (Claude asked 5 Nov): cutover night; whether future-dated absences (on or after the start date, including long leave) are carried from Google automatically.
 - Owner answers (5 Nov): future-dated absences are NOT carried; the owner re-enters them on D1. Timing: move fast while the school year ends (term baseline runs to 20 Nov); cutover as soon as #79 is reviewed and merged. Out of scope: any Google-to-D1 copy of absences, assignments or Stapler plans.
+## Design for review
+
+- Owner/model: Codex
+- Branch: `codex/roster-d1-fresh-start`
+- Dependency: the exact reviewed timetable-reconciliation head; stack this PR on `codex/roster-d1-timetable-reconcile` until that PR merges.
+- Scope: Roster's signed Google migration bridge, D1 import/fence/rollback, accounting and history projections, edge setup and read-only archive UI, focused and end-to-end tests, canonical generated copies.
+- Excluded: deployment, live freeze/import/reset/activation, live messages, full historical migration, Deploy authority changes, Cloudflare flags or bindings.
+
+### Small source capture and empty import
+
+Add an Admin-only signed `edgeFreshStartSource` operation. It requires the confirmed freeze and binds its retained receipt to the actor, request, freeze and Singapore start date. Read only settings and name bridges. Capture `systemConfig`, `nameBridges`, `nameBridgesSeeded` and `dailyEmploymentSettings` (notification settings outside `systemConfig`); leave secrets in their existing environment. Record the original Google document identities. Do not call the full-history snapshot builder or prepare any baseline/Stapler objects. A separate optional signed read may propose opening totals for Admin review; that proposal never saves balances automatically.
+
+The Worker `freshStart` action accepts that server-selected source, verifies its digest, and refuses active/paused heads, incomplete reset cleanup or a conflicting retained import. Reuse the existing reserve/stage/finalize transaction so both scopes become `imported` together at head revision 1. The operational document also starts at revision 1. Create an empty `GSISRosterOperations.initial()` document plus validated settings, a fresh-start audit event and metadata; create `{schema:1,revision:1,entries:[],receipts:[]}` for the register. No historical absences, duties, messages, plans, audit rows or receipts enter D1.
+
+Retain `freshStart: true`, `effectiveDate`, `fairnessMode`, `configDigest`, `sourceDigest`, `freezeId` and `archiveId` in the manifest and operational state. A repeated request with identical settings returns its saved receipt. Changed input under the same request refuses. Interrupted preparation resumes safely through existing import records. Fresh-start parity proves matching settings and intentionally empty historical collections; it must never claim full-history parity.
+
+### Activation, archive and rollback
+
+Keep the existing **Activate verified owner** UI and transitions. Its Google fence gains a separate proof branch selected by the retained fresh-source receipt: verify the original freeze, document identities and settings digest, then set the same writer-fence properties. This branch does not hash or traverse old histories. Ordinary imported snapshots retain their current full-source checks.
+
+While fresh D1 owns the records, original Google documents remain frozen and read-only. Add an authenticated archive route that admits only fixed read projections with current Contacts permissions. Invoke pure history/statistics/calculation projections, never the normal read dispatch that can reconcile and write. Reject caller-supplied file IDs and all mutation operations. A normal app URL is not an archive link because it follows current D1 authority.
+
+Suppress ordinary Google mirror processing for a fresh epoch in both Worker and backend. The existing mirror release installs D1 document pointers and would replace the Google archive, so it must refuse this mode. **Switch back to Google** instead quiesces and pauses D1, retains a report of D1 changes for re-entry, verifies the original Google identities/fence, and releases Google without replacing its data pointers. The owner still changes Cloudflare routing flags. After rollback, the original Google records resume as live writable records; this design does not promise an immutable historical snapshot after that point.
+
+### Timetable and accounting
+
+Exercise the normal D1 upload against an empty register. The first upload is active when its supplied date range covers the requested date; do not silently extend dates. Invalidate the empty day package and prepare the new model through existing timetable machinery. Preserve the prior PR's Auto-allocate/two-reloads invariant.
+
+The later owner ruling selects opening balances. Create an Admin-only spreadsheet-style Opening balances screen for the fresh epoch, visible read-only to SMC and hidden from teachers. One row per active Contacts teacher carries cumulative quota, cumulative relief done, an as-of date and last editor/time. Include partial name/department/role filtering, sortable columns, Tab/Enter navigation, name-matched Excel paste with a preview, and CSV round trip. Unknown/duplicate paste names remain unsaved. Values are whole numbers 0 through 9999; done above quota is a warning. Every changed row has an audit reason and durable receipt; later corrections use the same protected command.
+
+Keep one current `openingBalances` record per teacher/accounting year, with audit history for every replacement. Annual fairness adds that record to D1 relief dated strictly after its as-of date. Weekly quota entitlement whose checkpoint week starts on or before the as-of date is already represented by cumulative opening quota and is excluded from the annual denominator. Weekly capacity and recorded duties remain unchanged by later balance corrections. This prevents double-counting at midweek cutovers. Do not manufacture assignments, weekly entitlements or historical Statistics. Opening values never leak into a later accounting year. Auto-allocation stays paused until Admin confirms the initial grid; an explicit saved zero is allowed, an unreviewed blank is not.
+
+Every statistics, personal-calculation and history projection carries fresh-start coverage metadata. Show **since <date>**, including empty views, and provide a read-only Google archive link. Opening balances appear as opening balances rather than fabricated duty records.
+
+### Internal contracts
+
+The setup request is `{operation:'freshStart', requestId, effectiveDate, copyConfig, confirmation:'START FRESH'}`. Fairness mode is fixed to `opening-balances` by the owner ruling. The server verifies the confirmation, source receipt and all preconditions; a browser-supplied fresh-start flag never bypasses activation checks. Store epoch metadata in `state.freshStart`, dated annual balances in `state.openingBalances`, and expose `{since: effectiveDate, archiveUrl:'/archive.html'}` as `historyCoverage` on relevant projections. Opening-grid reads and saves use normal authenticated Roster operations with server-enforced role checks. The archive page sends only fixed read-view requests through the authenticated archive route.
+
+### Owner decision before a live fresh start
+
+The fairness question is resolved by the later owner ruling: Admin enters and confirms opening balances. The optional Google prefill is a proposal that needs review, not authority to save. A fresh epoch does not import old within-week usage, daily rotation or SRE history; the setup must state that limit. The owner still chooses when to perform a live fresh start. This design authorizes no live action.
+
+### Implementation and verification sequence
+
+1. Add signed source capture, empty-state transaction and config-specific fence, with replay/tamper/precondition tests.
+2. Add archive-only reads, mirror refusal and original-Google rollback, with pointer and permission tests.
+3. Add opening-balance accounting, the Admin spreadsheet grid and since-date projections; wire the setup and archive UI.
+4. Test fresh start, activation, first baseline upload, confirmed Admin opening balances, absence, allocation, two reloads, publication and queued WhatsApp end to end with synthetic data; include Admin/SMC/teacher boundaries, paste mismatches, per-row audit, as-of cutoffs and CSV round trip.
+5. Regenerate all canonical outputs, run the complete Node and LORD suite, and hand Claude the exact head.
+
+The design draft precedes implementation. No live Google, D1, R2 or messaging action is part of this task.
