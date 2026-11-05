@@ -34,10 +34,10 @@ function rosterTimetableBatchCommitEnd_(ticket){if(ticket)props_().setProperty('
 function rosterTimetableBatchSource_(manifestKey,marker,c,authorityKey){
  if(!marker)return null;
  const authority=(c.rosterPeople||[]).map(p=>[p.id,p.name,p.active,p.groups,p.role,p.adhocEligible,p.mk,p.appointmentLevel]);
- return rosterOperationsPlanDigest_(JSON.stringify([3,manifestKey,marker.source,authority,c.rosterSMCIds||[],authorityKey]));
+ return rosterOperationsPlanDigest_(JSON.stringify([4,manifestKey,marker.source,authority,c.rosterSMCIds||[],authorityKey]));
 }
 function rosterTimetableBatchCached_(source,encoding,value){
- if(!source)return null;try{const cache=CacheService.getScriptCache(),key='roster-batch-source-v3:'+rosterOperationsPlanDigest_(JSON.stringify([source,encoding]));if(value){const json=JSON.stringify(value);if(json.length<90000)cache.put(key,json,21600);return value;}const stored=cache.get(key);return stored?JSON.parse(stored):null;}catch(_){return null;}
+ if(!source)return null;try{const cache=CacheService.getScriptCache(),key='roster-batch-source-v4:'+rosterOperationsPlanDigest_(JSON.stringify([source,encoding]));if(value){const json=JSON.stringify(value);if(json.length<90000)cache.put(key,json,21600);return value;}const stored=cache.get(key);return stored?JSON.parse(stored):null;}catch(_){return null;}
 }
 function rosterTimetableBatchPlanKey_(row){const value={...row};delete value.timetableSourceRevision;if(value.timetableDay){value.timetableDay={...value.timetableDay};delete value.timetableDay.sourceRevision;}return rosterOperationsPlanDigest_(JSON.stringify(value));}
 /* Two read-only batches: immutable baselines first, then authorised suspended
@@ -95,14 +95,14 @@ function rosterTimetablePackedIdentity_(row,field){
  return stored?[stored.encoding,stored.bytes,stored.validation||null,rosterOperationsPlanDigest_(stored.data)]:null;
 }
 function rosterTimetablePreparedSource_(state,row){
- return rosterOperationsPlanDigest_(JSON.stringify([2,GSISRosterStapler.validationVersion,rosterTimetableBatchStamp_({staplerPlans:[row],dailyPublicationStates:state.dailyPublicationStates?.[row.date]?{[row.date]:state.dailyPublicationStates[row.date]}:{},audit:state.audit||[]}),['draft','published','confirmedPlan'].map(field=>rosterTimetablePackedIdentity_(row,field)),state.dailyPublicationStates?.[row.date]||null]));
+ return rosterOperationsPlanDigest_(JSON.stringify([3,GSISRosterStapler.validationVersion,rosterTimetableBatchStamp_({staplerPlans:[row],dailyPublicationStates:state.dailyPublicationStates?.[row.date]?{[row.date]:state.dailyPublicationStates[row.date]}:{},audit:state.audit||[]}),['draft','published','confirmedPlan'].map(field=>rosterTimetablePackedIdentity_(row,field)),state.dailyPublicationStates?.[row.date]||null]));
 }
 function rosterTimetableConfirmedSource_(state,row){
  const confirmed=GSISRosterOperations.confirmedStaplerSnapshot(row,state.audit);if(!confirmed)return null;
  const field=row.confirmedPlan===confirmed.plan?'confirmedPlan':row.published===confirmed.plan?'published':'draft';
  // Draft revisions do not alter the teacher's confirmed preview. Bind reuse to
  // all content used by that preview, including an older daily publication.
- return rosterOperationsPlanDigest_(JSON.stringify([1,GSISRosterStapler.validationVersion,row.date,String(row.name||''),row.baselineId,confirmed.revision,rosterTimetablePackedIdentity_(row,field),row.publishedRevision,rosterTimetablePackedIdentity_(row,'published'),state.dailyPublicationStates?.[row.date]||null]));
+ return rosterOperationsPlanDigest_(JSON.stringify([2,GSISRosterStapler.validationVersion,row.date,String(row.name||''),row.baselineId,confirmed.revision,rosterTimetablePackedIdentity_(row,field),row.publishedRevision,rosterTimetablePackedIdentity_(row,'published'),state.dailyPublicationStates?.[row.date]||null]));
 }
 function rosterTimetablePreparePlan_(state,row,packed){
  if(row.date<rosterToday_())return null;
@@ -111,7 +111,7 @@ function rosterTimetablePreparePlan_(state,row,packed){
  // Do not inflate every legacy date during an unrelated operational write.
  if(!prior&&state.dailyPublicationStates?.[row.date]?.sourceRevision!==state.revision&&[['draft',row.revision],['published',row.publishedRevision??row.revision],['confirmedPlan',row.confirmedRevision??row.revision]].every(([field,revision])=>!row[field]||rosterPlanPacked_.get(row[field])?.validation?.revision===revision))return null;
  const confirmed=GSISRosterOperations.confirmedStaplerSnapshot(row,state.audit),draft=row.draft||confirmed?.plan;if(!draft)return null;
- const base={id:row.baselineId,periods:draft.periods,teachers:[]},ctx={user:{smc:true},people:[],today:rosterToday_(),days:{[row.date]:base}};
+ const ctx={user:{smc:true},people:[],today:rosterToday_(),days:{},baselineDays:{}};
  const timetableDay=row.published||confirmed?GSISRosterOperations.timetableDay(state,ctx,{date:row.date}):null;
  const projections=new Map(),safe=plan=>{if(!projections.has(plan))projections.set(plan,GSISRosterOperations.confirmedStaplerProjection(plan));return projections.get(plan);};
  const project=(plan,mode,revision)=>({date:row.date,name:String(row.name||''),baselineId:row.baselineId,revision,viewMode:mode,plan:safe(plan),confirmedPlan:confirmed?safe(confirmed.plan):null,confirmedRevision:confirmed?.revision||0,timetableDay});
@@ -155,19 +155,12 @@ function rosterTimetableBatch_(req,c){
    if(record.date<from||record.date>to||seen.has(record.date))continue;seen.add(record.date);
    const confirmed=GSISRosterOperations.confirmedStaplerSnapshot(record,state.audit),allowed=privileged||GSISRosterOperations.mayViewConfirmed(state,ctx,record),source=privileged?(record.draft||confirmed?.plan):confirmed?.plan;
    if(!allowed||!source)continue;
-   const entry=GSISRoster.active(index.entries,record.date);let baselineChanged=!entry||record.baselineId!==entry.id;
    const prepared=multipart&&record.timetablePackage?.schema===1&&record.timetablePackage.sourceKey===rosterTimetablePreparedSource_(state,record)?record.timetablePackage:null,part=prepared&&(privileged?prepared.draft:prepared.confirmed);
-   const partValid=rosterTimetablePartValid_(part),periodsKey=partValid&&!baselineChanged?(entry.preparedTimings?.modelFile===entry.modelFile?entry.preparedTimings.key:rosterOperationsPlanDigest_(JSON.stringify(rosterTimetableBatchPeriods_(getModel(entry))))):null;
-   if(partValid&&(baselineChanged||prepared.periodsKey===periodsKey)){
-    parts[part.key]=part;plans.push({date:record.date,partKey:part.key,timetableSourceRevision:confirmed?.revision??state.revision,baselineContentKey:baselineChanged?null:modelKeys[entry.id],baselineChanged});continue;
+   if(rosterTimetablePartValid_(part)){
+    parts[part.key]=part;plans.push({date:record.date,partKey:part.key,timetableSourceRevision:confirmed?.revision??state.revision,baselineContentKey:null,baselineChanged:false});continue;
    }
-   baselineChanged=baselineChanged||source.baselineId!==entry.id;
-   let timetableDay=null;
-   if(record.published||confirmed){
-    const base={id:entry?.id,periods:entry?rosterTimetableBatchPeriods_(getModel(entry)):[],teachers:[]};
-    timetableDay=GSISRosterOperations.timetableDay(state,{...ctx,days:{[record.date]:base}},{date:record.date});
-   }
-   plans.push({date:record.date,name:String(record.name||''),baselineId:record.baselineId,baselineContentKey:baselineChanged?null:modelKeys[entry.id],revision:privileged?record.revision:confirmed.revision,viewMode:privileged?'draft':'confirmed',baselineChanged,plan:GSISRosterOperations.confirmedStaplerProjection(source),confirmedPlan:confirmed?GSISRosterOperations.confirmedStaplerProjection(confirmed.plan):null,confirmedRevision:confirmed?.revision||0,timetableDay});
+   const timetableDay=record.published||confirmed?GSISRosterOperations.timetableDay(state,ctx,{date:record.date}):null;
+   plans.push({date:record.date,name:String(record.name||''),baselineId:record.baselineId,baselineContentKey:null,revision:privileged?record.revision:confirmed.revision,viewMode:privileged?'draft':'confirmed',baselineChanged:false,plan:GSISRosterOperations.confirmedStaplerProjection(source),confirmedPlan:confirmed?GSISRosterOperations.confirmedStaplerProjection(confirmed.plan):null,confirmedRevision:confirmed?.revision||0,timetableDay});
   }
   const view=GSISRosterOperations.staplerDatesView(state,ctx);
   payload.operationsRevision=state.revision;payload.plans=plans.sort((a,b)=>a.date.localeCompare(b.date));payload.planKeys=Object.fromEntries(payload.plans.map(row=>[row.date,rosterTimetableBatchPlanKey_(row)]));payload.datesView={revision:state.revision,confirmedAccess:view.confirmedAccess,dates:view.dates.filter(row=>row.date>=from&&row.date<=to)};

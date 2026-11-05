@@ -20,36 +20,36 @@ function adapters(O){
 function assignments(f,n=6,status='draft'){
  f.O.apply(f.state,f.ctx,{operation:'saveAbsence',date:f.date,staffId:'alice',typeId:'mc',periods:[2,3],revision:0});
  f.O.apply(f.state,f.ctx,{operation:'autoAllocate',date:f.date,revision:0});
- f.state.smcAlerts=[];f.state.outbox=[];const seed=f.state.assignments[0];assert(seed);f.state.assignments=Array.from({length:n},(_,i)=>({...structuredClone(seed),id:'row-'+i,timetableId:'pruned',status}));return structuredClone(f.state.assignments);
+ f.state.smcAlerts=[];f.state.outbox=[];const seed=f.state.assignments[0];assert(seed);f.state.assignments=Array.from({length:n},(_,i)=>({...structuredClone(seed),id:'row-'+i,timetableId:'pruned',className:'Removed class',status}));return structuredClone(f.state.assignments);
 }
-test('D1 retained pruned Stapler plan: Auto-allocate then reload twice keeps assignments and confirmed content',async()=>{
+test('D1 retained pruned Stapler plan: Auto-allocate then twenty reloads keeps assignments and confirmed content',async()=>{
  const {edgeRosterContextFromReferences}=await import('../roster-update/public/edge-roster-context.js');
  const f=setup(),plan=savedPlan(f),model=R.validate({layoutMode:'single-week',single:{days:['Monday','Tuesday','Wednesday','Thursday','Friday'],perDay:17,maxPeriod:16,blocks:f.teachers.map(t=>({name:t.name,cells:Array.from({length:5},()=>t.cells).flat()}))},timing:{startMinutes:420,periodMinutes:30,normalLastPeriod:12},recesses:[]});
  const makeContext=(state=f.state)=>edgeRosterContextFromReferences({state,input:{operation:'autoAllocate',date:f.date,calendarByDate:{[f.date]:{date:f.date,schoolDay:true,parity:'single'}}},who:f.ctx.user,contacts:{user:{rosterStaffId:'alice',rosterSMC:true,rosterAdmin:true},rosterPeople:f.people.map(person=>({...person,adhocEligible:true})),rosterSMCIds:['alice'],rosterAdminIds:['alice']},index:{entries:f.ctx.timetableEntries},models:new Map([['active',model]]),quota:{from:'2026-01-01',to:'2026-12-31',rows:f.people.map(p=>({id:p.id,R:4})),formClasses:[],teachingGroups:[],venues:[]},referenceKey:'fixture',clock:f.ctx,env:{}});
- const ctx=makeContext();assert.equal(ctx.baselineDays[f.date].id,'active');assert.equal(ctx.days[f.date].id,'active');assert.equal(ctx.days[f.date].staplerBaselineId,'pruned');assert.equal(ctx.days[f.date].teachers[0].cells[2][0],'EL');assert.deepEqual(f.state.staplerPlans[0].draft,plan);
+ const ctx=makeContext();assert.equal(ctx.baselineDays[f.date].id,S.planId(plan));assert.equal(ctx.days[f.date].id,S.planId(plan));assert.equal(ctx.days[f.date].staplerBaselineId,'pruned');assert.equal(ctx.days[f.date].teachers[0].cells[2][0],'EL');assert.deepEqual(f.state.staplerPlans[0].draft,plan);
  f.O.apply(f.state,ctx,{operation:'saveAbsence',date:f.date,staffId:'alice',typeId:'mc',periods:[2,3],revision:0});f.O.apply(f.state,ctx,{operation:'autoAllocate',date:f.date,revision:0});
- assert.equal(f.state.assignments.length,2);assert(f.state.assignments.every(a=>a.timetableId==='active'));
+ assert.equal(f.state.assignments.length,2);assert(f.state.assignments.every(a=>a.timetableId===S.planId(plan)));
  for(const reconcile of adapters(f.O)){
-  const state=structuredClone(f.state);for(let n=0;n<2;n++){const fresh=makeContext(state);reconcile(state,fresh,true);const read=f.O.read(state,fresh,{operation:'read',view:'allocation',date:f.date});assert.equal(read.timetable.id,'active');assert.equal(read.assignments.filter(a=>a.status==='draft').length,2);}
+  const state=structuredClone(f.state);for(let n=0;n<20;n++){const fresh=makeContext(state);reconcile(state,fresh,true);const read=f.O.read(state,fresh,{operation:'read',view:'allocation',date:f.date});assert.equal(read.timetable.id,S.planId(plan));assert.equal(read.assignments.filter(a=>a.status==='draft').length,2);}
   assert.equal(state.assignments.length,2);assert(state.assignments.every(a=>a.status==='draft'));assert.deepEqual(state.staplerPlans[0].draft,plan);
  }
 });
 test('publication keeps original Stapler provenance when comparison baseline is replaced or unavailable',()=>{
  const f=setup();savedPlan(f);const ctx=f.O.composeStaplerContext(f.state,f.ctx);
  f.O.apply(f.state,ctx,{operation:'publish',date:f.date,allocationRevision:0});
- const publication=f.state.dailyPublicationStates[f.date];assert.equal(publication.baselineId,'active');assert.equal(publication.staplerBaselineId,'pruned');
+ const publication=f.state.dailyPublicationStates[f.date];assert.equal(publication.baselineId,'stapler:'+f.date);assert.equal(publication.staplerBaselineId,'pruned');
  for(const baselineDays of [{},{[f.date]:{...f.ctx.days[f.date],id:'replacement',teachers:[]}}]){
   const readContext={...ctx,days:baselineDays,baselineDays};
   const own=f.O.dailyTimetable(f.state,readContext,{date:f.date});assert.equal(own.unavailableReason,undefined);assert.equal(own.modified.cells[2][0],'EL');
   const schedule=f.O.timetableDay(f.state,readContext,{date:f.date});assert.equal(schedule.source,'published');assert.equal(schedule.teachers[0].cells[2][0],'EL');
  }
 });
-test('read mass-cancel guard preserves six mismatched rows and deduplicates its health alert',()=>{
+test('read mass-cancel guard preserves six removed-lesson rows and deduplicates its health alert',()=>{
  for(const reconcile of adapters(setup().O)){
   const f=setup(),before=assignments(f);assert.equal(reconcile(f.state,f.ctx,true),true);
   assert.deepEqual(f.state.assignments,before);assert.equal(f.state.smcAlerts.length,1);assert.equal(f.state.smcAlerts[0].code,'TIMETABLE_RECONCILE_BLOCKED');assert.equal(f.state.smcAlerts[0].affectedCount,6);assert.equal(f.O.healthRead(f.state,f.ctx,{date:f.date}).alerts[0].code,'TIMETABLE_RECONCILE_BLOCKED');assert.equal(f.state.outbox.length,0);
   reconcile(f.state,f.ctx,true);assert.equal(f.state.smcAlerts.length,1);assert.deepEqual(f.state.assignments,before);
-  reconcile(f.state,f.ctx,false);assert(f.state.assignments.every(a=>a.status==='cancelled'));
+  reconcile(f.state,f.ctx,false);assert.deepEqual(f.state.assignments,before);const preview=f.O.previewTimetableReconcile(f.state,f.ctx,{date:f.date});f.O.confirmTimetableReconcile(f.state,f.ctx,{date:f.date,previewDigest:preview.digest});assert(f.state.assignments.every(a=>a.status==='cancelled'));
  }
 });
 test('read mass guard leaves six published SMC decisions untouched without review annotations',()=>{
@@ -90,11 +90,10 @@ test('a small shared replacement pair never revisits generated removal rows',()=
   reconcile(f.state,f.ctx,true);assert.equal(JSON.stringify(f.state.assignments),before);
  }
 });
-test('read preserves a draft replacement of published shared relief without creating a removal',()=>{
+test('small removed shared lesson releases replacement and published ancestor once',()=>{
  for(const reconcile of adapters(setup().O)){
-  const f=setup();sharedPairs(f,1,true);const before=JSON.stringify(f.state.assignments);
-  assert.equal(reconcile(f.state,f.ctx,true),true);assert.equal(JSON.stringify(f.state.assignments),before);assert.equal(f.state.smcAlerts[0].affectedCount,2);
-  assert.deepEqual(f.state.smcAlerts[0].assignmentIds,['prior-0','replacement-0']);assert.equal(reconcile(f.state,f.ctx,true),false);assert.equal(JSON.stringify(f.state.assignments),before);
+  const f=setup();sharedPairs(f,1,true);assert.equal(reconcile(f.state,f.ctx,true),true);assert(f.state.assignments.every(row=>row.status==='cancelled'));assert(f.state.outbox.some(row=>row.kind==='relief_publication'));
+  const before=JSON.stringify(f.state.assignments);assert.equal(reconcile(f.state,f.ctx,true),false);assert.equal(JSON.stringify(f.state.assignments),before);
  }
 });
 test('read mass-cancel guard also protects changed lesson sources under the same timetable ID',()=>{
@@ -120,16 +119,15 @@ test('preflight does not write protected-assignment workload warnings',()=>{
  f.ctx.days[f.date].teachers.find(t=>t.staffId===row.staffId).cells[4]=['EL','4B','C1-02',''];
  const before=JSON.stringify(f.state);f.O.reconcile(f.state,{...f.ctx,reconcilePreflight:new Map()});assert.equal(JSON.stringify(f.state),before);
 });
-test('read preserves published rows for timetable and absence changes; explicit mutation can cancel',()=>{
+test('small removed published lessons release on read while absence-only reads retain published cover',()=>{
  for(const reconcile of adapters(setup().O))for(const reason of ['timetable','absence']){
   const f=setup(),before=assignments(f,1,'published');if(reason==='absence'){f.state.assignments[0].timetableId='active';f.state.absences[0].deletedAt=f.ctx.iso;before[0].timetableId='active';}
-  reconcile(f.state,f.ctx,true);assert.deepEqual(f.state.assignments,before);assert.equal(f.state.smcAlerts[0].code,'TIMETABLE_RECONCILE_BLOCKED');
-  reconcile(f.state,f.ctx,false);assert.equal(f.state.assignments[0].status,'cancelled');
+  reconcile(f.state,f.ctx,true);if(reason==='absence'){assert.deepEqual(f.state.assignments,before);assert.equal(f.state.smcAlerts[0].code,'TIMETABLE_RECONCILE_BLOCKED');reconcile(f.state,f.ctx,false);}else assert.equal(f.state.assignments[0].cancellationReason,'Lesson no longer in the timetable');assert.equal(f.state.assignments[0].status,'cancelled');
  }
 });
-test('read guard permits at most five draft mismatches and leaves unrelated absence reconciliation active',()=>{
+test('read guard permits a small draft release and leaves unrelated absence reconciliation active',()=>{
  for(const reconcile of adapters(setup().O)){
-  const f=setup();assignments(f,5);reconcile(f.state,f.ctx,true);assert(f.state.assignments.every(a=>a.status==='cancelled'));
+  const f=setup();assignments(f,2);reconcile(f.state,f.ctx,true);assert(f.state.assignments.every(a=>a.status==='cancelled'));
   const g=setup();assignments(g,1);g.state.assignments[0].timetableId='active';g.state.absences[0].deletedAt=g.ctx.iso;reconcile(g.state,g.ctx,true);assert.equal(g.state.assignments[0].status,'cancelled');
  }
 });

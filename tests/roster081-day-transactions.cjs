@@ -53,7 +53,7 @@ for(const users of [1,10,30])test(users+' notification users and callbacks compl
    }
   }return result;
  }};
- const result=h.call(p);assert.equal(result.run.coverage,2);assert.equal(allocations,2,'today publication changes weekly inputs, so the proposal is recomputed outside the lock');
+ const result=h.call(p);assert.equal(result.run.coverage,2);assert.equal(allocations,1,'publishing existing cover leaves weekly quota and fairness unchanged, so it merges without rerunning the solver');
  const s=h.state();assert.equal(s.receipts.length,users+2);assert.equal(new Set(s.receipts.map(r=>r.id)).size,s.receipts.length);assert.equal(s.audit.filter(a=>a.operation==='notifyDaily').length,users);
  const jobs=s.outbox.filter(j=>j.data?.dailyPublication);assert.equal(jobs.length,1);assert.equal(s.deliveryEvents.length,users);assert(jobs.every(j=>j.status==='sent'&&j.deliveryStatus==='delivered'&&j.attempts===1&&j.attemptHistory.length===1));
  assert.equal(s.assignments.filter(a=>a.date===h.date&&a.status==='published').length,1);assert.equal(s.assignments.filter(a=>a.date===tomorrow&&a.status==='draft').length,2);

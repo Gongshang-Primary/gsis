@@ -6,7 +6,7 @@ const snapshot=()=>({checkedAt:NOW,storage:{configured:true,available:true},jobs
 async function harness(handler){
  const dom=new JSDOM(fs.readFileSync('roster-update/public/system-health.html','utf8'),{url:'https://roster.gsps.edu.sg/system-health.html',runScripts:'outside-only'}),w=dom.window,calls=[];
  w.setInterval=()=>{throw Error('Health must not poll')};w.setTimeout=()=>{throw Error('Health must not schedule refresh')};w.HTMLDialogElement.prototype.showModal=function(){this.open=true};w.HTMLDialogElement.prototype.close=function(){this.open=false};
- w.fetch=async(path,options)=>{const body=JSON.parse(options.body);calls.push({path,options,body});const result=await handler(body,calls.length);return {ok:!result.status||result.status<400,status:result.status||200,json:async()=>result};};
+ w.fetch=async(path,options)=>{const body=JSON.parse(options.body);if(path==='/api/operations'){assert.deepEqual(body,{operation:'read',view:'timetableReview'});return {ok:true,status:200,json:async()=>({ok:true,data:{alerts:[],migrationNeeded:0}})};}calls.push({path,options,body});const result=await handler(body,calls.length);return {ok:!result.status||result.status<400,status:result.status||200,json:async()=>result};};
  vm.runInContext(fs.readFileSync('roster-update/public/system-health.js','utf8'),dom.getInternalVMContext());await tick();await tick();return {dom,w,calls,click:async(id)=>{w.document.getElementById(id).click();await tick();await tick();}};
 }
 (async()=>{

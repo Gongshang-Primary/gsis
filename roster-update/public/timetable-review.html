@@ -1,0 +1,11 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>GSiS Timetable Review</title><link rel="stylesheet" href="edge-setup.css"><link rel="stylesheet" href="system-health.css"><script src="timetable-review.js" defer></script></head>
+<body><a class="skip" href="#main">Skip to timetable review</a><header><a href="/" class="brand">GSiS <span>Roster</span></a><a href="system-health.html">System Health</a></header>
+<main id="main"><div class="section-heading"><h1>Timetable review</h1><button id="refresh" type="button">Refresh</button></div>
+<p>Use your signed-in school SMC or administrator account. <a href="/">Open Roster to sign in</a>.</p>
+<p id="status" class="notice" role="status" aria-live="polite">Checking access…</p>
+<section id="migration-section" hidden><h2>Save independent Stapler day copies</h2><p>Admin can copy each retained plan’s origin day once. Preview shows the dates and sources before saving. Existing timetable changes stay in the plan.</p><p id="migration-count"></p><button id="preview-migration" type="button">Dry run: preview day copies</button></section>
+<section><h2>Retained relief assignments</h2><p>Review blocked releases before confirming them. The server checks the preview again when you confirm.</p><div id="alerts"></div></section>
+<section id="preview-section" hidden><h2 id="preview-title">Preview</h2><div id="preview"></div><p id="preview-digest" class="muted"></p><button id="apply-preview" type="button" class="primary" disabled>Confirm preview</button></section>
+<button id="retry-action" type="button" hidden>Retry the unconfirmed action</button>
+</main></body></html>

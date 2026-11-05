@@ -60,7 +60,7 @@ function call(p,data,{early=false,baselineId=day.id}={}){
 }
 try{
  const old=call({operation:'staplerDates'},full),next=call({operation:'staplerDates'},compact,{early:true});assert.equal(old.ok,true,JSON.stringify(old));assert.equal(next.ok,true,JSON.stringify(next));assert.deepEqual(next.data,old.data);assert.equal(next.data.dates[0].draftRevision,3);assert.equal(next.data.dates[0].baselineChanged,false);assert.equal(h.writes(),0);
- const changed=call({operation:'staplerDates'},compact,{early:true,baselineId:'replacement'});assert.equal(changed.ok,true,JSON.stringify(changed));assert.equal(changed.data.dates[0].baselineChanged,true);
+ const changed=call({operation:'staplerDates'},compact,{early:true,baselineId:'replacement'});assert.equal(changed.ok,true,JSON.stringify(changed));assert.equal(changed.data.dates[0].baselineChanged,false,'baseline swaps never mark saved Stapler days stale');
  const teacher=plain(compact);Object.assign(teacher.user,{rosterSMC:false,rosterAdmin:false,rosterStaffId:'staff-1'});const ordinary=call({operation:'staplerDates'},teacher,{early:true});assert.equal(ordinary.ok,true);assert.equal(ordinary.data.dates[0].mayEdit,true);assert.deepEqual(ordinary.data.deletedArchives,[]);
  teacher.rosterDates.caller=null;teacher.user.rosterStaffId=null;assert.deepEqual(call({operation:'staplerDates'},teacher,{early:true}).data.dates,[]);
  for(const bad of [{...compact,rosterDates:{...compact.rosterDates,sponsors:[null]}},{...compact,rosterDates:{}},{...compact,rosterDates:{...compact.rosterDates,caller:{id:'wrong',name:'Wrong',active:true}}}])assert.equal(call({operation:'staplerDates'},bad).ok,false,'malformed projection fails closed');

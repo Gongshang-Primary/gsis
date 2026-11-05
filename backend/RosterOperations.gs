@@ -191,10 +191,33 @@ function rosterOperationsCellSource_(s,ctx,p){
 }
 function rosterOperationsPhase_(name,fn){return typeof deployPhase_==='function'?deployPhase_('roster.'+name,fn):fn();}
 // Historical/administrative record reads cannot invalidate current cover.
-function rosterOperationsRecordOnly_(p){return ['publish','createStapler','importStapler','previewRestoreStapler','restoreStapler'].includes(p.operation)||p.operation==='currentDuty'||p.operation==='read'&&p.view==='currentDuty'||rosterOperationsCustom_(p)||['teacherDailyUpdate','dailyNotify','notifyDaily','acknowledge','history','audit','prunePreview','accounting','saveRecessSettings','dutyRoster','setDutySMC','systemConfig','saveSystemConfig','nameBridges','saveNameBridge','deleteNameBridge','dailyEmployment','saveDailyEmploymentSettings','sendDailyEmploymentReport','staplerDates','requestStapler','decideStapler','renameStapler','deleteStapler'].includes(p.operation)||p.operation==='read'&&(['reportForm','schoolAbsences','teacherDailyUpdate','dailyNotify','mine','prune','notificationReadiness','dutyRoster','systemConfig','nameBridges','dailyEmployment','staplerDates'].includes(p.view)||p.compact===true&&['report','entry'].includes(p.view));}
-function rosterOperationsWeekCells_(date,timetableName,entries,models,parity){
+function rosterOperationsRecordOnly_(p){return ['previewStaplerMigration','migrateStaplerPlans','previewTimetableReconcile','confirmTimetableReconcile'].includes(p.operation)||p.operation==='read'&&['timetableReview','staplerMigration','timetableReconcile'].includes(p.view)||['publish','createStapler','importStapler','previewRestoreStapler','restoreStapler'].includes(p.operation)||p.operation==='currentDuty'||p.operation==='read'&&p.view==='currentDuty'||rosterOperationsCustom_(p)||['teacherDailyUpdate','dailyNotify','notifyDaily','acknowledge','history','audit','prunePreview','accounting','saveRecessSettings','dutyRoster','setDutySMC','systemConfig','saveSystemConfig','nameBridges','saveNameBridge','deleteNameBridge','dailyEmployment','saveDailyEmploymentSettings','sendDailyEmploymentReport','staplerDates','requestStapler','decideStapler','renameStapler','deleteStapler'].includes(p.operation)||p.operation==='read'&&(['reportForm','schoolAbsences','teacherDailyUpdate','dailyNotify','mine','prune','notificationReadiness','dutyRoster','systemConfig','nameBridges','dailyEmployment','staplerDates'].includes(p.view)||p.compact===true&&['report','entry'].includes(p.view));}
+// A confirmed day owns its cells. Live Deploy quota fields are attached separately.
+function rosterOperationsSavedStaplerDay_(state,d){
+ const row=state?.staplerPlans?.find(row=>row.date===d);if(!row||!row.confirmed&&!row.published)return null;
+ const plan=row.confirmed?(row.draft||row.confirmedPlan||row.published):row.published;
+ if(!plan?.tiles)error_(409,'This saved Stapler day needs the Admin day-copy migration before planning.');
+ return GSISRosterStapler.effectiveDay(plan);
+}
+function rosterOperationsStaplerMigrationContext_(req,c,state,index,base){
+ if(!base.user.admin)error_(403,'Admin access is required to migrate saved Stapler days.');
+ const origins={},seen=new Set();
+ for(const row of [...(state.staplerPlans||[]),...(state.staplerArchives||[])]){
+  const plans=['draft','published','confirmedPlan'].map(key=>row[key]).filter(Boolean);
+  if(plans.length&&plans.every(plan=>GSISRosterStapler.hasDaySnapshot(plan)))continue;
+  const key=row.date+'|'+row.baselineId;if(seen.has(key))continue;seen.add(key);
+  const entries=index.entries.filter(entry=>entry.id===row.baselineId);if(entries.length!==1)continue;
+  const saved=plans.find(plan=>['single','odd','even'].includes(plan.parity)),calendar=saved?{date:row.date,schoolDay:true,parity:saved.parity,available:true}:req.input.calendarByDate?.[row.date];
+  if(!calendar||calendar.date!==row.date||calendar.schoolDay!==true)continue;
+  const context=rosterOperationsContext_({identity:req.identity,input:{operation:'staplerMigrationOrigin',date:row.date,calendarByDate:{[row.date]:calendar}}},c,{...state,staplerPlans:[],staplerArchives:[]},{entries:[{...entries[0],from:row.date,to:row.date,pruned:false}]}),day=context.days[row.date];
+  if(!day?.verified||!day.schoolDay||!day.parity)continue;
+  (origins[row.date]||(origins[row.date]=[])).push(day);
+ }
+ return {...base,timetableEntries:index.entries,staplerOriginDays:origins};
+}
+function rosterOperationsWeekCells_(date,timetableName,entries,models,parity,state){
  const monday=GSISRosterAllocation.monday(date),name=rosterOperationsNames_(timetableName),cells=[];cells.capWeekDays=[];
- for(let weekday=0;weekday<5;weekday++){const d=GSISRosterAllocation.addDays(monday,weekday),entry=GSISRoster.active(entries,d);if(!entry)return {capVerificationReason:'No baseline timetable is active on '+d+'.'};const model=models[entry.id]||(models[entry.id]=rosterModel_(entry)),week=model[model.layoutMode==='single-week'?'single':parity],matches=(week?.blocks||[]).filter(b=>rosterOperationsNames_(b.name)===name);if(matches.length!==1)return {capVerificationReason:'Found '+matches.length+' timetable matches for '+timetableName+' on '+d+'. Exactly one is required.'};const dayCells=matches[0].cells.slice(weekday*week.perDay,(weekday+1)*week.perDay);cells.capWeekDays.push({date:d,baselineId:entry.id,periods:dayCells.map((_,period)=>({period,startMinutes:model.timing.startMinutes+period*model.timing.periodMinutes,endMinutes:model.timing.startMinutes+(period+1)*model.timing.periodMinutes})),cells:dayCells});cells.push(...dayCells);}return cells;
+ for(let weekday=0;weekday<5;weekday++){const d=GSISRosterAllocation.addDays(monday,weekday),saved=rosterOperationsSavedStaplerDay_(state,d);if(saved){const matches=saved.teachers.filter(t=>rosterOperationsNames_(t.timetableName||t.name)===name);if(matches.length!==1)return {capVerificationReason:'The saved Stapler day does not uniquely identify '+timetableName+' on '+d+'.'};const dayCells=matches[0].cells;cells.capWeekDays.push({date:d,baselineId:saved.id,periods:saved.periods,cells:dayCells});cells.push(...dayCells);continue;}const entry=GSISRoster.active(entries,d);if(!entry)return {capVerificationReason:'No baseline timetable is active on '+d+'.'};const model=models[entry.id]||(models[entry.id]=rosterModel_(entry)),week=model[model.layoutMode==='single-week'?'single':parity],matches=(week?.blocks||[]).filter(b=>rosterOperationsNames_(b.name)===name);if(matches.length!==1)return {capVerificationReason:'Found '+matches.length+' timetable matches for '+timetableName+' on '+d+'. Exactly one is required.'};const dayCells=matches[0].cells.slice(weekday*week.perDay,(weekday+1)*week.perDay);cells.capWeekDays.push({date:d,baselineId:entry.id,periods:dayCells.map((_,period)=>({period,startMinutes:model.timing.startMinutes+period*model.timing.periodMinutes,endMinutes:model.timing.startMinutes+(period+1)*model.timing.periodMinutes})),cells:dayCells});cells.push(...dayCells);}return cells;
 }
 function rosterOperationsQuotaTeacher_(teacher,row,cells,categories,source){
  const cap=row?.periodCap??null,capped=row?.capConfigured===true||cap!==null,capBasis=row?.capBasis,diagnostics={},capWorkload=!capped?null:GSISRosterStapler.capWorkload(cells,categories,capBasis,row?.capNonTeachingPeriods,diagnostics),capVerified=!capped||['teaching','total'].includes(capBasis)&&row?.capVerified===true&&Number.isFinite(cap)&&cap>=0&&Array.isArray(cells)&&Number.isFinite(capWorkload),headroom=capped&&capVerified?Math.max(0,cap-capWorkload):null;
@@ -222,6 +245,8 @@ function rosterOperationsContext_(req,c,state,providedIndex){
  const people=rosterOperationsPeople_(c),contactsDuty={available:Array.isArray(c.rosterSMCIds),staffIds:(c.rosterSMCIds||[]).filter(id=>people.some(t=>t.id===id&&GSISRosterOperations.dutyEligible(t))),source:{kind:'Contacts'}};
  GSISRosterOperations.seedNameBridges(state,people);const recordContext={calendarDatesVerified:Object.entries(p.calendarByDate||{}).filter(([date,value])=>value?.date===date&&value.available===true).map(([date])=>date),user,people,days:{},timetableEntries:[],dutySources:{[requested]:contactsDuty},today,minute,now:now.getTime(),iso:now.toISOString(),uuid:()=>Utilities.getUuid(),notificationsConfigured:p.notificationsReady===true,adminRecipients:[],smcIds:c.rosterSMCIds||[]};
  if(p.view==='reportForm'&&(p.operation||'read')==='read')return recordContext;
+ if(p.operation==='read'&&p.view==='timetableReview')return recordContext;
+ if(['previewStaplerMigration','migrateStaplerPlans'].includes(p.operation)||p.operation==='read'&&p.view==='staplerMigration')return rosterOperationsStaplerMigrationContext_(req,c,state,providedIndex||rosterIndex_(),recordContext);
  if(p.view==='schoolAbsences'&&(p.operation||'read')==='read'){if(!user.smc&&!user.admin)error_(403,'SMC or Admin access is required.');GSISRosterOperations.schoolAbsencesRange(recordContext,p);return recordContext;}
  // Ongoing directions are policy records. Their editor does not need Calendar,
  // daily teacher rows, R quotas or allocation reconciliation.
@@ -261,13 +286,16 @@ function rosterOperationsContext_(req,c,state,providedIndex){
  const compact=p.operation==='read'&&p.compact===true&&['report','entry'].includes(p.view),targetId=(user.smc||user.admin)?(p.staffId||state.absences.find(a=>a.id===(p.absenceId||p.id))?.staffId||user.staffId):user.staffId,targetIds=new Set(compact&&p.staffIds!==undefined?GSISRosterOperations.absenceStaffIds(recordContext,p):[targetId]);
 
  const quotaById=new Map(quota.rows.map(r=>[r.id,r]));
- const classCatalogues={},days=cached?cached.days:{};for(const d of cached?[]:unique){const entry=GSISRoster.active(index.entries,d);if(!entry){days[d]={id:null,parity:null,verified:true,schoolDay:false,warning:'No timetable is in force on this date.',periods:[],teachers:[]};continue;}
+ const classCatalogues={},days=cached?cached.days:{};for(const d of cached?[]:unique){
+  const savedDay=p.operation==='stapler'||p.view==='stapler'?null:rosterOperationsSavedStaplerDay_(state,d);
+  if(savedDay){const inRange=d>=quota.from&&d<=quota.to;days[d]={...savedDay,compact,targetId:compact?targetId:null,...(compact&&p.staffIds!==undefined?{targetIds:[...targetIds]}:{}),quotaSource:quota.source||null,deployTeachingEvidence:GSISRosterAllocation.deploymentTeachingEvidence(quota,d),teachers:savedDay.teachers.filter(t=>!compact||targetIds.has(t.staffId)).map(t=>{const row=inRange?quotaById.get(t.staffId):null;return rosterOperationsQuotaTeacher_(t,row,row?.capConfigured||row?.periodCap!=null?rosterOperationsWeekCells_(d,t.timetableName||t.name,index.entries,models,savedDay.parity,state):undefined,quota.subjectCategories,quota.source);})};continue;}
+  const entry=GSISRoster.active(index.entries,d);if(!entry){days[d]={id:null,parity:null,verified:true,schoolDay:false,warning:'No timetable is in force on this date.',periods:[],teachers:[]};continue;}
   const model=models[entry.id]||(models[entry.id]=rosterModel_(entry)),calendar=p.calendarByDate?.[d],verified=calendar&&calendar.date===d&&typeof calendar.schoolDay==='boolean',parity=model.layoutMode==='single-week'?'single':verified&&['odd','even'].includes(calendar.parity)?calendar.parity:null;
   const week=parity?model[parity]:null,weekday=(new Date(d+'T12:00:00Z').getUTCDay()+6)%7,schoolDay=verified&&calendar.schoolDay===true&&weekday<5&&!!week;
   const periods=Array.from({length:model.maxPeriod+1},(_,period)=>{const startMinutes=model.timing.startMinutes+period*model.timing.periodMinutes,endMinutes=startMinutes+model.timing.periodMinutes,fmt=m=>String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0');return {period,start:fmt(startMinutes),end:fmt(endMinutes),startMinutes,endMinutes};});
   if(p.operation!=='publish'&&!quotaRequested&&!cellMutation&&!subjectCatalogueLoaded&&GSISRoster.weeks(model).some(([,w])=>w.blocks.some(b=>b.cells.some(cell=>String(cell[3]||'').trim())))){Object.assign(quota,rosterOperationsSubjectCatalogue_());subjectCatalogueLoaded=true;}
   const teachers=[],identityWeek=model.layoutMode==='single-week'?model.single:model.odd,matched=modelIdentities[entry.id]||(modelIdentities[entry.id]=GSISRosterOperations.matchTimetableNames(state,people,identityWeek.blocks)),teacherIdentities=matched.map(({person,timetableName})=>({staffId:person.id,name:person.name,timetableName}));
-  if(week&&weekday<5)for(const {index:blockIndex,person,timetableName} of matched){if(compact&&!targetIds.has(person.id))continue;const block=week.blocks[blockIndex],r=d>=quota.from&&d<=quota.to?quotaById.get(person.id):null;teachers.push(rosterOperationsQuotaTeacher_({staffId:person.id,name:person.name,timetableName,teachingProfile:quotaRequested?GSISRosterAllocation.teachingProfile((model.layoutMode==='single-week'?[model.single]:[model.odd,model.even]).flatMap(w=>w.blocks[blockIndex]?.cells||[]),quota.formClasses||[],quota.teachingGroups||[],quota.subjectCategories||{},state.systemConfig):undefined,cells:block.cells.slice(weekday*week.perDay,(weekday+1)*week.perDay),...(p.operation==='externalDuties'?{weekCells:block.cells,perDay:week.perDay}: {})},r,r?.capConfigured||r?.periodCap!=null?rosterOperationsWeekCells_(d,timetableName,index.entries,models,parity):block.cells,quota.subjectCategories,quota.source));}
+  if(week&&weekday<5)for(const {index:blockIndex,person,timetableName} of matched){if(compact&&!targetIds.has(person.id))continue;const block=week.blocks[blockIndex],r=d>=quota.from&&d<=quota.to?quotaById.get(person.id):null;teachers.push(rosterOperationsQuotaTeacher_({staffId:person.id,name:person.name,timetableName,teachingProfile:quotaRequested?GSISRosterAllocation.teachingProfile((model.layoutMode==='single-week'?[model.single]:[model.odd,model.even]).flatMap(w=>w.blocks[blockIndex]?.cells||[]),quota.formClasses||[],quota.teachingGroups||[],quota.subjectCategories||{},state.systemConfig):undefined,cells:block.cells.slice(weekday*week.perDay,(weekday+1)*week.perDay),...(p.operation==='externalDuties'?{weekCells:block.cells,perDay:week.perDay}: {})},r,r?.capConfigured||r?.periodCap!=null?rosterOperationsWeekCells_(d,timetableName,index.entries,models,parity,state):block.cells,quota.subjectCategories,quota.source));}
   days[d]={id:entry.id,modelId:entry.id,modelReference:{id:entry.id,name:entry.name,from:entry.from,to:entry.to,priority:entry.priority},teacherIdentities,compact,targetId:compact?targetId:null,...(compact&&p.staffIds!==undefined?{targetIds:[...targetIds]}:{}),parity,verified:!!verified,schoolDay,warning:!verified?'Calendar date is unverified. Assignment planning is unavailable.':!schoolDay?(calendar.reason||calendar.warning||'This is not a confirmed school day.'):teacherIdentities.length!==identityWeek.blocks.length?'Some timetable names could not be matched uniquely to Contacts; these teachers are unavailable for automatic selection.':'',periods,teachers,endOfDayMinutes:model.timing.endOfDayMinutes??810,deployTeachingEvidence:GSISRosterAllocation.deploymentTeachingEvidence(quota,d),quotaSource:quota.source||null,recesses:model.recesses||[],subjectCategories:quota.subjectCategories||{},teachingGroups:d>=quota.from&&d<=quota.to?quota.teachingGroups||[]:[],formClasses:compact||savedReadPlan?[]:(classCatalogues[entry.id+':'+(d>=quota.from&&d<=quota.to)]||(classCatalogues[entry.id+':'+(d>=quota.from&&d<=quota.to)]=rosterOperationsFormClasses_(entry,model,d>=quota.from&&d<=quota.to?quota.formClasses||[]:[])))};
  }
  if(savedReadPlan)return {...recordContext,days,baselineDays:days,timetableEntries:index.entries,venues:{[requested]:savedReadPlan.venues||[]}};
@@ -323,7 +351,7 @@ function rosterOperationsAuditRepair_(req,c){
 function rosterOperationsReceipt_(req,c){
  const user=rosterOperationsAuthority_(c,req.identity),p=req.input?.command,repair=p?.operation==='repairStaplerAuditIds';
  if(repair&&user.admin!==true)error_(403,'Current Admin access is required.');
- const writes=['repairStaplerAuditIds','archiveColdOutput','reliefBatch','saveAbsence','deleteAbsences','saveInstructions','saveAdhoc','deleteAdhoc','saveTypes','requestMutual','respondMutual','prune','saveNameBridge','deleteNameBridge','notifyDaily','saveSystemConfig','saveDailyEmploymentSettings','sendDailyEmploymentReport','createStapler','importStapler','saveStapler','confirmStapler','publishStapler','resetStapler','requestStapler','decideStapler','renameStapler','moveStapler','deleteStapler','restoreStapler','unassign','saveRecessSettings','saveRecess','deleteRecess','setNoRelief','noRelief','publish','acknowledge','removeAssignment','saveCustomInstruction','deleteCustomInstruction','setCustomInstructionEnabled','assign','combine','undo','optimise','autoAllocate','setDutySMC','importRHistory','verifyRYear','correctRelief','confirmCompleted'];
+ const writes=['migrateStaplerPlans','confirmTimetableReconcile','repairStaplerAuditIds','archiveColdOutput','reliefBatch','saveAbsence','deleteAbsences','saveInstructions','saveAdhoc','deleteAdhoc','saveTypes','requestMutual','respondMutual','prune','saveNameBridge','deleteNameBridge','notifyDaily','saveSystemConfig','saveDailyEmploymentSettings','sendDailyEmploymentReport','createStapler','importStapler','saveStapler','confirmStapler','publishStapler','resetStapler','requestStapler','decideStapler','renameStapler','moveStapler','deleteStapler','restoreStapler','unassign','saveRecessSettings','saveRecess','deleteRecess','setNoRelief','noRelief','publish','acknowledge','removeAssignment','saveCustomInstruction','deleteCustomInstruction','setCustomInstructionEnabled','assign','combine','undo','optimise','autoAllocate','setDutySMC','importRHistory','verifyRYear','correctRelief','confirmCompleted'];
  if(!p||typeof p!=='object'||Array.isArray(p)||!writes.includes(p.operation)||typeof p.requestId!=='string'||!/^[\w-]{36}$/.test(p.requestId))error_(400,'The original save command is required.');
  const s=repair?rosterOperationsAuditRepairRead_().value:rosterOperationsState_(true),receipt=repair?rosterOperationsAuditRepairReceipt_(s,p,req.identity.email):s.receipts.find(r=>r.id===p.requestId);
  if(receipt&&(typeof rosterNativeReceiptMatches_==='function'?!rosterNativeReceiptMatches_(receipt,p,req.identity.email):receipt.actor!==req.identity.email||receipt.digest!==rosterOperationsCommandDigest_(p)))error_(409,'This request ID was used for a different save.');
@@ -384,7 +412,7 @@ function rosterOperationsSavedCandidates_(response,state,ctx,p,result){
   const quota=rosterOperationsPhase_('mutual-quota',()=>rosterOperationsQuota_([d])),inRange=d>=quota.from&&d<=quota.to,byId=new Map(quota.rows.map(r=>[r.id,r]));
   // Reuse the existing immutable model cache. Daily cells cannot establish a weekly employment cap.
   const models={},base=ctx.baselineDays?.[d]||dd;
-  const day={...base,teachers:base.teachers.map(t=>{const r=inRange?byId.get(t.staffId):null;return rosterOperationsQuotaTeacher_(t,r,r?.capConfigured||r?.periodCap!=null?rosterOperationsWeekCells_(d,t.timetableName||t.name,ctx.timetableEntries||[],models,dd.parity):undefined,quota.subjectCategories,quota.source);}),quotaSource:quota.source||null,subjectCategories:quota.subjectCategories||{},teachingGroups:inRange?quota.teachingGroups||[]:[],formClasses:dd.formClasses||[]},planning=GSISRosterOperations.composeStaplerContext(state,{...ctx,quotaRequested:true,baselineDays:{[d]:day},days:{[d]:day}}),demandIds=absence.reliefRequired?GSISRosterOperations.previewAbsence(planning,absence).map(x=>x.id):[];
+  const day={...base,teachers:base.teachers.map(t=>{const r=inRange?byId.get(t.staffId):null;return rosterOperationsQuotaTeacher_(t,r,r?.capConfigured||r?.periodCap!=null?rosterOperationsWeekCells_(d,t.timetableName||t.name,ctx.timetableEntries||[],models,dd.parity,state):undefined,quota.subjectCategories,quota.source);}),quotaSource:quota.source||null,subjectCategories:quota.subjectCategories||{},teachingGroups:inRange?quota.teachingGroups||[]:[],formClasses:dd.formClasses||[]},planning=GSISRosterOperations.composeStaplerContext(state,{...ctx,quotaRequested:true,baselineDays:{[d]:day},days:{[d]:day}}),demandIds=absence.reliefRequired?GSISRosterOperations.previewAbsence(planning,absence).map(x=>x.id):[];
   const candidates=demandIds.length?rosterOperationsPhase_('mutual-projection',()=>GSISRosterOperations.read(state,planning,{operation:'candidates',purpose:'mutual',byPeriod:true,date:d,demandIds})):{revision:state.revision,date:d,timetableId:dd.id,parity:dd.parity,candidatesByPeriod:{},quotaUnits:'periods/week'};
   return {...response,mutualCandidates:{...candidates,absenceId:absence.id}};
  }catch(error){return {...response,mutualCandidates:null,mutualCandidatesUnavailable:true};}
@@ -392,9 +420,9 @@ function rosterOperationsSavedCandidates_(response,state,ctx,p,result){
 // A dated display checks authority, register identity and timing only; no quota or allocation context.
 function rosterTimetableDay_(req,c){
  const user=rosterOperationsAuthority_(c,req.identity),today=rosterToday_();
- const p=req.input||{},date=GSISRosterOperations.date(p.date||today),index=rosterIndex_(),entry=GSISRoster.active(index.entries,date),model=entry?rosterModel_(entry):null;
+ const p=req.input||{},date=GSISRosterOperations.date(p.date||today),state=rosterOperationsPhase_('state-read',()=>rosterOperationsState_(true)),saved=rosterOperationsSavedStaplerDay_(state,date),index=saved?null:rosterIndex_(),entry=index?GSISRoster.active(index.entries,date):null,model=entry?rosterModel_(entry):null;
  const periods=model?Array.from({length:model.maxPeriod+1},(_,period)=>{const startMinutes=model.timing.startMinutes+period*model.timing.periodMinutes,endMinutes=startMinutes+model.timing.periodMinutes,fmt=m=>String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0');return {period,start:fmt(startMinutes),end:fmt(endMinutes),startMinutes,endMinutes};}):[];
- const state=rosterOperationsPhase_('state-read',()=>rosterOperationsState_(true)),base={id:entry?.id||null,periods,teachers:[]},people=c.rosterPeople.map(person=>({id:String(person.id),active:person.active===true,role:String(person.role||''),mk:String(person.mk||''),appointmentLevel:String(person.appointmentLevel||''),groups:Array.isArray(person.groups)?person.groups:[]}));
+ const base=saved||{id:entry?.id||null,periods,teachers:[]},people=c.rosterPeople.map(person=>({id:String(person.id),active:person.active===true,role:String(person.role||''),mk:String(person.mk||''),appointmentLevel:String(person.appointmentLevel||''),groups:Array.isArray(person.groups)?person.groups:[]}));
  return rosterOperationsPhase_('projection',()=>GSISRosterOperations.timetableDay(state,{today,user,people,days:{[date]:base}},p));
 }
 // Optimistic daily commands prepare outside the writer lock. The final merge is
@@ -402,12 +430,14 @@ function rosterTimetableDay_(req,c){
 function rosterOperationsConflict_(code,message){throw Object.assign(Error(message),{status:409,code});}
 function rosterOperationsPackedSnapshot_(s){return JSON.parse(JSON.stringify(rosterOperationsPackPlans_(s)));}
 function rosterOperationsDayToken_(s,ctx,d){
- d=GSISRosterOperations.date(d);const packed=rosterOperationsPackPlans_(s,false),excluded=new Set(['outbox','audit','receipts','deliveryEvents','smcAlerts','acknowledgements','publicationSnapshots','optimisationRuns','inboundEvents','dailyEmploymentMail','dailyEmploymentSnapshots']);
+ d=GSISRosterOperations.date(d);const packed=rosterOperationsPackPlans_(s,false),scoped=new Set(['absences','adhoc','assignments','requests','importedRelief','reliefCorrections','rotationEvents','smcDutyRoster','recessActivations','staplerPlans','staplerRequests','staplerArchives']);
  // A regenerated read package has no authority over saved content. Its clock
  // and compression work must not change a compare token or delay publication.
- const rows={};for(const [key,value] of Object.entries(packed))if(Array.isArray(value)&&!excluded.has(key))rows[key]=value.filter(r=>r&&typeof r==='object'&&(r.date===d||r.actual?.date===d)).map(row=>{if(!['staplerPlans','staplerArchives'].includes(key))return row;const {timetablePackage,...saved}=row;return saved;});
+ const reliefIds=new Set([...(s.assignments||[]),...(s.importedRelief||[])].filter(row=>row.date===d).map(row=>row.id));
+ for(const row of s.reliefCorrections||[])if(row.date===d||row.actual?.date===d)reliefIds.add(row.assignmentId);
+ const rows={};for(const [key,value] of Object.entries(packed))if(Array.isArray(value)&&scoped.has(key))rows[key]=value.filter(r=>r&&typeof r==='object'&&(r.date===d||r.actual?.date===d||key==='reliefCorrections'&&reliefIds.has(r.assignmentId))).map(row=>{if(!['staplerPlans','staplerArchives'].includes(key))return row;const {timetablePackage,...saved}=row;return saved;});
  const active=GSISRoster.active(ctx.timetableEntries||[],d),bridges={...s,nameBridges:s.nameBridges.slice()};GSISRosterOperations.seedNameBridges(bridges,ctx.people||[]);
- return rosterOperationsDigest_({schema:1,date:d,rows,dayRevision:s.dayRevisions[d]||0,publication:s.dailyPublicationStates?.[d]?.revision||0,baseline:active||ctx.days[d]?.id||null,customInstructions:s.customInstructions.filter(r=>!r.deletedAt),systemConfig:s.systemConfig,nameBridges:bridges.nameBridges,types:s.types,recessSettings:s.recessSettings});
+ return rosterOperationsDigest_({schema:1,date:d,rows,dayRevision:s.dayRevisions[d]||0,publication:s.dailyPublicationStates?.[d]?.revision||0,baseline:GSISRosterOperations.readyStaplerPlan((s.staplerPlans||[]).find(row=>row.date===d))?(GSISRosterOperations.readyStaplerPlan((s.staplerPlans||[]).find(row=>row.date===d)).id||'stapler:'+d):active||ctx.days[d]?.id||null,customInstructions:s.customInstructions.filter(r=>!r.deletedAt),systemConfig:s.systemConfig,nameBridges:bridges.nameBridges,types:s.types,recessSettings:s.recessSettings});
 }
 // Display invalidation includes accounting inputs across dates. Command day
 // tokens remain scoped to the edited date and keep their existing semantics.
@@ -524,9 +554,26 @@ function rosterOperationsReferenceStamp_(ctx){
  return rosterOperationsDigest_({entries:index.entries,quota});
 }
 function rosterOperationsDependencies_(state,p,ctx){
- const ignored=new Set(['revision','outbox','audit','receipts','deliveryEvents','smcAlerts','acknowledgements','scheduleReceipts','notificationWatermarks','inboundSessions','inboundEvents','dailyEmploymentMail','deliveryReview','allocationAuditExports','privateLinks']);
- const values=Object.fromEntries(Object.entries(state).filter(([key])=>!ignored.has(key)));
- if(p.operation==='scheduledRoster')values.notificationInputs=state.outbox.filter(j=>j.kind==='smc_report'||j.date===ctx.today&&j.data?.dailyPublication);
+ const A=GSISRosterAllocation,dates=new Set(p.date?[p.date,...(Array.isArray(p.dates)?p.dates:[]),...(p.actualDate?[p.actualDate]:[])]:Object.keys(ctx.days)),scheduled=p.operation==='scheduledRoster';if(scheduled)dates.add(ctx.today);
+ const weeks=new Set([...dates].map(A.monday)),years=new Set([...dates].map(A.year)),values={schema:2,dates:[...dates].sort()};
+ const dated=row=>dates.has(row.date)||dates.has(row.actual?.date),pickDates=value=>Object.fromEntries(Object.entries(value||{}).filter(([key,row])=>dates.has(key)||dates.has(key.slice(0,10))||row&&dated(row)));
+ // Only planning facts belong here. Inbox, delivery, audit and unrelated dated
+ // records merge against the latest document without invalidating the solver.
+ for(const key of ['types','systemConfig','nameBridges','recessSettings','customInstructions','accountingProfiles'])values[key]=state[key]??null;
+ for(const key of ['absences','assignments','importedRelief','requests','adhoc','recessActivations','publicationSnapshots','staplerRequests','optimisationRuns','smcDutyRoster'])values[key]=(state[key]||[]).filter(dated);
+ const reliefIds=new Set([...values.assignments,...values.importedRelief].map(row=>row.id));for(const row of state.reliefCorrections||[])if(dated(row))reliefIds.add(row.assignmentId);values.reliefCorrections=(state.reliefCorrections||[]).filter(row=>reliefIds.has(row.assignmentId));
+ values.staplerPlans=(state.staplerPlans||[]).filter(dated).map(({timetablePackage,...saved})=>saved);
+ for(const key of ['dayRevisions','manualDecisions','manualAuditBaselines','cellDecisionVersions','massPublications','dailyPublicationStates','healthWarningState'])values[key]=pickDates(state[key]);
+ values.accountingYears=Object.fromEntries(Object.entries(state.accountingYears||{}).filter(([year])=>years.has(year)));
+ values.weekEntitlements=(state.entitlements||[]).filter(row=>weeks.has(row.week));
+ values.weekLeave=(state.absences||[]).filter(row=>!row.deletedAt&&weeks.has(A.monday(row.date))&&((state.types||[]).some(type=>type.id===row.typeId&&type.extendedLeave)||['parental','hospital','npl'].includes(row.typeId))).map(({staffId,date,typeId,coverage,periods})=>({staffId,date,typeId,coverage,periods}));
+ // Other dates can genuinely change this day's cap or fairness. Compare the
+ // allocator's derived values, not every field of every historical record.
+ // Unpack only the weeks needed by UT workload, retaining packed merge inputs.
+ const accounting=rosterOperationsUnpackPlans_({...state,staplerPlans:(state.staplerPlans||[]).filter(row=>weeks.has(A.monday(row.date))).map(row=>({...row})),staplerArchives:[]});
+ values.balances=Object.fromEntries([...dates].map(date=>[date,[...A.balances(accounting,ctx,date)]]));
+ values.rotation=Object.fromEntries([...years].map(year=>[year,A.rotation(accounting,year)]));
+ if(scheduled){values.dailyEmploymentSettings=state.dailyEmploymentSettings;values.dailyEmploymentAutomatic=pickDates(state.dailyEmploymentAutomatic);values.dailyEmploymentSnapshots=(state.dailyEmploymentSnapshots||[]).filter(dated);values.acknowledgements=(state.acknowledgements||[]).filter(row=>(state.publicationSnapshots||[]).some(snapshot=>snapshot.id===row.snapshotId&&dated(snapshot)));values.notificationInputs=state.outbox.filter(j=>dates.has(j.date)&&(j.kind==='smc_report'||j.data?.dailyPublication));}
  return rosterOperationsDigest_(values);
 }
 function rosterOperationsMergePrepared_(base,next,current){
@@ -548,6 +595,15 @@ function rosterOperationsMergePrepared_(base,next,current){
  return merge(base,next,current);
 }
 function rosterOperationsClock_(ctx){const stamp=Date.now(),sg=new Date(stamp+8*3600000);Object.assign(ctx,{now:stamp,iso:new Date(stamp).toISOString(),today:sg.toISOString().slice(0,10),minute:sg.getUTCHours()*60+sg.getUTCMinutes()});}
+function rosterOperationsCheckClock_(prepared){
+ const current={};rosterOperationsClock_(current);const conflict=GSISRosterAllocation.preparedClockConflict(prepared,current);
+ if(conflict)throw Object.assign(Error(conflict.message),conflict,{status:409});
+}
+function rosterOperationsRefreshClock_(ctx){
+ const current={};rosterOperationsClock_(current);
+ if(ctx.today!==current.today)throw Object.assign(Error('The school date changed while planning; re-run.'),{status:409,code:'PLANNING_CLOCK_CHANGED',reasonCode:'SCHOOL_DATE_CHANGED'});
+ Object.assign(ctx,current);
+}
 function rosterAbsenceContextKey_(state,ctx){
  // Only inputs used to build immutable teacher/timetable context belong here.
  // Absences, allocation records, policy types and receipts are read fresh under
@@ -587,7 +643,8 @@ function rosterAbsenceDispatch_(req,c){gsisRequireBackendRole_('roster');
       rosterOperationsPreparedCheck_(state,ctx,p,req.intakeProjection===true);
       if(rosterOperationsReferenceStamp_(ctx)!==references)throw Object.assign(Error('Timetable sources changed during attendance preparation.'),{status:409,code:'PREPARED_RETRY',reasonCode:'TIMETABLE_MANIFEST_CHANGED'});
       if(rosterAbsenceContextKey_(state,ctx)!==contextKey)throw Object.assign(Error('Attendance context changed during preparation.'),{status:409,code:'PREPARED_RETRY',reasonCode:'ABSENCE_CONTEXT_CHANGED'});
-      const preparedToday=ctx.today;rosterOperationsClock_(ctx);if(preparedToday!==ctx.today)throw Object.assign(Error('The school date changed during attendance preparation.'),{status:409,code:'PREPARED_RETRY',reasonCode:'SCHOOL_DATE_CHANGED'});
+      const preparedToday=ctx.today;rosterOperationsClock_(ctx);if(preparedToday!==ctx.today)throw Object.assign(Error('The school date changed while planning; re-run.'),{status:409,code:'PLANNING_CLOCK_CHANGED',reasonCode:'SCHOOL_DATE_CHANGED'});
+      const preparedClock=GSISRosterAllocation.prepareClock(ctx,state,p);
       if(req.intakeAcceptedAt&&p.operation==='saveAbsence'){ctx.reportedAt=req.intakeAcceptedAt;ctx.reportToday=new Date(Date.parse(req.intakeAcceptedAt)+8*3600000).toISOString().slice(0,10);ctx.attendanceOnly=req.intakeProjection===true;ctx.resubmission=req.intakeProjection===true&&!p.id;ctx.reportSequence=req.intakeSequence||0;if(req.intakeOverlapChoice){if(req.intakeOverlapChoice.token!==rosterAbsenceOverlapKey_(state,p))rosterOperationsConflict_('ABSENCE_SHORTER_CONFIRMATION','Saved absence details changed. Review the shorter report again.');ctx.resubmissionChoice=req.intakeOverlapChoice.value;}}
       if(req.intakeInstructionSource){rosterAbsenceIntakeInstructionCheck_(state,ctx,p,req.intakeInstructionSource);ctx.intakeInstructions=true;ctx.reportedAt=req.intakeAcceptedAt;ctx.reportSequence=req.intakeSequence||0;}
       GSISRosterOperations.seedNameBridges(state,ctx.people);
@@ -602,14 +659,14 @@ function rosterAbsenceDispatch_(req,c){gsisRequireBackendRole_('roster');
       if(!attendanceProjection&&!peerProjection)GSISRosterOperations.refreshStaplerNotifications(state,ctx,before);notificationsQueued=state.outbox.length-before;state.revision++;
       receipt={id:p.requestId,actor:req.identity.email,digest,result,at:ctx.iso,revision:state.revision};state.receipts.push(receipt);
       if(typeof rosterAllocationAuditAccepted_==='function')rosterAllocationAuditAccepted_(state,auditBefore,ctx,p);
-      rosterOperationsPhase_('absence-commit',()=>rosterOperationsCommit_(state));
+      rosterOperationsPhase_('absence-commit',()=>rosterOperationsCommit_(state,null,false,()=>rosterOperationsCheckClock_(preparedClock)));
      }
     }finally{deployUnlock_(lock);}
    }
    if(p.receiptOnly===true)return rosterAbsenceReceiptResponse_(state,p,receipt,replayed,notificationsQueued);
    const input=p.view==='report'?{...p,compact:true}:p,response={...rosterOperationsPhase_('projection',()=>GSISRosterOperations.view(state,ctx,input)),...result,requestId:p.requestId,acceptedRevision:receipt.revision,...(replayed?{replayed:true}:{notificationsQueued})};
    return rosterOperationsAttachDayToken_(rosterOperationsSavedCandidates_(response,state,ctx,p,result),state,ctx,p);
-  }catch(e){if(e.code!=='PREPARED_RETRY')throw e;if(attempt===1)throw Object.assign(Error('Timetable inputs changed while saving. Your request is retained; retry the same save.'),{status:503,code:'ABSENCE_PREPARATION_RETRY',reasonCode:e.reasonCode||'REFERENCE_SOURCE_CHANGED',attempts:2});}
+  }catch(e){if(!['PREPARED_RETRY','PLANNING_CLOCK_CHANGED'].includes(e.code))throw e;if(attempt===1){if(e.code==='PLANNING_CLOCK_CHANGED')throw e;throw Object.assign(Error('Timetable inputs changed while saving. Your request is retained; retry the same save.'),{status:503,code:'ABSENCE_PREPARATION_RETRY',reasonCode:e.reasonCode||'REFERENCE_SOURCE_CHANGED',attempts:2});}}
  }
 }
 function rosterOperationsPreparedDispatch_(req,c){
@@ -640,14 +697,15 @@ function rosterOperationsPublishDispatch_(req,c){gsisRequireBackendRole_('roster
    if(rosterOperationsReferenceStamp_(ctx)!==references)rosterOperationsConflict_('PREPARED_RETRY','Timetable sources changed during publication preparation.');
    // Apply to the latest locked records. Only immutable baseline preparation
    // happens outside the lock; saved plan/absence/assignment facts stay current.
-   GSISRosterOperations.seedNameBridges(state,ctx.people);rosterOperationsClock_(ctx);
+   GSISRosterOperations.seedNameBridges(state,ctx.people);rosterOperationsRefreshClock_(ctx);
    const current=GSISRosterOperations.composeStaplerContext(state,{...ctx,days:ctx.baselineDays||ctx.days}),before={audit:state.audit.map(e=>({id:e.id})),optimisationRuns:state.optimisationRuns.map(e=>({id:e.id}))};
+   const preparedClock=GSISRosterAllocation.prepareClock(current,state,p);
    const result=rosterOperationsPhase_('publication-apply',()=>GSISRosterOperations.apply(state,current,{...p,notifyMode:'none'}));state.revision++;
    state.dailyPublicationStates[p.date||current.today].sourceRevision=state.revision;
    const response=rosterOperationsPublicationAcknowledgement_(state,current,p,{...result,notificationsQueued:0},state.revision),saved={id:p.requestId,actor:req.identity.email,digest,result:response,at:current.iso,revision:state.revision};state.receipts.push(saved);
    if(typeof rosterAllocationAuditAccepted_==='function')rosterAllocationAuditAccepted_(state,before,current,p);
-   rosterOperationsPhase_('publication-commit',()=>rosterOperationsCommit_(state));return response;
-  }catch(error){if(error.code!=='PREPARED_RETRY')throw error;if(attempt===1)error_(503,'Timetable sources changed while publishing. Retry the same publication.');}
+   rosterOperationsPhase_('publication-commit',()=>rosterOperationsCommit_(state,null,false,()=>rosterOperationsCheckClock_(preparedClock)));return response;
+  }catch(error){if(!['PREPARED_RETRY','PLANNING_CLOCK_CHANGED'].includes(error.code))throw error;if(attempt===1){if(error.code==='PLANNING_CLOCK_CHANGED')throw error;error_(503,'Timetable sources changed while publishing. Retry the same publication.');}}
   finally{deployUnlock_(lock);}
  }
 }
@@ -655,25 +713,26 @@ function rosterOperationsPreparedCore_(req,c){gsisRequireBackendRole_('roster');
  const p=req.input,op=p.operation,digest=rosterOperationsCommandDigest_(p);
  if(typeof p.requestId!=='string'||!/^[\w-]{36}$/.test(p.requestId))error_(400,'A save request ID is required.');
  for(let attempt=0;attempt<2;attempt++){
+  const preparationStarted=Date.now();let preparationRecorded=false;
+  try{
   let s=rosterOperationsPhase_('prepare-state',()=>rosterOperationsState_()),old=s.receipts.find(r=>r.id===p.requestId);
   if(old&&(old.actor!==req.identity.email||old.digest!==digest))error_(409,'This request ID was used for a different save.');
   if(old?.cancelled)rosterAllocationRunCancellation_();
   const base=rosterOperationsPackedSnapshot_(s),ctx=rosterOperationsPhase_('prepare-context',()=>rosterOperationsContext_(req,c,s));
   if(old){const response={...GSISRosterOperations.view(s,ctx,p),...old.result,replayed:true,...(op==='reliefBatch'?{acceptedRevision:old.revision,requestId:p.requestId}:{})};return rosterOperationsAttachDayToken_(response,s,ctx,p);}
-  rosterOperationsPreparedCheck_(s,ctx,p);
-  try{
+  rosterOperationsPreparedCheck_(s,ctx,p);rosterOperationsRefreshClock_(ctx);
    if(req.allocationRun)rosterAllocationRunStage_(req.allocationRun,attempt?'Planning inputs changed; recalculating against current records.':'Calculating available relief while retaining manual choices.');
-   const references=rosterOperationsReferenceKey_(ctx),dependencies=rosterOperationsDependencies_(base,p,ctx),before=s.outbox.length;
+   const references=rosterOperationsReferenceKey_(ctx),dependencies=rosterOperationsDependencies_(base,p,ctx),before=s.outbox.length,preparedClock=GSISRosterAllocation.prepareClock(ctx,s,p);
    if(op==='reliefBatch')ctx.draftBatch=true;
    if(!rosterOperationsRecordOnly_(p))rosterOperationsPhase_('prepare-reconcile',()=>rosterOperationsReconcile_(s,ctx));
    if(op==='publish'&&p.notifyMode!==undefined)s.outbox.splice(before);
    if(!['publish','notifyDaily'].includes(op))for(const d of Object.keys(ctx.days)){GSISRosterAllocation.initialiseHistory(s,ctx,d);GSISRosterAllocation.captureWeek(s,ctx,d);}
-   rosterOperationsClock_(ctx);const preparedClock=ctx.today+':'+ctx.minute;
    // Scope validation above replaces only the broad global counter. Domain
    // validation still runs against this complete authoritative working state.
    const merge=rosterOperationsBatchMerge_(s,ctx,p),result=rosterOperationsPhase_('prepare-apply',()=>merge.changes&&!merge.command.commands.length?{savedIds:[]}:GSISRosterOperations.apply(s,ctx,{...merge.command,revision:s.revision}));
    if(merge.changes){const cells=GSISRosterOperations.cellDecisions(s,p.date,merge.changes.map(change=>change.demandId));result.changes=merge.changes.map(change=>({...change,after:cells[change.demandId]}));rosterOperationsBatchAudit_(s,ctx,p,result.changes);}
    if(!['reliefBatch','notifyDaily','publish'].includes(op))GSISRosterOperations.refreshStaplerNotifications(s,ctx,before);
+   if(req.allocationRun){rosterAllocationRunPreparation_(req.allocationRun,Date.now()-preparationStarted);preparationRecorded=true;}
    const next=rosterOperationsPackedSnapshot_(s),queued=s.outbox.length-before;
    const lock=LockService.getScriptLock();if(!rosterOperationsPhase_('lock-wait',()=>deployLock_(lock,8000)))error_(503,'Another save is finishing. Retry the same save.');
    let committed,replayed=false;
@@ -684,17 +743,17 @@ function rosterOperationsPreparedCore_(req,c){gsisRequireBackendRole_('roster');
      rosterOperationsPreparedCheck_(current,ctx,p);
      if(['autoAllocate','optimise'].includes(op)&&typeof rosterAbsenceIntakeGate_==='function')rosterAbsenceIntakeGate_([p.date||ctx.today],['autoAllocate','optimise'].includes(op));
      if(rosterOperationsReferenceStamp_(ctx)!==references||rosterOperationsDependencies_(rosterOperationsPackPlans_(current),p,ctx)!==dependencies)rosterOperationsConflict_('PREPARED_RETRY','Shared planning inputs changed during preparation.');
-     const finalClock={};rosterOperationsClock_(finalClock);if(finalClock.today+':'+finalClock.minute!==preparedClock)rosterOperationsConflict_('PREPARED_RETRY','The school-day clock changed during preparation.');
+     rosterOperationsCheckClock_(preparedClock);
      const merged=rosterOperationsMergePrepared_(base,next,rosterOperationsPackedSnapshot_(current));merged.revision=current.revision+1;
      // sourceRevision is a document marker, not the publication conflict token.
      const publicationDate=p.date||ctx.today;if(op==='publish'&&merged.dailyPublicationStates?.[publicationDate])merged.dailyPublicationStates[publicationDate].sourceRevision=merged.revision;
      merged.receipts.push({id:p.requestId,actor:req.identity.email,digest,result,at:ctx.iso,revision:merged.revision});
-     committed=GSISRosterOperations.validateState(rosterOperationsUnpackPlans_(merged));if(typeof rosterAllocationAuditAccepted_==='function')rosterAllocationAuditAccepted_(committed,current,ctx,p);rosterOperationsPhase_('commit',()=>rosterOperationsCommit_(committed,['autoAllocate','optimise'].includes(op)?[p.date||ctx.today]:null,['autoAllocate','optimise'].includes(op),['autoAllocate','optimise'].includes(op)?()=>{const checkClock=()=>{const writeClock={};rosterOperationsClock_(writeClock);if(writeClock.today+':'+writeClock.minute!==preparedClock)rosterOperationsConflict_('PREPARED_RETRY','The school-day clock changed before writing.');};checkClock();if(req.allocationRun)rosterAllocationRunBeforeCommit_(req.allocationRun,checkClock);}:null));if(req.allocationRun)rosterAllocationRunComplete_(req.allocationRun,committed);
+     committed=GSISRosterOperations.validateState(rosterOperationsUnpackPlans_(merged));if(typeof rosterAllocationAuditAccepted_==='function')rosterAllocationAuditAccepted_(committed,current,ctx,p);rosterOperationsPhase_('commit',()=>rosterOperationsCommit_(committed,['autoAllocate','optimise'].includes(op)?[p.date||ctx.today]:null,['autoAllocate','optimise'].includes(op),()=>{const checkClock=()=>rosterOperationsCheckClock_(preparedClock);checkClock();if(req.allocationRun)rosterAllocationRunBeforeCommit_(req.allocationRun,checkClock);}));if(req.allocationRun)rosterAllocationRunComplete_(req.allocationRun,committed);
     }
    }finally{deployUnlock_(lock);}
    const response={...rosterOperationsPhase_('projection',()=>GSISRosterOperations.view(committed,GSISRosterOperations.composeStaplerContext(committed,ctx),p)),...(replayed?old.result:result),...(replayed?{replayed:true}:{notificationsQueued:result.notificationsQueued??queued}),...(op==='reliefBatch'?{acceptedRevision:committed.receipts.find(r=>r.id===p.requestId).revision,requestId:p.requestId}:{})};
    return rosterOperationsAttachDayToken_(response,committed,ctx,p);
-  }catch(e){if(e.code!=='PREPARED_RETRY')throw e;if(attempt===1)error_(503,'Planning inputs changed while saving. Your request is retained; retry the same save.');}
+  }catch(e){if(!['PREPARED_RETRY','PLANNING_CLOCK_CHANGED'].includes(e.code))throw e;if(attempt===1){if(e.code==='PLANNING_CLOCK_CHANGED')throw e;error_(503,'Planning inputs changed while saving. Your request is retained; retry the same save.');}}finally{if(req.allocationRun&&!preparationRecorded)rosterAllocationRunPreparation_(req.allocationRun,Date.now()-preparationStarted);}
  }
 }
 
@@ -722,14 +781,14 @@ function rosterOperationsDispatch_(req,c){
   if(op==='confirmStapler'&&p.knownPlanContentTag===tag)result={...result,plan:null,planUnchanged:true};
  }
  if(result&&Object.prototype.hasOwnProperty.call(result,'comparisonTiles')){
-  const comparison=Object.fromEntries(['comparisonAvailable','comparisonBaselineId','comparisonIssues','comparisonGhosts','comparisonTiles'].map(key=>[key,result[key]])),tag='stapler-comparison-v1:'+rosterOperationsPlanDigest_(JSON.stringify([1,req.identity.email,result.viewMode,comparison]));
-  result={...result,comparisonContentTag:tag,...(op==='confirmStapler'&&p.knownComparisonContentTag===tag?{comparisonUnchanged:true,comparisonTiles:null,comparisonGhosts:null,comparisonIssues:null}:{})};
+  const comparison=Object.fromEntries(['comparisonAvailable','comparisonBaselineId','comparisonIssues','comparisonGhosts','comparisonTiles','comparisonDifferences'].map(key=>[key,result[key]])),tag='stapler-comparison-v1:'+rosterOperationsPlanDigest_(JSON.stringify([1,req.identity.email,result.viewMode,comparison]));
+  result={...result,comparisonContentTag:tag,...(op==='confirmStapler'&&p.knownComparisonContentTag===tag?{comparisonUnchanged:true,comparisonTiles:null,comparisonGhosts:null,comparisonIssues:null,comparisonDifferences:null}:{})};
  }
  if(!result||typeof result!=='object'||!p.requestId||GSISRosterOperations.READS.includes(op)||['receiptStatus','acknowledgementStatus','statistics','statisticsCalendar','calculations','timetableBatch','timetableDay','directory','allocationVersion','deliveryReview','peerMailReview'].includes(op))return result;
- const suspended=['createStapler','importStapler','saveStapler','confirmStapler','publishStapler','resetStapler','renameStapler','moveStapler','deleteStapler','restoreStapler'].includes(op),publication=['publish','publishStapler'].includes(op),notification=['notifyDaily','dismissDeliveryIssues','cancelPendingNotifications','reviewPeerMail'].includes(op);
+ const suspended=['migrateStaplerPlans','createStapler','importStapler','saveStapler','confirmStapler','publishStapler','resetStapler','renameStapler','moveStapler','deleteStapler','restoreStapler'].includes(op),publication=['publish','publishStapler'].includes(op),notification=['notifyDaily','dismissDeliveryIssues','cancelPendingNotifications','reviewPeerMail'].includes(op);
  const affectedDomains=op==='acknowledge'?['acknowledgement']:notification?['notification']:['operations'];
  if(suspended)affectedDomains.push('suspended');if(publication)affectedDomains.push('publication');
- const affectedDates=[...new Set([p.date,p.newDate,p.actualDate,...(Array.isArray(p.dates)?p.dates:[]),...(result.affectedDates||[]),result.date].filter(d=>typeof d==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(d)))];
+ const affectedDates=[...new Set([p.date,p.newDate,p.actualDate,...(Array.isArray(p.dates)?p.dates:[]),...(result.affectedDates||[]),...(op==='migrateStaplerPlans'?result.savedIds||[]:[]),result.date].filter(d=>typeof d==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(d)))];
  return {...result,affectedDomains,affectedDates};
 }
 function rosterOperationsDispatchCore_(req,c){gsisRequireBackendRole_('roster');
@@ -742,7 +801,11 @@ function rosterOperationsDispatchCore_(req,c){gsisRequireBackendRole_('roster');
  if(['timetablePreparationManifest','timetablePreparationPart','timetablePreparationCheck'].includes(op))return rosterTimetablePreparationDispatch_(req,c);
  if(p.intake===true&&['saveAbsence','requestMutual'].includes(op))return rosterAbsenceIntakeCapture_(req,c);
  if(op==='receiptStatus'&&p.command?.intake===true)return rosterAbsenceIntakeReceipt_(req,c);
- if(op==='read'&&p.view==='intake')return {...rosterAbsenceIntakeVisible_(req,c),user:rosterOperationsAuthority_(c,req.identity)};
+ if(op==='read'&&p.view==='intake'){
+  const user=rosterOperationsAuthority_(c,req.identity),result={...rosterAbsenceIntakeVisible_(req,c),user};
+  if(p.includeAllocationPreparation===true&&(user.smc||user.admin))try{result.allocationPreparation=rosterAllocationPreparationStatus_();}catch(_){result.allocationPreparation={available:false};}
+  return result;
+ }
  if(op==='read'&&p.view==='intakeReview')return rosterAbsenceIntakeReview_(req,c);
  if(op==='retryAbsenceIntake')return rosterAbsenceIntakeRetry_(req,c);
  if(op==='resolveAbsenceIntake')return rosterAbsenceIntakeResolve_(req,c);
@@ -1072,10 +1135,12 @@ function rosterScheduledFastSkip_(slot,gate,today){
 function rosterScheduledDispatch_(req){gsisRequireBackendRole_('roster');
  const p=req.input||{},stamp=p.scheduledTime,started=Date.now();if(!Number.isFinite(stamp)||stamp>started+60000||started-stamp>120000)error_(400,'Scheduled tick is stale.');
  const slot={...GSISRosterAllocation.schedule(stamp),stamp},today=new Date(started+8*3600000).toISOString().slice(0,10),tracked=typeof rosterScheduledAllocationGate_==='function';
+ if(typeof rosterAllocationManualBusy_==='function'&&rosterAllocationManualBusy_(rosterAllocationRunRead_(slot.date)))return {code:'SKIPPED_BUSY',skipped:true,allocationSkipped:true};
  if(tracked)rosterScheduledAllocationRecover_(slot);const gate=tracked?rosterScheduledAllocationGate_(slot):{allocate:slot.optimise};
  if(tracked&&slot.allocationKey){const visible=rosterAllocationRunRead_(slot.date);if(visible?.scheduleKey===slot.allocationKey&&(visible.tickKey||visible.scheduleKey)===slot.key){if(visible.state==='completed')return {replayed:true,allocationSkipped:true};if(gate.allocationInProgress)throw Object.assign(Error('An allocator is already running for this date.'),{status:409,code:'ALLOCATION_IN_PROGRESS'});}}
  const fast=rosterScheduledFastSkip_(slot,gate,today);if(fast)return fast;
  const execute=(run,reportOnly=false)=>{
+  const executionStarted=Date.now();if(typeof rosterScheduledManualGuard_==='function')rosterScheduledManualGuard_(slot.date);
   if(typeof rosterAbsenceIntakeGate_==='function')rosterAbsenceIntakeGate_([slot.date],!!run||slot.optimise&&!reportOnly);
   const version=props_().getProperty('ROSTER_VERSION_HINT');let initial=rosterOperationsState_();rosterScheduledHintWrite_(initial,version);
   if(run&&rosterAllocationRunAccepted_(run,initial)){rosterAllocationRunLocked_(()=>rosterAllocationRunComplete_(run,initial));return {replayed:true};}
@@ -1083,35 +1148,37 @@ function rosterScheduledDispatch_(req){gsisRequireBackendRole_('roster');
   const effectiveSlot={...slot,optimise:!reportOnly&&(!!run||slot.optimise)},preflight=rosterScheduledIdle_(initial,effectiveSlot,today);if(preflight)return {...preflight,...(reportOnly?{allocationSkipped:true,...(gate.allocationStopped?{allocationStopped:true}:{})}:{})};
   const fresh=rosterServiceContacts_();
   for(let attempt=0;attempt<2;attempt++){
+   const preparationStarted=attempt?Date.now():executionStarted;let preparationRecorded=false;
+   try{
    const now=Date.now();if(now-stamp>120000)error_(400,'Scheduled tick is stale.');
    const s=rosterOperationsPhase_('prepare-state',()=>rosterOperationsState_()),today=new Date(now+8*3600000).toISOString().slice(0,10),idle=rosterScheduledIdle_(s,effectiveSlot,today);if(idle)return idle;
    const base=rosterOperationsPackedSnapshot_(s),ctx=rosterOperationsPhase_('prepare-context',()=>rosterOperationsContext_({identity:fresh.identity,input:{...p,operation:'scheduledRoster',date:slot.date}},fresh.c,s));
    ctx.user={staffId:null,email:'roster-service',smc:true,admin:false};ctx.service=true;ctx.skipScheduledAllocation=reportOnly;ctx.scheduledAllocationKey=run?.scheduleKey||slot.allocationKey||slot.key;ctx.scheduledAllocationRetry=!!run&&!slot.optimise;if(run)ctx.allocationBudgetCheck=()=>rosterScheduledAllocationBudget_(run);
    const command={...p,operation:'scheduledRoster',date:slot.date};
-   try{
     if(run)rosterAllocationRunStage_(run,attempt?'Planning inputs changed; recalculating against current records.':'Calculating scheduled relief while retaining manual choices.');
-    const references=rosterOperationsReferenceKey_(ctx),dependencies=rosterOperationsDependencies_(base,command,ctx),beforeOutbox=s.outbox.length;
-    rosterOperationsClock_(ctx);const preparedClock=ctx.today+':'+ctx.minute;
-    rosterOperationsPhase_('prepare-reconcile',()=>rosterOperationsReconcile_(s,ctx));const result=rosterOperationsPhase_('prepare-apply',()=>GSISRosterOperations.scheduledTick(s,ctx,stamp)),allocating=effectiveSlot.optimise&&!result.allocationTimedOut;
+    rosterOperationsRefreshClock_(ctx);
+    const references=rosterOperationsReferenceKey_(ctx),dependencies=rosterOperationsDependencies_(base,command,ctx),beforeOutbox=s.outbox.length,preparedClock=GSISRosterAllocation.prepareClock(ctx,s,command);
+     rosterOperationsPhase_('prepare-reconcile',()=>rosterOperationsReconcile_(s,ctx));const result=rosterOperationsPhase_('prepare-apply',()=>GSISRosterOperations.scheduledTick(s,ctx,stamp)),allocating=effectiveSlot.optimise&&!result.allocationTimedOut;
     // Scheduled receipts remain durable; the verified cold-output archive owns retention.
+    if(run){rosterAllocationRunPreparation_(run,Date.now()-preparationStarted);preparationRecorded=true;}
     const next=rosterOperationsPackedSnapshot_(s),domainChanged=rosterOperationsDependencies_(base,{},ctx)!==rosterOperationsDependencies_(next,{},ctx);
     if(run)rosterScheduledAllocationBudget_(run,true);
     const lock=LockService.getScriptLock();if(!rosterOperationsPhase_('lock-wait',()=>deployLock_(lock,8000)))error_(503,'Another relief update is finishing. Retry the scheduler tick.');
     try{
      if(typeof rosterAbsenceIntakeGate_==='function')rosterAbsenceIntakeGate_([slot.date],allocating);
      const current=rosterOperationsState_();if(run&&current.scheduleReceipts[run.scheduleKey]?.cancelled)rosterAllocationRunCancellation_();if(current.scheduleReceipts[slot.key]&&(!current.scheduleReceipts[slot.key].cancelled||current.scheduleReceipts[slot.key].reportComplete))return {replayed:true};
-     const checkClock=()=>{const clock={};rosterOperationsClock_(clock);if(run)rosterScheduledAllocationBudget_(run,true);if(clock.now-stamp>120000)error_(400,'Scheduled tick is stale.');if(allocating&&!s.scheduleReceipts[ctx.scheduledAllocationKey]?.cancelled&&s.systemConfig.scheduledAllocationEnabled&&ctx.days[slot.date]?.schoolDay&&clock.now>Date.parse(slot.date+'T06:29:59.999+08:00'))rosterOperationsConflict_('ALLOCATION_CUTOFF','Optimisation crossed the morning cut-off. No draft changes were saved.');if(clock.today+':'+clock.minute!==preparedClock)rosterOperationsConflict_('PREPARED_RETRY','The school-day clock changed before writing.');};
+     const checkClock=()=>{if(typeof rosterScheduledManualGuard_==='function')rosterScheduledManualGuard_(slot.date);const clock={};rosterOperationsClock_(clock);if(run)rosterScheduledAllocationBudget_(run,true);if(clock.now-stamp>120000)error_(400,'Scheduled tick is stale.');rosterOperationsCheckClock_(preparedClock);if(allocating&&!s.scheduleReceipts[ctx.scheduledAllocationKey]?.cancelled&&s.systemConfig.scheduledAllocationEnabled&&ctx.days[slot.date]?.schoolDay&&clock.now>Date.parse(slot.date+'T06:29:59.999+08:00'))rosterOperationsConflict_('ALLOCATION_CUTOFF','Optimisation crossed the morning cut-off. No draft changes were saved.');};
      checkClock();if(rosterOperationsReferenceStamp_(ctx)!==references||rosterOperationsDependencies_(rosterOperationsPackPlans_(current),command,ctx)!==dependencies)rosterOperationsConflict_('PREPARED_RETRY','Planning inputs changed during allocation.');
      const merged=rosterOperationsMergePrepared_(base,next,rosterOperationsPackedSnapshot_(current));merged.revision=current.revision+(domainChanged?1:0);
      const committed=GSISRosterOperations.validateState(rosterOperationsUnpackPlans_(merged));if(typeof rosterAllocationAuditAccepted_==='function')rosterAllocationAuditAccepted_(committed,current,ctx,{scheduleKey:run?.scheduleKey||slot.key});
      rosterOperationsPhase_('commit',()=>rosterOperationsCommit_(committed,[slot.date],allocating,()=>{checkClock();if(run)rosterAllocationRunBeforeCommit_(run,checkClock);}));if(run)rosterAllocationRunComplete_(run,committed);rosterScheduledHintWrite_(committed,props_().getProperty('ROSTER_VERSION_HINT'));
      return {...result,revision:committed.revision,notificationsQueued:s.outbox.length-beforeOutbox};
     }finally{deployUnlock_(lock);}
-   }catch(e){if(e.code!=='PREPARED_RETRY')throw e;if(attempt===1)error_(503,'Planning inputs changed during allocation. Retry this scheduler tick.');}
+   }catch(e){if(!['PREPARED_RETRY','PLANNING_CLOCK_CHANGED'].includes(e.code))throw e;if(attempt===1){if(e.code==='PLANNING_CLOCK_CHANGED')throw e;error_(503,'Planning inputs changed during allocation. Retry this scheduler tick.');}}finally{if(run&&!preparationRecorded)rosterAllocationRunPreparation_(run,Date.now()-preparationStarted);}
   }
  };
  try{return gate.allocate&&tracked?rosterAllocationRunExecute_(req,null,execute,{trigger:'scheduled',date:slot.date,scheduleKey:slot.allocationKey,tickKey:slot.key,budgetDeadline:Math.min(started+75000,stamp+90000),saveDeadline:Math.min(started+110000,stamp+115000)}):execute(null,!gate.allocate);}
- catch(error){if(!['ALLOCATION_SLOT_DONE','ALLOCATION_CANCELLED','ALLOCATION_IN_PROGRESS','ALLOCATION_UNCONFIRMED'].includes(error.code))throw error;const active=rosterAllocationRunRead_(slot.date);if(!['ALLOCATION_SLOT_DONE','ALLOCATION_CANCELLED'].includes(error.code)&&active?.trigger==='scheduled'&&active.scheduleKey===slot.allocationKey)throw error;
+ catch(error){if(error.code==='SKIPPED_BUSY')return {code:'SKIPPED_BUSY',skipped:true,allocationSkipped:true};if(!['ALLOCATION_SLOT_DONE','ALLOCATION_CANCELLED','ALLOCATION_IN_PROGRESS','ALLOCATION_UNCONFIRMED'].includes(error.code))throw error;const active=rosterAllocationRunRead_(slot.date);if(!['ALLOCATION_SLOT_DONE','ALLOCATION_CANCELLED'].includes(error.code)&&active?.trigger==='scheduled'&&active.scheduleKey===slot.allocationKey)throw error;
   const currentGate=tracked?rosterScheduledAllocationGate_(slot):gate,skip=rosterScheduledFastSkip_(slot,currentGate,today);return skip||execute(null,true);
  }
 }
@@ -1149,7 +1216,7 @@ function rosterNotificationEligible_(s,j,now,fresh,index,allowed){
  if(['stapler_request','stapler_decision'].includes(j.kind)){const requester=fresh.rosterPeople.find(x=>x.id===j.data.requesterId);if(!requester?.name)return 'The requesting teacher no longer exists in Contacts.';j.data.requesterName=requester.name;}
  const person=fresh.rosterPeople.find(x=>x.id===j.recipientId);
  if(!person)return 'Recipient no longer exists in Contacts.';
- if(j.kind==='stapler_timetable'&&!j.data.communicationSnapshot){const plan=j.data.communicationSnapshot|| (j.data.dailyPublication?s.dailyPublicationStates?.[j.date]:s.staplerPlans.find(r=>r.date===j.date));index.timetableEntries=index.timetableEntries||rosterIndex_().entries;if(!plan||GSISRoster.active(index.timetableEntries,j.date)?.id!==plan.baselineId)return 'The active baseline timetable changed.';}
+ if(j.kind==='stapler_timetable'&&!j.data.communicationSnapshot){const plan=j.data.dailyPublication?s.dailyPublicationStates?.[j.date]:s.staplerPlans.find(r=>r.date===j.date);if(!plan)return 'The saved timetable is unavailable.';}
  if(j.kind==='stapler_request'&&(!(fresh.rosterSMCIds||[]).includes(j.recipientId)||!GSISRosterOperations.teacherSponsor(person)))return 'The nominated sponsor is no longer an eligible teacher.';
  if(j.kind==='stapler_decision'&&j.data.audience==='stapler-sponsor'&&(!(fresh.rosterSMCIds||[]).includes(j.recipientId)||!GSISRosterOperations.teacherSponsor(person)))return 'The nominated sponsor is no longer an eligible teacher.';
  if(j.kind==='contact_review'&&!(fresh.rosterAdminIds||[]).includes(j.recipientId))return 'Recipient is no longer a Contacts Admin.';

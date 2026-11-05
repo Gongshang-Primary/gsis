@@ -50,9 +50,9 @@ function tiles(rows){list(rows,20000).forEach(t=>{
  exact(t.source,['teacherId','classIds','period','subject','venue','group'],'Tile source');if(t.source.teacherId!==null)text(t.source.teacherId,200);list(t.source.classIds,1000).forEach(x=>text(x,200));if(t.source.period!==null)integer(t.source.period,0,39);['subject','venue','group'].forEach(k=>text(t.source[k],500,true));
  });}
 export function validatePlan(plan){
- exact(plan,['schema','date','baselineId','parity','endOfDayMinutes','venues','status','revision','nextId','periods','teachers','classes','subjectCategories','tiles','mats','warnings','recessDefaults','baseline'],'Plan');
+ exact(plan,['schema','date','baselineId','parity','endOfDayMinutes','venues','status','revision','nextId','periods','teachers','classes','subjectCategories','tiles','mats','warnings','recessDefaults','baseline',...(Object.hasOwn(plan,'id')?['id']:[])],'Plan');
  if(plan.schema!==1||plan.status!=='draft'||![null,'single','odd','even'].includes(plan.parity))fail(400,'INVALID_NATIVE_PART','Invalid schedule-only plan.');
- day(plan.date);text(plan.baselineId);integer(plan.revision);integer(plan.nextId,1);integer(plan.endOfDayMinutes,451,1440);
+ day(plan.date);if(Object.hasOwn(plan,'id'))text(plan.id);text(plan.baselineId);integer(plan.revision);integer(plan.nextId,1);integer(plan.endOfDayMinutes,451,1440);
  const catalogue=p=>{periods(p.periods);teachers(p.teachers);classes(p.classes);categories(p.subjectCategories);tiles(p.tiles);recesses(p.recessDefaults);list(p.venues,10000).forEach(x=>text(x,500));};catalogue(plan);
  exact(plan.baseline,['parity','endOfDayMinutes','venues','tiles','teachers','classes','periods','subjectCategories','recessDefaults'],'Plan baseline');catalogue(plan.baseline);
  list(plan.mats,20000).forEach(m=>{exact(m,['target','targetId','fromPeriod','toPeriod','reason'],'Suspension');if(m.reason!=='Suspended')fail(400,'PRIVATE_FIELDS_REFUSED','Private suspension reasons are unsupported.');text(m.targetId,200);integer(m.fromPeriod,0,39);integer(m.toPeriod,0,39);});

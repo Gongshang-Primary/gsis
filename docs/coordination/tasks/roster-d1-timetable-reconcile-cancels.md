@@ -1,8 +1,8 @@
 # roster-d1-timetable-reconcile-cancels: on D1, every read cancels relief assignments ("effective timetable changed")
 
-- Status: implemented; full-suite verification and exact-head review gate, Codex, lane R
+- Status: claimed; Codex, lane R, TOP PRIORITY. Updating existing draft PR #78 to the final owner rulings. Other lane R implementation is paused for this task.
 - Reviewer/model: Claude
-- Last updated (Asia/Singapore): 5 Nov 2026 05:10
+- Last updated (Asia/Singapore): 5 Nov 2026
 
 ## Incident: cutover attempt 4 (v0.9.9j), 5 Nov 2026
 - Import completed 01:54 (316/316 parts; roster 18,905 records, roster-register 21). Activated 04:38:27 (both scopes active r2). Owner rolled back by the emergency route about 05:00 (Cloudflare legacy x3, edgeAuthorityRollbackToLegacy, venuesFenceDiagnose). D1 heads remain `active` (reset with "Reset D1 after manual rollback" before the next attempt). Evidence kept in D1.
@@ -30,38 +30,49 @@ roster-register entries:
 5. Add to the cutover acceptance test: Auto-allocate, reload twice, count unchanged.
 Full suite green. Draft PR with the exact head for Claude. No deploy, no live D1 writes.
 
-## Implementation claim
+## Root cause found (Claude, 5 Nov ~09:00, read-only D1 + code)
+- D1 `staplerPlans` for 2026-11-05: **confirmed, baselineId 1d28c523 (pruned)**. Neighbouring plans (2, 4, 6 Nov) use 14a50c1e (active).
+- Allocation builds the Stapler-composed day: demands get `timetableId: d.id` (shared/roster-operations.js about line 241), and `composeStaplerContext` makes `d.id` the plan's baseline (1d28c523). So every 5 Nov assignment carries 1d28c523.
+- The D1 read reconcile (`reconcileOperationalState`, roster-update/public/edge-roster.js about lines 403-406) compares `row.timetableId` with `GSISRoster.active(ctx.timetableEntries,row.date).id` (14a50c1e, the active baseline, ignoring the Stapler composition) and invalidates every row → mass cancellation on each read.
+- The same function's first loop also treats a confirmed Stapler plan whose `baselineId` is not the active baseline as stale ("The active baseline timetable changed") for importedRelief/notifications, consistent with the plan being stale.
+- So two defects: (A) **data**: the 5 Nov plan was confirmed on a pruned baseline (the Stapler should refuse or flag confirm/save on a non-active baseline, and existing such plans need an SMC "rebase or redo"); (B) **D1 reconcile** compares against the raw active baseline while allocation uses the Stapler-composed day; it must use the same effective day id as allocation, or treat the Stapler-plan mismatch as one SMC-visible issue, never a silent mass cancel. Check whether Google's reconcile has the same comparison (Google did not cancel on 5 Nov) and align both.
+- Fix list: (1) one resolver for the effective timetable id (Stapler-composed) used by allocation, demands and reconcile on Google and D1; (2) Stapler plan on a non-active baseline: block confirm, show "Rebase to the current baseline", and list existing stale plans in System Health; (3) the mass-cancel guard; (4) tests with a confirmed Stapler plan on a pruned baseline.
+
+## Owner ruling, 5 Nov: Stapler plans are delinked from baselines
+Owner (verbatim): "i need stapler plans to be totally delinked from baseline, it is like a baseline duplicate of the day, then later cell-by-cell comparison for user to note only. any other baselines should be free to swap out, don't need to tie to baseline"
+
+This replaces fix items (1)-(2) above for Stapler days:
+1. A Stapler plan is a self-contained copy of the day's timetable, taken when it was created. It holds every cell it needs, so it never reads the baseline again. `baselineId` stays only as a record of where the copy came from (origin), never as a validity key.
+2. On a date with a Stapler plan, the plan is the effective timetable. Allocation, demands, reconcile, export and notifications use the plan's own id on Google and D1. A baseline change, swap or prune never invalidates, cancels or marks stale a Stapler plan, its assignments, its imported relief or its outbox rows.
+3. Baselines are free to be added, swapped, reprioritised or pruned at any time, even while Stapler plans refer to them as their origin.
+4. Comparison is information only: Stapler shows a cell-by-cell difference against the current active baseline for that date (added, removed, changed cells), with no blocking, no automatic rebase and no "stale" status. An optional user action "copy this cell from baseline" may follow later; it is not in scope now.
+5. Days without a Stapler plan keep today's behaviour (see the open question below).
+6. Keep the mass-cancel guard (item 3) and the tests (item 4). Add tests: prune the origin baseline of a confirmed plan → no row changes on Google or D1; swap the active baseline → Stapler day unchanged, the difference view lists the changed cells; reload after allocate on a Stapler day → no invalidation.
+7. Migration: existing plans (including 5 Nov on pruned 1d28c523) must already hold their full day copy; check this, and if any plan reads cells from its baseline, copy them into the plan once (before pruning ever removes the source).
+
+Open question for the owner: on days WITHOUT a Stapler plan, when the active baseline changes, should existing assignments for lessons that no longer exist still be invalidated (current behaviour), or kept and flagged?
+- Evidence for item 7 (Claude, D1 read-only): the 5 Nov plan record is only 1151 bytes (date, baselineId, revision, workloadWarnings, ...). It holds no day copy; it is an overlay that reads cells from its baseline. So delinking needs (a) the plan to store the full day snapshot at create/confirm, and (b) a one-time migration that copies each existing plan's day from its origin baseline. Pruned baselines are soft-pruned (`pruned=1`, entries kept), so the source for 1d28c523 still exists. Do not hard-delete any baseline before this migration runs.
+
+## Owner answers, 5 Nov
+1. Days WITHOUT a Stapler plan: when a baseline change removes a lesson, its relief assignment is released (the lesson no longer exists). Release only the rows whose lesson is gone; lessons that still exist on the new baseline (same day, period, class, teacher) keep their assignment. Released rows show "Lesson no longer in the timetable" in the audit and to SMC; the teacher's relief notice is withdrawn. The mass-cancel guard still applies (if a swap would release a large share of the day, stop and ask SMC/Admin to confirm).
+2. Stapler difference view: show only. No per-cell copy action.
+
+## Updated implementation claim (5 Nov 2026)
 
 - Owner/model: Codex
-- Branch: `codex/roster-d1-timetable-reconcile`
-- Base SHA: `39b96c2ce0344d456f4867bbe02d6d007edfc3ac`
-- Files/domains owned: shared Roster timetable/domain code, D1 edge day/reference resolution and reconcile health, focused tests, cutover acceptance documentation, canonical generated copies.
-- Out of scope: deployment, live D1/Google/R2 writes, authority switches, fresh-start implementation (next task).
-- Acceptance: reproduce the pruned-entry mismatch; one resolver and timetable-scoped day caches; published and mass-cancel guard; Google/D1 parity; Auto-allocate then reload twice unchanged; canonical build and full Node/LORD suite.
-- Handoff: Claude reviews exact PR head; owner merges. No deployment.
+- Reviewer: Claude, exact final head
+- Branch: `codex/roster-d1-timetable-reconcile`; existing PR #78, one PR for this task
+- Current main: `a2079f62241b8d4643da9410d7638a025a31b372`; previous PR head: `640d2b67515ff868a4cd0cf2902e7478d29cd133`
+- Scope: shared Stapler full-day snapshots and effective-day resolver; Google/D1 adapters; lesson-specific reconciliation and guarded SMC confirmation; Admin dry-run/apply migration with preview digest; display-only cell differences; System Health; regression tests and canonical generated outputs.
+- Acceptance: all five required scenarios in the owner's request on both routes; canonical build; full Node and LORD suite with counts; exact-head task handoff.
+- Boundaries: no deploy, live D1/Google/R2 writes, authority changes, messages, baseline deletion, or unrelated lane work.
+- Plan: establish failing retained-plan and removed-lesson fixtures; implement shared snapshot and resolver; add digest-bound Admin migration and informational difference UI; align reconciliation and notice withdrawal; verify both adapters and full suite; hand off #78 to Claude.
+- The later owner rulings above replace the previous PR's active-baseline identity design. Existing published-row safeguards remain except where the owner explicitly authorises releasing removed lessons after confirmation.
 
-## Root-cause investigation (local reproduction)
-
-Both adapters resolve the active, non-pruned register entry correctly. D1 preloads it in `buildEdgeRosterContext` and selects it in `edgeRosterContextFromReferences`; Google selects it in `rosterOperationsContext_`. The shared `composeStaplerContext` then applies a retained confirmed/published plan. `GSISRosterStapler.effectiveDay` replaces `day.id` and `day.modelId` with that plan's original `baselineId`. Allocation copies that stale ID into every assignment. Reconcile compares it against the active register entry and invalidates it.
-
-An unchanged-code fixture with active `active-low`, pruned `pruned-high`, and a retained confirmed plan based on `pruned-high` produced two draft assignments stamped `pruned-high`; shared reconcile cancelled both with the incident's exact message. This proves the mechanism. The incident record does not contain the retained production plan, so the specific live origin remains an inference.
-
-Google's baseline resolver and cache are correct, but Google shares this composition defect and is not structurally immune. A register-only test would miss it. The regression must retain the old confirmed plan and compare both adapters.
-
-D1's immutable model cache uses R2 object key plus digest. Its context adapter disables the Google day cache. Google's allocation baseline cache includes register entries and current reference identities; timetable read packages include resolved date mappings and register revision. No date-only allocation cache was found.
-
-## Implementation decisions
-
-Preserve confirmed Stapler lesson content and its original baseline provenance. Resolve the operational timetable identity through `GSISRoster.active`, so pruned entries cannot become allocation identities. Protect read reconciliation in the shared domain as well as both adapters. Preflight all release reasons with a limit of five affected rows per date; a larger group remains untouched and raises a retained SMC/health alert. Published rows need an explicit SMC mutation before cancellation. Browser effective-day, report-day and timetable-status caches bind their resolved baseline mapping and retain the plan's original `staplerBaselineId` separately.
-
-The main-branch claim was rejected by automatic approval review. The claim is retained on the requested task branch; main remains unchanged.
-
-## Verification and deployment
-
-Canonical build passed. Fourteen targeted regression scenarios, the broader shared/backend checks and browser cache checks passed before the full-suite run. Independent local review found a replacement-chain guard bypass and incomplete published-row alert counts; both were fixed and rechecked. Original Google/D1 plan and publication evidence stays intact.
-
-The first exact-source CI run (`4f1ee8ecdd1e4b04caafe128eecd376b199527ca`, run `41918684389`) passed three shards. The fourth found three assertions in `roster701-integrity-review.cjs`: one still expected the now-forbidden published cancellation, and two required retained SMC review annotations. The follow-up preserves the annotations, replaces the obsolete cancellation expectation with published retention/no cancellation notice, and retains the concurrent delivery assertions. The final full-suite outcome and exact head are recorded in this branch's draft PR; all four Node/LORD jobs must pass before review handoff.
-
-Local full-suite clones lack historical Git objects `2efd6e0` and `e2bfe2c`; their packaging/comparison programs cannot establish those comparisons locally. CI uses the real repository history and runs them without exclusion. Missing local browser and generated ZIP prerequisites were repaired; the packaged-worker checks then passed. No current test was dropped or marked historical.
-
-No live data was read or written. No deployment, authority switch, live allocation or message was performed. Claude's exact-head review and the owner's merge remain required.
+## Claude check of PR #78 (head 640d2b6, 5 Nov): needs rework to the owner ruling
+#78 was built before the root cause and the owner rulings above. It conflicts with them:
+1. #78 makes "operational IDs follow the active non-pruned register entry" on Stapler days. The ruling says the opposite: on a Stapler day the plan is the effective timetable; baseline changes never affect it.
+2. #78 never lets a read cancel published rows and holds back any date with more than 5 affected rows. The ruling says lessons removed by a baseline change on non-Stapler days are released (including published ones, with the notice withdrawn); the mass-cancel guard stays, but as "a large share of the day", confirmed by SMC/Admin.
+3. #78 has no plan day-copy, no migration and no difference view.
+4. #78 is now in conflict with main (`dirty`). #79 is stacked on it.
+Action: Codex reworks on the same branch (or a new PR that supersedes #78) to the prompt of 5 Nov; keep its good parts (shared Google/D1 reconcile path, preflight, idempotent health alert, reload-twice acceptance). Rebase #79 afterwards. Lane R stays serial: merge #80 first, then the reworked #78, then #79.

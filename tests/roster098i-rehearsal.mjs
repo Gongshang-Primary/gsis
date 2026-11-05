@@ -82,13 +82,13 @@ await test('versioned synthetic snapshot roundtrip preserves complete supported 
  assert.equal(g.env.REHEARSAL_LEDGER.row().revision,before);
  assert.throws(()=>validateSnapshot({...snapshot,dataset:{...snapshot.dataset,journal:[...snapshot.dataset.journal,snapshot.dataset.journal[0]]}}),/unique/);
 });
-await test('effective timetable removal or subject change reconciles shared manual cover before persistence and snapshot replay',async()=>{
+await test('timetable removal flags manual cover while a surviving subject-changed lesson retains cover through snapshot replay',async()=>{
  for(const remove of [true,false]){
   const f=fixture();await f.write(seed);let r=await f.write({operation:'saveAbsence',staffId:'alice',periods:[2]},'reconcile-absence-id',1);const demandId=r.data.projection.demands[0].id;await f.write({operation:'assign',staffId:'bob',demandIds:[demandId]},'reconcile-manual-id',2);
   const day=sampleDay(seed.date);day.teachers[0].cells[2]=remove?['','','','']:['MA','4A','Demo-01',''];
-  r=await f.write({operation:'saveTimetable',day},'reconcile-timetable-id',3);assert.equal(r.status,200);assert.equal(r.data.projection.assignments.length,0,'obsolete EL duty is not active');assert.equal(r.data.projection.demands.length,remove?0:1);if(!remove)assert.equal(r.data.projection.demands[0].subject,'MA');
-  assert.equal((await f.call('/api/state')).data.projection.assignments.length,0);assert.deepEqual((await f.call('/api/timetable/read')).data.timetable.day,day);assert.equal((await f.call('/api/health')).data.persistenceProof.verified,true);
-  const snapshot=(await f.call('/api/snapshot/export')).data,g=fixture('rehearsal-reconcile-import');r=await g.call('/api/snapshot/import',{requestId:'reconcile-import-id',expectedRevision:0,snapshot});assert.equal(r.status,200);assert.equal(r.data.projection.assignments.length,0);assert.deepEqual((await g.call('/api/snapshot/export')).data.dataset,snapshot.dataset);
+  r=await f.write({operation:'saveTimetable',day},'reconcile-timetable-id',3);assert.equal(r.status,200);assert.equal(r.data.projection.assignments.length,remove?0:1,'removed lesson loses valid cover; surviving lesson retains its assignment');assert.equal(r.data.projection.demands.length,remove?0:1);if(!remove)assert.equal(r.data.projection.demands[0].subject,'MA');
+  assert.equal((await f.call('/api/state')).data.projection.assignments.length,remove?0:1);assert.deepEqual((await f.call('/api/timetable/read')).data.timetable.day,day);assert.equal((await f.call('/api/health')).data.persistenceProof.verified,true);
+  const snapshot=(await f.call('/api/snapshot/export')).data,g=fixture('rehearsal-reconcile-import');r=await g.call('/api/snapshot/import',{requestId:'reconcile-import-id',expectedRevision:0,snapshot});assert.equal(r.status,200);assert.equal(r.data.projection.assignments.length,remove?0:1);assert.deepEqual((await g.call('/api/snapshot/export')).data.dataset,snapshot.dataset);
  }
 });
 await test('bounds, unsupported endpoints, corrupted gzip and false receipt proof fail closed',async()=>{

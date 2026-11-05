@@ -88,7 +88,7 @@ const rejected=(fn,status,pattern)=>assert.throws(fn,e=>e.status===status&&(!pat
  const direct={...h.ctx,user:h.identity('alice')};rejected(()=>O.reportView(h.state(),direct,input),403);
  const suspended=h.state(),plan=require('../shared/roster-stapler.js').create({...copy(ctx.days[h.date]),date:h.date},{date:h.date});
  suspended.staplerPlans=[{date:h.date,baselineId:'baseline',revision:3,confirmed:true,draft:plan}];
- const composed=scope.rosterOperationsContext_(request,c,suspended),projection=O.reportView(suspended,composed,input);
+ scope.GSISRosterStapler=require('../shared/roster-stapler.js');const composed=scope.rosterOperationsContext_(request,c,suspended),projection=O.reportView(suspended,composed,input);
  assert.deepEqual(Array.from(composed.days[h.date].teachers,t=>t.staffId),['alice','bob'],'confirmed STAPLER compact context retains every selected teacher');
  assert.deepEqual(Array.from(projection.timetable.teachers,t=>t.staffId),['alice','bob']);assert.equal(projection.timetable.staplerRevision,3);
  // An explicit one-teacher selection is authoritative even when the optional
