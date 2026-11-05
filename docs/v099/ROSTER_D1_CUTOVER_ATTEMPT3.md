@@ -51,7 +51,7 @@ Set `ROSTER_EDGE_AUTHORITY` = `d1` on gsps-roster (Save, then Deployments → la
 Future date (next Friday), your own name.
 1. **t+0:** Ctrl + Shift + R. Assign Relief (for tomorrow and Friday), Daily Notify, System Config, Storage, Statistics, My Calculations all load live.
 2. Report Absence for yourself on Friday, two periods, relief required. Assign Relief: auto-allocate, change one cell, Save.
-   Record the assignment count and resolved timetable ID. Reload twice and confirm the count is unchanged, no new cancellations appear, and each assignment uses the active, non-pruned timetable ID. Repeat with a confirmed Stapler plan whose original baseline has been pruned; its confirmed lessons must remain intact.
+   Record the assignment count and resolved timetable ID. Reload twice and confirm the count is unchanged, no new cancellations appear, and non-Stapler days use the active, non-pruned baseline ID and Stapler days use `stapler:<date>`. Repeat with a confirmed Stapler plan whose original baseline has been pruned; its confirmed lessons must remain intact.
 3. Do **not** press "Let teachers see", WhatsApp or "Archive now".
 4. **t+20 minutes:** Ctrl + Shift + R and open Assign Relief again. It must still load live (this is where attempt 2 failed).
 5. Delete the test absence; Save.
