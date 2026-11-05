@@ -20,5 +20,7 @@ assert.equal(by('a4').absentName,undefined,'an unknown id is never shown as a na
 // The existing workbook label then reads "Art (for Nisha)".
 const label=a=>(a.subject||'Relief')+(a.absentName?' (for '+a.absentName+')':'');
 assert.equal(label(by('a1')),'Art (for Nisha)');assert.equal(label(by('a2')),'Art (for Wei Ling, Nisha)');
-assert.match(fs.readFileSync('roster-update/public/roster-stapler-export.js','utf8'),/\(a\.subject\|\|'Relief'\)\+\(absentName\?' \(for '\+absentName\+'\)'/,'workbook label uses absentName');
+assert.match(fs.readFileSync('roster-update/public/roster-export.js','utf8'),/\(a\.subject\|\|'Relief'\)\+\(absentName\?' \(for '\+absentName\+'\)'/,'workbook label uses absentName');
 console.log('PASS Excel relief cells: "Art (for Nisha)" from demand, combined names once, explicit name kept, unknown ids hidden');
+
+assert.match(fs.readFileSync('roster-update/public/roster-stapler-export.js','utf8'),/RosterExport\.applyReliefSummary\(summary/, 'Stapler uses the shared overlay');

@@ -100,7 +100,7 @@ var RosterExport=(()=>{
   return '<c r="'+ref+'" s="'+style+'" t="inlineStr"><is>'+text+'</is></c>';
  }
  function column(index){let name='';for(let n=index+1;n;n=Math.floor((n-1)/26))name=String.fromCharCode(65+(n-1)%26)+name;return name;}
- function periodHeaderRows(page){return Array.isArray(page.periods)&&page.periods.length===page.columns.length-1&&page.periods.length?4:3;}
+ function periodHeaderRows(page){if(page.dailyTeacher)return 5;return Array.isArray(page.periods)&&page.periods.length===page.columns.length-1&&page.periods.length?4:3;}
  function periodTime(p){
   const clock=n=>Number.isInteger(n)&&n>=0&&n<=1440?String(Math.floor(n/60)).padStart(2,'0')+':'+String(n%60).padStart(2,'0'):'';
   const start=p.start||clock(p.startMinutes),end=p.end||clock(p.endMinutes);
@@ -108,21 +108,26 @@ var RosterExport=(()=>{
  }
  function sheetXml(page){
   const lastColumn=column(page.columns.length-1),width=page.periodColumnWidth||Math.max(8,Math.min(28,140/(page.columns.length-1)));
-  const headers=periodHeaderRows(page),labels=headers===4?[page.columns[0],...page.periods.map(p=>'P'+p.period)]:page.columns;
+  const headers=periodHeaderRows(page),labels=headers>=4?[page.columns[0],...page.periods.map(p=>'P'+p.period)]:page.columns;
   const rows=['<row r="1" ht="24" customHeight="1">'+cell('A1',page.title,1)+'</row>','<row r="2" ht="30" customHeight="1">'+cell('A2',page.subtitle,2)+'</row>'];
+  if(page.dailyTeacher){rows.push('<row r="3" ht="22" customHeight="1">'+cell('A3',page.status,2)+'</row>');rows.push('<row r="4" ht="22" customHeight="1">'+labels.map((s,i)=>cell(column(i)+'4',s,3)).join('')+'</row>');rows.push('<row r="5" ht="32" customHeight="1">'+['Time',...page.periods.map(periodTime)].map((s,i)=>cell(column(i)+'5',s,3)).join('')+'</row>');}
   if(headers===4)rows.push('<row r="3" ht="32" customHeight="1">'+['Time',...page.periods.map(periodTime)].map((s,i)=>cell(column(i)+'3',s,3)).join('')+'</row>');
-  rows.push('<row r="'+headers+'" ht="'+(headers===4?24:42)+'" customHeight="1">'+labels.map((s,i)=>cell(column(i)+headers,s,3)).join('')+'</row>');
+  if(!page.dailyTeacher)rows.push('<row r="'+headers+'" ht="'+(headers===4?24:42)+'" customHeight="1">'+labels.map((s,i)=>cell(column(i)+headers,s,3)).join('')+'</row>');
   page.rows.forEach((row,i)=>{
    const r=i+headers+1,text=[row.day,...row.cells];
    // Estimate wrapped lines so Excel displays every card field without manual row resizing.
    const lines=Math.max(...text.map((s,c)=>s.split('\n').reduce((n,line)=>n+Math.max(1,Math.ceil(line.length/(c?width:13))),0)));
-   const height=Math.min(409,Math.max(45,lines*11.5+8));
+   const height=Math.min(409,Math.max(page.dailyTeacher?18:45,lines*11.5+8));
    rows.push('<row r="'+r+'" ht="'+height+'" customHeight="1">'+text.map((s,c)=>cell(column(c)+r,s,c?(row.styles?.[c-1]??5):4)).join('')+'</row>');
   });
-  const end=page.rows.length+headers;
-  return declaration+'<worksheet xmlns="'+ns+'"><sheetPr><pageSetUpPr fitToPage="1"/></sheetPr><dimension ref="A1:'+lastColumn+end+'"/><sheetViews><sheetView showGridLines="0" workbookViewId="0"><pane xSplit="1" ySplit="'+headers+'" topLeftCell="B'+(headers+1)+'" activePane="bottomRight" state="frozen"/></sheetView></sheetViews><sheetFormatPr defaultRowHeight="15"/><cols><col min="1" max="1" width="15" customWidth="1"/><col min="2" max="'+page.columns.length+'" width="'+width.toFixed(2)+'" customWidth="1"/></cols><sheetData>'+rows.join('')+'</sheetData><mergeCells count="2"><mergeCell ref="A1:'+lastColumn+'1"/><mergeCell ref="A2:'+lastColumn+'2"/></mergeCells><printOptions horizontalCentered="1"/><pageMargins left="0.25" right="0.25" top="0.3" bottom="0.3" header="0.1" footer="0.1"/><pageSetup paperSize="9" orientation="landscape" fitToWidth="1" fitToHeight="0"/></worksheet>';
+  const end=page.rows.length+headers,merges=['A1:'+lastColumn+'1','A2:'+lastColumn+'2',...(page.dailyTeacher?['A3:'+lastColumn+'3',...page.rows.flatMap((row,i)=>row.teacherId&&row.field===0?['A'+(i+headers+1)+':A'+(i+headers+4)]:[])]:[])];
+  return declaration+'<worksheet xmlns="'+ns+'"><sheetPr><pageSetUpPr fitToPage="1"/></sheetPr><dimension ref="A1:'+lastColumn+end+'"/><sheetViews><sheetView showGridLines="0" workbookViewId="0"><pane xSplit="1" ySplit="'+headers+'" topLeftCell="B'+(headers+1)+'" activePane="bottomRight" state="frozen"/></sheetView></sheetViews><sheetFormatPr defaultRowHeight="15"/><cols><col min="1" max="1" width="15" customWidth="1"/><col min="2" max="'+page.columns.length+'" width="'+width.toFixed(2)+'" customWidth="1"/></cols><sheetData>'+rows.join('')+'</sheetData><mergeCells count="'+merges.length+'">'+merges.map(ref=>'<mergeCell ref="'+ref+'"/>').join('')+'</mergeCells><printOptions horizontalCentered="1"/><pageMargins left="0.25" right="0.25" top="0.3" bottom="0.3" header="0.1" footer="0.1"/><pageSetup paperSize="9" orientation="landscape" fitToWidth="1" fitToHeight="0"/></worksheet>';
  }
  function stylesXml(){return declaration+'<styleSheet xmlns="'+ns+'"><fonts count="3"><font><sz val="9"/><name val="Calibri"/></font><font><b/><sz val="10"/><color rgb="FFFFFFFF"/><name val="Calibri"/></font><font><b/><sz val="14"/><color rgb="FF255F8C"/><name val="Calibri"/></font></fonts><fills count="6"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FF255F8C"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFE9F2FB"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFD9D9D9"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFFFC7CE"/><bgColor indexed="64"/></patternFill></fill></fills><borders count="2"><border><left/><right/><top/><bottom/><diagonal/></border><border><left style="thin"><color rgb="FFCCD7DF"/></left><right style="thin"><color rgb="FFCCD7DF"/></right><top style="thin"><color rgb="FFCCD7DF"/></top><bottom style="thin"><color rgb="FFCCD7DF"/></bottom><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="8"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1"/><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0" applyAlignment="1"><alignment vertical="top" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="2" borderId="1" xfId="0" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="0" fillId="3" borderId="1" xfId="0" applyAlignment="1"><alignment horizontal="center" vertical="top" wrapText="1"/></xf><xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyAlignment="1"><alignment vertical="top" wrapText="1"/></xf><xf numFmtId="0" fontId="0" fillId="4" borderId="1" xfId="0" applyAlignment="1"><alignment vertical="top" wrapText="1"/></xf><xf numFmtId="0" fontId="0" fillId="5" borderId="1" xfId="0" applyAlignment="1"><alignment vertical="top" wrapText="1"/></xf></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>';}
+ function dailyStylesXml(){
+  const xf=(fill,font=0)=>'<xf numFmtId="0" fontId="'+font+'" fillId="'+fill+'" borderId="1" xfId="0" applyFill="1" applyFont="1" applyAlignment="1"><alignment vertical="top" wrapText="1"/></xf>',fill=rgb=>'<fill><patternFill patternType="solid"><fgColor rgb="'+rgb+'"/><bgColor indexed="64"/></patternFill></fill>';
+  return stylesXml().replace('<fonts count="3">','<fonts count="4">').replace('</fonts>','<font><sz val="9"/><name val="Calibri"/><color rgb="FF777777"/></font></fonts>').replace('<fills count="6">','<fills count="8">').replace('</fills>',fill('FFFFC000')+fill('FFFFDCE3')+'</fills>').replace('<cellXfs count="8">','<cellXfs count="12">').replace('</cellXfs>',xf(6)+xf(7)+xf(4,3)+xf(0)+'</cellXfs>');
+ }
  function sheetNames(pages){
   const used=new Set(),truncate=(s,n)=>s.slice(0,n).replace(/[\uD800-\uDBFF]$/,'');
   return pages.map(page=>{
@@ -170,9 +175,9 @@ var RosterExport=(()=>{
  async function fitWorkbook(output){
   const zip=await JSZip.loadAsync(await output.blob.arrayBuffer());await fitWorkbookRows(zip);return {...output,blob:await zip.generateAsync({type:'blob',mimeType:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',compression:'DEFLATE'})};
  }
- async function makeWorkbook(pages){
+ function workbookFiles(pages){
   if(!Array.isArray(pages)||!pages.length)throw Error('There are no timetables to export.');
-  const names=sheetNames(pages),zip=new JSZip(),relationships='http://schemas.openxmlformats.org/package/2006/relationships';
+  const names=sheetNames(pages),files={},zip={file:(path,value)=>{files[path]=value;}},relationships='http://schemas.openxmlformats.org/package/2006/relationships';
   zip.file('[Content_Types].xml',declaration+'<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>'+pages.map((_,i)=>'<Override PartName="/xl/worksheets/sheet'+(i+1)+'.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>').join('')+'</Types>');
   zip.file('_rels/.rels',declaration+'<Relationships xmlns="'+relationships+'"><Relationship Id="rId1" Type="'+rel+'/officeDocument" Target="xl/workbook.xml"/></Relationships>');
   zip.file('xl/workbook.xml',declaration+'<workbook xmlns="'+ns+'" xmlns:r="'+rel+'"><bookViews><workbookView activeTab="0"/></bookViews><sheets>'+names.map((name,i)=>'<sheet name="'+xml(name)+'" sheetId="'+(i+1)+'" r:id="rId'+(i+1)+'"/>').join('')+'</sheets><definedNames>'+names.map((name,i)=>{
@@ -181,15 +186,43 @@ var RosterExport=(()=>{
    return '<definedName name="_xlnm.Print_Area" localSheetId="'+i+'">'+xml(sheet+'$A$1:$'+column(pages[i].columns.length-1)+'$'+(pages[i].rows.length+headers))+'</definedName><definedName name="_xlnm.Print_Titles" localSheetId="'+i+'">'+xml(sheet+'$1:$'+headers)+'</definedName>';
   }).join('')+'</definedNames></workbook>');
   zip.file('xl/_rels/workbook.xml.rels',declaration+'<Relationships xmlns="'+relationships+'">'+pages.map((_,i)=>'<Relationship Id="rId'+(i+1)+'" Type="'+rel+'/worksheet" Target="worksheets/sheet'+(i+1)+'.xml"/>').join('')+'<Relationship Id="rId'+(pages.length+1)+'" Type="'+rel+'/styles" Target="styles.xml"/></Relationships>');
-  zip.file('xl/styles.xml',stylesXml());
+  zip.file('xl/styles.xml',pages.some(p=>p.dailyTeacher)?dailyStylesXml():stylesXml());
   pages.forEach((page,i)=>zip.file('xl/worksheets/sheet'+(i+1)+'.xml',sheetXml(page)));
-  await fitWorkbookRows(zip);
-  return {blob:await zip.generateAsync({type:'blob',mimeType:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',compression:'DEFLATE'}),sheetNames:names};
+  return {files,sheetNames:names};
  }
+ async function makeWorkbook(pages){const prepared=workbookFiles(pages),zip=new JSZip();for(const [path,value] of Object.entries(prepared.files))zip.file(path,value);await fitWorkbookRows(zip);return {blob:await zip.generateAsync({type:'blob',mimeType:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',compression:'DEFLATE'}),sheetNames:prepared.sheetNames};}
  function dailyRelief(data){
   if(!data||!Array.isArray(data.periods)||!Array.isArray(data.rows))throw Error('The relief export is unavailable.');
   return {name:'Relief '+data.date,sheetName:'Relief '+data.date,periodColumnWidth:12,weekLabel:'',title:'GSiS Daily Relief · '+data.date,subtitle:data.legend+' Allocation revision '+data.allocationRevision+'. Exported '+data.exportedAt,columns:['Absent teacher / activity',...data.periods.map(p=>'P'+p.period+'\n'+p.start+'\n'+p.end)],periods:data.periods,rows:data.rows.map(row=>({day:row.name,cells:data.periods.map((p,i)=>String(row.cells[i]?.text||'')),styles:data.periods.map((p,i)=>['draft','no-relief'].includes(row.cells[i]?.status)?6:row.cells[i]?.status==='unassigned'?7:5)}))};
  }
- return {dailyRelief,dayModel,dayPages,names,pages,tableHtml,makeWorkbook,fitWorkbook,fitWorkbookRows,fitWorksheetRows,fields,groupName};
+ // Shared operational overlay for the browser Stapler export and scheduled day file.
+ function applyReliefSummary(summary,{read,write,periodCount,includeReasons=true,coveredBy=false}){
+  const key=(id,p)=>id+'|'+p,period=p=>{if(!Number.isInteger(p)||p<0||p>=periodCount)throw Error('An operational period does not match this timetable.');},byDemand=new Map(summary.assignments.map(a=>[a.demandId,a])),demands=new Map(),absent=new Set(),covered=new Set();
+  for(const group of summary.demands)for(const dem of group.members||[group]){const slot=key(dem.staffId,dem.period);if(!demands.has(slot))demands.set(slot,[]);demands.get(slot).push({dem,assignment:byDemand.get(group.id)});}
+  for(const absence of summary.absences)for(const p of absence.periods){
+   period(p);const values=read(absence.staffId,p),checks=demands.get(key(absence.staffId,p))||[],unresolved=checks.some(({dem,assignment:a})=>!dem.noReliefRequired&&(!a||a.remove)),noRelief=checks.length&&checks.every(({dem,assignment:a})=>a&&!a.remove?a.noRelief:dem.noReliefRequired),reason=includeReasons?' — '+(absence.reason||'Unspecified'):'';
+   values[0]=(values.some(Boolean)?(values[0]||'Lesson')+' (absent'+reason+')':'Absent'+reason)+(unresolved?' [UNASSIGNED]':noRelief?' [No Relief Needed]':'');
+   const covers=[...new Set(checks.map(({assignment:a})=>a&&!a.remove&&!a.noRelief&&(a.relieverName||a.staffId)).filter(Boolean))];if(coveredBy&&covers.length)values[0]+=' · Covered by '+covers.join(', ');
+   write(absence.staffId,p,values,'grey');absent.add(key(absence.staffId,p));
+  }
+  for(const a of summary.assignments.filter(a=>!a.noRelief&&!a.remove).sort((a,b)=>Number(!!a.combination)-Number(!!b.combination))){
+   period(a.period);const slot=key(a.staffId,a.period),current=read(a.staffId,a.period),combined=a.combination===true;
+   if(absent.has(slot)||covered.has(slot)&&!combined||current.some(Boolean)&&!combined&&!a.repurposedDuty)throw Error('Relief clashes detected: '+(a.relieverName||a.staffId)+', period '+a.period+'. Review this allocation before exporting.');
+   const absentName=a.absentName||[...new Set((a.members||[]).map(m=>m.name).filter(Boolean))].join(', '),label=(a.subject||'Relief')+(absentName?' (for '+absentName+')':'')+(combined?' [Combined]':'')+(a.repurposedDuty?' [Repurposed recess duty]':'')+(a.status==='completed'?' [Completed]':a.status==='draft'?'':' [Published]'),next=[label,a.className||'',a.venue||'',a.groupName||''];
+   write(a.staffId,a.period,combined?current.map((v,i)=>[v,next[i]].filter(Boolean).join(' + ')):next,'orange');covered.add(slot);
+  }
+ }
+ function dailyTeacherPage(data,{final=false}={}){
+  const summary=data?.teacherSummary,plan=summary?.plan;if(!plan||!data.periods?.length)throw Error('The teacher timetable export is unavailable.');
+  const teachers=[...new Map([...plan.teachers,...summary.addedTeachers||[]].map(t=>[t.staffId,t])).values()].sort((a,b)=>collator.compare(a.timetableName||a.name,b.timetableName||b.name)||a.staffId.localeCompare(b.staffId)),grid=new Map(teachers.map(t=>[t.staffId,data.periods.map(()=>({values:['','','',''],colour:'clear'}))])),classes=new Map(plan.classes.map(c=>[c.id,c.name]));
+  const read=(id,p)=>{const value=grid.get(id)?.[p];if(!value)throw Error('An operational teacher is missing from the workbook. Refresh Name Bridge and retry.');return value.values.slice();},write=(id,p,values,colour)=>{read(id,p);grid.get(id)[p]={values:values.map(v=>String(v??'')),colour};};
+  for(const tile of plan.tiles.filter(t=>t.kind==='lesson'&&t.location==='grid'))if(grid.has(tile.teacherId))write(tile.teacherId,tile.period,[tile.subject,tile.classIds.map(id=>classes.get(id)||'').join(', '),tile.venue,tile.group],tile.baselineId?'clear':'pink');
+  applyReliefSummary(summary,{read,write,periodCount:data.periods.length,includeReasons:false,coveredBy:true});
+  const style={orange:8,pink:9,grey:10,clear:11},rows=teachers.flatMap(t=>Array.from({length:4},(_,field)=>({teacherId:t.staffId,field,day:field?'':t.timetableName||t.name,cells:data.periods.map((_,p)=>read(t.staffId,p)[field]),colours:grid.get(t.staffId).map(c=>c.colour),styles:grid.get(t.staffId).map(c=>style[c.colour])})));
+  for(const [colour,label] of [['orange','Relief'],['pink','Extra lesson'],['grey','Absent'],['clear','No fill: timetable lesson or free period']])rows.push({day:colour==='orange'?'Legend':'',cells:data.periods.map((_,i)=>i?'':label),styles:data.periods.map((_,i)=>i?11:style[colour])});
+  const at=new Date(data.exportedAt),clock=Number.isFinite(at.getTime())?new Date(at.getTime()+28800000).toISOString().slice(11,16):'unknown',weekday=new Intl.DateTimeFormat('en-GB',{weekday:'long',timeZone:'Asia/Singapore'}).format(new Date(data.date+'T00:00:00+08:00'));
+  return {dailyTeacher:true,name:'Daily Relief',sheetName:data.date+' Relief',periodColumnWidth:22,periods:data.periods,title:'Gongshang Primary School · Daily Relief · '+data.date+' '+weekday,subtitle:(data.timetableName||(summary.staplerStatus!=='baseline'?'Stapler plan':'Baseline timetable'))+' · Subject / Class / Venue / Group',status:final?'FINAL (day closed) · revision '+data.revision:'LATEST as of '+clock+', revision '+data.revision,columns:['Teacher',...data.periods.map(p=>'P'+p.period)],rows};
+ }
+ return {dailyTeacherPage,applyReliefSummary,workbookFiles,dailyRelief,dayModel,dayPages,names,pages,tableHtml,makeWorkbook,fitWorkbook,fitWorkbookRows,fitWorksheetRows,fields,groupName};
 })();
 if(typeof module!=='undefined'&&module.exports)module.exports=RosterExport;

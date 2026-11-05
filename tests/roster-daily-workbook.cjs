@@ -1,0 +1,18 @@
+'use strict';
+const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm'),JSZip=require('jszip'),{JSDOM}=require('jsdom');
+const context={window:{},console,TextEncoder,Blob,module:{exports:{}}};vm.createContext(context);vm.runInContext(fs.readFileSync('roster-update/public/roster-export.js','utf8'),context);const renderer=context.module.exports;
+vm.runInContext(fs.readFileSync('roster-update/public/excel-export.js','utf8'),context);const excel=context.window.GSISExcel;
+const periods=Array.from({length:4},(_,period)=>({period,startMinutes:450+30*period,endMinutes:480+30*period}));
+const plan={date:'2026-11-06',periods,teachers:[{staffId:'absent',name:'Anna',timetableName:'Anna'},{staffId:'cover',name:'Ben',timetableName:'Ben'},{staffId:'empty',name:'Cara',timetableName:'Cara'}],classes:[{id:'c',name:'3 Respect'}],tiles:[{kind:'lesson',location:'grid',teacherId:'absent',period:1,subject:'MA',classIds:['c'],venue:'R1',group:'Whole class',baselineId:'original'},{kind:'lesson',location:'grid',teacherId:'cover',period:2,subject:'SC',classIds:['c'],venue:'Lab',group:'',baselineId:null}]};
+const summary={plan,addedTeachers:[{staffId:'adhoc',name:'Dana',timetableName:'Dana'}],absences:[{staffId:'absent',periods:[1],reason:'PRIVATE MEDICAL'}],demands:[{id:'d',staffId:'absent',period:1,name:'Anna'}],assignments:[{id:'a',demandId:'d',staffId:'cover',period:1,subject:'MA',className:'3 Respect',venue:'R1',groupName:'Whole class',absentName:'Anna',relieverName:'Ben',status:'published'}]};
+(async()=>{
+ const page=renderer.dailyTeacherPage({date:plan.date,periods,teacherSummary:summary,revision:42,exportedAt:'2026-11-06T01:05:00Z',timetableName:'Term 4'},{final:false});
+ assert.equal(page.rows.filter(r=>r.teacherId).length,16);assert.equal(page.rows.filter(r=>r.teacherId==='empty').length,4);assert.equal(page.rows.filter(r=>r.teacherId==='adhoc').length,4);
+ const source=page.rows.filter(r=>r.teacherId==='absent').map(r=>r.cells[1]);assert.match(source[0],/absent/i);assert.match(source[0],/Ben/);assert.deepEqual(Array.from(source.slice(1)),['3 Respect','R1','Whole class']);
+ const covered=page.rows.filter(r=>r.teacherId==='cover');assert.match(covered[0].cells[1],/MA \(for Anna\).*Published/);assert.equal(covered[0].colours[1],'orange');assert.equal(covered[0].colours[2],'pink');assert.equal(page.rows.find(r=>r.teacherId==='empty').colours[0],'clear');
+ assert(!JSON.stringify(page).includes('PRIVATE MEDICAL'));assert.match(page.status,/LATEST as of 09:05, revision 42/);assert.match(renderer.dailyTeacherPage({date:plan.date,periods,teacherSummary:summary,revision:42,exportedAt:'2026-11-07T00:01:00+08:00'},{final:true}).status,/FINAL/);
+ const parts=renderer.workbookFiles([page]),blob=excel.packageFiles(parts.files),zip=await JSZip.loadAsync(await blob.arrayBuffer()),xml=await zip.file('xl/worksheets/sheet1.xml').async('string'),styles=await zip.file('xl/styles.xml').async('string');
+ const doc=new JSDOM(xml,{contentType:'application/xml'}).window.document,pane=doc.querySelector('pane');assert.equal(pane.getAttribute('xSplit'),'1');assert.equal(pane.getAttribute('ySplit'),'5');assert.equal(pane.getAttribute('topLeftCell'),'B6');assert.match(xml,/Legend/);assert.match(xml,/Subject \/ Class \/ Venue \/ Group/);
+ for(const rgb of ['FFFFC000','FFFFDCE3','FFD9D9D9'])assert(styles.includes(rgb));assert.match(styles,/FF777777/);assert(!xml.includes('PRIVATE MEDICAL'));assert(!doc.querySelector('f'),'names and cards are literal text');
+ console.log('daily workbook shares the export renderer: four rows, active/ad-hoc blanks, panes, field content, colours, legend and privacy');
+})().catch(e=>{console.error(e);process.exitCode=1;});
