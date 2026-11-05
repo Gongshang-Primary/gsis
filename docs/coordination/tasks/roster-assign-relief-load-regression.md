@@ -1,6 +1,6 @@
 # roster-assign-relief-load-regression: v0.9.9k Assign Relief read exceeds the Worker timeout (incident 4 Nov)
 
-- Status: open; Codex, lane R, top priority (blocks the D1 cutover and v0.9.9k)
+- Status: open; Codex, lane R, TOP PRIORITY after v0.9.9l (l includes #68 and adds #80/#78 work; may time out like k). Measure on main 1f759a9.
 - Reviewer/model: Claude
 - Last updated (Asia/Singapore): 4 Nov 2026 16:20
 
