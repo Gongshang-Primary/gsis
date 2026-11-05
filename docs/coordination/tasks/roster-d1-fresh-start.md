@@ -157,3 +157,10 @@ Fresh local checks passed after the final source change: `npm run build`, `roste
 The full four-shard Node/LORD matrix and browser portability checks are required on the final PR head; PR #79 records the completed result and run URL. The runner's six optional historical comparison branches remain excluded; current behavior assertions stay selected. Initial local test setup failures from missing generated ZIPs and an unset Chromium path were corrected by running the canonical build in every isolated worktree and supplying the installed browser, without changing tests or assertions.
 
 No deployment, live Google/D1/R2 write, provider send, authority flag change or merge was performed. Remaining gate: Claude reviews the exact final head, then the owner decides the merge and cutover. Future absences are re-entered by the owner; within-week usage, rotation and SRE history are not imported.
+
+## Live evidence, fresh start night (5-6 Nov 2026, owner on edge-setup, Claude checking D1)
+- 22:57 D1 reset; 23:03 Google frozen; ~23:05 Start fresh prepared (roster 112 records, register 5, all history empty; start date recorded as 2026-11-05, not 06); 23:09:59 activated.
+- Baseline uploaded on D1; Assign Relief 6 Nov loads. Opening balances proposed from frozen Google (as of 4 Nov; 5 Nov relief not included, correction pending) and confirmed.
+- 19 absences re-entered for 6 Nov; Auto-allocate 23:54: 0 uncovered, preparation 0.8 s.
+- Stapler plan for 6 Nov created and confirmed on D1; owner: "stapler works. reload, reallocate all works."
+- Open: WhatsApp test to owner before re-enabling sends; audit export to Drive after quiet mode ends; 5 Nov relief counts to add to opening balances; Zero Trust temporary app to remove after acceptance.

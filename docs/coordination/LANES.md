@@ -50,6 +50,7 @@ Codex, urgent lane R (owner 3 Nov 08:37): `tasks/roster-peer-quota-override.md`:
 
 Muse pilot (owner 3 Nov): 1) `tasks/overlord-dismiss-past-unknowns.md` (lane L UI), then 2) `tasks/calendar-deploy-version-check.md` (lane K tooling). Review by Claude before any next Muse task.
 Muse (owner 6 Nov ~00:50, "let muse work on this"): `tasks/deploy-contacts-catalogue-sync.md` (Deploy/Contacts, not lane R).
+Muse, owner exception 6 Nov ~01:30: `tasks/stapler-add-tile-teacher-search.md` (Stapler UI only, roster-stapler-ui.js; disjoint from Codex's lane R files). One PR at a time: finish the Contacts task first unless the owner says otherwise.
 
 Owner 1 Nov 2026 08:05: "allocate any left PR to codex". All open work goes to Codex, in this order. Updated 1 Nov 19:10 after the first cutover attempt refused activation.
 
