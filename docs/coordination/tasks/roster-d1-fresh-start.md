@@ -1,6 +1,6 @@
 # roster-d1-fresh-start: start Roster on D1 without history and without baseline timetables
 
-- Status: route C implemented; full CI and exact-head review tracked on PR #79; Codex, lane R
+- Status: merged (#79 at 7b17c86 as 9fe5faa, owner "merge", 5 Nov); not yet in a release bundle. Review: docs/coordination/review/pr79-claude-review.md
 - Reviewer/model: Claude
 - Last updated (Asia/Singapore): 5 Nov 2026 16:49
 
