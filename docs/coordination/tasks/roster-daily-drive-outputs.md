@@ -1,6 +1,6 @@
 # roster-daily-drive-outputs: daily Excel + LLM-readable decisions log on the GSiS Drive home base
 
-- Status: authorised (owner "codex work", 5 Nov evening); Codex, lane R; priority 2 of the Drive work. Spec by Claude under the standing rule (owner intent, Claude specifies).
+- Status: claimed; Model: Codex; lane R; priority 2 of the owner-authorised Drive work. Spec by Claude under the standing rule (owner intent, Claude specifies).
 - Reviewer/model: Claude. Related: roster-d1-backup-ledger (same writer, ledger and home base).
 
 ## Owner intent (verbatim, 5 Nov)
@@ -59,3 +59,25 @@
 
 ## Small addition (5 Nov 20:46 message)
 The "Relief Capacity Warning" WhatsApp read "Relief capacity: P1 has 2 eligible opportunities. Health 100.0%. 46 uncovered periods. Relief Health: 100.0%". "Health 100%" beside 46 uncovered periods contradicts itself and the P1 line is unclear. Fix the wording in the same PR (template body is approved; change only the variable text): name what is short ("46 periods uncovered; fewest eligible teachers: P1 with 2"), and either define Relief Health in plain words or drop it when uncovered > 0.
+
+
+## Implementation claim (Model: Codex)
+
+Owner/model: Codex. Reviewer: Claude at the exact PR head. Owner merges.
+Updated: 2026-11-05 22:36 SGT.
+Branch: `codex/roster-daily-drive-outputs`.
+Base main: `75fb5d4c642c920a01c63d6d56b6e2af68dada2f`.
+Dependency: backup PR #81 at `644108ffc2eac254aa4b4f560b5105d51d7f591c`. The owner explicitly ordered this follow-on after the backup work. The same implementer works serially; #81 is frozen for review. This branch starts from the accepted claim, brings in that shared implementation, and targets its branch as a separate stacked PR. No duplicated ledger or writer.
+
+Scope: existing Roster/Stapler Excel renderer; backend/RosterAuditExport.gs and exportEdgeAudit; a D1 date queue processed only by the background Worker; the existing dedicated Drive writer and gsis_backup_ledger; System Config/Health; allocation evidence and capacity-warning variable wording; canonical generated copies, focused tests and task record. No deployment, live writes, notifications, sharing changes, frozen archive writes or authority change.
+
+Acceptance: one daily workbook with frozen headings/teacher column, all active and day-activated ad-hoc teachers, four rows each, Stapler colours and privacy; the existing audit TXT keeps its path and event trail with a summary/glossary/Why evidence; two-minute coalescing, midnight FINAL then immutable, failure retries/alerts; fresh-start support; canonical build and all Node/LORD checks green. Exact implementation SHA and final review head recorded at handoff.
+
+Plan:
+1. Extend the existing export renderer with a pure one-day teacher page and shared XLSX package path; test cell parity, panes, empty/ad-hoc teachers and colours.
+2. Extend the existing audit text builder in place, adding factual captured decision evidence and privacy-safe summaries; reuse it from D1 without changing file identity or quiet-mode behavior.
+3. Add a durable date queue and immutable finalisation metadata; observe committed revision changes in D1, coalesce writes and perform all rendering/provider work on the timer. Reuse the guarded writer and ledger, with read-back hashes and retained failure evidence.
+4. Add Admin output configuration and System Health results/alerts; correct the approved warning variables. Test triggers, provider failure/retry, fresh-start, quiet mode, finalisation and save latency.
+5. Rebuild canonical copies; run focused checks, full Node/LORD CI and advisory review; open a draft PR naming Claude and its exact head.
+
+Current outcome: claimed only, implementation not started. No live actions.
