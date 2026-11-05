@@ -10,8 +10,8 @@
 - "the daily (each school day) should be updated at fixed time events eg after each publish and after each autoallocate i.e. OK to be 'latest accurate' and stop being updated once the calendar day has passed"
 
 ## Drive layout (home base = folder GSiS, id 1pVI5eS4NWxbr8Ct0-2mmYVZEQZwa68_Z)
-- `06 Roster Daily/<YYYY-MM>/` : `<YYYY-MM-DD> Relief.xlsx` and `<YYYY-MM-DD> Roster decisions.md` (one pair per school day; each update overwrites the same file id, so Drive version history keeps every version).
-- `07 Roster Backups/` : restricted ("limited access" folder, inherited access off): Admin only; backup JSON, manifests (roster-d1-backup-ledger).
+- (withdrawn, see Owner answers) `06 Roster Daily/<YYYY-MM>/` : `<YYYY-MM-DD> Relief.xlsx` and `<YYYY-MM-DD> Roster decisions.md` (one pair per school day; each update overwrites the same file id, so Drive version history keeps every version).
+- (withdrawn) `07 Roster Backups/` : restricted ("limited access" folder, inherited access off): Admin only; backup JSON, manifests (roster-d1-backup-ledger).
 - Folder ids are stored in System Config (Admin), never hard-coded; the writer refuses any folder outside the home base and never writes into the frozen Google archive files.
 - Security note: the home base also holds credentials material ("Cloudflare 2FA Token Code" doc, "Cloudflare R2 API" folder). Any wider sharing must be on the `06 Roster Daily` folder only, never on the home base. Recommend moving credentials out of the shared drive into a password manager.
 
@@ -43,6 +43,16 @@
 - Triggers: auto-allocate and publish enqueue; burst of saves coalesces to one write; FINAL after midnight; no writes for a closed day; writer refuses folders outside the home base.
 - Failure: Drive error recorded, retried, alerted; Roster save latency unchanged.
 
-## Open owner questions (policy)
-1. Who may read `06 Roster Daily`: all teaching staff (view only, via a staff group), or SMC/School Leaders only? Teachers can query with an LLM only if they can open the file.
-2. In the decisions log, may teachers see other teachers' names and fairness numbers for the alternatives considered, or only counts and reason categories (names shown only for the chosen and absent teachers)?
+## Owner answers (5 Nov) and revised design
+1. Access is managed with Google Drive permissions by the owner; GSiS does not manage sharing. (Question closed.)
+2. The LLM workflow already exists: the **Allocation Audit** text export, `01 Live Data/Roster/Allocation Audit/<YYYY>/<MM>/<YYYY-MM-DD>.txt` (backend/RosterAuditExport.gs on Google; `exportEdgeAudit` in roster-update/public/edge-roster.js on D1). **Extend it; do not create a second log.** This replaces the "Decisions log" section above:
+   - Keep the file, folder, name and the existing event trail format unchanged (teachers' prompts depend on it).
+   - Add at the top: a plain-words rules glossary and a "Day summary" (absences by teacher and periods without reasons; each relief lesson with period, class, absent and relief teacher, method, status).
+   - Add to each allocation event a "Why" block: checks passed (free that period, weekly R, consecutive limit, daily cap), the chosen teacher's R% before and after, and the count of other eligible teachers with reason categories. Names of alternatives follow what the existing export already shows; no new personal data.
+   - Size: files reach 1 to 3 MB per day today. Keep the full trail, but put the summary first so an LLM reads the important part within its window.
+   - Verify it runs in D1 fresh-start mode (the Google mirror is off there) and still writes to the same Drive folder; quiet mode pauses it today, keep that.
+3. Folder layout follows the existing tree under the home base, not new top-level folders:
+   - Daily Excel: `01 Live Data/Roster/Daily Relief/<YYYY>/<MM>/<YYYY-MM-DD> Relief.xlsx`.
+   - Backups (roster-d1-backup-ledger): `01 Live Data/Roster/Backups/` (owner sets its Drive permissions).
+   The `06 Roster Daily` / `07 Roster Backups` names above are withdrawn.
+4. The credentials note is not a GSiS output: those two items were placed in the home base by hand. GSiS never writes credentials, tokens or private links to Drive (tested).
