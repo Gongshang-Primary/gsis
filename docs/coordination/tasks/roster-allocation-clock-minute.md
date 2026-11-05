@@ -26,12 +26,3 @@ Add to the PR:
 6. Scope the dependency digest to the inputs of the date being planned: that date's absences/demands, assignments, requests/peer arrangements, Stapler plan, day revision, timetable/quota references and allocation settings. Unrelated collections and other dates must not invalidate the plan; merge them at commit (rosterOperationsMergePrepared_) as today.
 7. Interactive Auto-allocate must win against the scheduled cycle for the same date: while an SMC run is preparing, the scheduled run for that date skips (SKIPPED_BUSY), using the existing allocation run record.
 8. Tests: an unrelated write during preparation commits; a same-date absence/assignment change conflicts; scheduled run defers to an active SMC run.
-
-## Claude review of PR #80 at exact head bb15ae5 (5 Nov)
-- Verdict: approve for merge (owner decides). CI full-suite green (run 41944141074). Claude locally: clock-minute, dependencies, clock-ui and day-transactions tests pass; canonical `npm run build` at bb15ae5 leaves no diff (generated files current).
-- Checked: `prepareClock`/`preparedClockConflict` (shared/roster-allocation.js) commit harmless minute changes, conflict only on date change, period start, passed cutoff or missing period times; Google and D1 both use it at the final write. The dependency digest now covers dated planning facts plus derived balances and rotation, so unrelated writes merge. The scheduled cycle returns SKIPPED_BUSY while a manual run owns the date (Google and D1).
-- Risks to watch after deploy (not blockers):
-  1. Speed: the new digest computes `balances` per planned date and `rotation` per year, twice per run (prepare and final check). No production timing was measured. Google is already slow (roster-assign-relief-load-regression). Watch the new System Health preparation durations on the first day; if preparation grows, this is the first suspect.
-  2. `saveAbsence` treats every period end of today as a cutoff, so an absence save that spans a period end gets one silent re-preparation, then a clock-conflict message. Acceptable; tell SMC the message means "try again".
-  3. The day token still uses `baseline: active||ctx.days[d].id`. Under the owner's Stapler delink ruling (roster-d1-timetable-reconcile-cancels) the Stapler-day id must come from the plan; the #78 rework must update this token too.
-- Supersedes `claude/hotfix-clock-minute` (134816a). After #80 is merged and deployed, the hand-edited hotfix in Apps Script is replaced by the bundle; do not merge the hotfix branch.
