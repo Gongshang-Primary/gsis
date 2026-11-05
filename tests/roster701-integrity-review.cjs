@@ -386,22 +386,25 @@ function publishedFixture(mutual = false) {
   return { state, ctx };
 }
 
-test('read reconciliation persists changed timetable cancellation and never resurrects old cover', () => {
+test('read reconciliation retains published peer cover without cancellation notices across repeated reads', () => {
   const { state } = publishedFixture(true);
-  // Legacy publications still reconcile durable cancellation notices; H daily publication
-  // uses the explicit Notify action instead of implicitly queuing a send.
+  // Exercise the legacy publication path as well as the current daily publication path.
   delete state.dailyPublicationStates[TODAY];
+  const originalSnapshots = clone(state.publicationSnapshots), originalOutbox = clone(state.outbox);
   const h = adapter(state);
   h.ctx.timetableEntries = [];
   const result = h.call({ operation: 'read', date: TODAY }, { staffId: 'c', email: 'c@gsps.edu.sg' });
-  assert.equal(result.myDuties.length, 0);
-  assert.equal(result.myDutyUpdates.length, 1);
-  assert.match(result.myDutyUpdates[0].cancellationReason, /timetable changed/);
-  assert.equal(h.state().assignments[0].status, 'cancelled');
-  assert(h.state().publicationSnapshots.some(v=>v.kind==='cancelled'&&v.staffId==='c'));
-  assert(h.state().outbox.some(j=>j.kind==='relief_publication'&&j.recipientId==='c'));
+  assert.equal(result.myDuties.length, 1);
+  assert.equal(result.myDutyUpdates.length, 0);
+  assert.equal(h.state().assignments[0].status, 'published');
+  assert.deepEqual(h.state().publicationSnapshots, originalSnapshots);
+  assert.deepEqual(h.state().outbox, originalOutbox);
+  const writes = h.writes();
+  assert.equal(h.call({ operation: 'read', date: TODAY }, { staffId: 'c' }).myDuties.length, 1);
+  assert.equal(h.writes(), writes, 'Repeated read does not persist the same blocked reconciliation again');
   h.ctx.timetableEntries = [{ id: 'baseline', from: '2026-01-01', to: '2026-12-31' }];
-  assert.equal(h.call({ operation: 'read', date: TODAY }, { staffId: 'c' }).myDuties.length, 0);
+  assert.equal(h.call({ operation: 'read', date: TODAY }, { staffId: 'c' }).myDuties.length, 1);
+  assert.equal(h.state().assignments[0].status, 'published');
 });
 
 test('Calendar outage preserves published cover and past snapshots while withholding availability', () => {
@@ -416,6 +419,9 @@ test('Calendar outage preserves published cover and past snapshots while withhol
   h.ctx.timetableEntries = [];
   const after = h.call({ operation: 'read', date: TODAY }, { staffId: 'c' });
   assert.deepEqual(Array.from(after.myDuties, row => row.id), [state.assignments[0].id, 'past-snapshot']);assert(h.state().assignments[0].invalidCover,'SMC decision is retained and flagged');
+  assert.equal(after.myDutyUpdates.length, 0);
+  assert.equal(h.state().assignments[0].status, 'published');
+  assert(!h.state().publicationSnapshots.some(v => v.kind === 'cancelled'));
 });
 
 test('concurrent delivery updates cannot be overwritten by read reconciliation', () => {
@@ -432,6 +438,7 @@ test('concurrent delivery updates cannot be overwritten by read reconciliation',
   assert.equal(h.state().outbox[0].deliveryStatus, 'read');
   assert.deepEqual(h.state().deliveryEvents, ['race-delivery']);
   assert.equal(h.state().assignments[0].status, 'published');assert(h.state().assignments[0].invalidCover);
+  assert(!h.state().publicationSnapshots.some(v => v.kind === 'cancelled'));
 });
 
 test('queue claims, send results and delivery callbacks do not stale the next school save', () => {

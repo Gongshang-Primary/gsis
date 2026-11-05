@@ -71,7 +71,7 @@ function rosterNotificationEligible_(s,j,now,fresh,index,allowed){
  if(['stapler_request','stapler_decision'].includes(j.kind)){const requester=fresh.rosterPeople.find(x=>x.id===j.data.requesterId);if(!requester?.name)return 'The requesting teacher no longer exists in Contacts.';j.data.requesterName=requester.name;}
  const person=fresh.rosterPeople.find(x=>x.id===j.recipientId);
  if(!person)return 'Recipient no longer exists in Contacts.';
- if(j.kind==='stapler_timetable'&&!j.data.communicationSnapshot){const plan=j.data.dailyPublication?s.dailyPublicationStates?.[j.date]:s.staplerPlans.find(r=>r.date===j.date);index.timetableEntries=index.timetableEntries||fresh.timetableEntries||[];if(!plan||GSISRoster.active(index.timetableEntries,j.date)?.id!==plan.baselineId)return 'The active baseline timetable changed.';}
+ if(j.kind==='stapler_timetable'&&!j.data.communicationSnapshot){const plan=j.data.dailyPublication?s.dailyPublicationStates?.[j.date]:s.staplerPlans.find(r=>r.date===j.date);if(!plan)return 'The saved timetable is unavailable.';}
  if(j.kind==='stapler_request'&&(!(fresh.rosterSMCIds||[]).includes(j.recipientId)||!GSISRosterOperations.teacherSponsor(person)))return 'The nominated sponsor is no longer an eligible teacher.';
  if(j.kind==='stapler_decision'&&j.data.audience==='stapler-sponsor'&&(!(fresh.rosterSMCIds||[]).includes(j.recipientId)||!GSISRosterOperations.teacherSponsor(person)))return 'The nominated sponsor is no longer an eligible teacher.';
  if(j.kind==='contact_review'&&!(fresh.rosterAdminIds||[]).includes(j.recipientId))return 'Recipient is no longer a Contacts Admin.';

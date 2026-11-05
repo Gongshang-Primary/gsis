@@ -69,19 +69,22 @@
   payload={...payload,models:payload.models.map(row=>({id:row.id,model:models.get(row.id)}))};
   return {payload:freeze(payload),days};
  }
+ const nativePlan=plan=>plan?.schema===1&&Array.isArray(plan.tiles)&&Array.isArray(plan.baseline?.tiles)&&Array.isArray(plan.periods)&&Array.isArray(plan.teachers)&&Array.isArray(plan.classes);
+ const independentPlan=row=>nativePlan(row?.plan)&&(!row.confirmedPlan||nativePlan(row.confirmedPlan));
+ const planId=plan=>plan.id||'stapler:'+plan.date;
  function suspendedStage(payload,baseline,canReadDrafts){
   if(payload.baselineKey!==baseline.payload.baselineKey||!Number.isSafeInteger(payload.operationsRevision)||payload.operationsRevision<0||!Array.isArray(payload.plans)||payload.plans.length>31||!object(payload.datesView)||!Array.isArray(payload.datesView.dates)||payload.datesView.dates.length>31)throw failure();
   const plans=new Map(),listed=new Set(),inWindow=d=>date(d)&&d>=payload.from&&d<=payload.to;
   for(const row of payload.plans){
    if(!object(row)||!inWindow(row.date)||plans.has(row.date)||!['draft','confirmed'].includes(row.viewMode)||row.viewMode==='draft'&&!canReadDrafts||!Number.isSafeInteger(row.revision)||row.revision<1||typeof row.baselineId!=='string'||!row.baselineId||!object(row.plan)||row.plan.date!==row.date||row.plan.baselineId!==row.baselineId)throw failure();
    const active=baseline.days.get(row.date);
-   if(row.baselineChanged!==true&&active?.entry.id!==row.baselineId)throw failure();
+   if(!independentPlan(row)&&row.baselineChanged!==true&&active?.entry.id!==row.baselineId)throw failure();
    if(row.confirmedPlan!=null&&(!object(row.confirmedPlan)||row.confirmedPlan.date!==row.date||row.confirmedPlan.baselineId!==row.baselineId||!Number.isSafeInteger(row.confirmedRevision)||row.confirmedRevision<1))throw failure();
-   if(row.timetableDay!=null&&(!object(row.timetableDay)||row.timetableDay.date!==row.date||row.timetableDay.baselineId!==row.baselineId||!['baseline','published','confirmed'].includes(row.timetableDay.source)||!Array.isArray(row.timetableDay.teachers)||!Array.isArray(row.timetableDay.periods)))throw failure();
-   plans.set(row.date,row);
+   if(row.timetableDay!=null&&(!object(row.timetableDay)||row.timetableDay.date!==row.date||![row.baselineId,...(independentPlan(row)?[planId(row.confirmedPlan||row.plan)]:[])].includes(row.timetableDay.baselineId)||!['baseline','published','confirmed'].includes(row.timetableDay.source)||!Array.isArray(row.timetableDay.teachers)||!Array.isArray(row.timetableDay.periods)))throw failure();
+   plans.set(row.date,independentPlan(row)?{...row,baselineChanged:false}:row);
   }
   for(const row of payload.datesView.dates){if(!object(row)||!inWindow(row.date)||listed.has(row.date))throw failure();listed.add(row.date);}
-  return {payload:freeze(payload),plans};
+  return {payload:freeze({...payload,plans:[...plans.values()],datesView:{...payload.datesView,dates:payload.datesView.dates.map(row=>independentPlan(plans.get(row.date))?{...row,baselineChanged:false}:row)}}),plans};
  }
  // Timetable checks are independent of operational refreshes. Before :20 the
  // current check slot is the preceding hour; local calendar days are Singapore.
@@ -97,6 +100,12 @@
   const current=()=>{const owner=typeof scope==='function'?scope():scope,from=typeof today==='function'?today():today;return owner&&date(from)?{owner,from,role:allowsDrafts(),key:JSON.stringify([owner,allowsDrafts()])}:null;};
   const store=()=>window.RosterBaselineCache;
   const reusableModels=()=>new Map((baseline?.payload.models||[]).map(row=>[baseline.payload.modelKeys?.[row.id]||row.contentKey,row.model]).filter(([key])=>key));
+  function dayProjection(cache,key,d,build){
+   const independent=independentPlan(key),source=independent?null:baseline?.days.get(d)||null,prior=cache.get(key);
+   if(prior&&prior.source===source)return prior.value;
+   const value=freeze(build(independent?planId(key.plan):source?.entry.id||null));cache.set(key,{source,value});return value;
+  }
+  function retainIndependentPlans(){if(!suspended)return;const plans=new Map([...suspended.plans].filter(([,row])=>independentPlan(row))),kept=new Set(plans.keys());suspended={...suspended,sourceKey:null,plans,payload:freeze({...suspended.payload,plans:[...plans.values()],planKeys:Object.fromEntries(Object.entries(suspended.payload.planKeys||{}).filter(([d])=>kept.has(d))),datesView:{...suspended.payload.datesView,dates:suspended.payload.datesView.dates.filter(row=>kept.has(row.date))}})};}
   function clear(){generation++;identity=null;baseline=null;suspended=null;pending=null;complete=false;checkedAt=0;checkedDay="";restored=false;restoring=null;}
   function check(){const value=current();if(identity&&value?.key!==identity.key)clear();if(identity&&value?.from!==identity.from){generation++;pending=null;complete=false;identity=value;}return value;}
   function isDue(now=Date.now()){const value=check(),last=checkSlot(checkedAt),slot=checkSlot(now);return !value||!complete||!checkedAt||checkedDay!==value.from||slot.slot>last.slot;}
@@ -159,7 +168,7 @@
       delete payload.delta;delete payload.removedDates;
      }
      const next=stage==='baseline'?await baselineStage(payload,assertActive,reusableModels()):suspendedStage(payload,baseline,allowsDrafts());
-     if(stage==='suspended')for(const row of next.plans.values())if(row.baselineContentKey&&next.payload.planKeys&&row.baselineChanged!==true&&row.baselineContentKey!==baseline.payload.modelKeys?.[row.baselineId])throw failure();
+     if(stage==='suspended')for(const row of next.plans.values())if(!independentPlan(row)&&row.baselineContentKey&&next.payload.planKeys&&row.baselineChanged!==true&&row.baselineContentKey!==baseline.payload.modelKeys?.[row.baselineId])throw failure();
      return {next:{...next,bytes:decoded.bytes,sourceKey:value.sourceKey},unchanged:false};
     };
     try{return await read();}catch(error){if(error.code==='TIMETABLE_BATCH_DELTA_INVALID'&&!skipCache)return request(stage,true);if(input.encoding==='gzip-parts-v1'&&error.status===400){input.encoding='gzip-base64-v1';try{return await read();}catch(fallback){error=fallback;}}if(error.code!=='TIMETABLE_BATCH_TRANSPORT'||input.encoding==='json-v1')throw error;input.encoding='json-v1';return read();}
@@ -181,17 +190,17 @@
        if(suspended&&!first.unchanged){
         // A date mapping can change without changing the set of model keys.
         // Fence only incompatible dates before exposing the new baseline stage.
-        const removed=new Set([...suspended.plans.values()].filter(row=>!row.baselineChanged&&(baseline.days.get(row.date)?.entry.id!==row.baselineId||row.baselineContentKey&&row.baselineContentKey!==baseline.payload.modelKeys?.[row.baselineId])).map(row=>row.date));
+        const removed=new Set([...suspended.plans.values()].filter(row=>!independentPlan(row)&&!row.baselineChanged&&(baseline.days.get(row.date)?.entry.id!==row.baselineId||row.baselineContentKey&&row.baselineContentKey!==baseline.payload.modelKeys?.[row.baselineId])).map(row=>row.date));
         if(removed.size){const plans=new Map([...suspended.plans].filter(([d])=>!removed.has(d)));suspended={...suspended,sourceKey:null,plans,payload:freeze({...suspended.payload,plans:[...plans.values()],planKeys:Object.fromEntries(Object.entries(suspended.payload.planKeys||{}).filter(([d])=>!removed.has(d))),datesView:{...suspended.payload.datesView,dates:suspended.payload.datesView.dates.filter(row=>!removed.has(row.date))}})};}
        }
 
        if(!first.unchanged){await onBaseline(baseline.payload);assertActive();}
        status('suspended');let second;
-       try{second=await request('suspended');}catch(error){if(oldBaseline&&oldBaseline.payload.baselineKey!==baseline.payload.baselineKey)suspended=null;throw error;}
+       try{second=await request('suspended');}catch(error){if(oldBaseline&&oldBaseline.payload.baselineKey!==baseline.payload.baselineKey)retainIndependentPlans();throw error;}
        assertActive();suspended=second.next;checkedAt=Date.now();checkedDay=owner.from;complete=true;
        if(!second.unchanged){await onSuspended(suspended.payload);assertActive();}
        try{await persist(!first.unchanged||!second.unchanged);}catch{}assertActive();status('ready');return {phase:'ready'};
-      }catch(error){if(error.stale)throw error;if(attempt===0&&error.status===409&&error.code==='TIMETABLE_BATCH_CHANGED'){baseline=null;suspended=null;continue;}throw error;}
+      }catch(error){if(error.stale)throw error;if(attempt===0&&error.status===409&&error.code==='TIMETABLE_BATCH_CHANGED'){baseline=null;retainIndependentPlans();continue;}throw error;}
      }
     }catch(error){if(error.stale||!active())return {phase:'cancelled'};complete=false;status('failed',error);return {phase:'failed',error};}
    };
@@ -205,9 +214,9 @@
    getPlan(d){const owner=check();if(!owner||d<owner.from||d>endDate(owner.from))return null;const row=suspended?.plans.get(d);return row?copy(row):null;},
    // View-only consumers need a small immutable projection. Planner editing
    // still receives its own deep copy through getPlan().
-   getTimetableStatus(d){const owner=check();if(!owner||d<owner.from||d>endDate(owner.from))return null;const row=suspended?.plans.get(d);if(!row)return null;let value=timetableStatuses.get(row);if(!value){value=freeze({date:row.date,baselineId:row.baselineId,baselineChanged:row.baselineChanged===true,allocationRevision:(row.confirmedPlan||['published','confirmed'].includes(row.timetableDay?.source))?row.revision:0,timetableDay:row.timetableDay||null});timetableStatuses.set(row,value);}return value;},
-   getEffectiveDay(d){const owner=check();if(!owner||d<owner.from||d>endDate(owner.from))return null;const row=suspended?.plans.get(d),plan=row?.confirmedPlan||(row?.viewMode==='confirmed'?row.plan:null);if(!plan||typeof GSISRosterStapler==='undefined')return null;let day=effectiveDays.get(plan);if(!day)try{day=freeze({...GSISRosterStapler.effectiveDay(plan),id:row.baselineId,staplerRevision:row.confirmedRevision||row.revision});effectiveDays.set(plan,day);}catch{return null;}return day;},
-   getReportDay(d){const owner=check();if(!owner||d<owner.from||d>endDate(owner.from))return null;const row=suspended?.plans.get(d);if(!row||!row.confirmedPlan&&!['published','confirmed'].includes(row.timetableDay?.source)||row.viewMode!=='draft'&&row.confirmedRevision!==row.revision||typeof GSISRosterStapler==='undefined')return null;let day=reportDays.get(row);if(!day)try{day=freeze({...GSISRosterStapler.effectiveDay(row.plan),id:row.baselineId,staplerRevision:row.revision});reportDays.set(row,day);}catch{return null;}return day;},
+   getTimetableStatus(d){const owner=check();if(!owner||d<owner.from||d>endDate(owner.from))return null;const row=suspended?.plans.get(d);if(!row)return null;return dayProjection(timetableStatuses,row,d,id=>({date:row.date,baselineId:id,staplerBaselineId:row.baselineId,baselineChanged:row.baselineChanged===true,allocationRevision:(row.confirmedPlan||['published','confirmed'].includes(row.timetableDay?.source))?row.revision:0,timetableDay:row.timetableDay||null}));},
+   getEffectiveDay(d){const owner=check();if(!owner||d<owner.from||d>endDate(owner.from))return null;const row=suspended?.plans.get(d),plan=row?.confirmedPlan||(row?.viewMode==='confirmed'?row.plan:null);if(!plan||typeof GSISRosterStapler==='undefined')return null;try{return dayProjection(effectiveDays,row,d,()=>({...GSISRosterStapler.effectiveDay(plan),staplerBaselineId:row.baselineId,staplerRevision:row.confirmedRevision||row.revision}));}catch{return null;}},
+   getReportDay(d){const owner=check();if(!owner||d<owner.from||d>endDate(owner.from))return null;const row=suspended?.plans.get(d);if(!row||!row.confirmedPlan&&!['published','confirmed'].includes(row.timetableDay?.source)||row.viewMode!=='draft'&&row.confirmedRevision!==row.revision||typeof GSISRosterStapler==='undefined')return null;try{return dayProjection(reportDays,row,d,()=>({...GSISRosterStapler.effectiveDay(row.plan),staplerBaselineId:row.baselineId,staplerRevision:row.revision}));}catch{return null;}},
    getDatesView(){check();return suspended?copy(suspended.payload.datesView):null;},
    snapshot(){check();return {phase:complete?'ready':baseline?'baseline':'empty',from:identity?.from||null,to:identity?endDate(identity.from):null,baselineKey:baseline?.payload.baselineKey||null,registerRevision:baseline?.payload.registerRevision??null,operationsRevision:suspended?.payload.operationsRevision??null,baselineBytes:baseline?.bytes||0,suspendedBytes:suspended?.bytes||0,checkedAt};}
   };

@@ -51,13 +51,14 @@ Set `ROSTER_EDGE_AUTHORITY` = `d1` on gsps-roster (Save, then Deployments → la
 Future date (next Friday), your own name.
 1. **t+0:** Ctrl + Shift + R. Assign Relief (for tomorrow and Friday), Daily Notify, System Config, Storage, Statistics, My Calculations all load live.
 2. Report Absence for yourself on Friday, two periods, relief required. Assign Relief: auto-allocate, change one cell, Save.
+   Record the assignment count and resolved timetable ID. Reload twice and confirm the count is unchanged, no new cancellations appear, and each assignment uses the active, non-pruned timetable ID. Repeat with a confirmed Stapler plan whose original baseline has been pruned; its confirmed lessons must remain intact.
 3. Do **not** press "Let teachers see", WhatsApp or "Archive now".
 4. **t+20 minutes:** Ctrl + Shift + R and open Assign Relief again. It must still load live (this is where attempt 2 failed).
 5. Delete the test absence; Save.
 6. Tell Claude. Claude checks the permissions refresh, Google backup progress (cursor rising) and job health.
 Do **not** press Update backup repeatedly; it now only requests a Worker run.
 
-**Pass** = every screen loads at t+0 and t+20, saves succeed, backup cursor rising, no new job failures.
+**Pass** = every screen loads at t+0 and t+20, saves succeed, Auto-allocate followed by two reloads leaves the assignment count unchanged, backup cursor rising, no new job failures.
 
 ## 8. Rollback
 - **Backup complete (Claude confirms):** edge-setup → **Switch back to Google…** → wait for "Verified Google backup restored" → Cloudflare `legacy` in 3 places (Pages: Retry deployment).

@@ -8,7 +8,7 @@ var GSISRosterStapler=(()=>{
  function isValidated(plan){if(plan)void plan.schema;const proof=plan&&validated.get(plan);return !!proof&&(proof.immutable||proof.json===JSON.stringify(plan));}
  function canonical(plan){validate(plan);const freeze=value=>{if(value&&typeof value==='object'&&!Object.isFrozen(value)){Object.freeze(value);for(const child of Object.values(value))freeze(child);}};freeze(plan);return acceptStored(plan,JSON.stringify(plan),true);}
  function copyValidated(plan){validate(plan);return acceptStored(clone(plan));}
- function structure(plan){return JSON.stringify([plan.schema,plan.date,plan.baselineId,plan.parity,plan.endOfDayMinutes,plan.venues,plan.periods,plan.teachers,plan.classes,plan.subjectCategories,plan.recessDefaults,plan.baseline,plan.mats]);}
+ function structure(plan){return JSON.stringify([plan.id,plan.daySnapshot,plan.schema,plan.date,plan.baselineId,plan.parity,plan.endOfDayMinutes,plan.venues,plan.periods,plan.teachers,plan.classes,plan.subjectCategories,plan.recessDefaults,plan.baseline,plan.mats]);}
 
  const clean=x=>String(x==null?'':x).trim();
  const norm=x=>clean(x).normalize('NFKC').toLowerCase().replace(/\s+/g,' ');
@@ -43,22 +43,25 @@ var GSISRosterStapler=(()=>{
  }
  function importNative(payload,options={}){
   if(!payload||unescape(encodeURIComponent(JSON.stringify(payload))).length>1900000)fail('The native plan is missing or too large.',400);
-  const plan=clone(payload);if(typeof plan.baselineId!=='string'||!plan.baselineId||plan.baselineId.length>500||!Array.isArray(plan.periods)||plan.periods.some((p,i)=>!p||p.period!==i||i&&p.startMinutes<plan.periods[i-1].endMinutes))fail('Invalid native timetable identity or timing.',400);try{validate(plan);}catch(error){if(error.status)throw error;fail('Invalid native timetable structure.',400);}if(options.date&&plan.date!==options.date)fail('The native plan belongs to another date.',400);plan.status='draft';return plan;
+  const plan=clone(payload);if(typeof plan.baselineId!=='string'||!plan.baselineId||plan.baselineId.length>500||!Array.isArray(plan.periods)||plan.periods.some((p,i)=>!p||p.period!==i||i&&p.startMinutes<plan.periods[i-1].endMinutes))fail('Invalid native timetable identity or timing.',400);try{validate(plan);}catch(error){if(error.status)throw error;fail('Invalid native timetable structure.',400);}if(options.date&&plan.date!==options.date)fail('The native plan belongs to another date.',400);plan.status='draft';return snapshotPlan(plan);
  }
  function comparison(plan,day){
-  validate(plan);const available=!!day?.id&&Array.isArray(day.periods)&&day.periods.length>0,issues=[],ghosts=[],tiles=[];
-  if(!available)return {available:false,baselineId:null,issues:['No comparison baseline is available.'],ghosts,tiles};
+  validate(plan);const available=!!day?.id&&Array.isArray(day.periods)&&day.periods.length>0,issues=[],ghosts=[],tiles=[],differences=[];
+  if(!available)return {available:false,baselineId:null,issues:['No comparison baseline is available.'],ghosts,tiles,differences};
   const teachers=new Map(plan.teachers.map(t=>[t.staffId,t])),periods=new Map(plan.periods.map(p=>[p.startMinutes+':'+p.endMinutes,p])),effective=new Map(effectiveDay(plan).teachers.map(t=>[t.staffId,t]));
   for(const p of day.periods){const match=periods.get(p.startMinutes+':'+p.endMinutes);if(!match){issues.push('Comparison period '+p.period+' has no matching time interval.');continue;}
    for(const t of day.teachers||[]){const c=t.cells?.[p.period];if(!c?.some(Boolean))continue;if(!teachers.has(t.staffId)){issues.push('Comparison teacher '+t.name+' is not in this plan.');continue;}
     const classIds=[];for(const name of split(c[1])){const cls=plan.classes.find(c=>classKey(c.name)===classKey(name));if(cls)classIds.push(cls.id);else issues.push('Comparison class '+name+' is not in this plan.');}
     const tile={id:'comparison:'+encodeURIComponent(t.staffId)+':'+p.period,kind:'lesson',teacherId:t.staffId,classIds,period:match.period,location:'grid',subject:c[0]||'',venue:c[2]||'',group:c[3]||'',baselineId:day.id};tiles.push(tile);if(!sameCell(c,effective.get(t.staffId)?.cells[match.period]||[]))ghosts.push(tile);
    }
-  }return {available:true,baselineId:day.id,issues:[...new Set(issues)],ghosts,tiles};
+  }
+  const slots=value=>{const rows=new Map();for(const t of value.teachers||[])for(const p of value.periods||[]){const c=canonicalCell(t.cells?.[p.period]);if(c.some(Boolean))rows.set(JSON.stringify([t.staffId,p.startMinutes,p.endMinutes]),{staffId:t.staffId,name:t.name,period:p.period,startMinutes:p.startMinutes,endMinutes:p.endMinutes,cell:c});}return rows;};
+  const before=slots(day),after=slots(effectiveDay(plan));for(const key of [...new Set([...before.keys(),...after.keys()])].sort()){const b=before.get(key),a=after.get(key);if(sameCell(b?.cell,a?.cell))continue;const row=a||b;differences.push({kind:!b?'added':!a?'removed':'changed',staffId:row.staffId,name:row.name,period:row.period,startMinutes:row.startMinutes,endMinutes:row.endMinutes,before:b?.cell||['','','',''],after:a?.cell||['','','','']});}
+  return {available:true,baselineId:day.id,issues:[...new Set(issues)],ghosts,tiles,differences};
  }
  function create(day,options={}){
   if(!day||day.verified===false||day.schoolDay===false||!Array.isArray(day.periods)||!day.periods.length||!Array.isArray(day.teachers))fail('Load a verified school-day baseline before planning.');
-  const plan={schema:1,date:date(options.date||day.date),baselineId:clean(day.modelId||day.id),parity:day.parity||null,endOfDayMinutes:options.endOfDayMinutes??day.endOfDayMinutes??day.timing?.endOfDayMinutes??810,venues:clone(options.venues||day.venues||[]),status:'draft',revision:0,nextId:1,periods:clone(day.periods),teachers:day.teachers.map(t=>({staffId:clean(t.staffId),name:clean(t.name),timetableName:clean(t.timetableName||t.name)})),classes:(day.formClasses||[]).map(c=>({id:clean(c.id),name:clean(c.name),level:Number(c.level)||null,traditional:c.traditional!==false,venue:clean(c.venue)})),subjectCategories:clone(options.subjectCategories||day.subjectCategories||{}),tiles:[],mats:[],warnings:[],recessDefaults:settingRecesses(day)};
+  const plan={schema:1,id:'stapler:'+date(options.date||day.date),daySnapshot:{...clone(day),schema:1},date:date(options.date||day.date),baselineId:clean(day.modelId||day.id),parity:day.parity||null,endOfDayMinutes:options.endOfDayMinutes??day.endOfDayMinutes??day.timing?.endOfDayMinutes??810,venues:clone(options.venues||day.venues||[]),status:'draft',revision:0,nextId:1,periods:clone(day.periods),teachers:day.teachers.map(t=>({staffId:clean(t.staffId),name:clean(t.name),timetableName:clean(t.timetableName||t.name)})),classes:(day.formClasses||[]).map(c=>({id:clean(c.id),name:clean(c.name),level:Number(c.level)||null,traditional:c.traditional!==false,venue:clean(c.venue)})),subjectCategories:clone(options.subjectCategories||day.subjectCategories||{}),tiles:[],mats:[],warnings:[],recessDefaults:settingRecesses(day)};
   if(!plan.baselineId)fail('The school day needs a saved baseline identity.');
   for(const t of day.teachers)for(const cell of t.cells||[])for(const name of split(cell?.[1]))if(!plan.classes.some(c=>classKey(c.name)===classKey(name))){const match=/^([1-6])([a-z]+)$/.exec(classKey(name));plan.classes.push({id:'class:'+encodeURIComponent(name),name,level:match?Number(match[1]):null,traditional:!!match,venue:''});if(match)plan.warnings.push('Class '+name+' was inferred from the timetable; verify its class identity against Deploy.');}
   for(const teacher of day.teachers)for(const p of plan.periods){const cell=teacher.cells[p.period];if(!Array.isArray(cell)||!cell.some(v=>clean(v)))continue;
@@ -93,7 +96,7 @@ var GSISRosterStapler=(()=>{
   const destinationTiles=new Map(baseline.tiles.map(t=>[t.id,t]));
   for(const t of baseline.baseline.tiles)if(!retained.has(t.id))next.tiles.push(oldTeachers.has(t.teacherId)?{...clone(t),location:'pit',period:null}:clone(destinationTiles.get(t.id)||t));
   for(const t of baseline.tiles.filter(t=>t.kind==='recess'))if(!next.tiles.some(x=>x.id===t.id))next.tiles.push(clone(t));
-  for(const key of ['date','baselineId','parity','endOfDayMinutes','periods','venues','subjectCategories','recessDefaults','baseline'])next[key]=clone(baseline[key]);
+  for(const key of ['id','daySnapshot','date','baselineId','parity','endOfDayMinutes','periods','venues','subjectCategories','recessDefaults','baseline'])next[key]=clone(baseline[key]);
   next.status='draft';next.revision=(plan.revision||0)+1;validate(next);return next;
  }
  // A new imported cover may be reassigned locally before its first save only
@@ -110,7 +113,8 @@ var GSISRosterStapler=(()=>{
  function validate(plan,options={}){
   if(!options.baseline&&!options.previous&&!options.publish&&isValidated(plan))return plan;
   if(!plan||plan.schema!==1||!Array.isArray(plan.tiles)||!Array.isArray(plan.teachers)||!Array.isArray(plan.classes)||!Array.isArray(plan.periods)||!Array.isArray(plan.mats)||!Array.isArray(plan.baseline?.tiles)||plan.tiles.length>20000||plan.teachers.length>500||plan.classes.length>1000||!plan.periods.length||plan.periods.length>40)fail('Invalid Stapler plan.',400);
-  const expected=options.baseline?.baseline||options.baseline,previous=options.previous||(options.baseline?.tiles?options.baseline:null),incremental=!options.publish&&previous&&isValidated(previous)&&structure(plan)===structure(previous),ids=list=>list.map(x=>x.id),unique=xs=>new Set(xs).size===xs.length;
+  const expected=options.baseline?.baseline||options.baseline,previous=options.previous||(options.baseline?.schema===1?options.baseline:null),incremental=!options.publish&&previous&&isValidated(previous)&&structure(plan)===structure(previous),ids=list=>list.map(x=>x.id),unique=xs=>new Set(xs).size===xs.length;
+  if(previous&&(planId(plan)!==planId(previous)||hasDaySnapshot(previous)&&JSON.stringify(plan.daySnapshot)!==JSON.stringify(previous.daySnapshot)))fail('The saved plan identity or day snapshot cannot be edited.');
   if(!unique(ids(plan.tiles)))fail('Duplicate timetable identities.',400);
   if(!incremental){
   date(plan.date);if(!Number.isInteger(plan.endOfDayMinutes)||plan.endOfDayMinutes<=450||plan.endOfDayMinutes>1440||plan.endOfDayMinutes!==plan.baseline.endOfDayMinutes)fail('Invalid baseline end-of-day timing.',400);
@@ -225,7 +229,32 @@ var GSISRosterStapler=(()=>{
   const entry=t=>[t.teacherId+'|'+t.period,{tile:t,key:JSON.stringify(canonicalCell(cell(plan,t)))}],index={before:new Map(plan.baseline.tiles.map(entry)),after:new Map(active(plan).filter(t=>t.kind==='lesson').map(entry))};
   if(immutable)comparisonIndexes.set(plan,index);return index;
  }
- function effectiveDay(plan,day){validate(plan);const out=clone(day||{});out.date=plan.date;out.id=plan.baselineId;out.modelId=plan.baselineId;out.parity=plan.parity||'single';out.verified=true;out.schoolDay=true;out.warning='';out.endOfDayMinutes=plan.endOfDayMinutes;out.subjectCategories=clone(plan.subjectCategories||{});out.periods=clone(plan.periods);out.formClasses=clone(plan.classes.filter(c=>c.traditional));const baselineTeachers=new Map((day?.teachers||[]).map(t=>[t.staffId,t])),baselineIds=new Set([...baselineTeachers.keys(),...(plan.baseline?.teachers||[]).map(t=>t.staffId)]);out.teachers=plan.teachers.filter(t=>!day?.compact||(Array.isArray(day.targetIds)?day.targetIds.includes(t.staffId):t.staffId===day.targetId)).map(t=>({...clone(baselineTeachers.get(t.staffId)||{}),...clone(t),...(day?{adhoc:!baselineIds.has(t.staffId)}:{}),cells:Array.from({length:Math.max(...plan.periods.map(p=>p.period))+1},()=>['','','',''])}));const teachers=new Map(out.teachers.map(t=>[t.staffId,t]));for(const t of active(plan).filter(t=>t.kind==='lesson')){const teacher=teachers.get(t.teacherId);if(teacher)teacher.cells[t.period]=cell(plan,t);}out.staplerRecesses=active(plan).filter(t=>t.kind==='recess').map(t=>({classId:t.classIds[0],periods:span(plan,t)}));out.staplerRevision=plan.revision;return out;}
+ function planId(plan){return plan.id||'stapler:'+plan.date;}
+ function hasDaySnapshot(plan){return !!plan&&plan.daySnapshot?.schema===1&&Array.isArray(plan.daySnapshot.periods)&&Array.isArray(plan.daySnapshot.teachers)&&Array.isArray(plan.tiles)&&Array.isArray(plan.baseline?.tiles);}
+ function snapshotPlan(plan,origin){
+  validate(plan);const next=clone(plan);if(hasDaySnapshot(plan)&&plan.id)return acceptStored(next);next.id=planId(plan);
+  if(!hasDaySnapshot(plan)){
+   if(!origin){
+    const base=plan.baseline;if(!Array.isArray(base.teachers)||!Array.isArray(base.classes)||!Array.isArray(base.periods)||!base.periods.length)fail('The original timetable needs Admin migration before saving.');
+    // Legacy native plans retain immutable originals separately from working
+    // cards. Rebuild from those originals, never from the edited projection.
+    origin={id:plan.baselineId,modelId:plan.baselineId,date:plan.date,parity:base.parity,verified:true,schoolDay:true,endOfDayMinutes:base.endOfDayMinutes,venues:clone(base.venues||[]),subjectCategories:clone(base.subjectCategories||{}),periods:clone(base.periods),formClasses:clone(base.classes.filter(c=>c.traditional)),recesses:clone(base.recessDefaults||[]),teachers:base.teachers.map(t=>({...clone(t),cells:Array.from({length:Math.max(...base.periods.map(p=>p.period))+1},()=>['','','',''])}))};
+    const teachers=new Map(origin.teachers.map(t=>[t.staffId,t]));for(const tile of base.tiles.filter(t=>t.kind==='lesson'&&t.location==='grid')){const teacher=teachers.get(tile.teacherId);if(!teacher||!base.periods.some(p=>p.period===tile.period)||tile.classIds.some(id=>!base.classes.some(c=>c.id===id)))fail('The original timetable needs Admin migration before saving.');teacher.cells[tile.period]=cell(base,tile);}
+   }
+   next.daySnapshot={...clone(origin),schema:1};
+  }
+  validate(next);return next;
+ }
+ // Only accounting evidence may come from a runtime day. Timetable cells,
+ // teacher membership, timing and class catalogues always belong to the plan.
+ const runtimeTeacherFields=['R','originalR','quotaSource','capConfigured','capBasis','periodCap','capVerified','capHeadroom','capWorkload','capVerificationReason','capWeekDays','capNonTeachingPeriods','rosterBasis'];
+ function effectiveDay(plan,day){
+  validate(plan);const stored=hasDaySnapshot(plan)?plan.daySnapshot:{},out=clone(stored),runtime=new Map((day?.teachers||[]).map(t=>[t.staffId,t])),metadata=new Map((stored.teachers||[]).map(t=>[t.staffId,t])),originalTeachers=new Set((plan.baseline.teachers||[]).map(t=>t.staffId));
+  out.date=plan.date;out.id=planId(plan);out.modelId=out.id;out.parity=plan.parity||'single';out.verified=true;out.schoolDay=true;out.warning='';out.endOfDayMinutes=plan.endOfDayMinutes;out.subjectCategories=clone(plan.subjectCategories||{});out.periods=clone(plan.periods);out.formClasses=clone(plan.classes.filter(c=>c.traditional));
+  if(day?.quotaSource!==undefined)out.quotaSource=clone(day.quotaSource);
+  out.teachers=plan.teachers.filter(t=>!day?.compact||(Array.isArray(day.targetIds)?day.targetIds.includes(t.staffId):t.staffId===day.targetId)).map(t=>{const source=runtime.get(t.staffId),captured=clone(metadata.get(t.staffId)||{}),accounting={};if(day)for(const key of runtimeTeacherFields)delete captured[key];if(source)for(const key of runtimeTeacherFields)if(source[key]!==undefined)accounting[key]=clone(source[key]);return {...captured,...clone(t),...accounting,adhoc:!originalTeachers.has(t.staffId),cells:Array.from({length:Math.max(...plan.periods.map(p=>p.period))+1},()=>['','','',''])};});
+  const teachers=new Map(out.teachers.map(t=>[t.staffId,t]));for(const t of active(plan).filter(t=>t.kind==='lesson')){const teacher=teachers.get(t.teacherId);if(teacher)teacher.cells[t.period]=cell(plan,t);}out.staplerRecesses=active(plan).filter(t=>t.kind==='recess').map(t=>({classId:t.classIds[0],periods:span(plan,t)}));out.staplerRevision=plan.revision;return out;
+ }
  function changes(plan){validate(plan);const {before,after}=comparisonIndex(plan),empty=JSON.stringify(['','','','']);return [...new Set([...before.keys(),...after.keys()])].sort().flatMap(key=>{const b=before.get(key),a=after.get(key);if((b?.key||empty)===(a?.key||empty))return [];const tile=(a||b).tile;return [{staffId:tile.teacherId,period:tile.period,before:b?cell(plan,b.tile):['','','',''],after:a?cell(plan,a.tile):['','','','']}];});}
  function isTransfer(t){return !!t.source?.teacherId&&t.teacherId!==t.source.teacherId;}
  function tileState(plan,t){if(t.kind==='recess')return 'recess';if(t.location==='grid'&&comparisonIndex(plan).before.get(t.teacherId+'|'+t.period)?.key===JSON.stringify(canonicalCell(cell(plan,t))))return 'original';if(isTransfer(t))return 'transfer';return 'edited';}
@@ -410,6 +439,6 @@ var GSISRosterStapler=(()=>{
   next.warnings=[...new Set([...(plan.warnings||[]),...warnings])];next.status=plan.status==='confirmed'?'confirmed':'draft';next.revision=(plan.revision||0)+1;next.importSource={mode:'final-day',app:payload.app,version:clean(payload.version),savedAt:clean(payload.savedAt),eventName:clean(payload.eventName),fileName:clean(payload.fileName),selectedSheet:clean(payload.selectedSheet),selectedDay:clean(payload.selectedDay)};
   validate(next,{baseline:plan.baseline,previous:plan});return next;
  }
- return {validationVersion,acceptStored,canonical,copyValidated,create,createStandalone,importNative,comparison,redate,apply,validate,effectiveDay,canonicalCell,sameCell,changes,accounting,capWorkload,activityClassifier,isOfflineAbsence,importContactEligible,importIssues,importLegacy,reviewImportedRelief,convertImportedRelief,ghosts,tileState,isImportedPlacement,tilePeriods:span,defaultRecesses,recessGroups};
+ return {planId,hasDaySnapshot,snapshotPlan,validationVersion,acceptStored,canonical,copyValidated,create,createStandalone,importNative,comparison,redate,apply,validate,effectiveDay,canonicalCell,sameCell,changes,accounting,capWorkload,activityClassifier,isOfflineAbsence,importContactEligible,importIssues,importLegacy,reviewImportedRelief,convertImportedRelief,ghosts,tileState,isImportedPlacement,tilePeriods:span,defaultRecesses,recessGroups};
 })();
 if(typeof module!=='undefined'&&module.exports)module.exports=GSISRosterStapler;
