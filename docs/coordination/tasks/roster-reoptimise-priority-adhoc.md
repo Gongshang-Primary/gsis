@@ -1,6 +1,6 @@
 # roster-reoptimise-priority-adhoc: Auto-allocate must re-plan unpublished automatic relief so ad hoc/daily SRE priority applies
 
-- Status: implemented and verified locally; owner approved publication; Claude exact-head review pending; lane R. Owner explicitly authorised this task in ChatGPT on 6 Nov 2026.
+- Status: PR #84 rebased onto main v0.9.9n; canonical build and focused checks passed; final-head CI and Claude review pending; lane R.
 - Reviewer/model: Claude. Related: roster-sre-daily-priority (PR #14, merged 30 Oct: daily/ad hoc SREs are priority 1 above annual R%).
 
 ## Owner report (verbatim)
@@ -21,7 +21,7 @@ The reoptimise accepts a new plan only if it improves coverage or the R% fairnes
 ## Claim
 - Owner/model: Codex
 - Reviewer/model: Claude
-- Last updated (Asia/Singapore): 2026-11-06 02:13
+- Last updated (Asia/Singapore): 2026-11-06, PR #84 rebase
 - Branch: `codex/roster-reoptimise-priority-adhoc`
 - Base SHA: `fabc1c8c9c00c8635770f7fc402fe9c174d43321` (requested specification `05bfa9c`)
 - Integration base: current main `e7d4f028ec1f6db499b44f14c0fea798fec55eca`; original accepted claim `662ccfb692fd08fb8318829923ad76b6cd79f803`.
@@ -99,3 +99,23 @@ GitHub still has no ad hoc branch or PR. The earlier automatic approval review r
 ## Publication approved (6 Nov 2026, 02:36 SGT)
 
 The owner explicitly replied "approve" to uploading both prepared branches and opening draft PRs in `helper-gsps/gsis`. This resolves the earlier publication approval blocker. The destination was rechecked as the private owner repository with push access. Proceed with the approved uploads, remote exact-head verification and draft PRs for Claude. No merge or deployment is authorised by this approval. Product code is unchanged from the local verification above.
+
+## Published recovery (6 Nov 2026, Model: Codex)
+
+The approved upload is complete. Implementation head: `219d987b08244022ab3b30b31013acd0de71b5b9`; published tree `c320f0d1c141d8ff46cdcca9450586ab2c0a2e91` exactly matches the previously tested local tree. The remote branch now contains all prepared product changes. This documentation-only handoff follows that implementation commit. GitHub full CI is running; open the draft PR after green CI and give Claude its final exact head. Earlier publication-blocker entries above are historical and resolved. No merge, deployment, live backfill or notification occurred.
+
+
+## PR #84 rebase onto main (6 Nov 2026, Model: Codex)
+
+Owner requested: rebase #84 on main, regenerate bundles and re-run CI. This resumes the existing Codex claim on the same branch; no new feature scope is claimed.
+
+- Base: `63ce6bdfd060ebc19cdcc9b44d0afcbf3604d558` (v0.9.9n).
+- Previous published head: `5c7fb3a75ce5612a8636b77161e38e1ed56d25ad`.
+- Rebased implementation: `a6f9080fb3584a39df63ef55bf046ee6769f57df`; tree `0b62d7109e57cc5fbd17c6393fd3c9fd2f592d2b`, identical to the locally built and checked implementation.
+- PR: https://github.com/helper-gsps/gsis/pull/84. Reviewer: Claude, at the final published head reported in the PR. This following commit updates this handoff only.
+
+Resolved both canonical allocator conflicts by keeping the ad hoc priority and idle-reason code while retaining main's removal of `captureDecisionWhy`, `decisionEligibility`, `whyChecks`, `whyForPlan` and the report-only Why call. Changelog entries from both sides remain. All conflicting generated files were regenerated with the canonical build, not hand-merged. Main's audit backfill, Deploy targets and v0.9.9n labels are retained. Existing PR #84 regression files are unchanged.
+
+Verification: `TZ=Asia/Singapore npm run build` passed for all 18 components; `git diff --check` passed. Ten focused programs passed: `roster-reoptimise-priority.cjs`, `roster-reoptimise-priority-parity.mjs`, `roster-remove-why-save.cjs`, `roster-daily-audit.cjs`, `roster-audit-backfill-edge.mjs`, `roster-daily-edge.mjs`, `roster-daily-queue.mjs`, `roster-daily-workbook.cjs`, `roster714-allocation-policy.cjs` and `roster098l-allocation-modes-ui.cjs`, all under `tests/`. Chromium was supplied for browser checks. Full GitHub CI will run on the final branch head; its outcome and exact SHA belong in the PR handoff, not inferred from the older green run. No full local-suite pass is claimed for this rebase.
+
+Next: publish with an expected-head lease, inspect all four CI shards and the full-suite aggregate, then hand the final SHA and CI run to Claude. Owner merges. No deployment, live records, authority/settings changes or notifications are included.
