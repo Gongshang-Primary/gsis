@@ -1,12 +1,12 @@
 # roster-drive-output-blob-content-type: Drive daily outputs fail — blob built with a null content type
 
-- Status: implementing — fix complete; full local suite and CI pending.
+- Status: implementing — fix and full local verification complete; remote full-suite pending before draft PR.
 - Owner/model: Codex
 - Reviewer/model: Muse
-- Last updated (Asia/Singapore): 6 November 2026
+- Last updated (Asia/Singapore): 6 November 2026, 19:51
 - Branch: codex/roster-drive-output-blob-content-type (from owner-specified b5bd6f0)
 - Base SHA: b5bd6f0c766f62513dc75bbf0c4263f2aa5e3326
-- Current head SHA (or PR head; avoid self-referential commit hashes): (none yet)
+- Current head SHA (or PR head; avoid self-referential commit hashes): code tested at 152740727c8731ece90e6b4875540bc558837b94; subsequent task-record-only commit records verification.
 - PR: (none yet)
 - User-authorised scope: pass a content type when building blobs from bytes in backend/RosterDriveOutputs.gs (4 sites below); tighten the test fakes so they reject a missing content type; add a regression test that fails on current code and passes after the fix.
 - Files/domains owned (include generated outputs): backend/RosterDriveOutputs.gs, generated Roster_Backend_v0.9.9.gs, backend/Code.gs and Deploy_Backend_v0.9.9.gs (canonical build copies required by WORKFLOW), tests/helpers/roster-daily-drive.cjs, tests/roster-drive-writer.cjs, one new regression test.
@@ -69,3 +69,16 @@ Claim: Model: Codex. No open PRs returned by GitHub at claim time. Owner explici
 - `TZ=Asia/Singapore npm run build`: passed; canonical generation copies the same four changes to all three backend bundles. No hand edits to generated files.
 - Full local Node/LORD suite running; CI will run on this branch push. Historical comparisons retain the runner's existing exclusions and are not claimed as passes. No live checks, configuration changes or deployment.
 - Rollback: revert this PR and regenerate backend copies. Full backup object assembly and lease failures remain a separate task. Muse reviews the exact final head; owner merges/releases.
+
+## Full verification and handoff (6 November 2026, Model: Codex)
+
+Tested code head: `152740727c8731ece90e6b4875540bc558837b94`. This merged current main after starting from the requested base; the sole merge conflict was the task-record add/add, resolved by retaining the implementation record. Product sources and generated copies merged cleanly.
+
+- `TZ=Asia/Singapore npm run build`: passed; repeated canonical build followed by `git diff --exit-code`: passed, no diff. `git diff --check`: passed.
+- Four full Node shards via `TZ=Asia/Singapore NODE_NO_WARNINGS=1 ROSTER_TEST_CHROMIUM=/usr/bin/chromium GSIS_BROWSER_EXECUTABLE=/usr/bin/chromium GSIS_TEST_SHARD_INDEX=<1..4> GSIS_TEST_SHARD_TOTAL=4 npm test`: **1034/1034 current Node programs passed**, counts 259/259, 259/259, 258/258, 258/258. Each npm command then stopped in LORD because its separate browser variable was missing; those command exit statuses were 1, not full npm passes.
+- Corrected LORD command `TZ=Asia/Singapore NODE_NO_WARNINGS=1 LORD_TEST_CHROMIUM=/usr/bin/chromium python3 lord-suite/tests/run_all_checks.py`: **40/40 programs passed**, exit 0. Node and LORD are both fully verified locally.
+- Initial local attempts used an absent Playwright browser path and then encountered sandbox socket restrictions. They were stopped; the complete run above used installed Chromium with approved execution permissions. No product changes were made to accommodate the environment.
+- Existing runner exclusions: 15 historical program inventories/policies and six historical comparisons (v0.8.3, v0.7.16, v0.7.17, old Stapler import, and two historical notify comparisons). Current behavior assertions ran; excluded historical comparisons are not passes.
+- Local logs: `/tmp/drive-blob-red.log`, `/tmp/drive-blob-shard-1.log` through `-4.log`, `/tmp/drive-blob-lord.log`, `/tmp/drive-blob-rebuild.log` (ephemeral workspace evidence; durable counts recorded above).
+- GitHub connector can read Actions jobs by known run ID; workspace `gh` Actions discovery returns Forbidden. Run `42212064861` tested 1527407: three shards passed while shard 4 was still preparing Chromium at the last check. No remote full-suite pass is claimed yet. This evidence-only commit triggers a fresh run; wait for its full-suite green before opening the draft PR, reviewer Muse at the final exact head.
+- `git merge-tree --write-tree --name-only origin/main HEAD`: clean after main reconciliation. No live flag changes, live data writes, staging validation or production deployment. Full backup assembly/lease work remains separate.
