@@ -1,6 +1,6 @@
 # roster-stapler-always-effective: when a Stapler plan exists for a date, every screen and the allocator use it
 
-- Status: changelog (owner 6 Nov ~07:30: "need changelog: to always load stapler plan if present"); lane R; Codex when authorised. Spec by Claude under the standing rule.
+- Status: merged (#91 at e59372a as 4b50f3e; conflicts with #87 resolved by Claude), owner "merge 87 91", 6 Nov; for release o. After deploy SMC must confirm 10 and 12 Nov Stapler drafts (rev 2) if intended
 - Reviewer/model: Claude
 
 ## Incident (6 Nov, D1 v0.9.9n)

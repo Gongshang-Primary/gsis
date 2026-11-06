@@ -1,6 +1,6 @@
 # roster-drive-outputs-bridge-error: Drive writes fail with ROSTER_BRIDGE_ERROR on v0.9.9n (live, 6 Nov)
 
-- Status: review preparation (owner on v0.9.9n, 6 Nov ~06:00, outputs disabled to stop alerts); Codex; lane R; priority 1 (blocks backups and daily outputs)
+- Status: merged (#87 at 8bd5acb as 9640f2c, owner "merge 87 91", 6 Nov); for release o. Outputs stay disabled until deployed and checked; system_alert template pending Meta
 - Reviewer/model: Claude
 
 ## Evidence (Claude, D1 read-only + owner's Apps Script checks)
