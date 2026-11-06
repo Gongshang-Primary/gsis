@@ -96,7 +96,7 @@ test('Duty roster filters excluded roles and stores an inclusive date range with
  const row=f.state.smcDutyRoster[0];assert(f.O.dutyWindow(row,'2026-10-16'));assert(!f.O.dutyWindow(row,'2026-10-17'));
 });
 
-test('Confirm supports a future date, subsequent saves are effective, and neither step sends',()=>{
+test('Confirm supports a future date, subsequent saves retain the confirmation, and neither step sends',()=>{
  const f=ready(),future='2026-10-15';f.ctx.days[future]=structuredClone(f.ctx.days[f.date]);f.ctx.baselineDays=f.ctx.days;
  let plan=f.O.read(f.state,f.ctx,{operation:'stapler',date:future}).plan;
  const tile=plan.tiles.find(t=>t.teacherId==='alice'&&t.period===2);
@@ -107,8 +107,8 @@ test('Confirm supports a future date, subsequent saves are effective, and neithe
  let effective=f.O.composeStaplerContext(f.state,f.ctx);assert.equal(effective.days[future].teachers.find(t=>t.staffId==='bob').cells[2][0],'EL');
  plan=S.apply(plan,{type:'move',tileId:tile.id,teacherId:'charlie',period:2});
  f.O.apply(f.state,f.ctx,{operation:'saveStapler',date:future,plan,staplerRevision:1});
- effective=f.O.composeStaplerContext(f.state,f.ctx);assert.equal(effective.days[future].staplerRevision,2);
- assert.equal(effective.days[future].teachers.find(t=>t.staffId==='charlie').cells[2][0],'EL');assert.equal(effective.days[future].teachers.find(t=>t.staffId==='bob').cells[2].some(Boolean),false);
+ effective=f.O.composeStaplerContext(f.state,f.ctx);assert.equal(effective.days[future].staplerRevision,1);
+ assert.equal(effective.days[future].teachers.find(t=>t.staffId==='bob').cells[2][0],'EL');assert.equal(effective.days[future].teachers.find(t=>t.staffId==='charlie').cells[2].some(Boolean),false);
  f.O.refreshStaplerNotifications(f.state,f.ctx);assert.equal(f.state.outbox.length,0);assert.equal(f.state.publicationSnapshots.length,0);
  assert.equal(f.O.read(f.state,f.ctx,{operation:'stapler',date:future}).canConfirm,true);
 });
@@ -121,14 +121,14 @@ test('Confirm reservations do not turn an empty annual history into an Admin-ver
  const result=f.O.apply(f.state,effective,{operation:'autoAllocate',date:f.date});assert.notEqual(result.paused,true);assert.equal(result.savedIds.length,1);
 });
 
-test('Resetting a confirmed plan after baseline replacement removes its quota reservations',()=>{
+test('Resetting a draft after baseline replacement retains confirmed quota reservations',()=>{
  const f=ready();f.ctx.baselineDays=f.ctx.days;let plan=f.O.read(f.state,f.ctx,{operation:'stapler',date:f.date}).plan;
  const tile=plan.tiles.find(t=>t.teacherId==='alice'&&t.period===2);plan=S.apply(plan,{type:'move',tileId:tile.id,teacherId:'bob',period:2});
  f.O.apply(f.state,f.ctx,{operation:'saveStapler',date:f.date,plan,staplerRevision:0});f.O.apply(f.state,f.ctx,{operation:'confirmStapler',date:f.date,staplerRevision:1});
  assert.equal(A.accounted(f.state).filter(r=>r.origin==='stapler').length,1);
  f.ctx.days[f.date].id='replacement';
  f.O.apply(f.state,f.ctx,{operation:'resetStapler',date:f.date,staplerRevision:1});
- assert.equal(A.accounted(f.state).filter(r=>r.origin==='stapler').length,0);assert.equal(f.state.staplerArchives.length,1);assert.equal(f.state.staplerPlans[0].baselineId,'replacement');
+ assert.equal(A.accounted(f.state).filter(r=>r.origin==='stapler').length,1);assert.equal(f.state.staplerArchives.length,1);assert.equal(f.state.staplerPlans[0].baselineId,'replacement');
 });
 
 test('Normal teachers can read daily reports without receiving recipient or settings details',()=>{
@@ -138,7 +138,7 @@ test('Normal teachers can read daily reports without receiving recipient or sett
  assert.throws(()=>f.O.apply(f.state,teacher,{operation:'saveDailyEmploymentSettings'}),e=>e.status===403);
 });
 
-test('Publish freezes teacher visibility; explicit Notify captures saved Stapler edits independently',()=>{
+test('Publish freezes teacher visibility; explicit Notify captures confirmed Stapler edits independently',()=>{
  const f=ready();f.ctx.baselineDays=f.ctx.days;let plan=f.O.read(f.state,f.ctx,{operation:'stapler',date:f.date}).plan;
  const tile=plan.tiles.find(t=>t.teacherId==='alice'&&t.period===2);plan=S.apply(plan,{type:'move',tileId:tile.id,teacherId:'bob',period:2});
  f.O.apply(f.state,f.ctx,{operation:'saveStapler',date:f.date,plan,staplerRevision:0});f.O.apply(f.state,f.ctx,{operation:'confirmStapler',date:f.date,staplerRevision:1});
@@ -156,7 +156,9 @@ test('Publish freezes teacher visibility; explicit Notify captures saved Stapler
  plan=S.apply(plan,{type:'move',tileId:tile.id,teacherId:'charlie',period:2});f.O.apply(f.state,f.ctx,{operation:'saveStapler',date:f.date,plan,staplerRevision:1});
  assert.equal(f.O.dailyTimetable(f.state,teacherCtx('bob'),{date:f.date}).modified.cells[2][0],'EL');
  assert.equal(f.O.dailyTimetable(f.state,teacherCtx('charlie'),{date:f.date}).modified.cells[2].some(Boolean),false);
- assert.equal(f.O.read(f.state,f.ctx,{operation:'dailyNotify',date:f.date}).pendingDraft,true);
+ assert.equal(f.O.read(f.state,f.O.composeStaplerContext(f.state,f.ctx),{operation:'dailyNotify',date:f.date}).timetableSource.pendingDraft,true);
+ const beforeConfirm=f.state.outbox.length;f.O.apply(f.state,f.O.composeStaplerContext(f.state,f.ctx),{operation:'notifyDaily',date:f.date,requestId:'notify-unconfirmed'});assert.equal(f.state.outbox.length,beforeConfirm,'pending drafts cannot become communication snapshots');
+ f.O.apply(f.state,f.ctx,{operation:'confirmStapler',date:f.date,staplerRevision:2});
  const start=f.state.outbox.length;
  f.O.apply(f.state,f.O.composeStaplerContext(f.state,f.ctx),{operation:'notifyDaily',date:f.date,requestId:'notify-saved-draft'});
  const notices=f.state.outbox.slice(start);assert.deepEqual(notices.map(j=>j.recipientId).sort(),['bob','charlie']);
@@ -184,6 +186,7 @@ for(const mode of ['all','none'])test('Explicit Notify after legacy publish mode
  publish('all');assert.equal(f.state.outbox.length,0,'Publish never sends implicitly');f.O.apply(f.state,f.O.composeStaplerContext(f.state,f.ctx),{operation:'notifyDaily',date:f.date,requestId:'notify-original'});assert.deepEqual(f.state.outbox.map(j=>j.recipientId).sort(),['alice','bob']);
  for(const job of f.state.outbox)Object.assign(job,{status:'sent',messageId:'wamid.original-'+job.recipientId,completedAt:f.ctx.iso});
  plan=S.apply(plan,{type:'move',tileId:tile.id,teacherId:'alice',period:2});f.O.apply(f.state,f.ctx,{operation:'saveStapler',date:f.date,plan,staplerRevision:1});
+ f.O.apply(f.state,f.ctx,{operation:'confirmStapler',date:f.date,staplerRevision:2});
  const start=f.state.outbox.length;publish(mode);const restored=f.state.dailyPublicationStates[f.date].teachers;
  assert.equal(restored.length,2);assert(restored.every(t=>!t.changed&&t.updated));
  assert.equal(f.state.outbox.length,start,'Every Publish mode changes visibility without sending');f.O.apply(f.state,f.O.composeStaplerContext(f.state,f.ctx),{operation:'notifyDaily',date:f.date,requestId:'notify-restored'});
@@ -237,3 +240,4 @@ test('Prune preview counts corrected relief and linked history even when its ori
 });
 
 console.log(passed+' v0.7.11 backend checks passed');
+

@@ -8,9 +8,9 @@ test('save keeps last confirmation, publication does not confirm the pending edi
  const f=setup(),{O,state,ctx,date}=f;confirm(f);const confirmed=structuredClone(state.staplerPlans[0].confirmedPlan),revision=state.dayRevisions[date],at=state.staplerPlans[0].confirmedAt;
  edit(f);assert.equal(O.readyStaplerPlan(state.staplerPlans[0]).tiles.find(t=>t.kind==='lesson'&&t.period===2).subject,'EL');assert.equal(state.dayRevisions[date],revision,'draft save must not advance effective allocation inputs');
  let day=O.effectiveTimetableDay(state,ctx,date);assert.equal(day.staplerRevision,1);assert.equal(day.teachers[0].cells[2][0],'EL');
- O.apply(state,ctx,{operation:'publish',date,allocationRevision:revision||0});const row=state.staplerPlans[0];assert.equal(row.publishedRevision,1);assert.equal(row.confirmedRevision,1);assert.equal(row.confirmedAt,at);assert.deepEqual(row.confirmedPlan,confirmed);assert.equal(state.dailyPublicationStates[date].staplerRevision,1);
+ O.apply(state,O.composeStaplerContext(state,ctx),{operation:'publish',date,allocationRevision:revision||0});const row=state.staplerPlans[0];assert.equal(row.publishedRevision,1);assert.equal(row.confirmedRevision,1);assert.equal(row.confirmedAt,at);assert.deepEqual(row.confirmedPlan,confirmed);assert.equal(state.dailyPublicationStates[date].staplerRevision,1);
  confirm(f);day=O.effectiveTimetableDay(state,ctx,date);assert.equal(day.staplerRevision,2);assert.equal(day.teachers[0].cells[2][0],'MA');
- const own=O.dailyTimetable(state,ctx,{date});assert.equal(own.modified.cells[2][0],'MA','live timetable uses latest confirmation even after a prior publication');
+ const own=O.read(state,ctx,{operation:'dailyTimetable',date});assert.equal(own.modified.cells[2][0],'MA','live timetable uses latest confirmation even after a prior publication');
 });
 test('retained confirmation stays effective when legacy confirmed flag is false',()=>{const f=setup();confirm(f);edit(f);f.state.staplerPlans[0].confirmed=false;assert.equal(f.O.effectiveTimetableDay(f.state,f.ctx,f.date).staplerRevision,1);});
 test('never confirmed draft uses baseline and reports its pending confirmation',()=>{const f=setup();edit(f);assert.equal(f.O.effectiveTimetableDay(f.state,f.ctx,f.date).id,'baseline');const view=f.O.read(f.state,f.ctx,{operation:'read',view:'allocation',date:f.date});assert.equal(view.timetableSource.kind,'baseline');assert.equal(view.timetableSource.neverConfirmed,true);});
@@ -32,10 +32,10 @@ test('replacement import retains confirmation and legacy notice evidence until e
 });
 test('audited legacy rename uses the same confirmation for export and publication',()=>{
  const f=setup();confirm(f);const row=f.state.staplerPlans[0];delete row.confirmedPlan;delete row.confirmedRevision;row.name='Renamed';row.revision=2;row.updatedAt=f.date+'T00:02:00Z';f.state.audit.push({id:'rename',date:f.date,operation:'renameStapler',at:row.updatedAt,actor:f.ctx.user.email,before:'',name:row.name,staplerRevision:2});
- assert.equal(f.O.effectiveTimetableDay(f.state,f.ctx,f.date).staplerRevision,1);assert.equal(f.O.dailyExport(f.state,f.ctx,{date:f.date,fullTeachers:true}).teacherSummary.staplerStatus,'confirmed');f.O.publishDay(f.state,f.ctx,{date:f.date,allocationRevision:f.state.dayRevisions[f.date]||0});assert.equal(row.publishedRevision,1);assert.equal(f.O.timetableDay(f.state,f.ctx,{date:f.date}).staplerRevision,1);
+ assert.equal(f.O.effectiveTimetableDay(f.state,f.ctx,f.date).staplerRevision,1);assert.equal(f.O.dailyExport(f.state,f.O.composeStaplerContext(f.state,f.ctx),{date:f.date,fullTeachers:true}).teacherSummary.staplerStatus,'confirmed');f.O.publishDay(f.state,f.O.composeStaplerContext(f.state,f.ctx),{date:f.date,allocationRevision:f.state.dayRevisions[f.date]||0});assert.equal(row.publishedRevision,1);assert.equal(f.O.timetableDay(f.state,f.ctx,{date:f.date}).staplerRevision,1);
 });
 test('new confirmed teacher view never overlays relief from an earlier publication by period index',()=>{
- const f=setup();confirm(f);f.O.publishDay(f.state,f.ctx,{date:f.date,allocationRevision:f.state.dayRevisions[f.date]||0});edit(f);confirm(f);
+ const f=setup();confirm(f);f.O.publishDay(f.state,f.O.composeStaplerContext(f.state,f.ctx),{date:f.date,allocationRevision:f.state.dayRevisions[f.date]||0});edit(f);confirm(f);
  f.state.assignments.push({id:'old-period',date:f.date,staffId:'alice',period:39,timeStart:'19:00',timeEnd:'19:30',status:'published',combination:true,subject:'OLD RELIEF',className:'1A'});
- const view=f.O.dailyTimetable(f.state,f.ctx,{date:f.date});assert.equal(view.modified.cells.length,view.periods.length);assert.equal(view.modified.cells[2][0],'MA');assert.doesNotMatch(JSON.stringify(view),/OLD RELIEF/);
+ const view=f.O.read(f.state,f.ctx,{operation:'dailyTimetable',date:f.date});assert.equal(view.modified.cells.length,view.periods.length);assert.equal(view.modified.cells[2][0],'MA');assert.doesNotMatch(JSON.stringify(view),/OLD RELIEF/);
 });

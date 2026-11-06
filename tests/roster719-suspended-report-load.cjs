@@ -22,7 +22,7 @@ async function setup(){
  {
   const t=await setup();try{
    const S=t.w.GSISRosterStapler,plan=S.apply(S.create({...t.f.day,date:t.f.ctx.today}),{type:'addTile',tile:{teacherId:'bob',period:2,subject:'SCI',venue:'Library',group:'Offline workshop'}});
-   t.f.state.staplerPlans.push({date:t.f.ctx.today,baselineId:'baseline',revision:1,confirmed:true,draft:plan});t.controls.compactRead=true;let warm=0;t.ctx.localTimetable=async()=>{warm++;};await t.render();
+   t.f.state.staplerPlans.push({date:t.f.ctx.today,baselineId:'baseline',revision:1,confirmed:true,confirmedRevision:1,confirmedPlan:structuredClone(plan),draft:plan});t.controls.compactRead=true;let warm=0;t.ctx.localTimetable=async()=>{warm++;};await t.render();
    const choose=name=>{for(const chip of t.w.document.querySelectorAll('[data-absence-teacher] .teacher-chip'))chip.click();const input=t.$('[data-teacher-search]');input.value=name;input.dispatchEvent(new t.w.Event('input'));t.$('[data-absence-teacher] [role=option]').click();};
    let release;t.controls.readGate=new Promise(r=>release=r);choose('Bob');assert.equal(t.$('[data-log-absence]').disabled,true);choose('Alice');
    t.controls.readGate=null;release();await t.wait(()=>t.$('#content').getAttribute('aria-busy')==='false');t.preview();assert(t.$('[data-instruction]'),'latest teacher retains available lesson instructions after an older teacher read');
@@ -33,7 +33,7 @@ async function setup(){
  {
   const t=await setup();try{
    const S=t.w.GSISRosterStapler,plan=S.apply(S.create({...t.f.day,date:t.f.ctx.today}),{type:'addTile',tile:{teacherId:'bob',period:2,subject:'SCI',venue:'Library',group:'Cached workshop'}});
-   t.f.state.staplerPlans.push({date:t.f.ctx.today,baselineId:'baseline',revision:1,confirmed:true,draft:plan});t.controls.compactRead=true;t.ctx.timetablePreload={getEffectiveDay:()=>({...S.effectiveDay(plan),staplerRevision:1})};await t.render();const count=t.readCount();for(const chip of t.w.document.querySelectorAll('[data-absence-teacher] .teacher-chip'))chip.click();const input=t.$('[data-teacher-search]');input.value='Bob';input.dispatchEvent(new t.w.Event('input'));t.$('[data-absence-teacher] [role=option][data-staff=bob]').click();t.preview();assert.equal(t.readCount(),count,'matching confirmed revision serves teacher switches locally');assert.match(t.$('[data-instructions-area]').textContent,/Cached workshop/);assert.equal(t.f.state.absences.length,0);
+   t.f.state.staplerPlans.push({date:t.f.ctx.today,baselineId:'baseline',revision:1,confirmed:true,confirmedRevision:1,confirmedPlan:structuredClone(plan),draft:plan});t.controls.compactRead=true;t.ctx.timetablePreload={getEffectiveDay:()=>({...S.effectiveDay(plan),staplerRevision:1})};await t.render();const count=t.readCount();for(const chip of t.w.document.querySelectorAll('[data-absence-teacher] .teacher-chip'))chip.click();const input=t.$('[data-teacher-search]');input.value='Bob';input.dispatchEvent(new t.w.Event('input'));t.$('[data-absence-teacher] [role=option][data-staff=bob]').click();t.preview();assert.equal(t.readCount(),count,'matching confirmed revision serves teacher switches locally');assert.match(t.$('[data-instructions-area]').textContent,/Cached workshop/);assert.equal(t.f.state.absences.length,0);
   }finally{t.dom.window.close();}
  }
  for(const mode of ['fresh-refresh','expired-refresh','invalidated-teacher-read']){
@@ -51,3 +51,4 @@ async function setup(){
  console.log('PASS suspended Report Absence: selected teacher fallback, rapid A/B/A selection, matching confirmed-cache teacher switches without reads, canonical lesson cells, authoritative fresh/expired refresh and invalidation guards, no early writes.');
 
 })().catch(e=>{console.error(e);process.exitCode=1;});
+
