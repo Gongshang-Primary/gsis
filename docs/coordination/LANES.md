@@ -21,7 +21,7 @@ All three share one GitHub identity, so the label is the only attribution.
 | **C: Contacts** | `contacts-update/public/`, `backend/Contacts_*.gs`, `Contacts_Code.gs` | Codex (Muse after pilot) | Independent of Roster bundles except the Contacts API used by Roster; API changes need coordinator sign-off. |
 | **K: Calendar** | `calendar-update/public/`, `calendar-backend/`, `calendar-job-worker/` | Codex (Muse after pilot) | Independent. |
 | **L: LORD suite UI** | `lord-suite/Source/` (frontends) | Codex (Muse after pilot) | LORD backend and queued writes stay with Codex until designed (D1-first rule). |
-| **Y: Layout and Venues** | `layout-update/public/`, `venues-viewport/public/` | Codex (Muse after pilot) | Independent. |
+| **Y: Layout and Venues** | `layout-update/public/`, `venues-viewport/public/` | Layout: Codex. **Venues: Muse** (owner 6 Nov: "let muse handle entirely"; `tasks/venues-muse-ownership.md`) | Independent. Roster-side Venues sync code stays lane R: changes need Claude's OK. |
 | **T: Docs and tests only** | `docs/`, `tests/` without product code | Any | Coordinator approves. |
 
 Any job that touches files in two lanes belongs to the stricter lane (R before D before the rest). Release assembly (`scripts/build-release.py`, `package.json`, `release-installation-manifest.json`) is coordinator-owned.
