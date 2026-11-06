@@ -1,6 +1,6 @@
 # WhatsApp remaining v2 contracts
 
-- Status: evidence captured and validated; runtime integration blocked by local checkout access
+- Status: merged (#95 at a7e5bca as f72d744, 6 Nov 17:37 SGT). Contracts evidence on main; runtime integration blocked by local checkout access
 - Owner/model: Codex
 - Reviewer/model: Muse (Claude when available)
 - Last updated (Asia/Singapore): 6 November 2026

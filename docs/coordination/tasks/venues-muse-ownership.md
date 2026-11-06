@@ -1,6 +1,6 @@
 # venues-muse-ownership: Muse owns Venues (viewport, backend, and the Roster→Venues feed check)
 
-- Status: assigned to **Muse** (owner 6 Nov ~09:05: "the venues-viewport is less time-sensitive, let muse handle entirely"); lane Y (Venues part). Claude reviews each PR at its exact head; owner merges.
+- Status: merged (#94 at 9b66b73b as 787810f, 6 Nov 17:36 SGT). Findings recorded on main; the #67 "stale" fix (M1 second half) is the remaining work, lane R, needs Claude's OK. Lane Y (Venues part). Owner merges.
 - Reviewer/model: Claude
 
 ## Scope Muse owns
