@@ -1,6 +1,6 @@
 # calendar-stale-dispatch: a DISPATCHED save that never landed blocks its event forever
 
-- Status: authorised for **Codex** (owner 6 Nov: "codex"); lane K (Calendar). Small.
+- Status: merged (#92 at db1cdbf as 6d60d8b, owner "merge 92 93 90", 6 Nov); for release o
 - Reviewer/model: Claude
 
 ## Evidence

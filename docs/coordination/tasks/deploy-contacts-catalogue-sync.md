@@ -1,6 +1,6 @@
 # deploy-contacts-catalogue-sync: published Deploy version not reflected in the Contacts viewport
 
-- Status: **reassigned to Codex** (owner 6 Nov ~05:45: "wish to have codex work on this instead, change agent"); was Muse (PR #83, head fd886f7, CI green but based on stale main e7d4f02, conflicts in 9 files, bundles not regenerated). Codex takes over from #83's branch; lane: Deploy/Contacts (not lane R)
+- Status: merged (#90 at reviewed head f8eb9ad as 2147d18; CHANGELOG/bundle conflicts resolved by Claude), owner "merge 92 93 90", 6 Nov; Codex pushed a refresh 95da06a to the PR at the same time (no new content beyond older main) — close #90 and #83 manually; for release o
 - Reviewer/model: Claude
 - Owner report (verbatim): "deploy-viewport: existing in-force version was saved and published but changes not reflected on contacts viewport"
 

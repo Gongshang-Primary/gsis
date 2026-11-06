@@ -1,6 +1,6 @@
 # roster-assign-relief-export-day: Assign Relief "Export Excel" exports only the selected day, in the daily workbook format
 
-- Status: changelog (owner 6 Nov: "export excel in assign relief only exports the day but follow same format of header frozen left col frozen"); lane R; Codex when authorised. Small. Spec by Claude.
+- Status: merged (#93 at 77bf557 as e3a3e4e, bundle conflicts resolved by Claude), owner "merge 92 93 90", 6 Nov; for release o
 - Reviewer/model: Claude
 
 ## Required
