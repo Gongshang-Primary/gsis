@@ -61,9 +61,9 @@ let browser;
   await page.waitForFunction(()=>state.booking.scheduleKey===state.booking.date&&!state.booking.scheduleLoading);
   assert.equal(scheduleReads,priorScheduleReads+1,'older backend retains the separate schedule fallback');
   const setupReturn=()=>page.evaluate(()=>{
-    state.busy=false;state.return={...state.return,selectionMode:'carried',teacher:'Test Staff',issue:false,issueNotes:'',comments:'',correctTrolleyDeclaration:true,sameOrientationDeclaration:true,
+    state.busy=false;state.return={...state.return,selectionMode:'carried',teacher:'Test Staff',issue:false,issueNotes:'',comments:'',
       selectedSession:{sessionId:'return-fixture',classOrActivity:'1A',subject:'Science',loanTrolleyCount:1,loanDeviceTotal:14,loanTeacher:'Test Staff',stylusQuantity:0,headphoneQuantity:0},
-      trolleys:[{name:'A1',trolleyRecordId:'trolley-fixture',loanQuantity:14,quantity:14,selected:true,photoData:'data:image/png;base64,fixture',fileName:'fixture.png'}]};renderReturnForm();
+      trolleys:[{name:'A1',trolleyRecordId:'trolley-fixture',loanQuantity:14,quantity:14,photoData:'data:image/png;base64,fixture',fileName:'fixture.png'}]};renderReturnForm();
   });
   for(const viewport of [{width:1920,height:1080},{width:1366,height:768},{width:390,height:844},{width:360,height:800}]){
     await page.setViewportSize(viewport);await setupReturn();
@@ -84,6 +84,10 @@ let browser;
   await page.locator('#returnIssueNotes').fill('One device is damaged');await page.locator('#returnIssueBtn').click();await page.waitForFunction(()=>document.querySelector('.notice.success'));
   assert.equal(writes.at(-1).issue,true);assert.equal(writes.at(-1).issueNotes,'One device is damaged');
   await setupReturn();await page.locator('#submitReturnBtn').click();await page.waitForFunction(()=>document.querySelector('.notice.success'));assert.equal(writes.at(-1).issue,false);
+  assert.equal(writes.at(-1).trolleys[0].correctTrolleyDeclaration,true,'clean return still sends the correct-trolley declaration');
+  assert.equal(writes.at(-1).trolleys[0].sameOrientationDeclaration,true,'clean return still sends the same-orientation declaration');
+  assert.equal(await page.locator('.return-trolley-selected').count(),0,'no per-trolley selection checkbox');
+  assert.equal(await page.locator('details[data-trolley-phase="return"]').count(),0,'return trolleys render open, with no accordion');
   await setupReturn();await page.locator('.return-quantity').fill('13');const count=writes.length;await page.locator('#submitReturnBtn').click();assert.equal(writes.length,count,'green action cannot bypass quantity discrepancy');assert.equal(await page.locator('#returnIssueNotes').isVisible(),true);
   assert.deepEqual(errors,[]);
   console.log(JSON.stringify({status:'passed',coverage:['space keyboard entry and cursor','repeated spaces','draft redraw and reload','save and reopen','three equal return actions at four viewport sizes','explicit issue/clean submissions','mismatch cannot become clean return']}));

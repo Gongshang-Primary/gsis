@@ -75,7 +75,10 @@ check('LORD booking-success Collect re-enters authoritative booking selector',lo
 check('LORD Collection accessory UI has independent quantities','stylusQuantity' in lord_app and 'headphoneQuantity' in lord_app and 'Quantity collected' in lord_app)
 check('LORD Collection zero accessory quantity needs no photo',"Number(state.loan.stylusQuantity) > 0 && !state.loan.stylusPhotoData" in lord_app and "Number(state.loan.headphoneQuantity) > 0 && !state.loan.headphonePhotoData" in lord_app)
 check('LORD immediate Collection-to-Return auto-selects trolleys',lord_app.count('loadSession(result.sessionId, { autoSelect: true })')>=1)
-check('LORD direct Return uses manual trolley confirmation',"selectionMode: 'manual'" in lord_app and 'return-trolley-selected' in lord_app and 'Partial returns are not permitted' in lord_app)
+check('LORD Return and Collection have no trolley accordion', 'details[data-trolley-phase' not in lord_app and 'bindTrolleyDetails' not in lord_app)
+check('LORD Return has no per-trolley selection or declaration checkboxes', 'return-trolley-selected' not in lord_app and 'returnCorrectTrolleyDeclaration' not in lord_app and 'returnSameOrientationDeclaration' not in lord_app)
+check('LORD Return still sends both placement declarations as true', 'correctTrolleyDeclaration: true' in lord_app and 'sameOrientationDeclaration: true' in lord_app)
+check('LORD Return confirmation covers correct trolley and orientation', 'with tablets in the correct trolley and facing the same orientation' in lord_app)
 check('LORD has one Session-level red issue control','id="returnIssueBtn"' in lord_app and "returnIssue'" not in lord_app)
 check('LORD issue action precedes clean return in the shared action row',lord_app.find('id="returnIssueBtn"') < lord_app.find('id="submitReturnBtn"') and 'action-grid return-actions' in lord_app)
 check('LORD issue text becomes mandatory when issue active','issueActive && !state.return.issueNotes.trim()' in lord_app)
@@ -122,7 +125,7 @@ check('LORD reference backend timeout no longer 12 seconds','proxyReference' in 
 check('LORD browser has local last-good reference cache',"referenceCache: 'lord_reference_cache_v1_3'" in lord_app and 'readReferenceCache' in lord_app and 'writeReferenceCache' in lord_app)
 check('LORD returning user can enter from local reference cache','loadAuthenticatedReference({ preferCache: true })' in lord_app and 'refreshReferenceInBackground()' in lord_app)
 check('LORD reference avoids layered browser retries','timeoutMs: 55000, getRetries: 0' in lord_app)
-check('LORD layout CSS preserves the approved return action row', hashlib.sha256((ROOT/'Source/lord/assets/styles.css').read_text().split('/* v1.3 reload controls */')[0].replace('v1.3','v1.2').strip().encode()).hexdigest()=='e1430cb63add670ac47db2c98d85dc710c9b1b3a01d12909084f7c80accef2fa')
+check('LORD layout CSS preserves the approved return action row', hashlib.sha256((ROOT/'Source/lord/assets/styles.css').read_text().split('/* v1.3 reload controls */')[0].replace('v1.3','v1.2').strip().encode()).hexdigest()=='1907bc466894331ab753d2b01c3e6bc61d3698dfd9f5807518d91b14f0fe9e78')
 
 
 # OVERLORD v1.3 parity with LORD v1.3 reliability principles
