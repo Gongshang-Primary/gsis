@@ -25,7 +25,7 @@ function replaceKnown(source,name,fn){
   const ranges=functionStatements(source,name);assert(ranges.length,name+' was not found');
   return removeRanges(source,ranges)+'\n'+declaration(name,fn)+'\n';
 }
-const removedLord=['loadBookingEdit','authenticateBookingOverlay','checkBookingAvailability','getBookingOverrideIfNeeded','renderBookingSuccess','renderLoanDetails','validateIdentityForLoan'];
+const removedLord=['loadBookingEdit','authenticateBookingOverlay','checkBookingAvailability','getBookingOverrideIfNeeded','renderBookingSuccess','renderLoanDetails','validateIdentityForLoan','bindGlobalReturnChecks','globalCheckHtml','bindTrolleyDetails'];
 function simplifyLord(source){
   for(const name of removedLord){
     assert.equal((source.match(new RegExp('\\b'+name+'\\b','g'))||[]).length,1,name+' has a caller');
