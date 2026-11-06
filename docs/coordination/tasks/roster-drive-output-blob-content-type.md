@@ -1,10 +1,10 @@
 # roster-drive-output-blob-content-type: Drive daily outputs fail — blob built with a null content type
 
-- Status: proposed — assigned to Codex by the owner 6 Nov 2026; Codex to claim and branch from main.
+- Status: claimed — Codex, owner-authorised 6 Nov 2026.
 - Owner/model: Codex
 - Reviewer/model: Muse
 - Last updated (Asia/Singapore): 6 November 2026
-- Branch: codex/roster-drive-output-blob-content-type (to be created by Codex from main b5bd6f0)
+- Branch: codex/roster-drive-output-blob-content-type (from owner-specified b5bd6f0)
 - Base SHA: b5bd6f0c766f62513dc75bbf0c4263f2aa5e3326
 - Current head SHA (or PR head; avoid self-referential commit hashes): (none yet)
 - PR: (none yet)
@@ -56,3 +56,5 @@ Not deployed unless supported by explicit environment/version/time evidence. Sta
 ## Handoff
 
 Codex: claim, create branch `codex/roster-drive-output-blob-content-type` from main b5bd6f0, implement the four sites plus the strict fakes and regression test, run the build and the full suite locally, open a draft PR only after full CI is green. Full backups stay separate work after this. No secrets or private school data.
+
+Claim: Model: Codex. No open PRs returned by GitHub at claim time. Owner explicitly selects b5bd6f0 as implementation base, overriding the default accepted-claim base. This claim alone is published to current main; it will be carried onto the implementation branch.
