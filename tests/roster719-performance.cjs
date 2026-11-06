@@ -4,7 +4,7 @@ const {harness}=require('./roster-draft-cell-save-speed.cjs'),S=require('../shar
 function suspended(h){
  const day={...h.ctx.days[h.date],date:h.date,periods:h.ctx.days[h.date].periods.map(({period,start,end,startMinutes,endMinutes})=>({period,start,end,startMinutes,endMinutes})),teachers:h.ctx.days[h.date].teachers.map((t,i)=>({...t,cells:t.cells.map(c=>c.some(Boolean)?[c[0],'Workshop '+i,c[2],c[3]]:c)})),formClasses:[],recesses:[]};
  const plan=S.create(day);plan.tiles.find(t=>t.teacherId==='teacher0'&&t.period===2).subject='SCI';plan.revision=3;
- const state=h.state();state.staplerPlans=[{date:h.date,baselineId:'baseline',revision:3,confirmed:true,draft:plan}];h.setState(state);return {plan,day,state};
+ const state=h.state();state.staplerPlans=[{date:h.date,baselineId:'baseline',revision:3,confirmed:true,confirmedRevision:3,confirmedPlan:structuredClone(plan),draft:plan}];h.setState(state);return {plan,day,state};
 }
 {
  const h=harness(),{plan,day,state}=suspended(h),data=h.call({operation:'read',view:'report',compact:true});
@@ -39,3 +39,4 @@ for(const operation of ['unassign','setNoRelief']){
  assert.throws(()=>load({DEPLOY_SHEET_ID:'custom'}),/all three/);assert.throws(()=>load({...settings,ROSTER_DATA_FOLDER_ID:'https://bad'}),/folder ID/);
  console.log('PASS fresh folder configuration uses 4 keyed reads and preserves custom-installation validation');
 }
+

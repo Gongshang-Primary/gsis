@@ -17,3 +17,4 @@ Calendar refused a change: "An earlier save or publication still has an unknown 
 ## Codex claim, 6 November 2026
 
 Owner/model: Codex. Reviewer: Claude. Branch: codex/calendar-stale-dispatch. Base: 69efd3ab9f0dbbb31f1a3bc7da9c86b3dc2ea348. Scope: Calendar mutation receipt resolution under its writer lock, original-user recovery UI, Admin unresolved receipts and Check now, tests and generated copies. Landed requests stay committed; only old non-landed requests fail with STALE_DISPATCH after verifying event/publication markers. Preserve young dispatched writes and idempotent receipts. No live mutation repair, messages, deployment or merge. Claim on task branch follows the owner continuation instruction and updated LANES order.
+

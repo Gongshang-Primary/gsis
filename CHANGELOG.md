@@ -1,3 +1,11 @@
+# Pending: retain the confirmed Stapler day while editing, 6 November 2026
+
+Model: Codex. Allocation, Report Absence, teacher timetables, publication and exports select the retained confirmed Stapler revision. Draft saves and replacement imports leave it active until Confirm. Assign Relief and Daily Notify show the effective source; never-confirmed drafts show a baseline notice and a dated review shortcut. Google, D1 and browser preload share the selected identity, including when the draft has a different origin. Existing reconciliation guards and historical communications remain. See [task](docs/coordination/tasks/roster-stapler-always-effective.md). No deployment or live action.
+
+# Pending: Drive output diagnostics and Admin-only alerts, 6 November 2026
+
+Model: Codex. Preserve sanitised Google refusal reasons in output ledgers and System Health, scan workbook cell/shared-string text, recover expired backups and deduplicate enabled output alerts by kind/day. Operational alerts now use active Admin recipients and separate Admin wording; claim/presend checks reject legacy duty-worded jobs. Coverage alerts retain the duty list. Proposed Admin template remains disabled pending Meta approval. The precise live Drive refusal remains unconfirmed. See [task and verification](docs/coordination/tasks/roster-drive-outputs-bridge-error.md). No deployment or live action.
+
 # Pending: priority-aware automatic relief replanning, 6 November 2026
 
 ## Unreleased: Calendar stale save recovery

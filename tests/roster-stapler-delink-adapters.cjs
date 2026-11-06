@@ -4,21 +4,22 @@ const fixture=require('./roster701-fixture.cjs'),adapter=require('./roster701-ad
 const copy=x=>JSON.parse(JSON.stringify(x));
 function setup(){
  const f=fixture(),plan=S.create({...f.ctx.days[f.date],date:f.date},{date:f.date});
- f.state.staplerPlans.push({date:f.date,baselineId:plan.baselineId,revision:1,confirmed:true,draft:plan});
+ f.state.staplerPlans.push({date:f.date,baselineId:plan.baselineId,revision:1,confirmed:true,confirmedAt:f.ctx.iso,updatedAt:f.ctx.iso,draft:plan});
  const contacts={rosterPeople:f.people.map(p=>({...p,adhocEligible:true})),user:{rosterStaffId:'alice',rosterSMC:true,rosterAdmin:true},rosterSMCIds:['alice'],rosterAdminIds:['alice']};
  const index={revision:2,entries:[{id:'replacement',from:'2026-01-01',to:'2026-12-31',priority:2},{id:'baseline',from:'2026-01-01',to:'2026-12-31',priority:3,pruned:true}]};
  const input={operation:'read',view:'report',compact:true,date:f.date,calendarByDate:{[f.date]:{date:f.date,schoolDay:true,parity:'even',available:true}}};
  return {...f,plan,contacts,index,input};
 }
-test('Google report uses saved Stapler cells without reading any baseline model',()=>{
- const f=setup(),h=adapter(),scope=h.scope;vm.runInContext(fs.readFileSync('backend/RosterOperations.gs','utf8'),scope);
+function pendingEdit(f){const row=f.state.staplerPlans[0];row.confirmedPlan=copy(row.draft);row.confirmedRevision=1;row.revision=2;row.confirmed=false;const tile=row.draft.tiles.find(t=>t.kind==='lesson'&&t.period===2);tile.subject='PRIVATE DRAFT';}
+test('Google report keeps last confirmation during draft editing without reading a baseline model',()=>{
+ const f=setup(),h=adapter(),scope=h.scope;pendingEdit(f);vm.runInContext(fs.readFileSync('backend/RosterOperations.gs','utf8'),scope);
  Object.assign(scope,{GSISRosterStapler:S,rosterIndex_:()=>f.index,rosterModel_:()=>{assert.fail('A saved Stapler day must not read baseline cells');},rosterOperationsSubjectCatalogue_:()=>({})});
  scope.Utilities.formatDate=(_,tz,format)=>format==='yyyy-MM-dd'?f.date:format==='HH'?'05':'00';
  const ctx=scope.rosterOperationsContext_({identity:f.ctx.user,input:f.input},f.contacts,f.state);
  assert.equal(ctx.days[f.date].id,S.planId(f.plan));assert.equal(ctx.days[f.date].teachers[0].cells[2][0],'EL');
 });
-test('D1 report uses saved Stapler cells with no baseline model in its model map',async()=>{
- const {edgeRosterContextFromReferences}=await import('../roster-update/public/edge-roster-context.js'),f=setup();
+test('D1 report keeps last confirmation during draft editing with no baseline model',async()=>{
+ const {edgeRosterContextFromReferences}=await import('../roster-update/public/edge-roster-context.js'),f=setup();pendingEdit(f);
  const ctx=edgeRosterContextFromReferences({state:f.state,input:f.input,who:f.ctx.user,contacts:f.contacts,index:f.index,models:new Map(),quota:{rows:[]},referenceKey:'test',clock:f.ctx,env:{}});
  assert.equal(ctx.days[f.date].id,S.planId(f.plan));assert.equal(ctx.days[f.date].teachers[0].cells[2][0],'EL');
 });
@@ -90,3 +91,4 @@ test('verified replacement baseline clears an unavailable-timetable manual revie
  f.ctx.days[f.date].id='replacement';f.ctx.days[f.date].verified=true;f.O.reconcile(f.state,f.ctx);assert(!a.invalidCover);assert.equal(a.reviewRequired,false);assert.equal(a.reviewReason,undefined);assert.equal(a.status,'draft');assert.equal(a.id,id);assert.equal(require('../shared/roster-allocation.js').effectiveAssignments(f.state).length,1);
  const before=JSON.stringify(f.state.assignments);f.O.reconcile(f.state,f.ctx);assert.equal(JSON.stringify(f.state.assignments),before);
 });
+

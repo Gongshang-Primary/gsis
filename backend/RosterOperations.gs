@@ -194,10 +194,10 @@ function rosterOperationsPhase_(name,fn){return typeof deployPhase_==='function'
 function rosterOperationsRecordOnly_(p){return ['previewStaplerMigration','migrateStaplerPlans','previewTimetableReconcile','confirmTimetableReconcile'].includes(p.operation)||p.operation==='read'&&['timetableReview','staplerMigration','timetableReconcile'].includes(p.view)||['publish','createStapler','importStapler','previewRestoreStapler','restoreStapler'].includes(p.operation)||p.operation==='currentDuty'||p.operation==='read'&&p.view==='currentDuty'||rosterOperationsCustom_(p)||['teacherDailyUpdate','dailyNotify','notifyDaily','acknowledge','history','audit','prunePreview','accounting','saveRecessSettings','dutyRoster','setDutySMC','systemConfig','saveSystemConfig','nameBridges','saveNameBridge','deleteNameBridge','dailyEmployment','saveDailyEmploymentSettings','sendDailyEmploymentReport','staplerDates','requestStapler','decideStapler','renameStapler','deleteStapler'].includes(p.operation)||p.operation==='read'&&(['reportForm','schoolAbsences','teacherDailyUpdate','dailyNotify','mine','prune','notificationReadiness','dutyRoster','systemConfig','nameBridges','dailyEmployment','staplerDates'].includes(p.view)||p.compact===true&&['report','entry'].includes(p.view));}
 // A confirmed day owns its cells. Live Deploy quota fields are attached separately.
 function rosterOperationsSavedStaplerDay_(state,d){
- const row=state?.staplerPlans?.find(row=>row.date===d);if(!row||!row.confirmed&&!row.published)return null;
- const plan=row.confirmed?(row.draft||row.confirmedPlan||row.published):row.published;
+ const row=state?.staplerPlans?.find(row=>row.date===d);if(!row)return null;const snapshot=GSISRosterOperations.confirmedStaplerSnapshot(row,state?.audit);if(!snapshot)return null;
+ const plan=snapshot.plan;
  if(!plan?.tiles)error_(409,'This saved Stapler day needs the Admin day-copy migration before planning.');
- return GSISRosterStapler.effectiveDay(plan);
+ return {...GSISRosterStapler.effectiveDay(plan),staplerRevision:snapshot.revision,staplerBaselineId:plan.baselineId};
 }
 function rosterOperationsStaplerMigrationContext_(req,c,state,index,base){
  if(!base.user.admin)error_(403,'Admin access is required to migrate saved Stapler days.');
@@ -437,7 +437,7 @@ function rosterOperationsDayToken_(s,ctx,d){
  for(const row of s.reliefCorrections||[])if(row.date===d||row.actual?.date===d)reliefIds.add(row.assignmentId);
  const rows={};for(const [key,value] of Object.entries(packed))if(Array.isArray(value)&&scoped.has(key))rows[key]=value.filter(r=>r&&typeof r==='object'&&(r.date===d||r.actual?.date===d||key==='reliefCorrections'&&reliefIds.has(r.assignmentId))).map(row=>{if(!['staplerPlans','staplerArchives'].includes(key))return row;const {timetablePackage,...saved}=row;return saved;});
  const active=GSISRoster.active(ctx.timetableEntries||[],d),bridges={...s,nameBridges:s.nameBridges.slice()};GSISRosterOperations.seedNameBridges(bridges,ctx.people||[]);
- return rosterOperationsDigest_({schema:1,date:d,rows,dayRevision:s.dayRevisions[d]||0,publication:s.dailyPublicationStates?.[d]?.revision||0,baseline:GSISRosterOperations.readyStaplerPlan((s.staplerPlans||[]).find(row=>row.date===d))?(GSISRosterOperations.readyStaplerPlan((s.staplerPlans||[]).find(row=>row.date===d)).id||'stapler:'+d):active||ctx.days[d]?.id||null,customInstructions:s.customInstructions.filter(r=>!r.deletedAt),systemConfig:s.systemConfig,nameBridges:bridges.nameBridges,types:s.types,recessSettings:s.recessSettings});
+ return rosterOperationsDigest_({schema:1,date:d,rows,dayRevision:s.dayRevisions[d]||0,publication:s.dailyPublicationStates?.[d]?.revision||0,baseline:GSISRosterOperations.readyStaplerPlan((s.staplerPlans||[]).find(row=>row.date===d),s.audit)?(GSISRosterOperations.readyStaplerPlan((s.staplerPlans||[]).find(row=>row.date===d),s.audit).id||'stapler:'+d):active||ctx.days[d]?.id||null,customInstructions:s.customInstructions.filter(r=>!r.deletedAt),systemConfig:s.systemConfig,nameBridges:bridges.nameBridges,types:s.types,recessSettings:s.recessSettings});
 }
 // Display invalidation includes accounting inputs across dates. Command day
 // tokens remain scoped to the edited date and keep their existing semantics.
@@ -1240,6 +1240,15 @@ function rosterNotificationEligible_(s,j,now,fresh,index,allowed){
  if(j.kind==='stapler_request'&&(!(fresh.rosterSMCIds||[]).includes(j.recipientId)||!GSISRosterOperations.teacherSponsor(person)))return 'The nominated sponsor is no longer an eligible teacher.';
  if(j.kind==='stapler_decision'&&j.data.audience==='stapler-sponsor'&&(!(fresh.rosterSMCIds||[]).includes(j.recipientId)||!GSISRosterOperations.teacherSponsor(person)))return 'The nominated sponsor is no longer an eligible teacher.';
  if(j.kind==='contact_review'&&!(fresh.rosterAdminIds||[]).includes(j.recipientId))return 'Recipient is no longer a Contacts Admin.';
+ // Recheck audience at claim and immediately before send, including retained
+ // pre-fix Drive jobs. Never reinterpret their duty wording as an Admin notice.
+ const systemAlert=j.kind==='system_alert'||j.data.audience==='system-admin'||j.data.audience==='backup-admin'||String(j.key||'').startsWith('drive-backup:');
+ if(systemAlert){
+  if(j.kind!=='system_alert'||j.data.audience!=='system-admin'||j.data.templateKey!=='system_alert')return 'Legacy system alert requires the Admin route and wording.';
+  if(!(fresh.rosterAdminIds||[]).includes(j.recipientId)||person.active!==true)return 'Recipient is no longer an active Roster Admin.';
+  if(j.data.outputKind&&(j.data.outputKind==='daily'?s.systemConfig?.driveDaily?.enabled:s.systemConfig?.driveBackup?.enabled)!==true)return 'Drive output alerts are disabled.';
+ }
+ if(j.data.templateKey==='smc_attention'&&j.data.audience!=='duty-smc')return 'SMC duty wording requires a current duty recipient.';
  if(j.data.audience==='duty-smc'){const row=s.smcDutyRoster.find(r=>r.date===j.date);if(!GSISRosterOperations.dutyEligible(person)||!(fresh.rosterSMCIds||[]).includes(j.recipientId)||!row?.staffIds.includes(j.recipientId)||!GSISRosterOperations.dutyWindow(row,j.date,now))return 'Recipient is no longer on relief duty for this time window.';}
  if(j.data.audience==='urgent-smc'&&!(fresh.rosterUrgentSMCIds||[]).includes(j.recipientId))return 'Recipient is no longer eligible for urgent staff messages.';
  if(!person.active&&!s.adhoc.some(a=>a.staffId===j.recipientId&&a.date===j.date&&!a.deletedAt))return 'Recipient is inactive and is not engaged for the selected date.';

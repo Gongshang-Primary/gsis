@@ -87,7 +87,7 @@ const rejected=(fn,status,pattern)=>assert.throws(fn,e=>e.status===status&&(!pat
  rejected(()=>scope.rosterOperationsContext_(request,{...c,user:{...c.user,rosterSMC:false}},h.state()),403);assert.equal(modelReads,1,'ordinary teacher denied before loading timetable cells');
  const direct={...h.ctx,user:h.identity('alice')};rejected(()=>O.reportView(h.state(),direct,input),403);
  const suspended=h.state(),plan=require('../shared/roster-stapler.js').create({...copy(ctx.days[h.date]),date:h.date},{date:h.date});
- suspended.staplerPlans=[{date:h.date,baselineId:'baseline',revision:3,confirmed:true,draft:plan}];
+ suspended.staplerPlans=[{date:h.date,baselineId:'baseline',revision:3,confirmed:true,confirmedRevision:3,confirmedPlan:structuredClone(plan),draft:plan}];
  scope.GSISRosterStapler=require('../shared/roster-stapler.js');const composed=scope.rosterOperationsContext_(request,c,suspended),projection=O.reportView(suspended,composed,input);
  assert.deepEqual(Array.from(composed.days[h.date].teachers,t=>t.staffId),['alice','bob'],'confirmed STAPLER compact context retains every selected teacher');
  assert.deepEqual(Array.from(projection.timetable.teachers,t=>t.staffId),['alice','bob']);assert.equal(projection.timetable.staplerRevision,3);
@@ -103,3 +103,4 @@ const rejected=(fn,status,pattern)=>assert.throws(fn,e=>e.status===status&&(!pat
  assert.deepEqual(Array.from(selfContext.days[h.date].teachers,t=>t.staffId),['alice'],'ordinary teacher retains their own explicit one-teacher selection');
 }
 console.log('PASS multiple-teacher absences: complete instructions, bounds, authority, no partial saves, reversed commits and exact receipt recovery.');
+
