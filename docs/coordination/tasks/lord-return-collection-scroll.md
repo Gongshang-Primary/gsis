@@ -1,13 +1,13 @@
 # lord-return-collection-scroll: LORD return and collection as one long scrolling page
 
-- Status: claimed
+- Status: merged (#98 at 35a4f5a as 999c1a4, 6 Nov 19:11 SGT)
 - Owner/model: Muse
 - Reviewer/model: Codex
 - Last updated (Asia/Singapore): 6 November 2026
 - Branch: muse/lord-return-collection-scroll
 - Base SHA: 307d1c76c048b2f3dba616ec63331cdf5c4c7c93
-- Current head SHA (or PR head; avoid self-referential commit hashes): 09ca3071d46d5a848157599b3250e109cace21a2
-- PR: #98 (draft, open)
+- Current head SHA (or PR head; avoid self-referential commit hashes): 35a4f5abb20e0d1479900f2f802fc03dfb0ad47f
+- PR: #98 (merged)
 - User-authorised scope: LORD return and collection pages: no collapsible trolley sections (long scrolling mobile-first page, minimal friction and clicks); remove the unnecessary checkboxes on the return page. Owner decision 6 Nov: drop the per-trolley "I am physically returning" checkbox and both declaration checkboxes ("Tablets are kept in the correct trolley", "Tablets are facing the same orientation"). The two declarations are still sent to the backend as true with every trolley, covered by the single submit confirmation, because the backend requires both booleans (requiredBoolean_ in lord-suite/Source/backend/Code.gs) and records false as a discrepancy.
 - Files/domains owned (include generated outputs): lord-suite/Source/lord/assets/app.js and lord-suite/First_Time_Setup/templates/lord/assets/app.js (byte-identical copies); lord-suite/Source/lord/assets/styles.css and its template copy; lord-suite/tests return/collection behaviour checks; docs/coordination/tasks/lord-return-collection-scroll.md; CHANGELOG.md.
 - Out of scope: backend (no change; declarations still sent as true); loan booking, OVERLORD, WhatsApp, D1/edge queue, Roster, Deploy, Contacts; live data and deployment; the accessory cards (quantity + photo, no checkboxes) and the "Return devices with issues" control.
