@@ -46,6 +46,7 @@ Kept for the record. Gemini/Jules no longer receives jobs; its branches no longe
 - After the pilot the coordinator reports quality (correctness, rule-following, test discipline) and the owner decides whether lanes K, L and Y open to Gemini.
 
 ## Current assignments (update on every change)
+**PR plan while Claude is away:** `plans/2026-11-handover-pr-plan.md` (Codex C1-C13, Muse M1-M4, owner decisions).
 **Reviewer handover (owner 6 Nov):** Muse reviews Codex PRs; Codex reviews Muse PRs; owner merges. See `HANDOVER_REVIEWER.md`.
 **Codex priority (owner 6 Nov 12:50, "put priority")**: A) roster-intake-overlap-message (Review report on D1 + plain reasons) and B) roster-d1-parity-sweep (inventory PR today, then ports) come first.
 **Codex order (owner 6 Nov ~10:20, "follow your order")**: 1) #87 Drive outputs (approved pending CI) → 2) roster-stapler-always-effective → 3) deploy-contacts-catalogue-sync (replaces #83) → 4) calendar-stale-dispatch → 5) roster-assign-relief-export-day → 6) old backlog (PRs from 1-4 Nov: rebase/re-verify or close) → allocation rules rework (rules book) when the owner starts it. Supersedes the 'clear the backlog without stopping' order recorded in PR #88.
