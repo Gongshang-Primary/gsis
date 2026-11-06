@@ -15,3 +15,8 @@
 Today roster-update/public/roster-export.js (line ~211) appends status tags to relief cell labels: " [Published]", " [Completed]" (draft shows nothing there, but other export paths may show "[Draft]").
 7. Remove status tags from every Excel export and the Drive daily workbook: no "[Draft]", "[Published]" or "[Completed]" in any cell. Keep content tags that describe the duty itself: "[Combined]", "[Repurposed recess duty]". Status, where needed, goes in the sheet's status line only (e.g. "Published 07:04, revision 2" or "Draft — not yet published").
 8. Test: no cell matches /\[(Draft|Published|Completed)\]/i in a fixture export with draft, published and completed relief; Combined/Repurposed tags still present.
+
+
+## Codex claim, 6 November 2026
+
+Owner/model: Codex. Reviewer: Claude. Branch: codex/roster-assign-relief-export-day. Base: e59372a1143489116a680f6299a0b48f99418f61 (PR #91). Scope: selected-day Assign Relief workbook through the canonical Drive renderer, offline local snapshot, consistent status-tag removal across Excel paths, tests and generated copies. This follows the owner continuation instruction and LANES order. No live Drive writes, messages, deployment or merge.
