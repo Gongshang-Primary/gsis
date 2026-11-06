@@ -549,9 +549,10 @@
         "attention_details",
         "roster_status_url"
       ],
-      "body": "*GSiS System Alert*\n\nHi {{1}}, this system alert is for GSiS Admins.\n\nDate: {{2}}\n\n{{3}}\n\nOpen System Health to review: {{4}}.\n\nThank you.",
-      "bodySha256": "8145e8dd3411294f66ef7aeb68ccdf02c8c38e6fddff444abb0a726cc9d4fc7d",
-      "submissionState": "NOT_SUBMITTED"
+      "body": "*GSiS System Alert*\n\nHi {{1}}, this system alert is for GSiS Admins.\n\nDate: {{2}}\n\nIssue: {{3}}\n\nOpen System Health to review: {{4}}.\n\nThank you.",
+      "bodySha256": "516d26993d6eb3f8fd5d8fe5864d35a2875fd5e4260bcaa75853a95fff252741",
+      "submissionState": "PENDING",
+      "id": "1846305353057485"
     }
   },
   "observedOn": "2026-10-18"

@@ -106,7 +106,8 @@ const currentSnapshot=JSON.parse(fs.readFileSync('notification-worker/template-o
 assert.equal(currentSnapshot.templates.length,21);
 for(const contract of Object.values(gateway.WHATSAPP_CONTRACTS)){
  if(contract.name==='gsis_system_alert_v1'){
-  assert.equal(contract.submissionState,'NOT_SUBMITTED');assert.equal(contract.id,undefined);
+  assert.equal(contract.submissionState,'PENDING');assert.equal(contract.id,'1846305353057485');
+  assert.match(contract.body,/Issue: \{\{3\}\}/);
   assert.equal(JSON.parse(fs.readFileSync('notification-worker/templates.activation.json')).system_alert.enabled,false);
   assert(!currentSnapshot.templates.some(t=>t.name===contract.name),'a proposal must not be represented as a historical provider observation');
   continue;
