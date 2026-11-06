@@ -1711,7 +1711,7 @@ const next=stapler().effectiveDay(plan,ctx.baselineDays?.[d]||ctx.days[d]);for(c
    if(p.dailyDrive===true){const visible=new Set(ctx.people.filter(t=>t.active||extraIds.has(t.id)).map(t=>t.id));fullPlan.teachers=fullPlan.teachers.filter(t=>visible.has(t.staffId));}
    teacherSummary={plan:fullPlan,absences:absent,assignments:effective,demands:demand(ctx,s,d).map(project),addedTeachers:ctx.people.filter(t=>extraIds.has(t.id)&&!fullPlan.teachers.some(p=>p.staffId===t.id)).map(({id,name})=>({staffId:id,name,timetableName:name})),staplerStatus:plan?(record.publishedRevision===confirmedStaplerSnapshot(record,s.audit)?.revision?'published':'confirmed'):'baseline'};
   }
-  return {revision:s.revision,allocationRevision:s.dayRevisions[d]||0,date:d,exportedAt:ctx.iso,...(teacherSummary?{teacherSummary}:{}),periods:copy(dd.periods),rows:[...rows.values()].sort((a,b)=>a.name.localeCompare(b.name,'en',{numeric:true})),legend:'Grey: unpublished allocation or explicit No Relief Needed. Light red: UNASSIGNED. White: published allocation. Blank: no vacancy.'};
+  return {revision:s.revision,allocationRevision:s.dayRevisions[d]||0,date:d,exportedAt:ctx.iso,timetableSource:timetableSource(s,ctx,d),...(teacherSummary?{teacherSummary}:{}),periods:copy(dd.periods),rows:[...rows.values()].sort((a,b)=>a.name.localeCompare(b.name,'en',{numeric:true})),legend:'Grey: unpublished allocation or explicit No Relief Needed. Light red: UNASSIGNED. White: published allocation. Blank: no vacancy.'};
  }
 
  function primaryLevel(className){const m=/^(?:P(?:rimary)?\s*)?([1-6])(?=$|[^0-9])/i.exec(String(className||'').trim());return m?Number(m[1]):null;}

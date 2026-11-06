@@ -40,7 +40,7 @@ function rosterOperationsAttachDayToken_(response,s,ctx,p){
   if(!response.cellStates){const demands=[...GSISRosterOperations.demand(ctx,s,date),...(response.manualRecoveryDemands||GSISRosterOperations.manualRecoveryDemands(s,ctx,date))];response.cellStates=GSISRosterOperations.cellDecisions(s,date,demands.map(d=>d.id));}
   if(response.allocationPatch){const selected=new Set(p.demandIds||[]);response.cellStates=Object.fromEntries(Object.entries(response.cellStates).filter(([id])=>selected.has(id)));}
   response.cellProvenance=GSISRosterOperations.cellProvenance(s,ctx,date,Object.keys(response.cellStates||{}));
-  if(!response.allocationPatch)response.exportContext=GSISRosterOperations.dailyExport(s,ctx,{date,fullTeachers:true});
+  if(!response.allocationPatch)response.exportContext=GSISRosterOperations.dailyExport(s,ctx,{date,fullTeachers:true,dailyDrive:true});
   response.auditExport=s.allocationAuditExports?.[date]?{pendingRevision:s.allocationAuditExports[date].pendingRevision||0,exportedRevision:s.allocationAuditExports[date].exportedRevision||0}:null;
  }
  return response;

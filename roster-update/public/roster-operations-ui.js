@@ -1641,6 +1641,7 @@ var RosterOpsUI = (() => {
   // Relief cells read "Art (for Nisha)": name every absent teacher from the record, never an id.
   const demandStaff=new Map();for(const group of s.data.demands||[])for(const dem of group.members||[group])demandStaff.set(dem.id,dem.staffId);
   const known=id=>s.data.people?.find(p=>p.id===id)?.name,absentNameFor=a=>a.absentName||[...new Set([...(a.absentIds||[]),a.absentId,demandStaff.get(a.demandId)].filter(Boolean).map(known).filter(Boolean))].join(', ');
+  for(const person of s.data.people||[])if(person.active&&!data.teacherSummary.plan.teachers.some(t=>t.staffId===person.id)&&!(data.teacherSummary.addedTeachers||[]).some(t=>t.staffId===person.id)){data.teacherSummary.addedTeachers??=[];data.teacherSummary.addedTeachers.push({staffId:person.id,name:person.name,timetableName:person.name});}
   data.teacherSummary.assignments=assignments.map(a=>{const absentName=absentNameFor(a);return {...project(a),relieverName:person(s,a.staffId).name,...(absentName?{absentName}:{})};});
   for(const a of assignments)if(!data.teacherSummary.plan.teachers.some(t=>t.staffId===a.staffId)&&!(data.teacherSummary.addedTeachers||[]).some(t=>t.staffId===a.staffId)){data.teacherSummary.addedTeachers??=[];data.teacherSummary.addedTeachers.push({staffId:a.staffId,name:person(s,a.staffId).name,timetableName:person(s,a.staffId).name});}
   for(const group of s.data.demands)for(const dem of group.members||[group]){
@@ -1654,12 +1655,12 @@ var RosterOpsUI = (() => {
   data.legend=data.snapshotLabel+'. '+data.legend;return data;
  }
  async function exportRelief(s,b,kind){
-  const full=kind==='teacher',classPov=kind==='class',label=b.textContent,date=s.date;let data,baseline;
-  try{data=localExportSnapshot(s);baseline=full?draftCopy(s.exportBaseline||s.ctx.cachedTimetable?.(date)||null):null;if(full&&(!baseline?.model||baseline.modelId!==data.teacherSummary?.plan?.baselineId))baseline=null;}catch(error){say(s,error.message,true);return;}
+  const full=kind==='teacher',classPov=kind==='class',label=b.textContent,date=s.date;let data;
+  try{data=localExportSnapshot(s);}catch(error){say(s,error.message,true);return;}
   b.dataset.exporting='true';b.disabled=true;b.innerHTML='<span class="ops-spinner" aria-hidden="true"></span> Exporting…';
   try{
-   if((full||classPov)&&!window.RosterStaplerExport)throw Error('The timetable workbook exporter could not load. Refresh and retry.');
-   const book=classPov?await window.RosterStaplerExport.makeClassWorkbook(data):full?await window.RosterStaplerExport.makeReliefWorkbook(data,baseline):await RosterExport.makeWorkbook([RosterExport.dailyRelief(data)]);
+   if(classPov&&!window.RosterStaplerExport)throw Error('The timetable workbook exporter could not load. Refresh and retry.');
+   const book=classPov?await window.RosterStaplerExport.makeClassWorkbook(data):full?RosterExport.dailyTeacherWorkbook(data):await RosterExport.makeWorkbook([RosterExport.dailyRelief(data)]);
    const url=URL.createObjectURL(book.blob),a=document.createElement('a');a.href=url;a.download=book.filename||'GSiS Relief '+data.date+'.xlsx';a.click();setTimeout(()=>URL.revokeObjectURL(url),5000);if(isLive(s)&&s.date===date)say(s,(classPov?'Class POV':full?'All-teacher':'Daily relief')+' Excel created from your local snapshot. '+data.localSnapshot.state+'. Relief instructions are excluded.');
   }catch(e){if(isLive(s)&&s.date===date)say(s,e.message||'Export failed. Retry.',true);}finally{delete b.dataset.exporting;if(b.isConnected){b.disabled=false;b.textContent=label;freshness(s);}}
  }

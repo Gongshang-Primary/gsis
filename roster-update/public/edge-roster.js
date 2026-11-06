@@ -616,7 +616,7 @@ export async function dailyOutputsEdgeRoster(env,options={}){
    if(calendar.schoolDay===true){
     const workbookState=await hydrate(env,state,[date]);ctx=await buildEdgeRosterContext(env,workbookState,{operation:'exportDaily',date,fullTeachers:true,dailyDrive:true});
     const daily=await sanitizeBackup(GSISRosterOperations.read(workbookState,{...ctx,iso:new Date(now).toISOString()},{operation:'exportDaily',date,fullTeachers:true,dailyDrive:true}));daily.timetableName=daily.teacherSummary.staplerStatus==='baseline'?(ctx.timetableEntries.find(e=>e.id===ctx.days[date]?.id)?.name||'Baseline timetable'):'Stapler plan';
-    const page=RosterExport.dailyTeacherPage(daily,{final}),book=RosterExport.workbookFiles([page]),bytes=new Uint8Array(await GSISExcel.packageFiles(book.files).arrayBuffer());files.unshift({kind:'excel',bytes,records:page.rows.filter(r=>r.teacherId&&r.field===0).length});
+    const book=RosterExport.dailyTeacherWorkbook(daily,{final,packageFiles:GSISExcel.packageFiles}),bytes=new Uint8Array(await book.blob.arrayBuffer());files.unshift({kind:'excel',bytes,records:book.records});
    }else if(!text)return {schoolDay:false};
   }catch(error){
    // The historical TXT needs only retained audit evidence. Recover it once even

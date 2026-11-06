@@ -1,5 +1,9 @@
 # Pending: retain the confirmed Stapler day while editing, 6 November 2026
 
+## Unreleased: selected-day relief workbook
+
+Assign Relief Export Excel uses the same one-day workbook renderer as daily Drive output, with frozen headers and teacher column, four rows per teacher, confirmed timetable source and local snapshot status. Excel duty cells no longer carry Draft, Published or Completed tags; Combined and Repurposed recess duty remain.
+
 Model: Codex. Allocation, Report Absence, teacher timetables, publication and exports select the retained confirmed Stapler revision. Draft saves and replacement imports leave it active until Confirm. Assign Relief and Daily Notify show the effective source; never-confirmed drafts show a baseline notice and a dated review shortcut. Google, D1 and browser preload share the selected identity, including when the draft has a different origin. Existing reconciliation guards and historical communications remain. See [task](docs/coordination/tasks/roster-stapler-always-effective.md). No deployment or live action.
 
 # Pending: Drive output diagnostics and Admin-only alerts, 6 November 2026

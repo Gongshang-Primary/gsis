@@ -172,8 +172,7 @@ window.RosterStaplerExport=(()=>{
   }
   const classes=plan.classes.slice().sort((a,b)=>a.name.localeCompare(b.name,'en',{numeric:true})),cards=new Map(),colourRank={clear:0,green:1,pink:2,orange:3};
   const add=(id,p,text,colour)=>{const slot=key(id,p);if(!cards.has(slot))cards.set(slot,[]);cards.get(slot).push({text,colour});};
-  const status=a=>a?.status==='completed'?' [Completed]':a&&a.status!=='draft'?' [Published]':'';
-  const cover=(name,a)=>a&&!a.noRelief?(a.relieverName||teachers.get(a.staffId)||a.staffId)+' (for '+name+')'+(a.combination?' [Combined]':'')+(a.repurposedDuty?' [Repurposed recess duty]':'')+status(a):null;
+  const cover=(name,a)=>a&&!a.noRelief?(a.relieverName||teachers.get(a.staffId)||a.staffId)+' (for '+name+')'+(a.combination?' [Combined]':'')+(a.repurposedDuty?' [Repurposed recess duty]':''):null;
   for(const tile of plan.tiles.filter(t=>t.location==='grid')){
    if(tile.kind==='recess'){
     for(const p of window.GSISRosterStapler.tilePeriods(plan,tile))for(const id of tile.classIds){const cls=classes.find(c=>c.id===id);if(!recess.some(({d})=>d.period===p&&norm(d.className)===norm(cls?.name)))add(id,p,['Recess',tile.venue].filter(Boolean).join('\n'),'clear');}
@@ -185,14 +184,14 @@ window.RosterStaplerExport=(()=>{
    const className=tile.classIds.map(id=>classes.find(c=>c.id===id)?.name||'').join(', ');
    const matched=checks.find(({d})=>norm(d.subject)===norm(tile.subject)&&norm(d.className)===norm(className)&&norm(d.venue)===norm(tile.venue)&&norm(d.groupName)===norm(tile.group))||(checks.length===1?checks[0]:null);
    const a=matched?.a,substitute=absence?cover(name,a):null;
-   const label=substitute||(absence?name+' (absent — '+(absence.reason||'Unspecified')+' — '+(matched&&!a?'unresolved':'no relief')+')'+status(a):name);
+   const label=substitute||(absence?name+' (absent — '+(absence.reason||'Unspecified')+' — '+(matched&&!a?'unresolved':'no relief')+')':name);
    const colour=substitute?'orange':window.GSISRosterStapler.tileState(plan,tile)==='original'?'clear':!tile.baselineId?'pink':'green';
    const text=[label,tile.subject,tile.venue,tile.group].filter(Boolean).join('\n');
    for(const id of tile.classIds)add(id,tile.period,text,colour);
   }
   for(const {d,a} of recess){
    const cls=classes.find(c=>norm(c.name)===norm(d.className));if(!cls)continue;
-   const text=[cover('Recess supervision',a)||(a?.noRelief?'No relief needed':'UNASSIGNED')+status(a),d.subject||'Recess',d.venue,d.groupName].filter(Boolean).join('\n');
+   const text=[cover('Recess supervision',a)||(a?.noRelief?'No relief needed':'UNASSIGNED'),d.subject||'Recess',d.venue,d.groupName].filter(Boolean).join('\n');
    add(cls.id,d.period,text,a&&!a.noRelief?'orange':'clear');
   }
   const planStatus=({confirmed:'Confirmed suspended timetable, not yet published',published:'Published suspended timetable',baseline:'Baseline timetable'})[summary.staplerStatus]||'Baseline timetable';
