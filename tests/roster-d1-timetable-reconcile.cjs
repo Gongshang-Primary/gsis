@@ -9,7 +9,7 @@ function setup(){
 }
 function savedPlan(f){
  const day={...structuredClone(f.ctx.days[f.date]),id:'pruned',date:f.date,formClasses:[]},plan=S.create(day,{date:f.date,venues:[]});
- f.state.staplerPlans.push({date:f.date,baselineId:'pruned',confirmed:true,revision:1,draft:plan});return plan;
+ f.state.staplerPlans.push({date:f.date,baselineId:'pruned',confirmed:true,revision:1,draft:plan,confirmedPlan:structuredClone(plan),confirmedRevision:1,confirmedAt:f.ctx.iso});return plan;
 }
 function adapters(O){
  const scope=vm.createContext({GSISRoster:R,GSISRosterOperations:O});

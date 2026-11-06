@@ -2,6 +2,14 @@
 
 Model: Codex. Report Contacts sync separately after a saved Deploy publication. Retry the same frozen publication and global catalogue revision with Admin/identity checks; reject superseded retries. Contacts invalidates cached validation choices by digest and rejects stale in-flight reads while retaining drafts and pending saves. Deploy keeps Layout handoff status visible alongside Contacts. Canonical bundles rebuilt; focused dispatch, writer and DOM tests passed. No deployment or live action. See [task](docs/coordination/tasks/deploy-contacts-catalogue-sync.md).
 
+# Pending: retain the confirmed Stapler day while editing, 6 November 2026
+
+Model: Codex. Allocation, Report Absence, teacher timetables, publication and exports select the retained confirmed Stapler revision. Draft saves and replacement imports leave it active until Confirm. Assign Relief and Daily Notify show the effective source; never-confirmed drafts show a baseline notice and a dated review shortcut. Google, D1 and browser preload share the selected identity, including when the draft has a different origin. Existing reconciliation guards and historical communications remain. See [task](docs/coordination/tasks/roster-stapler-always-effective.md). No deployment or live action.
+
+# Pending: Drive output diagnostics and Admin-only alerts, 6 November 2026
+
+Model: Codex. Preserve sanitised Google refusal reasons in output ledgers and System Health, scan workbook cell/shared-string text, recover expired backups and deduplicate enabled output alerts by kind/day. Operational alerts now use active Admin recipients and separate Admin wording; claim/presend checks reject legacy duty-worded jobs. Coverage alerts retain the duty list. Proposed Admin template remains disabled pending Meta approval. The precise live Drive refusal remains unconfirmed. See [task and verification](docs/coordination/tasks/roster-drive-outputs-bridge-error.md). No deployment or live action.
+
 # Pending: priority-aware automatic relief replanning, 6 November 2026
 
 Model: Codex. Full Auto-allocate gives first priority to daily SREs and any teacher activated ad hoc for the date with no baseline timetable, within their activation and workload limits. It ranks priority-1 relief use above recess-duty reuse and retains existing choices when business preferences tie. Ad hoc activation changes retain a date-local re-plan notice until a successful full run. Allocation logs name idle priority-1 teachers and their availability or limit reasons. Manual, peer, Stapler, protected, published and started duties stay fixed. Google and D1 use the same objective and evidence. See [task and verification](docs/coordination/tasks/roster-reoptimise-priority-adhoc.md). No deployment or live action.

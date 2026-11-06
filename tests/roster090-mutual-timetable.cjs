@@ -39,12 +39,13 @@ const copy=value=>JSON.parse(JSON.stringify(value));
  assert.equal(O.read(state,actor(confirmed),input).timetable.teachers.find(t=>t.staffId==='bob').cells[2][0],'MA');
  const changed=copy(state.staplerPlans[0].draft);changed.tiles.find(t=>t.teacherId==='bob'&&t.period===2).subject='UNCONFIRMED_PRIVATE_LESSON';O.staplerApply(state,ctx,{operation:'saveStapler',date,staplerRevision:1,plan:changed});
  const current=O.composeStaplerContext(state,ctx),before=copy(state);
- assert.throws(()=>O.read(state,actor(current),input),e=>e.status===409&&e.code==='TIMETABLE_CONFIRMATION_REQUIRED'&&!e.message.includes('UNCONFIRMED_PRIVATE_LESSON'),'ordinary teacher never receives a later working-plan grid');
+ const grid=O.read(state,actor(current),input).timetable;assert.equal(grid.staplerRevision,1);assert.equal(grid.teachers.find(t=>t.staffId==='bob').cells[2][0],'MA');assert(!JSON.stringify(grid).includes('UNCONFIRMED_PRIVATE_LESSON'),'ordinary teacher receives only the retained confirmed grid');
  assert.deepEqual(state,before);assert.equal(state.absences.length,1,'blocked grid does not undo the saved absence');
  const compact=O.reportView(state,actor(current),{date,staffId:'alice'});assert.deepEqual(compact.timetable.teachers.filter(t=>Array.isArray(t.cells)).map(t=>t.staffId),['alice'],'accepted report cannot leak other teachers’ draft cells before the grid check');
  assert(!JSON.stringify(compact.timetable).includes('UNCONFIRMED_PRIVATE_LESSON'));
- assert.equal(O.read(state,current,input).timetable.teachers.find(t=>t.staffId==='bob').cells[2][0],'UNCONFIRMED_PRIVATE_LESSON','SMC retains its current planning view');
+ assert.equal(O.read(state,current,input).timetable.teachers.find(t=>t.staffId==='bob').cells[2][0],'MA','SMC allocation also uses the retained confirmation');
  const record=state.staplerPlans[0];record.published=record.draft;record.publishedRevision=record.revision;delete record.confirmedPlan;delete record.confirmedRevision;
- assert.equal(O.read(state,actor(current),input).timetable.staplerRevision,record.publishedRevision,'matching published source remains available');
+ assert.equal(O.read(state,actor(O.composeStaplerContext(state,ctx)),input).timetable.staplerRevision,record.publishedRevision,'matching published source remains available');
 }
 console.log('PASS own-arrangements timetable: one optional candidate projection, matching source identity, full current cells including STAPLER, external rows, privacy and unchanged mutation guards.');
+

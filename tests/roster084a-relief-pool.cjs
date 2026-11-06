@@ -7,7 +7,7 @@ function suspended(f,eligible=false,legacy=false){
  f.people.push({id:'extra',name:'Additional staff',active:true,adhocEligible:eligible,role:eligible?'Teacher':'SENO'});
  let plan=S.create({...f.ctx.days[f.date],date:f.date});plan=S.apply(plan,{type:'addTeacher',teacher:{staffId:'extra',name:'Additional staff'}});
  if(legacy)delete plan.teachers.find(t=>t.staffId==='extra').adhoc;
- f.state.staplerPlans.push({date:f.date,baselineId:'baseline',revision:1,confirmed:true,draft:plan});
+ f.state.staplerPlans.push({date:f.date,baselineId:'baseline',revision:1,confirmed:true,confirmedRevision:1,confirmedPlan:structuredClone(plan),draft:plan});
  f.ctx=f.O.composeStaplerContext(f.state,f.ctx);return f.ctx.days[f.date].teachers.find(t=>t.staffId==='extra');
 }
 const candidate=(f,id='extra')=>A.teacherContext(f.state,f.ctx,f.date).get(id);
@@ -29,3 +29,4 @@ test('Old external activation does not override current Contacts exclusion',()=>
 test('Date and timetable verification still fail closed',()=>{const f=setup();suspended(f);f.ctx.days[f.date].verified=false;assert.equal(health(f).incomplete,true);f.ctx.days[f.date].verified=true;f.ctx.days[f.date].schoolDay=false;assert.equal(health(f).incomplete,true);});
 test('Protected manual assignments survive optimisation',()=>{const f=setup();suspended(f);const dem=demand(f),row={id:'manual',date:f.date,period:2,demandId:dem.id,staffId:'bob',status:'draft',origin:'smc',protected:true,rCost:1,version:1};f.state.assignments.push(row);const before=structuredClone(row);A.optimise(f.state,f.ctx,f.date,[dem]);assert.deepEqual(row,before);});
 console.log(`${count-failed}/${count} relief-pool regression checks passed`);if(failed)process.exitCode=1;
+

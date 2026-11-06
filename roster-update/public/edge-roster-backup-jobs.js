@@ -1,8 +1,8 @@
 // The notification Worker is the only execution owner. Admin requests enqueue.
 import {GSiSEdgeStore as Store} from './edge-store.js';
-import {ensureBackup,readBackupConfig,runDriveBackup,backupStatus,singaporeBackupDate} from './edge-roster-backup.js';
+import {ensureBackup,readBackupConfig,runDriveBackup,backupStatus,singaporeBackupDate,notifyOutputAlert,expireBackupRuns} from './edge-roster-backup.js';
 import {readBackupChain,restoreBackupChain} from './edge-roster-backup-restore.js';
-import {sha256Hex} from './edge-deploy-sha256.js';
+import {outputFailure,outputErrorText} from '../../shared/edge-output-error.js';
 import {GSISRosterAllocation as Allocation} from './edge-roster-domain.js';
 const fail=(code,message)=>{throw Object.assign(Error(message),{code,status:409});};
 const safe=e=>/^[A-Z][A-Z0-9_]{0,79}$/.test(e?.code||'')?e.code:'BACKUP_JOB_FAILED';
@@ -34,7 +34,7 @@ export async function backupRequests(db){if(!await db.prepare("SELECT 1 present 
 async function ledgerJob(db,kind,date,now,work){
  const id=crypto.randomUUID();await db.prepare("INSERT INTO gsis_backup_ledger(id,started_at,kind,date,status) VALUES(?,?,?,?,'running')").bind(id,now,kind,date).run();
  try{const result=await work();await db.prepare("UPDATE gsis_backup_ledger SET status=?,finished_at=?,duration_ms=?,record_count=?,drive_file_id=?,digest=?,manifest_json=? WHERE id=?").bind(result.pending?'pending':'verified',Date.now(),Math.max(0,Date.now()-now),result.records||result.rows||0,result.fileId||'',result.sourceDigest||result.digest||'',JSON.stringify(result),id).run();return result;}
- catch(error){await db.prepare("UPDATE gsis_backup_ledger SET status='failed',finished_at=?,duration_ms=?,error=? WHERE id=?").bind(Date.now(),Math.max(0,Date.now()-now),safe(error),id).run();throw error;}
+ catch(error){await db.prepare("UPDATE gsis_backup_ledger SET status='failed',finished_at=?,duration_ms=?,error=?,manifest_json=json_set(manifest_json,'$.outputError',json(?)) WHERE id=?").bind(Date.now(),Math.max(0,Date.now()-now),outputErrorText(error),JSON.stringify(outputFailure(error,'BACKUP_JOB_FAILED')),id).run();throw error;}
 }
 async function latestManifest(db){const row=await db.prepare("SELECT drive_file_id FROM gsis_backup_ledger WHERE kind IN ('full','increment') AND status='verified' AND drive_file_id<>'' ORDER BY started_at DESC LIMIT 1").first();if(!row)fail('BACKUP_MISSING','No verified backup is available.');return row.drive_file_id;}
 async function verifyCurrentCounts(db,chain){
@@ -69,15 +69,15 @@ async function resetScratch(sourceDb,targetDb){
 }
 export async function runBackupJobs(env,{bridge,continuity,alert,now=Date.now()}={}){
  if(env.ROSTER_EDGE_AUTHORITY!=='d1')return {enabled:false,skipped:true};
- const db=primary(env.GSIS_JOBS);await schema(db);const config=await readBackupConfig(db);if(!config.enabled)return {enabled:false,skipped:true};
+ const db=primary(env.GSIS_JOBS);await schema(db);await expireBackupRuns(db,now);const config=await readBackupConfig(db);if(!config.enabled)return {enabled:false,skipped:true};
  const token=crypto.randomUUID(),claim=await db.prepare("UPDATE gsis_backup_worker SET lease_token=?,lease_until=? WHERE id=1 AND lease_until<=?").bind(token,now+15*60000,now).run();if(!claim.meta?.changes)return {enabled:true,skipped:true,code:'SKIPPED_BUSY'};
  const started=Date.now(),rawBridge=bridge;bridge=async input=>{if(Date.now()-started>12*60000)fail('BACKUP_BUDGET','The backup work will retry within its retained time budget.');const owner=await db.prepare('SELECT lease_token FROM gsis_backup_worker WHERE id=1').first();if(owner.lease_token!==token)fail('BACKUP_LEASE','This Worker no longer owns the backup run.');return rawBridge(input);};
- let failures=0;const today=singaporeBackupDate(now),result={};
+ let failures=0,failure;const today=singaporeBackupDate(now),result={};
  try{
   // Recover interrupted auxiliary attempts. No outcome is reported as verified.
   await db.prepare("UPDATE gsis_backup_ledger SET status='failed',error='BACKUP_JOB_INTERRUPTED',finished_at=?,duration_ms=MAX(0,?-started_at) WHERE status='running' AND kind NOT IN ('full','increment') AND started_at<?").bind(now,now,now-15*60000).run();
   await db.prepare("UPDATE gsis_backup_requests SET status='pending' WHERE status='running'").run();
-  result.backup=await runDriveBackup(env,{now,bridge});failures+=result.backup.failed||0;
+  result.backup=await runDriveBackup(env,{now,bridge});failures+=result.backup.failed||0;failure=result.backup.failure;
   const pending=await db.prepare("SELECT * FROM gsis_backup_requests WHERE status='pending' ORDER BY created_at LIMIT 1").first();
   if(pending){
    await db.prepare("UPDATE gsis_backup_requests SET status='running' WHERE id=?").bind(pending.id).run();
@@ -87,21 +87,24 @@ export async function runBackupJobs(env,{bridge,continuity,alert,now=Date.now()}
      if(pending.kind==='verify')return {verified:true,fileId:pending.manifest_file_id,sourceDigest:chain.sourceDigest,records:Store.encode(chain.state).size+Store.encode(chain.index).size,...await verifyCurrentCounts(db,chain)};
      return restoreBackupChain({sourceDb:env.GSIS_JOBS,targetDb:env.ROSTER_BACKUP_RESTORE_DB,targetBucket:env.ROSTER_BACKUP_RESTORE_BUCKET,chain,actor:pending.actor,requestId:pending.id});
     });await db.prepare("UPDATE gsis_backup_requests SET status=?,result_json=? WHERE id=?").bind(outcome.pending?'pending':'verified',JSON.stringify(outcome),pending.id).run();
-   }catch(error){failures++;await db.prepare("UPDATE gsis_backup_requests SET status='failed',result_json=? WHERE id=?").bind(JSON.stringify({code:safe(error),retryable:true}),pending.id).run();}
+   }catch(error){failures++;failure={code:safe(error),outputError:outputFailure(error,'BACKUP_JOB_FAILED')};await db.prepare("UPDATE gsis_backup_requests SET status='failed',result_json=? WHERE id=?").bind(JSON.stringify({code:safe(error),retryable:true}),pending.id).run();}
   }
   const control=await db.prepare('SELECT * FROM gsis_backup_worker WHERE id=1').first(),publication=await db.prepare("SELECT COALESCE(MAX(revision),0) revision FROM gsis_edge_records WHERE scope='roster' AND collection IN ('dailyPublicationStates','publicationSnapshots','massPublications')").first(),lastContinuity=await db.prepare("SELECT started_at,status FROM gsis_backup_ledger WHERE kind='continuity' ORDER BY started_at DESC LIMIT 1").first(),dailyDue=now>=Date.parse(today+'T02:15:00+08:00')&&control.continuity_day!==today;
   if(continuity&&(publication.revision>control.continuity_revision||dailyDue)&&(!lastContinuity||lastContinuity.status==='verified'||now-lastContinuity.started_at>=5*60000)){
    try{await ledgerJob(db,'continuity',today,now,async()=>{const value=await continuity(now),saved=await bridge({operation:'edgeDriveOutput',step:'continuity',config,continuity:value});if(!saved?.verified)fail('BACKUP_CONTINUITY','The continuity Sheet write was not confirmed.');return saved;});await db.prepare('UPDATE gsis_backup_worker SET continuity_revision=?,continuity_day=? WHERE id=1 AND lease_token=?').bind(publication.revision,dailyDue?today:control.continuity_day,token).run();}
-   catch{failures++;}
+   catch(error){failures++;failure={code:safe(error),outputError:outputFailure(error,'BACKUP_JOB_FAILED')};}
   }
   const lastDrill=await db.prepare("SELECT started_at,status FROM gsis_backup_ledger WHERE kind='restore-test' ORDER BY started_at DESC LIMIT 1").first(),lastGood=await db.prepare("SELECT started_at FROM gsis_backup_ledger WHERE kind='restore-test' AND status='verified' ORDER BY started_at DESC LIMIT 1").first(),sg=new Date(now+28800000),sunday=new Date(Date.UTC(sg.getUTCFullYear(),sg.getUTCMonth(),sg.getUTCDate()-sg.getUTCDay(),2,15)).getTime()-28800000;
   if((control.drill_manifest_id||now>=sunday&&(!lastGood||lastGood.started_at<sunday))&&(!lastDrill||lastDrill.status==='pending'||now-lastDrill.started_at>=3600000)){
    try{const outcome=await ledgerJob(db,'restore-test',today,now,async()=>{const fileId=control.drill_manifest_id||await latestManifest(db),chain=await readBackupChain({manifestFileId:fileId,config,bridge});if(!control.drill_manifest_id){await resetScratch(env.GSIS_JOBS,env.ROSTER_BACKUP_SCRATCH_DB);await db.prepare('UPDATE gsis_backup_worker SET drill_manifest_id=? WHERE id=1 AND lease_token=?').bind(fileId,token).run();}const restored=await restoreBackupChain({sourceDb:env.GSIS_JOBS,targetDb:env.ROSTER_BACKUP_SCRATCH_DB,targetBucket:env.ROSTER_BACKUP_SCRATCH_BUCKET,chain,actor:'backup-restore-drill',requestId:'weekly-'+fileId});return {...restored,fileId};});if(!outcome.pending)await db.prepare("UPDATE gsis_backup_worker SET drill_manifest_id='' WHERE id=1 AND lease_token=?").bind(token).run();}
-   catch{failures++;}
+   catch(error){failures++;failure={code:safe(error),outputError:outputFailure(error,'BACKUP_JOB_FAILED')};}
   }
   const health=await backupStatus(db,{now});
   if(result.backup.sizeWarning)health.warnings.push('size-threshold');
-  const fingerprint=sha256Hex(JSON.stringify(health.warnings.sort()));if(alert&&fingerprint!==control.alert_fingerprint){let alertId=control.pending_id;if(control.pending_fingerprint!==fingerprint||!alertId){alertId=crypto.randomUUID();await db.prepare('UPDATE gsis_backup_worker SET pending_fingerprint=?,pending_id=? WHERE id=1 AND lease_token=?').bind(fingerprint,alertId,token).run();}const outcome=await alert({...health,alertId});if(!health.warnings.length||outcome?.queued===true)await db.prepare('UPDATE gsis_backup_worker SET alert_fingerprint=? WHERE id=1 AND lease_token=?').bind(fingerprint,token).run();}
-  return {enabled:true,completed:result.backup.completed||0,failed:failures,code:failures?'BACKUP_JOB_FAILED':health.warnings.length?'BACKUP_ATTENTION':'OK'};
+  for(const kind of ['backup','continuity','restore-test']){
+   const warnings=health.warnings.filter(w=>kind==='backup'?!['continuity-failed','restore-test-failed'].includes(w):w===kind+'-failed');
+   await notifyOutputAlert(db,{kind,now,health:{...health,warnings},message:kind==='backup'?'Drive backups need Admin attention':kind==='continuity'?'Drive continuity output failing':'Drive restore test failing',enabled:async()=>(await readBackupConfig(db)).enabled},alert);
+  }
+  return {enabled:true,completed:result.backup.completed||0,failed:failures,...(failure?{failure}:{}),code:failures?'BACKUP_JOB_FAILED':health.warnings.length?'BACKUP_ATTENTION':'OK'};
  }finally{await db.prepare("UPDATE gsis_backup_worker SET lease_token='',lease_until=0 WHERE id=1 AND lease_token=?").bind(token).run();}
 }

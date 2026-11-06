@@ -18,14 +18,14 @@ function confirmed(){const f=fixture();apply(f,'saveStapler',{plan:f.plan});appl
 function warning(f,id){return f.state.staplerPlans[0].workloadWarnings.find(w=>w.staffId===id);}
 function card(plan,id='staff-0'){return plan.tiles.find(t=>t.kind==='lesson'&&t.location==='grid'&&t.offlineSource&&t.teacherId===id);}
 function accepted(f,plan){apply(f,'saveStapler',{plan});assert.deepEqual(f.state.staplerPlans[0].workloadWarnings,[]);S.validate(f.state.staplerPlans[0].draft);}
-function assertRejected(f,plan,pattern){const before=JSON.stringify(f.state);assert.throws(()=>apply(f,'saveStapler',{plan}),error=>error.status===409&&pattern.test(error.message));assert.equal(JSON.stringify(f.state),before,'rejected edit leaves the saved plan and warnings intact');}
+function assertRejected(f,plan,pattern){let before=JSON.stringify(f.state);try{apply(f,'saveStapler',{plan});}catch(error){assert.equal(error.status,409);assert.match(error.message,pattern);assert.equal(JSON.stringify(f.state),before,'invalid structure cannot change the saved plan');return;}before=JSON.stringify(f.state);assert.throws(()=>apply(f,'confirmStapler'),error=>error.status===409&&pattern.test(error.message));assert.equal(JSON.stringify(f.state),before,'rejected confirmation leaves the saved draft and prior confirmation intact');}
 
 {
  const f=confirmed(),row=f.state.staplerPlans[0];
  assert.deepEqual(row.workloadWarnings,[],'suspended plans do not retain obsolete workload warnings');
  apply(f,'saveStapler',{plan:row.draft});assert.equal(warning(f,'staff-1'),undefined,'unchanged imports remain free of obsolete workload warnings');
  const first=card(row.draft),edited=S.apply(S.apply(row.draft,{type:'edit',tileId:first.id,patch:{subject:'SCI',venue:'Changed room',classIds:[]},customClasses:['Changed class']}),{type:'move',tileId:first.id,period:4});
- apply(f,'saveStapler',{plan:edited});assert(row.confirmed);assert.equal(warning(f,'staff-0'),undefined);
+ apply(f,'saveStapler',{plan:edited});assert.equal(row.confirmed,false);assert.equal(O.confirmedStaplerSnapshot(row).revision,1);assert.equal(warning(f,'staff-0'),undefined);
  assert.deepEqual(row.draft.tiles.find(t=>t.id===first.id).offlineSource,first.offlineSource,'routine edits preserve immutable import provenance');
  const view=O.staplerView(f.state,f.ctx,{date:f.day.date});view.workloadWarnings.push({name:'Client edit'});assert.deepEqual(row.workloadWarnings,[],'view warning field is detached from saved state');
  const effective=O.composeStaplerContext(f.state,f.ctx),teachers=A.teacherContext(f.state,effective,f.day.date);
@@ -78,7 +78,7 @@ for(const existingManual of [false,true]){
  plan=S.importLegacy(plan,f.payload,{people:f.ctx.people});apply(f,'saveStapler',{plan});if(!existingManual)apply(f,'confirmStapler');
  const tile=f.state.staplerPlans[0].draft.tiles.find(t=>t.teacherId===online.staffId&&t.location==='grid');
  apply(f,'saveStapler',{plan:S.apply(f.state.staplerPlans[0].draft,{type:'edit',tileId:tile.id,patch:{venue:'Metadata only'}})});
- assert(f.state.staplerPlans[0].confirmed);assert.equal(warning(f,online.staffId),undefined,'unrelated accepted workload does not acquire imported warning policy');
+ assert(O.confirmedStaplerSnapshot(f.state.staplerPlans[0]));assert.equal(warning(f,online.staffId),undefined,'unrelated accepted workload does not acquire imported warning policy');
 }
 
 for(const capWorkload of [NaN,Infinity]){
@@ -91,7 +91,7 @@ for(const capWorkload of [NaN,Infinity]){
  apply(f,'saveStapler',{plan:f.state.staplerPlans[0].draft});assert.deepEqual(f.state.staplerPlans[0].workloadWarnings,[],'verified compliant caps clear warnings');
  const reset=confirmed();reset.day.id='replacement-baseline';reset.ctx.timetableEntries[0].id=reset.day.id;apply(reset,'resetStapler');
  assert.deepEqual(O.staplerView(reset.state,reset.ctx,{date:reset.day.date}).workloadWarnings,[],'baseline reset does not carry old import warnings');
- assert.equal(reset.state.staplerPlans[0].confirmed,undefined);assert.equal(reset.state.staplerPlans[0].draft.importSource,undefined);
+ assert.equal(reset.state.staplerPlans[0].confirmed,false);assert(O.confirmedStaplerSnapshot(reset.state.staplerPlans[0]));assert.equal(reset.state.staplerPlans[0].draft.importSource,undefined);
 }
 
 console.log('PASS suspended import policy: no obsolete workload warnings, manual/transfer editing, suspended and baseline cap enforcement, immutable provenance, nonimport fast path and reset.');

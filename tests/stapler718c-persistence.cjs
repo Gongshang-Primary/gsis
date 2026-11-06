@@ -11,7 +11,7 @@ function fixture(){
  return {day,people,plan:S.importLegacy(S.create(day),payload,{people}),expected:[{staffId:'staff-0',code:'weekly-cap-unverified',weeklyTotal:null},{staffId:'staff-1',code:'weekly-cap-exceeded',weeklyTotal:3}]};
 }
 function context(day,people){const now=Date.parse(day.date+'T06:00:00+08:00');return {today:day.date,now,iso:new Date(now).toISOString(),minute:360,days:{[day.date]:day},baselineDays:{[day.date]:day},people,user:{email:'admin@gsps.edu.sg',staffId:people[0].id,smc:true,admin:true},uuid:crypto.randomUUID,timetableEntries:[{id:day.id,from:day.date,to:day.date}]};}
-function unpack(state){for(const row of state.staplerPlans)for(const field of ['draft','published'])if(row[field]?.encoding==='gzip-base64-v1')row[field]=JSON.parse(zlib.gunzipSync(Buffer.from(row[field].data,'base64')).toString('utf8'));return state;}
+function unpack(state){for(const row of state.staplerPlans)for(const field of ['draft','published','confirmedPlan'])if(row[field]?.encoding==='gzip-base64-v1')row[field]=JSON.parse(zlib.gunzipSync(Buffer.from(row[field].data,'base64')).toString('utf8'));for(const row of state.staplerPlans)if(row.confirmedPlan?.encoding==='same-as-draft-v1')row.confirmedPlan=row.draft;return state;}
 function warnings(data){assert(Array.isArray(data.workloadWarnings),'workload warnings have an explicit response field');assert.deepEqual(data.workloadWarnings,[],'suspended plans expose no obsolete cap warnings');}
 function verify(f,label,{clearWarnings=false}={}){
  const {day,people,expected}=f,h=harness(day,people),leaseSessionId=crypto.randomUUID();let leaseFence=0;
@@ -37,7 +37,7 @@ function verify(f,label,{clearWarnings=false}={}){
   const cls=edited.classes.find(c=>c.id===imported.classIds[0]);if(cls.adhoc)edited=S.apply(edited,{type:'renameClass',classId:cls.id,name:'Edited exam class'});
   const free=day.periods.find(p=>!edited.tiles.some(t=>t.location==='grid'&&t.teacherId===imported.teacherId&&t.period===p.period));assert(free);
   edited=S.apply(edited,{type:'move',tileId:imported.id,period:free.period});
-  const saveEdit=command('saveStapler',{plan:edited});data=ok(call(saveEdit));assert(data.confirmed,'editing a confirmed import keeps it ready');warnings(data,expected);checkStored();
+  const saveEdit=command('saveStapler',{plan:edited});data=ok(call(saveEdit));assert.equal(data.confirmed.revision,1,'editing retains the prior confirmation');warnings(data,expected);checkStored();
   const editWrites=h.writes();assert.equal(ok(call(saveEdit)).replayed,true);assert.equal(h.writes(),editWrites);
   data=read();assert(data.confirmed);warnings(data,expected);assert.deepEqual(S.effectiveDay(data.plan,day).teachers,S.effectiveDay(edited,day).teachers);assert.equal(data.plan.tiles.find(t=>t.id===imported.id).venue,'Edited room 中文');
   const invalid=clone(data.plan),ownerCards=invalid.tiles.filter(t=>t.kind==='lesson'&&t.location==='grid'&&t.teacherId===imported.teacherId);assert(ownerCards.length>1);ownerCards[1].period=ownerCards[0].period;

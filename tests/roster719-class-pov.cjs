@@ -10,7 +10,7 @@ const fixture=require('./roster701-fixture.cjs'),S=require('../shared/roster-sta
   day.teachers[2].cells[1]=['MA','3A','Room C','Group C'];
   let plan=S.create({...day,date});plan=S.apply(plan,{type:'move',tileId:'baseline:charlie:1',period:6});
   plan=S.apply(plan,{type:'addTile',tile:{teacherId:'dora',classIds:plan.classes.filter(c=>['4A','3A'].includes(c.name)).map(c=>c.id),period:6,subject:'Imported ABSENT label',venue:'<Lab> & room',group:'=HYPERLINK("test")'}});
-  state.staplerPlans.push({date,baselineId:'baseline',draft:plan,confirmed:true,revision:3,publishedRevision:2});
+  state.staplerPlans.push({date,baselineId:'baseline',draft:plan,confirmed:true,confirmedRevision:3,confirmedPlan:structuredClone(plan),revision:3,publishedRevision:2});
   state.absences.push({id:'absence-a',date,staffId:'alice',name:'Alice',typeId:'mc',typeLabel:'MC',periods:[2,3,4],reliefRequired:true,instructions:{},instructionsNA:true});
   const composed=O.composeStaplerContext(state,ctx),demands=O.demand(composed,state,date),d=demands.find(d=>d.period===2);
   state.assignments.push({...d,id:'draft-cover',date,demandId:d.id,staffId:'bob',absentId:'alice',absentName:'Alice',status:'draft',relieverName:'Bob'});
@@ -48,3 +48,4 @@ const fixture=require('./roster701-fixture.cjs'),S=require('../shared/roster-sta
   console.log('v0.7.19 Class POV workbook: effective suspended day, coverage, partial absence, stacked classes, literal text and no mutations passed');
  }finally{dom.window.close();}
 })().catch(e=>{console.error(e);process.exitCode=1;});
+

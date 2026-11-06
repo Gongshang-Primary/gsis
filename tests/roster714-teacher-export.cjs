@@ -14,7 +14,7 @@ const fixture=require('./roster701-fixture.cjs'),S=require('../shared/roster-sta
   let plan=S.create({...day,date});plan=S.apply(plan,{type:'move',tileId:'baseline:charlie:1',teacherId:'charlie',period:4});
   plan=S.apply(plan,{type:'addTile',tile:{teacherId:'dora',classIds:[],period:0,subject:'Extra task',venue:'A very long venue with <markup> & literal text '.repeat(4)+'\nSecond line',group:'G'}});
   plan=S.apply(plan,{type:'suspend',target:'teacher',targetId:'charlie',fromPeriod:0,toPeriod:0,reason:'Training'});
-  state.staplerPlans.push({date,baselineId:'baseline',draft:plan,confirmed:true,revision:3,publishedRevision:2});
+  state.staplerPlans.push({date,baselineId:'baseline',draft:plan,confirmed:true,confirmedRevision:3,confirmedPlan:structuredClone(plan),revision:3,publishedRevision:2});
   state.absences.push({id:'absence-a',date,staffId:'alice',name:'Alice',typeId:'mc',typeLabel:'MC',periods:[1,2,3,4],reliefRequired:true,instructions:{},instructionsNA:true});
   ctx.people.push({id:'external',name:'External Teacher',active:false,employment:'SRE'},{id:'unused-external',name:'Unused External',active:false,employment:'SRE'});
   state.adhoc.push({id:'adhoc1',date,staffId:'external',periods:[0,1,2,3,4]},{id:'adhoc2',date,staffId:'unused-external',periods:[0,1,2,3,4]});
@@ -63,3 +63,4 @@ const fixture=require('./roster701-fixture.cjs'),S=require('../shared/roster-sta
   console.log('PASS 714 teacher export: API to workbook, all 7 teacher blocks, absence and relief colours, draft/published labels, blank and external teachers, unchanged other days/weeks, literal formula text, no private instructions, preserved arrangements export, uncovered lessons, clash rejection and confirmed Stapler retained across comparison baseline replacement.');
  }finally{dom.window.close();}
 })().catch(error=>{console.error(error);process.exitCode=1;});
+
