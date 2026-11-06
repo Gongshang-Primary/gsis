@@ -371,7 +371,7 @@ async function retryContactsSync(){
   if(!valid())return;
   const contacts=result.contactsSync;
   if(result.versionId!==attempt.versionId||contacts?.publicationCommit!==attempt.publicationCommit||!contactsSyncConfirmed(contacts)){
-   attempt.reason=contacts?.reason||'Contacts sync not confirmed';el('status').textContent=publishStatusText({...result,layoutHandoff:result.layoutHandoff||attempt.layoutHandoff});el('connection').textContent='Retry Contacts sync from the version row after reviewing the result.';
+   attempt.reason=contacts?.reason||'Contacts sync not confirmed for this publication';el('status').textContent=publishStatusText({...result,contactsSync:{status:'failed',reason:attempt.reason},layoutHandoff:result.layoutHandoff||attempt.layoutHandoff});el('connection').textContent='Retry Contacts sync from the version row after reviewing the result.';
   }else{contactsSyncRetry=null;el('status').textContent=publishStatusText({...result,layoutHandoff:result.layoutHandoff||attempt.layoutHandoff});el('connection').textContent=connectionText();}
  }catch(e){if(valid()){attempt.reason=e.message;el('status').textContent=publishStatusText({contactsSync:{status:'failed',reason:e.message},layoutHandoff:attempt.layoutHandoff});el('connection').textContent='Contacts sync is unconfirmed. Retry uses the same publication.';}}
  finally{busy=false;if(epoch===sessionEpoch&&email===lastEmail){controls();if(['IP Deploy','Versions'].includes(tab))render();}}

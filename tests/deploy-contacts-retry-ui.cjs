@@ -16,6 +16,7 @@ const assert=require('node:assert/strict'),fs=require('node:fs'),{JSDOM}=require
   let retry=q('[data-version-action="retryContacts"]');assert.equal(retry.hidden,false);
   const note=q('[data-note-input]');note.value='Keep my note';note.dispatchEvent(new w.Event('input',{bubbles:true}));retry.click();assert.equal(w.requests.length,0,'unsaved note blocks retry');assert.equal(note.value,'Keep my note');w.fixture.clearNote();
   retry.click();assert.equal(w.requests.length,1);const first=w.requests.shift();assert.equal(first.input.publicationCommit,'commit-1');first.resolve({saved:true,versionId:'v1'});await until(()=>q('#status').textContent.includes('sync not confirmed'));assert(w.fixture.retryState(),'missing outcome stays retryable');
+  const wrong=w.fixture.retry(),mismatch=w.requests.shift();mismatch.resolve({...result('updated'),versionId:'different'});await wrong;assert.match(q('#status').textContent,/Contacts not updated/);assert(w.fixture.retryState());
   const again=w.fixture.retry(),second=w.requests.shift();assert.equal(second.input.requestId,first.input.requestId,'retry retains its request ID');second.resolve(result('updated'));await again;
   assert.match(q('#status').textContent,/Published; Contacts updated; Layout pending/);assert.equal(q('[data-version-action="retryContacts"]').hidden,true);
   w.fixture.setRetry();w.fixture.setRole('KP');w.fixture.render();assert.equal(q('[data-version-action="retryContacts"]').hidden,true);await w.fixture.retry();assert.equal(w.requests.length,0,'KP cannot invoke Admin retry');
