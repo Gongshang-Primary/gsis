@@ -15,3 +15,8 @@
 
 ## Rules
 One PR at a time (finish or pause the Stapler teacher-search PR first, or ask the owner which first). Rebase on current main; canonical build at the final head and commit regenerated bundles (gate: no diff); full CI; exact head SHA; Model: Muse.
+
+## Claude finding (6 Nov ~09:15, code reading)
+- `venues-sync` SKIPPED on D1 is by design: `dispatchVenuesSync` (roster-update/public/_worker.js:1270) returns skipped when edge Roster is enabled; it is the Google-side check.
+- Venues reads Roster occupancy via `venuesSourceRequest_` (Venues backend): it uses Script Property `VENUES_ROSTER_WORKER_URL` (D1 route `https://roster.gsps.edu.sg/api/venues-source`, served by roster-update/public/edge-timetable-cache.js with Pages secret `VENUES_BRIDGE_SECRET`) if set, else `VENUES_ROSTER_APPS_SCRIPT_URL` (Google Roster, now frozen: `rosterVenuesSource_` calls `rosterEdgeAssertLegacyWrite_` and refuses).
+- Likely fix is configuration: set `VENUES_ROSTER_WORKER_URL` in the Venues script and ensure Pages `VENUES_BRIDGE_SECRET` matches the Venues script's value. Owner checking (names only). Muse: verify end to end after the owner's check, then the #67 item.
