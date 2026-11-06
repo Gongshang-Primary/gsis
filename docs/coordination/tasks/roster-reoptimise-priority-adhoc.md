@@ -1,6 +1,6 @@
 # roster-reoptimise-priority-adhoc: Auto-allocate must re-plan unpublished automatic relief so ad hoc/daily SRE priority applies
 
-- Status: PR #84 rebased onto main v0.9.9n; canonical build and focused checks passed; final-head CI and Claude review pending; lane R.
+- Status: merged (#84 at 5333110 as 90b136f, owner "merge 84", 6 Nov); for release o
 - Reviewer/model: Claude. Related: roster-sre-daily-priority (PR #14, merged 30 Oct: daily/ad hoc SREs are priority 1 above annual R%).
 
 ## Owner report (verbatim)
