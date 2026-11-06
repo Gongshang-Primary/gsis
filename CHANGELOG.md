@@ -1,6 +1,10 @@
-# Pending: Drive output failure diagnostics and recovery, 6 November 2026
+# Pending: Drive output diagnostics and Admin-only alerts, 6 November 2026
 
-Model: Codex. Preserve sanitised Apps Script/Google errors in the output ledger and System Health, scan workbook cell/shared-string text instead of Office XML metadata, recover expired backup attempts before scheduling, and group alerts by kind and Singapore date while respecting disabled settings. The existing renderer workbook passes the fake-Drive writer; the precise live refusal remains unconfirmed. See [task and verification](docs/coordination/tasks/roster-drive-outputs-bridge-error.md). No deployment or live action.
+Model: Codex. Preserve sanitised Google refusal reasons in output ledgers and System Health, scan workbook cell/shared-string text, recover expired backups and deduplicate enabled output alerts by kind/day. Operational alerts now use active Admin recipients and separate Admin wording; claim/presend checks reject legacy duty-worded jobs. Coverage alerts retain the duty list. Proposed Admin template remains disabled pending Meta approval. The precise live Drive refusal remains unconfirmed. See [task and verification](docs/coordination/tasks/roster-drive-outputs-bridge-error.md). No deployment or live action.
+
+# Pending: priority-aware automatic relief replanning, 6 November 2026
+
+Model: Codex. Full Auto-allocate gives first priority to daily SREs and any teacher activated ad hoc for the date with no baseline timetable, within their activation and workload limits. It ranks priority-1 relief use above recess-duty reuse and retains existing choices when business preferences tie. Ad hoc activation changes retain a date-local re-plan notice until a successful full run. Allocation logs name idle priority-1 teachers and their availability or limit reasons. Manual, peer, Stapler, protected, published and started duties stay fixed. Google and D1 use the same objective and evidence. See [task and verification](docs/coordination/tasks/roster-reoptimise-priority-adhoc.md). No deployment or live action.
 
 # Pending: Deploy ledger targets use configured relief budgets, 6 November 2026
 

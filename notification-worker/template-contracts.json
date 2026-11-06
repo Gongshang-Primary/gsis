@@ -538,6 +538,20 @@
       "body": "*Suspended timetable request outcome*\n\n{{1}} made a request to plan a suspended timetable for {{2}}.\n\nThe request has been reviewed and the outcome is:\n{{3}}\n\nView the request and decision here:\n{{4}}\n\nThank you.",
       "bodySha256": "f36a327edb998054baf402b6a7c6df03c77804ad00425d659d3936c7e72d63b5",
       "submissionState": "PENDING"
+    },
+    "system_alert": {
+      "name": "gsis_system_alert_v1",
+      "language": "en_GB",
+      "category": "UTILITY",
+      "fields": [
+        "recipient_name",
+        "request_date",
+        "attention_details",
+        "roster_status_url"
+      ],
+      "body": "*GSiS System Alert*\n\nHi {{1}}, this system alert is for GSiS Admins.\n\nDate: {{2}}\n\n{{3}}\n\nOpen System Health to review: {{4}}.\n\nThank you.",
+      "bodySha256": "8145e8dd3411294f66ef7aeb68ccdf02c8c38e6fddff444abb0a726cc9d4fc7d",
+      "submissionState": "NOT_SUBMITTED"
     }
   },
   "observedOn": "2026-10-18"

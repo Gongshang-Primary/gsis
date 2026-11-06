@@ -26,3 +26,25 @@ test('successful reoptimisation reports changed automatic covers without claimin
  const h=await planner('06:00',true);try{h.f.state.importedRelief.push({id:'dora-past-relief',staffId:'dora',date:'2026-10-07',period:2,status:'completed',origin:'imported',rCost:3});const old=h.f.state.assignments[0];h.query('[data-auto-allocate]').click();await until(()=>h.query('[data-ops-message]')?.textContent.includes('kept.'));assert.equal(h.f.state.assignments.find(a=>a.id===old.id).status,'cancelled');assert.equal(h.w.GSISRosterAllocation.effectiveAssignments(h.f.state).find(a=>a.period===3).staffId,'charlie');assert.doesNotMatch(h.query('[data-ops-message]').textContent,/Existing assignments kept/);assert.match(h.query('[data-ops-message]').textContent,/Published, SMC and peer choices kept/);}finally{h.w.close();}
  const f=await planner();try{f.query('[data-auto-fill-blanks]').click();await until(()=>f.query('[data-ops-message]')?.textContent.includes('kept.'));assert.match(f.query('[data-ops-message]').textContent,/Existing assignments kept/);}finally{f.w.close();}
 });
+
+test('ad hoc changes show a date-specific suggestion after reload without starting allocation',async()=>{
+ const h=await planner('06:00',true);try{
+  h.w.GSISRosterOperations.apply(h.f.state,h.f.ctx,{operation:'saveAdhoc',date:h.f.ctx.today,staffId:'ext',periods:[3]});h.f.state.revision++;
+  h.w.RosterOpsUI.unmount();h.w.RosterOpsUI.invalidateDates([h.f.ctx.today]);await h.w.RosterOpsUI.render('Assign Relief',h.ctx);await until(()=>h.query('[data-replan-suggested]'));assert.match(h.query('[data-replan-suggested]').textContent,/Re-plan suggested/);
+  assert.equal(h.calls.filter(p=>p.operation==='autoAllocate').length,0);
+  h.w.GSISRosterOperations.apply(h.f.state,h.f.ctx,{operation:'autoAllocate',date:h.f.ctx.today,allocationMode:'fill-only',requestId:'fill'});
+  await h.w.RosterOpsUI.render('Assign Relief',h.ctx);assert(h.query('[data-replan-suggested]'));
+  h.query('[data-auto-allocate]').click();await until(()=>h.calls.some(p=>p.operation==='autoAllocate'));
+  await until(()=>!h.query('[data-replan-suggested]'));assert.equal(h.calls.filter(p=>p.operation==='autoAllocate').length,1);
+ }finally{h.w.close();}
+});
+test('Google completion displays retained priority reasons in the allocation log',async()=>{
+ const h=await planner('06:00',true);try{
+  h.f.day.deployTeachingEvidence={verified:true,rows:[]};const O=h.w.GSISRosterOperations,date=h.f.ctx.today,requestId='idle-priority';
+  O.apply(h.f.state,h.f.ctx,{operation:'saveAdhoc',date,staffId:'ext',periods:[1]});
+  O.apply(h.f.state,h.f.ctx,{operation:'autoAllocate',date,allocationMode:'reoptimise',requestId});
+  const api=h.ctx.api;h.ctx.api=async(...args)=>({...await api(...args),allocatorRun:{id:'idle-control',date,trigger:'manual',requestId,allocationMode:'reoptimise',state:'completed',log:[{seq:1,message:'Allocation draft saved.'}]}});
+  h.w.RosterOpsUI.unmount();h.w.RosterOpsUI.invalidateDates([date]);await h.w.RosterOpsUI.render('Assign Relief',h.ctx);
+  assert.match(h.query('[data-run-log]').textContent,/Priority-1 External Known \(SRE\) received no relief: activation window/);
+ }finally{h.w.close();}
+});

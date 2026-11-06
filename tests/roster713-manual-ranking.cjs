@@ -36,7 +36,8 @@ special.state.entitlements.find(t=>t.staffId==='dora').quota=0;
 special.people.push({id:'external',name:'External relief',active:false,mobile:'90000001'});
 special.state.adhoc.push({staffId:'external',date:special.date,periods:[2]});
 const specialRows=A.manualRanks(A.manualModel(special.state,special.ctx,special.date),{...special.dem,recessActivationId:'recess',level:1}).filter(r=>r.available);
-assert.deepEqual(specialRows.slice(0,2).map(r=>[r.id,r.tier]),[['dora',-1],['external',0]],'recess duty and activated ad hoc retain their priorities');
+assert.deepEqual(specialRows.slice(0,2).map(r=>[r.id,r.tier]),[['external',0],['dora',-1]],'activated ad hoc outside the baseline ranks before recess-duty reuse');
+assert.equal(specialRows[0].adhocPriority,true);assert.equal(specialRows[0].autoEligible,true);
 console.log('PASS manual ranking: remaining R across old fit tiers; equal-R fit; unavailable and unknown-R safeguards; special priorities');
 
 (async()=>{

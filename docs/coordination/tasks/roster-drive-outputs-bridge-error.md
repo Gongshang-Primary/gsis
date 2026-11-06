@@ -28,6 +28,20 @@
 - Owner's priority-1 instruction authorises this bounded work while #84 awaits review and #83 remains separate. No edits to allocator priority or Contacts work.
 - Out of scope: deployment, live Drive/D1 writes, authority/config changes, notifications, release-label assembly and merging. Intended release is v0.9.9o with #84; owner merges after Claude review.
 
+## Bug (owner 6 Nov ~06:10): Admins receive the duty-SMC message
+Owner: "faizal received messages from WhatsApp meant for those on duty for assigning relief smc, but his name isn't checked in the SMC duty roster".
+Evidence (D1 outbox): the Drive outputs alert at 2026-11-05T21:49:37Z (05:49 SGT) went as `smc_alert` / template `smc_attention` to the 8 duty SMCs of 6 Nov **and** all Admins (Faizal, Vivian (AE), Jay, Eric …). The template opens "you are on SMC relief duty at … on <date>", wrong for Admins not on duty. Faizal is correctly not on the 6 Nov duty list.
+Required (same PR):
+6. Operational/system alerts (Drive outputs, backups, restore drill, job health) go to **Admins only**, never to duty SMCs, using an Admin wording (no "you are on SMC relief duty"; e.g. "GSiS system alert for Admin: …"). Use an approved Admin template if one exists; otherwise use the existing generic template without the duty sentence, and list the new template text for Claude to submit to Meta.
+7. Duty-SMC alerts (allocation/coverage issues) go only to that date's duty SMCs (plus Admins only where the existing rule explicitly says so, and then with Admin wording).
+8. Tests: a Drive failure alerts Admins only with Admin wording; a coverage issue alerts the duty list only; an Admin who is not on duty never receives "you are on SMC relief duty".
+
+## Retired by Claude on owner instruction (6 Nov 08:02, "programmatically retire it first")
+- D1 `gsis_roster_daily_outputs`: reset `failure_count`, `last_error`, `next_attempt_at` on 7 dates (5, 6 Nov at 2 failures; 16-20 Nov at 1) so the "daily-output-failed" warning that drives the WhatsApp alert is cleared and cannot re-fire on the next failure. The `gsis_backup_ledger` failure rows are kept unchanged (records).
+- Both features remain disabled in System Config (`driveBackup.enabled=false`, `driveDaily.enabled=false`); no outbox alert jobs are queued.
+- The 24 alert messages already sent (05:45 and 05:49) cannot be recalled. Open smcAlert records for 6 Nov stay as audit history.
+
+
 ## Implementation and reproduction (Codex, 6 November 2026)
 
 The unmodified writer accepted a 919,742-byte workbook from the existing renderer (150 teachers, 17 periods). Its actual Office schema URLs did not trigger the guard. A metadata-only URL containing a fragment does reproduce the broad XML-scan false positive; the new guard scans parsed cell/shared-string values, decodes XML entities and joins rich-text runs. Private cell links and JWTs, TXT rules, backup privacy, folder/authority guards, stable file IDs and FINAL protection remain enforced.
@@ -54,3 +68,11 @@ Next: full exact-head GitHub CI, Claude review, owner merge. After a separately 
 All 19 focused local programs passed, including the large restore-limit regression. The final disabled-expiry addition also passed the output-error, backup-job, backup and daily-queue programs. Both local canonical builds rebuilt all 18 components. No tracked build drift remains.
 
 Implementation first published at `9ebda6a36ba6fb789a21981f9533f449f21a60a0`; follow-up adds expiry while disabled. The exact final head, full CI result and PR link are in the PR description/owner handoff. The locally reconstructed commits are not GitHub history; remote trees are hash-checked against the local tree. Claude reviews the complete final diff. No merge or deployment is authorised to Codex.
+
+## Admin audience correction and current-main refresh (Codex, 6 November)
+
+System alerts now use active Roster Admin IDs only and a separate system_alert contract. Coverage alerts retain the selected date’s duty list. Both Google and D1 claim/presend checks reject legacy Drive jobs carrying duty wording, removed/inactive Admin recipients and disabled outputs. Existing sent records remain audit history.
+
+No approved generic Admin contract exists in the repository. The proposed gsis_system_alert_v1 body is in notification-worker/system-alert-template.proposed.json for Claude to submit; activation stays disabled until approval and live contract verification. This is a release dependency for WhatsApp system alerts. Ledger and System Health diagnostics do not depend on template approval.
+
+Current continuation: canonical build passed all 18 components. Eleven focused programs passed, including Admin/duty separation through both eligibility implementations, the real timer/D1/renderer/signed fake-Drive path, template payload preparation with a synthetic approval fixture, provider-result settlement, retry recovery, and all 14 SMC schedule checks. No real notifications were sent. Full CI must pass at the newly published head; earlier green CI belongs to 29e0e16 only. Local checkout contains selected source/tests, so no full local-suite pass is claimed. Main product source was refreshed through a7b74aa; its later changes were coordination documents only.
