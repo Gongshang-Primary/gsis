@@ -938,6 +938,10 @@ function dispatchCore_(action, actor, payload, requestId) {
       rc18IO_().venueCatalogue=calendarVenueCatalogue_(actor);
       return runEventMutation_(actor, action, payload, requestId);
 
+    case 'mutationReceipts':
+      requireAdmin_(roles);
+      return apiMutationReceipts_(actor,payload);
+
     case 'eventMutationStatus':
       if (payload.action === 'saveParentSide') requireParentEditor_(roles); else requireAdmin_(roles);
       return apiEventMutationStatus_(actor, payload);
@@ -1192,6 +1196,7 @@ function apiBootstrap_(actor, roles, payload) {
     tags: config.tags,
     people: people,
     events: events.map(eventForClient_),
+    mutationFailures: calendarFailedMutations_(actor,roles,year,events),
     ...calendarVenueCatalogue_(actor),
     pendingRemovals: pendingRemovals,
     yearStructure: structure,
@@ -1752,9 +1757,7 @@ function apiPublishVersion_(actor, payload, requestId) {
   const previous = mutationLookup_(log,identity.operationId);
   if (previous) {
     mutationCheckIdentity_(previous.object,actor,'publishVersion',identity.hash);
-    if (previous.object.State === 'COMMITTED') return JSON.parse(previous.object.ResultJSON);
-    if (previous.object.State === 'REJECTED') return unwrapMutationOutcome_(mutationOutcome_(previous.object));
-    throw mutationError_('UNKNOWN','Publication status is not confirmed. Retry Publish version to check the same operation.',503,false);
+    return unwrapMutationOutcome_(resolveMutationRecord_(log,previous.object,actor));
   }
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const years = ss.getSheetByName(CALV2.SHEETS.YEARS);
@@ -1770,7 +1773,7 @@ function apiPublishVersion_(actor, payload, requestId) {
   const now = isoNow_();
   const after = Object.assign({},hit.object,{ReleasedToTeachers:'Yes',UpdatedAt:now,UpdatedBy:actor.userAlias});
   const record = {OperationID:identity.operationId,UserAlias:actor.userAlias,Action:'publishVersion',
-    PayloadHash:identity.hash,State:'DISPATCHED',EventID:'YEAR:'+year,CreatedAt:now,UpdatedAt:now};
+    PayloadHash:identity.hash,State:'DISPATCHED',EventID:'YEAR:'+year,CreatedAt:now,UpdatedAt:now,ResultJSON:JSON.stringify({dispatchRequestId:requestId,beforeYear:hit.object,afterYear:after})};
   try {
     mutationWrite_(log,record);
     const result = rc18Atomic_(function() {
@@ -1778,7 +1781,7 @@ function apiPublishVersion_(actor, payload, requestId) {
       const promotion = publishHiddenEventsForYearOnRelease_(actor,year,requestId,rc18Queue_);
       const queued = markYearStaffDirty_(year,rc18Queue_);
       const value = {year:year,published:promotion.published,staffQueued:queued,ReleasedToTeachers:'Yes'};
-      appendAudit_(actor,'PUBLISH_VERSION','Year',String(year),hit.object,value,requestId);
+      appendAudit_(actor,'PUBLISH_VERSION','Year',String(year),hit.object,Object.assign({operationId:identity.operationId},value),requestId);
       record.State = 'COMMITTED';
       record.ResultJSON = JSON.stringify(value);
       mutationWrite_(log,record);
@@ -9177,12 +9180,13 @@ function mutationCheckIdentity_(record, actor, action, hash) {
 
 function mutationOutcome_(record) {
   if (record.State === 'COMMITTED') {
+    if(record.Action==='publishVersion')return {state:'SAVED',result:JSON.parse(record.ResultJSON||'{}')};
     if (record.Action === 'deleteEvent') return {state:'SAVED',result:{eventId:record.EventID,deleted:true}};
     const hit = findRowByKey_(SpreadsheetApp.getActiveSpreadsheet().getSheetByName(CALV2.SHEETS.EVENTS),'EventID',record.EventID);
     if (!hit) return {state:'UNKNOWN',message:'A committed event is no longer present. Check the archive or contact an Admin.'};
     return {state:'SAVED',result:eventForClient_(hit.object)};
   }
-  if (record.State === 'REJECTED') return {state:'REJECTED',error:JSON.parse(record.ErrorJSON || '{}')};
+  if (record.State === 'REJECTED' || record.State === 'FAILED') return {state:'REJECTED',error:JSON.parse(record.ErrorJSON || '{}')};
   if (record.State === 'CANCELLED') return {state:'NOT_SAVED'};
   return {state:'UNKNOWN'};
 }
@@ -9313,21 +9317,63 @@ function rc17DefaultTimes_(lane, schedule, shift) {
   return {start:timeText_(row.DefaultStartTime),end:timeText_(row.DefaultEndTime)};
 }
 
-function resolveMutationRecord_(log, record) {
-  if (!['PREPARED','DISPATCHED'].includes(record.State)) return mutationOutcome_(record);
-  // The request-local lookup retains its previous object for field comparison.
-  record=Object.assign({},record);
-  const hit = findRowByKey_(SpreadsheetApp.getActiveSpreadsheet().getSheetByName(CALV2.SHEETS.EVENTS),'EventID',record.EventID);
-  if (hit && String(hit.object.LastMutationID) === String(record.OperationID)) {
-    record.State = 'COMMITTED';
-  } else if (record.State === 'PREPARED') {
-    // No source dispatch was submitted for a PREPARED receipt. A DISPATCHED
-    // native write can still be uncertain; an absent marker cannot cancel it.
-    record.State = 'CANCELLED';
-  } else return mutationOutcome_(record);
-  mutationWrite_(log,record);
-  SpreadsheetApp.flush();
+const CALENDAR_STALE_DISPATCH_MS = 60*60*1000;
+function staleMutationAge_(record){const created=Date.parse(record.CreatedAt);return Number.isFinite(created)?Math.max(0,Date.now()-created):null;}
+function failStaleMutation_(log,record,current,actor){
+  if(!rc18IO_().lockDepth)throw mutationError_('LOCK_REQUIRED','Receipt resolution requires the Calendar writer lock.',409,true);
+  const label=current?.StaffTitle||record.EventID,when=String(record.CreatedAt||'');
+  const error={code:'STALE_DISPATCH',message:'Your save on '+when+' to '+label+' did not apply. Please redo it.',status:409,current:current?eventForClient_(current):null};
+  const next=Object.assign({},record,{State:'FAILED',ErrorJSON:JSON.stringify(error)});
+  const audited=calendarBirthdayRows_(SpreadsheetApp.getActiveSpreadsheet().getSheetByName(CALV2.SHEETS.AUDIT),'RequestID',record.OperationID).some(r=>r.object.Action==='STALE_DISPATCH'&&r.object.EntityID===record.OperationID);
+  rc18Atomic_(()=>{if(!audited)appendAudit_(actor||{userAlias:record.UserAlias},'STALE_DISPATCH','Mutation',record.OperationID,{state:record.State,eventId:record.EventID,originalUser:record.UserAlias},{state:'FAILED',ageMs:staleMutationAge_(record)},record.OperationID);mutationWrite_(log,next);});
+  return mutationOutcome_(next);
+}
+function resolvePublicationReceipt_(log,record,actor){
+  const ss=SpreadsheetApp.getActiveSpreadsheet(),year=Number(String(record.EventID).slice(5)),hit=findRowByKey_(ss.getSheetByName(CALV2.SHEETS.YEARS),'Year',year);
+  let evidence={};try{evidence=JSON.parse(record.ResultJSON||'{}');}catch(ignored){}
+  if(evidence.dispatchRequestId){
+    const audits=calendarBirthdayRows_(ss.getSheetByName(CALV2.SHEETS.AUDIT),'RequestID',evidence.dispatchRequestId).map(x=>x.object).filter(x=>x.Action==='PUBLISH_VERSION'&&String(x.EntityID)===String(year)&&x.UserAlias===record.UserAlias);
+    const matches=audits.flatMap(row=>{let value;try{value=JSON.parse(row.AfterJSON);}catch(ignored){return [];}return value&&value.operationId===record.OperationID&&Number(value.year)===year&&Number.isFinite(value.published)&&yes_(value.ReleasedToTeachers)?[value]:[];});
+    if(matches.length===1){const result=matches[0],next=Object.assign({},record,{State:'COMMITTED',ResultJSON:JSON.stringify(result)});mutationWrite_(log,next);return mutationOutcome_(next);}
+  }
+  const age=staleMutationAge_(record);if(age===null||age<CALENDAR_STALE_DISPATCH_MS)return mutationOutcome_(record);
+  // An already-released year with a contemporaneous/later write is ambiguous.
+  // A retained before-image proves non-application only when it still matches.
+  const canonical=value=>calendarMetadataRevision_(value);
+  const unchanged=evidence.beforeYear&&evidence.afterYear&&hit&&canonical(evidence.beforeYear)!==canonical(evidence.afterYear)&&canonical(hit.object)===canonical(evidence.beforeYear);
+  const updated=hit?Date.parse(hit.object.UpdatedAt):NaN,created=Date.parse(record.CreatedAt);
+  if(!hit||unchanged||!yes_(hit.object.ReleasedToTeachers)||Number.isFinite(updated)&&updated<created)return failStaleMutation_(log,record,null,actor);
   return mutationOutcome_(record);
+}
+function resolveMutationRecord_(log, record, actor) {
+  if (!['PREPARED','DISPATCHED'].includes(record.State)) return mutationOutcome_(record);
+  if(!rc18IO_().lockDepth)throw mutationError_('LOCK_REQUIRED','Receipt resolution requires the Calendar writer lock.',409,true);
+  record=Object.assign({},record);
+  if(String(record.EventID).startsWith('YEAR:'))return record.Action==='publishVersion'?resolvePublicationReceipt_(log,record,actor):mutationOutcome_(record);
+  const hit = findRowByKey_(SpreadsheetApp.getActiveSpreadsheet().getSheetByName(CALV2.SHEETS.EVENTS),'EventID',record.EventID);
+  if (hit && String(hit.object.LastMutationID) === String(record.OperationID)) record.State = 'COMMITTED';
+  else if (record.State === 'PREPARED') record.State = 'CANCELLED';
+  else {const age=staleMutationAge_(record);if(age!==null&&age>=CALENDAR_STALE_DISPATCH_MS)return failStaleMutation_(log,record,hit?.object||null,actor);return mutationOutcome_(record);}
+  mutationWrite_(log,record);SpreadsheetApp.flush();return mutationOutcome_(record);
+}
+function calendarFailedMutations_(actor,roles,year,events){
+  if(!roles.isAdmin&&!roles.isParentPublisher)return [];
+  const log=SpreadsheetApp.getActiveSpreadsheet().getSheetByName(CALV2.SHEETS.MUTATIONS);if(!log)return [];
+  return calendarBirthdayRows_(log,'UserAlias',actor.userAlias).map(r=>r.object).filter(r=>r.State==='FAILED').flatMap(r=>{
+    let error;try{error=JSON.parse(r.ErrorJSON||'{}');}catch(ignored){return [];}
+    if(error.code!=='STALE_DISPATCH')return [];
+    const current=events.find(e=>e.EventID===r.EventID),publication=r.EventID==='YEAR:'+year;
+    if(!current&&!publication&&(String(r.EventID).startsWith('YEAR:')||error.current&&Number(error.current.Year)!==Number(year)))return [];
+    return [{operationId:r.OperationID,message:error.message,event:r.EventID,createdAt:r.CreatedAt,current:current?eventForClient_(current):null}];
+  }).sort((a,b)=>String(b.createdAt).localeCompare(String(a.createdAt))).slice(0,20);
+}
+function apiMutationReceipts_(actor,payload){
+  return withRC17WriteLock_(()=>{
+    const log=mutationSheet_(),rows=tableObjects_(log).filter(r=>['PREPARED','DISPATCHED'].includes(r.State)),checked=[];
+    if(payload.check===true){const id=String(payload.operationId||'');if(!id||!rows.some(r=>r.OperationID===id))throw mutationError_('RECEIPT_CHANGED','This receipt is no longer unresolved. Reload the list.',409,true);const outcome=resolveMutationRecord_(log,rows.find(r=>r.OperationID===id),actor);checked.push({operationId:id,...outcome});}
+    const settled=new Set(checked.filter(r=>r.state!=='UNKNOWN').map(r=>r.operationId));
+    return {checkedAt:isoNow_(),checked,receipts:rows.filter(r=>!settled.has(r.OperationID)).map(r=>({operationId:r.OperationID,state:r.State,ageMs:staleMutationAge_(r),event:r.EventID,user:r.UserAlias,createdAt:r.CreatedAt,action:r.Action}))};
+  },true,payload.check!==true);
 }
 
 function apiEventMutationStatus_(actor, payload) {
@@ -9348,7 +9394,7 @@ function apiEventMutationStatus_(actor, payload) {
       PayloadHash:identity.hash,State:'CANCELLED',EventID:'',CreatedAt:isoNow_(),UpdatedAt:isoNow_()};
     mutationWrite_(log,record); SpreadsheetApp.flush();
     return {state:'NOT_SAVED'};
-  });
+  },true);
 }
 
 function rc17SafeCache_() {
@@ -9569,6 +9615,7 @@ function rc18AssertNoPendingEvent_(eventId, exceptOperationId, year, anyEvent) {
     const anyMatch=anyEvent==='publication' ? pendingId.indexOf('YEAR:')===0 : !!anyEvent;
     if((anyMatch || (wanted && pendingId===wanted) || (year && pendingId==='YEAR:'+Number(year))) &&
        row.operationId!==except) {
+      if(rc18IO_().lockDepth){const log=mutationSheet_(),hit=mutationLookup_(log,row.operationId);if(hit&&resolveMutationRecord_(log,hit.object).state!=='UNKNOWN')return;}
       throw mutationError_('PENDING_EVENT_WRITE','An earlier save or publication still has an unknown outcome. Check the original operation before making another change. This proposal has not been applied.',409,true);
     }
   });

@@ -539,7 +539,7 @@ async function calendarChangeGatewayCall(env,actor,input){
  const response=await env.CALENDAR_JOBS.fetch(new Request('https://calendar-jobs.internal/changes',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({payload,signature:await hmac(payload,gsisApiSecret(env,'CALENDAR_PROXY_SECRET'),true)})}));
  return response;
 }
-const CALENDAR_CHANGE_READ_ACTIONS=new Set(['bootstrap','eventMutationStatus','calendarSyncStatus','calendarChangesAuthorize','calendarChangesDelta','calendarPreflight','healthCheck','calendarReconciliationPreview','calendarWipePreview','archiveYearsPreview','runSelfTests']);
+const CALENDAR_CHANGE_READ_ACTIONS=new Set(['bootstrap','eventMutationStatus','mutationReceipts','calendarSyncStatus','calendarChangesAuthorize','calendarChangesDelta','calendarPreflight','healthCheck','calendarReconciliationPreview','calendarWipePreview','archiveYearsPreview','runSelfTests']);
 async function proxyCalendarTrackedWrite(env,actor,action,payload){
  if(!calendarChangeGatewayEnabled(env)||CALENDAR_CHANGE_READ_ACTIONS.has(action))return proxyAppsScript(env,actor,action,payload);
  // Store only identity/scope metadata, never proposed titles, people or edits.

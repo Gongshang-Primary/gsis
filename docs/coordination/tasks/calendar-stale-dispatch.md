@@ -12,3 +12,9 @@ Calendar refused a change: "An earlier save or publication still has an unknown 
 2. The UI tells the original user: "Your save on <date> to <event> did not apply. Please redo it." and shows the event's current content.
 3. Admin view listing unresolved receipts (state, age, event, user) with a "Check now" action that runs the same resolution.
 4. Tests: landed → COMMITTED; never landed and old → FAILED and the event unblocks; young DISPATCHED still blocks; publication receipts.
+
+
+## Codex claim, 6 November 2026
+
+Owner/model: Codex. Reviewer: Claude. Branch: codex/calendar-stale-dispatch. Base: 69efd3ab9f0dbbb31f1a3bc7da9c86b3dc2ea348. Scope: Calendar mutation receipt resolution under its writer lock, original-user recovery UI, Admin unresolved receipts and Check now, tests and generated copies. Landed requests stay committed; only old non-landed requests fail with STALE_DISPATCH after verifying event/publication markers. Preserve young dispatched writes and idempotent receipts. No live mutation repair, messages, deployment or merge. Claim on task branch follows the owner continuation instruction and updated LANES order.
+

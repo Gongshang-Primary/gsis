@@ -8,6 +8,10 @@ Model: Codex. Preserve sanitised Google refusal reasons in output ledgers and Sy
 
 # Pending: priority-aware automatic relief replanning, 6 November 2026
 
+## Unreleased: Calendar stale save recovery
+
+Calendar can settle hour-old dispatched event saves that never landed, under the writer lock with an audit receipt. Publication recovery verifies operation-bound audit evidence and keeps ambiguous partial writes blocked. Admins can list unresolved receipts and check each one; the original user sees a redo notice with current content. No live repair is performed by this change.
+
 Model: Codex. Full Auto-allocate gives first priority to daily SREs and any teacher activated ad hoc for the date with no baseline timetable, within their activation and workload limits. It ranks priority-1 relief use above recess-duty reuse and retains existing choices when business preferences tie. Ad hoc activation changes retain a date-local re-plan notice until a successful full run. Allocation logs name idle priority-1 teachers and their availability or limit reasons. Manual, peer, Stapler, protected, published and started duties stay fixed. Google and D1 use the same objective and evidence. See [task and verification](docs/coordination/tasks/roster-reoptimise-priority-adhoc.md). No deployment or live action.
 
 # Pending: Deploy ledger targets use configured relief budgets, 6 November 2026
