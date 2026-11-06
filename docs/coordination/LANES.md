@@ -46,6 +46,7 @@ Kept for the record. Gemini/Jules no longer receives jobs; its branches no longe
 - After the pilot the coordinator reports quality (correctness, rule-following, test discipline) and the owner decides whether lanes K, L and Y open to Gemini.
 
 ## Current assignments (update on every change)
+**Codex order (owner 6 Nov ~10:20, "follow your order")**: 1) #87 Drive outputs (approved pending CI) → 2) roster-stapler-always-effective → 3) deploy-contacts-catalogue-sync (replaces #83) → 4) calendar-stale-dispatch → 5) roster-assign-relief-export-day → 6) old backlog (PRs from 1-4 Nov: rebase/re-verify or close) → allocation rules rework (rules book) when the owner starts it. Supersedes the 'clear the backlog without stopping' order recorded in PR #88.
 Edge queue with Google authority (owner 6 Nov): `tasks/edge-queue-google-authority.md`: **Muse, all phases** (module + Deploy, then Venues, then Contacts); Codex keeps deploy-contacts-catalogue-sync.
 Codex, lane R (owner 6 Nov): `tasks/roster-allocation-rules-rework.md`: owner reworks allocation rules in natural language directly with Codex; rules book first, shadow mode before switching.
 Codex, urgent lane R (owner 3 Nov 08:37): `tasks/roster-peer-quota-override.md`: colleague approval may exceed weekly R.
