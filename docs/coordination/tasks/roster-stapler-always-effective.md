@@ -17,3 +17,14 @@
 
 ## Owner confirmation (6 Nov): "always load confirmed stapler"
 Confirmed: the effective timetable is always the latest **confirmed** Stapler version; unconfirmed drafts never drive allocation or teacher-facing output (banner + Confirm shortcut only).
+
+## Codex claim (6 November 2026, following updated owner order)
+
+Owner/model: Codex. Reviewer: Claude. Branch: codex/roster-stapler-always-effective. Base: 69efd3ab9f0dbbb31f1a3bc7da9c86b3dc2ea348. Scope: canonical Stapler effective-day selection and save/confirm lifecycle in shared/roster-operations.js; Google/D1 context readers and canonical UI source labels/banner; relevant renderer/export consumers only as needed; tests and generated copies. Preserve published/manual/peer relief and the existing reconciliation guard. No live changes, notification sends, authority switch, merge or deployment. Acceptance: saved draft retains last confirmation, confirm changes only affected lessons, unconfirmed-first draft remains baseline with banner, Report Absence and Google/D1/teacher/export parity. Current #87 review/CI continues independently; #90 was already implemented when this owner priority arrived. Claim published on task branch because automatic review rejected direct-main claims earlier in this session.
+
+
+## Codex implementation, 6 November 2026
+
+The confirmed-snapshot selector now controls effective plans and revisions across Google/D1 context, UT weekly evidence, live teacher views, publication, exports and browser preload. Draft save/import/reset retain confirmation and publication/legacy notification evidence; confirmation alone activates the edited content. Publication no longer promotes a pending draft or rewrites its confirmation timestamp. Cross-origin replacement drafts retain independently identified confirmed packages. Assign Relief and Daily Notify show the source, with a dated review/Confirm shortcut for a never-confirmed plan.
+
+Local validation includes canonical build (18 components), actual save/confirm/publication/reconciliation tests, Google/D1 report adapters, actual Google batch through browser preload for Admin and teacher, and jsdom full-screen source labels and shortcut clicks. Existing published-withdrawal/privacy, confirmation, UT and persistence checks are retained. Older tests now provide real confirmation metadata and assert conflicts at Confirm rather than draft save. Full repository Node/LORD CI remains required at the published head. No local Chromium claim. Claude reviews the exact head; owner merges.

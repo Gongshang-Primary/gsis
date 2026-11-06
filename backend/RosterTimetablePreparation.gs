@@ -46,7 +46,7 @@ function rosterTimetablePreparationSnapshot_(from,to){
  const seen=new Set(),suspended=[];
  for(const row of state.staplerPlans||[]){if(row.date<from||row.date>to)continue;if(seen.has(row.date))rosterTimetablePreparationFail_('TIMETABLE_PREPARATION_INVALID','More than one saved suspended timetable uses the same date.');seen.add(row.date);
   const confirmed=GSISRosterOperations.confirmedStaplerSnapshot(row,state.audit||[]);if(!confirmed){if(row.confirmed===true)rosterTimetablePreparationFail_('TIMETABLE_PREPARATION_CONFIRMATION','A suspended timetable has an unproven confirmation. Review its saved confirmation before exporting.');continue;}
-  if(confirmed.plan.date!==row.date||confirmed.plan.baselineId!==row.baselineId)rosterTimetablePreparationFail_('TIMETABLE_PREPARATION_INVALID','A confirmed suspended timetable has inconsistent source identity.');
+  if(confirmed.plan.date!==row.date)rosterTimetablePreparationFail_('TIMETABLE_PREPARATION_INVALID','A confirmed suspended timetable has inconsistent source identity.');
   const at=confirmed.at||null;if(at!==null&&(!/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z$/.test(at)||new Date(at).toISOString()!==at))rosterTimetablePreparationFail_('TIMETABLE_PREPARATION_INVALID','A confirmed timetable timestamp needs review.');
   suspended.push({date:row.date,name:String(row.name||''),baselineId:confirmed.plan.baselineId,revision:confirmed.revision,confirmedAt:at,independentBaseline:true,plan:rosterTimetablePreparationPlan_(confirmed.plan,confirmed.revision)});
  }

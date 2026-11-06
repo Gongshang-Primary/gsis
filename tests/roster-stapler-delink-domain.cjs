@@ -2,7 +2,7 @@
 const test=require('node:test'),assert=require('node:assert/strict');
 const fixture=require('./roster701-fixture.cjs'),S=require('../shared/roster-stapler.js');
 function setup(n=2){const f=fixture();f.ctx.minute=300;f.ctx.now=Date.parse(f.date+'T05:00:00+08:00');f.ctx.iso=new Date(f.ctx.now).toISOString();f.ctx.baselineDays=f.ctx.days;f.ctx.days[f.date].date=f.date;f.ctx.timetableEntries=[{id:'baseline',from:'2026-01-01',to:'2026-12-31',priority:1}];for(let p=2;p<2+n;p++)f.teachers[0].cells[p]=['EL','4A','C1-01',''];return f;}
-function plan(f){const p=S.create(f.ctx.days[f.date]);f.state.staplerPlans.push({date:f.date,baselineId:p.baselineId,confirmed:true,revision:1,draft:p});return p;}
+function plan(f){const p=S.create(f.ctx.days[f.date]);f.state.staplerPlans.push({date:f.date,baselineId:p.baselineId,confirmed:true,confirmedAt:f.ctx.iso,updatedAt:f.ctx.iso,revision:1,draft:p});return p;}
 function allocate(f,n=2){f.O.apply(f.state,f.ctx,{operation:'saveAbsence',date:f.date,staffId:'alice',typeId:'mc',periods:Array.from({length:n},(_,i)=>i+2),revision:0});f.O.apply(f.state,f.ctx,{operation:'autoAllocate',date:f.date,revision:0});assert.equal(f.state.assignments.filter(a=>a.status==='draft').length,n);}
 function remove(f,ps){f.ctx.days[f.date].id='replacement';f.ctx.timetableEntries[0].id='replacement';for(const p of ps)f.teachers[0].cells[p]=['','','',''];}
 test('new plans capture complete day metadata and own persistent identity without reading comparison cells',()=>{const f=setup(),p=plan(f);assert.equal(p.id,'stapler:'+f.date);assert.equal(p.daySnapshot.schema,1);const poisoned={teachers:f.teachers.map(t=>({...t,get cells(){throw Error('live cells accessed');}}))};const d=S.effectiveDay(p,poisoned);assert.equal(d.id,p.id);assert.equal(d.teachers[0].R,4);assert.equal(d.teachers[0].cells[2][0],'EL');});
@@ -37,3 +37,4 @@ test('recomposition keeps current runtime quotas and native cells while refusing
  const next=f.O.composeStaplerContext(f.state,f.ctx).days[f.date].teachers.find(t=>t.staffId==='bob');assert.equal(next.R,0);assert.equal(next.capHeadroom,0);assert.equal(next.capWorkload,20);assert.equal(next.cells[2][0],'');
  const absent=f.O.effectiveTimetableDay(f.state,{...f.ctx,days:{},baselineDays:{}},f.date);assert.equal(absent.teachers.find(t=>t.staffId==='bob').R,undefined);assert.equal(S.effectiveDay(p).teachers.find(t=>t.staffId==='alice').cells[2][0],'EL');
 });
+

@@ -238,15 +238,15 @@ var GSISRosterAllocation = (() => {
     const contactsUT=String(person?.employment||'').split(/[,;]/).some(value=>value.trim().toUpperCase()==='UT');
     if(contactsUT&&(!teacher||teacher.capBasis!=='total'||teacher.capVerified!==true||!Number.isFinite(teacher.periodCap)||teacher.periodCap<0||!Number.isFinite(teacher.capHeadroom)))return {...teacher,staffId:person.id,capConfigured:true,capBasis:'total',periodCap:teacher?.periodCap??null,capVerified:false,capHeadroom:null,capVerificationReason:'The configured weekly UT employment cap cannot be verified.'};
     if(!teacher||teacher.capBasis!=='total'||teacher.capVerified!==true)return teacher;
-    const S=typeof GSISRosterStapler!=='undefined'?GSISRosterStapler:require('./roster-stapler.js'),week=monday(d),days=teacher.capWeekDays;
+    const O=typeof GSISRosterOperations!=='undefined'?GSISRosterOperations:require('./roster-operations.js'),S=typeof GSISRosterStapler!=='undefined'?GSISRosterStapler:require('./roster-stapler.js'),week=monday(d),days=teacher.capWeekDays;
     if(!Array.isArray(days)||days.length!==5){
-      if((s.staplerPlans||[]).some(r=>monday(r.date)===week&&(r.confirmed||r.published)))return {...teacher,capVerified:false,capHeadroom:null,capVerificationReason:'Effective weekly UT workload cannot be verified.'};
+      if((s.staplerPlans||[]).some(r=>monday(r.date)===week&&O.readyStaplerPlan(r,s.audit)))return {...teacher,capVerified:false,capHeadroom:null,capVerificationReason:'Effective weekly UT workload cannot be verified.'};
       return teacher;
     }
     const cells=[],categories={...(ctx.baselineDays?.[d]||ctx.days[d])?.subjectCategories};
     for(let n=0;n<5;n++){
       const date=addDays(week,n),evidence=days.find(row=>row.date===date);if(!evidence||!Array.isArray(evidence.cells))return {...teacher,capVerified:false,capHeadroom:null,capVerificationReason:'Effective weekly UT workload cannot be verified.'};
-      const record=(s.staplerPlans||[]).find(r=>r.date===date),plan=record?.confirmed?(record.confirmedPlan||record.draft||record.published):record?.published;
+      const record=(s.staplerPlans||[]).find(r=>r.date===date),plan=O.readyStaplerPlan(record,s.audit);
       let current=clone(evidence.cells),periods=evidence.periods||current.map((_,period)=>({period}));
       if(plan){
         try{const actual=S.effectiveDay(plan);current=clone(actual.teachers.find(t=>t.staffId===teacher.staffId)?.cells||actual.periods.map(()=>['','','','']));periods=actual.periods;Object.assign(categories,plan.subjectCategories||{});

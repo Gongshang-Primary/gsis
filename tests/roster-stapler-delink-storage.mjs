@@ -19,7 +19,7 @@ const modelJson=JSON.stringify(model);await bucket.put('origin-model',await new 
 const periods=Array.from({length:17},(_,period)=>({period,startMinutes:420+30*period,endMinutes:450+30*period})),teachers=people.map((p,i)=>({staffId:p.id,name:p.name,cells:(i?blank():alice).slice(0,17),R:4}));
 const plan=S.create({id:'origin',date,parity:'single',schoolDay:true,verified:true,periods,teachers},{date});delete plan.daySnapshot;delete plan.id;
 const planJson=JSON.stringify(plan);await bucket.put('old-plan',await new Response(new Blob([planJson]).stream().pipeThrough(new CompressionStream('gzip'))).arrayBuffer());
-const state=O.initial();state.staplerPlans.push({date,baselineId:'origin',revision:1,confirmed:true,draft:{edgeObject:true,key:'old-plan',digest:sha256Hex(planJson),encoding:'gzip-json-v1'}});
+const state=O.initial();state.staplerPlans.push({date,baselineId:'origin',revision:1,confirmed:true,confirmedAt:date+'T00:00:00Z',updatedAt:date+'T00:00:00Z',draft:{edgeObject:true,key:'old-plan',digest:sha256Hex(planJson),encoding:'gzip-json-v1'}});
 const roster=await activate(db,'roster',state),register=await activate(db,'roster-register',{revision:1,entries:[{id:'origin',from:date,to:date,priority:2,pruned:true,modelObject:{key:'origin-model',digest:sha256Hex(modelJson),encoding:'gzip-json-v1'}}],receipts:[]});
 await activate(db,'roster-references',{schema:1,contacts:{rosterPeople:people,rosterSMCIds:['alice'],rosterAdminIds:['alice'],rosterUrgentSMCIds:['alice']},contactsCheckedAt:Date.now(),calendarCheckedAt:Date.now(),calendarByDate:{[date]:{date,schoolDay:true,parity:'single',available:true}}});
 const env={GSIS_JOBS:db,ROSTER_EDGE_AUTHORITY:'d1',ROSTER_TIMETABLE_SNAPSHOTS:bucket,ROSTER_PUBLIC_ORIGIN:'https://roster.gsps.edu.sg',WHATSAPP_ENABLED:'false'};globalThis.fetch=()=>assert.fail('No Google call is allowed');
@@ -34,3 +34,4 @@ const saved=JSON.stringify((await loadEdgeRoster(env)).state.staplerPlans);
 for(let n=0;n<20;n++){const result=await send({operation:'read',view:'report',compact:true,date});assert.equal(result.timetable.id,S.planId(plan));assert.equal(result.timetable.teachers.find(t=>t.staffId==='alice').cells[2][0],'EL');}
 assert.equal(reads.includes('origin-model'),false);assert.equal(JSON.stringify((await loadEdgeRoster(env)).state.staplerPlans),saved);
 console.log('PASS real D1/R2 dry-run purity, exact pruned origin, digest apply, receipt replay, migration no-op and twenty baseline-free reloads');
+

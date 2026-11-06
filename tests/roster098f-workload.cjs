@@ -2,7 +2,7 @@
 const assert=require('node:assert/strict'),fixture=require('./roster701-fixture.cjs'),A=require('../shared/roster-allocation.js'),S=require('../shared/roster-stapler.js');
 function setup(confirmed=true){const f=fixture();f.ctx.now=Date.parse(f.date+'T06:00:00+08:00');f.ctx.minute=360;f.ctx.iso=new Date(f.ctx.now).toISOString();f.state.systemConfig={...f.state.systemConfig,maxDailyPeriods:1,maxConsecutivePeriods:1};
  for(const t of f.teachers){t.R=0;Object.assign(t,{periodCap:26,capConfigured:true,capVerified:false,capWorkload:null,capHeadroom:null});}
- const p=S.create({...f.ctx.days[f.date],date:f.date});f.state.staplerPlans.push({date:f.date,baselineId:p.baselineId,revision:1,confirmed,draft:p});return f;}
+ const p=S.create({...f.ctx.days[f.date],date:f.date});f.state.staplerPlans.push({date:f.date,baselineId:p.baselineId,revision:1,confirmed,confirmedAt:confirmed?f.ctx.iso:null,updatedAt:f.ctx.iso,draft:p});return f;}
 {
  const f=setup();const ctx=f.O.composeStaplerContext(f.state,f.ctx);assert.equal(ctx.days[f.date].workloadIgnored,true,'only confirmed composition skips the workload formula');
  const id=f.O.apply(f.state,f.ctx,{operation:'saveAbsence',date:f.date,staffId:'alice',typeId:'mc',periods:[2,3]}).savedId,dem=f.O.demand(ctx,f.state,f.date)[0],model=A.manualModel(f.state,ctx,f.date),bob=A.manualRanks(model,dem).find(t=>t.staffId==='bob');assert.equal(bob.available,false);assert.equal(bob.Rviolation,true);assert.equal(bob.capViolation,true);assert.equal(bob.autoEligible,false);assert.equal(bob.warnings.some(x=>/quota|cap|consecutive/i.test(x)),true);
@@ -18,3 +18,4 @@ function setup(confirmed=true){const f=fixture();f.ctx.now=Date.parse(f.date+'T0
 }
 {const f=setup(),ctx=f.O.composeStaplerContext(f.state,f.ctx);f.O.apply(f.state,ctx,{operation:'saveAbsence',date:f.date,staffId:'alice',typeId:'mc',periods:[2,3]});const result=f.O.apply(f.state,ctx,{operation:'autoAllocate',date:f.date});assert.notEqual(result.paused,true,'a genuinely empty loaded ledger may initialise verified zero history');assert.equal(result.savedIds.length,0);assert.equal(result.run.coverage,0,'automatic allocation still respects exhausted R and unverified caps');}
 console.log('PASS F suspended formula-only exemption, retained R/cap enforcement, zero-history initialisation, model visibility and actual clashes');
+

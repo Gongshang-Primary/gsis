@@ -10,7 +10,7 @@ const root=path.resolve(__dirname,'..');
   for(const name of ['shared/roster-stapler.js','shared/roster-allocation.js','shared/roster-operations.js','tests/roster701-fixture.js','roster-update/public/roster-operations-ui.js'])await page.addScriptTag({content:fs.readFileSync(path.join(root,name),'utf8')});
   await page.evaluate(()=>{
    const f=__fixture,O=GSISRosterOperations,S=GSISRosterStapler;f.setClock(f.ctx.today+'T06:00:00+08:00');
-   let plan=S.create({...f.day,date:f.ctx.today});plan=S.apply(plan,{type:'move',tileId:'baseline:alice:4',period:5});f.state.staplerPlans.push({date:f.ctx.today,baselineId:'baseline',draft:plan,confirmed:true,revision:1});
+   let plan=S.create({...f.day,date:f.ctx.today});plan=S.apply(plan,{type:'move',tileId:'baseline:alice:4',period:5});f.state.staplerPlans.push({date:f.ctx.today,baselineId:'baseline',draft:plan,confirmed:true,confirmedRevision:1,confirmedPlan:structuredClone(plan),revision:1});
    f.state.absences.push({id:'a',date:f.ctx.today,staffId:'alice',name:'Alice <img src=x onerror="window.__xss=true">',typeId:'mc',typeLabel:'MC <script>bad()</script>',periods:[2,3,5],reliefRequired:true,instructions:{},instructionsNA:true});
    const ds=O.demand(O.composeStaplerContext(f.state,f.ctx),f.state,f.ctx.today);
    for(const period of [2,3]){const d=ds.find(d=>d.period===period);f.state.assignments.push({...d,id:'cover-'+period,demandId:d.id,staffId:period===2?'bob':null,relieverName:'Bob Colleague',absentId:'alice',absentName:'Alice Teacher',noRelief:period===3,status:'draft'});}
@@ -50,3 +50,4 @@ const root=path.resolve(__dirname,'..');
   assert.deepEqual(errors,[]);console.log('v0.7.19 relief tools browser: saved suspended summaries, empty data, export route, escaping, keyboard focus and desktop/mobile toolbar passed');
  }finally{await browser.close();}
 })().catch(e=>{console.error(e);process.exitCode=1;});
+
