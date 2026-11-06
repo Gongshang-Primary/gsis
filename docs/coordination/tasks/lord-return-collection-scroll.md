@@ -6,8 +6,8 @@
 - Last updated (Asia/Singapore): 6 November 2026
 - Branch: muse/lord-return-collection-scroll
 - Base SHA: 307d1c76c048b2f3dba616ec63331cdf5c4c7c93
-- Current head SHA (or PR head; avoid self-referential commit hashes):
-- PR:
+- Current head SHA (or PR head; avoid self-referential commit hashes): 09ca3071d46d5a848157599b3250e109cace21a2
+- PR: #98 (draft, open)
 - User-authorised scope: LORD return and collection pages: no collapsible trolley sections (long scrolling mobile-first page, minimal friction and clicks); remove the unnecessary checkboxes on the return page. Owner decision 6 Nov: drop the per-trolley "I am physically returning" checkbox and both declaration checkboxes ("Tablets are kept in the correct trolley", "Tablets are facing the same orientation"). The two declarations are still sent to the backend as true with every trolley, covered by the single submit confirmation, because the backend requires both booleans (requiredBoolean_ in lord-suite/Source/backend/Code.gs) and records false as a discrepancy.
 - Files/domains owned (include generated outputs): lord-suite/Source/lord/assets/app.js and lord-suite/First_Time_Setup/templates/lord/assets/app.js (byte-identical copies); lord-suite/Source/lord/assets/styles.css and its template copy; lord-suite/tests return/collection behaviour checks; docs/coordination/tasks/lord-return-collection-scroll.md; CHANGELOG.md.
 - Out of scope: backend (no change; declarations still sent as true); loan booking, OVERLORD, WhatsApp, D1/edge queue, Roster, Deploy, Contacts; live data and deployment; the accessory cards (quantity + photo, no checkboxes) and the "Return devices with issues" control.
@@ -29,7 +29,8 @@ Exact command, tested commit, outcome and evidence. Explicitly list checks not r
 - TZ=Asia/Singapore node lord-suite/tests/run_reload_browser_checks.cjs: passed, 19 checks.
 - TZ=Asia/Singapore python3 lord-suite/tests/run_all_checks.py: LORD suite 40/40 passed, exit 0.
 - Full Node suite (TZ=Asia/Singapore NODE_NO_WARNINGS=1 node tests/run.cjs): first sequential run finished 1026/1031 — 5 scripts failed, names lost because the run's output was piped through tail. The 4 named shard-1 failures were re-run alone: roster089a-home-timetable-browser and stapler716-browser failed only on a missing /tmp/chromium (wrong env var; both pass with GSIS_BROWSER_EXECUTABLE set); roster711-workspace-ui passes alone (timing race under load); calendar098j-jobs passes alone on a quiet machine (its ui.cjs child hit the 35 s spawn timeout under load). All 11 further candidates from the 4 parallel shard runs (which added load flakes of their own) also pass alone, sequentially, with the correct env. No Node script references the LORD files changed, so no failure is tied to this change. CI is the remaining gate.
-- Not run locally: full CI (verify-queue workflow) — runs on push; draft PR only after it is green.
+- Draft PR #98 opened 6 Nov at head 09ca3071d46d5a848157599b3250e109cace21a2 (implementation 4426de9 + merge of main 5e1738e), Codex reviews. CI run 42184079898 pending at opening.
+- Not run locally: full CI (verify-queue workflow) — runs on this PR.
 
 ## Review
 Reviewer/model, reviewed SHA, findings, resolution. Advisory review is not human approval.
