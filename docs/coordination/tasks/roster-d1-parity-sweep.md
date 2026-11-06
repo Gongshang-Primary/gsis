@@ -18,3 +18,17 @@ Method: static analysis of both dispatchers plus a test that calls every listed 
 
 ## Done when
 `D1_PARITY.md` shows no high-risk MISSING rows; a CI test fails if a new Google operation is added without a D1 handler or an explicit "Google-only" entry.
+
+## Step 1 claim, 6 November 2026
+
+- Status: implementing inventory and harness only.
+- Owner/model: Codex (this continuation).
+- Reviewer/model: Muse or Claude.
+- Branch: codex/roster-d1-parity-sweep.
+- Base SHA: afe4c6ea3d6034c78743e980fa0d8c70c8bb529f.
+- Scope: docs/roster/D1_PARITY.md, a machine-readable operation inventory and tests that exercise the real D1 dispatcher; no product changes. 'Docs-only' means no production behavior changes; the requested harness is test code.
+- A has an active separate Codex claim at d7b44cd19c28088a649e411db4018c9dd793f3a3. Do not edit that implementation branch or its product files. Record intakeReview as missing in this pinned base until A lands.
+- Source restoration: authenticated GitHub connector at the pinned base; verify local files against Git blob SHAs. Direct clone authentication is unavailable.
+- Verification required: inventory completeness, real edge dispatch outcomes, canonical build and full Node/LORD CI. No tests yet claimed.
+- No deployment, live calls, notifications, settings, authority changes or merge.
+- Use branch claim because automatic approval review previously rejected direct main claims. Step 2 ports remain separate, in risk order after the inventory.
