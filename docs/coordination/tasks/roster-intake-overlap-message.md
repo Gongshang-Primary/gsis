@@ -1,6 +1,6 @@
 # roster-intake-overlap-message: overlapping absence reports — say why, and show the true status
 
-- Status: changelog (owner 6 Nov), **priority (D1 gap blocks SMC review)**; lane R; Codex when authorised. Small.
+- Status: **authorised, priority** (owner 6 Nov "codex work … put priority"); Codex, lane R. Small.
 - Reviewer/model: Muse or Claude
 
 ## Evidence (D1 `gsis_absence_transport`, 6 Nov)
