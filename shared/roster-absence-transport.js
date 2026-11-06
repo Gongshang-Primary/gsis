@@ -76,6 +76,16 @@ function absenceTransportCommand_(input,origin){
  return {command:out,dates};
 }
 async function absenceTransportFind_(context,actor,requestId){return context.db.prepare('SELECT * FROM gsis_absence_transport WHERE namespace=? AND actor=? AND request_id=?').bind(context.namespace,actor,requestId).first();}
+// Internal raw record lookup. all:true requires a fresh authority check in the
+// caller; never return this record (identity/namespace included) to a browser.
+export async function readAbsenceTransportRecord(env,who,{requestId,all=false}={}){
+ const context=await absenceTransportContext_(env);if(!context)return null;const identity=absenceTransportIdentity_(who);
+ if(typeof requestId!=='string'||! /^[a-f\d]{8}-(?:[a-f\d]{4}-){3}[a-f\d]{12}$/i.test(requestId))absenceTransportInvalid_();
+ const result=await context.db.prepare('SELECT * FROM gsis_absence_transport WHERE namespace=? AND request_id=?'+(all===true?'':' AND actor=?')+' LIMIT 2').bind(context.namespace,requestId,...(all===true?[]:[identity.email])).all();
+ if(result.success===false)throw absenceTransportError_(503,'ABSENCE_TRANSPORT_STORAGE','The original report could not be read.');
+ if(result.results?.length>1)throw absenceTransportError_(409,'ABSENCE_CAPTURE_AMBIGUOUS','The report identity needs administrator review.');return result.results?.[0]||null;
+}
+export function publicAbsenceTransportReceipt(row){return absenceTransportReceiptValue_(row);}
 function absenceTransportReceiptValue_(row){const peers=row.operation==='requestMutual'||!!JSON.parse(row.command).ownArrangementsByStaffDate;return {accepted:true,intakeReceipt:true,receiptOnly:true,requestId:row.request_id,acceptedAt:row.accepted_at,intakeState:['needsReview','withdrawn'].includes(row.state)?row.state:'pending',transportState:row.state,absenceApplied:false,savedIds:[],peerState:peers?'pending':'none',mutualRequestIds:[],reasonCode:row.last_code||null,affectedDates:JSON.parse(row.dates),...(row.state==='withdrawn'?{resolution:{at:row.resolved_at,by:row.resolved_by,reason:row.resolution_reason}}:{})};}
 export async function captureAbsenceTransport(env,who,input){
  const context=await absenceTransportContext_(env);if(!context)return null;const identity=absenceTransportIdentity_(who),{command,dates}=absenceTransportCommand_(input,context.origin),encoded=JSON.stringify(command),digest=await absenceTransportHash_(JSON.stringify(absenceTransportStable_(command))),now=Date.now();
@@ -140,4 +150,17 @@ export async function resolveAbsenceTransport(env,who,{requestId,reason,all=fals
  const found=await context.db.prepare('SELECT * FROM gsis_absence_transport WHERE namespace=? AND request_id=? LIMIT 2').bind(context.namespace,requestId).all();if(found.success===false)throw absenceTransportError_(503,'ABSENCE_TRANSPORT_STORAGE','The report could not be read.');if(!found.results?.length)return null;if(found.results.length!==1)throw absenceTransportError_(409,'ABSENCE_CAPTURE_AMBIGUOUS','The report identity needs administrator review.');const row=found.results[0];
  if(['forwarded','withdrawn'].includes(row.state))return absenceTransportReceiptValue_(row);if(row.state!=='needsReview')throw absenceTransportError_(409,'ABSENCE_CAPTURE_PROCESSING','Only a report awaiting review can be withdrawn here.');
  const result=await context.db.prepare("UPDATE gsis_absence_transport SET state='withdrawn',resolved_at=?,resolved_by=?,resolution_reason=? WHERE namespace=? AND actor=? AND request_id=? AND state='needsReview'").bind(new Date().toISOString(),identity.email,reason.trim(),context.namespace,row.actor,requestId).run();if(result.success===false)throw absenceTransportError_(503,'ABSENCE_TRANSPORT_STORAGE','Withdrawal could not be confirmed. Retry the same review.');const current=await absenceTransportFind_(context,row.actor,requestId);if(current?.state!=='withdrawn')throw absenceTransportError_(409,'ABSENCE_CAPTURE_PROCESSING','This report changed while it was being reviewed.');return absenceTransportReceiptValue_(current);
+}
+
+// Internal bounded recovery of old overlap refusals. A partial overlap remains
+// parked; backoff prevents a poison report from monopolising each queue wake.
+export async function dueAbsenceOverlapRecords(env){
+ const context=await absenceTransportContext_(env);if(!context||!context.edge)return [];
+ const result=await context.db.prepare("SELECT * FROM gsis_absence_transport WHERE namespace=? AND operation='saveAbsence' AND state='needsReview' AND last_code='BACKEND_REJECTED_409' AND available_at<=? ORDER BY available_at,accepted_at LIMIT 4").bind(context.namespace,Date.now()).all();
+ if(result.success===false)throw absenceTransportError_(503,'ABSENCE_TRANSPORT_STORAGE','Report recovery is unavailable.');return result.results||[];
+}
+export async function deferAbsenceOverlapRecord(env,row){
+ const context=await absenceTransportContext_(env);if(!context||context.namespace!==row.namespace)return;
+ const result=await context.db.prepare("UPDATE gsis_absence_transport SET available_at=? WHERE namespace=? AND actor=? AND request_id=? AND attempts=? AND state='needsReview'").bind(Date.now()+3600000,row.namespace,row.actor,row.request_id,row.attempts).run();
+ if(result.success===false)throw absenceTransportError_(503,'ABSENCE_TRANSPORT_STORAGE','Report recovery could not be deferred.');
 }
