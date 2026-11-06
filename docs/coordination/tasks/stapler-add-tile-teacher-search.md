@@ -1,6 +1,6 @@
 # stapler-add-tile-teacher-search: type-to-search teacher picker in Stapler "Add teacher tile"
 
-- Status: claimed by **Muse**, 6 Nov 2026 (Asia/Singapore); owner exception to lane R for this UI-only task (roster-update/public/roster-stapler-ui.js and its CSS/tests), disjoint from Codex's current lane R files.
+- Status: draft PR #99 opened 6 Nov 2026, head 260bd41, CI run 42203020268 green (all 5 jobs); Codex reviews. (Was: claimed by **Muse**, 6 Nov 2026 (Asia/Singapore); owner exception to lane R for this UI-only task (roster-update/public/roster-stapler-ui.js and its CSS/tests), disjoint from Codex's current lane R files.)
 - Reviewer/model: Codex (two-model rule; Claude is out of tokens)
 - Branch: muse/stapler-add-tile-teacher-search-rebase
 - Base SHA: 682a88715ff1b2b2ef5f8c7e5eca46e28285dd3f
