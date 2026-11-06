@@ -17,3 +17,6 @@
 gsis_system_alert_v1 created on Meta: template id 1846305353057485, status PENDING, category UTILITY, en_GB. Body differs from the proposed file by one word ("Issue: {{3}}"; Meta rejects adjacent placeholders):
 "*GSiS System Alert*\n\nHi {{1}}, this system alert is for GSiS Admins.\n\nDate: {{2}}\n\nIssue: {{3}}\n\nOpen System Health to review: {{4}}.\n\nThank you."
 Raw-text SHA-256 (no trailing newline): 516d26993d6eb3f8fd5d8fe5864d35a2875fd5e4260bcaa75853a95fff252741 — Codex: update notification-worker/system-alert-template.proposed.json and the system_alert contract bodySha256 to this exact body (compute it the same way the contract code does), keep enabled:false until approval is confirmed, re-run CI. Required before merging #87.
+
+## Final at head 8bd5acb (6 Nov ~11:10): approve
+Contract and proposed file now carry the submitted body ("Issue: {{3}}"), bodySha256 516d2699… verified against the body; activation `enabled:false`. CI full-suite green at 8bd5acb; merges cleanly into main.

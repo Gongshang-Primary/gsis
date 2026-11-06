@@ -105,6 +105,13 @@ assert(snapshot.templates.some(t=>t.name==='gsis_relief_evening_v2'),'v2 remains
 const currentSnapshot=JSON.parse(fs.readFileSync('notification-worker/template-observation-20261017.json'));
 assert.equal(currentSnapshot.templates.length,21);
 for(const contract of Object.values(gateway.WHATSAPP_CONTRACTS)){
+ if(contract.name==='gsis_system_alert_v1'){
+  assert.equal(contract.submissionState,'PENDING');assert.equal(contract.id,'1846305353057485');
+  assert.match(contract.body,/Issue: \{\{3\}\}/);
+  assert.equal(JSON.parse(fs.readFileSync('notification-worker/templates.activation.json')).system_alert.enabled,false);
+  assert(!currentSnapshot.templates.some(t=>t.name===contract.name),'a proposal must not be represented as a historical provider observation');
+  continue;
+ }
  const observed=currentSnapshot.templates.find(t=>t.name===contract.name);
  assert(observed);assert.equal(contract.bodySha256,observed.bodySha256);assert.equal(contract.id,observed.id);assert.equal(observed.category,'UTILITY');assert.equal(contract.submissionState,observed.status);
 }

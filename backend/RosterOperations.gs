@@ -1240,6 +1240,15 @@ function rosterNotificationEligible_(s,j,now,fresh,index,allowed){
  if(j.kind==='stapler_request'&&(!(fresh.rosterSMCIds||[]).includes(j.recipientId)||!GSISRosterOperations.teacherSponsor(person)))return 'The nominated sponsor is no longer an eligible teacher.';
  if(j.kind==='stapler_decision'&&j.data.audience==='stapler-sponsor'&&(!(fresh.rosterSMCIds||[]).includes(j.recipientId)||!GSISRosterOperations.teacherSponsor(person)))return 'The nominated sponsor is no longer an eligible teacher.';
  if(j.kind==='contact_review'&&!(fresh.rosterAdminIds||[]).includes(j.recipientId))return 'Recipient is no longer a Contacts Admin.';
+ // Recheck audience at claim and immediately before send, including retained
+ // pre-fix Drive jobs. Never reinterpret their duty wording as an Admin notice.
+ const systemAlert=j.kind==='system_alert'||j.data.audience==='system-admin'||j.data.audience==='backup-admin'||String(j.key||'').startsWith('drive-backup:');
+ if(systemAlert){
+  if(j.kind!=='system_alert'||j.data.audience!=='system-admin'||j.data.templateKey!=='system_alert')return 'Legacy system alert requires the Admin route and wording.';
+  if(!(fresh.rosterAdminIds||[]).includes(j.recipientId)||person.active!==true)return 'Recipient is no longer an active Roster Admin.';
+  if(j.data.outputKind&&(j.data.outputKind==='daily'?s.systemConfig?.driveDaily?.enabled:s.systemConfig?.driveBackup?.enabled)!==true)return 'Drive output alerts are disabled.';
+ }
+ if(j.data.templateKey==='smc_attention'&&j.data.audience!=='duty-smc')return 'SMC duty wording requires a current duty recipient.';
  if(j.data.audience==='duty-smc'){const row=s.smcDutyRoster.find(r=>r.date===j.date);if(!GSISRosterOperations.dutyEligible(person)||!(fresh.rosterSMCIds||[]).includes(j.recipientId)||!row?.staffIds.includes(j.recipientId)||!GSISRosterOperations.dutyWindow(row,j.date,now))return 'Recipient is no longer on relief duty for this time window.';}
  if(j.data.audience==='urgent-smc'&&!(fresh.rosterUrgentSMCIds||[]).includes(j.recipientId))return 'Recipient is no longer eligible for urgent staff messages.';
  if(!person.active&&!s.adhoc.some(a=>a.staffId===j.recipientId&&a.date===j.date&&!a.deletedAt))return 'Recipient is inactive and is not engaged for the selected date.';
