@@ -287,7 +287,7 @@
   }
 
   async function api(action, payload = {}) {
-    const isRead=['calendarPreflight','healthCheck','calendarReconciliationPreview','runSelfTests','calendarWipePreview','archiveYearsPreview','eventMutationStatus','calendarSyncStatus'].includes(action);
+    const isRead=['calendarPreflight','healthCheck','calendarReconciliationPreview','runSelfTests','calendarWipePreview','archiveYearsPreview','eventMutationStatus','calendarSyncStatus','mutationReceipts'].includes(action);
     const duringPublication = ['publishVersion','startSyncYear','syncYearBatch','pullBirthdays'].includes(action);
     if(!isRead && !isCalendarEditable(duringPublication))throw new Error('Refresh verification, publication, sync or save recovery must finish before editing.');
     if(EVENT_MUTATIONS.has(action) && pendingEventJob(action==='saveEvent'?payload.event?.EventID:payload.eventId))throw new Error('This event has an unresolved Calendar job. Check its exact receipt before editing it again.');
@@ -358,6 +358,18 @@
     renderCalendarJobs();
   }
 
+  function mutationCurrentHtml(event) {
+    if(!event)return '<p>The event is no longer available in this view. Refresh before redoing the change.</p>';
+    const fields=['StaffTitle','StartDate','EndDate','StartTime','EndTime','LaneID','Status','StaffDescription','ParentTitle','ParentDescription'];
+    return `<dl>${fields.filter(k=>event[k]).map(k=>`<dt>${esc(k)}</dt><dd>${esc(event[k])}</dd>`).join('')}</dl>`;
+  }
+  function renderMutationFailures() {
+    $('mutationFailureNotices')?.remove();
+    const failures=state.data?.mutationFailures||[];if(!failures.length)return;
+    const box=document.createElement('div');box.id='mutationFailureNotices';box.className='notice';
+    box.innerHTML=failures.map(row=>`<details><summary>${esc(row.message)}</summary><p>Current saved content</p>${mutationCurrentHtml(row.current)}</details>`).join('');
+    $('page-'+state.page)?.prepend(box);
+  }
   function renderPage(page) {
     switch (page) {
       case 'events': renderCalendar(); break;
@@ -375,6 +387,7 @@
         renderWeeklyView();
         break;
     }
+    renderMutationFailures();
   }
 
   function activatePage(page) {
@@ -3134,6 +3147,12 @@
       </div>
 
       <div class="card stable-health-card">
+        <h3>Unresolved saves and publications</h3>
+        <p class="privacy-note">Check a receipt against the current saved record. Recent or uncertain writes remain blocked.</p>
+        <button id="loadMutationReceipts" type="button" class="secondary">Load receipts</button>
+        <div id="mutationReceiptsHost" style="margin-top:10px"></div>
+      </div>
+      <div class="card stable-health-card">
         <h3>Stable Release Health</h3>
 
         <p class="privacy-note">
@@ -3443,6 +3462,19 @@
       }
     };
 
+    const loadMutationReceipts=async(operationId)=>{
+      const host=$('mutationReceiptsHost'),button=$('loadMutationReceipts'),owner=calendarOwnerContext();
+      button.disabled=true;host.querySelectorAll('button').forEach(b=>b.disabled=true);
+      try{
+        const response=await api('mutationReceipts',operationId?{check:true,operationId}:{check:false}),result=response?.result||response;
+        if(!sameCalendarOwner(owner)||$('mutationReceiptsHost')!==host)return;
+        const checked=(result.checked||[]).map(row=>row.error?.message||`${row.operationId}: ${row.state==='UNKNOWN'?'Still uncertain. No change made.':row.state}`).join(' ');
+        host.innerHTML=`${checked?`<p role="status">${esc(checked)}</p>`:''}${result.receipts?.length?`<div class="conflict-table-wrap"><table class="data-table"><thead><tr><th>State</th><th>Age</th><th>Event</th><th>User</th><th>Action</th></tr></thead><tbody>${result.receipts.map(row=>`<tr><td>${esc(row.state)}</td><td>${row.ageMs==null?'Unknown':Math.floor(row.ageMs/60000)+' min'}</td><td>${esc(row.event)}</td><td>${esc(row.user)}</td><td><button type="button" class="secondary" data-check-mutation="${esc(row.operationId)}">Check now</button></td></tr>`).join('')}</tbody></table></div>`:'<p>No unresolved receipts.</p>'}`;
+        host.querySelectorAll('[data-check-mutation]').forEach(b=>b.onclick=()=>loadMutationReceipts(b.dataset.checkMutation));
+      }catch(err){if(sameCalendarOwner(owner)&&$('mutationReceiptsHost')===host)host.innerHTML=`<p role="alert">${esc(err.message)}</p>`;}
+      finally{if($('loadMutationReceipts')===button)button.disabled=false;}
+    };
+    $('loadMutationReceipts').onclick=()=>loadMutationReceipts();
     $('healthCheckBtn')
       .addEventListener(
         'click',
@@ -5438,6 +5470,7 @@
       await syncYear('staff', operation);
     } catch (err) {
       if (err.definite) { publicationRequests.delete(requestKey); savePublicationRequests(); }
+      if(err.code==='STALE_DISPATCH')await loadBootstrap(year).catch(()=>{});
       toast(operation.published
         ? `${year} is published. Staff sync did not start. Refresh this year, then click Sync Staff. ${err.message}`
         : `${err.message} ${err.definite ? 'Correct the problem, then click Publish version again.' : 'Click Publish version again to retry the same request.'}`, true);
@@ -6651,7 +6684,7 @@
   function openCalendarJobProposal(job) {
     if(!job||!confirmUnsavedChanges('view this retained proposal'))return;
     openModal(`<div class="modal-head"><h3>Retained event proposal</h3><button class="close-x" data-close>&times;</button></div><div class="modal-body"><p>${esc(calendarJobLabel(job))}. Job ${esc(job.jobId)}.</p><p>Google remains authoritative. Review the current event before creating a revised change.</p><pre class="calendar-job-proposal">${esc(JSON.stringify({action:job.action,payload:job.payload,error:job.error},null,2))}</pre></div><div class="modal-foot"><button type="button" class="secondary" data-close>Close</button><button type="button" class="primary" id="downloadCalendarJobProposal">Download proposal</button></div>`);
-    if(job.outcome==='REJECTED' && job.error?.code==='CONFLICT' && job.error.current){
+    if(job.outcome==='REJECTED' && ['CONFLICT','STALE_DISPATCH'].includes(job.error?.code) && job.error.current){
       const baseline=job._uiBaseline||{},proposal=job.payload.event||job.payload;
       showConflictReview(responseError(job.error),baseline,proposal,latest=>{
         if(!isCalendarEditable())return;
@@ -6798,12 +6831,12 @@
   }
 
   function showConflictReview(err, baseline, proposal, accepted, options = {}) {
-    if (!err.current || err.code !== 'CONFLICT') {toast(err.message,true); return;}
+    if (!err.current || !['CONFLICT','STALE_DISPATCH'].includes(err.code)) {toast(err.message,true); return;}
     $('conflictReview')?.remove();
     const latest=err.current;
-    const fields=GSPSCalendarCore.EDIT_FIELDS.filter(k => k!=='EventID' && String(baseline[k]||'')!==String(latest[k]||''));
+    const fields=GSPSCalendarCore.EDIT_FIELDS.filter(k => k!=='EventID' && (err.code==='STALE_DISPATCH'||String(baseline[k]||'')!==String(latest[k]||'')));
     const box=document.createElement('div'); box.id='conflictReview'; box.className='notice';
-    box.innerHTML=`<strong>A colleague changed this event.</strong><p>Your proposal has not been saved or discarded. Review the differences before resubmitting.</p>
+    box.innerHTML=`<strong>${esc(err.code==='STALE_DISPATCH'?err.message:'A colleague changed this event.')}</strong><p>Your proposal has not been saved or discarded. Review the differences before resubmitting.</p>
       <div class="conflict-table-wrap"><table class="data-table"><thead><tr><th>Field</th><th>${options.baselineAvailable===false?'Before queued change':'When opened'}</th><th>Latest saved</th><th>Your proposal</th></tr></thead><tbody>
       ${fields.map(k=>`<tr><td>${esc(k)}</td><td class="wrap">${options.baselineAvailable===false?'Not retained':esc(baseline[k])}</td><td class="wrap">${esc(latest[k])}</td><td class="wrap">${esc(proposal[k]??baseline[k])}</td></tr>`).join('')}</tbody></table></div>
       <p>Keeping your proposal may replace the newer values shown above. Nothing is submitted by the review button.</p>
