@@ -52,3 +52,6 @@ These files are a coordination protocol, not an automatic lock service or backgr
 
 ## Owner standing rule (5 Nov 2026): owner states intent, Claude specifies
 "i say what i want, and you spec what a proper production-class webapp should have". Claude turns each owner request into a full production-class specification (security, privacy, reliability targets, monitoring, backup/restore, testing, accessibility) and decides technical details itself. Claude asks the owner only for genuine owner choices: school policy, people and roles, money, timing of deploys, and anything irreversible.
+
+## Reviewer handover (owner 6 Nov 2026)
+When Claude is unavailable, Muse reviews Codex's PRs and Codex reviews Muse's PRs; the owner merges. Follow `docs/coordination/HANDOVER_REVIEWER.md` (checklist, merge and release procedures, current state).
