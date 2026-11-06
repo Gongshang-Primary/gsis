@@ -661,21 +661,27 @@ export async function receivedReportWorkDue(env,{now=Date.now()}={}){
  const context=await absenceTransportContext_(env),row=await db.prepare("SELECT EXISTS (SELECT 1 FROM gsis_absence_transport WHERE namespace=? AND ((state='queued' AND available_at<=?) OR (state='claimed' AND lease_until<=?)"+(edgeRosterEnabled(env)?" OR (state='needsReview' AND last_code='BACKEND_REJECTED_409' AND operation='saveAbsence' AND available_at<=?)":"")+")) has_work").bind(context.namespace,now,now,...(edgeRosterEnabled(env)?[now]:[])).first();
  return row?.has_work===1;
 }
+async function recoverDuplicateIntake(env){
+ try{const result=await serviceBackend(env,{operation:'resolveDuplicateIntake'});if(result?.ok)return {available:true,...result.data};throw result;}
+ catch(error){const code=error?.code==='ABSENCE_TRANSPORT_STORAGE'?'ABSENCE_TRANSPORT_STORAGE':'ROSTER_INTAKE_RECOVERY';console.error(JSON.stringify({event:'roster-intake-duplicate-recovery-deferred',code}));return {available:false,code};}
+}
 export async function dispatchReceivedReports(env,{limit=8,budgetMs=150000}={}){
  if(edgeRosterEnabled(env)){
-  const recovery=await serviceBackend(env,{operation:'resolveDuplicateIntake'});if(!recovery?.ok)throw Object.assign(Error('Duplicate report recovery could not be confirmed.'),{status:recovery?.status||503,code:recovery?.code||'ROSTER_INTAKE_RECOVERY'});
   const context=await absenceTransportContext_(env);
   if(context){const db=typeof context.db.withSession==='function'?context.db.withSession('first-primary'):context.db,now=Date.now(),row=await db.prepare("SELECT EXISTS (SELECT 1 FROM gsis_absence_transport WHERE namespace=? AND ((state='queued' AND available_at<=?) OR (state='claimed' AND lease_until<=?))) AS has_work").bind(context.namespace,now,now).first();
    // D1 applies captured attendance directly; nextAbsenceIntake has no second
    // queue in this authority. A newly arriving report is picked up next wake.
-   if(row?.has_work===0)return {transport:{enabled:true,claimed:0,forwarded:0,pending:0,needsReview:0},intake:{claimed:0,applied:0,deferred:0,needsReview:0,notificationsQueued:0,...(!configuredSecret(gsisApiSecret(env,'ROSTER_SERVICE_SECRET'))?{configured:false}:{})},hasMore:false};
+   if(row?.has_work===0)return {transport:{enabled:true,claimed:0,forwarded:0,pending:0,needsReview:0},intake:{claimed:0,applied:0,deferred:0,needsReview:0,notificationsQueued:0,...(!configuredSecret(gsisApiSecret(env,'ROSTER_SERVICE_SECRET'))?{configured:false}:{})},duplicateRecovery:await recoverDuplicateIntake(env),hasMore:false};
   }
  }
  const started=Date.now(),transport=await forwardAbsenceTransport(env,{limit,budgetMs:Math.min(budgetMs,60000)});
  const remaining=budgetMs-(Date.now()-started),intake=remaining>1000?await dispatchAbsenceIntake(env,{limit,budgetMs:remaining}):{deferred:1};
  // A bounded batch reaching its limit may have more work. Keep a Queue wake
  // alive even when every attempted item succeeded; cron remains a backstop.
- return {transport,intake,hasMore:transport.claimed>=limit||intake.claimed>=limit||intake.hasMore===true};
+ // Fresh captures have priority. A parked report's recovery failure must not
+ // block new attendance; return its unavailable state for diagnostics/retry.
+ const duplicateRecovery=edgeRosterEnabled(env)?(budgetMs-(Date.now()-started)>1000?await recoverDuplicateIntake(env):{available:false,code:'RECOVERY_BUDGET_DEFERRED'}):undefined;
+ return {transport,intake,...(duplicateRecovery?{duplicateRecovery}:{}),hasMore:transport.claimed>=limit||intake.claimed>=limit||intake.hasMore===true};
 }
 export async function assertAbsenceTransportReady(env,dates,includePeers=false,who){
  if(backendAvailable(env)){await callOperationalBackend(env,'roster-transport',{operation:'ready',dates,includePeers,identity:who});return;}

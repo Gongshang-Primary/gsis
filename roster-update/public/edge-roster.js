@@ -558,7 +558,7 @@ async function resolveEdgeIntake(env,p,who){
  const loaded=await loadEdgeRoster(env,{hydrate:false}),auth=await buildEdgeRosterContext(env,loaded.state,{operation:'currentDuty'},who);if(!auth.user.smc&&!auth.user.admin)fail(403,'ROSTER_SMC_REQUIRED','SMC or Admin access is required.');
  const original=await readAbsenceTransportRecord(env,who,{requestId:p.intakeRequestId,all:true});if(!original)fail(404,'ROSTER_INTAKE_MISSING','This received report is unavailable.');const command=JSON.parse(original.command);if(command.operation!=='saveAbsence')fail(400,'ROSTER_INTAKE_KIND','Only absence reports support this resolution.');
  const reason=typeof p.reason==='string'?p.reason.trim():'';if(!reason||reason.length>1000)fail(400,'ROSTER_INTAKE_REASON','Enter a reason of no more than 1000 characters.');
- const result=await mutateEdgeRoster(env,{actor:who.email,who,requestId:p.requestId,command:p,contextInput:()=>p.resolution==='merge'?{...command,_edgeAttendance:false}:{operation:'currentDuty'},beforeCommit:p.resolution==='merge'?()=>beginEdgeVenuesChange(env,{source:'roster',requestId:p.requestId}):null,async apply(state,ctx){
+ const result=await mutateEdgeRoster(env,{actor:who.email,who,requestId:p.requestId,command:p,contextInput:()=>p.resolution==='merge'?{...command,_edgeAttendance:false}:{operation:'currentDuty'},async apply(state,ctx){
   if(!ctx.user.smc&&!ctx.user.admin)fail(403,'ROSTER_SMC_REQUIRED','SMC or Admin access is required.');const row=await readAbsenceTransportRecord(env,who,{requestId:p.intakeRequestId,all:true});
   if(!row||row.state!=='needsReview'||edgeIntakeToken(state,row)!==p.overlapToken)fail(409,'ROSTER_INTAKE_REVIEW_CHANGED','The report or saved absences changed. Open Review report again before deciding.');
   ctx.absenceTransportResolution={namespace:row.namespace,actor:row.actor,requestId:row.request_id,digest:row.digest,attempts:row.attempts,nextState:p.resolution==='merge'?'forwarded':'withdrawn',reason};
@@ -571,7 +571,8 @@ async function resolveEdgeIntake(env,p,who){
   GSISRosterOperations.essentialDecisionAudit(state,ctx,'absence-intake-merge',{intakeRequestId:row.request_id,savedIds:changed.savedIds,reason});
   const {actor,command:retained,...receipt}=edgeIntakeEntries(state).find(entry=>entry.requestId===row.request_id);return {...receipt,resolution,affectedDomains:['operations']};
  }});
- if(p.resolution==='merge')await completeRosterFence(env,p.requestId);return {...result,resolutionRequestId:p.requestId,requestId:p.intakeRequestId};
+ // Attendance-only decisions do not change the published occupancy source.
+ return {...result,resolutionRequestId:p.requestId,requestId:p.intakeRequestId};
 }
 
 function edgeIntakeEntries(state){

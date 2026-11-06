@@ -8,6 +8,7 @@ import {edgeRosterBackend,edgeRosterService,loadEdgeRoster,mutateEdgeRoster,edge
 import {sha256Hex} from '../roster-update/public/edge-deploy-sha256.js';
 
 import * as transport from '../shared/roster-absence-transport.js';
+import {dispatchReceivedReports} from '../roster-update/public/_worker.js';
 function database(){const sql=new DatabaseSync(':memory:');sql.exec('PRAGMA foreign_keys=ON');let hook=null;const prepare=text=>({text,args:[],bind(...args){return {...this,args};},async first(){return sql.prepare(this.text).get(...this.args)||null;},async all(){return {success:true,results:sql.prepare(this.text).all(...this.args),meta:{changes:0}};},async run(){const result=sql.prepare(this.text).run(...this.args);return {success:true,results:[],meta:{changes:Number(result.changes)}};}});const db={sql,prepare,withSession(){return this;},async batch(statements){if(hook&&statements[0].text.startsWith('UPDATE gsis_edge_heads SET revision=revision+1,mode=')){const fn=hook;hook=null;await fn();}sql.exec('BEGIN');try{const values=statements.map(s=>{const q=sql.prepare(s.text);if(/^\s*(SELECT|WITH)/.test(s.text))return {success:true,results:q.all(...s.args),meta:{changes:0}};const result=q.run(...s.args);return {success:true,results:[],meta:{changes:Number(result.changes)}};});sql.exec('COMMIT');return values;}catch(error){sql.exec('ROLLBACK');throw error;}},onCommit(fn){hook=fn;}};return db;}
 async function activate(db,scope,state){const store=GSiSEdgeStore.open(db,scope),head=await store.importState({state,actor:'setup',requestId:crypto.randomUUID()});await store.transition({from:'imported',to:'active',expectedRevision:head.revision,actor:'setup',proof:{legacyWritesDisabled:true,sourceDigest:head.sourceDigest,verifiedRecords:head.importedRecords}});return store;}
 
@@ -27,6 +28,7 @@ const delivery=await transport.dispatchAbsenceTransport(env,{limit:1,capture:asy
 assert.equal(delivery.forwarded,1,JSON.stringify(delivery));const receipt=await send({operation:'receiptStatus',command:duplicate});assert.equal(receipt.alreadyRecorded,true);assert.equal(receipt.intakeState,'applied');assert.equal((await loadEdgeRoster(env)).state.absences.length,1);assert((await loadEdgeRoster(env)).state.audit.some(row=>row.operation==='absence-already-recorded'));
 async function park(extra={}){const c=transport.normalizeAbsenceTransportCommand(env,command(extra));await transport.captureAbsenceTransport(env,who,c);db.sql.prepare("UPDATE gsis_absence_transport SET state='needsReview',last_code='BACKEND_REJECTED_409',attempts=1 WHERE request_id=?").run(c.requestId);return c;}
 await mutateEdgeRoster(env,{actor:smc.email,who:smc,requestId:crypto.randomUUID(),command:{operation:'currentDuty'},apply(state){state.assignments.push({id:'protected-relief',date:day,demandId:absence.id+':5',absenceId:absence.id,absentId:'alice',staffId:'bob',period:5,version:1,origin:'manual',status:'published',protected:true,timetableId:'baseline'});return {};}});const protectedBefore=structuredClone((await loadEdgeRoster(env)).state.assignments);
+env.VENUES_APPS_SCRIPT_URL='https://script.google.com/macros/s/venues/exec';env.VENUES_BRIDGE_SECRET='v'.repeat(32);
 const partial=await park({periods:[6,7],reasonDetail:'Math check'}),review=await send({operation:'read',view:'intakeReview',intakeRequestId:partial.requestId},smc);
 assert.deepEqual(review.resolutionOptions,['merge','keep','edit']);assert(review.message.includes('P5, P6'));assert(review.message.includes('Work review'));assert.equal(review.teachers[0].dates[0].savedEntries[0].reasonDetail,'Work review');
 const own=await send({operation:'read',view:'intake',scope:'mine'});assert(own.entries.find(row=>row.requestId===partial.requestId).message.includes('Work review'));assert(!JSON.stringify(await send({operation:'read',view:'intake',scope:'mine'},{email:people[2].email,subject:'charlie'})).includes(partial.requestId));
@@ -57,3 +59,13 @@ const google=createRequire(import.meta.url)('./roster093b-absence-intake.cjs')()
 const googleView=google.scope.rosterAbsenceIntakeReview_(google.req({intakeRequestId:googleCommand.requestId}),contacts),edgeView=await send({operation:'read',view:'intakeReview',intakeRequestId:oldPartial.requestId},smc);
 for(const key of ['requested','teachers','overlaps','message'])assert.deepEqual(JSON.parse(JSON.stringify(googleView[key])),edgeView[key],key+' parity');
 console.log('PASS retained duplicate auto-resolution, partial-overlap backoff, lost-response recovery and Google/D1 review parity');
+
+// A failed old-duplicate scan must not block fresh captures or claim recovery succeeded.
+const freshActor={email:people[2].email,subject:'charlie'},freshCommand=command({staffId:'charlie',periods:[10]});
+await transport.captureAbsenceTransport(env,freshActor,freshCommand);
+const prepareBefore=db.prepare;let recoveryAttempted=false;
+db.prepare=text=>{if(text.includes("last_code='BACKEND_REJECTED_409'")&&text.includes('LIMIT 4')){recoveryAttempted=true;assert.equal(db.sql.prepare('SELECT state FROM gsis_absence_transport WHERE request_id=?').get(freshCommand.requestId).state,'forwarded','fresh report must be processed before background recovery');throw Object.assign(Error('Recovery storage unavailable'),{status:503,code:'ABSENCE_TRANSPORT_STORAGE'});}return prepareBefore(text);};
+const drained=await dispatchReceivedReports(env,{limit:8,budgetMs:30000});
+assert(recoveryAttempted);assert.equal(drained.duplicateRecovery.available,false);assert.equal(drained.duplicateRecovery.code,'ABSENCE_TRANSPORT_STORAGE');assert.equal(db.sql.prepare('SELECT state FROM gsis_absence_transport WHERE request_id=?').get(freshCommand.requestId).state,'forwarded');
+const idleRecovery=await dispatchReceivedReports(env,{limit:8,budgetMs:30000});assert.equal(idleRecovery.transport.claimed,0);assert.equal(idleRecovery.duplicateRecovery.available,false);db.prepare=prepareBefore;
+console.log('PASS fresh and idle dispatch survive background duplicate-recovery outage');
