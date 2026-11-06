@@ -1,6 +1,6 @@
 # calendar-stale-dispatch: a DISPATCHED save that never landed blocks its event forever
 
-- Status: changelog (found 6 Nov with the owner); lane K (Calendar); builder when authorised. Small.
+- Status: authorised for **Codex** (owner 6 Nov: "codex"); lane K (Calendar). Small.
 - Reviewer/model: Claude
 
 ## Evidence
