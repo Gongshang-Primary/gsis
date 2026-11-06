@@ -58,12 +58,12 @@ function rosterDriveOutputBytes_(id){return rosterDriveOutputFetch_('https://www
 function rosterDriveOutputPrivacy_(value){
  if(typeof value==='string'){if(/https?:\/\/[^\s<>"']*(?:#[^\s<>"']+|[?&](?:amp;)?(?:token|cap|key|auth|signature)=|\/(?:external|private)(?:[./?]|$))/i.test(value)||/\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b/.test(value))rosterDriveOutputFail_('A private link cannot be written to Drive.');return;}
  if(!value||typeof value!=='object')return;
- if(value.encoding==='gzip-audit-v1'){rosterDriveOutputPrivacy_(JSON.parse(Utilities.ungzip(Utilities.newBlob(Utilities.base64Decode(value.data))).getDataAsString()));return;}
+ if(value.encoding==='gzip-audit-v1'){rosterDriveOutputPrivacy_(JSON.parse(Utilities.ungzip(Utilities.newBlob(Utilities.base64Decode(value.data), 'application/x-gzip')).getDataAsString()));return;}
  for(const [key,child] of Object.entries(value)){if(/(?:token|capabilit|secret|password|authorization|private.?link|private.?url|signature|nonce)/i.test(key))rosterDriveOutputFail_('Credentials and private capabilities cannot be written to Drive.');if(['value_json','json'].includes(key)&&typeof child==='string')rosterDriveOutputPrivacy_(JSON.parse(child));else rosterDriveOutputPrivacy_(child);}
 }
 function rosterDriveOutputCounts_(payload){const counts={};for(const row of payload.rows||[]){const key=row.scope+'.'+row.collection,value=JSON.parse(row.value_json);if(counts[key]===undefined)counts[key]=0;if(row.record_id==='$'&&['array','map'].includes(value?.kind))continue;counts[key]++;}return counts;}
 function rosterDriveOutputWorkbookPrivacy_(bytes){
- const parts=Utilities.unzip(Utilities.newBlob(bytes));if(!parts.length||parts.length>200)rosterDriveOutputFail_('Invalid daily workbook.');
+ const parts=Utilities.unzip(Utilities.newBlob(bytes, 'application/zip'));if(!parts.length||parts.length>200)rosterDriveOutputFail_('Invalid daily workbook.');
  for(const part of parts){
   if(!/^xl\/(?:worksheets\/[^/]+|sharedStrings)\.xml$/.test(part.getName()))continue;
   // XML attributes include schema URLs, not cell text. Element values decode
@@ -73,7 +73,7 @@ function rosterDriveOutputWorkbookPrivacy_(bytes){
  }
 }
 function rosterDriveOutputVerify_(bytes,p){
- const raw=p.step==='writeBackup'?Utilities.ungzip(Utilities.newBlob(bytes)).getDataAsString():Utilities.newBlob(bytes).getDataAsString();
+ const raw=p.step==='writeBackup'?Utilities.ungzip(Utilities.newBlob(bytes, 'application/x-gzip')).getDataAsString():Utilities.newBlob(bytes).getDataAsString();
  if(Utilities.newBlob(raw).getBytes().length>33554432||rosterDriveOutputDigest_(raw)!==p.digest)rosterDriveOutputFail_('Backup digest verification failed.');
  const value=JSON.parse(raw);if(value.schema!=='gsis-roster-drive-backup-v1')rosterDriveOutputFail_('Unknown backup schema.');rosterDriveOutputPrivacy_(value);
  if(p.step==='writeBackup'){
@@ -121,7 +121,7 @@ function rosterDriveOutputDaily_(p){
  const parent=configured||rosterDriveOutputFolder_(root,folderName),meta=rosterDriveOutputMeta_(parent);
  if(meta.trashed||meta.mimeType!=='application/vnd.google-apps.folder'||meta.name!==folderName||meta.parents?.length!==1||meta.parents[0]!==root)rosterDriveOutputFail_('Use the '+folderName+' folder directly under 01 Live Data/Roster.');
  if(typeof p.data!=='string'||p.data.length>11184816)rosterDriveOutputFail_('The daily output exceeds its transfer limit.',413);
- const bytes=Utilities.ungzip(Utilities.newBlob(Utilities.base64Decode(p.data))).getBytes();
+ const bytes=Utilities.ungzip(Utilities.newBlob(Utilities.base64Decode(p.data), 'application/x-gzip')).getBytes();
  if(bytes.length!==p.bytesRaw||bytes.length>16777216||rosterDriveOutputDigest_(bytes)!==p.digest)rosterDriveOutputFail_('Daily output digest verification failed.');
  if(p.kind==='log')rosterDriveOutputPrivacy_(Utilities.newBlob(bytes).getDataAsString());else rosterDriveOutputWorkbookPrivacy_(bytes);
  // The existing output-only UserLock serialises provider retries. No planner
