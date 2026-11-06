@@ -1,0 +1,74 @@
+{
+  "capturedOn": "2026-11-06",
+  "source": "Meta WhatsApp Business template detail reads",
+  "account": "Gongshang Primary",
+  "purpose": "Provider evidence only; runtime integration and activation remain pending.",
+  "templates": {
+    "contact_review": {
+      "name": "gsis_contact_review_v2",
+      "id": "1512880204232296",
+      "language": "en_GB",
+      "category": "UTILITY",
+      "fields": [
+        "recipient_name",
+        "request_date",
+        "contact_review_details"
+      ],
+      "body": "*Contact Details for Ad Hoc External Relief*\n\nHi {{1}}.\n\nOn https://roster.gsps.edu.sg, contact details for an ad hoc external relief teacher were added or updated on {{2}}.\n\nPlease review these details as a Contacts Admin:\n\n{{3}}\n\nReview and confirm the details in Contacts using the button below.\n\nThank you.",
+      "submissionState": "APPROVED",
+      "urlButtons": [
+        {
+          "text": "Open Contacts",
+          "url": "https://contacts.gsps.edu.sg/"
+        }
+      ],
+      "verifiedAt": "2026-11-06",
+      "bodySha256": "42fcb51651d81880491f812b50ffc70053a7a90a9a4847c6eba40793799dbe27"
+    },
+    "relief_unacknowledged": {
+      "name": "gsis_relief_unacknowledged_v2",
+      "id": "2320845038701493",
+      "language": "en_GB",
+      "category": "UTILITY",
+      "fields": [
+        "duty_smc_name",
+        "assigned_teacher_name",
+        "duty_date",
+        "lesson_period_start_venue"
+      ],
+      "body": "*Relief Duty Not Acknowledged*\n\nHi {{1}}, {{2}} has not acknowledged the relief duty on {{3}}.\n\n{{4}}\n\nThe lesson starts in 10 minutes. Please contact the teacher and confirm cover.\n\nView the current status using the button below.\n\nThank you.",
+      "submissionState": "APPROVED",
+      "urlButtons": [
+        {
+          "text": "Open Roster",
+          "url": "https://roster.gsps.edu.sg/"
+        }
+      ],
+      "verifiedAt": "2026-11-06",
+      "bodySha256": "0ed20d84bafefce9da32e42557a67b12e6bd3326980c9b165b926b5aa4f494e9"
+    },
+    "relief_urgent_smc": {
+      "name": "gsis_relief_urgent_smc_v2",
+      "id": "1746432063105141",
+      "language": "en_GB",
+      "category": "UTILITY",
+      "fields": [
+        "duty_smc_name",
+        "assigned_teacher_name",
+        "duty_date",
+        "minutes_remaining",
+        "lesson_period_start_venue"
+      ],
+      "body": "*Urgent Relief Cover*\n\nHi {{1}}, {{2}} has been assigned relief on {{3}}. The lesson starts in {{4}} minutes.\n\n{{5}}\n\nThe duty has not yet been acknowledged. Please check that cover is confirmed.\n\nView the current status using the button below.\n\nThank you.",
+      "submissionState": "APPROVED",
+      "urlButtons": [
+        {
+          "text": "Open Roster",
+          "url": "https://roster.gsps.edu.sg/"
+        }
+      ],
+      "verifiedAt": "2026-11-06",
+      "bodySha256": "d1ae58551d6eb91f8787104c87a3c69fa3699e773f31f6cb52e9f3ffd0dbe680"
+    }
+  }
+}
