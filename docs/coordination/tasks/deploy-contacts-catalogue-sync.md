@@ -18,3 +18,7 @@
 4. Re-publishing the same in-force version must re-apply catalogues to Contacts (idempotent, no duplicate rows).
 5. Tests: Contacts busy → publish reports partial + retry succeeds; viewport refreshes on new revision; re-publish idempotent; no change to Roster/D1 code.
 6. Scope: Deploy and Contacts backends/frontends only. No Roster (lane R) files; if a fix needs them, stop and ask Claude.
+
+## Codex continuation claim (6 November 2026)
+
+Owner/model: Codex. Reviewer: Claude. Branch: codex/deploy-contacts-catalogue-sync. Base: a7b74aafb6a3ad5c3960f2a1903dcae8b21c324b. Owner reassigned #83 and authorised serial backlog clearance without pausing after each PR. Replace the stale PR with bounded Deploy/Contacts changes from current main. Canonical scope: backend/Code.gs dispatch, Planning.gs, FieldStore.gs publication identity, Contacts_Code.gs, Contacts and Deploy frontend, focused tests and canonical generated copies only. No Roster behavior change or D1 authority work. Preserve current publication, Layout handoff, drafts and pending request identities. Acceptance: busy partial publish, same-publication idempotent retry, superseded retry fence, cache response race and draft/session preservation; canonical build and full exact-head CI. No live writes, deployment, messages or merge. Claim also recorded via backlog PR #88 because direct main claim updates were not approved by automatic review.
