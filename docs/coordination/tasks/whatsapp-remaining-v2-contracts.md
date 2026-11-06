@@ -1,6 +1,6 @@
 # WhatsApp remaining v2 contracts
 
-- Status: claimed; evidence capture first, runtime integration pending
+- Status: evidence captured and validated; runtime integration blocked by local checkout access
 - Owner/model: Codex
 - Reviewer/model: Muse (Claude when available)
 - Last updated (Asia/Singapore): 6 November 2026
@@ -24,3 +24,9 @@ None. All activation settings remain unchanged.
 ## Handoff
 
 Capture provider-derived contracts without sample recipient data. Then restore authenticated checkout, promote the three pendingVariants to validated variants, cover static buttons and unchanged fallback, regenerate, run full suite, and submit the exact head to Muse. Owner decides activation and merge.
+
+## 6 November evidence capture
+
+Added docs/reference/whatsapp-remaining-v2-contracts.json with exact approved bodies, static button labels/URLs, IDs, languages and inferred positional field mappings from the existing v1 contracts (only the final URL field is removed). Omitted provider example recipient data. Python hashlib calculated UTF-8 body hashes; JSON parsing, exact sequential placeholder counts (3/4/5), approved status and static URL checks passed. No product tests or build ran.
+
+The expected-head claim update on main was rejected by automatic approval review as bypassing the owner merge workflow. The claim and evidence therefore remain on a draft review branch. No main update was made.
