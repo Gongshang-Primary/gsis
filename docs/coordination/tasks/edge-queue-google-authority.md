@@ -1,7 +1,7 @@
 # edge-queue-google-authority: D1 as intermediary (read cache + queued writes), Google stays the record — Venues, Deploy, Contacts
 
 - Status: changelog/authorised design (owner 6 Nov: "for venues view-port, aim for d1 intermediary for queued requests and let Google be main/fallback i/o. wish for similar system for deploy-viewport and contacts-viewport"). Spec by Claude under the standing rule.
-- Reviewer/model: Claude. Builders: shared module + Deploy + Contacts → Codex; Venues adoption → Muse (owner gave Venues to Muse).
+- Reviewer/model: Claude. Builder: **Muse for all phases** (owner 6 Nov: "let muse handle the D1 intermediary over Google stored data"). Codex keeps the small live fix tasks/deploy-contacts-catalogue-sync.md; Muse's Deploy phase builds on it once merged.
 - Prior art to reuse, not duplicate: LORD queued writes phase 1 (tasks/lord-queued-writes.md: signed gateway, SQL conditional admission, single dispatch claim, receipts, uncertainty recovery, retention, switch-back) and Calendar's signed short-lived gateway.
 
 ## Principle
@@ -18,10 +18,16 @@ Google (Apps Script + Sheets/Drive) remains the **system of record** for Venues,
 8. **Switch-back**: pause admission, drain or export pending, verify every applied revision against Google, then set `direct`.
 
 ## Phasing
-- P1 (Codex): shared module + **Deploy** (saves and publish; fixes Deploy's 60 s save timeouts and the publish→Contacts partial failure together with tasks/deploy-contacts-catalogue-sync.md).
+- P1 (Muse): shared module + **Deploy** (saves and publish; fixes Deploy's 60 s save timeouts and the publish→Contacts partial failure together with tasks/deploy-contacts-catalogue-sync.md).
 - P2 (Muse): **Venues** on the module (bookings/occupancy writes queued; reads from D1 cache; Roster occupancy already comes from D1 via VENUES_ROSTER_WORKER_URL).
-- P3 (Codex): **Contacts** (Edit Info, admin tables, Deploy catalogue application as a queued command).
+- P3 (Muse): **Contacts** (Edit Info, admin tables, Deploy catalogue application as a queued command).
 - Each phase: shadow period with `direct` default, then owner switches to `queued`.
 
 ## Tests (each app)
 Admission idempotency and caps; ordered dispatch; conflict on changed revision; lost response → uncertain → verified, no double apply; fallback to direct with the same request ID is deduplicated; cache staleness → direct read; switch-back drain; UI receipt states; Admin-only alerts.
+
+## Guardrails for this assignment (Claude)
+- One PR at a time; each phase is its own PR series; never start the next phase before the previous is merged.
+- Every PR: rebased on current main at review time, canonical build at the final head with regenerated bundles committed (gate: no diff), full CI green, exact head SHA. (Lessons from #74 and #83.)
+- Files outside Deploy/Venues/Contacts/shared queue module (Roster lane R, LORD, Calendar) need Claude's OK before editing.
+- Order for Muse: (1) Venues D1 route verification (tasks/venues-muse-ownership.md), (2) Stapler teacher search PR, (3) this module: design note PR first (data model, admission, dispatch, receipts, fallback, switch-back; reuse LORD phase 1 code where it fits), then P1 Deploy.

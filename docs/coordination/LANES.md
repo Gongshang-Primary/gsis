@@ -46,7 +46,7 @@ Kept for the record. Gemini/Jules no longer receives jobs; its branches no longe
 - After the pilot the coordinator reports quality (correctness, rule-following, test discipline) and the owner decides whether lanes K, L and Y open to Gemini.
 
 ## Current assignments (update on every change)
-Edge queue with Google authority (owner 6 Nov): `tasks/edge-queue-google-authority.md`: shared module + Deploy (Codex, P1), Venues (Muse, P2, after P1 merges), Contacts (Codex, P3).
+Edge queue with Google authority (owner 6 Nov): `tasks/edge-queue-google-authority.md`: **Muse, all phases** (module + Deploy, then Venues, then Contacts); Codex keeps deploy-contacts-catalogue-sync.
 Codex, lane R (owner 6 Nov): `tasks/roster-allocation-rules-rework.md`: owner reworks allocation rules in natural language directly with Codex; rules book first, shadow mode before switching.
 Codex, urgent lane R (owner 3 Nov 08:37): `tasks/roster-peer-quota-override.md`: colleague approval may exceed weekly R.
 
