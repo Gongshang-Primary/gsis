@@ -146,16 +146,9 @@ function rosterAbsenceIntakeReview_(req,c){
  const id=req.input?.intakeRequestId;if(typeof id!=='string'||!/^[-\w]{36}$/.test(id))error_(400,'Identify the received report to review.');
  const row=rosterAbsenceIntakeState_().entries.find(row=>row.id===id);if(!row?.command||row.command.operation!=='saveAbsence')error_(404,'The original absence report is unavailable for review.');
  if(!user.smc&&!user.admin&&!(row.actor===req.identity.email&&row.failureCode==='ABSENCE_SHORTER_CONFIRMATION'))error_(403,'Only the reporter or SMC can review this shorter report.');
- const state=rosterOperationsState_(true),people=rosterOperationsPeople_(c),command=row.command,dates=row.dates.slice().sort(),wanted=new Set(dates),byDate=new Map();
- for(const record of state.absences)if(!record.deletedAt&&wanted.has(record.date)){if(!byDate.has(record.date))byDate.set(record.date,[]);byDate.get(record.date).push(record);}
- const mobile=id=>GSISRosterOperations.mobile(people.find(person=>person.id===id)?.mobile),same=(a,b)=>a===b||!!mobile(a)&&mobile(a)===mobile(b),type=state.types.find(type=>type.id===command.typeId);
- const teachers=row.staffIds.map(staffId=>{
-  const rows=dates.map(date=>({date,savedEntries:(byDate.get(date)||[]).filter(record=>same(record.staffId,staffId)).map(record=>({id:record.id,staffId:record.staffId,coverage:rosterAbsenceIntakeCoverage_(record.coverage),periods:(record.periods||[]).slice(),periodTimes:(record.periodSnapshot||[]).filter(period=>(record.periods||[]).includes(period.period)).map(({period,startMinutes,endMinutes})=>({period,startMinutes,endMinutes})),typeId:record.typeId,typeLabel:record.typeLabel||record.typeId,reliefRequired:record.reliefRequired===true}))}));
-  return {staffId,name:people.find(person=>person.id===staffId)?.name||staffId,dates:rows,missingDates:rows.filter(day=>!day.savedEntries.length).map(day=>day.date)};
- });
- // The presence of an entry does not prove matching coverage, type or relief.
- // This snapshot never applies, retries, withdraws or clears a pending gate.
- return {...rosterAbsenceIntakeReceiptValue_(row),readOnly:true,checkedAt:new Date().toISOString(),registerRevision:state.revision,overlapToken:rosterAbsenceOverlapKey_(state,command),requested:{coverage:rosterAbsenceIntakeCoverage_(command.fullDay===true?{kind:'fullDay'}:command.coverage),periods:(command.periods||[]).slice(),typeId:command.typeId,typeLabel:type?.label||command.typeId,reliefRequired:command.reliefRequired!==false},teachers};
+ const state=rosterOperationsState_(true),command=row.command,projection=GSISRosterOperations.intakeReviewProjection(state,rosterOperationsPeople_(c),command,row.staffIds,row.dates);
+ // Shared projection is read-only and does not clear any pending report.
+ return {...rosterAbsenceIntakeReceiptValue_(row),readOnly:true,checkedAt:new Date().toISOString(),registerRevision:state.revision,overlapToken:rosterAbsenceOverlapKey_(state,command),...projection};
 }
 // Token binds a coverage decision to all absence facts on its requested dates.
 // A concurrent save forces a new preview; no blind overwrite or second lock.

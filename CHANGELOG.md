@@ -1,5 +1,9 @@
 # Pending: reliable Deploy to Contacts publication sync, 6 November 2026
 
+## Unreleased: D1 received absence review
+
+D1 received reports show saved overlapping periods and reasons. Exact duplicate attendance is marked Already recorded with an audit note, including bounded recovery of retained duplicate refusals. SMC can merge, keep existing, or edit then retry. Decisions require a current review and commit report status with attendance atomically; protected relief and original evidence remain. The reporter card shows parked review and applied states accurately. Google and D1 share the read-only comparison projection. No new setting, authority switch or live repair; local verification complete, full CI and exact-head review remain release gates. Revert this change to roll back; no schema migration.
+
 Model: Codex. Report Contacts sync separately after a saved Deploy publication. Retry the same frozen publication and global catalogue revision with Admin/identity checks; reject superseded retries. Contacts invalidates cached validation choices by digest and rejects stale in-flight reads while retaining drafts and pending saves. Deploy keeps Layout handoff status visible alongside Contacts. Canonical bundles rebuilt; focused dispatch, writer and DOM tests passed. No deployment or live action. See [task](docs/coordination/tasks/deploy-contacts-catalogue-sync.md).
 
 # Pending: retain the confirmed Stapler day while editing, 6 November 2026
