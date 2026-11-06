@@ -1,0 +1,23 @@
+{
+  "name": "gsis_system_alert_v1",
+  "language": "en_GB",
+  "category": "UTILITY",
+  "submissionState": "PENDING",
+  "components": [
+    {
+      "type": "BODY",
+      "text": "*GSiS System Alert*\n\nHi {{1}}, this system alert is for GSiS Admins.\n\nDate: {{2}}\n\nIssue: {{3}}\n\nOpen System Health to review: {{4}}.\n\nThank you.",
+      "example": {
+        "body_text": [
+          [
+            "Admin",
+            "6 Nov 2026",
+            "GSiS system alert for Admin: Daily Drive outputs failing: 3 dates.",
+            "https://roster.gsps.edu.sg/"
+          ]
+        ]
+      }
+    }
+  ],
+  "id": "1846305353057485"
+}

@@ -38,7 +38,7 @@ for(const module of [gateway,bundle]){
  const success=await module.diagnoseNotificationConnections(env,scheduledTime);
  assert.equal(calls.length,4);assert.equal(success.connectionsReady,true);assert.equal(success.sendingTested,false);
  assert.match(success.diagnosticBuild,diagnosticBuildPattern);assert.equal(success.graphApiVersion,'v23.0');checkPrivacy(success);
- assert.equal(success.checks.find(c=>c.name==='metaTemplates').approved,21);
+ assert.equal(success.checks.find(c=>c.name==='metaTemplates').approved,22);
  const calendarSuccess=success.checks.find(c=>c.name==='calendar');
  assert.equal(calendarSuccess.phase,'complete');assert.equal(calendarSuccess.httpStatus,200);assert.equal(calendarSuccess.responseFormat,'json');assert(calendarSuccess.elapsedMs>=0);
 
@@ -90,10 +90,10 @@ for(const module of [gateway,bundle]){
 // Both browser and dashboard modules must preserve disabled defaults and the compact contracts.
 for(const name of ['templates.activation.json','templates.disabled.example.json']){
  const raw=fs.readFileSync('notification-worker/'+name,'utf8'),templates=JSON.parse(raw);
- assert(Buffer.byteLength(raw)<5120);assert.equal(Object.keys(templates).length,21);
+ assert(Buffer.byteLength(raw)<5120);assert.equal(Object.keys(templates).length,name==='templates.activation.json'?22:21);
  for(const [key,value] of Object.entries(templates)){
   const base=gateway.WHATSAPP_CONTRACTS[key],c=[base,...Object.values(base.variants||{})].find(contract=>contract.name===value.name);assert(c,'Configured template must match a known exact contract: '+key);assert.equal(value.name,c.name);assert.equal(value.language,c.language);assert.equal(value.bodySha256,c.bodySha256);assert.equal(value.summaryMaxCharacters,1024);
-  assert.equal(value.enabled,name==='templates.activation.json');
+  assert.equal(value.enabled,name==='templates.activation.json'&&key!=='system_alert','Pending system alert stays disabled until approved and activated');
  }
  for(const module of [gateway,bundle])assert.equal(module.notificationStatus({...env,WHATSAPP_TEMPLATES_JSON:raw}).configured,true);
 }
@@ -134,3 +134,4 @@ try{
  assert.equal(calls.length,4);assert.equal(logs.length,1);checkPrivacy(logs);
 }finally{console.info=savedInfo;}
 console.log('PASS v0.7.11 worker diagnostics: safe configuration/Meta/Calendar failure classes, manual redirects, no-send scheduler and compact 21-route values.');
+

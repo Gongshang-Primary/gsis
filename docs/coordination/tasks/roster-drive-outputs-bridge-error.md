@@ -1,6 +1,6 @@
 # roster-drive-outputs-bridge-error: Drive writes fail with ROSTER_BRIDGE_ERROR on v0.9.9n (live, 6 Nov)
 
-- Status: claimed (owner on v0.9.9n, 6 Nov ~06:00, outputs disabled to stop alerts); Codex; lane R; priority 1 (blocks backups and daily outputs)
+- Status: review preparation (owner on v0.9.9n, 6 Nov ~06:00, outputs disabled to stop alerts); Codex; lane R; priority 1 (blocks backups and daily outputs)
 - Reviewer/model: Claude
 
 ## Evidence (Claude, D1 read-only + owner's Apps Script checks)
@@ -40,3 +40,43 @@ Required (same PR):
 - D1 `gsis_roster_daily_outputs`: reset `failure_count`, `last_error`, `next_attempt_at` on 7 dates (5, 6 Nov at 2 failures; 16-20 Nov at 1) so the "daily-output-failed" warning that drives the WhatsApp alert is cleared and cannot re-fire on the next failure. The `gsis_backup_ledger` failure rows are kept unchanged (records).
 - Both features remain disabled in System Config (`driveBackup.enabled=false`, `driveDaily.enabled=false`); no outbox alert jobs are queued.
 - The 24 alert messages already sent (05:45 and 05:49) cannot be recalled. Open smcAlert records for 6 Nov stay as audit history.
+
+
+## Implementation and reproduction (Codex, 6 November 2026)
+
+The unmodified writer accepted a 919,742-byte workbook from the existing renderer (150 teachers, 17 periods). Its actual Office schema URLs did not trigger the guard. A metadata-only URL containing a fragment does reproduce the broad XML-scan false positive; the new guard scans parsed cell/shared-string values, decodes XML entities and joins rich-text runs. Private cell links and JWTs, TXT rules, backup privacy, folder/authority guards, stable file IDs and FINAL protection remain enforced.
+
+The live refusal itself is not yet reproduced. Confirmed diagnostic losses are fixed: Drive HTTP errors discarded the Google reason; the JSON wrapper mislabelled transport exceptions; doPost replaced every Roster 503 with a generic message; Worker ledgers kept only the code. Authenticated output calls now carry a sanitised message and Google code through the real envelope, ledger error/manifest, job-health diagnostics, ledger UI and System Health. Messages and displayed errors are bounded to 300 characters; URLs, credential values, JWTs, email addresses, long identifiers and stacks are removed. Ordinary Roster errors retain their existing privacy projection.
+
+Expired full/increment attempts are failed even while outputs are disabled, before schedule/backoff selection and retried even when a recent successful full would otherwise defer the next hour. Captured temporary items are cleaned; failed ledger evidence is retained and late completion cannot mark an expired attempt verified.
+
+Daily alerts use one stable identity per kind and Singapore date, including uncertain queue-response retries. Daily failure count covers the full queue. Backup, continuity and restore-test alerts are grouped separately. Disabled settings are checked both before enqueue and against the current mutation state. There are no healthy/empty alerts.
+
+## Verification and remaining gate
+
+Canonical build: all 18 components rebuilt locally. Focused tests cover the real signed doPost/writer refusal, a realistic workbook, private-cell rejection, parsed rich text, ledger/health propagation, lease retry and late completion, alert identity reuse and disabled silence. The notification timer/D1/render/signed-bridge integration checks sanitised diagnostics in the actual job-health table. UI checks render errors as literal text.
+
+Local Chromium installation returned an empty/truncated download. The local LORD run therefore stopped at its browser check; that is not a pass. Full Node/LORD verification must complete in GitHub CI before opening the review PR. No live requests, Drive writes, notifications, authority changes or deployment were used.
+
+Base: accepted claim `0ac29a6510832493ae034c52f09a2461184dc112`, built from main tree `397b65866a990822527b11e39b2923324d0a3b06`. Direct Git authentication was unavailable, so the local source was refreshed through the GitHub connector and every tracked blob verified against that exact tree. Publishing uses the same connector and checks tree identity. Reviewer: Claude; owner merges. Release labels remain coordinator-owned for v0.9.9o with #84.
+
+Next: full exact-head GitHub CI, Claude review, owner merge. After a separately authorised deployment, inspect the next retained refusal to identify any remaining live configuration/provider cause. Do not describe this as a live-verified incident fix.
+
+
+## Review handoff
+
+All 19 focused local programs passed, including the large restore-limit regression. The final disabled-expiry addition also passed the output-error, backup-job, backup and daily-queue programs. Both local canonical builds rebuilt all 18 components. No tracked build drift remains.
+
+Implementation first published at `9ebda6a36ba6fb789a21981f9533f449f21a60a0`; follow-up adds expiry while disabled. The exact final head, full CI result and PR link are in the PR description/owner handoff. The locally reconstructed commits are not GitHub history; remote trees are hash-checked against the local tree. Claude reviews the complete final diff. No merge or deployment is authorised to Codex.
+
+## Admin audience correction and current-main refresh (Codex, 6 November)
+
+System alerts now use active Roster Admin IDs only and a separate system_alert contract. Coverage alerts retain the selected date’s duty list. Both Google and D1 claim/presend checks reject legacy Drive jobs carrying duty wording, removed/inactive Admin recipients and disabled outputs. Existing sent records remain audit history.
+
+No approved generic Admin contract exists in the repository. The proposed gsis_system_alert_v1 body is in notification-worker/system-alert-template.proposed.json for Claude to submit; activation stays disabled until approval and live contract verification. This is a release dependency for WhatsApp system alerts. Ledger and System Health diagnostics do not depend on template approval.
+
+Current continuation: canonical build passed all 18 components. Eleven focused programs passed, including Admin/duty separation through both eligibility implementations, the real timer/D1/renderer/signed fake-Drive path, template payload preparation with a synthetic approval fixture, provider-result settlement, retry recovery, and all 14 SMC schedule checks. No real notifications were sent. Full CI must pass at the newly published head; earlier green CI belongs to 29e0e16 only. Local checkout contains selected source/tests, so no full local-suite pass is claimed. Main product source was refreshed through a7b74aa; its later changes were coordination documents only.
+
+## Submitted Admin template (6 November 10:25 SGT)
+
+Claude recorded the owner-authorised Meta submission in docs/coordination/review/pr87-claude-review.md: gsis_system_alert_v1, ID 1846305353057485, PENDING, UTILITY, en_GB. Contract and proposal now match the submitted body with "Issue: {{3}}". Raw body SHA-256: 516d26993d6eb3f8fd5d8fe5864d35a2875fd5e4260bcaa75853a95fff252741. Activation stays disabled pending approval and live verification. The historical-observation test now checks this pending template separately while retaining all existing provider comparisons. No live submission or sending by Codex.
