@@ -1,6 +1,6 @@
 # roster-drive-output-blob-content-type: Drive daily outputs fail — blob built with a null content type
 
-- Status: implementing — fix and full local verification complete; remote full-suite pending before draft PR.
+- Status: merged (#100 at 7b98409 as 5cc4408, 6 Nov 21:15 SGT)
 - Owner/model: Codex
 - Reviewer/model: Muse
 - Last updated (Asia/Singapore): 6 November 2026, 19:51
