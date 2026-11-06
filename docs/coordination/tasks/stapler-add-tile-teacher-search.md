@@ -1,7 +1,15 @@
 # stapler-add-tile-teacher-search: type-to-search teacher picker in Stapler "Add teacher tile"
 
-- Status: assigned to **Muse** (owner 6 Nov ~01:30: "include in-place partial text search for selecting teacher. let muse work on this"); owner exception to lane R for this UI-only task (roster-update/public/roster-stapler-ui.js and its CSS/tests), disjoint from Codex's current lane R files.
-- Reviewer/model: Claude
+- Status: claimed by **Muse**, 6 Nov 2026 (Asia/Singapore); owner exception to lane R for this UI-only task (roster-update/public/roster-stapler-ui.js and its CSS/tests), disjoint from Codex's current lane R files.
+- Reviewer/model: Codex (two-model rule; Claude is out of tokens)
+- Branch: muse/stapler-add-tile-teacher-search-rebase
+- Base SHA: 682a88715ff1b2b2ef5f8c7e5eca46e28285dd3f
+- Main head when the branch was created: 682a887 (after #94, #97, #95 merged)
+- Model: Muse
+- Sequence: Venues (#94) merged 6 Nov 17:36 SGT, so the owner's Venues-first order is satisfied and Stapler proceeds. Supersedes the earlier branch muse/stapler-add-tile-teacher-search (head 6be90b7e, claim only, no implementation; abandoned, not force-pushed).
+
+## Claim note
+WORKFLOW describes a claim-only commit to main, but the pilot rule is never push to main. As with earlier Muse tasks, the claim is recorded on the task branch only, not on main.
 
 ## Today
 Stapler (inside Roster) → Add teacher tile: the Teacher field is a native <select> with the whole staff list in an arbitrary order (roster-update/public/roster-stapler-ui.js, `addCard` about line 497). Finding a teacher means scrolling.
