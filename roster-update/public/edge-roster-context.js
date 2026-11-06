@@ -65,10 +65,10 @@ function rosterOperationsRecordOnly_(p){return ['previewStaplerMigration','migra
 
 // A confirmed day owns its cells. Live Deploy quota fields are attached separately.
 function rosterOperationsSavedStaplerDay_(state,d){
- const row=state?.staplerPlans?.find(row=>row.date===d);if(!row||!row.confirmed&&!row.published)return null;
- const plan=row.confirmed?(row.draft||row.confirmedPlan||row.published):row.published;
+ const row=state?.staplerPlans?.find(row=>row.date===d);if(!row)return null;const snapshot=GSISRosterOperations.confirmedStaplerSnapshot(row,state?.audit);if(!snapshot)return null;
+ const plan=snapshot.plan;
  if(!plan?.tiles)error_(409,'This saved Stapler day needs the Admin day-copy migration before planning.');
- return GSISRosterStapler.effectiveDay(plan);
+ return {...GSISRosterStapler.effectiveDay(plan),staplerRevision:snapshot.revision,staplerBaselineId:plan.baselineId};
 }
 function rosterOperationsStaplerMigrationContext_(req,c,state,index,base){
  if(!base.user.admin)error_(403,'Admin access is required to migrate saved Stapler days.');

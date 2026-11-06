@@ -1,3 +1,7 @@
+# Pending: retain the confirmed Stapler day while editing, 6 November 2026
+
+Model: Codex. Allocation, Report Absence, teacher timetables, publication and exports select the retained confirmed Stapler revision. Draft saves and replacement imports leave it active until Confirm. Assign Relief and Daily Notify show the effective source; never-confirmed drafts show a baseline notice and a dated review shortcut. Google, D1 and browser preload share the selected identity, including when the draft has a different origin. Existing reconciliation guards and historical communications remain. See [task](docs/coordination/tasks/roster-stapler-always-effective.md). No deployment or live action.
+
 # Pending: priority-aware automatic relief replanning, 6 November 2026
 
 Model: Codex. Full Auto-allocate gives first priority to daily SREs and any teacher activated ad hoc for the date with no baseline timetable, within their activation and workload limits. It ranks priority-1 relief use above recess-duty reuse and retains existing choices when business preferences tie. Ad hoc activation changes retain a date-local re-plan notice until a successful full run. Allocation logs name idle priority-1 teachers and their availability or limit reasons. Manual, peer, Stapler, protected, published and started duties stay fixed. Google and D1 use the same objective and evidence. See [task and verification](docs/coordination/tasks/roster-reoptimise-priority-adhoc.md). No deployment or live action.

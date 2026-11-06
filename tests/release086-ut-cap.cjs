@@ -48,7 +48,7 @@ function suspended(subject,transfer=false){
  Object.assign(f.teachers[0],{periodCap:30,capConfigured:true,capBasis:'total',capWorkload:26,capHeadroom:4,capVerified:true});Object.assign(f.teachers[1],{periodCap:30,capConfigured:true,capBasis:'total',capWorkload:24,capHeadroom:6,capVerified:true});
  let p=S.create({...f.ctx.days[f.date],date:f.date});const tile=p.tiles.find(t=>t.teacherId==='alice'&&t.period===2);
  p=S.apply(p,transfer?{type:'move',tileId:tile.id,teacherId:'bob',period:2}:subject?{type:'edit',tileId:tile.id,patch:{subject}}:{type:'pit',tileId:tile.id});
- f.state.staplerPlans.push({date:f.date,baselineId:p.baselineId,revision:1,confirmed:true,draft:p});return {...f,plan:p};
+ f.state.staplerPlans.push({date:f.date,baselineId:p.baselineId,revision:1,confirmed:true,confirmedAt:f.ctx.iso,updatedAt:f.ctx.iso,draft:p});return {...f,plan:p};
 }
 test('Confirmed suspended UT needs verified weekly evidence while transferred relief history is charged only once',()=>{
  const removed=suspended(),out=removed.O.composeStaplerContext(removed.state,removed.ctx);assert.equal(out.days[removed.date].teachers[0].capWorkload,26);assert.equal(out.days[removed.date].workloadIgnored,true);
@@ -61,3 +61,4 @@ test('An extra confirmed suspended duty does not alter workload limits',()=>{
  const day=f.O.composeStaplerContext(f.state,f.ctx).days[f.date];assert.equal(day.teachers[0].capWorkload,26);assert.equal(day.workloadIgnored,true);
 });
 test('Unconfirmed suspended plans do not change the cap',()=>{const f=suspended();f.state.staplerPlans[0].confirmed=false;assert.equal(f.O.composeStaplerContext(f.state,f.ctx).days[f.date].teachers[0].capWorkload,26);});
+

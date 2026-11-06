@@ -27,13 +27,14 @@ assert.equal(state.outbox.length,0,'Import and confirmation do not send staff no
 const exported=O.dailyExport(state,effective,{date,fullTeachers:true});
 assert.deepEqual(S.effectiveDay(exported.teacherSummary.plan,day).teachers.find(t=>t.staffId==='alice').cells,teachers.get('alice').cells,'Excel receives the same confirmed day as allocation');
 const changed=clone(state.staplerPlans[0].draft),alice=changed.tiles.find(t=>t.location==='grid'&&t.teacherId==='alice');alice.subject='MA';
-assert.throws(()=>O.staplerApply(state,ctx,{operation:'saveStapler',date,staplerRevision:1,plan:changed}),/reported absent/,'Later manual edits retain the absence guard');
+function rejectsConfirmation(plan,pattern,message){const attempt=clone(state);O.staplerApply(attempt,ctx,{operation:'saveStapler',date,staplerRevision:1,plan});assert.throws(()=>O.staplerApply(attempt,ctx,{operation:'confirmStapler',date,staplerRevision:2}),pattern,message);assert.equal(attempt.staplerPlans[0].confirmedRevision,1);}
+rejectsConfirmation(changed,/reported absent/,'Changed lessons for absent teachers cannot be confirmed');
 const moved=S.apply(state.staplerPlans[0].draft,{type:'move',tileId:imported.tiles.find(t=>t.location==='grid'&&t.teacherId==='bob').id,teacherId:'alice',period:2});
-assert.throws(()=>O.staplerApply(state,ctx,{operation:'saveStapler',date,staplerRevision:1,plan:moved}),/reported absent/,'Transfers to absent teachers remain blocked');
+rejectsConfirmation(moved,/reported absent/,'Transfers to absent teachers remain blocked at confirmation');
 const transferred=clone(state),presentTransfer=S.apply(transferred.staplerPlans[0].draft,{type:'move',tileId:imported.tiles.find(t=>t.location==='grid'&&t.teacherId==='bob').id,teacherId:'charlie',period:2});
 O.staplerApply(transferred,ctx,{operation:'saveStapler',date,staplerRevision:1,plan:presentTransfer});
 O.staplerApply(transferred,ctx,{operation:'confirmStapler',date,staplerRevision:2});
 assert.equal(transferred.importedRelief.filter(a=>a.staffId==='charlie'&&a.status!=='cancelled').length,1,'A later genuine transfer can save and confirm with its original source retained');
 state.assignments.push({id:'existing-cover',date,period:2,staffId:'bob',status:'published'});
-assert.throws(()=>O.staplerApply(state,ctx,{operation:'saveStapler',date,staplerRevision:1,plan:clone(imported)}),/double-book/,'Published relief conflicts still require resolution');
+rejectsConfirmation(clone(imported),/double-book/,'Published relief conflicts still require resolution before confirmation');
 console.log('PASS 0.7.14a operations: imported demand/availability/export, baseline fallback, absence preservation, no phantom relief, protected manual guards');
