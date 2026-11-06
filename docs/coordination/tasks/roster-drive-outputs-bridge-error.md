@@ -35,3 +35,8 @@ Required (same PR):
 6. Operational/system alerts (Drive outputs, backups, restore drill, job health) go to **Admins only**, never to duty SMCs, using an Admin wording (no "you are on SMC relief duty"; e.g. "GSiS system alert for Admin: …"). Use an approved Admin template if one exists; otherwise use the existing generic template without the duty sentence, and list the new template text for Claude to submit to Meta.
 7. Duty-SMC alerts (allocation/coverage issues) go only to that date's duty SMCs (plus Admins only where the existing rule explicitly says so, and then with Admin wording).
 8. Tests: a Drive failure alerts Admins only with Admin wording; a coverage issue alerts the duty list only; an Admin who is not on duty never receives "you are on SMC relief duty".
+
+## Retired by Claude on owner instruction (6 Nov 08:02, "programmatically retire it first")
+- D1 `gsis_roster_daily_outputs`: reset `failure_count`, `last_error`, `next_attempt_at` on 7 dates (5, 6 Nov at 2 failures; 16-20 Nov at 1) so the "daily-output-failed" warning that drives the WhatsApp alert is cleared and cannot re-fire on the next failure. The `gsis_backup_ledger` failure rows are kept unchanged (records).
+- Both features remain disabled in System Config (`driveBackup.enabled=false`, `driveDaily.enabled=false`); no outbox alert jobs are queued.
+- The 24 alert messages already sent (05:45 and 05:49) cannot be recalled. Open smcAlert records for 6 Nov stay as audit history.
