@@ -1,6 +1,8 @@
 # roster-intake-overlap-message: overlapping absence reports — say why, and show the true status
 
-- Status: **authorised, priority** (owner 6 Nov "codex work … put priority"); Codex, lane R. Small.
+- Status: implementing; claimed by Codex on 6 November 2026, 13:06 SGT; lane R.
+- Branch: `codex/roster-intake-overlap-message`
+- Base: `afe4c6ea3d6034c78743e980fa0d8c70c8bb529f`
 - Reviewer/model: Muse or Claude
 
 ## Evidence (D1 `gsis_absence_transport`, 6 Nov)
@@ -17,3 +19,7 @@
 3. Partial overlap: SMC review offers "Merge into existing" (extend periods / update reason), "Keep existing, close report", or "Edit existing then retry".
 4. The reporter's card shows the true transport state (needs review / already recorded / applied), never "sending" for a parked report.
 5. Tests: duplicate auto-resolves; partial overlap shows reason and options; card state matches transport state.
+
+## Implementation claim
+
+Model: Codex. Owner priority in LANES.md supersedes the remaining backlog drafts. Scope: D1 intake review and transport handling, shared absence overlap projection/resolution, received-report UI and Google/D1 parity tests; canonical generated bundles only as required. Preserve retained reports, original request IDs, all current permissions, unknown outcomes and existing protected relief. No live repair, records, settings, sends, deployment or merge. Reviewer: Muse (Claude when available), exact final head. Build and full Node/LORD CI before handoff. Branch claim used because direct-main claim updates were rejected earlier in this session.
