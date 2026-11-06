@@ -37,13 +37,13 @@ test('Inactive SENO never gains an external relief reservation',()=>{
  O.staplerApply(state,ctx,{operation:'saveStapler',date,staplerRevision:0,plan});O.staplerApply(state,ctx,{operation:'confirmStapler',date,staplerRevision:1});
  assert(!state.adhoc.some(row=>row.staffId==='olivia'));
 });
-test('Inactive eligible SRE retains dated manual relief activation',()=>{
+test('Inactive eligible SRE receives priority through its dated relief activation',()=>{
  const {O,state,ctx,date}=ready(),person={id:'external',name:'External (SRE)',active:false,role:'Teacher',employment:'SRE',adhocEligible:true};ctx.people.push(person);
  const plan=add(O.staplerView(state,ctx,{date}).plan,person);
  O.staplerApply(state,ctx,{operation:'saveStapler',date,staplerRevision:0,plan});O.staplerApply(state,ctx,{operation:'confirmStapler',date,staplerRevision:1});
  assert.equal(state.adhoc.filter(row=>row.staffId===person.id).length,1);
  const result=A.eligibility(A.teacherContext(state,O.composeStaplerContext(state,ctx),date).get(person.id),2);
- assert.equal(result.available,true);assert.equal(result.autoEligible,false);
+ assert.equal(result.available,true);assert.equal(result.autoEligible,true);assert.equal(result.adhocPriority,true);
 });
 test('Server rejects a client-forged MK addition with the current policy',()=>{
  const {O,state,ctx,date}=ready(),person={id:'mk',name:'Kindergarten',active:true,role:'MKE'};ctx.people.push(person);

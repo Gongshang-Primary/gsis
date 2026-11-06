@@ -1,3 +1,7 @@
+# Pending: priority-aware automatic relief replanning, 6 November 2026
+
+Model: Codex. Full Auto-allocate gives first priority to daily SREs and any teacher activated ad hoc for the date with no baseline timetable, within their activation and workload limits. It ranks priority-1 relief use above recess-duty reuse and retains existing choices when business preferences tie. Ad hoc activation changes retain a date-local re-plan notice until a successful full run. Allocation logs name idle priority-1 teachers and their availability or limit reasons. Manual, peer, Stapler, protected, published and started duties stay fixed. Google and D1 use the same objective and evidence. See [task and verification](docs/coordination/tasks/roster-reoptimise-priority-adhoc.md). No deployment or live action.
+
 # Pending: Deploy ledger targets use configured relief budgets, 6 November 2026
 
 Model: Codex. Remove the Target offload % column from both ledger views and their shared Excel/print output. FAJT Target now uses the saved relief fajtWeeklyPeriods / weeklyPeriods ratio; missing or invalid budgets show Needs configuration. Help shows the configured values. The public projection includes only these two budgets and their schema, retaining the server-only relief engine and Admin-only settings. Defaults preserve Target, at-load bands, load status and R. See [task and verification](docs/coordination/tasks/deploy-remove-target-offload.md). No deployment or live action.

@@ -8,7 +8,8 @@ function rosterScheduledManualGuard_(date){if(rosterAllocationManualBusy_(roster
 function rosterAllocationRunPublic_(row,state){
  if(!row)return null;let status=row.state;if(state&&rosterAllocationRunCancelled_(row,state))status='cancelled';else if(state&&rosterAllocationRunAccepted_(row,state))status='completed';
  else if(rosterAllocationRunExpired_(row)&&['running','cancelling','committing'].includes(status))status=status==='committing'?'uncertain':'abandoned';
- return {id:row.id,date:row.date,state:status,authority:'google',preparationMs:row.preparationMs??null,preparationAttempts:row.preparationAttempts||0,trigger:row.trigger,...(row.trigger==='scheduled'?{attempts:row.attempts||1,allocationStopped:row.state==='failed'&&(row.attempts>=2||row.slotStopped===true)}:{}),...(row.allocationMode?{allocationMode:row.allocationMode}:{}),requestId:row.trigger==='manual'?row.requestId:null,actorName:row.actorName,startedAt:row.startedAt,updatedAt:row.updatedAt,log:row.log,canCancel:['running','cancelling'].includes(status)};
+ const extra=state&&status==='completed'?GSISRosterOperations.allocationPriorityLog(state,row):[],log=[...row.log,...extra.map((message,i)=>({seq:(row.log.at(-1)?.seq||0)+i+1,at:row.updatedAt,message}))];
+ return {id:row.id,date:row.date,state:status,authority:'google',preparationMs:row.preparationMs??null,preparationAttempts:row.preparationAttempts||0,trigger:row.trigger,...(row.trigger==='scheduled'?{scheduleKey:row.scheduleKey,attempts:row.attempts||1,allocationStopped:row.state==='failed'&&(row.attempts>=2||row.slotStopped===true)}:{}),...(row.allocationMode?{allocationMode:row.allocationMode}:{}),requestId:row.trigger==='manual'?row.requestId:null,actorName:row.actorName,startedAt:row.startedAt,updatedAt:row.updatedAt,log,canCancel:['running','cancelling'].includes(status)};
 }
 function rosterAllocationPreparationStatus_(){
  const properties=props_().getProperties();
