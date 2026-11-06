@@ -40,4 +40,26 @@ function applyPlanning_(d,x,c,idx){
   }
  }catch(e){if(e.status)throw e;error_(400,e.message);}
 }
-function syncPublishedCatalogues_(b,idx,identity){gsisRequireBackendRole_('deploy');const entry=publishedEntry_(idx),published=entry?document_(b,entry):null;if(!published)return;contacts_(identity,false,'applyDeployCatalogues',{revision:idx.revision,options:published.masterOptions||idx.masterOptions||null,membership:published.membership||null});}
+function syncPublishedCatalogues_(b,idx,identity,expected){
+ gsisRequireBackendRole_('deploy');
+ const entry=publishedEntry_(idx),revision=entry?.catalogueRevision;
+ const details={versionId:entry?.id,publicationCommit:entry?.commit,revision};
+ try{
+  if(!entry)return {status:'failed',reason:'No published version.'};
+  if(expected&&(entry.id!==expected.versionId||expected.publicationCommit&&entry.commit!==expected.publicationCommit||expected.requestId&&entry.publishRequestId!==expected.requestId))return {status:'failed',reason:'This publication has been superseded. Refresh before retrying.',code:409,...details};
+  if(!Number.isInteger(revision)||!entry.commit)return {status:'failed',reason:'Publication sync identity is unavailable. Republish this version.',...details};
+  const published=document_(b,entry);
+  const result=contacts_(identity,false,'applyDeployCatalogues',{revision,options:published.masterOptions||null,membership:published.membership||null});
+  if(result?.saved!==true||result.revision!==revision)return {status:'failed',reason:'Contacts did not confirm this catalogue revision.',...details};
+  return {status:result.duplicate?'duplicate':result.unchanged?'unchanged':'updated',...details};
+ }catch(e){return {status:'failed',reason:String(e.message||'Contacts sync could not be confirmed.').slice(0,300),code:e.status||503,...details};}
+}
+function retryContactsSync_(b,idx,identity,p,c){
+ auth_(c,'Admin');
+ if(typeof p.requestId!=='string'||!/^[\w-]{36}$/.test(p.requestId))error_(400,'Request ID required');
+ if(!p.versionId||typeof p.publicationCommit!=='string'||!p.publicationCommit)error_(400,'Version and publication identity required');
+ const entry=publishedEntry_(idx);
+ if(!entry||entry.id!==p.versionId||entry.commit!==p.publicationCommit)error_(409,'This publication has been superseded. Refresh before retrying.');
+ if((idx.requests||[]).includes(p.requestId))error_(409,'Use a new request ID for Contacts sync.');
+ return syncPublishedCatalogues_(b,idx,identity,{versionId:p.versionId,publicationCommit:p.publicationCommit});
+}

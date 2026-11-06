@@ -1,3 +1,7 @@
+# Pending: reliable Deploy to Contacts publication sync, 6 November 2026
+
+Model: Codex. Report Contacts sync separately after a saved Deploy publication. Retry the same frozen publication and global catalogue revision with Admin/identity checks; reject superseded retries. Contacts invalidates cached validation choices by digest and rejects stale in-flight reads while retaining drafts and pending saves. Deploy keeps Layout handoff status visible alongside Contacts. Canonical bundles rebuilt; focused dispatch, writer and DOM tests passed. No deployment or live action. See [task](docs/coordination/tasks/deploy-contacts-catalogue-sync.md).
+
 # Pending: priority-aware automatic relief replanning, 6 November 2026
 
 Model: Codex. Full Auto-allocate gives first priority to daily SREs and any teacher activated ad hoc for the date with no baseline timetable, within their activation and workload limits. It ranks priority-1 relief use above recess-duty reuse and retains existing choices when business preferences tie. Ad hoc activation changes retain a date-local re-plan notice until a successful full run. Allocation logs name idle priority-1 teachers and their availability or limit reasons. Manual, peer, Stapler, protected, published and started duties stay fixed. Google and D1 use the same objective and evidence. See [task and verification](docs/coordination/tasks/roster-reoptimise-priority-adhoc.md). No deployment or live action.
