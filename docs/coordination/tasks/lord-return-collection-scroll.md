@@ -17,9 +17,19 @@
 
 - 6 Nov, owner: drop the two declaration checkboxes too. Backend keeps requiring both booleans, so the frontend sends them as true per trolley; the single submit confirmation is the attestation. No backend change.
 - 6 Nov, owner: remove collapsible sections in collection too (loan trolley cards always open).
+- Implementation (head fbe6f38 + working tree): returnTrolleyHtml and trolleyEditorHtml no longer render `<details>`; expandedTrolley/bindTrolleyDetails removed; per-trolley selection checkbox, selection gate and `selected` state removed; declaration checkboxes, globalCheckHtml/bindGlobalReturnChecks and the declarations gate removed; payload sends correctTrolleyDeclaration: true and sameOrientationDeclaration: true per trolley; confirmation notice now reads "I confirm that I returned the devices as recorded above, with tablets in the correct trolley and facing the same orientation."; accordion and selection CSS removed (the card padding:0 override went with it, so cards use the base 0.9rem padding); Source and template copies byte-identical.
+- Tests: run_static_checks.py — old manual-confirmation check replaced by four new checks (no accordion, no selection/declaration checkboxes, declarations still sent true, confirmation covers placements); the pinned LORD layout-CSS hash updated to 1907bc46… (action-row rules themselves untouched); booking-remarks-return-browser.cjs fixture drops the dead state fields and now asserts the payload declarations are true, no selection checkbox and no return accordion; run_reload_browser_checks.cjs loan test now asserts three open cards with all quantity fields visible; run_reload_checks.cjs trolley-render test now asserts three open cards; run_refactor_checks.cjs — loadSession added to lordChanged and the three removed functions added to removedLord (simplifyLord script mode would refuse the current tree anyway).
 
 ## Verification
 Exact command, tested commit, outcome and evidence. Explicitly list checks not run.
+
+- TZ=Asia/Singapore npm run build: PASS, no generated diff (6 Nov, working tree).
+- TZ=Asia/Singapore python3 lord-suite/tests/run_static_checks.py: 116/116 passed.
+- TZ=Asia/Singapore node lord-suite/tests/booking-remarks-return-browser.cjs (LORD_TEST_CHROMIUM=headless shell): passed.
+- TZ=Asia/Singapore node lord-suite/tests/run_reload_browser_checks.cjs: passed, 19 checks.
+- TZ=Asia/Singapore python3 lord-suite/tests/run_all_checks.py: LORD suite 40/40 passed, exit 0.
+- Full Node suite (TZ=Asia/Singapore NODE_NO_WARNINGS=1 node tests/run.cjs): first sequential run finished 1026/1031 — 5 scripts failed, names lost because the run's output was piped through tail. The 4 named shard-1 failures were re-run alone: roster089a-home-timetable-browser and stapler716-browser failed only on a missing /tmp/chromium (wrong env var; both pass with GSIS_BROWSER_EXECUTABLE set); roster711-workspace-ui passes alone (timing race under load); calendar098j-jobs passes alone on a quiet machine (its ui.cjs child hit the 35 s spawn timeout under load). All 11 further candidates from the 4 parallel shard runs (which added load flakes of their own) also pass alone, sequentially, with the correct env. No Node script references the LORD files changed, so no failure is tied to this change. CI is the remaining gate.
+- Not run locally: full CI (verify-queue workflow) — runs on push; draft PR only after it is green.
 
 ## Review
 Reviewer/model, reviewed SHA, findings, resolution. Advisory review is not human approval.

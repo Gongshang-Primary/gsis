@@ -1,3 +1,7 @@
+# Pending: LORD return and collection as one long scrolling page, 6 November 2026
+
+Model: Muse. Return and collection trolley cards render open in a single scrolling list with no collapsible sections and no one-open-at-a-time binding. The return page no longer has the per-trolley "I am physically returning" checkbox or the two placement declaration checkboxes; quantity and photo per trolley still gate submission, partial returns remain barred by the backend, and both placement declarations are still sent as true with every trolley, covered by the single submit confirmation. Source and template copies kept byte-identical; return and collection browser tests updated. No deployment or live action. See [task](docs/coordination/tasks/lord-return-collection-scroll.md).
+
 # Pending: reliable Deploy to Contacts publication sync, 6 November 2026
 
 Model: Codex. Report Contacts sync separately after a saved Deploy publication. Retry the same frozen publication and global catalogue revision with Admin/identity checks; reject superseded retries. Contacts invalidates cached validation choices by digest and rejects stale in-flight reads while retaining drafts and pending saves. Deploy keeps Layout handoff status visible alongside Contacts. Canonical bundles rebuilt; focused dispatch, writer and DOM tests passed. No deployment or live action. See [task](docs/coordination/tasks/deploy-contacts-catalogue-sync.md).

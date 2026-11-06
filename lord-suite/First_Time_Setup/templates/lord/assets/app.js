@@ -52,8 +52,6 @@ const state = {
     headphoneQuantity: 0,
     headphonePhotoData: '',
     headphoneFileName: '',
-    correctTrolleyDeclaration: false,
-    sameOrientationDeclaration: false,
     issue: false,
     issueNotes: '',
     comments: ''
@@ -757,7 +755,6 @@ function renderLoanTrolleys() {
   const trolleyList = document.getElementById('trolleyList');
   trolleyList.innerHTML = state.loan.trolleys.map((t, i) => trolleyEditorHtml(t, i, trolleyOptions, 'loan')).join('');
   bindLoanTrolleyEditors();
-  bindTrolleyDetails('loan');
   trolleyList.addEventListener('input', event => {
     const card = event.target.closest('.trolley-card');
     if (card && event.target.classList.contains('trolley-quantity')) card.querySelector('.trolley-progress').textContent = trolleyProgress(state.loan.trolleys[Number(card.dataset.index)], 'loan');
@@ -766,7 +763,6 @@ function renderLoanTrolleys() {
   updateLoanSummary();
 
   document.getElementById('addTrolleyBtn').onclick = () => {
-    expandedTrolley.loan = state.loan.trolleys.length;
     state.loan.trolleys.push({ name: '', quantity: 14, photoData: '', fileName: '' });
     persistDraft();
     renderLoanTrolleys();
@@ -865,16 +861,6 @@ function bindLoanAccessory(key) {
   }
 }
 
-const expandedTrolley = { loan: 0, return: 0 };
-function bindTrolleyDetails(phase) {
-  document.querySelectorAll('details[data-trolley-phase="' + phase + '"]').forEach(details => {
-    details.ontoggle = () => {
-      if (!details.open) return;
-      expandedTrolley[phase] = Number(details.dataset.index);
-      document.querySelectorAll('details[data-trolley-phase="' + phase + '"]').forEach(other => { if (other !== details) other.open = false; });
-    };
-  });
-}
 function trolleyProgress(trolley, phase) {
   const quantity = Number(trolley.quantity) || 0;
   return quantity + ' devices · ' + (trolley.photoData ? 'Photo ready' : 'Photo needed');
@@ -883,7 +869,7 @@ function trolleyEditorHtml(trolley, index, optionsHtml, phase) {
   const preview = trolley.photoData ? `<img class="photo-preview" src="${trolley.photoData}" alt="Photo preview">` : '';
   return `
     <article class="trolley-card" data-index="${index}">
-      <details data-trolley-phase="loan" data-index="${index}" ${index === Math.min(expandedTrolley.loan, state.loan.trolleys.length - 1) ? 'open' : ''}><summary><strong>${escapeHtml(trolley.name || `Trolley ${index + 1}`)}</strong><span class="trolley-progress">${trolleyProgress(trolley, phase)}</span></summary>
+      <div class="trolley-head"><strong>${escapeHtml(trolley.name || `Trolley ${index + 1}`)}</strong><span class="trolley-progress">${trolleyProgress(trolley, phase)}</span></div>
       <div class="trolley-head"><h3>Trolley ${index + 1}</h3><button type="button" class="small-button remove-trolley">Remove</button></div>
       <div class="field">
         <label for="loan-trolley-name-${index}">Trolley</label>
@@ -899,7 +885,6 @@ function trolleyEditorHtml(trolley, index, optionsHtml, phase) {
         <p class="help">Capture the whole trolley with all slots visible. LORD compresses the photo before upload.</p>
         ${preview}
       </div>
-      </details>
     </article>`;
 }
 
@@ -1116,13 +1101,10 @@ async function loadSession(sessionId, options = {}) {
     state.return.headphoneQuantity = Number(payload.session.headphoneQuantity) || 0;
     state.return.headphonePhotoData = '';
     state.return.headphoneFileName = '';
-    state.return.correctTrolleyDeclaration = false;
-    state.return.sameOrientationDeclaration = false;
     state.return.issue = false;
     state.return.issueNotes = '';
     state.return.trolleys = payload.session.trolleys.map(t => ({
       ...t,
-      selected: autoSelect,
       quantity: t.loanQuantity,
       photoData: '',
       fileName: ''
@@ -1167,17 +1149,13 @@ function renderReturnForm() {
   const mismatchReasons = returnQuantityMismatchReasons();
   const trolleySelectionNotice = carriedForward
     ? `<div class="notice success return-selection-note"><strong>Trolleys carried forward automatically</strong><br>These are the exact trolleys recorded in the collection you just completed.</div>`
-    : `<div class="notice info return-selection-note"><strong>Confirm the physical trolleys</strong><br>Select every trolley you are returning. Partial returns are not permitted for one loan session.</div>`;
+    : '';
 
   main.innerHTML = `
     <section class="card">
       <div class="section-title"><div><span class="step-kicker">Return 2 of 2</span><h2>Return devices</h2><p>${escapeHtml(s.classOrActivity)} · ${escapeHtml(s.subject)}</p></div></div>
       <div class="notice info">Original loan: ${s.loanTrolleyCount} trolley${s.loanTrolleyCount === 1 ? '' : 's'}, ${s.loanDeviceTotal} devices by ${escapeHtml(s.loanTeacher)}.</div>
       ${trolleySelectionNotice}
-      <div class="return-wide-checks">
-        ${globalCheckHtml('returnCorrectTrolleyDeclaration', 'Tablets are kept in the correct trolley based on their device numbering.', state.return.correctTrolleyDeclaration)}
-        ${globalCheckHtml('returnSameOrientationDeclaration', 'Tablets are facing the same orientation.', state.return.sameOrientationDeclaration)}
-      </div>
       <div class="photo-example" role="note" aria-label="Example trolley photo">
         <img src="assets/trolley-photo-example.webp" alt="Example of a top-down trolley photo showing all tablets">
         <div><strong>Photo example</strong><p>Take a top-down photo showing all devices in this trolley.</p></div>
@@ -1186,7 +1164,7 @@ function renderReturnForm() {
       <div id="returnAccessoryEvidence"></div>
 
       <div class="field"><label for="returnComments">Other comments</label><textarea id="returnComments" placeholder="Optional">${escapeHtml(state.return.comments)}</textarea></div>
-      <div class="notice info" style="margin-top:1rem">I confirm that I returned the devices as recorded above and completed the checks shown.</div>
+      <div class="notice info" style="margin-top:1rem">I confirm that I returned the devices as recorded above, with tablets in the correct trolley and facing the same orientation.</div>
       <div class="action-grid return-actions">
         <button class="ghost-button" id="backBtn">Back</button>
         <button type="button" class="danger-button return-issue-toggle ${issueActive ? 'is-active' : ''}" id="returnIssueBtn" aria-pressed="${issueActive}"><span>Return devices</span><span>with issues</span></button>
@@ -1203,11 +1181,9 @@ function renderReturnForm() {
     </section>
     <div class="summary-bar" id="returnSummary"></div>`;
 
-  document.getElementById('returnTrolleyList').innerHTML = state.return.trolleys.map((t, i) => returnTrolleyHtml(t, i, carriedForward)).join('');
+  document.getElementById('returnTrolleyList').innerHTML = state.return.trolleys.map((t, i) => returnTrolleyHtml(t, i)).join('');
   bindReturnEditors();
-  bindTrolleyDetails('return');
   renderReturnAccessoryEvidence();
-  bindGlobalReturnChecks();
   bindReturnIssueControl();
   updateReturnSummary();
 
@@ -1298,43 +1274,18 @@ function bindReturnAccessory(key) {
   }
 }
 
-function returnTrolleyHtml(t, index, carriedForward) {
-  const selected = carriedForward || Boolean(t.selected);
+function returnTrolleyHtml(t, index) {
   const preview = t.photoData ? `<img class="photo-preview" src="${t.photoData}" alt="Return photo preview">` : '';
-  const selection = carriedForward
-    ? ''
-    : `<div class="return-trolley-selection"><input class="return-trolley-selected" id="return-trolley-selected-${index}" type="checkbox" ${selected ? 'checked' : ''}><label for="return-trolley-selected-${index}">I am physically returning ${escapeHtml(t.name)}</label></div>`;
 
   return `
-    <article class="trolley-card return-trolley-card ${selected ? 'is-selected' : 'is-unselected'}" data-index="${index}">
-      <details data-trolley-phase="return" data-index="${index}" ${index === Math.min(expandedTrolley.return, state.return.trolleys.length - 1) ? 'open' : ''}><summary><strong>${escapeHtml(t.name)}</strong><span class="trolley-progress">${selected ? trolleyProgress(t, 'return') : 'Not selected'}</span></summary>
+    <article class="trolley-card return-trolley-card" data-index="${index}">
+      <div class="trolley-head"><h3>${escapeHtml(t.name)}</h3><span class="trolley-progress">${trolleyProgress(t, 'return')}</span></div>
       <div class="trolley-head"><span class="muted">Loaned: ${t.loanQuantity}</span></div>
-      ${selection}
-      <div class="return-trolley-fields ${selected ? '' : 'is-disabled'}">
-        <div class="field"><label for="return-quantity-${index}">Number of devices returned</label><input id="return-quantity-${index}" class="input return-quantity" type="number" min="0" max="200" step="1" inputmode="numeric" value="${escapeAttr(t.quantity)}" ${selected ? '' : 'disabled'}></div>
-        <div class="photo-box"><label for="return-photo-${index}">Top view return photo</label><input id="return-photo-${index}" class="return-photo" type="file" accept="image/*" capture="environment" ${selected ? '' : 'disabled'}><p class="help">Capture the whole trolley with all slots visible.</p>${preview}</div>
+      <div class="return-trolley-fields">
+        <div class="field"><label for="return-quantity-${index}">Number of devices returned</label><input id="return-quantity-${index}" class="input return-quantity" type="number" min="0" max="200" step="1" inputmode="numeric" value="${escapeAttr(t.quantity)}"></div>
+        <div class="photo-box"><label for="return-photo-${index}">Top view return photo</label><input id="return-photo-${index}" class="return-photo" type="file" accept="image/*" capture="environment"><p class="help">Capture the whole trolley with all slots visible.</p>${preview}</div>
       </div>
-      </details>
     </article>`;
-}
-
-function globalCheckHtml(id, label, checked) {
-  return `<div class="check-row"><input id="${id}" type="checkbox" ${checked ? 'checked' : ''}><label for="${id}">${escapeHtml(label)}</label></div>`;
-}
-
-function bindGlobalReturnChecks() {
-  const bindings = [
-    ['returnCorrectTrolleyDeclaration', 'correctTrolleyDeclaration'],
-    ['returnSameOrientationDeclaration', 'sameOrientationDeclaration']
-  ];
-  bindings.forEach(([id, field]) => {
-    const input = document.getElementById(id);
-    if (!input) return;
-    input.onchange = () => {
-      state.return[field] = input.checked;
-      persistDraft();
-    };
-  });
 }
 
 function bindReturnIssueControl() {
@@ -1382,14 +1333,6 @@ function bindReturnEditors() {
   document.querySelectorAll('.return-trolley-card').forEach(card => {
     const i = Number(card.dataset.index);
     const trolley = state.return.trolleys[i];
-    const selector = card.querySelector('.return-trolley-selected');
-    if (selector) {
-      selector.onchange = e => {
-        trolley.selected = e.target.checked;
-        persistDraft();
-        renderReturnForm();
-      };
-    }
 
     const qty = card.querySelector('.return-quantity');
     if (qty) {
@@ -1434,13 +1377,6 @@ async function submitReturn(withIssues) {
     updateReturnIssueUi();
   }
 
-  if (state.return.selectionMode !== 'carried') {
-    const notConfirmed = state.return.trolleys.filter(t => !t.selected);
-    if (notConfirmed.length) {
-      return alert(`Confirm every trolley before returning. Still unconfirmed: ${notConfirmed.map(t => t.name).join(', ')}. Partial returns are not permitted.`);
-    }
-  }
-
   for (const t of state.return.trolleys) {
     if (!Number.isInteger(Number(t.quantity)) || Number(t.quantity) < 0) return alert(`Enter a valid returned quantity for ${t.name}.`);
     if (!t.photoData) return alert(`Take a return photo of ${t.name}.`);
@@ -1459,9 +1395,6 @@ async function submitReturn(withIssues) {
   const mismatchReasons = returnQuantityMismatchReasons();
   const issueActive = Boolean(state.return.issue || mismatchReasons.length);
 
-  if (!issueActive && (!state.return.correctTrolleyDeclaration || !state.return.sameOrientationDeclaration)) {
-    return alert('Complete both return checks for a normal return, or choose Return with issue if either check cannot be confirmed.');
-  }
   if (issueActive && !state.return.issueNotes.trim()) {
     return alert('Describe the outstanding issue for the ICT Backend team.');
   }
@@ -1493,8 +1426,10 @@ async function submitReturn(withIssues) {
       quantity: t.quantity,
       photoData: t.photoData,
       fileName: t.fileName,
-      correctTrolleyDeclaration: state.return.correctTrolleyDeclaration,
-      sameOrientationDeclaration: state.return.sameOrientationDeclaration,
+      // The submit confirmation covers both placements; the backend still
+      // requires both booleans per trolley (requiredBoolean_).
+      correctTrolleyDeclaration: true,
+      sameOrientationDeclaration: true,
       issue: issueActive,
       notes: issueActive ? state.return.issueNotes : ''
     }))
@@ -1821,7 +1756,7 @@ function resetStateKeepTeacher(clearStored = true) {
   state.identity = { teacher, teacherCustom: false, classOrActivity: '', classCustom: false, subject: '', subjectCustom: false };
   state.loan = { cartGroup: '', trolleys: [], comments: '', sessionSearch: '', booking: null, stylusQuantity: '', stylusPhotoData: '', stylusFileName: '', headphoneQuantity: '', headphonePhotoData: '', headphoneFileName: '' };
   state.booking = { date: '', resource: '', deviceType: '', quantity: 1, startPeriod: '', endPeriod: '', headphones: false, styluses: false, remarks: '', selections: [], availability: [], occupiedPeriods: [], occupancyKey: '', daySchedule: [], scheduleKey: '', scheduleLoading: false, scheduleError: '', editing: null };
-  state.return = { openSessions: [], selectedSession: null, teacher, trolleys: [], selectionMode: 'manual', stylusQuantity: 0, stylusPhotoData: '', stylusFileName: '', headphoneQuantity: 0, headphonePhotoData: '', headphoneFileName: '', correctTrolleyDeclaration: false, sameOrientationDeclaration: false, issue: false, issueNotes: '', comments: '', sessionSearch: '' };
+  state.return = { openSessions: [], selectedSession: null, teacher, trolleys: [], selectionMode: 'manual', stylusQuantity: 0, stylusPhotoData: '', stylusFileName: '', headphoneQuantity: 0, headphonePhotoData: '', headphoneFileName: '', issue: false, issueNotes: '', comments: '', sessionSearch: '' };
   if (clearStored) clearDraft();
 }
 
