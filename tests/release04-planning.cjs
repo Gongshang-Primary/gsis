@@ -37,18 +37,27 @@ vm.runInContext(`{
  assert(call('sync',{versionId:copy}).current.membership[0][12]==='','Copied role mapping remains independent');
  assert(call('sync',{versionId:copy}).current.organisations.dept[0].slots[0]==='t1','Copied group members retained');
  let projections=[],failProjection=false;
- contacts_=(identity,authority,action,input)=>{if(action==='applyDeployCatalogues'){if(failProjection)error_(503,'Projection interrupted');projections.push(clone(input));return {saved:true}}return c};
+ contacts_=(identity,authority,action,input)=>{if(action==='applyDeployCatalogues'){if(failProjection)error_(503,'Projection interrupted');projections.push(clone(input));return {saved:true,revision:input.revision}}return c};
  const publishRequest={operation:'publish',key:'meta',versionId:plan,clientId:'v04',expectedRevision:call('sync',{versionId:plan}).versions.find(v=>v.id===plan).revision,requestId:Utilities.getUuid()};
- failProjection=true;rejects(()=>call('change',publishRequest),503);failProjection=false;
+ failProjection=true;const interrupted=call('change',publishRequest);assert(interrupted.saved&&interrupted.contactsSync&&interrupted.contactsSync.status==='failed'&&interrupted.contactsSync.code===503&&interrupted.contactsSync.reason==='Projection interrupted','Interrupted projection is reported on the publish result, not swallowed');failProjection=false;
  assert(call('change',publishRequest).saved,'Publication retry completes after interrupted projection');
  assert(projections.at(-1).membership[0][12]==='HOD','Published membership reaches Contacts');
  const publishedRevision=index_(book_()).revision;call('change',publishRequest);assert(index_(book_()).revision===publishedRevision,'Publication retry does not append another version');
+ const syncPublication=index_(book_()).published.commit,retryRequest={operation:'retryContactsSync',versionId:plan,publicationCommit:syncPublication,requestId:Utilities.getUuid()};
+ const retryResult=call('change',retryRequest);assert(retryResult.contactsSync.status==='updated','Explicit retry confirms Contacts');
+ const retryPayload=clone(projections.at(-1));call('change',retryRequest);assert(index_(book_()).revision===publishedRevision,'Duplicate sync retry does not write Deploy');
+ rejects(()=>dispatch_({action:'change',identity:who,input:retryRequest},{...c,user:{roles:['KP']}}),403);
+ rejects(()=>call('change',{...retryRequest,versionId:''}),400);rejects(()=>call('change',{...retryRequest,publicationCommit:''}),400);
+ rejects(()=>call('change',{...retryRequest,requestId:'bad'}),400);rejects(()=>call('change',{...retryRequest,requestId:publishRequest.requestId}),409);
+
  // A new draft does not change the published mapping when version-owned choices synchronize.
  membership=clone(read().membership);membership[0][12]='ST';save([{operation:'setMembership',expected:read().membership,value:membership}]);
  const options=clone(read().masterOptions);options['EO Appt Level'].push('Visiting');save([{operation:'setMasterOptions',expected:read().masterOptions,value:options}]);
+ call('change',retryRequest);assert(JSON.stringify(projections.at(-1))===JSON.stringify(retryPayload),'Retry after draft edits keeps the frozen revision and payload');
  assert(projections.at(-1).membership[0][12]==='HOD','Draft mapping must not reach Contacts');assert(!projections.at(-1).options['EO Appt Level'].includes('Visiting'),'Draft choices must not reach Contacts');
  const copySnapshot=call('sync',{versionId:copy});assert(!copySnapshot.current.masterOptions['EO Appt Level'].includes('Visiting'),'Other versions keep independent choices');
  const publishChoices={operation:'publish',key:'meta',versionId:plan,clientId:'v04',expectedRevision:call('sync',{versionId:plan}).versions.find(v=>v.id===plan).revision,requestId:Utilities.getUuid()};call('change',publishChoices);assert(projections.at(-1).options['EO Appt Level'].includes('Visiting'),'Publication replaces Contacts choices');assert(projections.at(-1).membership[0][12]==='ST','Publication applies this version’s Membership');
+ const sentAfterRepublish=projections.length;rejects(()=>call('change',retryRequest),409);assert(projections.length===sentAfterRepublish,'Old publication retry never writes Contacts');const oldPublish=call('change',publishRequest);assert(oldPublish.contactsSync.status==='failed'&&projections.length===sentAfterRepublish,'Replayed superseded publish does not sync newer data under an old request');
  assert(!copySnapshot.current.membership.some(r=>r[12]==='ST'),'Role mapping is version-specific');
  // An ordinary metadata edit uses the version revision in one write request.
  rejects(()=>call('change',{operation:'metadata',key:'meta',versionId:plan,expectedRevision:0,name:'Stale',requestId:Utilities.getUuid()}),409);

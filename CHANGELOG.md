@@ -1,3 +1,7 @@
+# Pending: reliable Deploy to Contacts publication sync, 6 November 2026
+
+Model: Codex. Report Contacts sync separately after a saved Deploy publication. Retry the same frozen publication and global catalogue revision with Admin/identity checks; reject superseded retries. Contacts invalidates cached validation choices by digest and rejects stale in-flight reads while retaining drafts and pending saves. Deploy keeps Layout handoff status visible alongside Contacts. Canonical bundles rebuilt; focused dispatch, writer and DOM tests passed. No deployment or live action. See [task](docs/coordination/tasks/deploy-contacts-catalogue-sync.md).
+
 # Pending: retain the confirmed Stapler day while editing, 6 November 2026
 
 ## Unreleased: selected-day relief workbook

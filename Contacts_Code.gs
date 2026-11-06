@@ -213,18 +213,19 @@ function contactAuthority_(ss,identity){return {email:identity.email,roles:roles
 function email_(value,domain){const s=String(value||'').trim();if(!s)return '';return s.indexOf('@')>=0?s:s+'@'+domain;}
 function version_(row){return row?Utilities.base64EncodeWebSafe(Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256,JSON.stringify([row.Email,row.Role,row.Active,row['Updated At'],row['Admin ID']]))):'new';}
 function bootstrap_(ss,identity){
-  const {people,groups}=contactDirectoryRead_(ss);
+  const dir=contactDirectoryRead_(ss),people=dir.people,groups=dir.groups;
   const access=access_(ss),mine=access.rows.find(r=>r.Email===identity.email);
   const named={};people.forEach(p=>{if(p.emails.gsps)named[p.emails.gsps.toLowerCase()]=p.name;});
   return {user:{email:identity.email,roles:roles_(mine)},people,groups,
     access:access.rows.map(r=>({email:r.Email,name:named[r.Email]||'',roles:roles_(r),active:r.Active,version:version_(r)})),
+    catalogueRevision:dir.catalogueRevision||catalogueRevision_(ss),
     fetchedAt:new Date().toISOString(),signatureSettings:signatureSettings_(),deploymentAvailable:false};
 }
 // Shared data only: each caller's identity and current permissions are read separately.
 function contactDirectoryRead_(ss){
  return contactCachedRead_('directory-v601-memberships',()=>{
   if(contactCacheEnabled_){contactPrefetchDirectory_(ss);access_(ss);}
-  const catalogue=table_(ss,'roles'),contacts=deriveContacts_(ss,table_(ss,'contacts'),catalogue);
+  const catalogue=table_(ss,'roles'),rawContacts=table_(ss,'contacts'),contacts=deriveContacts_(ss,rawContacts,catalogue);
   required_(contacts,['TTb Name','Statutory Name','Role','Employment Modifier','Subject Modifier','Active','MK Modifier','Staff ID']);
   required_(catalogue,['Role Shortform']);
   const groupHeaders=catalogue.headers.filter(h=>!['Role Shortform','Formal Role Name','EO Appt Level','Required Subject Modifier'].includes(h));
@@ -237,7 +238,9 @@ function contactDirectoryRead_(ss){
     mobile:r['Mobile No'],ext:r.EXT
   }));
   // Requested directory fields are explicitly selected; raw rows and hidden identifiers are not exported.
-  return {people,groups:groupHeaders};
+  // The catalogue revision is computed here from the tables already loaded,
+  // so a cached directory read costs no extra sheet read on the warm path.
+  return {people,groups:groupHeaders,catalogueRevision:digestData_([sysFields_(ss,rawContacts,catalogue),catalogue.rows])};
  });
 }
 function setKP_(ss,req){
@@ -412,9 +415,17 @@ function deploymentData_(identity){
 const DATA_FIELDS=['TTb Name','Basic Name','Statutory Name','iCON Alias (@moe.edu.sg)','CES Alias (@schools.gov.sg)','GSPS Alias (@gsps.edu.sg)','Mobile No','EXT','Day of Birth','Month of birth','Role','EO Appt Level','Appointment Status','Employment Modifier','Subject Modifier','Active','MK Modifier'];
 function requireDataAdmin_(ss,identity){const mine=access_(ss).rows.find(r=>r.Email===identity.email);if(!roles_(mine).includes('Admin'))throw fault_(403,'Only Sys Admins may access staff data.');}
 function requireStaffView_(ss,identity){const r=roles_(access_(ss).rows.find(r=>r.Email===identity.email));if(!r.some(x=>x==='Admin'||x==='KP'))throw fault_(403,'Admin or KP access required');return r.includes('Admin')}
+// One catalogue revision for the Contacts viewport: a digest of the validation
+// choices and the roles table. It changes exactly when a Deploy catalogue sync
+// (or any catalogue edit) changes what the viewport shows, so the frontend can
+// invalidate its cached tables by revision instead of a manual reload.
+// Prefer the value-based digest on tables already loaded (no extra sheet read);
+// catalogueRevision_(ss) is only the fallback for directory entries cached
+// before this change, which expire within 30 seconds.
+function catalogueRevision_(ss){return digestData_([sysFields_(ss),table_(ss,'roles').rows]);}
 function contactData_(ss,identity){
  const editable=requireStaffView_(ss,identity),raw=table_(ss,'contacts'),catalogue=table_(ss,'roles'),t=deriveContacts_(ss,raw,catalogue);required_(t,['Staff ID',...DATA_FIELDS]);const seen=new Set();
- return {fields:DATA_FIELDS,editable,roleRules:catalogue.rows.map(r=>({role:r['Role Shortform'],level:normaliseEO_(r['EO Appt Level']),requiredSubject:requiredSubject_(r)})),lists:sysFields_(ss,t,catalogue),rows:t.rows.filter(r=>r['Staff ID']).map(r=>{if(seen.has(r['Staff ID']))throw fault_(503,'Duplicate Staff ID');seen.add(r['Staff ID']);return {id:r['Staff ID'],values:DATA_FIELDS.map(k=>r[k]||''),computed:DATA_FIELDS.map(k=>CONTACT_DERIVED_FIELDS.includes(k)),groups:contactRoleGroups_(catalogue.rows.find(x=>x['Role Shortform']===r.Role),MEMBERSHIP_FLAGS),formalRole:catalogue.rows.find(x=>x['Role Shortform']===r.Role)?.['Formal Role Name']||''}})};
+ return {fields:DATA_FIELDS,editable,catalogueRevision:digestData_([sysFields_(ss,raw,catalogue),catalogue.rows]),roleRules:catalogue.rows.map(r=>({role:r['Role Shortform'],level:normaliseEO_(r['EO Appt Level']),requiredSubject:requiredSubject_(r)})),lists:sysFields_(ss,t,catalogue),rows:t.rows.filter(r=>r['Staff ID']).map(r=>{if(seen.has(r['Staff ID']))throw fault_(503,'Duplicate Staff ID');seen.add(r['Staff ID']);return {id:r['Staff ID'],values:DATA_FIELDS.map(k=>r[k]||''),computed:DATA_FIELDS.map(k=>CONTACT_DERIVED_FIELDS.includes(k)),groups:contactRoleGroups_(catalogue.rows.find(x=>x['Role Shortform']===r.Role),MEMBERSHIP_FLAGS),formalRole:catalogue.rows.find(x=>x['Role Shortform']===r.Role)?.['Formal Role Name']||''}})};
 }
 function safeCell_(v){return typeof v==='string'&&/^[=+@-]/.test(v)?"'"+v:v}
 function digestData_(v){return Utilities.base64EncodeWebSafe(Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256,JSON.stringify(v)))}
@@ -603,9 +614,10 @@ function adminTable_(ss,identity,kind){
  if(kind==='diy'){const r=ownStaff_(ss,identity);return {kind,editable:true,fields:DIY_FIELDS,lists:{},rows:[{id:r['Staff ID'],values:DIY_FIELDS.map(k=>r[k]||''),computed:DIY_FIELDS.map(()=>false)}]};}
  const editable=requireStaffView_(ss,identity),lists=sysFields_(ss);
  if(kind==='offload')throw fault_(410,'Offload is managed per version in Deploy.');
- if(kind==='sysFields')return {kind,editable,lists,fields:['Field','Options'],rows:VALIDATED_FIELDS.map(k=>[k,lists[k].join('\n')]),revision:digestData_(lists)};
+ if(kind==='sysFields')return {kind,editable,lists,fields:['Field','Options'],rows:VALIDATED_FIELDS.map(k=>[k,lists[k].join('\n')]),revision:digestData_(lists),catalogueRevision:digestData_([lists,table_(ss,'roles').rows])};
  const t=table_(ss,kind==='membership'?'roles':'offload'),fields=kind==='membership'?['Role Shortform','Formal Role Name',...MEMBERSHIP_FLAGS,'EO Appt Level']:['Tags','Offload Factor','Notes'];required_(t,kind==='membership'?['Role Shortform','EO Appt Level']:['Tags','Offload Factor']);
- lists['EO Appt Level']=[...new Set(['SL','HOD','Jnr KP','TC','ST','LT','MTT',...(lists['EO Appt Level']||[]),...t.rows.map(r=>normaliseEO_(r['EO Appt Level'])).filter(Boolean)])];const rows=t.rows.filter(r=>r[fields[0]]).map(r=>fields.map(k=>k==='EO Appt Level'?normaliseEO_(r[k]):k==='Required Subject Modifier'?requiredSubject_(r):r[k]||''));return {kind,editable,fields,rows,lists,revision:digestData_([fields,rows])};
+ const catalogueRevision=digestData_([lists,t.rows]);
+ lists['EO Appt Level']=[...new Set(['SL','HOD','Jnr KP','TC','ST','LT','MTT',...(lists['EO Appt Level']||[]),...t.rows.map(r=>normaliseEO_(r['EO Appt Level'])).filter(Boolean)])];const rows=t.rows.filter(r=>r[fields[0]]).map(r=>fields.map(k=>k==='EO Appt Level'?normaliseEO_(r[k]):k==='Required Subject Modifier'?requiredSubject_(r):r[k]||''));return {kind,editable,fields,rows,lists,revision:digestData_([fields,rows]),catalogueRevision};
 }
 function contactJournalRow_(sheet,id,width){
  if(!sheet||sheet.getLastRow()<2)return null;
