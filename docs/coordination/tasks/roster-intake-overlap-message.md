@@ -1,6 +1,6 @@
 # roster-intake-overlap-message: overlapping absence reports — say why, and show the true status
 
-- Status: implementing; claimed by Codex on 6 November 2026, 13:06 SGT; lane R.
+- Status: merged (#96 at c4f1e0b as 3906622, 6 Nov 19:24 SGT)
 - Branch: `codex/roster-intake-overlap-message`
 - Base: `afe4c6ea3d6034c78743e980fa0d8c70c8bb529f`
 - Reviewer/model: Muse or Claude
