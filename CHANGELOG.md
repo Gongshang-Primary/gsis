@@ -1,3 +1,7 @@
+# Pending: Contacts transport requires GSIS_SECRET, 7 November 2026
+
+Model: Codex. Contacts-only first step of the secret-consolidation series: require GSIS_SECRET for transport, retain the session purpose/origin derivation, preserve service envelope boundaries and fail closed on missing/invalid configuration. The build selects Contacts-specific helpers; other apps and independent session/private-link/provider secrets are unchanged. Adds a scoped legacy-read CI guard and signing/session regressions. Deployment requires the same GSIS_SECRET value at both Contacts ends and aligned active peers; keep legacy configuration until the new pair is live and verified. This is not the live Contacts configuration fix. See docs/coordination/tasks/gsis-secret-consolidation.md.
+
 # Pending: D1 parity inventory and CI coverage guard, 7 November 2026
 
 Model: Codex. Step 1 only: inventory canonical Google Roster dispatch, shared domain branches, Pages forwarding boundaries and persistence references; record synthetic D1 outcomes and detect unlisted operations in CI. Includes #96 intakeReview as present. No ports, production behavior, live calls or deployment. See docs/roster/D1_PARITY.md and docs/coordination/tasks/roster-d1-parity-sweep.md.

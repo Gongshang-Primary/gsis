@@ -1,7 +1,7 @@
 // Synthetic Contacts workbook. No real staff data, sessions or service calls.
 const fs=require('fs'),vm=require('vm'),crypto=require('crypto'),assert=require('assert/strict');
 module.exports=function fixture(source=fs.readFileSync('Contacts_Code.gs','utf8')){
- const sheets=new Map(),props=new Map([['BRIDGE_SECRET','x'.repeat(32)],['CONTACTS_PENDING_V2','{}']]);
+ const sheets=new Map(),props=new Map([['GSIS_SECRET','x'.repeat(32)],['BRIDGE_SECRET','x'.repeat(32)],['CONTACTS_PENDING_V2','{}']]);
  const stats={flush:0,reads:[],writes:[],nativeWrites:0,finds:0};let held=false,busy=false,mode='',insideAPI=false;
  class Sheet{
   constructor(name,data=[],max=1000){this.name=name;this.data=data;this.formulas=[];this.max=max;}

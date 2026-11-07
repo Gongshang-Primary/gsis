@@ -3,7 +3,7 @@ const {ctx,run,sheets,props,headers}=require('./contacts-data.cjs');
 const contact=sheets.get('contacts'),journal=sheets.get('contact_save_journal');let lockHeld=false,lockBusy=false;
 ctx.LockService.getScriptLock=()=>({tryLock(){if(lockBusy||lockHeld)return false;lockHeld=true;return true},releaseLock(){assert.ok(lockHeld);lockHeld=false}});
 sheets.get('admin_users').data.push(['recovery@gsps.edu.sg','Admin','Y','','r']);
-ctx.Utilities.computeHmacSha256Signature=(s,key)=>[...crypto.createHmac('sha256',key).update(s).digest()];ctx.ContentService={MimeType:{JSON:'json'},createTextOutput:text=>({text,setMimeType(){return this}})};props.set('BRIDGE_SECRET','x'.repeat(32));
+ctx.Utilities.computeHmacSha256Signature=(s,key)=>[...crypto.createHmac('sha256',key).update(s).digest()];ctx.ContentService={MimeType:{JSON:'json'},createTextOutput:text=>({text,setMimeType(){return this}})};props.set('GSIS_SECRET','x'.repeat(32));
 function post(action,input={},email='recovery@gsps.edu.sg'){const payload=JSON.stringify({action,input,identity:{email,subject:email},timestamp:Date.now(),nonce:crypto.randomUUID()});ctx.signed={postData:{contents:JSON.stringify({payload,signature:crypto.createHmac('sha256','x'.repeat(32)).update(payload).digest('hex')})}};return JSON.parse(run('doPost(signed).text'));}
 function pending(changes){ctx.recoveryChanges=changes;run("contactReadCache_.clear();var pendingID=Utilities.getUuid();saveJournal_(book,pendingID,actor.email,'contacts',recoveryChanges).begin()");return {requestId:run('pendingID'),digest:journal.data.at(-1)[3]};}
 contact.data[1][headers.indexOf('Mobile No')]='9123 4567';

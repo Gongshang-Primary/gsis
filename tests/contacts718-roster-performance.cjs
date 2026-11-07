@@ -19,7 +19,7 @@ function setup(source=current){
  f.metadata=metadata;f.reset();return f;
 }
 function read(f,email='smc@gsps.edu.sg'){const out=f.post('deploySnapshot',input,email);assert.equal(out.ok,true,JSON.stringify(out));return out.data;}
-function service(f){f.props.set('ROSTER_SERVICE_SECRET','s'.repeat(32));const payload=JSON.stringify({action:'rosterServiceDirectory',service:'gsis-roster-notifier-v1',input:{},timestamp:Date.now(),nonce:crypto.randomUUID()});f.ctx.serviceRequest={postData:{contents:JSON.stringify({payload,signature:crypto.createHmac('sha256','s'.repeat(32)).update(payload).digest('hex')})}};const out=JSON.parse(f.run('doPost(serviceRequest).text'));assert.equal(out.ok,true,JSON.stringify(out));return out.data;}
+function service(f){f.props.set('GSIS_SECRET','s'.repeat(32));f.props.set('ROSTER_SERVICE_SECRET','s'.repeat(32));const payload=JSON.stringify({action:'rosterServiceDirectory',service:'gsis-roster-notifier-v1',input:{},timestamp:Date.now(),nonce:crypto.randomUUID()});f.ctx.serviceRequest={postData:{contents:JSON.stringify({payload,signature:crypto.createHmac('sha256','s'.repeat(32)).update(payload).digest('hex')})}};const out=JSON.parse(f.run('doPost(serviceRequest).text'));assert.equal(out.ok,true,JSON.stringify(out));return out.data;}
 const plain=data=>{const copy=JSON.parse(JSON.stringify(data));delete copy.timing;return copy};
 const measurements={};
 for(const [label,call]of [['signedRosterDirectory',read],['notificationServiceDirectory',service]]){

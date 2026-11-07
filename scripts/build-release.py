@@ -63,6 +63,8 @@ for source, targets in api_secret_sources:
  block='/* '+marker+'_BEGIN */\n'+(root/source).read_text()+'\n/* '+marker+'_END */'
  pattern=r'/\* '+marker+r'_BEGIN \*/[\s\S]*?/\* '+marker+r'_END \*/'
  for target in targets:
+  helper_source=({'backend/ApiSecret.gs':'backend/ContactsApiSecret.gs','shared/gsis-api-secret.js':'shared/contacts-api-secret.js'}.get(source,source) if target in {'Contacts_Code.gs','contacts-update/public/_worker.js'} else source)
+  block='/* '+marker+'_BEGIN */\n'+(root/helper_source).read_text()+'\n/* '+marker+'_END */'
   path=root/target
   content=path.read_text()
   assert len(re.findall(pattern,content))<=1, 'Duplicate API secret helper: '+target
@@ -73,6 +75,10 @@ for dest,source,marker in [('backend/Code.gs','shared/edge-store.js','GSIS_EDGE_
  content=p.read_text()
  pattern=r'/\* '+marker+r'_BEGIN \*/[\s\S]*?/\* '+marker+r'_END \*/'
  block='/* '+marker+'_BEGIN */\n'+(root/source).read_text()+'\n/* '+marker+'_END */'
+ if dest=='Contacts_Code.gs' and source in {'backend/LordBridge.gs','backend/VenuesBridge.gs'}:
+  block=re.sub(r"gsisApiSecret_\('(?:LORD|VENUES)_BRIDGE_SECRET'\)",'gsisApiSecret_()',block)
+  block=block.replace('Configure VENUES_BRIDGE_SECRET','Configure GSIS_SECRET')
+  block=block.replace('A separate read-only service credential; never delegates a school-user role.', 'Read-only service boundary; transport authentication never delegates a school-user role.')
  p.write_text(re.sub(pattern,lambda m:block,content) if re.search(pattern,content) else content+'\n'+block+'\n')
 for folder in ['public','contacts-update/public','layout-update/public','roster-update/public']:
  p=root/folder/'_worker.js';content=p.read_text();marker='GSIS_BACKEND_RESPONSE'
