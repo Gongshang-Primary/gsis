@@ -80,3 +80,12 @@ Run the canonical build, focused local checks and full branch CI. Open the Conta
 
 - Inspection of the remaining CI logs also found two Node fixture failures in shard 4: `lord-source-bridges.cjs` and `review04-cache.cjs`, both still configuring the actual Contacts provider through legacy-only bindings. Those two fixture configurations were migrated without weakening their read/snapshot/security assertions. Other app providers and the LORD product code remain unchanged.
 - After the nested contract fixture correction, the complete local LORD suite passed: 40 programs, 0 failures. The two additional Node fixture corrections were verified separately before the next push: lord-source-bridges.cjs passed all 14 signed source contracts; review04-cache.cjs passed its cache/authority/mutation/timeout checks.
+
+## Calendar claim — 7 November 2026, Model: Codex
+
+- Status: claimed; paused before implementation pending bounded shared-build-file approval under the owner's new queue rule.
+- Branch: `codex/gsis-secret-consolidation-calendar`.
+- Base: `37a93066745573aef23e4084e5999412c3fbb601`, freshly fetched current main. Contacts #102 is recorded as owner-merged at b9d9f8c as 772d424. Reviewer for Calendar: Muse at the eventual exact head.
+- Scope: Calendar transport secret reads, Calendar-specific helper variants as necessary, Calendar job Worker transport, Calendar generated artifacts, the existing migrated-app legacy-read guard extended to Calendar, associated fixture/behavior tests and Calendar deploy instructions. Preserve CALENDAR_SESSION_SECRET for session signing; do not use the transport credential to sign Calendar sessions. No other app product changes or later queue work.
+- Shared-file scope request: `scripts/build-release.py` still injects the common fallback helpers into `calendar-backend/Code.gs` and `calendar-update/public/_worker.js`, and embeds the shared Venues bridge into Calendar. Extend its target selection/specialization narrowly for Calendar, retaining Contacts' merged behavior and byte-identical outputs for every other app. New Calendar helper sources are already contemplated in the queue; this request is for the shared generator edit, following the explicit Contacts precedent.
+- No implementation files edited or tests claimed. No live settings/data/provider calls or deployment. Continue only after the owner approves this bounded addition; do not proceed to the edge-queue design note or another app until the Calendar PR is reviewed and owner-merged.
