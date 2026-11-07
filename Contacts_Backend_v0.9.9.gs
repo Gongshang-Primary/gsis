@@ -73,7 +73,7 @@ var GSISSheets = (function(){
 /* GSIS_SHEETS_IO_END */
 /* GSiS Contacts v0.9.7 */
 // Cloudflare verifies Google identity. This endpoint accepts only HMAC-signed envelopes.
-// Set your chosen GSIS_SECRET in Script Properties and the matching Cloudflare secret. Legacy bridge keys remain supported when it is absent.
+// Set your chosen GSIS_SECRET in Script Properties and the matching Cloudflare secret. GSIS_SECRET is required; legacy transport names are not read.
 const GSIS_SHEET = PropertiesService.getScriptProperties().getProperty('CONTACTS_SHEET_ID') || '1mbKXkgL2L6OOud6aki8CgJsjReYRKxjlkMD3SdhudKI';
 // Editor-only first installation. Never expose this through doPost. Existing
 // installations use setupGSiS; this routine accepts only an explicitly configured
@@ -109,13 +109,7 @@ function setupGSiS() {
   required_(catalogue, ['Role Shortform']);
   const access = access_(ss);
   if (!access.rows.some(r => roles_(r).includes('Admin'))) throw new Error('At least one active Admin is required in admin_users.');
-  const properties = PropertiesService.getScriptProperties();
-  let secret = gsisApiSecret_('BRIDGE_SECRET');
-  if (!secret) {
-    secret = Utilities.getUuid().replace(/-/g, '') + Utilities.getUuid().replace(/-/g, '');
-    properties.setProperty('BRIDGE_SECRET', secret);
-  }
-  if (secret.length < 32) throw new Error('Existing BRIDGE_SECRET is too short. Set a random secret of at least 32 bytes.');
+  gsisApiSecret_(); // Validate the operator-supplied setting; never generate or rotate it here.
   console.log('GSiS setup ready. Set your chosen GSIS_SECRET in Project Settings > Script properties and the matching Cloudflare encrypted secret. The secret is not logged.');
   return {ready:true, spreadsheet:GSIS_SHEET, secretConfigured:true};
 }
@@ -130,7 +124,7 @@ function doPost(e) {
     const req=JSON.parse(env.payload);
     if(req.action==='venuesSource')return reply_({ok:true,data:venuesContactsSource_(env)});
     if(req.action==='lordService'){contactTrace_.action=req.action;contactTrace_.requestId=req.nonce;return reply_({ok:true,data:lordContactsService_(env)});}
-    const service=req.action==='rosterServiceDirectory',secret=gsisApiSecret_(service?'ROSTER_SERVICE_SECRET':'BRIDGE_SECRET');
+    const service=req.action==='rosterServiceDirectory',secret=gsisApiSecret_();
     if (!secret || secret.length < 32) throw fault_(503,service?'Roster service connection is not configured.':'School connection is not configured.');
     const expected = Utilities.computeHmacSha256Signature(env.payload,secret).map(b=>('0'+((b+256)%256).toString(16)).slice(-2)).join('');
     if (!equal_(expected,env.signature)) throw fault_(401,'Invalid service signature');
@@ -145,6 +139,7 @@ function doPost(e) {
       const rosterPeople=rosterContactPeople_(ss);return {rosterPeople,rosterAdminIds:rosterContactAdminIds_(ss,rosterPeople),rosterSMCIds:rosterContactSMCIds_(ss,rosterPeople),rosterUrgentSMCIds:rosterContactUrgentSMCIds_(ss,rosterPeople),user:{rosterSMC:false,rosterAdmin:false,rosterStaffId:null}};
      })});
     }
+    if(Object.prototype.hasOwnProperty.call(req,'service'))throw fault_(403,'A directory service request cannot perform a school-user action.');
     if (!req.identity || !/^[^@\s]+@gsps\.edu\.sg$/.test(req.identity.email||'') || !req.identity.subject) throw fault_(403,'School account required');
     // Published teaching data needs no Contacts workbook or directory recovery.
     if(req.action==='deployment')return reply_({ok:true,data:deploymentData_(req.identity)});
@@ -396,11 +391,11 @@ function rosterContactCreate_(ss,req){
  }finally{lock.releaseLock();}
 }
 
-// Optional active-only Deploy data. Configure DEPLOY_API_URL and DEPLOY_BRIDGE_SECRET.
+// Optional active-only Deploy data. Configure DEPLOY_API_URL and align GSIS_SECRET with Deploy.
 function bootstrapWithDeploy_(ss,identity){const data=bootstrap_(ss,identity);data.deploymentPending=true;return data;}
 function deploymentData_(identity){
  const current=currentContactsDeployment_(SpreadsheetApp.openById(GSIS_SHEET));if(current!==null)return current;
- const p=PropertiesService.getScriptProperties(),url=p.getProperty('DEPLOY_API_URL'),secret=gsisApiSecret_('DEPLOY_BRIDGE_SECRET');
+ const p=PropertiesService.getScriptProperties(),url=p.getProperty('DEPLOY_API_URL'),secret=gsisApiSecret_();
  if(!url||!secret)return {available:false,error:'Deploy connection not configured'};
  try{
   if(!/^https:\/\/script\.google\.com\/macros\/s\/[^/]+\/exec$/.test(url)||secret.length<32)throw Error('Invalid Deploy configuration');
@@ -1317,7 +1312,7 @@ function lordSourceHash_(value){return Utilities.computeDigest(Utilities.DigestA
 function lordSourceAuthenticate_(envelope,source){
  const fail=()=>lordSourceError_(401,'SOURCE_UNAUTHORIZED','Invalid LORD reference service request.');
  if(!envelope||typeof envelope.payload!=='string'||envelope.payload.length>6000||typeof envelope.signature!=='string'||!/^[a-f0-9]{64}$/.test(envelope.signature)||Object.keys(envelope).some(k=>!['payload','signature'].includes(k)))fail();
- const secret=gsisApiSecret_('LORD_BRIDGE_SECRET');if(!secret||secret.length<32)lordSourceError_(503,'SOURCE_UNAVAILABLE','Configure the LORD reference service connection.');
+ const secret=gsisApiSecret_();if(!secret||secret.length<32)lordSourceError_(503,'SOURCE_UNAVAILABLE','Configure the LORD reference service connection.');
  const signature=Utilities.computeHmacSha256Signature(envelope.payload,secret).map(b=>('0'+((b+256)%256).toString(16)).slice(-2)).join('');let mismatch=0;for(let i=0;i<64;i++)mismatch|=signature.charCodeAt(i)^envelope.signature.charCodeAt(i);if(mismatch)fail();
  let req;try{req=JSON.parse(envelope.payload);}catch(_){fail();}
  if(!req||req.action!=='lordService'||req.service!=='gsis-lord-v1'||req.source!==source||Object.keys(req).some(k=>!['action','service','source','timestamp','nonce','input'].includes(k))||!Number.isFinite(req.timestamp)||Math.abs(Date.now()-req.timestamp)>60000||!/^[-\w]{36}$/.test(req.nonce||''))fail();
@@ -1370,7 +1365,7 @@ function venuesSourceHash_(value){return Utilities.computeDigest(Utilities.Diges
 function venuesSourceAuthenticate_(envelope,source){
  const deny=()=>venuesSourceError_(401,'VENUES_SOURCE_AUTH','Invalid Venues source request.');
  if(!envelope||typeof envelope.payload!=='string'||envelope.payload.length>120000||typeof envelope.signature!=='string'||!/^[a-f0-9]{64}$/.test(envelope.signature)||Object.keys(envelope).some(k=>!['payload','signature'].includes(k)))deny();
- const secret=gsisApiSecret_('VENUES_BRIDGE_SECRET');if(!secret||secret.length<32)venuesSourceError_(503,'VENUES_SOURCE_SETUP','Configure VENUES_BRIDGE_SECRET for the Venues source service.');
+ const secret=gsisApiSecret_();if(!secret||secret.length<32)venuesSourceError_(503,'VENUES_SOURCE_SETUP','Configure GSIS_SECRET for the Venues source service.');
  const signature=Utilities.computeHmacSha256Signature(envelope.payload,secret).map(b=>('0'+((b+256)%256).toString(16)).slice(-2)).join('');let diff=0;for(let i=0;i<64;i++)diff|=signature.charCodeAt(i)^envelope.signature.charCodeAt(i);if(diff)deny();
  let request;try{request=JSON.parse(envelope.payload);}catch(_){deny();}
  if(!request||request.action!=='venuesSource'||request.service!=='gsis-venues-v1'||request.source!==source||Object.keys(request).some(k=>!['action','service','source','timestamp','nonce','input'].includes(k))||!Number.isFinite(request.timestamp)||Math.abs(Date.now()-request.timestamp)>60000||!/^[-\w]{36}$/.test(request.nonce||''))deny();
@@ -1397,14 +1392,11 @@ function venuesContactsSource_(envelope){
 /* GSIS_VENUES_CONTACTS_SOURCE_END */
 
 /* GSIS_API_SECRET_BEGIN */
-// Server-to-server transport only. Session keys, private links and provider credentials stay separate.
-function gsisApiSecret_(legacyName){
- const properties=PropertiesService.getScriptProperties(),value=properties.getProperty('GSIS_SECRET');
- if(value!==null&&value!==undefined){
-  if(typeof value!=='string'||! /^[!-~]{32,8000}$/.test(value))throw Object.assign(Error('GSIS_SECRET must contain 32 to 8000 printable ASCII characters without spaces.'),{status:503,code:'GSIS_SECRET_INVALID'});
-  return value;
- }
- return properties.getProperty(legacyName)||'';
+// Contacts transport uses one required setting. No legacy credential fallback.
+function gsisApiSecret_(){
+ const value=PropertiesService.getScriptProperties().getProperty('GSIS_SECRET');
+ if(typeof value!=='string'||! /^[!-~]{32,8000}$/.test(value))throw Object.assign(Error('GSIS_SECRET must contain 32 to 8000 printable ASCII characters without spaces.'),{status:503,code:'GSIS_SECRET_INVALID'});
+ return value;
 }
 
 /* GSIS_API_SECRET_END */

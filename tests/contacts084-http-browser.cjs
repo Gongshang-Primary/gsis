@@ -28,7 +28,7 @@ const googleStub="window.google={accounts:{id:{initialize(config){window.__login
    }else if(url.pathname==='/api/bootstrap')response=apiJSON({ok:true,data});
    else if(url.pathname==='/api/deployment')response=apiJSON({ok:true,data:{available:true,assignments:[],workloads:[],organisations:{}}});
    else response=await worker.fetch(new Request('http://127.0.0.1'+req.url),{
-    GOOGLE_CLIENT_ID:'fixture-client',APPS_SCRIPT_URL:'https://fixture.invalid/',BRIDGE_SECRET:'fixture-secret'.repeat(3),
+    GOOGLE_CLIENT_ID:'fixture-client',APPS_SCRIPT_URL:'https://fixture.invalid/',GSIS_SECRET:'fixture-secret'.repeat(3),
     ASSETS:{async fetch(request){
      const pathname=new URL(request.url).pathname,file=path.resolve(root,'.'+(pathname==='/'?'/index.html':pathname));
      if(!file.startsWith(root+path.sep)||!fs.existsSync(file)||!fs.statSync(file).isFile())return new Response('Missing asset',{status:404});

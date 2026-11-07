@@ -7,8 +7,8 @@ function request(input,signatureSecret=secret){
  f.ctx.venuesRequest={postData:{contents:JSON.stringify({payload,signature:crypto.createHmac('sha256',signatureSecret).update(payload).digest('hex')})}};
  return JSON.parse(f.run('doPost(venuesRequest).text'));
 }
-let r=request({operation:'manifest'});assert.equal(r.code,'VENUES_SOURCE_SETUP');
-f.props.set('VENUES_BRIDGE_SECRET',secret);
+f.props.delete('GSIS_SECRET');let r=request({operation:'manifest'});assert.equal(r.code,'GSIS_SECRET_INVALID');
+f.props.set('GSIS_SECRET',secret);f.props.set('VENUES_BRIDGE_SECRET','legacy-is-not-read'.repeat(3));
 r=request({operation:'manifest'},'wrong');assert.equal(r.code,'VENUES_SOURCE_AUTH');
 r=request({operation:'delete'});assert.equal(r.code,'VENUES_SOURCE_INPUT');
 f.run("lordContactsSnapshot_=function(){venuesSourceError_(409,'VENUES_SOURCE_CHANGED','Refresh the source.');}");

@@ -15,14 +15,14 @@ function service(f,extra={},secret='s'.repeat(32)){
  f.ctx.serviceSigned={postData:{contents:JSON.stringify({payload,signature:crypto.createHmac('sha256',secret).update(payload).digest('hex')})}};
  return JSON.parse(f.run('doPost(serviceSigned).text'));
 }
-// The notification service has a separate credential and cannot impersonate a school user or write.
+// The directory service shares transport authentication but cannot impersonate a school user or write.
 {
- const f=setup();assert.equal(service(f).status,503);f.props.set('ROSTER_SERVICE_SECRET','s'.repeat(32));
+ const f=setup();f.props.delete('GSIS_SECRET');assert.equal(service(f).status,503);f.props.set('ROSTER_SERVICE_SECRET','s'.repeat(32));assert.equal(service(f).status,503,'legacy-only service setting is rejected');f.props.set('GSIS_SECRET','s'.repeat(32));
  f.sheets.get('contacts').data[4][3]='admin';const out=service(f);assert.equal(out.ok,true,JSON.stringify(out));assert.deepEqual(out.data.rosterAdminIds,['staff-3']);
  assert.deepEqual(out.data.user,{rosterSMC:false,rosterAdmin:false,rosterStaffId:null});assert.equal(out.data.timing.io.apiReads,1);assert.equal(f.stats.writes.length,0);
  assert.equal(service(f,{},'x'.repeat(32)).status,401);assert.equal(service(f,{identity:{email:'admin@gsps.edu.sg',subject:'fake'}}).status,403);
  assert.equal(service(f,{service:'wrong'}).status,403);assert.equal(service(f,{input:{role:'Admin'}}).status,403);assert.equal(service(f,{timestamp:Date.now()-61000}).status,401);
- assert.equal(service(f,{action:'rosterContactCreate',input:request(),identity:{email:'admin@gsps.edu.sg',subject:'fake'}}).status,401);
+ assert.equal(service(f,{action:'rosterContactCreate',input:request(),identity:{email:'admin@gsps.edu.sg',subject:'fake'}}).status,403);
  f.sheets.get('admin_users').data[1][2]='N';assert.deepEqual(service(f).data.rosterAdminIds,[]);
  f.seedSnapshot([{id:'staff-1',field:'Basic Name',expected:'Person 1',value:'Changed name'}]);assert.equal(service(f).status,503);
 }

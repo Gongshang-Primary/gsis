@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';import {readFile} from 'node:fs/promises
 const source=await readFile('contacts-update/public/_worker.js','utf8'),{default:worker}=await import(toWorkerModuleURL('data:text/javascript;base64,'+Buffer.from(source).toString('base64')));
 const key=await crypto.subtle.generateKey({name:'RSASSA-PKCS1-v1_5',modulusLength:2048,publicExponent:new Uint8Array([1,0,1]),hash:'SHA-256'},true,['sign','verify']),jwk=await crypto.subtle.exportKey('jwk',key.publicKey);jwk.kid='test';
 const enc=x=>Buffer.from(JSON.stringify(x)).toString('base64url'),h=enc({alg:'RS256',kid:'test'}),p=enc({iss:'https://accounts.google.com',aud:'client',sub:'test',email:'qa@gsps.edu.sg',email_verified:true,hd:'gsps.edu.sg',iat:Date.now()/1000-10,exp:Date.now()/1000+600}),sig=await crypto.subtle.sign('RSASSA-PKCS1-v1_5',key.privateKey,new TextEncoder().encode(h+'.'+p)),jwt=h+'.'+p+'.'+Buffer.from(sig).toString('base64url');
-const env={GOOGLE_CLIENT_ID:'client',APPS_SCRIPT_URL:'https://script.google.com/macros/s/test/exec',BRIDGE_SECRET:'x'.repeat(64)};
+const env={GOOGLE_CLIENT_ID:'client',APPS_SCRIPT_URL:'https://script.google.com/macros/s/test/exec',GSIS_SECRET:'x'.repeat(64),BRIDGE_SECRET:'x'.repeat(64)};
 const request=path=>new Request('https://contacts.example/api/'+path,{method:'POST',headers:{Origin:'https://contacts.example',Authorization:'Bearer '+jwt},body:JSON.stringify({requestId:crypto.randomUUID()})});
 const originalTimeout=AbortSignal.timeout,originalFetch=globalThis.fetch,originalError=console.error;let budgets=[],mode='ok',logs=[];
 AbortSignal.timeout=ms=>{budgets.push(ms);return originalTimeout(ms)};console.error=(label,data)=>logs.push(data);

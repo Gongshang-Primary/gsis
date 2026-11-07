@@ -19,7 +19,7 @@ function request(action,input={},extra={}){return {action,input,timestamp:Date.n
  const reply=key=>JSON.parse(c.doPost(signed(request('deployment'),key)).text);
  assert.equal(reply(canonical).ok,true,'Contacts accepts GSIS_SECRET without requiring the legacy bridge key');
  assert.equal(reply(legacy).status,401,'configured canonical key must not keep accepting the old bridge key');
- h.values.delete('GSIS_SECRET');assert.equal(reply(legacy).ok,true,'unconfigured canonical preserves existing installation');
+ h.values.delete('GSIS_SECRET');assert.equal(reply(legacy).status,503,'Contacts requires GSIS_SECRET and never accepts legacy-only configuration');
  h.values.set('GSIS_SECRET','');assert.equal(reply(legacy).status,503,'empty configured canonical fails closed');assert.equal(reply(legacy).code,'GSIS_SECRET_INVALID');
  assert.equal(h.logs.some(line=>line.includes(canonical)||line.includes(legacy)),false,'diagnostics never disclose either key');
 }

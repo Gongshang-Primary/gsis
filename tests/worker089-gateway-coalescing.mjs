@@ -1,7 +1,7 @@
 import {toWorkerModuleURL} from './helpers/worker-module.cjs';
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
-const env={GOOGLE_CLIENT_ID:'client',APPS_SCRIPT_URL:'https://script.google.com/macros/s/test/exec',BRIDGE_SECRET:'x'.repeat(64)};
+const env={GOOGLE_CLIENT_ID:'client',APPS_SCRIPT_URL:'https://script.google.com/macros/s/test/exec',GSIS_SECRET:'x'.repeat(64),BRIDGE_SECRET:'x'.repeat(64)};
 const origin='https://suite.test';
 for (const [file,route,method] of [['contacts-update/public/_worker.js','bootstrap','GET'],['public/_worker.js','sync','POST']]) {
  const module=await import(toWorkerModuleURL('data:text/javascript;base64,'+Buffer.from(await readFile(file)).toString('base64')));
