@@ -1,6 +1,6 @@
 # roster-d1-parity-sweep: find and close every Google-only Roster operation now that Roster runs on D1
 
-- Status: **authorised, priority** (owner 6 Nov: "codex work. sweep now. put priority"); Codex, lane R.
+- Status: Step 1 merged (#101 at e6be5a4 as 27527f5, 7 Nov 16:10 SGT). Step 2 ports remain separate PRs in risk order. (Was: authorised, priority; owner 6 Nov: "codex work. sweep now. put priority"); Codex, lane R.
 - Reviewer/model: Muse or Claude
 
 ## Why
