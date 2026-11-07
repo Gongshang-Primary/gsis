@@ -1,6 +1,6 @@
 # gsis-secret-consolidation: reduce all transport secrets to one GSIS_SECRET
 
-- Status: implementing Contacts PR only; build-script scope approved by owner (7 Nov: "include").
+- Status: Contacts merged (#102 at b9d9f8c as 772d424, 7 Nov 16:34 SGT; local merge, CHANGELOG conflict kept both entries). Calendar is next, only after this merge. (Was: implementing Contacts PR only; build-script scope approved by owner (7 Nov: "include").)
 - Owner/model: Codex
 - Reviewer/model: Muse
 - Last updated (Asia/Singapore): 7 Nov 2026
