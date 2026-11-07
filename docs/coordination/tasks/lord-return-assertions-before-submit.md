@@ -1,6 +1,6 @@
 # lord-return-assertions-before-submit: move two return-form assertions before the submit click
 
-- Status: claimed
+- Status: implementing — change done and verified locally; draft PR after full CI is green.
 - Owner/model: Muse
 - Reviewer/model: Codex
 - Last updated (Asia/Singapore): 7 Nov 2026
@@ -19,6 +19,12 @@ Codex's nonblocking suggestion on PR #98 (reviewed at head 35a4f5a, merged as 99
 
 ## Verification
 Exact command, tested commit, outcome and evidence. Explicitly list checks not run.
+
+- `TZ=Asia/Singapore NODE_NO_WARNINGS=1 node lord-suite/tests/booking-remarks-return-browser.cjs` (with `LORD_TEST_CHROMIUM` set): PASS, `{"status":"passed",...}`.
+- Negative control: temporarily reintroduced the checkbox (`<input class="return-trolley-selected">`) and accordion (`<details data-trolley-phase="return">`) in `returnTrolleyHtml` (`lord-suite/Source/lord/assets/app.js`): the test FAILED at line 86, `AssertionError: no per-trolley selection checkbox, 1 !== 0`. Product file reverted immediately after (git checkout); the final diff touches only the test file, CHANGELOG.md and this task record.
+- `TZ=Asia/Singapore npm run build`: PASS (18 production components), no diff.
+- `TZ=Asia/Singapore python3 lord-suite/tests/run_all_checks.py`: LORD suite 40/40 passed, 0 failed.
+- Not run: full Node suite locally (CI is the gate); live services/data, staging, deployment.
 
 ## Review
 Reviewer/model, reviewed SHA, findings, resolution. Advisory review is not human approval.

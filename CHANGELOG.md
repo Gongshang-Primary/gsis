@@ -1,3 +1,4 @@
+
 # Pending: D1 Drive backup progress and cache-loss recovery, 12 November 2026
 
 Model: Codex. Completed, failed and expired runs remove their transient captured copies while retaining every ledger row and manifest. Full/increment exports and their scheduled worker renew ownership from actual progress, retain stage timings, and wait an hour after failures. Missing or corrupt derived timetable-cache entries are listed in `missingCacheParts` and omitted; authoritative digest failures remain fatal. Verified full/restore results appear in System Health. Per-day Admin alert identities survive recovery, which closes incidents without resetting blocked delivery history. Synthetic coverage includes 14,081 records, scheduled restore, increments, a 20-minute export/competing cron and retained blocked alerts. No live configuration, template activation, provider calls, merge or deployment. See docs/coordination/tasks/roster-d1-full-backup-fix.md.
@@ -44,6 +45,10 @@ Model: Muse. Assign Relief → Export Excel now produces the Stapler standalone 
 # Pending: Assign Relief Export Excel lists baseline-named teachers plus ad hoc relief teachers only, 10 November 2026
 
 Model: Muse. Assign Relief → Export Excel and the Drive daily file list only the teachers named in the baseline timetable plus ad hoc relief teachers, relief assignees and absent teachers; every other active teacher no longer appears. The download returns to the Stapler relief workbook for the selected date only (Teacher Summary, Stapler colours and legend), with absence reasons kept hidden. See docs/coordination/tasks/assign-relief-export-baseline-adhoc.md.
+# Pending: LORD return-form assertions run before submit, 7 November 2026
+
+Model: Muse. Test-only follow-up to PR #98: the two return-form assertions in `lord-suite/tests/booking-remarks-return-browser.cjs` (no per-trolley selection checkbox; no return accordion) now run before the submit click, against the rendered return form, instead of after submission on the success screen. No product change. See docs/coordination/tasks/lord-return-assertions-before-submit.md.
+
 
 # Pending: Contacts transport requires GSIS_SECRET, 7 November 2026
 
