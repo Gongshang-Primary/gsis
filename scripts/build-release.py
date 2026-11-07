@@ -78,6 +78,7 @@ for dest,source,marker in [('backend/Code.gs','shared/edge-store.js','GSIS_EDGE_
  if dest=='Contacts_Code.gs' and source in {'backend/LordBridge.gs','backend/VenuesBridge.gs'}:
   block=re.sub(r"gsisApiSecret_\('(?:LORD|VENUES)_BRIDGE_SECRET'\)",'gsisApiSecret_()',block)
   block=block.replace('Configure VENUES_BRIDGE_SECRET','Configure GSIS_SECRET')
+  block=block.replace('A separate read-only service credential; never delegates a school-user role.', 'Read-only service boundary; transport authentication never delegates a school-user role.')
  p.write_text(re.sub(pattern,lambda m:block,content) if re.search(pattern,content) else content+'\n'+block+'\n')
 for folder in ['public','contacts-update/public','layout-update/public','roster-update/public']:
  p=root/folder/'_worker.js';content=p.read_text();marker='GSIS_BACKEND_RESPONSE'

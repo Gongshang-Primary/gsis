@@ -6,6 +6,7 @@ for(const h of [contacts,deploy]){
  h.props.set('LORD_BRIDGE_SECRET',secret);h.ctx.Utilities.computeHmacSha256Signature=(s,k)=>[...crypto.createHmac('sha256',k).update(s).digest()];h.ctx.ContentService={MimeType:{JSON:'json'},createTextOutput:text=>({text,setMimeType(){return this;}})};
  for(const file of ['backend/LordBridge.gs',h===contacts?'backend/Contacts_Lord.gs':'backend/LordDeploy.gs'])vm.runInContext(fs.readFileSync(file,'utf8'),h.ctx);
 }
+contacts.props.set('GSIS_SECRET',secret); // Only the migrated Contacts provider changes its configuration name.
 const call=(h,event)=>{h.ctx.lordEvent=event;return JSON.parse(vm.runInContext('doPost(lordEvent).text',h.ctx));};
 let checks=0;const test=(name,fn)=>{try{fn();checks++;console.log('PASS',name);}catch(e){console.error('FAIL',name);throw e;}};
 const contactsPost=(input,changes)=>call(contacts,signed('contacts',input,changes)),deployPost=(input,changes)=>call(deploy,signed('deploy',input,changes));

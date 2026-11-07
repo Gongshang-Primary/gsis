@@ -1359,7 +1359,7 @@ function lordContactsSnapshot_(input){
 /* GSIS_LORD_CONTACTS_SOURCE_END */
 
 /* GSIS_VENUES_SOURCE_BRIDGE_BEGIN */
-// A separate read-only service credential; never delegates a school-user role.
+// Read-only service boundary; transport authentication never delegates a school-user role.
 function venuesSourceError_(status,code,message){throw Object.assign(Error(message),{status,code});}
 function venuesSourceHash_(value){return Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256,JSON.stringify(value)).map(b=>('0'+((b+256)%256).toString(16)).slice(-2)).join('');}
 function venuesSourceAuthenticate_(envelope,source){

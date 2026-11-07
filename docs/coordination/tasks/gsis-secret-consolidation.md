@@ -72,3 +72,11 @@ Codex to claim and code, starting with the Contacts PR. Muse reviews each PR at 
 ### Contacts handoff gate
 
 Run the canonical build, focused local checks and full branch CI. Open the Contacts draft PR only when the complete CI run at its exact head is green. Reviewer: Muse at that head. Do not start Calendar or another app until the owner has merged this Contacts PR. No live settings, data, provider calls, merges or deployments are authorized by this implementation.
+
+### Contacts CI fixture correction
+
+- First implementation CI run `42354141699` at `7f13689` failed in the nested LORD-to-Contacts reference contract after Node regressions. Its fake Contacts provider was still configured only with LORD_BRIDGE_SECRET, while Contacts now requires GSIS_SECRET. The contract fixture now aligns the synthetic Contacts GSIS_SECRET with the unchanged LORD caller's effective legacy signing value. This changes test configuration only; no LORD product migration or live alignment occurred. It directly exercises the staged-rollout alignment requirement.
+- Retained first-run failure evidence; do not describe that run as green or replace the full-CI gate with the focused local results. Rerun the full local LORD suite and full branch CI at the correction head before opening the Contacts draft PR.
+
+- Inspection of the remaining CI logs also found two Node fixture failures in shard 4: `lord-source-bridges.cjs` and `review04-cache.cjs`, both still configuring the actual Contacts provider through legacy-only bindings. Those two fixture configurations were migrated without weakening their read/snapshot/security assertions. Other app providers and the LORD product code remain unchanged.
+- After the nested contract fixture correction, the complete local LORD suite passed: 40 programs, 0 failures. The two additional Node fixture corrections were verified separately before the next push: lord-source-bridges.cjs passed all 14 signed source contracts; review04-cache.cjs passed its cache/authority/mutation/timeout checks.

@@ -34,6 +34,9 @@ for (const source of [contacts, deploy]) {
   source.ctx.console = { log() {}, info() {}, error() {} };
   assert.equal(typeof source.ctx.doPost, 'function');
 }
+// Contacts is migrated first; the unchanged LORD caller still uses its legacy transport binding.
+// Align the synthetic provider's required canonical value with that caller, as the rollout requires.
+contacts.props.set('GSIS_SECRET', secret);
 assert.equal(typeof contacts.ctx.lordContactsService_, 'function', 'Build the Contacts source bridge before running this contract.');
 assert.equal(typeof deploy.ctx.lordDeployService_, 'function', 'Build the Deploy source bridge before running this contract.');
 
