@@ -1,11 +1,11 @@
 # gsis-secret-consolidation: reduce all transport secrets to one GSIS_SECRET
 
-- Status: authorised (owner 7 Nov 2026: "Set it up for Codex"); Codex to claim and code.
+- Status: claimed — Contacts PR only; blocked pending Contacts-specific build-script scope confirmation.
 - Owner/model: Codex
 - Reviewer/model: Muse
 - Last updated (Asia/Singapore): 7 Nov 2026
 - Branch: codex/gsis-secret-consolidation
-- Base SHA: 0890f05
+- Base SHA: 9e1057b
 - Current head SHA (or PR head; avoid self-referential commit hashes):
 - PR:
 - User-authorised scope: cross-lane by necessity — the secret reads span Roster (lane R), Deploy, Calendar, Contacts, Venues and LORD. Owner authorised the setup 7 Nov 2026. One PR per app (Contacts first, then Calendar, Roster/Deploy, Venues, LORD); each PR is reviewed at its exact head by Muse and merged only on the owner's word.
@@ -34,3 +34,12 @@ Not deployed unless supported by explicit environment/version/time evidence. Sta
 
 ## Handoff
 Codex to claim and code, starting with the Contacts PR. Muse reviews each PR at its exact head. Owner merges and owns the live config alignment at deploy time. No secrets or private school data.
+
+## Contacts claim — 7 November 2026, Model: Codex
+
+- Branch: `codex/gsis-secret-consolidation`; base: `9e1057b` (the supplied main).
+- Scope: Contacts transport and Contacts browser session derivation only, associated tests/guard, generated Contacts artifacts and deploy instructions. Calendar and subsequent apps wait for Contacts review and owner merge. Reviewer: Muse.
+- Read the task and audit before claiming. Checked open PRs: no other Contacts consolidation implementation is open. No product files edited, no live reads/config changes, no secret values inspected.
+- Build-scope blocker: `scripts/build-release.py:52–69` injects `backend/ApiSecret.gs` into Contacts, Deploy/Roster, Calendar and Venues, and `shared/gsis-api-secret.js` into all app Workers. Its shared module assembly also embeds `backend/LordBridge.gs` and `backend/VenuesBridge.gs` into Contacts and other apps. Direct edits to Contacts embedded blocks are overwritten; changing the shared fallback globally would violate the one-app-per-PR rollout.
+- Proposed bounded addition: authorize `scripts/build-release.py` and Contacts-specific helper sources as needed to select GSIS_SECRET-only helper/module variants for Contacts targets, while keeping all other app outputs byte-identical. Add tests for Contacts generated parity and other-app non-regression; no global migration in this PR.
+- Per the owner's instruction to stop for files outside the listed scope, implementation is paused before product edits. No build, regression test, CI, review or deployment is claimed for this work yet.
