@@ -1,3 +1,7 @@
+# Pending: D1 parity inventory and CI coverage guard, 7 November 2026
+
+Model: Codex. Step 1 only: inventory canonical Google Roster dispatch, shared domain branches, Pages forwarding boundaries and persistence references; record synthetic D1 outcomes and detect unlisted operations in CI. Includes #96 intakeReview as present. No ports, production behavior, live calls or deployment. See docs/roster/D1_PARITY.md and docs/coordination/tasks/roster-d1-parity-sweep.md.
+
 # Pending: type-to-search teacher picker in Stapler "Add teacher tile", 6 November 2026
 
 Model: Muse. The Teacher field in the Add teacher tile dialog (and Edit teacher tile, which shares the same fields) is now the existing accessible teacher combobox instead of a native select. Typing filters as you type, matching the display name, the timetable name and bracket tags such as (MTL) and (FAJT), ignoring case, accents and spacing; prefix matches come first, then alphabetical. Keyboard and screen-reader support follow the combobox pattern, with a "No matching teacher" state. The same teachers, the same first-teacher default and the same saved staffId as before; saving tiles is unchanged. The shared picker also gains the new matching and ordering in Report Absence and Add teacher. Focused picker, dialog and Chromium tests passed. No deployment or live action. See [task](docs/coordination/tasks/stapler-add-tile-teacher-search.md).
