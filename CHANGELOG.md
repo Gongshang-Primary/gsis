@@ -1,4 +1,16 @@
+# Pending: type-to-search teacher picker in Stapler "Add teacher tile", 6 November 2026
+
+Model: Muse. The Teacher field in the Add teacher tile dialog (and Edit teacher tile, which shares the same fields) is now the existing accessible teacher combobox instead of a native select. Typing filters as you type, matching the display name, the timetable name and bracket tags such as (MTL) and (FAJT), ignoring case, accents and spacing; prefix matches come first, then alphabetical. Keyboard and screen-reader support follow the combobox pattern, with a "No matching teacher" state. The same teachers, the same first-teacher default and the same saved staffId as before; saving tiles is unchanged. The shared picker also gains the new matching and ordering in Report Absence and Add teacher. Focused picker, dialog and Chromium tests passed. No deployment or live action. See [task](docs/coordination/tasks/stapler-add-tile-teacher-search.md).
+
+# Pending: LORD return and collection as one long scrolling page, 6 November 2026
+
+Model: Muse. Return and collection trolley cards render open in a single scrolling list with no collapsible sections and no one-open-at-a-time binding. The return page no longer has the per-trolley "I am physically returning" checkbox or the two placement declaration checkboxes; quantity and photo per trolley still gate submission, partial returns remain barred by the backend, and both placement declarations are still sent as true with every trolley, covered by the single submit confirmation. Source and template copies kept byte-identical; return and collection browser tests updated. No deployment or live action. See [task](docs/coordination/tasks/lord-return-collection-scroll.md).
+
 # Pending: reliable Deploy to Contacts publication sync, 6 November 2026
+
+## Unreleased: D1 received absence review
+
+D1 received reports show saved overlapping periods and reasons. Exact duplicate attendance is marked Already recorded with an audit note, including bounded recovery of retained duplicate refusals. SMC can merge, keep existing, or edit then retry. Decisions require a current review and commit report status with attendance atomically; protected relief and original evidence remain. The reporter card shows parked review and applied states accurately. Google and D1 share the read-only comparison projection. No new setting, authority switch or live repair; local verification complete, full CI and exact-head review remain release gates. Revert this change to roll back; no schema migration.
 
 Model: Codex. Report Contacts sync separately after a saved Deploy publication. Retry the same frozen publication and global catalogue revision with Admin/identity checks; reject superseded retries. Contacts invalidates cached validation choices by digest and rejects stale in-flight reads while retaining drafts and pending saves. Deploy keeps Layout handoff status visible alongside Contacts. Canonical bundles rebuilt; focused dispatch, writer and DOM tests passed. No deployment or live action. See [task](docs/coordination/tasks/deploy-contacts-catalogue-sync.md).
 

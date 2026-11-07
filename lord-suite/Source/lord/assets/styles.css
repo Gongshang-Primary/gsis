@@ -793,21 +793,6 @@ input[data-monday-picker]{cursor:pointer}
 }
 .return-auto-issue { margin-top: .75rem; }
 .return-selection-note { margin-top: .85rem; }
-.return-trolley-selection {
-  display: grid;
-  grid-template-columns: 28px 1fr;
-  gap: .6rem;
-  align-items: start;
-  margin: .25rem 0 .85rem;
-  padding: .7rem .75rem;
-  border: 1px solid #cbd7e5;
-  border-radius: 12px;
-  background: #f5f8fb;
-}
-.return-trolley-selection input { width: 22px; height: 22px; margin: .05rem 0 0; }
-.return-trolley-selection label { margin: 0; font-weight: 750; line-height: 1.4; }
-.return-trolley-card.is-unselected { border-style: dashed; opacity: .82; }
-.return-trolley-fields.is-disabled { opacity: .5; }
 .accessory-trolley-card .photo-box.hidden { display: none !important; }
 
 /* v1.3 reload controls */
@@ -818,17 +803,8 @@ input[data-monday-picker]{cursor:pointer}
 .reload-data-status { padding:.65rem 1rem; background:#eaf4ee; color:#183c28; font-size:.85rem; }
 .reload-data-status.error { background:#fff1ef; color:#86251d; }
 @media (max-width:600px) { .app-header { flex-wrap:wrap; } .header-data-actions { margin-left:auto; } }
-/* v1.7 approved A/B/E: compact status and three visible trolley summaries. */
 .reload-data-status,.network-status{padding:4px 8px;line-height:1.3;font-size:12px;min-height:0}
-.trolley-card{padding:0;overflow:hidden}
-.trolley-card details>summary{min-height:48px;padding:8px 10px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:8px;background:#f2f5f8;border-bottom:1px solid #d7e0ea}
-.trolley-card summary::after{content:'+';font-size:20px;flex:0 0 auto}
-.trolley-card details[open]>summary::after{content:'−'}
 .trolley-card .trolley-progress{font-size:11px;color:#435468;margin-left:auto;text-align:right}
-.trolley-card details>:not(summary){margin:8px 10px}
-.trolley-card .trolley-head{min-height:28px}
-.trolley-card .trolley-head h3{font-size:13px}
-.trolley-card summary:focus-visible{outline:3px solid #be7800;outline-offset:-3px}
 .trolley-card button,.trolley-card select,.trolley-card input[type=number]{min-height:44px}
 @media(max-width:600px){.trolley-card .photo-preview{max-height:180px;object-fit:contain}.header-data-actions{gap:4px}}
 dialog.booking-overlay{border:0;max-width:none;max-height:none;width:100%;height:100dvh;margin:0;padding:12px;overflow:auto;color:var(--text,#10233f);background:transparent}
@@ -837,7 +813,6 @@ dialog.booking-overlay::backdrop{background:#10233f99}
 dialog.booking-overlay .booking-overlay-card{max-height:calc(100dvh - 24px);overflow:auto}
 dialog.booking-overlay button{min-width:44px;min-height:44px}
 .trolley-card input[type=file]{min-height:44px;max-width:100%;font-size:16px}
-.return-trolley-selection label{min-height:44px;display:flex;align-items:center}
 /* v1.8 task responses reuse compact v1.7 controls. */
 .response-card h2{margin:4px 0 8px}.response-card p{margin:8px 0}.response-actions{display:grid;gap:8px;margin-top:12px}.response-actions button{min-height:44px}.consent-check{display:flex;gap:10px;align-items:flex-start;margin:12px 0}.consent-check input{width:22px;height:22px;flex:none}.response-card .field{margin:10px 0}
 

@@ -33,7 +33,9 @@ Claude remains coordinator/reviewer while available; when Claude is unavailable,
 3. Bundle branch `deploy/<YYYY-MM-DD>-v0.9.9X` with `deploy-bundle/`: 1_Roster_Backend.gs (Roster_Backend_v0.9.9.gs), 2_Deploy_Backend.gs, 3_Roster_Frontend.zip, 4_gsis-roster-notifications_worker.js (notification-worker/dashboard-worker.mjs), 5_gsis-operations_worker.js, 6_Deploy_Frontend.zip, 7_Venues_Backend.gs only if changed, emergency/EdgeAuthorityTools.gs, optional-label-only/*, COMMIT.txt, LABEL.txt, SHA256SUMS.txt, DEPLOY_STEPS.md.
 4. DEPLOY_STEPS.md: what changed, deploy order, manual steps (crons, settings), checks, rollback. Record in `docs/plans/<date>-v0.9.9X.md`.
 
-## 5. State at handover (6 Nov ~11:45)
+## 5. State at handover — see also `plans/2026-11-handover-pr-plan.md` (PR-by-PR plan, 6 Nov afternoon; supersedes the queues below)
+
+### Earlier snapshot (6 Nov ~11:45)
 - **Live**: v0.9.9n on D1 (fresh start 5 Nov 23:10). Drive backups/daily outputs **disabled** (writes failed with ROSTER_BRIDGE_ERROR; #87 records the real reason).
 - **Main, not deployed**: #84 ad hoc priority, #87 Drive failure reasons + Admin-only system alerts, #91 always-confirmed Stapler → **release o**. Approved, awaiting merge: #90 (Contacts publish retry; then close #83), #92 (Calendar stale save), #93 (day export, no status tags).
 - **After deploying o**: SMC confirm 10 and 12 Nov Stapler drafts (rev 2) if intended; enable daily outputs once, read the recorded reason, fix or keep on.

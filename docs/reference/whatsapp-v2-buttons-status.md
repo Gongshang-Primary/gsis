@@ -21,3 +21,9 @@ How to switch the 5 ready routes (no code change): Cloudflare → gsis-roster-no
 Roll back: paste the previous value (`notification-worker/templates.activation.json`).
 Before switching: confirm the current `WHATSAPP_TEMPLATES_JSON` value equals `notification-worker/templates.activation.json` (if it was edited by hand, merge the 5 flags into it instead of replacing).
 Remaining 3 (contact_review, relief_unacknowledged, relief_urgent_smc): Codex task to capture the exact approved body/buttons as contracts, then they can be switched the same way.
+
+## Evidence captured on 6 November
+
+The exact approved contracts for contact_review, relief_unacknowledged and relief_urgent_smc are in [whatsapp-remaining-v2-contracts.json](whatsapp-remaining-v2-contracts.json). Each has one static URL button. No capability token or dynamic button parameter is appropriate. Body parameters are 3, 4 and 5 respectively; the v1 final URL parameter is omitted.
+
+This is provider evidence, not runtime activation readiness. The canonical template registry still needs promotion from pendingVariants to variants, static-button regression coverage, regenerated outputs, full CI and Muse review. Keep the three activation flags false until that work is complete. No live settings changed.

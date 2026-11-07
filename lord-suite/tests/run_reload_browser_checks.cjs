@@ -70,9 +70,10 @@ function pass(name){results.push({name,ok:true});}
   if(app==='lord'){
    await page.locator('#bookBtn').waitFor();
    await page.evaluate(()=>{state.mode='loan';state.loan.cartGroup='Cart A';state.loan.trolleys=[1,2,3].map(n=>({name:'A'+n,quantity:14,photoData:'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7',fileName:'example.gif'}));renderLoanTrolleys();});
-   assert.equal(await page.locator('details[data-trolley-phase="loan"]').count(),3);
-   await page.locator('details[data-index="1"] summary').click();await page.waitForFunction(()=>document.querySelectorAll('details[data-trolley-phase="loan"][open]').length===1&&document.querySelector('details[data-index="1"]').open);
-   await page.locator('#loan-quantity-1').fill('13');await page.locator('details[data-index="2"] summary').click();await page.locator('details[data-index="1"] summary').click();assert.equal(await page.locator('#loan-quantity-1').inputValue(),'13');assert(await page.evaluate(()=>state.loan.trolleys.every(t=>Boolean(t.photoData))));pass('Three trolley sections preserve quantities and photo state while switching');
+   assert.equal(await page.locator('.trolley-card').count(),3);
+   assert.equal(await page.locator('details[data-trolley-phase="loan"]').count(),0,'collection trolleys render open, with no accordion');
+   assert(await page.evaluate(()=>[...document.querySelectorAll('.trolley-card .trolley-quantity')].every(el=>el.offsetParent!==null)),'every trolley quantity field is visible at once');
+   await page.locator('#loan-quantity-1').fill('13');assert.equal(await page.locator('#loan-quantity-1').inputValue(),'13');assert(await page.evaluate(()=>state.loan.trolleys.every(t=>Boolean(t.photoData))));pass('Three trolley cards render open together and preserve quantities and photo state');
    await page.locator('#loanComments').fill('Keep this draft');await page.locator('#backBtn').focus();
    await page.evaluate(()=>{globalThis.dialogResult=undefined;confirmLORD('Cancel this sample booking?','Cancel booking','Keep booking').then(value=>globalThis.dialogResult=value);});
    assert(await page.locator('[data-safe-focus]').evaluate(el=>el===document.activeElement));await page.keyboard.press('Escape');await page.waitForFunction(()=>globalThis.dialogResult===false);assert.equal(await page.locator('#loanComments').inputValue(),'Keep this draft');assert.equal(await page.evaluate(()=>document.activeElement.id),'backBtn');pass('LORD safe default, Escape and focus restoration retain draft fields');
