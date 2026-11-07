@@ -1,13 +1,13 @@
 # lord-return-assertions-before-submit: move two return-form assertions before the submit click
 
-- Status: implementing — change done and verified locally; draft PR after full CI is green.
+- Status: draft PR #103 opened 7 Nov 2026, head f3f0e67, CI run 42359057289 green; task-record commit moves the head, PR body to be updated to the new head after its CI is green.
 - Owner/model: Muse
 - Reviewer/model: Codex
 - Last updated (Asia/Singapore): 7 Nov 2026
 - Branch: muse/lord-return-assertions-before-submit
 - Base SHA: 37a9306
 - Current head SHA (or PR head; avoid self-referential commit hashes):
-- PR:
+- PR: #103
 - User-authorised scope: test-only. Move the two return-form assertions in `lord-suite/tests/booking-remarks-return-browser.cjs` (no per-trolley selection checkbox; no return accordion) to before the submit click, so they check the rendered return form instead of the success screen. Follow-up to Codex's nonblocking suggestion on PR #98, approved by the owner 7 Nov 2026.
 - Files/domains owned (include generated outputs): `lord-suite/tests/booking-remarks-return-browser.cjs`, `CHANGELOG.md`, this task record.
 - Out of scope: no LORD product code, no other test files, no backend change, no live data or deployment.
