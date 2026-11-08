@@ -117,7 +117,7 @@ Run the canonical build, focused local checks and full branch CI. Open the Conta
 ### Calendar remaining gates
 
 - Local implementation is prepared for Muse's review at the eventual exact head. No Muse review or approval has occurred.
-- Branch history resolution remains pending because the published claim cannot be rebased and pushed to its existing branch without violating the owner's no-force-push rule. Do not push rewritten history. Apply the owner's selected merge/new-branch alternative before publishing implementation.
+- Branch history resolution: owner directed the fresh-branch procedure on 8 November; see the branch-move record below. Do not rewrite or push the old branch.
 - Run canonical build at the final head and require no diff. Full CI at that exact published head must pass all 5 jobs before opening a draft PR. No Calendar PR, full-CI pass, deployment, live configuration alignment, live D1/Google reads or provider verification is claimed here. Contacts' live 401 configuration alignment remains outside this work.
 
 ### Calendar local verification — 8 November 2026, Model: Codex
@@ -126,3 +126,12 @@ Run the canonical build, focused local checks and full branch CI. Open the Conta
 - Across the focused runs, 56 distinct local test programs passed, including all 46 top-level Calendar programs, the two existing Contacts consolidation programs, Calendar job gateway/SQLite Worker, backend-secret compatibility, Calendar bundle checker, Roster gateway integration, LORD source bridges, cache contracts and current release metadata. Initial missing-key fixture failure is retained above; its corrected rerun passed. Local log inventories are in ignored `verification/calendar-consolidation-results.json` and `verification/calendar-consolidation-extra-results.json`.
 - Guard negative control passed and the deliberately introduced read was removed. `git diff --check` passed. Other apps' product and generated paths have no diff.
 - Not run: full local `npm test`, full branch CI for this implementation, live service/D1/Google/provider tests, deployment or owner-side credential alignment. Historical release comparisons were not rerun. The full CI and exact-head Muse review remain gates, not inferred from these focused checks.
+
+
+### Calendar branch move — 8 November 2026, Model: Codex
+
+- Owner confirmed the standing rule: a rebase of published work always uses a fresh branch because force-push is prohibited. Follow this procedure for future published-branch refreshes without treating it as a new owner decision.
+- Current branch: `codex/gsis-secret-consolidation-calendar-rebase`, created from freshly fetched main `27ab05af8c5464f4479d6bed536673608f188bd3`.
+- Cherry-picked the existing claim `585f1c3` as `fcc0d48`, then implementation `e33a806` as `f1cecb5`, in that order. Both applied cleanly with no conflicts. This carries the existing claim forward; it is not a new claim.
+- Old branch `codex/gsis-secret-consolidation-calendar` remains unchanged at local implementation `e33a80655fdeb53db7507b860f8db8d60475bb06`; its published claim remains untouched. Do not push to it.
+- Status: implementation carried forward; final-head canonical build, focused verification, new-branch push and all-five-job CI gate precede the draft PR. Reviewer: Muse at that exact head. Owner merges and deploys; no review, merge, deployment or live configuration alignment is claimed.
