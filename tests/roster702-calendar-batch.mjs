@@ -29,7 +29,7 @@ assert.throws(()=>h.call('rosterDate',{date:'2028-01-03'},'teacher'),error=>erro
 h.seed('Years',[{Year:2026,Status:'ARCHIVED',ReleasedToTeachers:'Yes'}]);
 assert.equal(h.call('rosterDates',{dates:[keys[0]]},'teacher').dates[0].code,'YEAR_UNAVAILABLE');
 
-function calendarPost(changes={}){const body={action:'rosterDates',payload:{dates:[keys[0]]},actor:h.actor('teacher'),proxySecret:'synthetic-secret',...changes};return JSON.parse(h.sandbox.doPost({postData:{contents:JSON.stringify(body)}}).text);}
+function calendarPost(changes={}){const body={action:'rosterDates',payload:{dates:[keys[0]]},actor:h.actor('teacher'),proxySecret:'synthetic-secret'.repeat(3),...changes};return JSON.parse(h.sandbox.doPost({postData:{contents:JSON.stringify(body)}}).text);}
 assert.equal(calendarPost().ok,true);
 assert.equal(calendarPost({proxySecret:'wrong'}).ok,false);
 assert.equal(calendarPost({actor:{...h.actor('teacher'),email:'teacher@outside.test'}}).ok,false);
@@ -39,7 +39,7 @@ assert.equal(calendarPost({action:'rosterDate',payload:{date:keys[0]},service:'g
 assert.equal(h.audit.writes,beforeWrites);assert.equal(h.audit.calendarCalls.length,0);
 
 const gateway=await import(toWorkerModuleURL('data:text/javascript;base64,'+Buffer.from(fs.readFileSync('roster-update/public/_worker.js','utf8')).toString('base64')));
-const env={APPS_SCRIPT_URL:'https://script.google.com/macros/s/roster-test/exec',BRIDGE_SECRET:'s'.repeat(40),CALENDAR_APPS_SCRIPT_URL:'https://script.google.com/macros/s/calendar-test/exec',CALENDAR_PROXY_SECRET:'synthetic-secret'},who={email:'teacher@gsps.edu.sg',subject:'teacher'};
+const env={APPS_SCRIPT_URL:'https://script.google.com/macros/s/roster-test/exec',BRIDGE_SECRET:'s'.repeat(40),CALENDAR_APPS_SCRIPT_URL:'https://script.google.com/macros/s/calendar-test/exec',CALENDAR_PROXY_SECRET:'synthetic-secret'.repeat(3)},who={email:'teacher@gsps.edu.sg',subject:'teacher'};
 const input={operation:'saveAbsence',date:keys[0],from:keys[0],to:keys.at(-1),revision:4,requestId:crypto.randomUUID(),calendarByDate:{[keys[0]]:{date:keys[0],schoolDay:false,parity:'odd'}}};
 const oldFetch=globalThis.fetch,oldTimeout=AbortSignal.timeout,oldInfo=console.info;
 let calls=[];

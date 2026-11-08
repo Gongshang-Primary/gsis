@@ -6,7 +6,7 @@
  * FIRST RUN
  * 1. Enable Advanced Google service Calendar API v3 (Calendar). Sheets v4 is not required.
  * 2. NEW workbook: setupCalendarV2Workbook(). EXISTING workbook: upgradeCalendarToRC19().
- * 3. In Project Settings > Script Properties set your chosen GSIS_SECRET (or retain CALENDAR_PROXY_SECRET until switching).
+ * 3. In Project Settings > Script Properties set your chosen GSIS_SECRET (required on both Calendar ends).
  * 4. Deploy as Web App:
  *      Execute as: Me
  *      Who has access: Anyone
@@ -856,7 +856,7 @@ function doPost(e) {
     if (request.service !== undefined) {
       if(request.service==='gsis-calendar-command-v1')return jsonOutput_({ok:true,result:calendarCommandService_(request)});
       if (request.service === 'gsis-calendar-sync-worker-v1' && request.action === 'calendarSyncContinue') {
-        const secret = gsisApiSecret_('CALENDAR_SERVICE_SECRET');
+        const secret = gsisApiSecret_();
         if (!secret || request.calendarServiceSecret !== secret) throw mutationError_('SERVICE_AUTH_REQUIRED', 'Calendar background service is not authorised.', 403, true);
         return jsonOutput_({ok: true, result: apiContinueCalendarSync_()});
       }
@@ -1074,8 +1074,8 @@ function parseRequest_(e) {
 }
 
 function verifyProxySecret_(candidate) {
-  const expected = gsisApiSecret_('CALENDAR_PROXY_SECRET');
-  if (!expected) throw new Error('Backend is not configured: CALENDAR_PROXY_SECRET missing.');
+  const expected = gsisApiSecret_();
+  if (!expected) throw new Error('Backend is not configured: GSIS_SECRET missing.');
   if (!candidate || !constantTimeEqual_(String(candidate), String(expected))) throw new Error('Unauthorised proxy.');
 }
 
@@ -10016,9 +10016,9 @@ function apiRosterStatisticsCalendar_(payload){
 function calendarBirthdaySource_(actor) {
   const props=PropertiesService.getScriptProperties();
   const url=String(props.getProperty('CONTACTS_APPS_SCRIPT_URL')||'').trim();
-  const secret=String(gsisApiSecret_('CONTACTS_BRIDGE_SECRET')||'');
+  const secret=String(gsisApiSecret_()||'');
   if(!/^https:\/\/script\.google\.com\/macros\/s\/[\w-]+\/exec$/.test(url)||secret.length<32) {
-    throw mutationError_('CONTACTS_NOT_CONFIGURED','Set CONTACTS_APPS_SCRIPT_URL and CONTACTS_BRIDGE_SECRET in Calendar Script Properties. No birthday was changed.',503,true);
+    throw mutationError_('CONTACTS_NOT_CONFIGURED','Set CONTACTS_APPS_SCRIPT_URL and GSIS_SECRET in Calendar Script Properties. No birthday was changed.',503,true);
   }
   const payload=JSON.stringify({action:'calendarBirthdays',identity:{email:actor.email,subject:actor.sub},input:{},timestamp:Date.now(),nonce:Utilities.getUuid()});
   const signature=Utilities.computeHmacSha256Signature(payload,secret).map(b=>('0'+((b+256)%256).toString(16)).slice(-2)).join('');
@@ -10171,13 +10171,13 @@ function apiPullBirthdays_(actor,payload,requestId) {
 /* GSIS_CALENDAR_BIRTHDAYS_END */
 
 /* GSIS_VENUES_SOURCE_BRIDGE_BEGIN */
-// A separate read-only service credential; never delegates a school-user role.
+// Read-only service boundary; transport authentication never delegates a school-user role.
 function venuesSourceError_(status,code,message){throw Object.assign(Error(message),{status,code});}
 function venuesSourceHash_(value){return Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256,JSON.stringify(value)).map(b=>('0'+((b+256)%256).toString(16)).slice(-2)).join('');}
 function venuesSourceAuthenticate_(envelope,source){
  const deny=()=>venuesSourceError_(401,'VENUES_SOURCE_AUTH','Invalid Venues source request.');
  if(!envelope||typeof envelope.payload!=='string'||envelope.payload.length>120000||typeof envelope.signature!=='string'||!/^[a-f0-9]{64}$/.test(envelope.signature)||Object.keys(envelope).some(k=>!['payload','signature'].includes(k)))deny();
- const secret=gsisApiSecret_('VENUES_BRIDGE_SECRET');if(!secret||secret.length<32)venuesSourceError_(503,'VENUES_SOURCE_SETUP','Configure VENUES_BRIDGE_SECRET for the Venues source service.');
+ const secret=gsisApiSecret_();if(!secret||secret.length<32)venuesSourceError_(503,'VENUES_SOURCE_SETUP','Configure GSIS_SECRET for the Venues source service.');
  const signature=Utilities.computeHmacSha256Signature(envelope.payload,secret).map(b=>('0'+((b+256)%256).toString(16)).slice(-2)).join('');let diff=0;for(let i=0;i<64;i++)diff|=signature.charCodeAt(i)^envelope.signature.charCodeAt(i);if(diff)deny();
  let request;try{request=JSON.parse(envelope.payload);}catch(_){deny();}
  if(!request||request.action!=='venuesSource'||request.service!=='gsis-venues-v1'||request.source!==source||Object.keys(request).some(k=>!['action','service','source','timestamp','nonce','input'].includes(k))||!Number.isFinite(request.timestamp)||Math.abs(Date.now()-request.timestamp)>60000||!/^[-\w]{36}$/.test(request.nonce||''))deny();
@@ -10216,14 +10216,11 @@ function venuesCalendarView_(year){
 /* GSIS_VENUES_CALENDAR_SOURCE_END */
 
 /* GSIS_API_SECRET_BEGIN */
-// Server-to-server transport only. Session keys, private links and provider credentials stay separate.
-function gsisApiSecret_(legacyName){
- const properties=PropertiesService.getScriptProperties(),value=properties.getProperty('GSIS_SECRET');
- if(value!==null&&value!==undefined){
-  if(typeof value!=='string'||! /^[!-~]{32,8000}$/.test(value))throw Object.assign(Error('GSIS_SECRET must contain 32 to 8000 printable ASCII characters without spaces.'),{status:503,code:'GSIS_SECRET_INVALID'});
-  return value;
- }
- return properties.getProperty(legacyName)||'';
+// Calendar transport uses one required setting. No legacy credential fallback.
+function gsisApiSecret_(){
+ const value=PropertiesService.getScriptProperties().getProperty('GSIS_SECRET');
+ if(typeof value!=='string'||! /^[!-~]{32,8000}$/.test(value))throw Object.assign(Error('GSIS_SECRET must contain 32 to 8000 printable ASCII characters without spaces.'),{status:503,code:'GSIS_SECRET_INVALID'});
+ return value;
 }
 
 /* GSIS_API_SECRET_END */
@@ -10293,7 +10290,7 @@ function calendarVenueCatalogue_(actor){
     const props=PropertiesService.getScriptProperties(),url=props.getProperty('VENUES_APPS_SCRIPT_URL');
     if(!url)fail('VENUES_URL_MISSING');
     if(!/^https:\/\/script\.google\.com\/macros\/s\/[\w-]+\/exec$/.test(url))fail('VENUES_URL_INVALID');
-    const secret=gsisApiSecret_('VENUES_BRIDGE_SECRET');if(!secret)fail('VENUES_SECRET_MISSING');
+    const secret=gsisApiSecret_();if(!secret)fail('VENUES_SECRET_MISSING');
     const payload=JSON.stringify({action:'calendarCatalogue',service:'gsis-calendar-catalogue-v1',purpose:'calendar-venue-catalogue-v1',timestamp:Date.now(),nonce:Utilities.getUuid(),identity:{email:actor.email,subject:actor.sub},input:{operation:'calendarLookup'}});
     const signature=Utilities.computeHmacSha256Signature(payload,secret).map(b=>('0'+((b+256)%256).toString(16)).slice(-2)).join('');
     stage='transport';

@@ -2,7 +2,7 @@
 const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm'),crypto=require('node:crypto');
 const {makeHarness}=require('./calendar/backend_harness.cjs');
 function fixture(){const h=makeHarness();if(fs.existsSync('calendar-backend/Commands.gs'))vm.runInContext(fs.readFileSync('calendar-backend/Commands.gs','utf8'),h.sandbox);return h;}
-function request(h,mode,payload,extra={}){return JSON.parse(h.sandbox.doPost({postData:{contents:JSON.stringify({proxySecret:'synthetic-secret',service:'gsis-calendar-command-v1',purpose:'calendar-mutation-job-v1',action:'calendarCommand',mode,actor:h.actor('admin'),commandId:payload.operationId,operation:{action:'saveEvent',payload},...extra})}}).text);}
+function request(h,mode,payload,extra={}){return JSON.parse(h.sandbox.doPost({postData:{contents:JSON.stringify({proxySecret:'synthetic-secret'.repeat(3),service:'gsis-calendar-command-v1',purpose:'calendar-mutation-job-v1',action:'calendarCommand',mode,actor:h.actor('admin'),commandId:payload.operationId,operation:{action:'saveEvent',payload},...extra})}}).text);}
 {
  const h=fixture(),event=h.event('E1'),payload={event:{...event,StaffTitle:'Queued change'},expectedRevision:event._revision,operationId:crypto.randomUUID()},before=JSON.stringify(h.sheets.get('Events').values),writes=h.audit.nativeWrites.length;
  const auth=request(h,'authorize',payload);assert.equal(auth.ok,true,auth.error);assert.equal(auth.result.authorized,true);assert.equal(h.audit.nativeWrites.length,writes);assert.equal(JSON.stringify(h.sheets.get('Events').values),before);

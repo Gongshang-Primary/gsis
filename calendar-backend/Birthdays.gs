@@ -4,9 +4,9 @@
 function calendarBirthdaySource_(actor) {
   const props=PropertiesService.getScriptProperties();
   const url=String(props.getProperty('CONTACTS_APPS_SCRIPT_URL')||'').trim();
-  const secret=String(gsisApiSecret_('CONTACTS_BRIDGE_SECRET')||'');
+  const secret=String(gsisApiSecret_()||'');
   if(!/^https:\/\/script\.google\.com\/macros\/s\/[\w-]+\/exec$/.test(url)||secret.length<32) {
-    throw mutationError_('CONTACTS_NOT_CONFIGURED','Set CONTACTS_APPS_SCRIPT_URL and CONTACTS_BRIDGE_SECRET in Calendar Script Properties. No birthday was changed.',503,true);
+    throw mutationError_('CONTACTS_NOT_CONFIGURED','Set CONTACTS_APPS_SCRIPT_URL and GSIS_SECRET in Calendar Script Properties. No birthday was changed.',503,true);
   }
   const payload=JSON.stringify({action:'calendarBirthdays',identity:{email:actor.email,subject:actor.sub},input:{},timestamp:Date.now(),nonce:Utilities.getUuid()});
   const signature=Utilities.computeHmacSha256Signature(payload,secret).map(b=>('0'+((b+256)%256).toString(16)).slice(-2)).join('');

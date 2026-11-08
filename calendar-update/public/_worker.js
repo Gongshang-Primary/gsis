@@ -1,13 +1,9 @@
 /* GSIS_API_SECRET_BEGIN */
-// First-party API credentials share one operator-selected setting. Browser
-// sessions, private relief links and third-party credentials stay independent.
-function gsisApiSecret(env,legacyName){
+// Calendar transport uses one required setting. Calendar session signing stays separate.
+function gsisApiSecret(env){
  const value=env?.GSIS_SECRET;
- if(value!==undefined||Object.prototype.hasOwnProperty.call(env||{},'GSIS_SECRET')){
-  if(typeof value!=='string'||!/^[!-~]{32,8000}$/.test(value))throw Object.assign(Error('GSIS_SECRET must contain 32 to 8000 printable ASCII characters without spaces.'),{status:503,code:'GSIS_SECRET_INVALID'});
-  return value;
- }
- return env?.[legacyName];
+ if(typeof value!=='string'||!/^[!-~]{32,8000}$/.test(value))throw Object.assign(Error('GSIS_SECRET must contain 32 to 8000 printable ASCII characters without spaces.'),{status:503,code:'GSIS_SECRET_INVALID'});
+ return value;
 }
 
 /* GSIS_API_SECRET_END */
@@ -19,9 +15,8 @@ function gsisApiSecret(env,legacyName){
  *   GOOGLE_CLIENT_ID           plain variable
  *   CALENDAR_APPS_SCRIPT_URL   plain variable (deployed Apps Script /exec URL)
  *   CALENDAR_SESSION_SECRET    secret
- *   CALENDAR_PROXY_SECRET      secret; must match Apps Script Script Property
+ *   GSIS_SECRET                transport secret; match backend and job Worker
  * Optional background sync:
- *   CALENDAR_SERVICE_SECRET    secret; match standalone Worker and Script Property
  *
  * Pages Functions binding:
  *   ASSETS                     automatically available for Pages _worker.js
@@ -134,7 +129,7 @@ async function proxyCalendarJobs(request, env, actor) {
       !['enqueue','list','retry','check'].includes(input.kind) ||
       (input.kind === 'enqueue' && !['saveEvent','deleteEvent','saveParentSide','relocateEvent'].includes(input.action)) ||
       JSON.stringify(input).length > 34000) throw httpError(400, 'Choose a supported, bounded Calendar event job.');
-  const secret = gsisApiSecret(env,'CALENDAR_PROXY_SECRET');
+  const secret = gsisApiSecret(env);
   if (!secret) throw httpError(503, 'Calendar background save authentication is not configured.');
   const payload = JSON.stringify({purpose:'calendar-job-gateway-v1',timestamp:Date.now(),nonce:crypto.randomUUID(),actor,input});
   const response = await env.CALENDAR_JOBS.fetch(new Request('https://calendar-jobs.internal/commands', {
@@ -147,12 +142,12 @@ async function proxyCalendarJobs(request, env, actor) {
 // A wake is only a hint. The durable source session, claim and fresh Admin role
 // in Apps Script decide whether work may run. Replayed wakes cannot start jobs.
 async function continueCalendarSync(request, env) {
-  if (!gsisApiSecret(env,'CALENDAR_SERVICE_SECRET')) throw httpError(503, 'Calendar background sync is not configured.');
+  if (!gsisApiSecret(env)) throw httpError(503, 'Calendar background sync is not configured.');
   const envelope = await readJson(request);
   if (typeof envelope.payload !== 'string' || envelope.payload.length > 2048 || !/^[a-f0-9]{64}$/.test(String(envelope.signature || ''))) {
     throw httpError(401, 'Invalid Calendar service signature.');
   }
-  const expected = await hmac(envelope.payload, gsisApiSecret(env,'CALENDAR_SERVICE_SECRET'), true);
+  const expected = await hmac(envelope.payload, gsisApiSecret(env), true);
   if (!timingSafeEqual(envelope.signature, expected)) throw httpError(401, 'Invalid Calendar service signature.');
   let payload;
   try { payload = JSON.parse(envelope.payload); } catch { throw httpError(400, 'Invalid Calendar service payload.'); }
@@ -160,10 +155,10 @@ async function continueCalendarSync(request, env) {
       Math.abs(Date.now() - payload.timestamp) > 120000 || !/^[a-zA-Z0-9-]{16,80}$/.test(String(payload.nonce || ''))) {
     throw httpError(401, 'Calendar service wake has expired or is invalid.');
   }
-  if (!env.CALENDAR_APPS_SCRIPT_URL || !gsisApiSecret(env,'CALENDAR_PROXY_SECRET')) throw httpError(503, 'Calendar backend is not configured.');
+  if (!env.CALENDAR_APPS_SCRIPT_URL || !gsisApiSecret(env)) throw httpError(503, 'Calendar backend is not configured.');
   const result = await callAppsScriptManualRedirect_(env.CALENDAR_APPS_SCRIPT_URL, JSON.stringify({
-    proxySecret: gsisApiSecret(env,'CALENDAR_PROXY_SECRET'), service: 'gsis-calendar-sync-worker-v1',
-    calendarServiceSecret: gsisApiSecret(env,'CALENDAR_SERVICE_SECRET'), action: 'calendarSyncContinue',
+    proxySecret: gsisApiSecret(env), service: 'gsis-calendar-sync-worker-v1',
+    calendarServiceSecret: gsisApiSecret(env), action: 'calendarSyncContinue',
     requestId: crypto.randomUUID()
   }));
   if (!result || result.ok !== true || !result.result) {
@@ -258,11 +253,11 @@ async function requireSession(request, env) {
 
 async function proxyAppsScript(env, actor, action, payload) {
   if (!env.CALENDAR_APPS_SCRIPT_URL) throw httpError(500, 'CALENDAR_APPS_SCRIPT_URL is not configured.');
-  if (!gsisApiSecret(env,'CALENDAR_PROXY_SECRET')) throw httpError(500, 'CALENDAR_PROXY_SECRET is not configured.');
+  if (!gsisApiSecret(env)) throw httpError(500, 'GSIS_SECRET is not configured.');
 
   const requestId = crypto.randomUUID();
   const body = JSON.stringify({
-    proxySecret: gsisApiSecret(env,'CALENDAR_PROXY_SECRET'),
+    proxySecret: gsisApiSecret(env),
     actor,
     action,
     payload,
@@ -536,7 +531,7 @@ async function calendarChangeGatewayCall(env,actor,input){
  if(!calendarChangeGatewayEnabled(env))throw httpError(503,'Calendar change push is not enabled.');
  if(input.kind==='subscribe')input={...input,sessionExpiresAt:actor.sessionExpiresAt};
  const payload=JSON.stringify({purpose:'calendar-change-gateway-v1',timestamp:Date.now(),nonce:crypto.randomUUID(),actor,input});
- const response=await env.CALENDAR_JOBS.fetch(new Request('https://calendar-jobs.internal/changes',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({payload,signature:await hmac(payload,gsisApiSecret(env,'CALENDAR_PROXY_SECRET'),true)})}));
+ const response=await env.CALENDAR_JOBS.fetch(new Request('https://calendar-jobs.internal/changes',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({payload,signature:await hmac(payload,gsisApiSecret(env),true)})}));
  return response;
 }
 const CALENDAR_CHANGE_READ_ACTIONS=new Set(['bootstrap','eventMutationStatus','mutationReceipts','calendarSyncStatus','calendarChangesAuthorize','calendarChangesDelta','calendarPreflight','healthCheck','calendarReconciliationPreview','calendarWipePreview','archiveYearsPreview','runSelfTests']);

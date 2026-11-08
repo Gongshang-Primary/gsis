@@ -10,7 +10,7 @@ h.seed('Years',[{Year:2026,Status:'ACTIVE',ReleasedToTeachers:'Yes'}]);
 h.seed('YearStructure',[{StructureID:'week',Year:2026,Kind:'TERM_WEEK',Term:'4',Week:'6',StartDate:'2026-10-19',EndDate:'2026-10-25'}]);
 const yearReads=[],readYear=h.sandbox.rc18YearData_;
 h.sandbox.rc18YearData_=(year,names)=>{yearReads.push(year);return readYear(year,names);};
-const service={action:'rosterDates',service:'gsis-roster-notifier-v1',proxySecret:'synthetic-secret',payload:{dates}};
+const service={action:'rosterDates',service:'gsis-roster-notifier-v1',proxySecret:'synthetic-secret'.repeat(3),payload:{dates}};
 const post=body=>JSON.parse(h.sandbox.doPost({postData:{contents:JSON.stringify(body)}}).text);
 const writesBefore=h.audit.writes;
 const batch=post(service);
@@ -22,7 +22,7 @@ for(const change of [{proxySecret:'wrong'},{service:'wrong'},{action:'saveEvent'
 assert.equal(h.audit.writes,writesBefore,'Service date reads do not mutate Calendar');
 
 const worker=await import(toWorkerModuleURL('data:text/javascript;base64,'+Buffer.from(fs.readFileSync('roster-update/public/_worker.js','utf8')).toString('base64')));
-const env={APPS_SCRIPT_URL:'https://script.google.com/macros/s/roster-test/exec',BRIDGE_SECRET:'b'.repeat(40),ROSTER_SERVICE_SECRET:'s'.repeat(40),ROSTER_AUTOMATION_ENABLED:'true',CALENDAR_APPS_SCRIPT_URL:'https://script.google.com/macros/s/calendar-test/exec',CALENDAR_PROXY_SECRET:'synthetic-secret'};
+const env={APPS_SCRIPT_URL:'https://script.google.com/macros/s/roster-test/exec',BRIDGE_SECRET:'b'.repeat(40),ROSTER_SERVICE_SECRET:'s'.repeat(40),ROSTER_AUTOMATION_ENABLED:'true',CALENDAR_APPS_SCRIPT_URL:'https://script.google.com/macros/s/calendar-test/exec',CALENDAR_PROXY_SECRET:'synthetic-secret'.repeat(3)};
 const oldFetch=globalThis.fetch,oldTimeout=AbortSignal.timeout;
 let calls=[],forwarded=[],deadlines=[];
 try{

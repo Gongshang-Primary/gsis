@@ -96,17 +96,17 @@ test('A lane change during sync cannot mark the old publication synced', () => {
 
 test('Background continuation resumes only existing jobs for an active Admin', () => {
   const h = fixture();
-  h.props.set('CALENDAR_SERVICE_SECRET', 'background-secret');
+  h.props.set('GSIS_SECRET', 'synthetic-secret'.repeat(3));
   const wake = secret => JSON.parse(h.sandbox.doPost({postData: {contents: JSON.stringify({
-    proxySecret: 'synthetic-secret', service: 'gsis-calendar-sync-worker-v1',
+    proxySecret: 'synthetic-secret'.repeat(3), service: 'gsis-calendar-sync-worker-v1',
     calendarServiceSecret: secret, action: 'calendarSyncContinue', payload: {year: 2030, startedBy: 'someone-else'}
   })}}).text);
   assert.equal(wake('wrong').ok, false);
   assert.equal(h.api.live(h.calendarId).length, 0);
-  const response = wake('background-secret');
+  const response = wake('synthetic-secret'.repeat(3));
   assert.equal(response.ok, true); assert.equal(response.result.completed, true);
   assert.equal(h.api.live(h.calendarId).length, 1);
-  assert.equal(wake('background-secret').result.idle, true);
+  assert.equal(wake('synthetic-secret'.repeat(3)).result.idle, true);
   assert.equal(h.api.calls.filter(c => c.method === 'Events.insert').length, 1);
 });
 

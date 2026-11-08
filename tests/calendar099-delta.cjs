@@ -2,7 +2,7 @@
 const assert=require('node:assert/strict');
 const {makeHarness}=require('./calendar/backend_harness.cjs');
 const h=makeHarness(),admin=h.actor('admin'),viewer=h.actor('teacher');
-const send=(actor,action,payload)=>JSON.parse(h.sandbox.doPost({postData:{contents:JSON.stringify({proxySecret:'synthetic-secret',actor,action,payload})}}).text);
+const send=(actor,action,payload)=>JSON.parse(h.sandbox.doPost({postData:{contents:JSON.stringify({proxySecret:'synthetic-secret'.repeat(3),actor,action,payload})}}).text);
 let result=send(admin,'calendarChangesAuthorize',{year:2026});
 assert.equal(result.ok,true,result.error);assert.equal(result.result.authorized,true);
 const known=h.event('E1');

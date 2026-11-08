@@ -80,3 +80,66 @@ Run the canonical build, focused local checks and full branch CI. Open the Conta
 
 - Inspection of the remaining CI logs also found two Node fixture failures in shard 4: `lord-source-bridges.cjs` and `review04-cache.cjs`, both still configuring the actual Contacts provider through legacy-only bindings. Those two fixture configurations were migrated without weakening their read/snapshot/security assertions. Other app providers and the LORD product code remain unchanged.
 - After the nested contract fixture correction, the complete local LORD suite passed: 40 programs, 0 failures. The two additional Node fixture corrections were verified separately before the next push: lord-source-bridges.cjs passed all 14 signed source contracts; review04-cache.cjs passed its cache/authority/mutation/timeout checks.
+
+## Calendar claim — 7 November 2026, Model: Codex
+
+- Status: claimed; paused before implementation pending bounded shared-build-file approval under the owner's new queue rule.
+- Branch: `codex/gsis-secret-consolidation-calendar`.
+- Base: `37a93066745573aef23e4084e5999412c3fbb601`, freshly fetched current main. Contacts #102 is recorded as owner-merged at b9d9f8c as 772d424. Reviewer for Calendar: Muse at the eventual exact head.
+- Scope: Calendar transport secret reads, Calendar-specific helper variants as necessary, Calendar job Worker transport, Calendar generated artifacts, the existing migrated-app legacy-read guard extended to Calendar, associated fixture/behavior tests and Calendar deploy instructions. Preserve CALENDAR_SESSION_SECRET for session signing; do not use the transport credential to sign Calendar sessions. No other app product changes or later queue work.
+- Shared-file scope request: `scripts/build-release.py` still injects the common fallback helpers into `calendar-backend/Code.gs` and `calendar-update/public/_worker.js`, and embeds the shared Venues bridge into Calendar. Extend its target selection/specialization narrowly for Calendar, retaining Contacts' merged behavior and byte-identical outputs for every other app. New Calendar helper sources are already contemplated in the queue; this request is for the shared generator edit, following the explicit Contacts precedent.
+- No implementation files edited or tests claimed. No live settings/data/provider calls or deployment. Continue only after the owner approves this bounded addition; do not proceed to the edge-queue design note or another app until the Calendar PR is reviewed and owner-merged.
+
+## Calendar implementation approval — 8 November 2026, Model: Codex
+
+- Owner explicitly approved the bounded Calendar extension to `scripts/build-release.py` ("include", 8 Nov). Implementation may proceed within Calendar, its helper variants, generated artifacts, guard/tests and deploy notes. Muse is coordinator and reviewer; Claude is not involved on this item.
+- Refreshed main is `27ab05a`. Published claim `585f1c3` is based on `37a9306`. Rebasing that published claim would require a prohibited force-push; asked the owner asynchronously whether to merge main into the task branch or use a new branch from current main. Continue independent Calendar implementation while that history decision is pending; do not rewrite/push the published claim history without authorization.
+- CALENDAR_SESSION_SECRET remains the independent Calendar cookie signer/verifier. GSIS_SECRET is transport-only for Calendar; no fallback or use as a Calendar session key.
+
+### Calendar implementation and rollout — Model: Codex
+
+- Calendar backend, Pages Worker and Calendar job Worker now read GSIS_SECRET only for transport. Calendar-specific strict helpers are `backend/CalendarApiSecret.gs` and `shared/calendar-api-secret.js`. Missing/invalid canonical configuration fails closed; legacy-only settings do not authorize calls. Existing service, source, purpose, actor and timestamp checks remain in place.
+- The approved generator change selects those helpers only for Calendar and specializes the embedded Venues bridge only in Calendar, retaining Contacts' merged specialization. Canonical Calendar backend and job Worker dashboard copies were regenerated. Other app product sources/generated outputs have no diff.
+- CALENDAR_SESSION_SECRET remains the separate Calendar session signing/verifying credential. Tests use different synthetic session and transport keys and reject cookies signed with raw or purpose-derived GSIS_SECRET.
+- The existing AST guard now covers 12 deployed Contacts/Calendar sources, including Calendar helper callers and both job Worker copies. `TZ=Asia/Singapore node tests/contacts-secret-consolidation-guard.cjs --prove-calendar` passed: a deliberate Calendar `env.BRIDGE_SECRET` read caused child exit 1 and was removed/restored byte-for-byte before the clean guard passed.
+- `tests/calendar-secret-consolidation.mjs` exercises actual backend/Pages/job Worker authentication, outgoing Contacts/Venues HMACs, invalid/legacy-only configuration before I/O, service/source/purpose/time checks, independent session signing, signed continuation and generated parity, using synthetic local providers and an in-memory job-list database stub. Existing Calendar queue tests separately exercise actual local SQLite durability and recovery.
+- Existing Calendar request fixtures were aligned with the new canonical key. The first broad run passed 47/48 programs; `calendar099-venue-diagnostics.cjs` incorrectly inherited the harness's new canonical key in its missing-secret case. It now deletes GSIS_SECRET explicitly and expects GSIS_SECRET_INVALID; the focused rerun passed. No product assertion was disabled.
+
+### Calendar deploy steps — owner only, after review/merge and staging
+
+1. Privately align the same operator-selected GSIS_SECRET value in Calendar Pages, Calendar Apps Script Script Properties and the Calendar job Worker. Values must match in every active calling pair. Preserve existing URLs, bindings, queue database and feature flags. Do not paste values into repository files, PRs, logs or chat.
+2. Check active Calendar peers before rollout: Contacts birthdays, Venues catalogue/source requests and Roster Calendar reads. Their effective transport credential must match Calendar's GSIS_SECRET. Peers still awaiting their own migration retain their current code and may still use a legacy setting; their effective values must agree. Do not remove their legacy configuration as part of this Calendar PR.
+3. Preserve CALENDAR_SESSION_SECRET unchanged and independently chosen. Do not replace it with GSIS_SECRET or derive it from transport. Preserve external-link rotation keys and provider credentials. No credential generation or rotation is part of this change.
+4. Deploy the matching regenerated Calendar backend, Pages Worker and Calendar job Worker together in the owner's controlled staging/rollout window. Retain Calendar legacy configuration until new code is live on all Calendar ends and the owner has verified aligned authentication. Legacy names can be removed from Calendar configuration only after that verification; retaining them does not provide fallback in new code.
+5. Owner verifies sign-in, Calendar read and save/receipt behavior, existing job status/recovery, optional Contacts birthdays and Venues lookups using approved staging data. Retain existing default-off push/continuation flags and Google authority. No live provider calls or deployment are claimed by local tests.
+6. On authentication failure, compare each pair's GSIS_SECRET privately. To roll back code, restore the matching previous Calendar components together and preserve the retained configuration, session signer and durable jobs/uncertain outcomes. Do not clear receipts or retry unknown writes to test credentials.
+
+### Calendar remaining gates
+
+- Local implementation is prepared for Muse's review at the eventual exact head. No Muse review or approval has occurred.
+- Branch history resolution: owner directed the fresh-branch procedure on 8 November; see the branch-move record below. Do not rewrite or push the old branch.
+- Run canonical build at the final head and require no diff. Full CI at that exact published head must pass all 5 jobs before opening a draft PR. No Calendar PR, full-CI pass, deployment, live configuration alignment, live D1/Google reads or provider verification is claimed here. Contacts' live 401 configuration alignment remains outside this work.
+
+### Calendar local verification — 8 November 2026, Model: Codex
+
+- `TZ=Asia/Singapore npm run build`: passed after implementation, then passed again after all fixture corrections. All 18 components regenerated; no deployment performed.
+- Across the focused runs, 56 distinct local test programs passed, including all 46 top-level Calendar programs, the two existing Contacts consolidation programs, Calendar job gateway/SQLite Worker, backend-secret compatibility, Calendar bundle checker, Roster gateway integration, LORD source bridges, cache contracts and current release metadata. Initial missing-key fixture failure is retained above; its corrected rerun passed. Local log inventories are in ignored `verification/calendar-consolidation-results.json` and `verification/calendar-consolidation-extra-results.json`.
+- Guard negative control passed and the deliberately introduced read was removed. `git diff --check` passed. Other apps' product and generated paths have no diff.
+- Not run: full local `npm test`, full branch CI for this implementation, live service/D1/Google/provider tests, deployment or owner-side credential alignment. Historical release comparisons were not rerun. The full CI and exact-head Muse review remain gates, not inferred from these focused checks.
+
+
+### Calendar branch move — 8 November 2026, Model: Codex
+
+- Owner confirmed the standing rule: a rebase of published work always uses a fresh branch because force-push is prohibited. Follow this procedure for future published-branch refreshes without treating it as a new owner decision.
+- Current branch: `codex/gsis-secret-consolidation-calendar-rebase`, created from freshly fetched main `27ab05af8c5464f4479d6bed536673608f188bd3`.
+- Cherry-picked the existing claim `585f1c3` as `fcc0d48`, then implementation `e33a806` as `f1cecb5`, in that order. Both applied cleanly with no conflicts. This carries the existing claim forward; it is not a new claim.
+- Old branch `codex/gsis-secret-consolidation-calendar` remains unchanged at local implementation `e33a80655fdeb53db7507b860f8db8d60475bb06`; its published claim remains untouched. Do not push to it.
+- Status: implementation carried forward; final-head canonical build, focused verification, new-branch push and all-five-job CI gate precede the draft PR. Reviewer: Muse at that exact head. Owner merges and deploys; no review, merge, deployment or live configuration alignment is claimed.
+
+### Calendar CI fixture correction — 8 November 2026, Model: Codex
+
+- Full CI run `42467969601` at `79b5c16d2146e79d88ee28bc0ce6b0ec875a76bc` failed: regression shards 1, 2 and 3 failed, shard 4 passed, and the full-suite gate failed. No draft PR was opened.
+- Reproduced all three failures locally with `TZ=Asia/Singapore`: `roster-absence-year-worker.mjs` returned 400 instead of 200 at line 39; `roster081-api-roundtrips.mjs` rejected the authenticated scheduler at line 17; `roster702-calendar-batch.mjs` rejected `calendarPost()` at line 33. A direct actual-backend boundary check rejected the old single synthetic value with `Unauthorised proxy.` and accepted the value matching the harness's GSIS_SECRET.
+- Root cause: five synthetic caller settings/request fields in those three Roster-to-Calendar integration fixtures still used the old single value, while the migrated Calendar harness requires the repeated canonical value. Updated only those five values to align with the Calendar fixture. Unmigrated Roster retains its existing legacy setting names in these fixtures; no Roster product migration, live configuration change or relaxed authentication/assertion is involved.
+- After the canonical build passed, all three corrected programs passed locally, as did `calendar-secret-consolidation.mjs` and the migrated-app guard. The guard's `--prove-calendar` negative control again rejected the deliberate legacy read with child exit 1 and restored the source. `git diff --check` passed. Failure evidence is retained in ignored `verification/calendar-ci-red-*.log`; correction results in `verification/calendar-ci-fix-results.json`.
+- Next gate: canonical build at the correction head must leave no diff, then full CI at that exact pushed head must pass all 5 jobs before the Calendar draft PR is opened for Muse. This correction does not claim full local npm-test, live provider/D1/Google tests, deployment, live Contacts outage repair or any model review.

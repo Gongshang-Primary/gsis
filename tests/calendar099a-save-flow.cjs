@@ -3,7 +3,7 @@
 const assert=require('node:assert/strict'),crypto=require('node:crypto');
 const {makeHarness}=require('./calendar/backend_harness.cjs');
 function execute(h,action,payload,alias='admin'){
- return JSON.parse(h.sandbox.doPost({postData:{contents:JSON.stringify({proxySecret:'synthetic-secret',service:'gsis-calendar-command-v1',purpose:'calendar-mutation-job-v1',action:'calendarCommand',mode:'execute',actor:h.actor(alias),commandId:payload.operationId,operation:{action,payload}})}}).text);
+ return JSON.parse(h.sandbox.doPost({postData:{contents:JSON.stringify({proxySecret:'synthetic-secret'.repeat(3),service:'gsis-calendar-command-v1',purpose:'calendar-mutation-job-v1',action:'calendarCommand',mode:'execute',actor:h.actor(alias),commandId:payload.operationId,operation:{action,payload}})}}).text);
 }
 function proposal(h,extra={}){const event=h.event('E1');return {operationId:crypto.randomUUID(),expectedRevision:event._revision,event:{...event,StaffTitle:'Queued direct execute'},...extra};}
 // Removing any execute-time fence must fail without a preceding authorize call.
