@@ -1,6 +1,6 @@
 # Edge-queue design note: current assignment
 
-- Model: Codex. Status: design note written; local documentation checks passed; final-head build and full CI pending.
+- Model: Codex. Status: design note merged (#105 at 7c3b839 as ff44f9c, 8 Nov 20:58 SGT). Next: secret consolidation — Roster/Deploy, then edge-queue P1 (Deploy).
 - Updated: 8 November 2026, Asia/Singapore.
 - Branch: `codex/edge-queue-design-note`.
 - Base: `0c897a4047bf4b1d7e3f8a85edaac34236dc3a55`, freshly fetched main. Calendar #104 is owner-merged as `d360069` from `fb0ee22`.
