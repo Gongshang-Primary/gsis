@@ -1,6 +1,6 @@
 # Edge-queue design note: current assignment
 
-- Model: Codex. Status: claimed; documentation research complete, design note in progress.
+- Model: Codex. Status: design note written; local documentation checks passed; final-head build and full CI pending.
 - Updated: 8 November 2026, Asia/Singapore.
 - Branch: `codex/edge-queue-design-note`.
 - Base: `0c897a4047bf4b1d7e3f8a85edaac34236dc3a55`, freshly fetched main. Calendar #104 is owner-merged as `d360069` from `fb0ee22`.
@@ -9,6 +9,15 @@
 - Implementation record before note creation: inspect LORD phase-1 task, actual job Worker/schema and backend dispatch; inspect the existing Deploy publication/Contacts sync, Venues revision/receipt and Contacts mutation boundaries. Decide all three app adapters, atomic admission/ordering, receipts, cache freshness, fallback/deduplication, reconciliation, security and phased gates in the note. Proposed handlers and schemas must be distinguished from current source behavior.
 - Verification gates: inspect the two-file diff and relative links; run `TZ=Asia/Singapore npm run build` at the final head with no diff; require all five full-CI jobs green at that exact published head before opening the draft PR. PR body names Muse and states exact head, files, results and omissions. Every commit and PR description carries `Model: Codex`.
 - Next work stays blocked until this note is reviewed and owner-merged: secret consolidation for Roster/Deploy, then separate P1 shared queue + Deploy with `direct` default. P2 Venues and P3 Contacts each follow the prior phase's merge. Venues route suspension/#67 and the live Contacts 401 configuration alignment remain separate.
+
+## Design-note implementation record — 8 November 2026, Model: Codex
+
+- Added [the design note](../plans/edge-queue-design-note.md). It decides data/receipt schemas, atomic admission, per-app caps, document-wide FIFO dispatch, Google revision/ledger recovery, user receipt states and separate publish steps, verified read caches, authenticated direct fallback, switch-back, Admin health/alerts, privacy and phase gates.
+- The note separates current implementation evidence from future handlers. LORD's backend handler does exist: `doPost` lowercases `queueCommand` to `queuecommand` and dispatches `lordQueueCommand_` (base lines 531 and 7485). D1 admission is in the job Worker. A case-sensitive search missed the backend dispatch. The edge service follows that admission/execute separation; a new scope gate is required because LORD's per-job lease alone is not a whole-document FIFO guarantee.
+- Direct fallback requires shared durable Google operation identities and an independently reachable authenticated recovery route. It is not enabled by a missing D1 receipt or a second path on a failed Worker. Per-app implementation must prove this before queued mode can be enabled. Pending work remains uncertain until evidence or an exact cancellation fence resolves it.
+- P1 preserves #90's frozen publication/Contacts and Layout outcomes. P3 makes catalogue application a Contacts child command without replaying the parent publish. New handlers are GSIS_SECRET-only. No shared module, app implementation, Roster authority change, route activation, live configuration/data/provider access or deployment occurred.
+- Local documentation verification: all 9 relative links in the plan resolved before this task link was added, and the changed/untracked path union matched exactly the two authorized Markdown files. `git diff --check` passed. The build and full CI must now run at the exact final head; their results belong in the PR handoff, not an inferred runtime test claim.
+- Not tested by this docs work: future queue performance/one-second receipt, new schema or adapters, fallback UI/token flow, cache/reconciliation races, owner staging, or live Google/D1/provider behavior. The note specifies those as future phase acceptance gates. No Muse review or approval is claimed.
 
 ---
 
