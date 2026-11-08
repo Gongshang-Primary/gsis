@@ -26,7 +26,7 @@ export default {
 };
 
 function secret(env){
- const value=env.GSIS_SECRET!==undefined?env.GSIS_SECRET:env.CALENDAR_PROXY_SECRET;
+ const value=env.GSIS_SECRET;
  if(typeof value!=='string'||!/^[!-~]{32,8000}$/.test(value))throw failure(503,'JOB_SETUP','Configure the existing GSIS_SECRET for Calendar jobs.');
  return value;
 }

@@ -50,11 +50,11 @@ test('lost committed native receipt response recovers receipt and uncertain writ
 test('signed Calendar-to-Contacts bridge reads the current source and denies bad secret without writes',()=>{
  const contacts=require('./contacts503-fixture.js')({source:fs.readFileSync('Contacts_Code.gs','utf8')+'\n'+fs.readFileSync('backend/Contacts_Birthdays.gs','utf8')});
  const row=contacts.sheets.get('contacts').data[2];row[contacts.headers.indexOf('Day of Birth')]='4';row[contacts.headers.indexOf('Month of birth')]='6';
- const h=fixture();h.props.set('CONTACTS_APPS_SCRIPT_URL','https://script.google.com/macros/s/test/exec');h.props.set('CONTACTS_BRIDGE_SECRET','x'.repeat(32));
+ const h=fixture();h.props.set('CONTACTS_APPS_SCRIPT_URL','https://script.google.com/macros/s/test/exec');h.props.set('GSIS_SECRET','x'.repeat(32));
  h.sandbox.Utilities.computeHmacSha256Signature=(text,key)=>[...crypto.createHmac('sha256',key).update(text).digest()];
  h.sandbox.UrlFetchApp={fetch(url,options){assert.equal(url,'https://script.google.com/macros/s/test/exec');const envelope=JSON.parse(options.payload),request=JSON.parse(envelope.payload);assert.equal(request.action,'calendarBirthdays');assert.equal(request.identity.email,'admin@gsps.edu.sg');assert.equal(h.sandbox.rc18IO_().lockDepth,0,'network source read must not hold Calendar writer lock');contacts.ctx.signed={postData:{contents:options.payload}};const text=contacts.run('doPost(signed).text');return {getResponseCode:()=>200,getContentText:()=>text};}};
  const r=h.call('pullBirthdays',{year:2026,operationId:crypto.randomUUID()});assert.equal(r.created,1);assert.equal(rows(h)[0].StartDate,'2026-06-04');
- h.props.set('CONTACTS_BRIDGE_SECRET','z'.repeat(32));const before=h.audit.nativeWrites.length;assert.throws(()=>h.call('pullBirthdays',{year:2026,operationId:crypto.randomUUID()}),e=>e.code==='CONTACTS_UNAVAILABLE');assert.equal(h.audit.nativeWrites.length,before);
+ h.props.set('GSIS_SECRET','z'.repeat(32));const before=h.audit.nativeWrites.length;assert.throws(()=>h.call('pullBirthdays',{year:2026,operationId:crypto.randomUUID()}),e=>e.code==='CONTACTS_UNAVAILABLE');assert.equal(h.audit.nativeWrites.length,before);
 });
 test('a 1000-birthday removal keeps audit cells bounded with exact count and complete change digest',()=>{
  const h=fixture(),people=Array.from({length:1000},(_,i)=>person('scale-'+i,{active:'N'}));

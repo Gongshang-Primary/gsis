@@ -4,7 +4,7 @@ const dates=['2026-09-14','2026-09-15'];
 function setup(){const h=makeHarness();vm.runInContext(fs.readFileSync('calendar-backend/RosterDate.gs','utf8'),h.sandbox);h.seed('YearStructure',[{StructureID:'week',Year:2026,Kind:'TERM_WEEK',Term:'T3',Week:'9',StartDate:'2026-09-14',EndDate:'2026-09-18',Label:'Week 9'}]);return {...h,window:p=>h.call('rosterWindow',{dates,...p}),stamp:()=>h.sandbox.rosterCalendarStamp_(),patch:(name,row,patch)=>{h.sandbox.rc18ResetIO_();h.sandbox.updateRowPatch_(h.sheets.get(name),row,patch);}};}
 let checks=0;function check(name,run){run();checks++;console.log('PASS '+name);}
 check('authenticated Roster service can read a bounded Calendar window only',()=>{
- const h=setup(),request={proxySecret:'synthetic-secret',service:'gsis-roster-notifier-v1',action:'rosterWindow',payload:{dates}},reply=JSON.parse(h.sandbox.doPost({postData:{contents:JSON.stringify(request)}}).text);assert.equal(reply.ok,true);assert.equal(reply.result.dates.length,2);assert.equal(reply.result.dates[0].schoolDay,true);assert.equal(h.audit.apiWrites.length,0);
+ const h=setup(),request={proxySecret:'synthetic-secret'.repeat(3),service:'gsis-roster-notifier-v1',action:'rosterWindow',payload:{dates}},reply=JSON.parse(h.sandbox.doPost({postData:{contents:JSON.stringify(request)}}).text);assert.equal(reply.ok,true);assert.equal(reply.result.dates.length,2);assert.equal(reply.result.dates[0].schoolDay,true);assert.equal(h.audit.apiWrites.length,0);
  request.action='saveYear';assert.equal(JSON.parse(h.sandbox.doPost({postData:{contents:JSON.stringify(request)}}).text).ok,false);
 });
 check('validated identical windows skip source tables but expire after five minutes',()=>{

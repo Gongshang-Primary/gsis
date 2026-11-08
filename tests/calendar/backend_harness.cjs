@@ -150,7 +150,7 @@ function makeHarness(options={}) {
   seed('Settings',spec.DEFAULT_SETTINGS.map(r=>({Key:r[0],Value:r[1],Description:r[2]})));
   const base={EventID:'E1',Year:2026,Status:'PUBLISHED',LaneID:'after_school',ShiftSpan:'PM_I',OwnerTag:'Mtg',StaffTitle:'Synthetic staff meeting',StaffDescription:'Fixture only',Location:'Room 1',EventType:'TIMED',StartDate:'2026-09-14',EndDate:'2026-09-14',StartTime:'14:15',EndTime:'15:15',ParentEnabled:'Yes',ParentTitle:'Parent-facing title',ParentDescription:'Parent-facing description',StaffCalendarEventId:'STAFF-LINK',ParentCalendarEventId:'PARENT-LINK',StaffSyncState:'SYNCED',ParentSyncState:'SYNCED',CreatedAt:'2026-08-01T12:00:00+08:00',UpdatedAt:'2026-08-01T12:00:00+08:00',LastMutationID:''};
   seed('Events',[base,{...base,EventID:'E2',StaffTitle:'Multi-day camp',LaneID:'day',ShiftSpan:'NONE',EventType:'MULTI_DAY',StartDate:'2026-09-14',EndDate:'2026-09-16',StartTime:'',EndTime:''},{...base,EventID:'E3',Year:2027,Status:'HIDDEN',StartDate:'2027-01-04',EndDate:'2027-01-04',StaffTitle:'2027 planning meeting'}]);
-  props.set('CALENDAR_PROXY_SECRET','synthetic-secret');
+  props.set('GSIS_SECRET','synthetic-secret'.repeat(3));
   const actor=alias=>({sub:'synthetic-'+alias,email:alias+'@gsps.edu.sg',userAlias:alias});
   const call=(action,payload={},alias='admin')=>{
     const input=copy(payload);

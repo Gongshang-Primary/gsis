@@ -4,7 +4,7 @@ const {makeHarness}=require('./calendar/backend_harness.cjs');
 const room={id:'room',unit:'A1-01',name:'Synthetic Hall',aliases:[],active:true};
 function fixture({url='https://script.google.com/macros/s/synthetic/exec',secret='k'.repeat(33),status=200,body={ok:true,data:{venues:[room]}}}={}){
  const h=makeHarness();vm.runInContext(fs.readFileSync('calendar-backend/VenueDirectory.gs','utf8'),h.sandbox);
- if(url!==null)h.props.set('VENUES_APPS_SCRIPT_URL',url);if(secret!==null)h.props.set('GSIS_SECRET',secret);
+ if(url!==null)h.props.set('VENUES_APPS_SCRIPT_URL',url);if(secret!==null)h.props.set('GSIS_SECRET',secret);else h.props.delete('GSIS_SECRET');
  let calls=0;
  h.sandbox.Utilities.computeHmacSha256Signature=(p,s)=>[...crypto.createHmac('sha256',s).update(p).digest()];
  h.sandbox.UrlFetchApp={fetch(){calls++;return{getResponseCode:()=>status,getContentText:()=>typeof body==='string'?body:JSON.stringify(body)};}};
@@ -12,7 +12,7 @@ function fixture({url='https://script.google.com/macros/s/synthetic/exec',secret
 }
 for(const [options,code] of [
  [{url:null},'VENUES_URL_MISSING'],[{url:'https://example.test/private?secret=private-value'},'VENUES_URL_INVALID'],
- [{secret:null},'VENUES_SECRET_MISSING'],[{secret:'has a space'},'GSIS_SECRET_INVALID'],
+ [{secret:null},'GSIS_SECRET_INVALID'],[{secret:'has a space'},'GSIS_SECRET_INVALID'],
  [{status:502,body:'private backend response'},'VENUES_HTTP_ERROR'],[{body:'<html>private login</html>'},'VENUES_RESPONSE_INVALID'],
  [{body:'x'.repeat(2000001)},'VENUES_RESPONSE_TOO_LARGE'],
  [{body:{ok:false,code:'INVALID_SIGNATURE',error:'private key material'}},'INVALID_SIGNATURE'],

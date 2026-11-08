@@ -9,7 +9,7 @@ function calendarVenueCatalogue_(actor){
     const props=PropertiesService.getScriptProperties(),url=props.getProperty('VENUES_APPS_SCRIPT_URL');
     if(!url)fail('VENUES_URL_MISSING');
     if(!/^https:\/\/script\.google\.com\/macros\/s\/[\w-]+\/exec$/.test(url))fail('VENUES_URL_INVALID');
-    const secret=gsisApiSecret_('VENUES_BRIDGE_SECRET');if(!secret)fail('VENUES_SECRET_MISSING');
+    const secret=gsisApiSecret_();if(!secret)fail('VENUES_SECRET_MISSING');
     const payload=JSON.stringify({action:'calendarCatalogue',service:'gsis-calendar-catalogue-v1',purpose:'calendar-venue-catalogue-v1',timestamp:Date.now(),nonce:Utilities.getUuid(),identity:{email:actor.email,subject:actor.sub},input:{operation:'calendarLookup'}});
     const signature=Utilities.computeHmacSha256Signature(payload,secret).map(b=>('0'+((b+256)%256).toString(16)).slice(-2)).join('');
     stage='transport';
