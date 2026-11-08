@@ -1,9 +1,9 @@
 # gsis-secret-consolidation: reduce all transport secrets to one GSIS_SECRET
 
-- Status: Contacts merged (#102 at b9d9f8c as 772d424, 7 Nov 16:34 SGT; local merge, CHANGELOG conflict kept both entries). Calendar is next, only after this merge. (Was: implementing Contacts PR only; build-script scope approved by owner (7 Nov: "include").)
+- Status: Contacts merged (#102 at b9d9f8c as 772d424, 7 Nov 16:34 SGT). Calendar merged (#104 at fb0ee22 as d360069, 8 Nov 20:31 SGT). Next in the queue: edge-queue design note (Codex codes, Muse reviews), then Roster/Deploy consolidation.
 - Owner/model: Codex
 - Reviewer/model: Muse
-- Last updated (Asia/Singapore): 7 Nov 2026
+- Last updated (Asia/Singapore): 8 Nov 2026
 - Branch: codex/gsis-secret-consolidation
 - Base SHA: 9e1057b
 - Current head SHA (or PR head; avoid self-referential commit hashes):
