@@ -1,3 +1,19 @@
+# Edge-queue design note: current assignment
+
+- Model: Codex. Status: claimed; documentation research complete, design note in progress.
+- Updated: 8 November 2026, Asia/Singapore.
+- Branch: `codex/edge-queue-design-note`.
+- Base: `0c897a4047bf4b1d7e3f8a85edaac34236dc3a55`, freshly fetched main. Calendar #104 is owner-merged as `d360069` from `fb0ee22`.
+- Owner instruction on 8 November supersedes the historical Muse-builder/Claude-reviewer assignment below for this docs-only item. Codex writes the note; Muse coordinates and reviews the exact head. Claude is unavailable. Owner merges and deploys.
+- Files in scope: this task record and new `docs/coordination/plans/edge-queue-design-note.md` only. No product code, shared module, Worker, Deploy implementation, live settings/data/provider calls, or deployment.
+- Implementation record before note creation: inspect LORD phase-1 task, actual job Worker/schema and backend dispatch; inspect the existing Deploy publication/Contacts sync, Venues revision/receipt and Contacts mutation boundaries. Decide all three app adapters, atomic admission/ordering, receipts, cache freshness, fallback/deduplication, reconciliation, security and phased gates in the note. Proposed handlers and schemas must be distinguished from current source behavior.
+- Verification gates: inspect the two-file diff and relative links; run `TZ=Asia/Singapore npm run build` at the final head with no diff; require all five full-CI jobs green at that exact published head before opening the draft PR. PR body names Muse and states exact head, files, results and omissions. Every commit and PR description carries `Model: Codex`.
+- Next work stays blocked until this note is reviewed and owner-merged: secret consolidation for Roster/Deploy, then separate P1 shared queue + Deploy with `direct` default. P2 Venues and P3 Contacts each follow the prior phase's merge. Venues route suspension/#67 and the live Contacts 401 configuration alignment remain separate.
+
+---
+
+## Historical task specification (6 November; assignment superseded above)
+
 # edge-queue-google-authority: D1 as intermediary (read cache + queued writes), Google stays the record — Venues, Deploy, Contacts
 
 - Status: changelog/authorised design (owner 6 Nov: "for venues view-port, aim for d1 intermediary for queued requests and let Google be main/fallback i/o. wish for similar system for deploy-viewport and contacts-viewport"). Spec by Claude under the standing rule.
