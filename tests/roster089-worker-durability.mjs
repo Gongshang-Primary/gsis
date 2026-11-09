@@ -11,7 +11,7 @@ const source=fs.readFileSync('roster-update/public/_worker.js','utf8');
 let sequence=0;
 const moduleFor=()=>import(toWorkerModuleURL('data:text/javascript;base64,'+Buffer.from(source+'\n// isolated fixture '+sequence++).toString('base64')));
 const M=await moduleFor();
-const env={WHATSAPP_DURABLE_INGRESS:'true',WHATSAPP_ENABLED:'true',WHATSAPP_MENU_ENABLED:'false',WHATSAPP_PHONE_NUMBER_ID:'123456789',WHATSAPP_ACCOUNT_ID:'223456789',WHATSAPP_API_VERSION:'v23.0',WHATSAPP_ACCESS_TOKEN:'fixture-access-'.repeat(4),WHATSAPP_APP_SECRET:'fixture-app-'.repeat(4),ROSTER_SERVICE_SECRET:'fixture-service-'.repeat(4),BRIDGE_SECRET:'fixture-bridge-'.repeat(4),ROSTER_PUBLIC_ORIGIN:'https://roster.example.test',APPS_SCRIPT_URL:'https://script.google.com/macros/s/test/exec'};
+const env={WHATSAPP_DURABLE_INGRESS:'true',WHATSAPP_ENABLED:'true',WHATSAPP_MENU_ENABLED:'false',WHATSAPP_PHONE_NUMBER_ID:'123456789',WHATSAPP_ACCOUNT_ID:'223456789',WHATSAPP_API_VERSION:'v23.0',WHATSAPP_ACCESS_TOKEN:'fixture-access-'.repeat(4),WHATSAPP_APP_SECRET:'fixture-app-'.repeat(4),ROSTER_SERVICE_SECRET:'fixture-service-'.repeat(4),GSIS_SECRET:'fixture-bridge-'.repeat(4),ROSTER_PUBLIC_ORIGIN:'https://roster.example.test',APPS_SCRIPT_URL:'https://script.google.com/macros/s/test/exec'};
 const ok=data=>Response.json({ok:true,data});
 function database(){
  const sql=new DatabaseSync(':memory:');sql.exec(M.WEBHOOK_SCHEMA_SQL);

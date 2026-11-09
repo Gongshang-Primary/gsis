@@ -13,9 +13,9 @@ async function run(){
  await deploy.backend(env,'bootstrap',{}, {email:'a@gsps.edu.sg',subject:'a',expiresAt:Date.now()+100000},{started:Date.now(),traceId:'trace',diagnosticId:'diag'});
  const hmac=async(secret,text)=>Buffer.from(await crypto.subtle.sign('HMAC',await crypto.subtle.importKey('raw',new TextEncoder().encode(secret),{name:'HMAC',hash:'SHA-256'},false,['sign']),new TextEncoder().encode(text))).toString('hex');
  assert.equal(captured.signature,await hmac(canonical,captured.payload));assert.notEqual(captured.signature,await hmac(legacy,captured.payload));
- assert.equal(deploy.__sessionKey(env,'https://deploy.gsps.edu.sg'),legacy+'|gsis-browser-session-v1|https://deploy.gsps.edu.sg','shared transport setting must not rotate browser session signing');
+ assert.equal(deploy.__sessionKey(env,'https://deploy.gsps.edu.sg'),canonical+'|gsis-browser-session-v1|https://deploy.gsps.edu.sg','migrated Deploy sessions retain purpose/origin binding while using GSIS_SECRET');
  await assert.rejects(deploy.backend({...env,GSIS_SECRET:'bad'},'bootstrap',{}, {},{started:Date.now(),traceId:'trace',diagnosticId:'diag'}),e=>e.code==='GSIS_SECRET_INVALID');
- console.log('PASS G real Deploy transport signs with canonical key while browser session key stays separate');
+ console.log('PASS G real Deploy transport signs with canonical key with purpose-bound canonical session derivation');
 
 const helper=fs.readFileSync(path.join(root,'shared/gsis-api-secret.js'),'utf8');
 const context=vm.createContext({});vm.runInContext(helper,context);

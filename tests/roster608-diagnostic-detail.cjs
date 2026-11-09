@@ -9,7 +9,7 @@ const digest=(text,key)=>crypto.createHmac('sha256',key).update(text).digest('he
 const activeEntry={id:'active-timetable',name:'Private timetable',from:'2020-01-01',to:'2099-12-31',priority:1,modelFile:'model-file'};
 const register=JSON.stringify({schema:1,revision:1,entries:[activeEntry],receipts:[]});
 function harness(options={}){
- const logs=[],cache=new Map(),calls={contacts:0,published:0,drive:0,writes:0,output:0},properties={BRIDGE_SECRET:bridge,CONTACTS_API_URL:contactsUrl,CONTACTS_BRIDGE_SECRET:contactsSecret,...options.properties};
+ const logs=[],cache=new Map(),calls={contacts:0,published:0,drive:0,writes:0,output:0},properties={GSIS_SECRET:bridge,CONTACTS_API_URL:contactsUrl,CONTACTS_BRIDGE_SECRET:contactsSecret,...options.properties};
  const forbidden=()=>{calls.writes++;throw Error('Unexpected business write');};
  const log=text=>{if(options.logFailure)throw Error('Console unavailable');logs.push(JSON.parse(text));};
  const cacheApi={get(key){if(options.cacheFailure)throw Error('Cache unavailable');return cache.get(key)||null;},put(key,value,ttl){if(options.cacheFailure)throw Error('Cache unavailable');assert.ok(ttl<=21600);cache.set(key,value);}};
@@ -42,7 +42,7 @@ function harness(options={}){
    }
    assert.equal(request.method,'post');assert.equal(request.muteHttpExceptions,true);
    const envelope=JSON.parse(request.payload),payload=JSON.parse(envelope.payload);
-   if(url===contactsUrl){calls.contacts++;assert.equal(envelope.signature,digest(envelope.payload,contactsSecret));assert.equal(payload.action,'deploySnapshot');assert.equal(payload.input.rosterAuthority,true);assert.equal(payload.input.authorityOnly,true);assert.equal(payload.identity.email,email);if(options.contactsError)throw Error(options.contactsError);return response(options.contactsRaw??JSON.stringify({ok:true,data:{user:{rosterSMC:true}}}),options.contactsHttpStatus||200);}
+   if(url===contactsUrl){calls.contacts++;assert.equal(envelope.signature,digest(envelope.payload,bridge));assert.equal(payload.action,'deploySnapshot');assert.equal(payload.input.rosterAuthority,true);assert.equal(payload.input.authorityOnly,true);assert.equal(payload.identity.email,email);if(options.contactsError)throw Error(options.contactsError);return response(options.contactsRaw??JSON.stringify({ok:true,data:{user:{rosterSMC:true}}}),options.contactsHttpStatus||200);}
    assert.equal(url,publishedUrl);calls.published++;assert.equal(envelope.signature,digest(envelope.payload,bridge));assert.equal(payload.action,'rosterProfile');
    if(options.publishedHtml)return response('<html>Private response body</html>');
    // A separate VM represents the published deployment; it runs the actual
@@ -66,7 +66,7 @@ function expectFailure(h,result,status,phase){assert.equal(result.ok,false);asse
  const save=harness(),saveFailure=save.call({action:'rosterOperations',input:{operation:'saveStapler',date:'2026-10-21',plan:{privateText:'PRIVATE_IMPORTED_PLAN — 华文'}}},'incorrect');
  expectFailure(save,saveFailure,401,'bridge-signature');assert.equal(saveFailure.diagnosticId,reference);assert.equal(saveFailure.failureStage,'bridge-signature');assert.equal(saveFailure.backendVersion,save.run('GSIS_DEPLOY_VERSION'));assert.equal(save.failures()[0].action,'rosterOperations');assert.equal(save.failures()[0].authenticated,false);assert.equal(save.calls.contacts,0);assert.equal(save.calls.drive,0);assert.doesNotMatch(JSON.stringify([saveFailure,save.logs]),/PRIVATE_IMPORTED_PLAN|华文/);
  const expired=harness();expectFailure(expired,expired.call({timestamp:Date.now()-120000}),401,'request-freshness');assert.equal(expired.calls.contacts,0);
- const config=harness({properties:{BRIDGE_SECRET:null}});expectFailure(config,config.call(),503,'bridge-config');assert.equal(config.calls.contacts,0);
+ const config=harness({properties:{GSIS_SECRET:null}});expectFailure(config,config.call(),503,'bridge-config');assert.equal(config.calls.contacts,0);
  const contactsConfig=harness({properties:{CONTACTS_API_URL:null}});expectFailure(contactsConfig,contactsConfig.call(),503,'contacts-config');assert.equal(contactsConfig.calls.contacts,0);
  const invalid=harness(),result=JSON.parse(invalid.ctx.doPost({postData:{contents:'not JSON'}}).getContent());assert.equal(result.ok,false);assert.equal(invalid.failures().at(-1).phase,'request-envelope');assert.equal(invalid.calls.contacts,0);
 }

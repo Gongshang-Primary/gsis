@@ -17,12 +17,12 @@ const root=path.resolve(__dirname,'..'),settings=require('../package.json'),vers
    if(patch&&!settings.gsisPatchComponents.includes(app.toLowerCase()+'Frontend')){assert.equal(deployment.file(`${app}_Frontend_v${version}.zip`),null,'unchanged component is not shipped');continue;}
    const frontend=await JSZip.loadAsync(await deployment.file(`${app}_Frontend_v${version}.zip`).async('nodebuffer'));
    const worker=await load(app,await frontend.file('_worker.js').async('string'));
-   const response=await worker.fetch(new Request('https://'+app.toLowerCase()+'.gsps.edu.sg/api/config'),{},{});
+   const response=await worker.fetch(new Request('https://'+app.toLowerCase()+'.gsps.edu.sg/api/config'),{GSIS_SECRET:'synthetic-packaged-transport-credential'},{});
    assert.equal(response.status,200);assert.equal((await response.json()).version,version);
   }
   if(!patch||settings.gsisPatchComponents.includes('operationsWorker')){
    const operations=await load('operations',await deployment.file(`GSiS_Operations_Worker_v${version}.txt`).async('string'));
-   const rejected=await operations.fetch(new Request('https://private/v1/roster',{method:'POST',body:'{}'}),{GSIS_BACKEND_SECRET:'s'.repeat(40)},{});
+   const rejected=await operations.fetch(new Request('https://private/v1/roster',{method:'POST',body:'{}'}),{GSIS_SECRET:'s'.repeat(40)},{});
    assert.equal(rejected.status,401,'unsigned calls must not reach private operational data');
   }else assert.equal(deployment.file(`GSiS_Operations_Worker_v${version}.txt`),null,'recovery package requires no private Worker deployment');
   if(!patch||settings.gsisPatchComponents.includes('notificationWorker')){

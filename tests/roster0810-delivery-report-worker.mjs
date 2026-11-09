@@ -2,7 +2,7 @@ import {toWorkerModuleURL} from './helpers/worker-module.cjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 const gateway=await import(toWorkerModuleURL('data:text/javascript;base64,'+Buffer.from(fs.readFileSync('roster-update/public/_worker.js','utf8')).toString('base64')));
-const env={APPS_SCRIPT_URL:'https://script.google.com/macros/s/report-test/exec',ROSTER_SERVICE_SECRET:'s'.repeat(40)};
+const env={APPS_SCRIPT_URL:'https://script.google.com/macros/s/report-test/exec',GSIS_SECRET:'s'.repeat(40)};
 let calls=0,result={reported:1,date:'2026-10-23',fileId:'file-1'};
 globalThis.fetch=async()=>{calls++;return Response.json({ok:true,data:result});};
 const at=Date.parse('2026-10-23T00:00:00Z');

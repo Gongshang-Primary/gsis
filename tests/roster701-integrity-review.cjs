@@ -469,12 +469,12 @@ test('external approval remains a real domain revision and invalidates stale sch
   rejects(() => h.call({ operation: 'saveInstructions', requestId: crypto.randomUUID(), revision: requested.revision, date: TODAY, absenceId: absence.savedId, instructions: {} }), 409);
 });
 
-test('actual Roster entry point separates notification service credentials from school identity', () => {
+test('actual Roster entry point separates notification service envelopes from school identity with one transport credential', () => {
   const h = adapter();
   const script = fs.readFileSync(path.join(__dirname, '../backend/Code.gs'), 'utf8');
   const begin = script.indexOf('function doPost(e)'), end = script.indexOf('\nfunction ', begin + 10);
   assert(begin >= 0 && end > begin);
-  const secrets = { BRIDGE_SECRET: 'school-bridge-secret-for-review-12345', ROSTER_SERVICE_SECRET: 'service-secret-for-review-123456789' };
+  const secrets = { GSIS_SECRET: 'school-bridge-secret-for-review-12345', ROSTER_SERVICE_SECRET: 'service-secret-for-review-123456789' };
   const sign = (payload, secret) => crypto.createHmac('sha256', secret).update(payload).digest('hex');
   const scope = vm.createContext({
     Date: h.scope.Date, GSIS_DEPLOY_VERSION: '0.7.00', GSISSheets: { resetStats() {} },
@@ -489,7 +489,7 @@ test('actual Roster entry point separates notification service credentials from 
     rosterServiceDispatch_: req => h.scope.rosterServiceDispatch_(req)
   });
   require('./load-backend-role.cjs')(scope,'roster');
-  vm.runInContext(fs.readFileSync(path.join(__dirname,'../backend/ApiSecret.gs'),'utf8'),scope);
+  vm.runInContext(fs.readFileSync(path.join(__dirname,'../backend/RosterDeployApiSecret.gs'),'utf8'),scope);
   require('./helpers/load-roster-diagnostic-build.cjs')(scope);
   vm.runInContext(script.slice(begin, end), scope);
   // The entry point now adds safe diagnostic metadata to rejected signatures.
@@ -500,13 +500,13 @@ test('actual Roster entry point separates notification service credentials from 
   const intakeDetailBegin = script.indexOf('function rosterAbsenceFailureDetail_('), intakeDetailEnd = script.indexOf('\nfunction auth_', intakeDetailBegin);
   assert(intakeDetailBegin >= 0 && intakeDetailEnd > intakeDetailBegin);
   vm.runInContext(script.slice(intakeDetailBegin, intakeDetailEnd), scope);
-  const call = (changes = {}, key = 'ROSTER_SERVICE_SECRET') => {
+  const call = (changes = {}, key = "GSIS_SECRET") => {
     const payload = JSON.stringify({ action: 'rosterService', service: 'gsis-roster-notifier-v1', timestamp: h.clock.now, nonce: crypto.randomUUID(), input: { operation: 'claimNotifications' }, ...changes });
     return scope.doPost({ postData: { contents: JSON.stringify({ payload, signature: sign(payload, secrets[key]) }) } });
   };
   assert.equal(call().ok, true);
-  assert.equal(call({}, 'BRIDGE_SECRET').status, 401);
-  assert.equal(call({ action: 'rosterOperations', identity: { email: 'admin@gsps.edu.sg', subject: 'forged' } }).status, 401);
+  assert.equal(call({}, "ROSTER_SERVICE_SECRET").status, 401);
+  assert.equal(call({ action: 'rosterOperations', identity: { email: 'admin@gsps.edu.sg', subject: 'forged' } }).status, 403);
   assert.equal(call({ timestamp: h.clock.now - 60001 }).status, 401);
   assert.equal(call({ nonce: 'not-a-valid-nonce' }).status, 401);
   assert.equal(call({ service: 'not-gsis' }).status, 401);

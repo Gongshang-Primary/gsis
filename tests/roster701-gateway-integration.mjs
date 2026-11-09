@@ -10,9 +10,9 @@ const source=fs.readFileSync('roster-update/public/_worker.js','utf8');
 const M=await import(toWorkerModuleURL('data:text/javascript;base64,'+Buffer.from(source).toString('base64')));
 const origin='https://roster.test';
 const registry=JSON.parse(fs.readFileSync('notification-worker/template-contracts.json')).templates;
-const env={GOOGLE_CLIENT_ID:'client',APPS_SCRIPT_URL:'https://script.google.com/macros/s/deploy/exec',BRIDGE_SECRET:'b'.repeat(40),ROSTER_SERVICE_SECRET:'s'.repeat(40),EXTERNAL_LINK_SECRET:'l'.repeat(40),CALENDAR_APPS_SCRIPT_URL:'https://script.google.com/macros/s/calendar/exec',CALENDAR_PROXY_SECRET:'c'.repeat(40),ROSTER_PUBLIC_ORIGIN:origin,CONTACTS_PUBLIC_URL:'https://contacts.test/',WHATSAPP_ENABLED:'false',WHATSAPP_API_VERSION:'v99.0',WHATSAPP_PHONE_NUMBER_ID:'123456789',WHATSAPP_ACCOUNT_ID:'987654321',WHATSAPP_TEMPLATE_ACCOUNT_ID:'987654320',WHATSAPP_APP_SECRET:'a'.repeat(40),WHATSAPP_ACCESS_TOKEN:'t'.repeat(40),WHATSAPP_VERIFY_TOKEN:'v'.repeat(40),WHATSAPP_TEMPLATES_JSON:JSON.stringify(Object.fromEntries(Object.entries(registry).map(([kind,t])=>[kind,{...t,enabled:true}])))};
+const env={GOOGLE_CLIENT_ID:'client',APPS_SCRIPT_URL:'https://script.google.com/macros/s/deploy/exec',GSIS_SECRET:'b'.repeat(40),ROSTER_SERVICE_SECRET:'s'.repeat(40),EXTERNAL_LINK_SECRET:'l'.repeat(40),CALENDAR_APPS_SCRIPT_URL:'https://script.google.com/macros/s/calendar/exec',CALENDAR_PROXY_SECRET:'c'.repeat(40),ROSTER_PUBLIC_ORIGIN:origin,CONTACTS_PUBLIC_URL:'https://contacts.test/',WHATSAPP_ENABLED:'false',WHATSAPP_API_VERSION:'v99.0',WHATSAPP_PHONE_NUMBER_ID:'123456789',WHATSAPP_ACCOUNT_ID:'987654321',WHATSAPP_TEMPLATE_ACCOUNT_ID:'987654320',WHATSAPP_APP_SECRET:'a'.repeat(40),WHATSAPP_ACCESS_TOKEN:'t'.repeat(40),WHATSAPP_VERIFY_TOKEN:'v'.repeat(40),WHATSAPP_TEMPLATES_JSON:JSON.stringify(Object.fromEntries(Object.entries(registry).map(([kind,t])=>[kind,{...t,enabled:true}])))};
 const now=Date.now(),today=new Date(now+8*3600000).toISOString().slice(0,10);
-const signed=await M.sign({purpose:'gsis-session-v1',origin,email:'teacher@gsps.edu.sg',subject:'teacher',issued:now,expires:now+60000},env.BRIDGE_SECRET+'|gsis-browser-session-v1|'+origin);
+const signed=await M.sign({purpose:'gsis-session-v1',origin,email:'teacher@gsps.edu.sg',subject:'teacher',issued:now,expires:now+60000},env.GSIS_SECRET+'|gsis-browser-session-v1|'+origin);
 const cookie='__Host-gsis_session='+Buffer.from(signed.payload).toString('base64url')+'.'+signed.signature;
 const req=(path,input,headers={})=>new Request(origin+path,{method:'POST',headers:{Origin:origin,Cookie:cookie,...headers},body:JSON.stringify(input)});
 let calls=[],schoolInputs=[],serviceInputs=[];
@@ -21,7 +21,7 @@ recordedFetch(async(url,options)=>{
  const envelope=JSON.parse(options.body);
  if(url===env.CALENDAR_APPS_SCRIPT_URL)return Response.json({ok:true,result:{date:envelope.payload.date,schoolDay:true,parity:'odd'}});
  const payload=JSON.parse(envelope.payload);schoolInputs.push(payload);
- assert.equal((await M.sign(payload,env.BRIDGE_SECRET)).signature,envelope.signature);
+ assert.equal((await M.sign(payload,env.GSIS_SECRET)).signature,envelope.signature);
  return Response.json({ok:true,data:{revision:1}});
 });
 let result=await M.default.fetch(req('/api/operations',{operation:'read',date:today,trustedNow:-5,calendarByDate:{[today]:{schoolDay:false,parity:'even'}},calendar:{schoolDay:false},capability:{staffId:'victim'},identity:{email:'admin@gsps.edu.sg'},service:'forged'}),env);
@@ -45,12 +45,12 @@ assert.deepEqual(await M.readCapability(token,env,origin,now),cap);
 await assert.rejects(()=>M.readCapability(token.slice(0,-1)+(token.endsWith('a')?'b':'a'),env,origin,now));
 await assert.rejects(()=>M.readCapability(token,env,'https://evil.test',now));
 await assert.rejects(()=>M.readCapability(token,env,origin,now+3600001));
-await assert.rejects(()=>M.readCapability(token,{...env,EXTERNAL_LINK_SECRET:env.BRIDGE_SECRET},origin,now));
+await assert.rejects(()=>M.readCapability(token,{...env,EXTERNAL_LINK_SECRET:env.GSIS_SECRET},origin,now));
 const url=await M.externalUrl(cap,env);assert.equal(new URL(url).search,'');assert.ok(new URL(url).hash.length>40);
 recordedFetch(async(url,options)=>{
  const envelope=JSON.parse(options.body);
  if(url===env.CALENDAR_APPS_SCRIPT_URL){assert.equal(envelope.service,'gsis-roster-notifier-v1');assert.equal(envelope.actor,undefined);return Response.json({ok:true,result:{date:today,schoolDay:true,parity:'even'}})}
- const payload=JSON.parse(envelope.payload);serviceInputs.push(payload.input);assert.equal(payload.identity,undefined);assert.equal(payload.action,'rosterService');assert.equal(payload.service,'gsis-roster-notifier-v1');assert.equal((await M.sign(payload,env.ROSTER_SERVICE_SECRET)).signature,envelope.signature);return Response.json({ok:true,data:{date:today,duties:[]}});
+ const payload=JSON.parse(envelope.payload);serviceInputs.push(payload.input);assert.equal(payload.identity,undefined);assert.equal(payload.action,'rosterService');assert.equal(payload.service,'gsis-roster-notifier-v1');assert.equal((await M.sign(payload,env.GSIS_SECRET)).signature,envelope.signature);return Response.json({ok:true,data:{date:today,duties:[]}});
 });
 result=await M.default.fetch(req('/api/external',{operation:'view',staffId:'victim',date:'2099-01-01',capability:{staffId:'victim'},calendarByDate:{[today]:{date:today,schoolDay:true,parity:'odd'}}},{Authorization:'Bearer '+token,Cookie:''}),env);
 assert.equal(result.status,200);assert.equal(serviceInputs.at(-1).capability.staffId,'contact-1');assert.equal(serviceInputs.at(-1).capability.date,today);assert.equal(serviceInputs.at(-1).calendarByDate[today].parity,'even');assert.equal(serviceInputs.at(-1).calendarByDate[today].date,today);assert.equal(result.headers.get('Cache-Control'),'no-store');assert.equal(result.headers.get('Referrer-Policy'),'no-referrer');

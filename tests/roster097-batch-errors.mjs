@@ -7,7 +7,7 @@ import {createRequire} from 'node:module';
 const require=createRequire(import.meta.url),R=require('../shared/roster.js');
 globalThis.crypto??=webcrypto;
 const gateway=await import(toWorkerModuleURL('data:text/javascript;base64,'+fs.readFileSync('roster-update/public/_worker.js').toString('base64')));
-const origin='https://roster.test',env={APPS_SCRIPT_URL:'https://script.google.com/macros/s/roster/exec',BRIDGE_SECRET:'synthetic-batch-read-bridge-secret-0123456789'};
+const origin='https://roster.test',env={APPS_SCRIPT_URL:'https://script.google.com/macros/s/roster/exec',GSIS_SECRET:'synthetic-batch-read-bridge-secret-0123456789'};
 const from=new Date(Date.now()+8*3600000).toISOString().slice(0,10),dates=Array.from({length:31},(_,i)=>new Date(Date.parse(from)+i*86400000).toISOString().slice(0,10)),to=dates.at(-1),key='a'.repeat(64);
 const week={days:['Monday','Tuesday','Wednesday','Thursday','Friday'],perDay:2,maxPeriod:1,blocks:[{name:'Alice',cells:Array.from({length:10},()=>['EL','4A','Room',''])}]};
 const model=R.validate({layoutMode:'single-week',single:week,timing:{startMinutes:420,periodMinutes:30,normalLastPeriod:1},recesses:[]});
@@ -15,7 +15,7 @@ const baseline={schema:1,stage:'baseline',from,to,baselineKey:key,registerRevisi
 const suspended={schema:1,stage:'suspended',from,to,baselineKey:key,registerRevision:1,operationsRevision:1,plans:[],datesView:{revision:1,confirmedAccess:'available',dates:[]}};
 function envelope(payload){const data=JSON.stringify(payload);return {schema:1,stage:payload.stage,from,to,baselineKey:key,key:'b'.repeat(64),bytes:Buffer.byteLength(data),encoding:'json-v1',data};}
 let changed=true,mode='normal';const calls=[];
-const box=vm.createContext({GSIS_DEPLOY_VERSION:'test',GSISSheets:{resetStats(){}},Utilities:{getUuid:randomUUID},props_:()=>({getProperty:name=>name==='BRIDGE_SECRET'?env.BRIDGE_SECRET:null}),signature_:(payload,secret)=>createHmac('sha256',secret).update(payload).digest('hex'),same_:(a,b)=>a===b,out_:x=>JSON.stringify(x),error_:(status,message)=>{throw Object.assign(Error(message),{status});},rosterDiagnostic_(){},rosterDiagnosticError_:()=>'',rosterDiagnosticText_:()=>'',rosterStage_(){},rosterFailureDetail_:()=>({}),contacts_:()=>({}),rosterDispatch_:req=>{
+const box=vm.createContext({GSIS_DEPLOY_VERSION:'test',GSISSheets:{resetStats(){}},Utilities:{getUuid:randomUUID},props_:()=>({getProperty:name=>name==="GSIS_SECRET"?env.GSIS_SECRET:null}),signature_:(payload,secret)=>createHmac('sha256',secret).update(payload).digest('hex'),same_:(a,b)=>a===b,out_:x=>JSON.stringify(x),error_:(status,message)=>{throw Object.assign(Error(message),{status});},rosterDiagnostic_(){},rosterDiagnosticError_:()=>'',rosterDiagnosticText_:()=>'',rosterStage_(){},rosterFailureDetail_:()=>({}),contacts_:()=>({}),rosterDispatch_:req=>{
  const input=req.input;
  if(mode.startsWith('ALLOCATION_'))throw Object.assign(Error('Allocation status requires recovery.'),{status:409,code:mode});
  if(mode==='cancel'){assert.equal(input.operation,'cancelAllocationRun');assert.deepEqual(JSON.parse(JSON.stringify(input.calendarByDate)),{});return {cancellation:'accepted'};}
@@ -30,7 +30,7 @@ vm.runInContext(fs.readFileSync('backend/ApiSecret.gs','utf8'),box);
 require('./load-backend-role.cjs')(box,'roster');
 require('./helpers/load-roster-diagnostic-build.cjs')(box);
 const source=fs.readFileSync('backend/Code.gs','utf8'),start=source.indexOf('function doPost(e){');vm.runInContext(source.slice(start,source.indexOf('\nfunction auth_',start)),box);vm.runInContext(fs.readFileSync('backend/RosterTimetableBatch.gs','utf8'),box);
-const now=Date.now(),signed=await gateway.sign({purpose:'gsis-session-v1',origin,email:'alice@gsps.edu.sg',subject:'synthetic',issued:now,expires:now+60000},env.BRIDGE_SECRET+'|gsis-browser-session-v1|'+origin),cookie='__Host-gsis_session='+Buffer.from(signed.payload).toString('base64url')+'.'+signed.signature;
+const now=Date.now(),signed=await gateway.sign({purpose:'gsis-session-v1',origin,email:'alice@gsps.edu.sg',subject:'synthetic',issued:now,expires:now+60000},env.GSIS_SECRET+'|gsis-browser-session-v1|'+origin),cookie='__Host-gsis_session='+Buffer.from(signed.payload).toString('base64url')+'.'+signed.signature;
 const oldFetch=globalThis.fetch,oldError=console.error,oldInfo=console.info;console.error=console.info=()=>{};
 globalThis.fetch=async(url,options)=>{assert.equal(String(url),env.APPS_SCRIPT_URL);return new Response(box.doPost({postData:{contents:options.body}}),{headers:{'Content-Type':'application/json'}});};
 async function request(input){const response=await gateway.default.fetch(new Request(origin+'/api/operations',{method:'POST',headers:{Origin:origin,Cookie:cookie},body:JSON.stringify(input)}),env,{waitUntil:()=>assert.fail('A preload must not dispatch background writes')});return {status:response.status,body:await response.json()};}

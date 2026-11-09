@@ -15,7 +15,7 @@ const contacts=f.sheets.get('contacts');contacts.data[18][5]='Updated Person';f.
 }
 // Exercise the real Deploy bridge, actual signed Contacts dispatcher and immutable cache.
 const {ctx,props}=require('./storage.cjs'),run=s=>vm.runInContext(s,ctx),deployCache=new Map(),requests=[];ctx.CacheService=cacheService(deployCache);ctx.Utilities.computeHmacSha256Signature=(s,k,charset='utf8')=>[...crypto.createHmac('sha256',Buffer.from(k,charset)).update(s,charset).digest()];
-props.set('CONTACTS_API_URL','https://script.google.com/macros/s/synthetic/exec');props.set('CONTACTS_BRIDGE_SECRET','x'.repeat(32));
+props.set('CONTACTS_API_URL','https://script.google.com/macros/s/synthetic/exec');props.set('GSIS_SECRET','x'.repeat(32));
 const trace=crypto.randomUUID();ctx.trace=trace;run('deployTrace_={requestId:trace,phases:{}}');
 ctx.UrlFetchApp={fetch(url,options){const envelope=JSON.parse(options.payload),request=JSON.parse(envelope.payload);requests.push(request);f.ctx.signed={postData:{contents:options.payload}};return {getContentText:()=>f.run('doPost(signed).text')};}};
 const bridge=()=>run("realContactsBridge({email:'admin@gsps.edu.sg',subject:'admin'},false,'deploySnapshot',{readOnly:true})");

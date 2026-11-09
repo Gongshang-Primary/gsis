@@ -70,7 +70,7 @@ try{
  const bucket={async get(){objectCalls.gets++;return null;},async put(){objectCalls.puts++;}};
  const env={GSIS_JOBS:db,ROSTER_EDGE_AUTHORITY:'d1',DEPLOY_EDGE_AUTHORITY:'d1',ROSTER_AUTOMATION_ENABLED:'true',ROSTER_TIMETABLE_SNAPSHOTS:bucket,
   ROSTER_PUBLIC_ORIGIN:'https://roster.gsps.edu.sg',APPS_SCRIPT_URL:'https://script.google.com/macros/s/fixture/exec',DEPLOY_APPS_SCRIPT_URL:'https://script.google.com/macros/s/deploy-fixture/exec',DEPLOY_BRIDGE_SECRET:'d'.repeat(40),
-  ROSTER_SERVICE_SECRET:'s'.repeat(40),CALENDAR_APPS_SCRIPT_URL:'https://script.google.com/macros/s/calendar-fixture/exec',CALENDAR_PROXY_SECRET:'c'.repeat(40),CALENDAR_BACKGROUND_SYNC:'false',
+  GSIS_SECRET:'s'.repeat(40),CALENDAR_APPS_SCRIPT_URL:'https://script.google.com/macros/s/calendar-fixture/exec',CALENDAR_PROXY_SECRET:'c'.repeat(40),CALENDAR_BACKGROUND_SYNC:'false',
   WHATSAPP_ENABLED:'true',WHATSAPP_DURABLE_INGRESS:'true',WHATSAPP_PHONE_NUMBER_ID:'123456789',WHATSAPP_ACCOUNT_ID:'123456789',WHATSAPP_TEMPLATE_ACCOUNT_ID:'123456789',WHATSAPP_API_VERSION:'v22.0',
   WHATSAPP_ACCESS_TOKEN:'a'.repeat(40),WHATSAPP_APP_SECRET:'b'.repeat(40),EXTERNAL_LINK_SECRET:'e'.repeat(40),WHATSAPP_VERIFY_TOKEN:'v'.repeat(40),CONTACTS_PUBLIC_URL:'https://contacts.gsps.edu.sg/',WHATSAPP_TEMPLATES_JSON:'{}'};
  // Generic historical Store fixtures do not prove a coordinated Roster cutover.

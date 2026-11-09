@@ -10,7 +10,7 @@ const worker=await import(toWorkerModuleURL('data:text/javascript;base64,'+Buffe
 // Actual worker + Inbox adapter/domain. Only Drive, R2, Contacts and Meta are synthetic.
 // Each backend call has a fresh VM and reads the committed metadata from disk.
 const temp=fs.mkdtempSync(path.join(os.tmpdir(),'gsis-inbox716-')),file=path.join(temp,'inbox.json');
-const env={WHATSAPP_ENABLED:'true',WHATSAPP_MENU_ENABLED:'false',ROSTER_AUTOMATION_ENABLED:'false',WHATSAPP_PHONE_NUMBER_ID:'123456789',WHATSAPP_ACCOUNT_ID:'223456789',WHATSAPP_TEMPLATE_ACCOUNT_ID:'323456789',WHATSAPP_API_VERSION:'v23.0',WHATSAPP_ACCESS_TOKEN:'test-access-'.repeat(8),WHATSAPP_APP_SECRET:'test-app-'.repeat(8),WHATSAPP_VERIFY_TOKEN:'test-verify-'.repeat(8),ROSTER_SERVICE_SECRET:'test-service-'.repeat(8),BRIDGE_SECRET:'test-bridge-'.repeat(8),ROSTER_PUBLIC_ORIGIN:'https://roster.example.test',APPS_SCRIPT_URL:'https://script.google.com/macros/s/test/exec'};
+const env={WHATSAPP_ENABLED:'true',WHATSAPP_MENU_ENABLED:'false',ROSTER_AUTOMATION_ENABLED:'false',WHATSAPP_PHONE_NUMBER_ID:'123456789',WHATSAPP_ACCOUNT_ID:'223456789',WHATSAPP_TEMPLATE_ACCOUNT_ID:'323456789',WHATSAPP_API_VERSION:'v23.0',WHATSAPP_ACCESS_TOKEN:'test-access-'.repeat(8),WHATSAPP_APP_SECRET:'test-app-'.repeat(8),WHATSAPP_VERIFY_TOKEN:'test-verify-'.repeat(8),ROSTER_SERVICE_SECRET:'test-service-'.repeat(8),GSIS_SECRET:'test-bridge-'.repeat(8),ROSTER_PUBLIC_ORIGIN:'https://roster.example.test',APPS_SCRIPT_URL:'https://script.google.com/macros/s/test/exec'};
 const origin=env.ROSTER_PUBLIC_ORIGIN,waId='6590000000',calls=[],objects=new Map(),bytes=new TextEncoder().encode('synthetic voice note');
 let authorized=true,sends=0,writes=0,putCount=0;
 const contacts={rosterPeople:[{id:'admin',name:'Admin',active:true,role:'T',email:'admin@gsps.edu.sg',mobile:'90000001'}],rosterSMCIds:['admin'],rosterAdminIds:['admin']};
@@ -28,7 +28,7 @@ env.WHATSAPP_INBOX_MEDIA={async head(key){const item=objects.get(key);return ite
 const nativeFetch=globalThis.fetch;
 globalThis.fetch=async(input,init={})=>{
  const url=new URL(input);calls.push(url.origin+url.pathname);
- if(url.href===env.APPS_SCRIPT_URL){const signed=JSON.parse(init.body),payload=JSON.parse(signed.payload);assert.equal(signed.signature,(await worker.sign(payload,payload.action==='rosterService'?env.ROSTER_SERVICE_SECRET:env.BRIDGE_SECRET)).signature);assert(['rosterInbox','rosterService'].includes(payload.action));return Response.json(backend(payload));}
+ if(url.href===env.APPS_SCRIPT_URL){const signed=JSON.parse(init.body),payload=JSON.parse(signed.payload);assert.equal(signed.signature,(await worker.sign(payload,payload.action==='rosterService'?env.GSIS_SECRET:env.GSIS_SECRET)).signature);assert(['rosterInbox','rosterService'].includes(payload.action));return Response.json(backend(payload));}
  assert.equal(init.redirect,'manual');assert.equal(init.headers.Authorization,'Bearer '+env.WHATSAPP_ACCESS_TOKEN);
  if(url.hostname==='graph.facebook.com'){
   if(url.pathname.endsWith('/messages')){const sent=JSON.parse(init.body);assert.equal(sent.to,waId);assert.equal(sent.type,'text');assert.equal(sent.text.body,'Reply from authorised staff');sends++;return Response.json({messages:[{id:'wamid.sent-'+sends}]});}
@@ -36,7 +36,7 @@ globalThis.fetch=async(input,init={})=>{
  }
  assert.equal(url.hostname,'lookaside.fbsbx.com','No unexpected or real network calls');return new Response(bytes,{headers:{'Content-Type':'audio/ogg','Content-Length':String(bytes.length)}});
 };
-const session=await worker.sign({purpose:'gsis-session-v1',origin,email:'admin@gsps.edu.sg',subject:'test-subject',issued:Date.now(),expires:Date.now()+86400000},env.BRIDGE_SECRET+'|gsis-browser-session-v1|'+origin),cookie='__Host-gsis_session='+Buffer.from(session.payload).toString('base64url')+'.'+session.signature;
+const session=await worker.sign({purpose:'gsis-session-v1',origin,email:'admin@gsps.edu.sg',subject:'test-subject',issued:Date.now(),expires:Date.now()+86400000},env.GSIS_SECRET+'|gsis-browser-session-v1|'+origin),cookie='__Host-gsis_session='+Buffer.from(session.payload).toString('base64url')+'.'+session.signature;
 async function operation(input,settings=env,authenticated=true){const response=await worker.default.fetch(new Request(origin+'/api/operations',{method:'POST',headers:{Origin:origin,'Content-Type':'application/json',...(authenticated?{Cookie:cookie}:{})},body:JSON.stringify(input)}),settings,{});return {status:response.status,...await response.json()};}
 async function webhook(messages=[],statuses=[],settings=env){const event={object:'whatsapp_business_account',entry:[{id:env.WHATSAPP_ACCOUNT_ID,changes:[{field:'messages',value:{metadata:{phone_number_id:env.WHATSAPP_PHONE_NUMBER_ID},messages,statuses}}]}]},signed=await worker.sign(event,env.WHATSAPP_APP_SECRET);return worker.whatsappWebhook(new Request(origin+'/api/whatsapp/webhook',{method:'POST',headers:{'X-Hub-Signature-256':'sha256='+signed.signature},body:signed.payload}),settings);}
 try{
@@ -44,9 +44,10 @@ try{
  assert.equal(result.status,200);assert.equal(result.data.threads.length,0);assert.equal(result.data.configuration.liveVerified,false);
  for(const key of ['capture','replies','voice','templates'])assert.deepEqual(result.data.configuration[key],{configured:true,missing:[]});
  assert.equal(calls.length,1,'Readiness adds no network calls or sends');assert.equal(sends,0);
- const incomplete={...env,WHATSAPP_ENABLED:'false',WHATSAPP_INBOX_MEDIA:undefined,WHATSAPP_APP_SECRET:'',WHATSAPP_VERIFY_TOKEN:'',WHATSAPP_ACCESS_TOKEN:'',WHATSAPP_TEMPLATE_ACCOUNT_ID:'',ROSTER_SERVICE_SECRET:''};
- result=await operation({operation:'inboxList'},incomplete);assert.equal(result.data.configuration.enabled,false);assert(result.data.configuration.capture.missing.includes('ROSTER_SERVICE_SECRET'));assert(result.data.configuration.capture.missing.includes('WHATSAPP_APP_SECRET'));assert(result.data.configuration.capture.missing.includes('WHATSAPP_VERIFY_TOKEN'));assert(result.data.configuration.voice.missing.includes('WHATSAPP_INBOX_MEDIA'));assert(result.data.configuration.templates.missing.includes('WHATSAPP_TEMPLATE_ACCOUNT_ID'));
- for(const secret of [env.WHATSAPP_APP_SECRET,env.WHATSAPP_ACCESS_TOKEN,env.ROSTER_SERVICE_SECRET,env.WHATSAPP_VERIFY_TOKEN])assert(!JSON.stringify(result).includes(secret));
+ const incomplete={...env,WHATSAPP_ENABLED:'false',WHATSAPP_INBOX_MEDIA:undefined,WHATSAPP_APP_SECRET:'',WHATSAPP_VERIFY_TOKEN:'',WHATSAPP_ACCESS_TOKEN:'',WHATSAPP_TEMPLATE_ACCOUNT_ID:''};
+ result=await operation({operation:'inboxList'},incomplete);assert.equal(result.data.configuration.enabled,false);assert.equal(result.data.configuration.capture.missing.includes("GSIS_SECRET"),false);assert(result.data.configuration.capture.missing.includes('WHATSAPP_APP_SECRET'));assert(result.data.configuration.capture.missing.includes('WHATSAPP_VERIFY_TOKEN'));assert(result.data.configuration.voice.missing.includes('WHATSAPP_INBOX_MEDIA'));assert(result.data.configuration.templates.missing.includes('WHATSAPP_TEMPLATE_ACCOUNT_ID'));
+ for(const secret of [env.WHATSAPP_APP_SECRET,env.WHATSAPP_ACCESS_TOKEN,env.GSIS_SECRET,env.WHATSAPP_VERIFY_TOKEN])assert(!JSON.stringify(result).includes(secret));
+ const callsBeforeMissingCanonical=calls.length;const missingCanonical=await operation({operation:'inboxList'},{...incomplete,GSIS_SECRET:''});assert.equal(missingCanonical.status,503);assert.equal(missingCanonical.code,'GSIS_SECRET_INVALID');assert.equal(missingCanonical.data,undefined);assert.equal(calls.length,callsBeforeMissingCanonical,'invalid canonical transport cannot make provider or backend calls');
  authorized=false;result=await operation({operation:'inboxList'});assert.equal(result.status,403);assert.equal(result.data,undefined);authorized=true;assert.equal((await operation({operation:'inboxList'},env,false)).status,401);
  const incoming={id:'wamid.incoming',from:waId,type:'text',timestamp:String(Math.floor(Date.now()/1000)),text:{body:'An incoming message'}};
  assert.equal((await webhook([incoming],[],{...env,WHATSAPP_ENABLED:'false'})).status,200);assert.equal(writes,0,'Existing disabled gate is preserved');

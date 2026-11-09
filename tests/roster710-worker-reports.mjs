@@ -7,7 +7,7 @@ import {assertRecoveryWritable} from '../shared/edge-recovery.js';
 import {safeHealthError} from '../shared/edge-health.js';
 const code=fs.readFileSync('roster-update/public/_worker.js','utf8');
 const gateway=await import(toWorkerModuleURL('data:text/javascript;base64,'+Buffer.from(code).toString('base64')));
-const env={APPS_SCRIPT_URL:'https://script.google.com/macros/s/deploy/exec',ROSTER_SERVICE_SECRET:'s'.repeat(40),ROSTER_AUTOMATION_ENABLED:'false'};
+const env={APPS_SCRIPT_URL:'https://script.google.com/macros/s/deploy/exec',GSIS_SECRET:'s'.repeat(40),ROSTER_AUTOMATION_ENABLED:'false'};
 let calls=0;
 globalThis.fetch=async()=>{calls++;throw Error('Unexpected Calendar request');};
 for(const operation of ['systemConfig','saveSystemConfig','dailyEmployment','saveDailyEmploymentSettings','staplerDates','requestStapler','decideStapler','acquireStaplerLock','renewStaplerLock','releaseStaplerLock','nameBridges','saveNameBridge','deleteNameBridge']){
@@ -21,7 +21,7 @@ let input;
 globalThis.fetch=async(url,options)=>{
  assert.equal(String(url),env.APPS_SCRIPT_URL);
  const envelope=JSON.parse(options.body),payload=JSON.parse(envelope.payload);
- assert.equal((await gateway.sign(payload,env.ROSTER_SERVICE_SECRET)).signature,envelope.signature);
+ assert.equal((await gateway.sign(payload,env.GSIS_SECRET)).signature,envelope.signature);
  assert.equal(payload.action,'rosterService');
  assert.equal(payload.identity,undefined);
  input=payload.input;

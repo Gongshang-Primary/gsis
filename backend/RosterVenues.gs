@@ -1,8 +1,8 @@
-/* Venues coordination is optional until its two connection properties are set.
+/* Venues coordination is optional until its connection URL is set.
    A durable pending fence blocks reservations across independent ScriptLocks. */
 function rosterVenuesConfig_(){
- const p=props_(),url=p.getProperty('VENUES_APPS_SCRIPT_URL');if(!url&&!p.getProperty('VENUES_BRIDGE_SECRET'))return null;const secret=gsisApiSecret_('VENUES_BRIDGE_SECRET');
- if(!/^https:\/\/script\.google\.com\/macros\/s\/[\w-]+\/exec$/.test(url||'')||!secret||secret.length<32)venuesSourceError_(503,'VENUES_SOURCE_SETUP','Set both VENUES_APPS_SCRIPT_URL and VENUES_BRIDGE_SECRET in Roster, or remove both until Venues is installed.');return {url,secret};
+ const p=props_(),url=p.getProperty('VENUES_APPS_SCRIPT_URL');if(!url)return null;const secret=gsisApiSecret_();
+ if(!/^https:\/\/script\.google\.com\/macros\/s\/[\w-]+\/exec$/.test(url||'')||!secret||secret.length<32)venuesSourceError_(503,'VENUES_SOURCE_SETUP','Set VENUES_APPS_SCRIPT_URL and GSIS_SECRET in Roster; omit the URL until Venues is installed.');return {url,secret};
 }
 function rosterVenuesMarker_(){let marker;try{marker=JSON.parse(props_().getProperty('ROSTER_VENUES_SOURCE')||'null');}catch(_){}return marker;}
 // Diagnostics have their own signed, read/recovery-only route. Normal source

@@ -51,7 +51,7 @@ await test('recovery pause blocks all cache and cleanup mutations before accessi
  for(const operation of [()=>M.enqueueEdgeTimetableRefresh(env),()=>M.edgeTimetableBatch(env,{stage:'baseline'},who,{}),()=>M.drainEdgeTimetableJobs(env,who),()=>M.isEdgeTimetableRefreshDue(env),()=>runRosterR2Cleanup({...env,ROSTER_EDGE_AUTHORITY:'d1'})])await assert.rejects(operation(),error=>error.code==='GSIS_RECOVERY_PAUSED');
 });
 await test('signed Venues reads do not consume a nonce during recovery',async()=>{
- const env={GSIS_RECOVERY_MODE:'true',VENUES_BRIDGE_SECRET:'s'.repeat(32)},payload=JSON.stringify({action:'venuesSource',service:'gsis-venues-v1',source:'roster',timestamp:Date.now(),nonce:crypto.randomUUID(),input:{operation:'manifest'}}),key=await crypto.subtle.importKey('raw',new TextEncoder().encode(env.VENUES_BRIDGE_SECRET),{name:'HMAC',hash:'SHA-256'},false,['sign']);
+ const env={GSIS_RECOVERY_MODE:'true',GSIS_SECRET:'s'.repeat(32)},payload=JSON.stringify({action:'venuesSource',service:'gsis-venues-v1',source:'roster',timestamp:Date.now(),nonce:crypto.randomUUID(),input:{operation:'manifest'}}),key=await crypto.subtle.importKey('raw',new TextEncoder().encode(env.GSIS_SECRET),{name:'HMAC',hash:'SHA-256'},false,['sign']);
  const signature=Buffer.from(await crypto.subtle.sign('HMAC',key,new TextEncoder().encode(payload))).toString('hex'),response=await M.edgeVenuesSourceRoute(new Request('https://roster.gsps.edu.sg/api/venues-source',{method:'POST',body:JSON.stringify({payload,signature})}),env,{});
  assert.equal(response.status,503);assert.equal((await response.json()).code,'GSIS_RECOVERY_PAUSED');
 });

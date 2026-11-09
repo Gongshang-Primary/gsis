@@ -10,7 +10,7 @@ Date.now=()=>now;
 async function test(name,run){try{await run();originalInfo('PASS '+name);}catch(error){failed++;originalError(name,error);}}
 async function fixture(){
  const db=database();await GSiSEdgeStore.open(db,'roster').ensure();
- const env={GSIS_JOBS:db,ROSTER_EDGE_AUTHORITY:'legacy',APPS_SCRIPT_URL:'https://script.google.com/macros/s/venues-fixture/exec',ROSTER_SERVICE_SECRET:'synthetic-venues-service-'.repeat(3),ROSTER_PUBLIC_ORIGIN:'https://roster.gsps.edu.sg',ROSTER_AUTOMATION_ENABLED:'false',WHATSAPP_ENABLED:'false'},calls=[],logs=[];
+ const env={GSIS_JOBS:db,ROSTER_EDGE_AUTHORITY:'legacy',APPS_SCRIPT_URL:'https://script.google.com/macros/s/venues-fixture/exec',GSIS_SECRET:'synthetic-venues-service-'.repeat(3),ROSTER_PUBLIC_ORIGIN:'https://roster.gsps.edu.sg',ROSTER_AUTOMATION_ENABLED:'false',WHATSAPP_ENABLED:'false'},calls=[],logs=[];
  let onService=null;
  globalThis.fetch=async(url,options)=>{assert.equal(String(url),env.APPS_SCRIPT_URL);const input=JSON.parse(JSON.parse(options.body).payload).input;calls.push(input.operation);if(onService)await onService(input.operation);const results={nextAbsenceIntake:{job:null},sendPeerMail:{sent:0},venuesSyncCheck:{enabled:true,state:'ready',marker:'PRIVATE_MARKER'},allocationAuditExport:{exported:[],pending:0,failures:[]}};assert(Object.hasOwn(results,input.operation),'unexpected Google call '+input.operation);return Response.json({ok:true,data:results[input.operation]});};
  console.info=console.error=value=>logs.push(JSON.parse(value));

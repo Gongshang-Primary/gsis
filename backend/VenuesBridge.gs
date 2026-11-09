@@ -1,10 +1,10 @@
-// A separate read-only service credential; never delegates a school-user role.
+// Read-only service boundary; transport authentication never delegates a school-user role.
 function venuesSourceError_(status,code,message){throw Object.assign(Error(message),{status,code});}
 function venuesSourceHash_(value){return Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256,JSON.stringify(value)).map(b=>('0'+((b+256)%256).toString(16)).slice(-2)).join('');}
 function venuesSourceAuthenticate_(envelope,source){
  const deny=()=>venuesSourceError_(401,'VENUES_SOURCE_AUTH','Invalid Venues source request.');
  if(!envelope||typeof envelope.payload!=='string'||envelope.payload.length>120000||typeof envelope.signature!=='string'||!/^[a-f0-9]{64}$/.test(envelope.signature)||Object.keys(envelope).some(k=>!['payload','signature'].includes(k)))deny();
- const secret=gsisApiSecret_('VENUES_BRIDGE_SECRET');if(!secret||secret.length<32)venuesSourceError_(503,'VENUES_SOURCE_SETUP','Configure VENUES_BRIDGE_SECRET for the Venues source service.');
+ const secret=gsisApiSecret_();if(!secret||secret.length<32)venuesSourceError_(503,'VENUES_SOURCE_SETUP','Configure GSIS_SECRET for the Venues source service.');
  const signature=Utilities.computeHmacSha256Signature(envelope.payload,secret).map(b=>('0'+((b+256)%256).toString(16)).slice(-2)).join('');let diff=0;for(let i=0;i<64;i++)diff|=signature.charCodeAt(i)^envelope.signature.charCodeAt(i);if(diff)deny();
  let request;try{request=JSON.parse(envelope.payload);}catch(_){deny();}
  if(!request||request.action!=='venuesSource'||request.service!=='gsis-venues-v1'||request.source!==source||Object.keys(request).some(k=>!['action','service','source','timestamp','nonce','input'].includes(k))||!Number.isFinite(request.timestamp)||Math.abs(Date.now()-request.timestamp)>60000||!/^[-\w]{36}$/.test(request.nonce||''))deny();

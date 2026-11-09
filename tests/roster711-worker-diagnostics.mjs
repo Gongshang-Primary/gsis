@@ -4,7 +4,7 @@ import fs from 'node:fs';
 
 const gateway=await import(toWorkerModuleURL('data:text/javascript;base64,'+Buffer.from(fs.readFileSync('roster-update/public/_worker.js','utf8')).toString('base64')));
 const bundle=await import('../notification-worker/dashboard-worker.mjs');
-const env={WHATSAPP_DIAGNOSTICS_ENABLED:'true',WHATSAPP_ENABLED:'false',WHATSAPP_MENU_ENABLED:'false',ROSTER_AUTOMATION_ENABLED:'false',WHATSAPP_TEMPLATES_JSON:'{}',WHATSAPP_PHONE_NUMBER_ID:'123456789',WHATSAPP_ACCOUNT_ID:'223456789',WHATSAPP_TEMPLATE_ACCOUNT_ID:'323456789',WHATSAPP_API_VERSION:'v23.0',WHATSAPP_ACCESS_TOKEN:'access-private-'.repeat(8),WHATSAPP_APP_SECRET:'app-private-'.repeat(8),WHATSAPP_VERIFY_TOKEN:'verify-private-'.repeat(8),ROSTER_SERVICE_SECRET:'service-private-'.repeat(8),EXTERNAL_LINK_SECRET:'link-private-'.repeat(8),ROSTER_PUBLIC_ORIGIN:'https://roster.example.test',CONTACTS_PUBLIC_URL:'https://contacts.example.test',APPS_SCRIPT_URL:'https://script.google.com/macros/s/deploy-test/exec',CALENDAR_APPS_SCRIPT_URL:'https://script.google.com/macros/s/calendar-test/exec',CALENDAR_PROXY_SECRET:'calendar-private-'.repeat(8)};
+const env={WHATSAPP_DIAGNOSTICS_ENABLED:'true',WHATSAPP_ENABLED:'false',WHATSAPP_MENU_ENABLED:'false',ROSTER_AUTOMATION_ENABLED:'false',WHATSAPP_TEMPLATES_JSON:'{}',WHATSAPP_PHONE_NUMBER_ID:'123456789',WHATSAPP_ACCOUNT_ID:'223456789',WHATSAPP_TEMPLATE_ACCOUNT_ID:'323456789',WHATSAPP_API_VERSION:'v23.0',WHATSAPP_ACCESS_TOKEN:'access-private-'.repeat(8),WHATSAPP_APP_SECRET:'app-private-'.repeat(8),WHATSAPP_VERIFY_TOKEN:'verify-private-'.repeat(8),GSIS_SECRET:'service-private-'.repeat(8),EXTERNAL_LINK_SECRET:'link-private-'.repeat(8),ROSTER_PUBLIC_ORIGIN:'https://roster.example.test',CONTACTS_PUBLIC_URL:'https://contacts.example.test',APPS_SCRIPT_URL:'https://script.google.com/macros/s/deploy-test/exec',CALENDAR_APPS_SCRIPT_URL:'https://script.google.com/macros/s/calendar-test/exec',CALENDAR_PROXY_SECRET:'calendar-private-'.repeat(8)};
 const scheduledTime=Date.parse('2026-10-18T13:00:00Z');
 const diagnosticBuildPattern=/^\d+\.\d+\.\d+-worker-diag[1-9]\d*$/;
 let calls=[];
@@ -21,7 +21,7 @@ function installFetch(){globalThis.fetch=async(input,init={})=>{
  if(url.href===env.APPS_SCRIPT_URL){
   const p=JSON.parse(body.payload);
   assert.deepEqual(p.input,{operation:'connectionStatus'},'No queue claim, allocation, publication or mail dispatch');
-  assert.equal(body.signature,(await gateway.sign(p,env.ROSTER_SERVICE_SECRET)).signature);
+  assert.equal(body.signature,(await gateway.sign(p,env.GSIS_SECRET)).signature);
   return Response.json({ok:true,data:{readOnly:true,contactsReady:true,privateData:'PRIVATE_UPSTREAM'}});
  }
  assert.equal(url.href,env.CALENDAR_APPS_SCRIPT_URL);
@@ -42,13 +42,14 @@ for(const module of [gateway,bundle]){
  const calendarSuccess=success.checks.find(c=>c.name==='calendar');
  assert.equal(calendarSuccess.phase,'complete');assert.equal(calendarSuccess.httpStatus,200);assert.equal(calendarSuccess.responseFormat,'json');assert(calendarSuccess.elapsedMs>=0);
 
- for(const field of ['WHATSAPP_PHONE_NUMBER_ID','WHATSAPP_API_VERSION','WHATSAPP_ACCESS_TOKEN','WHATSAPP_APP_SECRET','ROSTER_SERVICE_SECRET','EXTERNAL_LINK_SECRET','ROSTER_PUBLIC_ORIGIN','APPS_SCRIPT_URL','WHATSAPP_VERIFY_TOKEN','WHATSAPP_ACCOUNT_ID','WHATSAPP_TEMPLATE_ACCOUNT_ID','CONTACTS_PUBLIC_URL','CALENDAR_APPS_SCRIPT_URL','CALENDAR_PROXY_SECRET']){
+ for(const field of ['WHATSAPP_PHONE_NUMBER_ID','WHATSAPP_API_VERSION','WHATSAPP_ACCESS_TOKEN','WHATSAPP_APP_SECRET',"GSIS_SECRET",'EXTERNAL_LINK_SECRET','ROSTER_PUBLIC_ORIGIN','APPS_SCRIPT_URL','WHATSAPP_VERIFY_TOKEN','WHATSAPP_ACCOUNT_ID','WHATSAPP_TEMPLATE_ACCOUNT_ID','CONTACTS_PUBLIC_URL','CALENDAR_APPS_SCRIPT_URL']){
   for(const [value,reason] of [['','MISSING_OR_EMPTY'],['bad','INVALID_VALUE']]){
    calls=[];const result=await module.diagnoseNotificationConnections({...env,[field]:value},scheduledTime);
    assert.equal(calls.length,0);assert.match(result.diagnosticBuild,diagnosticBuildPattern);
    assert.deepEqual(result.checks,[{name:'configuration',ok:false,code:'CONFIGURATION_INCOMPLETE',field,reason}]);checkPrivacy(result);
   }
  }
+ for(const value of ['','bad']){calls=[];const ignoredLegacy=await module.diagnoseNotificationConnections({...env,CALENDAR_PROXY_SECRET:value},scheduledTime);assert.equal(calls.length,4,'obsolete Calendar key cannot disable canonical transport');assert.equal(ignoredLegacy.connectionsReady,true);checkPrivacy(ignoredLegacy);}
  const invalidTemplates=await module.diagnoseNotificationConnections({...env,WHATSAPP_TEMPLATES_JSON:'{"RAW_PROVIDER_ERROR":{}}'},scheduledTime);
  assert.equal(invalidTemplates.checks[0].field,'WHATSAPP_TEMPLATES_JSON');checkPrivacy(invalidTemplates);
 

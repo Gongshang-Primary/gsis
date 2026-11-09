@@ -4,7 +4,7 @@ import worker,{rosterBackend} from '../roster-update/public/_worker.js';
 
 globalThis.crypto??=webcrypto;
 const origin='https://roster.gsps.edu.sg',secret='synthetic-import-secret-'.repeat(3),now=Date.now();
-const env={BRIDGE_SECRET:secret,GOOGLE_CLIENT_ID:'fixture',APPS_SCRIPT_URL:'https://script.google.com/macros/s/fixture/exec'};
+const env={GSIS_SECRET:secret,GOOGLE_CLIENT_ID:'fixture',APPS_SCRIPT_URL:'https://script.google.com/macros/s/fixture/exec'};
 const session=JSON.stringify({purpose:'gsis-session-v1',origin,email:'admin@gsps.edu.sg',subject:'fixture',issued:now,expires:now+3600000});
 const cookie='__Host-gsis_session='+Buffer.from(session).toString('base64url')+'.'+createHmac('sha256',secret+'|gsis-browser-session-v1|'+origin).update(session).digest('hex');
 const request=input=>new Request(origin+'/api/operations',{method:'POST',headers:{Origin:origin,Cookie:cookie},body:JSON.stringify(input)});

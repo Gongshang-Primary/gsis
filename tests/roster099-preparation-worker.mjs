@@ -8,7 +8,7 @@ const require=createRequire(import.meta.url),Import=require('../shared/roster-im
 
 function fixture(options={}){
  const db=database(),who={email:'admin@gsps.edu.sg',subject:'admin'},requestId=crypto.randomUUID(),sessionId=sha256Hex(JSON.stringify([who.email,requestId]));
- const env={GSIS_JOBS:db,APPS_SCRIPT_URL:'https://script.google.com/macros/s/preparation-fixture/exec',BRIDGE_SECRET:'b'.repeat(32),ROSTER_SERVICE_SECRET:'s'.repeat(32)};
+ const env={GSIS_JOBS:db,APPS_SCRIPT_URL:'https://script.google.com/macros/s/preparation-fixture/exec',GSIS_SECRET:'b'.repeat(32),ROSTER_SERVICE_SECRET:'s'.repeat(32)};
  const binding={actor:who.email,requestId,sessionId},store=Import.open(db,binding),calls=[],files=new Map(),checkpoints=new Map();
  let admin=true,loseNext=false,held=false,release,abandonFailure=false,abandoned=null;
  const frozen=Import.freeze({sourceDigest:'a'.repeat(64),state:{revision:0,rows:[{id:'one',value:'frozen'}]},index:{entries:[]}},binding,{hash:sha256Hex,gzip:value=>[...gzipSync(value)],base64:bytes=>Buffer.from(bytes).toString('base64')});
@@ -98,7 +98,7 @@ try{
 
  const bundle=require('../scripts/bundle-worker.cjs').bundle,Pages=await import('data:text/javascript;base64,'+Buffer.from(bundle('roster-update/public/_worker.js')).toString('base64'));
  async function gateway(f,body){
-  const origin='https://roster.gsps.edu.sg',env={...f.env,ROSTER_D1_PREPARE:'import',ROSTER_PUBLIC_ORIGIN:origin},payload=JSON.stringify({purpose:'gsis-session-v1',origin,email:f.who.email,subject:f.who.subject,issued:now,expires:now+3600000}),signature=createHmac('sha256',env.BRIDGE_SECRET+'|gsis-browser-session-v1|'+origin).update(payload).digest('hex');
+  const origin='https://roster.gsps.edu.sg',env={...f.env,ROSTER_D1_PREPARE:'import',ROSTER_PUBLIC_ORIGIN:origin},payload=JSON.stringify({purpose:'gsis-session-v1',origin,email:f.who.email,subject:f.who.subject,issued:now,expires:now+3600000}),signature=createHmac('sha256',env.GSIS_SECRET+'|gsis-browser-session-v1|'+origin).update(payload).digest('hex');
   return Pages.default.fetch(new Request(origin+'/api/edge/migration',{method:'POST',headers:{Origin:origin,'Content-Type':'application/json',Cookie:'__Host-gsis_session='+Buffer.from(payload).toString('base64url')+'.'+signature},body:JSON.stringify(body)}),env);
  }
  const gate=fixture();await gate.store.reserve();await gate.store.failPreparation();

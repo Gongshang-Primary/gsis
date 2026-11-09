@@ -6,7 +6,7 @@ import {GSISRosterOperations as O} from '../roster-update/public/edge-roster-dom
 import {readRosterCutoverFreeze} from '../shared/roster-cutover-freeze.js';
 import {sha256Hex} from '../roster-update/public/edge-deploy-sha256.js';
 const require=createRequire(import.meta.url),database=require('./helpers/chunked-import-db.cjs'),Import=require('../shared/roster-import.js'),db=database(),who={email:'admin@gsps.edu.sg',subject:'admin'},id=crypto.randomUUID(),requestId=crypto.randomUUID();
-const env={GSIS_JOBS:db,APPS_SCRIPT_URL:'https://script.google.com/macros/s/cutover-fixture/exec',BRIDGE_SECRET:'b'.repeat(40),ROSTER_SERVICE_SECRET:'s'.repeat(40),CALENDAR_APPS_SCRIPT_URL:'https://script.google.com/macros/s/calendar-fixture/exec',CALENDAR_PROXY_SECRET:'c'.repeat(40)};
+const env={GSIS_JOBS:db,APPS_SCRIPT_URL:'https://script.google.com/macros/s/cutover-fixture/exec',GSIS_SECRET:'b'.repeat(40),ROSTER_SERVICE_SECRET:'s'.repeat(40),CALENDAR_APPS_SCRIPT_URL:'https://script.google.com/macros/s/calendar-fixture/exec',CALENDAR_PROXY_SECRET:'c'.repeat(40)};
 const source={schema:1,sourceDigest:'a'.repeat(64),state:O.initial(),index:{revision:1,entries:[],receipts:[]}},files=new Map(),oldFetch=globalThis.fetch;
 let proof={available:true,active:false,state:'idle',requestId:null,frozenAt:null},completeCalls=0,loseComplete=true,failScope=false,legacyFenced=false,refuseFence=false;
 try{

@@ -7,7 +7,7 @@ const who={email:'admin@example.test',subject:'admin'},previous=globalThis.fetch
 try{
  for(const scenario of ['late','late-body','late-google','pending','wrong-digest','google','google-timeout']){
   const db=database(),requestId='checkpoint-'+scenario,sessionId=hash(JSON.stringify([who.email,requestId])),binding={actor:who.email,requestId,sessionId};
-  const env={GSIS_JOBS:db,ROSTER_D1_PREPARE:'import',BRIDGE_SECRET:'b'.repeat(40),APPS_SCRIPT_URL:'https://script.google.com/macros/s/fixture/exec'};
+  const env={GSIS_JOBS:db,ROSTER_D1_PREPARE:'import',GSIS_SECRET:'b'.repeat(40),APPS_SCRIPT_URL:'https://script.google.com/macros/s/fixture/exec'};
   const store=Import.open(db,binding);await store.reserve();const initial=await store.claimPreparation();
   const checkpoint={fileId:'previous',digest:hash('previous')};
   await store.commitPreparation(initial,{adminVerified:true,sessionId,preparing:true,preparation:{ordinal:1,checkpoint},step:1,done:1,total:4,elapsedMs:1000,nextStep:{phase:'Freeze parts',bytes:262157,records:0}});

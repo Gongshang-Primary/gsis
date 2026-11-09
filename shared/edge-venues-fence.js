@@ -1,13 +1,13 @@
 /* GSIS_API_SECRET_BEGIN */
-// First-party API credentials share one operator-selected setting. Browser
-// sessions, private relief links and third-party credentials stay independent.
-function gsisApiSecret(env,legacyName){
+// Roster/Deploy transport requires one setting without legacy fallback.
+// Browser sessions retain their existing purpose- and origin-bound derivation.
+function gsisApiSecret(env){
  const value=env?.GSIS_SECRET;
- if(value!==undefined||Object.prototype.hasOwnProperty.call(env||{},'GSIS_SECRET')){
-  if(typeof value!=='string'||!/^[!-~]{32,8000}$/.test(value))throw Object.assign(Error('GSIS_SECRET must contain 32 to 8000 printable ASCII characters without spaces.'),{status:503,code:'GSIS_SECRET_INVALID'});
-  return value;
+ if(typeof value!=='string'||!/^[!-~]{32,8000}$/.test(value)){
+  throw Object.assign(Error('GSIS_SECRET must contain 32 to 8000 printable ASCII characters without spaces.'),
+   {status:503,code:'GSIS_SECRET_INVALID'});
  }
- return env?.[legacyName];
+ return value;
 }
 
 /* GSIS_API_SECRET_END */
@@ -15,7 +15,7 @@ function gsisApiSecret(env,legacyName){
    until a verified source head completes the same durable change token. */
 const encoder=new TextEncoder(),schemas=new WeakMap();
 const fail=(code,message,status=503)=>{throw Object.assign(Error(message),{code,status});};
-function configuration(env){const url=env.VENUES_APPS_SCRIPT_URL;if(!url&&!env.VENUES_BRIDGE_SECRET)return null;const secret=gsisApiSecret(env,'VENUES_BRIDGE_SECRET');if(!/^https:\/\/script\.google\.com\/macros\/s\/[A-Za-z0-9_-]+\/exec$/.test(url||'')||typeof secret!=='string'||secret.length<32)fail('VENUES_FENCE_SETUP','Set both VENUES_APPS_SCRIPT_URL and VENUES_BRIDGE_SECRET before publishing occupancy.');if(!env.GSIS_JOBS?.prepare)fail('VENUES_FENCE_SETUP','The durable source fence requires GSIS_JOBS.');return {url,secret};}
+function configuration(env){const url=env.VENUES_APPS_SCRIPT_URL;if(!url)return null;const secret=gsisApiSecret(env);if(!/^https:\/\/script\.google\.com\/macros\/s\/[A-Za-z0-9_-]+\/exec$/.test(url||'')||typeof secret!=='string'||secret.length<32)fail('VENUES_FENCE_SETUP','Set VENUES_APPS_SCRIPT_URL and GSIS_SECRET before publishing occupancy.');if(!env.GSIS_JOBS?.prepare)fail('VENUES_FENCE_SETUP','The durable source fence requires GSIS_JOBS.');return {url,secret};}
 async function ensure(db){if(!schemas.has(db))schemas.set(db,db.prepare("CREATE TABLE IF NOT EXISTS gsis_timetable_fences (source TEXT PRIMARY KEY, request_id TEXT NOT NULL, token TEXT NOT NULL, prior_revision TEXT NOT NULL, revision TEXT NOT NULL, phase TEXT NOT NULL, updated_at TEXT NOT NULL)").run().catch(error=>{schemas.delete(db);throw error;}));await schemas.get(db);}
 async function call(config,input){const payload=JSON.stringify({action:'venuesService',service:'gsis-venues-v1',timestamp:Date.now(),nonce:crypto.randomUUID(),input}),key=await crypto.subtle.importKey('raw',encoder.encode(config.secret),{name:'HMAC',hash:'SHA-256'},false,['sign']),signature=[...new Uint8Array(await crypto.subtle.sign('HMAC',key,encoder.encode(payload)))].map(x=>x.toString(16).padStart(2,'0')).join('');let result;try{const response=await fetch(config.url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({payload,signature}),redirect:'follow',signal:AbortSignal.timeout(25000)});if(!response.ok)throw Error();result=await response.json();}catch{fail('VENUES_FENCE_UNCERTAIN','Venues coordination could not be confirmed. Retry this same change.');}if(result?.ok!==true||!result.data)fail('VENUES_FENCE_REJECTED','Venues has not accepted this source change. Review its pending source fence.');return result.data;}
 export async function beginEdgeVenuesChange(env,{source,requestId}){if(!['roster','deploy'].includes(source)||typeof requestId!=='string'||!requestId||requestId.length>200)fail('VENUES_FENCE_INPUT','A source and stable request ID are required.',400);const config=configuration(env);if(!config)return null;const db=env.GSIS_JOBS;await ensure(db);let row=await db.prepare('SELECT * FROM gsis_timetable_fences WHERE source=?').bind(source).first();if(row&&row.phase!=='ready'&&row.request_id!==requestId)fail('VENUES_FENCE_PENDING','Another occupancy change needs completion or recovery before publishing.',409);

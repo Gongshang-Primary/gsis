@@ -5,11 +5,11 @@ import vm from 'node:vm';
 const gateway=await import(toWorkerModuleURL('data:text/javascript;base64,'+Buffer.from(fs.readFileSync('roster-update/public/_worker.js','utf8')).toString('base64')));
 assert.equal(typeof gateway.dispatchDeliveryReviewReports,'function','background review adapter exists');
 const reportTime=Date.parse('2026-10-23T00:00:00Z');
-const env={APPS_SCRIPT_URL:'https://script.google.com/macros/s/deploy/exec',ROSTER_SERVICE_SECRET:'s'.repeat(40),ROSTER_AUTOMATION_ENABLED:'false'};
+const env={APPS_SCRIPT_URL:'https://script.google.com/macros/s/deploy/exec',GSIS_SECRET:'s'.repeat(40),ROSTER_AUTOMATION_ENABLED:'false'};
 let inputs=[],graph=0,live=[];
 globalThis.fetch=async(url,options)=>{
  if(String(url).startsWith('https://graph.facebook.com/')){graph++;return Response.json({data:live});}
- assert.equal(String(url),env.APPS_SCRIPT_URL);const envelope=JSON.parse(options.body),payload=JSON.parse(envelope.payload);assert.equal((await gateway.sign(payload,env.ROSTER_SERVICE_SECRET)).signature,envelope.signature);assert.equal(payload.action,'rosterService');inputs.push(payload.input);return Response.json({ok:true,data:{sent:1,pending:0}});
+ assert.equal(String(url),env.APPS_SCRIPT_URL);const envelope=JSON.parse(options.body),payload=JSON.parse(envelope.payload);assert.equal((await gateway.sign(payload,env.GSIS_SECRET)).signature,envelope.signature);assert.equal(payload.action,'rosterService');inputs.push(payload.input);return Response.json({ok:true,data:{sent:1,pending:0}});
 };
 assert.equal((await gateway.dispatchDeliveryReviewReports(env,reportTime)).sent,1);assert.equal(inputs.at(-1).operation,'deliveryReviewMailDispatch');assert.equal(inputs.at(-1).monitor.state,'disabled');assert.equal(graph,0);
 await gateway.dispatchDeliveryReviewReports({...env,WHATSAPP_ENABLED:'true',WHATSAPP_PHONE_NUMBER_ID:'private-secret-value'},reportTime);assert.equal(inputs.at(-1).monitor.state,'configuration');assert.equal(inputs.at(-1).monitor.field,'WHATSAPP_PHONE_NUMBER_ID');assert(!JSON.stringify(inputs).includes('private-secret-value'));

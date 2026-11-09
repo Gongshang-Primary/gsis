@@ -4,11 +4,11 @@ import {createHmac} from 'node:crypto';
 import {edgeRosterMigration} from '../roster-update/public/edge-roster.js';
 import {readRosterCutoverFreeze} from '../shared/roster-cutover-freeze.js';
 const require=createRequire(import.meta.url),database=require('./helpers/chunked-import-db.cjs');
-const db=database(),env={GSIS_JOBS:db,APPS_SCRIPT_URL:'https://script.google.com/macros/s/freeze-fixture/exec',BRIDGE_SECRET:'b'.repeat(40),ROSTER_SERVICE_SECRET:'s'.repeat(40)},who={email:'admin@example.test',subject:'synthetic-admin'},id=crypto.randomUUID(),realFetch=globalThis.fetch;
+const db=database(),env={GSIS_JOBS:db,APPS_SCRIPT_URL:'https://script.google.com/macros/s/freeze-fixture/exec',GSIS_SECRET:'b'.repeat(40),ROSTER_SERVICE_SECRET:'s'.repeat(40)},who={email:'admin@example.test',subject:'synthetic-admin'},id=crypto.randomUUID(),realFetch=globalThis.fetch;
 let proof={available:true,active:false,state:'idle',requestId:null,frozenAt:null,ageMs:0,overdue:false},admin=true,lose=false,freezeCalls=0;
 try{
  globalThis.fetch=async(_url,options)=>{
-  const envelope=JSON.parse(options.body),req=JSON.parse(envelope.payload),p=req.input,secret=req.action==='rosterService'?env.ROSTER_SERVICE_SECRET:env.BRIDGE_SECRET;
+  const envelope=JSON.parse(options.body),req=JSON.parse(envelope.payload),p=req.input,secret=req.action==='rosterService'?env.GSIS_SECRET:env.GSIS_SECRET;
   assert.equal(envelope.signature,createHmac('sha256',secret).update(envelope.payload).digest('hex'));
   if(p.operation==='edgeReferences')return Response.json({ok:true,data:{adminVerified:admin,contacts:{rosterPeople:[],rosterSMCIds:[],rosterAdminIds:[]},cutoverFreeze:proof}});
   if(p.operation==='edgeFreeze'){

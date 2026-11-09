@@ -8,7 +8,7 @@ import {JSDOM} from 'jsdom';
 const M=await import(toWorkerModuleURL('data:text/javascript;base64,'+Buffer.from(fs.readFileSync('roster-update/public/_worker.js','utf8')).toString('base64')));
 const C=M.WHATSAPP_CONTRACTS,chosen=['relief_assignment','relief_morning','relief_evening','conditional_relief_instruction','contact_review'];
 const templates=Object.fromEntries(chosen.map(key=>[key,{...C[key],enabled:key!=='contact_review'}]));
-const env={GOOGLE_CLIENT_ID:'test-client',WHATSAPP_ENABLED:'true',WHATSAPP_PHONE_NUMBER_ID:'123456789',WHATSAPP_ACCOUNT_ID:'223456789',WHATSAPP_TEMPLATE_ACCOUNT_ID:'323456789',WHATSAPP_API_VERSION:'v26.0',WHATSAPP_ACCESS_TOKEN:'test-token-'.repeat(8),WHATSAPP_APP_SECRET:'test-app-'.repeat(8),WHATSAPP_VERIFY_TOKEN:'test-verify-'.repeat(8),ROSTER_SERVICE_SECRET:'test-service-'.repeat(8),EXTERNAL_LINK_SECRET:'test-link-'.repeat(8),BRIDGE_SECRET:'test-bridge-'.repeat(8),ROSTER_PUBLIC_ORIGIN:'https://roster.example.test',CONTACTS_PUBLIC_URL:'https://contacts.example.test',APPS_SCRIPT_URL:'https://script.google.com/macros/s/deploy-test/exec',WHATSAPP_TEMPLATES_JSON:JSON.stringify(templates)};
+const env={GOOGLE_CLIENT_ID:'test-client',WHATSAPP_ENABLED:'true',WHATSAPP_PHONE_NUMBER_ID:'123456789',WHATSAPP_ACCOUNT_ID:'223456789',WHATSAPP_TEMPLATE_ACCOUNT_ID:'323456789',WHATSAPP_API_VERSION:'v26.0',WHATSAPP_ACCESS_TOKEN:'test-token-'.repeat(8),WHATSAPP_APP_SECRET:'test-app-'.repeat(8),WHATSAPP_VERIFY_TOKEN:'test-verify-'.repeat(8),ROSTER_SERVICE_SECRET:'test-service-'.repeat(8),EXTERNAL_LINK_SECRET:'test-link-'.repeat(8),GSIS_SECRET:'test-bridge-'.repeat(8),ROSTER_PUBLIC_ORIGIN:'https://roster.example.test',CONTACTS_PUBLIC_URL:'https://contacts.example.test',APPS_SCRIPT_URL:'https://script.google.com/macros/s/deploy-test/exec',WHATSAPP_TEMPLATES_JSON:JSON.stringify(templates)};
 let calls=0;
 globalThis.fetch=async()=>{throw Error('Status reads must not fetch Meta');};
 let status=M.notificationStatus(env);
@@ -35,7 +35,7 @@ try{Date.now=()=>status.checkedAt+300001;assert.equal(M.notificationStatus(env).
 globalThis.fetch=async()=>{throw Error('Public status must not fetch');};
 const origin=env.ROSTER_PUBLIC_ORIGIN,publicConfig=await (await M.default.fetch(new Request(origin+'/api/config'),env)).json();
 assert.equal(publicConfig.notifications.routes,undefined);
-const now=Date.now(),date=new Date(now+8*3600000).toISOString().slice(0,10),signed=await M.sign({purpose:'gsis-session-v1',origin,email:'teacher@gsps.edu.sg',subject:'teacher',issued:now,expires:now+60000},env.BRIDGE_SECRET+'|gsis-browser-session-v1|'+origin);
+const now=Date.now(),date=new Date(now+8*3600000).toISOString().slice(0,10),signed=await M.sign({purpose:'gsis-session-v1',origin,email:'teacher@gsps.edu.sg',subject:'teacher',issued:now,expires:now+60000},env.GSIS_SECRET+'|gsis-browser-session-v1|'+origin);
 const cookie='__Host-gsis_session='+Buffer.from(signed.payload).toString('base64url')+'.'+signed.signature;
 let user={email:'teacher@gsps.edu.sg',staffId:'teacher',smc:false,admin:false};
 globalThis.fetch=async(url)=>{assert.equal(String(url),env.APPS_SCRIPT_URL);return Response.json({ok:true,data:{date,today:date,user,notifications:{configured:false,pending:0}}});};
@@ -50,7 +50,7 @@ user={...user,smc:false,admin:true};data=(await (await M.default.fetch(request('
 assert(data.notifications.readiness,'Admin receives notification readiness diagnostics');
 assert.deepEqual(data.notifications.readiness.routes,status.routes,'Admin receives the same readiness diagnostics as SMC');
 user={...user,smc:true,admin:false};data=(await (await M.default.fetch(request('notificationReadiness'),env)).json()).data;
-for(const value of [env.WHATSAPP_ACCESS_TOKEN,env.BRIDGE_SECRET,env.ROSTER_SERVICE_SECRET])assert(!JSON.stringify(data).includes(value));
+for(const value of [env.WHATSAPP_ACCESS_TOKEN,env.GSIS_SECRET,env.GSIS_SECRET])assert(!JSON.stringify(data).includes(value));
 
 const dom=new JSDOM('<main id="content"></main>',{url:origin,runScripts:'outside-only',pretendToBeVisual:true});
 try{

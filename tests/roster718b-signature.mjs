@@ -6,7 +6,7 @@ import {createHmac,randomUUID,webcrypto} from 'node:crypto';
 globalThis.crypto??=webcrypto;
 const worker=await import(toWorkerModuleURL('data:text/javascript;base64,'+fs.readFileSync('roster-update/public/_worker.js').toString('base64')));
 const origin='https://roster.test',date='2026-10-21',secret='synthetic-bridge-secret-0123456789abcdef';
-const env={APPS_SCRIPT_URL:'https://script.google.com/macros/s/roster-test/exec',BRIDGE_SECRET:secret};
+const env={APPS_SCRIPT_URL:'https://script.google.com/macros/s/roster-test/exec',GSIS_SECRET:secret};
 const identity={email:'synthetic@gsps.edu.sg',subject:'synthetic-test'};
 // Use the real backend verifier and an independent native HMAC implementation.
 // Only Google's utility service is adapted; no staff data or live requests.

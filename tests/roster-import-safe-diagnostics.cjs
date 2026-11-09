@@ -47,7 +47,7 @@ assert.equal(response({signed:false}).result.failureReason,undefined,'unverified
  const Import=require('../shared/roster-import.js'),db=require('./helpers/chunked-import-db.cjs')();
  const who={email:'admin@gsps.edu.sg',subject:'test'},requestId=randomUUID();
  const sessionId=createHash('sha256').update(JSON.stringify([who.email,requestId])).digest('hex'),binding={actor:who.email,requestId,sessionId};
- const env={GSIS_JOBS:db,APPS_SCRIPT_URL:'https://script.google.com/macros/s/diagnostic-fixture/exec',BRIDGE_SECRET:'b'.repeat(32),ROSTER_SERVICE_SECRET:'s'.repeat(32)};
+ const env={GSIS_JOBS:db,APPS_SCRIPT_URL:'https://script.google.com/macros/s/diagnostic-fixture/exec',GSIS_SECRET:'b'.repeat(32),ROSTER_SERVICE_SECRET:'s'.repeat(32)};
  const failed=response({ordinal:0,code:'ROSTER_IMPORT_LIMIT'}),originalFetch=globalThis.fetch;
  globalThis.fetch=async(_url,options)=>{
   const input=JSON.parse(JSON.parse(options.body).payload).input;

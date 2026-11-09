@@ -83,11 +83,11 @@ console.log('PASS Admin freeze, both locks, stable source, writer refusal, same-
  const {readRosterCutoverFreeze}=await import('../shared/roster-cutover-freeze.js');
  const Import=require('../shared/roster-import.js'),db=require('./helpers/chunked-import-db.cjs')(),google=fixture(),realFetch=globalThis.fetch;
  const who={email:'admin@example.test',subject:'synthetic-admin'},requestId='failed-frozen-import',sessionId=crypto.createHash('sha256').update(JSON.stringify([who.email,requestId])).digest('hex'),binding={actor:who.email,requestId,sessionId},store=Import.open(db,binding),freezeId=crypto.randomUUID();
- const env={GSIS_JOBS:db,APPS_SCRIPT_URL:'https://script.google.com/macros/s/frozen-restart/exec',BRIDGE_SECRET:'b'.repeat(40),ROSTER_SERVICE_SECRET:'s'.repeat(40)};let lost=true;
+ const env={GSIS_JOBS:db,APPS_SCRIPT_URL:'https://script.google.com/macros/s/frozen-restart/exec',GSIS_SECRET:'b'.repeat(40),ROSTER_SERVICE_SECRET:'s'.repeat(40)};let lost=true;
  try{
   await store.reserve();
   google.properties.set('ROSTER_EDGE_EXPORT:'+sessionId,JSON.stringify({...binding,state:'failed',sourceFileId:'retained-private-source'}));
-  globalThis.fetch=async(_url,options)=>{const envelope=JSON.parse(options.body),req=JSON.parse(envelope.payload);assert.equal(envelope.signature,crypto.createHmac('sha256',env.BRIDGE_SECRET).update(envelope.payload).digest('hex'));assert.equal(req.action,'rosterOperations');
+  globalThis.fetch=async(_url,options)=>{const envelope=JSON.parse(options.body),req=JSON.parse(envelope.payload);assert.equal(envelope.signature,crypto.createHmac('sha256',env.GSIS_SECRET).update(envelope.payload).digest('hex'));assert.equal(req.action,'rosterOperations');
    try{const data=google.call(req.input);if(req.input.operation==='edgeExportAbandon'&&lost){lost=false;throw Error('lost abandonment acknowledgement');}return Response.json({ok:true,data});}catch(error){return Response.json({ok:false,status:error.status||503,error:error.message,code:error.code});}};
   await edgeRosterMigration(env,{operation:'freeze',requestId:freezeId},who);const digest=google.scope.rosterEdgeSnapshot_().sourceDigest;
   const reset={operation:'restart',requestId:'restart-frozen-import',importRequestId:requestId,sessionId};

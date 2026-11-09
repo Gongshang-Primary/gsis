@@ -2,15 +2,15 @@ import {edgeDeployEnabled,edgeDeployDispatch,edgeDeployAdmin,edgeDeployService} 
 import {callOperationalBackend,forwardOperationalRequest} from '../shared/backend-service.js';
 import {assertRecoveryWritable} from '../shared/edge-recovery.js';
 /* GSIS_API_SECRET_BEGIN */
-// First-party API credentials share one operator-selected setting. Browser
-// sessions, private relief links and third-party credentials stay independent.
-function gsisApiSecret(env,legacyName){
+// Roster/Deploy transport requires one setting without legacy fallback.
+// Browser sessions retain their existing purpose- and origin-bound derivation.
+function gsisApiSecret(env){
  const value=env?.GSIS_SECRET;
- if(value!==undefined||Object.prototype.hasOwnProperty.call(env||{},'GSIS_SECRET')){
-  if(typeof value!=='string'||!/^[!-~]{32,8000}$/.test(value))throw Object.assign(Error('GSIS_SECRET must contain 32 to 8000 printable ASCII characters without spaces.'),{status:503,code:'GSIS_SECRET_INVALID'});
-  return value;
+ if(typeof value!=='string'||!/^[!-~]{32,8000}$/.test(value)){
+  throw Object.assign(Error('GSIS_SECRET must contain 32 to 8000 printable ASCII characters without spaces.'),
+   {status:503,code:'GSIS_SECRET_INVALID'});
  }
- return env?.[legacyName];
+ return value;
 }
 
 /* GSIS_API_SECRET_END */
@@ -48,26 +48,26 @@ async function backend(env,action,input,who,trace){
  if(action==='deployEdgeAdmin'||edgeDeployEnabled(env)){try{const data=action==='deployEdgeAdmin'?await edgeDeployAdmin(env,input,who):await edgeDeployDispatch(env,action,input,who,trace.context);return {ok:true,data,gatewayTiming:{backendMs:Date.now()-started,totalMs:Date.now()-trace.started,diagnosticId,traceId:trace.traceId}};}catch(e){return {ok:false,status:e.status||503,error:e.status?e.message:'Deploy edge service unavailable.',code:e.code};}}
  const endpoint=new URL(env.APPS_SCRIPT_URL);
  if(endpoint.protocol!=='https:'||endpoint.hostname!=='script.google.com'||!/^\/macros\/s\/[^/]+\/exec$/.test(endpoint.pathname))throw Object.assign(Error('Invalid backend URL'),{code:'BACKEND_CONFIG'});
- const body=await sign({action,input,identity:who,timestamp:Date.now(),nonce:diagnosticId,traceId:trace.traceId},gsisApiSecret(env,'BRIDGE_SECRET'));
+ const body=await sign({action,input,identity:who,timestamp:Date.now(),nonce:diagnosticId,traceId:trace.traceId},gsisApiSecret(env));
  const response=await fetch(endpoint,{method:'POST',body:JSON.stringify(body),headers:{'Content-Type':'application/json'},redirect:'follow',signal:AbortSignal.timeout(action==='change'?60000:['sync','bootstrap','publishReview'].includes(action)?45000:25000)});
  const result=await readGSiSBackendResponse(response);result.gatewayTiming={backendMs:Date.now()-started,totalMs:Date.now()-trace.started,diagnosticId,traceId:trace.traceId};return result;
 }
 export {backend as deployBackend};
 export default {async fetch(req,env,ctx){
  const gatewayStarted=Date.now(),u=new URL(req.url);env={...env,GSIS_REQUEST_ORIGIN:u.origin};
- if(u.pathname.startsWith('/api/')&&!['/api/session','/api/logout'].includes(u.pathname))try{gsisApiSecret(env,'BRIDGE_SECRET');}catch(error){return json({ok:false,code:error.code,error:error.message},503);}
+ if(u.pathname.startsWith('/api/')&&u.pathname!=='/api/logout')try{gsisApiSecret(env);}catch(error){return json({ok:false,code:error.code,error:error.message},503);}
  if(u.pathname.startsWith('/api/')&&!['/api/config','/api/session'].includes(u.pathname)){try{assertRecoveryWritable(env);}catch(error){return json({ok:false,code:error.code,error:error.message},503);}}
  if(['/api/edge/service','/api/venues-source','/api/lord-source'].includes(u.pathname)){try{const delegated=await forwardOperationalRequest(req,env,'deploy');return delegated===undefined?edgeDeployService(req,env,ctx):delegated;}catch(error){return json({ok:false,code:error.code,error:error.status<500?error.message:'The operational service could not be confirmed.'},error.status||503);}}
  const sessionResponse=await sessionRoute(req,env);if(sessionResponse)return sessionResponse;
  if(u.pathname==='/campus-base.svg')return json({ok:false,error:'Sign in to view the map'},403);if(!u.pathname.startsWith('/api/'))return env.ASSETS.fetch(req);
- if(u.pathname==='/api/config')return json({version:'0.9.9',clientId:env.GOOGLE_CLIENT_ID||'',configured:!!(env.GOOGLE_CLIENT_ID&&env.APPS_SCRIPT_URL&&gsisApiSecret(env,'BRIDGE_SECRET')),liveConfigured:!!env.LIVE_HUB});
+ if(u.pathname==='/api/config')return json({version:'0.9.9',clientId:env.GOOGLE_CLIENT_ID||'',configured:!!(env.GOOGLE_CLIENT_ID&&env.APPS_SCRIPT_URL&&gsisApiSecret(env)),liveConfigured:!!env.LIVE_HUB});
  if(u.pathname==='/api/live'){
   if(!env.LIVE_HUB)return json({ok:false,error:'Live updates are not configured'},503);
   if(req.method!=='GET'||req.headers.get('Origin')!==u.origin||req.headers.get('Upgrade')?.toLowerCase()!=='websocket')return json({ok:false,error:'WebSocket required'},403);
   const target=new URL('https://hub/connect');target.searchParams.set('ticket',u.searchParams.get('ticket')||'');
   return hub(env).fetch(new Request(target,req));
  }
- if(!env.GOOGLE_CLIENT_ID||!env.APPS_SCRIPT_URL||!gsisApiSecret(env,'BRIDGE_SECRET'))return json({ok:false,error:'Configure the Deploy connection first.'},503);
+ if(!env.GOOGLE_CLIENT_ID||!env.APPS_SCRIPT_URL||!gsisApiSecret(env))return json({ok:false,error:'Configure the Deploy connection first.'},503);
  const routes={'/api/edge/admin':'deployEdgeAdmin','/api/relief':'relief','/api/acknowledgeNotices':'acknowledgeNotices','/api/auditPage':'auditPage','/api/versionNote':'versionNote','/api/delta':'delta','/api/receipt':'receipt','/api/roleTruthTable':'roleTruthTable','/api/saveRoleTruthTable':'saveRoleTruthTable','/api/landmark/catalog':'publicCampus','/api/landmark/unit':'landmarkUnit','/api/landmark/search':'landmarkSearch','/api/publishReview':'publishReview','/api/bootstrap':'bootstrap','/api/sync':'sync','/api/lease':'lease','/api/change':'change','/api/active':'active','/api/live-ticket':'live-ticket','/api/layout-reference':'layout-reference','/api/campus-map':'campus-map'},action=routes[u.pathname];
  if(!action)return json({ok:false,error:'Not found'},404);
  if(req.method!==(action==='relief'?'GET':'POST'))return json({ok:false,error:action==='relief'?'GET required':'POST required'},405);
@@ -117,11 +117,11 @@ const layoutReference='JVBERi0xLjQKJSDi48/TCjMKMApvYmoKPDwKL1R5cGUKL0NhdGFsb2cKL
 // issuance; application permissions remain authoritative in Apps Script on every call.
 const SESSION_COOKIE='__Host-gsis_session';
 const sessionAge=env=>Math.max(1,Math.min(30,Number(env.SESSION_DAYS)||7))*86400000;
-const sessionKey=(env,origin)=>env.BRIDGE_SECRET+'|gsis-browser-session-v1|'+origin;
+const sessionKey=(env,origin)=>gsisApiSecret(env)+'|gsis-browser-session-v1|'+origin;
 function sessionHeader(value,age){return SESSION_COOKIE+'='+value+'; Path=/; Max-Age='+Math.floor(age/1000)+'; Secure; HttpOnly; SameSite=Lax'}
 export async function readSession(req,env){
  const origin=new URL(req.url).origin,raw=(req.headers.get('Cookie')||'').split(';').map(x=>x.trim()).find(x=>x.startsWith(SESSION_COOKIE+'='))?.slice(SESSION_COOKIE.length+1);
- if(!raw||raw.length>5000||!env.BRIDGE_SECRET||env.BRIDGE_SECRET.length<32)throw Error('No session');
+ if(!raw||raw.length>5000||!gsisApiSecret(env)||gsisApiSecret(env).length<32)throw Error('No session');
  const [encoded,signature,...extra]=raw.split('.');if(extra.length||!signature||!/^[a-f0-9]{64}$/.test(signature))throw Error('Invalid session');
  const payload=new TextDecoder().decode(decode(encoded)),key=await crypto.subtle.importKey('raw',enc.encode(sessionKey(env,origin)),{name:'HMAC',hash:'SHA-256'},false,['verify']);
  if(!await crypto.subtle.verify('HMAC',key,Uint8Array.from(signature.match(/../g),x=>parseInt(x,16)),enc.encode(payload)))throw Error('Invalid session');
@@ -131,7 +131,7 @@ export async function readSession(req,env){
 async function requestIdentity(req,env){const auth=req.headers.get('Authorization');if(auth){if(!auth.startsWith('Bearer ')||auth.length>16000)throw Error('Invalid identity');return identity(auth.slice(7),env.GOOGLE_CLIENT_ID)}return readSession(req,env)}
 async function sessionRoute(req,env){
  const u=new URL(req.url);if(!['/api/session','/api/logout'].includes(u.pathname))return null;
- if(!env.BRIDGE_SECRET||env.BRIDGE_SECRET.length<32||!env.GOOGLE_CLIENT_ID)return json({ok:false,error:'Configure school sign-in first.'},503);
+ if(u.pathname!=='/api/logout'&&(!gsisApiSecret(env)||gsisApiSecret(env).length<32||!env.GOOGLE_CLIENT_ID))return json({ok:false,error:'Configure school sign-in first.'},503);
  if(req.method==='POST'&&req.headers.get('Origin')!==u.origin)return json({ok:false,error:'Origin not allowed'},403);
  if(u.pathname==='/api/logout'){if(req.method!=='POST')return json({ok:false,error:'POST required'},405);const res=json({ok:true});res.headers.set('Set-Cookie',sessionHeader('',0));return res}
  if(req.method==='GET'){try{return json({ok:true,data:{user:await readSession(req,env)}})}catch{return json({ok:false,error:'Sign in required'},401)}}

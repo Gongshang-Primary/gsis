@@ -35,7 +35,7 @@ function assertSelfContained(node,label){
    assert.equal(typeof worker.fetch,'function');
    let assetCalls=0;
    const env={GOOGLE_CLIENT_ID:'test-client',CALENDAR_SESSION_SECRET:'offline-packaging-session-secret',APPS_SCRIPT_URL:'https://script.google.com/macros/s/test/exec',
-    BRIDGE_SECRET:'packaging-test-secret-that-is-never-published',
+    GSIS_SECRET:'packaging-test-secret-that-is-never-published',
     ASSETS:{fetch:async req=>{assetCalls++;return new Response('asset:'+new URL(req.url).pathname);}}};
    const ctx={waitUntil(){throw Error('Smoke routes must not schedule work');}};
    const origin=`https://${app.toLowerCase()}.example.test`;
@@ -43,7 +43,7 @@ function assertSelfContained(node,label){
    assert.equal(config.status,200);
    const body=await config.json();assert.equal(app==='Calendar'?body.frontendVersion:body.version,settings.gsisRelease);
    assert.equal(app==='Calendar'?body.googleClientId:body.clientId,env.GOOGLE_CLIENT_ID);
-   assert(!JSON.stringify(body).includes(env.BRIDGE_SECRET));
+   assert(!JSON.stringify(body).includes(env.GSIS_SECRET));
    const asset=await worker.fetch(new Request(origin+'/index.html'),env,ctx);
    assert.equal(await asset.text(),'asset:/index.html');assert.equal(assetCalls,1);
    const route=app==='Calendar'?'/api':app==='Roster'?'/api/operations':'/api/bootstrap';

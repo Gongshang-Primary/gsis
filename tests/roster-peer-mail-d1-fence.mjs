@@ -3,7 +3,7 @@ import {createRequire} from 'node:module';
 import {dispatchPeerMail} from '../roster-update/public/_worker.js';
 import {GSISRosterOperations as O} from '../roster-update/public/edge-roster-domain.js';
 const require=createRequire(import.meta.url),Store=require('../shared/edge-store.js'),database=require('./helpers/chunked-import-db.cjs'),db=database(),previousFetch=globalThis.fetch;
-const env={GSIS_JOBS:db,ROSTER_EDGE_AUTHORITY:'d1',ROSTER_PUBLIC_ORIGIN:'https://roster.gsps.edu.sg',APPS_SCRIPT_URL:'https://script.google.com/macros/s/fenced-fixture/exec',ROSTER_SERVICE_SECRET:'s'.repeat(40)};
+const env={GSIS_JOBS:db,ROSTER_EDGE_AUTHORITY:'d1',ROSTER_PUBLIC_ORIGIN:'https://roster.gsps.edu.sg',APPS_SCRIPT_URL:'https://script.google.com/macros/s/fenced-fixture/exec',GSIS_SECRET:'s'.repeat(40)};
 let googleCalls=0;
 async function activate(scope,state){const store=Store.open(db,scope),head=await store.importState({state,actor:'setup',requestId:crypto.randomUUID()});await store.transition({from:'imported',to:'active',expectedRevision:head.revision,actor:'setup',proof:{legacyWritesDisabled:true,sourceDigest:head.sourceDigest,verifiedRecords:head.importedRecords}});return store;}
 try{

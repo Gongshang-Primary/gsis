@@ -1,13 +1,13 @@
 /* GSIS_API_SECRET_BEGIN */
-// First-party API credentials share one operator-selected setting. Browser
-// sessions, private relief links and third-party credentials stay independent.
-function gsisApiSecret(env,legacyName){
+// Roster/Deploy transport requires one setting without legacy fallback.
+// Browser sessions retain their existing purpose- and origin-bound derivation.
+function gsisApiSecret(env){
  const value=env?.GSIS_SECRET;
- if(value!==undefined||Object.prototype.hasOwnProperty.call(env||{},'GSIS_SECRET')){
-  if(typeof value!=='string'||!/^[!-~]{32,8000}$/.test(value))throw Object.assign(Error('GSIS_SECRET must contain 32 to 8000 printable ASCII characters without spaces.'),{status:503,code:'GSIS_SECRET_INVALID'});
-  return value;
+ if(typeof value!=='string'||!/^[!-~]{32,8000}$/.test(value)){
+  throw Object.assign(Error('GSIS_SECRET must contain 32 to 8000 printable ASCII characters without spaces.'),
+   {status:503,code:'GSIS_SECRET_INVALID'});
  }
- return env?.[legacyName];
+ return value;
 }
 
 /* GSIS_API_SECRET_END */
@@ -27,7 +27,7 @@ async function signed(url,secret,body){
  const signature=Array.from(new Uint8Array(await crypto.subtle.sign('HMAC',key,encoder.encode(payload)))).map(n=>n.toString(16).padStart(2,'0')).join('');
  const response=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({payload,signature}),signal:AbortSignal.timeout(25000),redirect:'follow'});let result;try{result=await response.json();}catch{fail(503,'The Google integration returned an invalid response.');}if(!response.ok||!result.ok)fail(result.status||503,result.error||'The Google integration is unavailable.',result.code);return result.data;
 }
-async function adapter(env,operation,input,identity){return signed(env.APPS_SCRIPT_URL,gsisApiSecret(env,'BRIDGE_SECRET'),{action:'deployEdge',input:{operation,...input},identity});}
+async function adapter(env,operation,input,identity){return signed(env.APPS_SCRIPT_URL,gsisApiSecret(env),{action:'deployEdge',input:{operation,...input},identity});}
 
 // A bounded metadata cache keeps ordinary Deploy reads fast. Source verification
 // always reads the live register; it must never approve a stale booking snapshot.
@@ -40,13 +40,13 @@ async function physicalRegistry(env,fresh=false){
 }
 
 async function contacts(env,action,input,identity){
- const result=env.CONTACTS_APPS_SCRIPT_URL&&gsisApiSecret(env,'CONTACTS_BRIDGE_SECRET')?await signed(env.CONTACTS_APPS_SCRIPT_URL,gsisApiSecret(env,'CONTACTS_BRIDGE_SECRET'),{action,input,identity}):await adapter(env,'contacts',{contactAction:action,contactInput:input},identity);
+ const result=env.CONTACTS_APPS_SCRIPT_URL&&gsisApiSecret(env)?await signed(env.CONTACTS_APPS_SCRIPT_URL,gsisApiSecret(env),{action,input,identity}):await adapter(env,'contacts',{contactAction:action,contactInput:input},identity);
  if(['approveDeployTeachers','applyDeployCatalogues','saveRoleTruthTable'].includes(action))try{await env.GSIS_JOBS.prepare('DELETE FROM gsis_deploy_authority').run();}catch(ignore){}
  return result;
 }
 
 function domain(state,identity,responses,env){
- return createDeployDomain({state,identity,sha256:sha256Bytes,calculations,apiSecret:name=>gsisApiSecret(env,name),integration:(service,action,input,who)=>{
+ return createDeployDomain({state,identity,sha256:sha256Bytes,calculations,apiSecret:()=>gsisApiSecret(env),integration:(service,action,input,who)=>{
   const key=JSON.stringify([service,action,input,who.email]);if(responses.has(key))return clone(responses.get(key));throw Object.assign(new Error('Integration prerequisite'),{integration:{key,service,action,input,identity:who}});
  }});
 }
@@ -111,7 +111,7 @@ export async function edgeDeployDispatch(env,action,input,identity,ctx){
   }
   if(!writer)return data;
   let venuesTicket=null;
-  if(action==='change'&&input.operation==='publish'&&(env.VENUES_APPS_SCRIPT_URL||env.VENUES_BRIDGE_SECRET)){
+  if(action==='change'&&input.operation==='publish'&&env.VENUES_APPS_SCRIPT_URL){
    const revision=domain(state,identity,responses,env).venuesService({operation:'manifest'}).key;venuesTicket=await beginEdgeVenuesChange(env,{source:'deploy',requestId});const id='venuesFence:'+requestId;if(!state.jobs[id])state.jobs[id]={id,kind:'venuesFence',input:{requestId,revision},identity,commit:state.index.published.commit,publicationRevision:state.index.revision,state:'pending',attempts:0,createdAt:new Date().toISOString()};
   }
   try{
@@ -230,7 +230,7 @@ async function rosterDeployPublication(env){
  const valid=ref=>ref?.entry&&typeof ref.entry.id==='string'&&ref.entry.id&&typeof ref.entry.commit==='string'&&ref.entry.commit&&Number.isSafeInteger(ref.entry.revision)&&ref.entry.revision>=0&&ref.document?.id===ref.entry.id&&Array.isArray(ref.document.teachers)&&Array.isArray(ref.document.assignments);
  if(cached&&!valid(cached))cached=null;
  if(cached&&row.publication_key===JSON.stringify([cached.entry.id,cached.entry.commit,cached.entry.revision])&&started>=row.checked_at&&started-row.checked_at<30000)return cached;
- const reply=await signed(env.APPS_SCRIPT_URL,gsisApiSecret(env,'ROSTER_SERVICE_SECRET'),{action:'rosterService',service:'gsis-roster-notifier-v1',input:{operation:'edgeDeployPublication',...(cached?{knownCommit:cached.entry.commit,knownRevision:cached.entry.revision}:{})}});
+ const reply=await signed(env.APPS_SCRIPT_URL,gsisApiSecret(env),{action:'rosterService',service:'gsis-roster-notifier-v1',input:{operation:'edgeDeployPublication',...(cached?{knownCommit:cached.entry.commit,knownRevision:cached.entry.revision}:{})}});
  const ref=reply?.unchanged===true&&cached&&reply.entry?.id===cached.entry.id&&reply.entry?.commit===cached.entry.commit&&reply.entry?.revision===cached.entry.revision?cached:reply;
  if(!valid(ref))fail(503,'Google did not return a verified published Deploy document.','ROSTER_DEPLOY_PUBLICATION_INVALID');
  const publicationKey=JSON.stringify([ref.entry.id,ref.entry.commit,ref.entry.revision]);
@@ -255,7 +255,7 @@ export async function edgeDeployService(request,env,ctx){
  try{
   if(request.method!=='POST')fail(405,'POST required.');const path=new URL(request.url).pathname,body=await request.text();if(body.length>150000)fail(413,'Service request too large.');const envelope=JSON.parse(body);
   if(typeof envelope.payload!=='string'||! /^[a-f0-9]{64}$/.test(envelope.signature||''))fail(401,'Invalid service request.');
-  const secret=path==='/api/venues-source'?gsisApiSecret(env,'VENUES_BRIDGE_SECRET'):path==='/api/lord-source'?gsisApiSecret(env,'LORD_BRIDGE_SECRET'):gsisApiSecret(env,'DEPLOY_EDGE_SECRET');if(typeof secret!=='string'||secret.length<32)fail(503,'Configure the Deploy source service credential.');
+  const secret=path==='/api/venues-source'?gsisApiSecret(env):path==='/api/lord-source'?gsisApiSecret(env):gsisApiSecret(env);if(typeof secret!=='string'||secret.length<32)fail(503,'Configure the Deploy source service credential.');
   const key=await crypto.subtle.importKey('raw',encoder.encode(secret),{name:'HMAC',hash:'SHA-256'},false,['verify']),signature=Uint8Array.from(envelope.signature.match(/../g),x=>parseInt(x,16));if(!await crypto.subtle.verify('HMAC',key,signature,encoder.encode(envelope.payload)))fail(401,'Invalid service signature.');
   const command=JSON.parse(envelope.payload);if(!Number.isFinite(command.timestamp)||Math.abs(Date.now()-command.timestamp)>60000||! /^[\w-]{36}$/.test(command.nonce||''))fail(401,'Expired service request.');
   let action;if(path==='/api/venues-source'){if(command.action!=='venuesSource'||command.service!=='gsis-venues-v1'||command.source!=='deploy')fail(401,'Invalid Venues source request.');action='venuesSource';}

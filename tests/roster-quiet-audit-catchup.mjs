@@ -20,7 +20,7 @@ async function activate(db,scope,state){const store=Store.open(db,scope),head=aw
 
 async function fixture(authority='legacy'){
  now=at('06:30');const h=adapter(),db=database(),files=new Map(),objects=new Map(),textWrites=[],serviceCalls=[];
- const env={GSIS_JOBS:db,ROSTER_EDGE_AUTHORITY:authority,ROSTER_PUBLIC_ORIGIN:'https://roster.gsps.edu.sg',APPS_SCRIPT_URL:'https://script.google.com/macros/s/audit-fixture/exec',ROSTER_SERVICE_SECRET:'s'.repeat(40),ROSTER_TIMETABLE_SNAPSHOTS:{async put(key,value){objects.set(key,new Uint8Array(value));if(afterExport){const hook=afterExport;afterExport=null;await hook();}},async get(key){const value=objects.get(key);return value?{body:new Blob([value]).stream(),text:async()=>new TextDecoder().decode(value)}:null;}}};
+ const env={GSIS_JOBS:db,ROSTER_EDGE_AUTHORITY:authority,ROSTER_PUBLIC_ORIGIN:'https://roster.gsps.edu.sg',APPS_SCRIPT_URL:'https://script.google.com/macros/s/audit-fixture/exec',GSIS_SECRET:'s'.repeat(40),ROSTER_TIMETABLE_SNAPSHOTS:{async put(key,value){objects.set(key,new Uint8Array(value));if(afterExport){const hook=afterExport;afterExport=null;await hook();}},async get(key){const value=objects.get(key);return value?{body:new Blob([value]).stream(),text:async()=>new TextDecoder().decode(value)}:null;}}};
  let afterExport=null,failText=false,busy=false;
  function clock(value){now=value;h.ctx.now=now;h.ctx.iso=new NativeDate(now).toISOString();h.ctx.minute=new NativeDate(now+28800000).getUTCHours()*60+new NativeDate(now+28800000).getUTCMinutes();}
  clock(now);vm.runInContext(fs.readFileSync('backend/RosterAuditExport.gs','utf8'),h.scope);

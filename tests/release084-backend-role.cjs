@@ -32,11 +32,11 @@ console.log('PASS v0.8.4 backend roles: fail-closed builds, explicit owner activ
 {
  const code=fs.readFileSync('backend/Code.gs','utf8');
  for(const kind of ['deploy','roster']){
-  const properties={BRIDGE_SECRET:'x'.repeat(40),ROSTER_SERVICE_SECRET:'s'.repeat(40),ROSTER_WRITER_ENABLED:'true',ROSTER_OWNER_SCRIPT_ID:'roster-project',ROSTER_ROOT_FOLDER_ID:'root',ROSTER_ARCHIVE_FOLDER_ID:'archive',ROSTER_DATA_FOLDER_ID:'data'};let routed=0;
+  const properties={GSIS_SECRET:'x'.repeat(40),ROSTER_SERVICE_SECRET:'s'.repeat(40),ROSTER_WRITER_ENABLED:'true',ROSTER_OWNER_SCRIPT_ID:'roster-project',ROSTER_ROOT_FOLDER_ID:'root',ROSTER_ARCHIVE_FOLDER_ID:'archive',ROSTER_DATA_FOLDER_ID:'data'};let routed=0;
   const scope=vm.createContext({console:{log:()=>{}},PropertiesService:{getScriptProperties:()=>({getProperty:k=>properties[k]||null,getProperties:()=>({...properties})})},ScriptApp:{getScriptId:()=> 'roster-project'},Utilities:{getUuid:()=> '00000000-0000-4000-8000-000000000000'},ContentService:{MimeType:{JSON:'json'},createTextOutput:text=>({text,setMimeType(){return this;}})}});
   vm.runInContext(code.replace("const GSIS_BACKEND_KIND='deploy';","const GSIS_BACKEND_KIND='"+kind+"';"),scope);
   scope.signature_=()=> 'valid';scope.rosterDiagnostic_=()=>{};scope.contacts_=()=>({user:{roles:['Admin']}});scope.rosterDispatch_=scope.rosterServiceDispatch_=scope.dispatch_=()=>{routed++;return {routed:true};};
-  const request=(action,signature='valid')=>JSON.parse(scope.doPost({postData:{contents:JSON.stringify({payload:JSON.stringify({action,service:'gsis-roster-notifier-v1',timestamp:Date.now(),nonce:'00000000-0000-4000-8000-000000000000',identity:{email:'test@gsps.edu.sg',subject:'test'},input:{}}),signature})}}).text);
+  const request=(action,signature='valid')=>JSON.parse(scope.doPost({postData:{contents:JSON.stringify({payload:JSON.stringify({action,...(action==='rosterService'?{service:'gsis-roster-notifier-v1'}:{}),timestamp:Date.now(),nonce:'00000000-0000-4000-8000-000000000000',identity:{email:'test@gsps.edu.sg',subject:'test'},input:{}}),signature})}}).text);
   assert.equal(request(kind==='roster'?'rosterProfile':'sync').ok,true);assert.equal(routed,1);
   assert.equal(request(kind==='roster'?'sync':'rosterProfile').ok,false);assert.equal(routed,1);
   assert.equal(request('rosterService').ok,kind==='roster');assert.equal(routed,kind==='roster'?2:1);

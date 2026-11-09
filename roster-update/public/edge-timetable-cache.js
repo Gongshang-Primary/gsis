@@ -1,14 +1,14 @@
 import {assertRecoveryWritable} from '../../shared/edge-recovery.js';
 /* GSIS_API_SECRET_BEGIN */
-// First-party API credentials share one operator-selected setting. Browser
-// sessions, private relief links and third-party credentials stay independent.
-function gsisApiSecret(env,legacyName){
+// Roster/Deploy transport requires one setting without legacy fallback.
+// Browser sessions retain their existing purpose- and origin-bound derivation.
+function gsisApiSecret(env){
  const value=env?.GSIS_SECRET;
- if(value!==undefined||Object.prototype.hasOwnProperty.call(env||{},'GSIS_SECRET')){
-  if(typeof value!=='string'||!/^[!-~]{32,8000}$/.test(value))throw Object.assign(Error('GSIS_SECRET must contain 32 to 8000 printable ASCII characters without spaces.'),{status:503,code:'GSIS_SECRET_INVALID'});
-  return value;
+ if(typeof value!=='string'||!/^[!-~]{32,8000}$/.test(value)){
+  throw Object.assign(Error('GSIS_SECRET must contain 32 to 8000 printable ASCII characters without spaces.'),
+   {status:503,code:'GSIS_SECRET_INVALID'});
  }
- return env?.[legacyName];
+ return value;
 }
 
 /* GSIS_API_SECRET_END */
@@ -204,8 +204,8 @@ export async function edgeVenuesSource(env,input,r){
  if(periodSets.size>1)fail('VENUES_PERIODS_AMBIGUOUS','The selected year has different period timings. Review the baseline register.');const [oh,rh]=await Promise.all([ops.store.head(),reg.store.head()]);if(oh.revision!==ops.revision||rh.revision!==reg.revision)fail('VENUES_SOURCE_CHANGED','Roster changed during occupancy preparation.',409);return {...header,periods:[...periodSets.values()][0]||[],days,patterns};
 }
 export async function edgeVenuesSourceRoute(request,env,provided){const json=(v,status)=>Response.json(v,{status,headers:{'Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff'}});try{
- if(request.method!=='POST')fail('METHOD','POST required.',405);if(typeof gsisApiSecret(env,'VENUES_BRIDGE_SECRET')!=='string'||gsisApiSecret(env,'VENUES_BRIDGE_SECRET').length<32)fail('VENUES_SOURCE_SETUP','Configure the private Venues source bridge.');if(Number(request.headers.get('Content-Length'))>1000000)fail('BODY_TOO_LARGE','Source request is too large.',413);
+ if(request.method!=='POST')fail('METHOD','POST required.',405);if(typeof gsisApiSecret(env)!=='string'||gsisApiSecret(env).length<32)fail('VENUES_SOURCE_SETUP','Configure the private Venues source bridge.');if(Number(request.headers.get('Content-Length'))>1000000)fail('BODY_TOO_LARGE','Source request is too large.',413);
  const raw=await request.text();if(enc.encode(raw).length>1000000)fail('BODY_TOO_LARGE','Source request is too large.',413);let envelope;try{envelope=JSON.parse(raw);}catch{fail('INVALID_SIGNATURE','A signed source request is required.',403);}if(typeof envelope.payload!=='string'||!/^[a-f0-9]{64}$/.test(envelope.signature||''))fail('INVALID_SIGNATURE','A signed source request is required.',403);
- const secret=await crypto.subtle.importKey('raw',enc.encode(gsisApiSecret(env,'VENUES_BRIDGE_SECRET')),{name:'HMAC',hash:'SHA-256'},false,['verify']);if(!await crypto.subtle.verify('HMAC',secret,Uint8Array.from(envelope.signature.match(/../g),x=>parseInt(x,16)),enc.encode(envelope.payload)))fail('INVALID_SIGNATURE','The source signature is invalid.',403);const p=JSON.parse(envelope.payload);if(p.action!=='venuesSource'||p.service!=='gsis-venues-v1'||p.source!=='roster'||p.identity!==undefined||!Number.isFinite(p.timestamp)||Math.abs(Date.now()-p.timestamp)>60000||typeof p.nonce!=='string'||!p.nonce||p.nonce.length>200||!p.input||!['manifest','snapshot'].includes(p.input.operation))fail('INVALID_SIGNATURE','The signed source request is invalid.',403);
+ const secret=await crypto.subtle.importKey('raw',enc.encode(gsisApiSecret(env)),{name:'HMAC',hash:'SHA-256'},false,['verify']);if(!await crypto.subtle.verify('HMAC',secret,Uint8Array.from(envelope.signature.match(/../g),x=>parseInt(x,16)),enc.encode(envelope.payload)))fail('INVALID_SIGNATURE','The source signature is invalid.',403);const p=JSON.parse(envelope.payload);if(p.action!=='venuesSource'||p.service!=='gsis-venues-v1'||p.source!=='roster'||p.identity!==undefined||!Number.isFinite(p.timestamp)||Math.abs(Date.now()-p.timestamp)>60000||typeof p.nonce!=='string'||!p.nonce||p.nonce.length>200||!p.input||!['manifest','snapshot'].includes(p.input.operation))fail('INVALID_SIGNATURE','The signed source request is invalid.',403);
  assertRecoveryWritable(env);const cache=await new TimetablePackageStore(env.GSIS_JOBS,env.ROSTER_TIMETABLE_SNAPSHOTS).ensure();await cache.db.prepare('DELETE FROM gsis_timetable_nonces WHERE expires_at<?').bind(Date.now()).run();const inserted=await cache.db.prepare('INSERT OR IGNORE INTO gsis_timetable_nonces(nonce,expires_at) VALUES(?,?)').bind(p.nonce,Date.now()+120000).run();if(inserted.meta?.changes!==1)fail('REPLAY','The signed source request was already consumed.',409);const fence=await cache.db.prepare("SELECT phase FROM gsis_timetable_fences WHERE source='roster'").first();if(fence&&fence.phase!=='ready')fail('VENUES_FENCE_PENDING','A Roster occupancy change needs completion before refreshing Venues.',409);const data=await edgeVenuesSource(env,p.input,provided||await runtime());return json({ok:true,data},200);
  }catch(error){return json({ok:false,status:error.status||503,code:error.code||'VENUES_SOURCE_UNAVAILABLE',error:error.code?error.message:'The authoritative occupancy could not be read.'},error.status||503);}}

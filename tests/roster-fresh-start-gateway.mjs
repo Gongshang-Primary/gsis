@@ -5,12 +5,12 @@ import gateway from '../roster-update/public/_worker.js';
 
 const require=createRequire(import.meta.url),database=require('./helpers/chunked-import-db.cjs'),Store=require('../shared/edge-store.js');
 const db=database(),previousFetch=globalThis.fetch,origin='https://roster.gsps.edu.sg';
-const env={GSIS_JOBS:db,ROSTER_EDGE_AUTHORITY:'d1',ROSTER_PUBLIC_ORIGIN:origin,APPS_SCRIPT_URL:'https://script.google.com/macros/s/archive-gateway-fixture/exec',BRIDGE_SECRET:'fixture-bridge-secret-'.repeat(3),ROSTER_SERVICE_SECRET:'fixture-service-secret-'.repeat(3)};
+const env={GSIS_JOBS:db,ROSTER_EDGE_AUTHORITY:'d1',ROSTER_PUBLIC_ORIGIN:origin,APPS_SCRIPT_URL:'https://script.google.com/macros/s/archive-gateway-fixture/exec',GSIS_SECRET:'fixture-bridge-secret-'.repeat(3),ROSTER_SERVICE_SECRET:'fixture-service-secret-'.repeat(3)};
 const fresh={effectiveDate:'2026-11-05',sourceDigest:'a'.repeat(64),archiveId:'b'.repeat(64)},calls=[];
 const importedMetadata={source:{sourceDigest:fresh.sourceDigest,manifestDigest:'c'.repeat(64)},importSession:'d'.repeat(64)};
 function cookie({expires=Date.now()+3600000,sessionOrigin=origin}={}){
  const payload=JSON.stringify({purpose:'gsis-session-v1',origin:sessionOrigin,email:'teacher@gsps.edu.sg',subject:'teacher',issued:Date.now(),expires});
- return '__Host-gsis_session='+Buffer.from(payload).toString('base64url')+'.'+createHmac('sha256',env.BRIDGE_SECRET+'|gsis-browser-session-v1|'+sessionOrigin).update(payload).digest('hex');
+ return '__Host-gsis_session='+Buffer.from(payload).toString('base64url')+'.'+createHmac('sha256',env.GSIS_SECRET+'|gsis-browser-session-v1|'+sessionOrigin).update(payload).digest('hex');
 }
 async function send(input={view:'history'},{method='POST',requestOrigin=origin,auth=cookie(),raw}={}){
  const response=await gateway.fetch(new Request(origin+'/api/edge/archive',{method,headers:{...(requestOrigin===null?{}:{Origin:requestOrigin}),...(auth?{Cookie:auth}:{}),'Content-Type':'application/json'},...(method==='GET'?{}:{body:raw??JSON.stringify(input)})}),env,{});
@@ -26,7 +26,7 @@ try{
  globalThis.fetch=async(url,options)=>{
   assert.equal(String(url),env.APPS_SCRIPT_URL,'archive uses only the configured signed Google bridge');
   const envelope=JSON.parse(options.body),request=JSON.parse(envelope.payload);
-  assert.equal(envelope.signature,createHmac('sha256',env.BRIDGE_SECRET).update(envelope.payload).digest('hex'));
+  assert.equal(envelope.signature,createHmac('sha256',env.GSIS_SECRET).update(envelope.payload).digest('hex'));
   assert.equal(request.identity.email,'teacher@gsps.edu.sg');
   assert.equal(request.input.operation,'edgeArchiveRead');assert.equal(request.input.archiveId,fresh.archiveId);
   calls.push(request.input);
