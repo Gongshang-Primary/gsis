@@ -49,7 +49,7 @@ function deployQueueAttachJournal_(tx){
 function deployQueueIdentity_(who,c){if(!who||typeof who.subject!=='string'||!who.subject||! /^[^@\s]+@gsps\.edu\.sg$/.test(who.email||''))error_(401,'QUEUE_IDENTITY');auth_(c,'either');}
 function deployQueueExecute_(command,c,configGeneration,fence=0,delivery='direct'){
  gsisRequireBackendRole_('deploy');GSiSEdgeCommandQueue.command(command);deployQueueIdentity_(command.actor,c);GSiSEdgeCommandQueue.deployPermission(command,{admin:c.user.roles.includes('Admin'),kp:c.user.roles.includes('KP'),palEditor:c.user.palEditor===true});
- const lock=LockService.getScriptLock();if(!lock.tryLock(8000))error_(503,'QUEUE_GOOGLE_BUSY');
+ const lock=LockService.getScriptLock();if(!deployLock_(lock,8000))error_(503,'QUEUE_GOOGLE_BUSY');
  try{
   const config=deployQueueConfig_(),hash=deployQueueDigest_(GSiSEdgeCommandQueue.binding(command)),found=deployQueueFind_(command.requestId);
   if(found){if(found.record.payloadHash!==hash||found.record.actorSubject!==command.actor.subject)error_(409,'QUEUE_ID_MISMATCH');return deployQueueAttest_(deployQueueDecision_(found.record));}
@@ -82,7 +82,7 @@ function deployQueueExecute_(command,c,configGeneration,fence=0,delivery='direct
    }
    return deployQueueAttest_(current||record);
   }finally{deployQueueContext_=null;deployQueueOwnsLock_=false;}
- }finally{lock.releaseLock();}
+ }finally{deployUnlock_(lock);}
 }
 function deployQueueStatus_(id,who,c){const found=deployQueueFind_(id);if(!found)return {app:'deploy',document:'workbook',requestId:id,decision:'UNKNOWN'};if(found.record.actorSubject!==who.subject&&!c.user.roles.includes('Admin'))error_(404,'QUEUE_RECEIPT_NOT_FOUND');if(found.record.actorSubject!==who.subject)console.log(JSON.stringify({app:'deploy',requestId:id,event:'QUEUE_ADMIN_RECEIPT_READ'}));return deployQueueAttest_(deployQueueDecision_(found.record));}
 function deployQueueLegacyDirect_(req,c){
@@ -111,11 +111,11 @@ function deployQueueEndpoint_(envelope){
  if(req.kind==='status')return deployQueueSigned_('edge-command-google-result-v1',deployQueueStatus_(req.requestId,who,c));
  if(req.kind==='recover'){auth_(c,'Admin');recoverFieldCommit();return deployQueueSigned_('edge-command-google-result-v1',deployQueueStatus_(req.requestId,who,c));}
  if(req.kind==='cancel'){
-  auth_(c,'Admin');GSiSEdgeCommandQueue.command(req.command);const lock=LockService.getScriptLock();if(!lock.tryLock(8000))error_(503,'QUEUE_GOOGLE_BUSY');try{const found=deployQueueFind_(req.command.requestId);if(found)return deployQueueSigned_('edge-command-google-result-v1',deployQueueStatus_(req.command.requestId,who,c));const hash=deployQueueDigest_(GSiSEdgeCommandQueue.binding(req.command)),record={...deployQueueRecord_(req.command,hash,config),decision:'CANCELLED',resultKind:'rejected',code:'QUEUE_ADMIN_CANCELLED'};deployQueueWrite_(record);return deployQueueSigned_('edge-command-google-result-v1',deployQueueAttest_(record));}finally{lock.releaseLock();}
+  auth_(c,'Admin');GSiSEdgeCommandQueue.command(req.command);const lock=LockService.getScriptLock();if(!deployLock_(lock,8000))error_(503,'QUEUE_GOOGLE_BUSY');try{const found=deployQueueFind_(req.command.requestId);if(found)return deployQueueSigned_('edge-command-google-result-v1',deployQueueStatus_(req.command.requestId,who,c));const hash=deployQueueDigest_(GSiSEdgeCommandQueue.binding(req.command)),record={...deployQueueRecord_(req.command,hash,config),decision:'CANCELLED',resultKind:'rejected',code:'QUEUE_ADMIN_CANCELLED'};deployQueueWrite_(record);return deployQueueSigned_('edge-command-google-result-v1',deployQueueAttest_(record));}finally{deployUnlock_(lock);}
  }
  if(req.kind==='configure'){
   auth_(c,'Admin');const p=req.configuration;if(!p||p.mode!=='direct'||p.generation!==config.generation||typeof p.admissionPaused!=='boolean'||typeof p.dispatchPaused!=='boolean'||Object.keys(p).some(k=>!['mode','generation','admissionPaused','dispatchPaused','requireResolved'].includes(k)))error_(409,'QUEUE_RECOVERY_PAGE_REQUIRED');
-  const lock=LockService.getScriptLock();if(!lock.tryLock(8000))error_(503,'QUEUE_GOOGLE_BUSY');try{if(deployQueueConfig_().generation!==p.generation)error_(409,'QUEUE_CONFIG_GENERATION');if(p.requireResolved===true||!p.admissionPaused||!p.dispatchPaused){deployQueueAssertNoHold_(null);if(index_(book_()).pendingFieldCommit)error_(503,'QUEUE_NATIVE_PENDING');}const next={...config,...p,generation:config.generation+1,recoveryPageReady:false};props_().setProperty('DEPLOY_EDGE_QUEUE_CONFIG',deployQueueCanonical_(next));return deployQueueSigned_('edge-command-google-config-v1',next);}finally{lock.releaseLock();}
+  const lock=LockService.getScriptLock();if(!deployLock_(lock,8000))error_(503,'QUEUE_GOOGLE_BUSY');try{if(deployQueueConfig_().generation!==p.generation)error_(409,'QUEUE_CONFIG_GENERATION');if(p.requireResolved===true||!p.admissionPaused||!p.dispatchPaused){deployQueueAssertNoHold_(null);if(index_(book_()).pendingFieldCommit)error_(503,'QUEUE_NATIVE_PENDING');}const next={...config,...p,generation:config.generation+1,recoveryPageReady:false};props_().setProperty('DEPLOY_EDGE_QUEUE_CONFIG',deployQueueCanonical_(next));return deployQueueSigned_('edge-command-google-config-v1',next);}finally{deployUnlock_(lock);}
  }
  if(req.kind==='reconcileSummary'){auth_(c,'Admin');const sheet=deployQueueSheet_(false),holds=sheet&&sheet.getLastRow()>1?sheet.getRange(2,5,sheet.getLastRow()-1,1).createTextFinder('PREPARED').matchEntireCell(true).matchCase(true).findAll().length:0;return deployQueueSigned_('edge-command-google-reconciliation-v1',{app:'deploy',document:'workbook',generation:config.generation,allResolved:holds===0&&!index_(book_()).pendingFieldCommit,holds});}
 
