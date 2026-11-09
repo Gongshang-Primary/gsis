@@ -1,3 +1,15 @@
+# P1 shared queue and Deploy — current assignment
+
+- Model: Codex. Status: claimed before implementation, 9 November 2026, Asia/Singapore.
+- Branch: `codex/edge-queue-p1-deploy`; base: `5a4ab02d9d2aee2ae8009cf8c01ebd1ca4747ef4`. Dependency #107 is owner-merged as `03782ca3` from `2247f729`. Muse coordinates/reviews the exact final head; Claude is unavailable; owner merges/deploys.
+- Owner-approved scope: shared command protocol/service, Deploy saves/publish adapter and Google decision ledger under the existing writer lock, receipts/UI, verified cache, same-ID direct fallback through a surviving authenticated gateway, health/switch-back and synthetic behavioral tests. Default remains direct; queued enablement is prohibited in this PR. Preserve #90 frozen publication and separate downstream results/fenced retries. No P2/P3 or other-app product changes, live data/settings/flags/provider calls, deployment, or p bundle changes.
+- Owner clarification: the design's P1 gate and full-Worker-outage browser test conflicted with the prompt excluding the independent Google recovery page. Owner answered "yes" on 9 November to amending those requirements: defer the recovery page and browser tests to a mandatory queued-enablement gate. P1 still implements/proves the shared ledger and surviving-gateway fallback with the same operation ID. Full Worker outage retains the pending proposal/ID and explains continuation is unavailable. Do not claim queued readiness.
+- Files/domains: Deploy frontend/gateway/backend sources and Deploy-generated outputs; `shared/edge-command-queue.js` and new queue service/schema/adapters; associated tests; this task and the approved design amendment. Inspect shared backend/build propagation before product edits; if another app's source/output or unapproved build files must change, stop and report the concrete bounded dependency first.
+- Claim procedure: owner explicitly requires this branch and prohibits main pushes, superseding WORKFLOW's main claim exception. Record this claim only on the feature branch. No existing claim is taken over.
+- Acceptance: design's D1/Google ledger, atomic admission/caps/nonce/roles, scope FIFO/fences/uncertainty, publish child receipts, cache verification/high-water invalidation, same-ID fallback, switch-back and private health/alert behavior. Local shadow evidence uses read comparisons and synthetic commands only; never double-dispatch a real write. Canonical build then full local Node/LORD suite with Singapore timezone, final-head no-diff build, all 5 CI jobs green before draft PR, Muse named at exact head. No test/review/deployment is yet claimed.
+
+---
+
 # Edge-queue design note: current assignment
 
 - Model: Codex. Status: design note merged (#105 at 7c3b839 as ff44f9c, 8 Nov 20:58 SGT). Next: secret consolidation — Roster/Deploy, then edge-queue P1 (Deploy).
