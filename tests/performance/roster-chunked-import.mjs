@@ -72,7 +72,7 @@ const mf = new Miniflare({
   d1Databases: {GSIS_JOBS: 'synthetic-import'}, r2Buckets: ['ROSTER_TIMETABLE_SNAPSHOTS'],
   bindings: {
     ROSTER_EDGE_AUTHORITY: 'legacy', APPS_SCRIPT_URL: 'https://script.google.com/macros/s/fixture/exec',
-    ROSTER_PUBLIC_ORIGIN: 'https://roster.example.test', BRIDGE_SECRET: 'b'.repeat(32),
+    ROSTER_PUBLIC_ORIGIN: 'https://roster.example.test', GSIS_SECRET: 'b'.repeat(32),
     ROSTER_SERVICE_SECRET: 's'.repeat(32), CALENDAR_PROXY_SECRET: 'c'.repeat(32),
     CALENDAR_APPS_SCRIPT_URL: 'https://script.google.com/macros/s/calendar-fixture/exec', WHATSAPP_ENABLED: 'false'
   },
