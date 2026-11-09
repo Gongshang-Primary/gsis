@@ -29,6 +29,7 @@ h.properties.LORD_GSIS_SNAPSHOT_FOLDER_ID = 'offline-snapshot-folder';
 c.Utilities.computeHmacSha256Signature = (text, key) => [...crypto.createHmac('sha256', key).update(text).digest()];
 for (const source of [contacts, deploy]) {
   source.props.set('LORD_BRIDGE_SECRET', secret);
+  source.props.set('GSIS_SECRET', secret); // Align the migrated Contacts/Deploy providers with the unchanged LORD caller.
   source.ctx.Utilities.computeHmacSha256Signature = c.Utilities.computeHmacSha256Signature;
   source.ctx.ContentService = { MimeType: { JSON: 'application/json' }, createTextOutput: text => ({ text, setMimeType() { return this; } }) };
   source.ctx.console = { log() {}, info() {}, error() {} };

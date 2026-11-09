@@ -1,6 +1,6 @@
 # gsis-secret-consolidation: reduce all transport secrets to one GSIS_SECRET
 
-- Status: Contacts #102 and Calendar #104 merged; edge-queue design #105 and release p #106 merged. Roster/Deploy implementation is prepared on the branch below; a bounded two-file parity-inventory refresh needs owner scope approval before the full-suite gate can pass. It targets the next release, not p.
+- Status: Contacts #102 and Calendar #104 merged; edge-queue design #105 and release p #106 merged. Roster/Deploy implementation is prepared on the branch below; the owner approved the bounded two-file parity refresh on 9 November and full verification is in progress. It targets the next release, not p.
 - Owner/model: Codex
 - Reviewer/model: Muse
 - Last updated (Asia/Singapore): 9 Nov 2026
@@ -181,3 +181,12 @@ Run the canonical build, focused local checks and full branch CI. Open the Conta
 - Await owner approval to refresh only those two generated inventory files with the existing harness. Actual repository parity test is deliberately still red until the record is refreshed; no guard, assertion or fixture was changed to force the obsolete outcome.
 - Local evidence: new consolidation behavior and 45-source negative-control guard passed. The initial credential audit examined 144 programs and retained 118 failures, mostly old synthetic settings plus existing historical comparisons. After targeted binding updates, 99/120 first correction checks passed. Manual corrections resolved the remaining scoped current-fixture cases; the four final focused fixture programs passed. Failure logs/results remain in ignored `verification/rd-*` and `/tmp`.
 - Full local npm suite, final-head no-diff build, remote full CI and draft PR remain pending. No PR, Muse approval, live provider/data/settings work or deployment is claimed. Other app product/generated paths have no diff and the p bundle branch remains at `21bef884145592cf39f98280e7df3072b7c08207`.
+
+
+### Parity refresh approval and fixture follow-up — 9 November 2026, Model: Codex
+
+- Owner explicitly answered "Include the two generated parity files" to the bounded request for `docs/roster/d1-parity.json` and `docs/roster/D1_PARITY.md`. Approval covers the prepared three-row refresh: manifest probe 503 -> 403 and the logout/session source references, with all other outcomes and totals unchanged. Regenerate with the existing `tests/roster-d1-parity.mjs --record`; do not change assertions or invent a result.
+- The existing LORD contract suite reached its nested Deploy-provider authentication test and failed because that synthetic provider retained only its legacy service binding while the caller used its established synthetic key. Align GSIS_SECRET in that test provider, preserving the LORD app code and all contract assertions. This is a Roster/Deploy provider fixture update, not a LORD migration.
+- Continue canonical build, full local suite and exact-head CI. The earlier scope-dependency record is retained as history; the owner has now authorized precisely those two additional generated files. No additional scope, review, live configuration or deployment is claimed.
+
+- Approved refresh executed with the original repository harness, then checked normally: all 272 inventory probes match the regenerated records, with unchanged totals and zero remote calls. The nested LORD source contract now passes all 8 cases with zero live calls after aligning the migrated Deploy provider's synthetic GSIS_SECRET. Canonical/other-app parity and full local/CI gates still follow at the final committed head.
