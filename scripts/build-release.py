@@ -2,11 +2,8 @@
 from pathlib import Path
 import zipfile, shutil, subprocess, re, tempfile, os, sys, hashlib
 from contextlib import contextmanager
-def without_deploy_queue(code):
- # Deploy-only entry/ledger hooks must not enter the Roster backend.
- return re.sub(r"/\* GSIS_DEPLOY_QUEUE_([A-Z_]+)_BEGIN \*/[\s\S]*?/\* GSIS_DEPLOY_QUEUE_\1_END \*/", "", code)
 def roster_backend_source(code, component_version):
- code=without_deploy_queue(code)
+ code=re.sub(r'/\* GSIS_DEPLOY_QUEUE_([A-Z_]+)_BEGIN \*/[\s\S]*?/\* GSIS_DEPLOY_QUEUE_\1_END \*/', '', code)
  # Deploy owns Layout routes, the campus seed and the local aSc exporter. Roster retains the
  # live venue identities used by Relief/Deploy quota and timetable helpers.
  for marker in ['GSIS_LAYOUT_DATA','GSIS_LAYOUT_REPOSITORY','GSIS_LAYOUT_DIAGNOSTICS','GSIS_LAYOUT_SEED','GSIS_ASC_EXPORT']:
