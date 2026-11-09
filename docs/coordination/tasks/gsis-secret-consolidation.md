@@ -1,11 +1,11 @@
 # gsis-secret-consolidation: reduce all transport secrets to one GSIS_SECRET
 
-- Status: Contacts merged (#102 at b9d9f8c as 772d424, 7 Nov 16:34 SGT). Calendar merged (#104 at fb0ee22 as d360069, 8 Nov 20:31 SGT). Next in the queue: edge-queue design note (Codex codes, Muse reviews), then Roster/Deploy consolidation.
+- Status: Contacts #102 and Calendar #104 merged; edge-queue design #105 and release p #106 merged. Roster/Deploy consolidation is claimed and in progress on the branch below. It targets the next release, not p.
 - Owner/model: Codex
 - Reviewer/model: Muse
-- Last updated (Asia/Singapore): 8 Nov 2026
-- Branch: codex/gsis-secret-consolidation
-- Base SHA: 9e1057b
+- Last updated (Asia/Singapore): 9 Nov 2026
+- Branch: codex/gsis-secret-consolidation-roster-deploy
+- Base SHA: 8194dd3a0b93297b3d790541397d80b3bd68f36f
 - Current head SHA (or PR head; avoid self-referential commit hashes):
 - PR:
 - User-authorised scope: cross-lane by necessity — the secret reads span Roster (lane R), Deploy, Calendar, Contacts, Venues and LORD. Owner authorised the setup 7 Nov 2026. One PR per app (Contacts first, then Calendar, Roster/Deploy, Venues, LORD); each PR is reviewed at its exact head by Muse and merged only on the owner's word.
@@ -143,3 +143,13 @@ Run the canonical build, focused local checks and full branch CI. Open the Conta
 - Root cause: five synthetic caller settings/request fields in those three Roster-to-Calendar integration fixtures still used the old single value, while the migrated Calendar harness requires the repeated canonical value. Updated only those five values to align with the Calendar fixture. Unmigrated Roster retains its existing legacy setting names in these fixtures; no Roster product migration, live configuration change or relaxed authentication/assertion is involved.
 - After the canonical build passed, all three corrected programs passed locally, as did `calendar-secret-consolidation.mjs` and the migrated-app guard. The guard's `--prove-calendar` negative control again rejected the deliberate legacy read with child exit 1 and restored the source. `git diff --check` passed. Failure evidence is retained in ignored `verification/calendar-ci-red-*.log`; correction results in `verification/calendar-ci-fix-results.json`.
 - Next gate: canonical build at the correction head must leave no diff, then full CI at that exact pushed head must pass all 5 jobs before the Calendar draft PR is opened for Muse. This correction does not claim full local npm-test, live provider/D1/Google tests, deployment, live Contacts outage repair or any model review.
+
+
+## Roster/Deploy claim — 9 November 2026, Model: Codex
+
+- Status: claimed before implementation edits; current main fetched and active PRs inspected. Branch `codex/gsis-secret-consolidation-roster-deploy`, base `8194dd3a0b93297b3d790541397d80b3bd68f36f`. Existing older Roster backlog branches are not taken over; this owner-assigned transport task is bounded to the following targets. Muse coordinates/reviews the exact head; Claude is unavailable; owner merges/deploys.
+- Scope: Roster/Deploy transport callers and backend dispatch, Roster/Deploy session derivations, their notification/operations/private-backend and edge adapter sources, corresponding generated outputs, target-specific strict helper sources, same bounded build selection/specialization as #102/#104, the migrated-app guard and behavior/fixture tests, and deploy instructions here. No Venues, LORD, Calendar or Contacts product/output changes; no p bundle changes or live config/data/provider calls.
+- Pre-edit grep inventory confirmed BRIDGE_SECRET entry/session reads; ROSTER_SERVICE_SECRET service reads; GSIS_BACKEND_SECRET gateway reads and dynamic per-domain bridge remapping; DEPLOY_EDGE_SECRET edge paths; Contacts/Calendar/Venues/LORD peer selectors in Roster/Deploy; direct Venues configuration probes; setup's legacy generation; diagnostics/redaction legacy reads. Each migrated deployed target must read only GSIS_SECRET, preserve optional-peer URL gates, and fail closed on invalid canonical configuration. Calendar session, relief-link rotation pair and Meta app secret remain separate.
+- Build plan: add `backend/RosterDeployApiSecret.gs` and `shared/roster-deploy-api-secret.js`; select only for Roster/Deploy helper targets. Specialize shared LORD/Venues bridge blocks only where embedded in `backend/Code.gs`, retaining the merged Contacts/Calendar specialization. Keep common fallback helpers for unmigrated apps. If actual build dependencies require a different pattern or non-scope product changes, stop and report before expanding.
+- Validation: behavioral backend/Worker/service/session/outgoing/generated tests and the extended AST guard, including a restored `--prove-roster-deploy` negative control; canonical no-diff build; full local npm suite with Roster and LORD browser variables; full exact-head CI, all five jobs green, before a draft PR naming Muse. No test, review or deployment is yet claimed for this phase.
+- Release p remains frozen on `deploy/2026-11-08-v0.9.9p` at `21bef884145592cf39f98280e7df3072b7c08207`. This branch targets a later release. The Contacts 401 attribution is owner-reported Apps Script deployment lag; it is outside this code task.
