@@ -1,0 +1,3 @@
+const fs=require('node:fs'),{DatabaseSync}=require('node:sqlite');
+function database(){const db=new DatabaseSync(':memory:');db.exec(fs.readFileSync('edge-command-worker/schema.sql','utf8'));const stmt=(sql,args=[])=>({bind(...values){return stmt(sql,values)},async first(){return db.prepare(sql).get(...args)||null},async all(){return {results:db.prepare(sql).all(...args)}},async run(){const r=db.prepare(sql).run(...args);return {meta:{changes:Number(r.changes)}}},_sql:sql,_args:args});return {raw:db,prepare:stmt,async batch(stmts){db.exec('BEGIN IMMEDIATE');try{const result=stmts.map(s=>({results:db.prepare(s._sql).all(...s._args)}));db.exec('COMMIT');return result}catch(e){db.exec('ROLLBACK');throw e}}};}
+module.exports=database;

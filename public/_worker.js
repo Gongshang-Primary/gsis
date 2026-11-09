@@ -1,3 +1,5 @@
+import {deployCommandGateway,deployCommandShadow} from './deploy-command-gateway.js';
+import {boundedJSON} from '../edge-command-worker/worker.mjs';
 import {edgeDeployEnabled,edgeDeployDispatch,edgeDeployAdmin,edgeDeployService} from './edge-deploy.js';
 import {callOperationalBackend,forwardOperationalRequest} from '../shared/backend-service.js';
 import {assertRecoveryWritable} from '../shared/edge-recovery.js';
@@ -50,7 +52,7 @@ async function backend(env,action,input,who,trace){
  if(endpoint.protocol!=='https:'||endpoint.hostname!=='script.google.com'||!/^\/macros\/s\/[^/]+\/exec$/.test(endpoint.pathname))throw Object.assign(Error('Invalid backend URL'),{code:'BACKEND_CONFIG'});
  const body=await sign({action,input,identity:who,timestamp:Date.now(),nonce:diagnosticId,traceId:trace.traceId},gsisApiSecret(env));
  const response=await fetch(endpoint,{method:'POST',body:JSON.stringify(body),headers:{'Content-Type':'application/json'},redirect:'follow',signal:AbortSignal.timeout(action==='change'?60000:['sync','bootstrap','publishReview'].includes(action)?45000:25000)});
- const result=await readGSiSBackendResponse(response);result.gatewayTiming={backendMs:Date.now()-started,totalMs:Date.now()-trace.started,diagnosticId,traceId:trace.traceId};return result;
+ const result=await readGSiSBackendResponse(response);if(env.DEPLOY_COMMAND_SERVICE&&trace.context?.waitUntil&&['bootstrap','sync'].includes(action)&&result.ok)trace.context.waitUntil(deployCommandShadow(env,input,who,result.data).catch(()=>{}));result.gatewayTiming={backendMs:Date.now()-started,totalMs:Date.now()-trace.started,diagnosticId,traceId:trace.traceId};return result;
 }
 export {backend as deployBackend};
 export default {async fetch(req,env,ctx){
@@ -60,7 +62,7 @@ export default {async fetch(req,env,ctx){
  if(['/api/edge/service','/api/venues-source','/api/lord-source'].includes(u.pathname)){try{const delegated=await forwardOperationalRequest(req,env,'deploy');return delegated===undefined?edgeDeployService(req,env,ctx):delegated;}catch(error){return json({ok:false,code:error.code,error:error.status<500?error.message:'The operational service could not be confirmed.'},error.status||503);}}
  const sessionResponse=await sessionRoute(req,env);if(sessionResponse)return sessionResponse;
  if(u.pathname==='/campus-base.svg')return json({ok:false,error:'Sign in to view the map'},403);if(!u.pathname.startsWith('/api/'))return env.ASSETS.fetch(req);
- if(u.pathname==='/api/config')return json({version:'0.9.9',clientId:env.GOOGLE_CLIENT_ID||'',configured:!!(env.GOOGLE_CLIENT_ID&&env.APPS_SCRIPT_URL&&gsisApiSecret(env)),liveConfigured:!!env.LIVE_HUB});
+ if(u.pathname==='/api/config')return json({version:'0.9.9',clientId:env.GOOGLE_CLIENT_ID||'',configured:!!(env.GOOGLE_CLIENT_ID&&env.APPS_SCRIPT_URL&&gsisApiSecret(env)),edgeCommandProtocol:edgeDeployEnabled(env)?null:1,liveConfigured:!!env.LIVE_HUB});
  if(u.pathname==='/api/live'){
   if(!env.LIVE_HUB)return json({ok:false,error:'Live updates are not configured'},503);
   if(req.method!=='GET'||req.headers.get('Origin')!==u.origin||req.headers.get('Upgrade')?.toLowerCase()!=='websocket')return json({ok:false,error:'WebSocket required'},403);
@@ -68,7 +70,7 @@ export default {async fetch(req,env,ctx){
   return hub(env).fetch(new Request(target,req));
  }
  if(!env.GOOGLE_CLIENT_ID||!env.APPS_SCRIPT_URL||!gsisApiSecret(env))return json({ok:false,error:'Configure the Deploy connection first.'},503);
- const routes={'/api/edge/admin':'deployEdgeAdmin','/api/relief':'relief','/api/acknowledgeNotices':'acknowledgeNotices','/api/auditPage':'auditPage','/api/versionNote':'versionNote','/api/delta':'delta','/api/receipt':'receipt','/api/roleTruthTable':'roleTruthTable','/api/saveRoleTruthTable':'saveRoleTruthTable','/api/landmark/catalog':'publicCampus','/api/landmark/unit':'landmarkUnit','/api/landmark/search':'landmarkSearch','/api/publishReview':'publishReview','/api/bootstrap':'bootstrap','/api/sync':'sync','/api/lease':'lease','/api/change':'change','/api/active':'active','/api/live-ticket':'live-ticket','/api/layout-reference':'layout-reference','/api/campus-map':'campus-map'},action=routes[u.pathname];
+ const routes={'/api/commands':'queue-command','/api/edge/admin':'deployEdgeAdmin','/api/relief':'relief','/api/acknowledgeNotices':'acknowledgeNotices','/api/auditPage':'auditPage','/api/versionNote':'versionNote','/api/delta':'delta','/api/receipt':'receipt','/api/roleTruthTable':'roleTruthTable','/api/saveRoleTruthTable':'saveRoleTruthTable','/api/landmark/catalog':'publicCampus','/api/landmark/unit':'landmarkUnit','/api/landmark/search':'landmarkSearch','/api/publishReview':'publishReview','/api/bootstrap':'bootstrap','/api/sync':'sync','/api/lease':'lease','/api/change':'change','/api/active':'active','/api/live-ticket':'live-ticket','/api/layout-reference':'layout-reference','/api/campus-map':'campus-map'},action=routes[u.pathname];
  if(!action)return json({ok:false,error:'Not found'},404);
  if(req.method!==(action==='relief'?'GET':'POST'))return json({ok:false,error:action==='relief'?'GET required':'POST required'},405);
  if(action!=='relief'&&req.headers.get('Origin')!==u.origin)return json({ok:false,error:'Origin not allowed'},403);
@@ -77,9 +79,10 @@ export default {async fetch(req,env,ctx){
   const allowed=new Set(['versionId','year','teacherId']);input={};if(u.search.length>1000)throw Error();
   for(const [key,value] of u.searchParams){if(!allowed.has(key)||key in input||!value||value.length>80)throw Error();input[key]=value;}
   if(input.year&&(!/^\d{4}$/.test(input.year)||Number(input.year)<2000||Number(input.year)>2099))throw Error();
- }else{const raw=await req.text();if(raw.length>250000)return json({ok:false,error:'Request too large'},413);input=JSON.parse(raw);if(!input||Array.isArray(input)||typeof input!=='object')throw Error()}}catch{return json({ok:false,error:action==='relief'?'Invalid relief query':'Invalid JSON'},400)}
+ }else if(action==='queue-command'){input=await boundedJSON(req);}else{const raw=await req.text();if(raw.length>250000)return json({ok:false,error:'Request too large'},413);input=JSON.parse(raw);if(!input||Array.isArray(input)||typeof input!=='object')throw Error()}}catch(error){return json({ok:false,code:error.code,error:action==='relief'?'Invalid relief query':'Invalid JSON'},error.status===413?413:400)}
  const diagnosticId=crypto.randomUUID(),providedTrace=req.headers.get('X-GSiS-Trace-ID'),trace={context:ctx,started:gatewayStarted,diagnosticId,traceId:/^[\w-]{36}$/.test(providedTrace||'')?providedTrace:diagnosticId};
  try{
+  if(action==='queue-command'){try{const queued=await deployCommandGateway(env,input,who,ctx);return json(queued,queued.httpStatus||(queued.ok?200:queued.status||503));}catch(error){return json({ok:false,saved:false,code:error.code||'QUEUE_UNAVAILABLE',error:'Command outcome could not be confirmed. Keep the same request ID.'},[400,401,403,404,409,413,429].includes(error.status)?error.status:503);}}
   if(action==='campus-map'){const access=await backend(env,'access',{},who,trace);if(!access.ok)return json(access,access.status||503);const asset=await env.ASSETS.fetch(new Request(new URL('/campus-base.svg',u)));return new Response(asset.body,{headers:{'Content-Type':'image/svg+xml','Cache-Control':'no-store'}});}
   if(action==='layout-reference'){
    const result=await backend(env,'access',{},who,trace);if(!result.ok)return json(result,result.status||503);

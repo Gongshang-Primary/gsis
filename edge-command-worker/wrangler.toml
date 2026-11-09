@@ -1,0 +1,7 @@
+name = "gsis-deploy-command-queue"
+main = "worker.mjs"
+compatibility_date = "2026-07-01"
+# Preparation only. No live database ID or active cron is included.
+# Owner supplies an isolated Deploy DEPLOY_EDGE_QUEUE D1 binding and GSIS_SECRET.
+# APPS_SCRIPT_URL must remain the existing Deploy /exec endpoint.
+# Deploy's Google-authoritative mode remains direct; queued cannot be enabled in P1.
