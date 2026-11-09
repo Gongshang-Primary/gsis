@@ -11,15 +11,15 @@ import {readRosterCutoverFreeze} from '../../shared/roster-cutover-freeze.js';
 import {rosterRecoveryEnvironment,resolveRosterAuthorityEnvironment} from '../../shared/roster-recovery-profile.js';
 import {readQuietMode,startQuietMode,endQuietMode,endQuietModeSession,QUIET_END_OPERATIONS} from '../../shared/roster-quiet-mode.js';
 /* GSIS_API_SECRET_BEGIN */
-// First-party API credentials share one operator-selected setting. Browser
-// sessions, private relief links and third-party credentials stay independent.
-function gsisApiSecret(env,legacyName){
+// Roster/Deploy transport requires one setting without legacy fallback.
+// Browser sessions retain their existing purpose- and origin-bound derivation.
+function gsisApiSecret(env){
  const value=env?.GSIS_SECRET;
- if(value!==undefined||Object.prototype.hasOwnProperty.call(env||{},'GSIS_SECRET')){
-  if(typeof value!=='string'||!/^[!-~]{32,8000}$/.test(value))throw Object.assign(Error('GSIS_SECRET must contain 32 to 8000 printable ASCII characters without spaces.'),{status:503,code:'GSIS_SECRET_INVALID'});
-  return value;
+ if(typeof value!=='string'||!/^[!-~]{32,8000}$/.test(value)){
+  throw Object.assign(Error('GSIS_SECRET must contain 32 to 8000 printable ASCII characters without spaces.'),
+   {status:503,code:'GSIS_SECRET_INVALID'});
  }
- return env?.[legacyName];
+ return value;
 }
 
 /* GSIS_API_SECRET_END */
@@ -66,7 +66,7 @@ async function backend(env,action,input,who,traceId){
   const endpoint=new URL(env.APPS_SCRIPT_URL);
   if(endpoint.protocol!=='https:'||endpoint.hostname!=='script.google.com'||!/^\/macros\/s\/[^/]+\/exec$/.test(endpoint.pathname))throw Object.assign(Error('Invalid backend URL'),{code:'BACKEND_CONFIG'});
   const carriesStaplerPlan=action==='rosterOperations'&&(['saveStapler','importStapler'].includes(input.operation)||input.operation==='receiptStatus'&&['saveStapler','importStapler'].includes(input.command?.operation));
-  const body=await sign({action,input,identity:who,timestamp:Date.now(),nonce,traceId},gsisApiSecret(env,'BRIDGE_SECRET'),carriesStaplerPlan);
+  const body=await sign({action,input,identity:who,timestamp:Date.now(),nonce,traceId},gsisApiSecret(env),carriesStaplerPlan);
   const response=await fetch(endpoint,{method:'POST',body:JSON.stringify(body),headers:{'Content-Type':'application/json; charset=utf-8'},redirect:'follow',signal:AbortSignal.timeout(action==='rosterUpload'?55000:25000)});
   const result=await readGSiSBackendResponse(response);
   // Browser identity has already been checked. A rejected service signature must
@@ -160,7 +160,7 @@ async function calendarDates(env,dates,who,diagnostic={}){
  const started=Date.now();
  Object.assign(diagnostic,{phase:'configuration',httpStatus:null,code:'CALENDAR_NOT_CONFIGURED'});
  const failed=message=>Object.fromEntries(dates.map(date=>[date,{available:false,message}]));
- if(!env.CALENDAR_APPS_SCRIPT_URL||!gsisApiSecret(env,'CALENDAR_PROXY_SECRET'))return failed('Calendar connection is not configured.');
+ if(!env.CALENDAR_APPS_SCRIPT_URL||!gsisApiSecret(env))return failed('Calendar connection is not configured.');
  try{
   diagnostic.code='INVALID_CALENDAR_URL';
   const url=new URL(env.CALENDAR_APPS_SCRIPT_URL);if(url.protocol!=='https:'||url.hostname!=='script.google.com'||!/^\/macros\/s\/[^/]+\/exec$/.test(url.pathname))throw Error();
@@ -168,7 +168,7 @@ async function calendarDates(env,dates,who,diagnostic={}){
   const batch=dates.length>1;
   const requester=who?{actor:{email:who.email,sub:who.subject,userAlias:who.email.split('@')[0]}}:{service:'gsis-roster-notifier-v1'};
   Object.assign(diagnostic,{phase:'request',code:'FETCH_FAILED'});
-  const r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:batch?'rosterDates':'rosterDate',payload:batch?{dates}:{date:dates[0]},...requester,proxySecret:gsisApiSecret(env,'CALENDAR_PROXY_SECRET'),requestId:crypto.randomUUID()}),signal:AbortSignal.timeout(12000),redirect:'follow'});
+  const r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:batch?'rosterDates':'rosterDate',payload:batch?{dates}:{date:dates[0]},...requester,proxySecret:gsisApiSecret(env),requestId:crypto.randomUUID()}),signal:AbortSignal.timeout(12000),redirect:'follow'});
   const contentType=r.headers.get('Content-Type')||'';
   Object.assign(diagnostic,{phase:'response',httpStatus:r.status,redirected:r.redirected===true,responseFormat:/\bjson\b/i.test(contentType)?'json':/\bhtml\b/i.test(contentType)?'html':'other',code:'HTTP_ERROR'});
   if(!r.ok)throw Error();
@@ -205,7 +205,7 @@ async function calendarDates(env,dates,who,diagnostic={}){
 // Only a Worker-signed, actor/configuration-bound window may return from the
 // browser. This is a bounded read optimisation; mutations always fetch Calendar.
 const CALENDAR_READ_AGE=5*60000,CALENDAR_PROOF_AGE=7*86400000;
-function calendarProofKey(env){return gsisApiSecret(env,'BRIDGE_SECRET')+'|roster-calendar-window-v1|'+env.CALENDAR_APPS_SCRIPT_URL+'|'+gsisApiSecret(env,'CALENDAR_PROXY_SECRET');}
+function calendarProofKey(env){return gsisApiSecret(env)+'|roster-calendar-window-v1|'+env.CALENDAR_APPS_SCRIPT_URL+'|'+gsisApiSecret(env);}
 function calendarWindowValues(values,dates,sourceRevision){
  if(!Array.isArray(values)||values.length!==dates.length||new Set(values.map(c=>c?.date)).size!==dates.length||values.some((c,i)=>!c||c.date!==dates[i]||c.code!=='YEAR_UNAVAILABLE'&&(![true,false,null].includes(c.schoolDay)||!['odd','even',null].includes(c.parity))))throw Error('Invalid Calendar window');
  return Object.fromEntries(values.map(c=>[c.date,c.code==='YEAR_UNAVAILABLE'?{date:c.date,sourceRevision,available:false,message:'Calendar year is not released to staff.'}:{...c,sourceRevision,available:true}]));
@@ -214,7 +214,7 @@ export async function cachedCalendarWindow(env,dates,who,proof,now=Date.now()){
  const failed=()=>({calendarByDate:Object.fromEntries(dates.map(date=>[date,{available:false,message:'Calendar is temporarily unavailable. Retry checking this date.'}]))});
  let saved;
  try{
-  if(configuredSecret(gsisApiSecret(env,'BRIDGE_SECRET'))&&typeof proof?.payload==='string'&&enc.encode(proof.payload).byteLength<=65536&&await verifyHmac(proof.payload,proof.signature,calendarProofKey(env))){
+  if(configuredSecret(gsisApiSecret(env))&&typeof proof?.payload==='string'&&enc.encode(proof.payload).byteLength<=65536&&await verifyHmac(proof.payload,proof.signature,calendarProofKey(env))){
    const data=JSON.parse(proof.payload);
    if(data.type==='roster-calendar-window-v1'&&data.email===who.email&&data.subject===who.subject&&Number.isFinite(data.checkedAt)&&data.checkedAt<=now&&now-data.checkedAt<=CALENDAR_PROOF_AGE&&/^[a-f0-9]{64}$/.test(data.sourceRevision||'')&&Array.isArray(data.dates)&&data.dates.length===62){
     const keys=data.dates.map(d=>d.date);if(keys.every((key,i)=>validDate(key)&&(!i||Date.parse(key)-Date.parse(keys[i-1])===86400000))&&dates.every(date=>keys.includes(date))){calendarWindowValues(data.dates,keys,data.sourceRevision);saved=data;}
@@ -224,9 +224,9 @@ export async function cachedCalendarWindow(env,dates,who,proof,now=Date.now()){
  if(saved&&now-saved.checkedAt<CALENDAR_READ_AGE)return {calendarByDate:calendarWindowValues(saved.dates,saved.dates.map(d=>d.date),saved.sourceRevision),calendarCache:proof,calendarCheckedAt:saved.checkedAt};
  const keys=saved?saved.dates.map(d=>d.date):Array.from({length:62},(_,i)=>new Date(Date.parse(dates[0]+'T00:00:00Z')+i*86400000).toISOString().slice(0,10));
  try{
-  if(!gsisApiSecret(env,'CALENDAR_PROXY_SECRET'))throw Error();
+  if(!gsisApiSecret(env))throw Error();
   const url=new URL(env.CALENDAR_APPS_SCRIPT_URL);if(url.protocol!=='https:'||url.hostname!=='script.google.com'||!/^\/macros\/s\/[^/]+\/exec$/.test(url.pathname))throw Error();
-  const response=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'rosterWindow',payload:{dates:keys,...(saved?{knownRevision:saved.sourceRevision}:{})},actor:{email:who.email,sub:who.subject,userAlias:who.email.split('@')[0]},proxySecret:gsisApiSecret(env,'CALENDAR_PROXY_SECRET'),requestId:crypto.randomUUID()}),signal:AbortSignal.timeout(12000),redirect:'follow'});
+  const response=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'rosterWindow',payload:{dates:keys,...(saved?{knownRevision:saved.sourceRevision}:{})},actor:{email:who.email,sub:who.subject,userAlias:who.email.split('@')[0]},proxySecret:gsisApiSecret(env),requestId:crypto.randomUUID()}),signal:AbortSignal.timeout(12000),redirect:'follow'});
   const envelope=await response.json(),result=envelope.result;
   // Rolling deployments may briefly retain the old Calendar read contract.
   if(response.ok&&!envelope.ok&&/Unknown action|Unsupported action|Unknown API action/i.test(envelope.error||''))return {calendarByDate:await calendarDates(env,dates,who)};
@@ -237,7 +237,7 @@ export async function cachedCalendarWindow(env,dates,who,proof,now=Date.now()){
   // Preserve the source-read age across both cache layers. A server-side
   // conditional hit must not grant another five minutes of browser trust.
   const data={type:'roster-calendar-window-v1',email:who.email,subject:who.subject,checkedAt,sourceRevision:result.sourceRevision,dates:values};
-  const calendarCache=result.cacheable!==false&&certified&&configuredSecret(gsisApiSecret(env,'BRIDGE_SECRET'))&&enc.encode(JSON.stringify(data)).byteLength<=65536?await sign(data,calendarProofKey(env)):undefined;
+  const calendarCache=result.cacheable!==false&&certified&&configuredSecret(gsisApiSecret(env))&&enc.encode(JSON.stringify(data)).byteLength<=65536?await sign(data,calendarProofKey(env)):undefined;
   return {calendarByDate,calendarCheckedAt:result.cacheable!==false&&certified?checkedAt:null,...(calendarCache?{calendarCache}:{})};
  }catch{return failed();}
 }
@@ -245,7 +245,7 @@ export async function cachedCalendarWindow(env,dates,who,proof,now=Date.now()){
 // skipped to choose a later one. This read never loads or changes allocations.
 export async function nextSchoolDay(env,who,now=Date.now(),proof){
  if(edgeRosterEnabled(env)){const reply=await edgeRosterBackend(env,'rosterOperations',{operation:'nextSchoolDay'},who,crypto.randomUUID());if(!reply.result.ok)throw Object.assign(Error(reply.result.error),{status:reply.result.status});return reply.result.data;}
- const today=singaporeDate(now),dates=Array.from({length:62},(_,i)=>new Date(Date.parse(today+'T00:00:00Z')+(i+1)*86400000).toISOString().slice(0,10)),cached=configuredSecret(gsisApiSecret(env,'BRIDGE_SECRET'))?await cachedCalendarWindow(env,dates,who,proof,now):{calendarByDate:await calendarDates(env,dates,who)},values=cached.calendarByDate,extra=cached.calendarCache?{calendarCache:cached.calendarCache}:{};
+ const today=singaporeDate(now),dates=Array.from({length:62},(_,i)=>new Date(Date.parse(today+'T00:00:00Z')+(i+1)*86400000).toISOString().slice(0,10)),cached=configuredSecret(gsisApiSecret(env))?await cachedCalendarWindow(env,dates,who,proof,now):{calendarByDate:await calendarDates(env,dates,who)},values=cached.calendarByDate,extra=cached.calendarCache?{calendarCache:cached.calendarCache}:{};
  for(const date of dates){const value=values[date];if(value?.available!==true||typeof value.schoolDay!=='boolean')return {today,date:null,available:false,...extra,message:'The next school day could not be verified. Choose a date manually or retry.'};if(value.schoolDay)return {today,date,available:true,...extra};}
  return {today,date:null,available:false,...extra,message:'No school day was found in the next 62 days. Choose a date manually.'};
 }
@@ -277,7 +277,7 @@ export default {async fetch(req,env,ctx){
  if(u.pathname==='/api/system-health')return systemHealthRoute(req,{...rosterRecoveryEnvironment(env),GSIS_REQUEST_ORIGIN:u.origin},env);
  try{env={...(typeof resolveRosterAuthorityEnvironment==='function'?await resolveRosterAuthorityEnvironment(env):rosterRecoveryEnvironment(env)),GSIS_REQUEST_ORIGIN:u.origin};}
  catch(error){return json({ok:false,code:error.code||'ROSTER_AUTHORITY_UNVERIFIED',error:error.message},error.status||503);}
- if(u.pathname.startsWith('/api/')&&!['/api/session','/api/logout'].includes(u.pathname))try{gsisApiSecret(env,'BRIDGE_SECRET');}catch(error){return json({ok:false,code:error.code,error:error.message},503);}
+ if(u.pathname.startsWith('/api/')&&u.pathname!=='/api/logout')try{gsisApiSecret(env);}catch(error){return json({ok:false,code:error.code,error:error.message},503);}
  // Migration is deliberately absent from the restoration release. In
  // particular, an old dashboard binding must not reactivate a second writer.
  // 0.9.9a D1 preparation: ROSTER_D1_PREPARE=import reopens only read and copy
@@ -303,7 +303,7 @@ export default {async fetch(req,env,ctx){
  const action={'/api/profile':'rosterProfile','/api/read':'rosterRead','/api/upload':'rosterUpload','/api/update':'rosterUpdate','/api/operations':'rosterOperations','/api/edge/migration':'edgeMigration','/api/edge/archive':'edgeArchive'}[u.pathname];
  if(!action)return json({ok:false,error:'Not found'},404);
  if(req.method!=='POST'||req.headers.get('Origin')!==u.origin)return json({ok:false,error:'Same-origin POST required'},403);
- if(!env.APPS_SCRIPT_URL||!gsisApiSecret(env,'BRIDGE_SECRET')||gsisApiSecret(env,'BRIDGE_SECRET').length<32)return json({ok:false,error:'Roster connection is not configured.'},503);
+ if(!env.APPS_SCRIPT_URL||!gsisApiSecret(env)||gsisApiSecret(env).length<32)return json({ok:false,error:'Roster connection is not configured.'},503);
  let who;try{who=await requestIdentity(req,env)}catch{return json({ok:false,error:'Sign in with your school account.'},401)}
  const raw=await req.text(),requestBytes=enc.encode(raw).byteLength;if(requestBytes>(action==='rosterUpload'?11000000:action==='rosterOperations'?4100000:action==='rosterProfile'?131072:4000))return json({ok:false,error:'Request too large'},413);
  let input;try{input=JSON.parse(raw);if(!input||Array.isArray(input)||typeof input!=='object')throw Error()}catch{return json({ok:false,error:'Invalid request'},400)}
@@ -386,11 +386,11 @@ function rosterFailure(action,diagnosticId,detail){
 // issuance; application permissions remain authoritative in Apps Script on every call.
 const SESSION_COOKIE='__Host-gsis_session';
 const sessionAge=env=>Math.max(1,Math.min(30,Number(env.SESSION_DAYS)||7))*86400000;
-const sessionKey=(env,origin)=>env.BRIDGE_SECRET+'|gsis-browser-session-v1|'+origin;
+const sessionKey=(env,origin)=>gsisApiSecret(env)+'|gsis-browser-session-v1|'+origin;
 function sessionHeader(value,age){return SESSION_COOKIE+'='+value+'; Path=/; Max-Age='+Math.floor(age/1000)+'; Secure; HttpOnly; SameSite=Lax'}
 export async function readSession(req,env){
  const origin=new URL(req.url).origin,raw=(req.headers.get('Cookie')||'').split(';').map(x=>x.trim()).find(x=>x.startsWith(SESSION_COOKIE+'='))?.slice(SESSION_COOKIE.length+1);
- if(!raw||raw.length>5000||!env.BRIDGE_SECRET||env.BRIDGE_SECRET.length<32)throw Error('No session');
+ if(!raw||raw.length>5000||!gsisApiSecret(env)||gsisApiSecret(env).length<32)throw Error('No session');
  const [encoded,signature,...extra]=raw.split('.');if(extra.length||!signature||!/^[a-f0-9]{64}$/.test(signature))throw Error('Invalid session');
  const payload=new TextDecoder().decode(decode(encoded)),key=await crypto.subtle.importKey('raw',enc.encode(sessionKey(env,origin)),{name:'HMAC',hash:'SHA-256'},false,['verify']);
  if(!await crypto.subtle.verify('HMAC',key,Uint8Array.from(signature.match(/../g),x=>parseInt(x,16)),enc.encode(payload)))throw Error('Invalid session');
@@ -449,7 +449,7 @@ export async function systemHealthRoute(req,env,authorityEnv=env){
 }
 async function sessionRoute(req,env){
  const u=new URL(req.url);if(!['/api/session','/api/logout'].includes(u.pathname))return null;
- if(!env.BRIDGE_SECRET||env.BRIDGE_SECRET.length<32||!env.GOOGLE_CLIENT_ID)return json({ok:false,error:'Configure school sign-in first.'},503);
+ if(u.pathname!=='/api/logout'&&(!gsisApiSecret(env)||gsisApiSecret(env).length<32||!env.GOOGLE_CLIENT_ID))return json({ok:false,error:'Configure school sign-in first.'},503);
  if(req.method==='POST'&&req.headers.get('Origin')!==u.origin)return json({ok:false,error:'Origin not allowed'},403);
  if(u.pathname==='/api/logout'){if(req.method!=='POST')return json({ok:false,error:'POST required'},405);const res=json({ok:true});res.headers.set('Set-Cookie',sessionHeader('',0));return res}
  if(req.method==='GET'){try{return json({ok:true,data:{user:await readSession(req,env)}})}catch{return json({ok:false,error:'Sign in required'},401)}}
@@ -515,9 +515,9 @@ export function operationDates(input,selectionOnly=false){
 }
 async function statisticsCalendar(env,who,year){
  if(!Number.isInteger(Number(year))||Number(year)<2000||Number(year)>2200)throw Error('Choose a valid calendar year.');
- if(!env.CALENDAR_APPS_SCRIPT_URL||!gsisApiSecret(env,'CALENDAR_PROXY_SECRET'))throw Error('Calendar connection is not configured.');
+ if(!env.CALENDAR_APPS_SCRIPT_URL||!gsisApiSecret(env))throw Error('Calendar connection is not configured.');
  const url=new URL(env.CALENDAR_APPS_SCRIPT_URL);if(url.protocol!=='https:'||url.hostname!=='script.google.com'||!/^\/macros\/s\/[^/]+\/exec$/.test(url.pathname))throw Error('Invalid Calendar connection.');
- const response=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'rosterStatisticsCalendar',payload:{year:Number(year)},actor:{email:who.email,sub:who.subject,userAlias:who.email.split('@')[0]},proxySecret:gsisApiSecret(env,'CALENDAR_PROXY_SECRET'),requestId:crypto.randomUUID()}),signal:AbortSignal.timeout(12000),redirect:'follow'});
+ const response=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'rosterStatisticsCalendar',payload:{year:Number(year)},actor:{email:who.email,sub:who.subject,userAlias:who.email.split('@')[0]},proxySecret:gsisApiSecret(env),requestId:crypto.randomUUID()}),signal:AbortSignal.timeout(12000),redirect:'follow'});
  const value=await response.json();if(!response.ok||!value.ok||!Array.isArray(value.data?.terms)||!Array.isArray(value.data?.semesters))throw Error('School calendar periods could not be loaded.');return value.data;
 }
 export async function trustedOperationsInput(input,env,who,calendarOutput={},now=Date.now()){
@@ -601,10 +601,10 @@ export async function serviceBackend(env,input){
  try{const result=await legacyServiceBackend(env,input);return result?.ok?result:{...result,operation:input.operation};}catch(error){error.operation=input.operation;throw error;}
 }
 async function legacyServiceBackend(env,input){
- if(!configuredSecret(gsisApiSecret(env,'ROSTER_SERVICE_SECRET')))throw Error('Roster service is not configured.');
+ if(!configuredSecret(gsisApiSecret(env)))throw Error('Roster service is not configured.');
  const endpoint=new URL(env.APPS_SCRIPT_URL||'');
  if(endpoint.protocol!=='https:'||endpoint.hostname!=='script.google.com'||!/^\/macros\/s\/[^/]+\/exec$/.test(endpoint.pathname))throw Error('Roster service is not configured.');
- const body=await sign({action:'rosterService',service:'gsis-roster-notifier-v1',input,timestamp:Date.now(),nonce:crypto.randomUUID(),traceId:crypto.randomUUID()},gsisApiSecret(env,'ROSTER_SERVICE_SECRET'));
+ const body=await sign({action:'rosterService',service:'gsis-roster-notifier-v1',input,timestamp:Date.now(),nonce:crypto.randomUUID(),traceId:crypto.randomUUID()},gsisApiSecret(env));
  const response=await fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body),redirect:'follow',signal:AbortSignal.timeout(25000)});
  return readGSiSBackendResponse(response);
 }
@@ -613,7 +613,7 @@ async function legacyServiceBackend(env,input){
 // this same drain even when automatic allocation has been switched off.
 export async function dispatchAbsenceIntake(env,{limit=2,budgetMs=180000}={}){
  const result={claimed:0,applied:0,deferred:0,needsReview:0,notificationsQueued:0},started=Date.now(),count=Math.max(1,Math.min(10,Number(limit)||2)),budget=Math.max(1,Math.min(240000,Number(budgetMs)||180000));
- if(!configuredSecret(gsisApiSecret(env,'ROSTER_SERVICE_SECRET')))return {...result,configured:false};
+ if(!configuredSecret(gsisApiSecret(env)))return {...result,configured:false};
  for(let i=0;i<count&&Date.now()-started<budget;i++){
   const next=await serviceBackend(env,{operation:'nextAbsenceIntake'});
   if(!next.ok)throw rosterScheduledFailure(next);
@@ -632,7 +632,7 @@ export async function dispatchAbsenceIntake(env,{limit=2,budgetMs=180000}={}){
 }
 
 export async function dispatchPeerMail(env){
- if(!configuredSecret(gsisApiSecret(env,'ROSTER_SERVICE_SECRET')))return {configured:false};
+ if(!configuredSecret(gsisApiSecret(env)))return {configured:false};
  const result=await serviceBackend(env,{operation:'sendPeerMail',publicOrigin:publicOrigin(env),limit:6});
  if(!result.ok)throw rosterScheduledFailure({...result,operation:'sendPeerMail'});return result.data;
 }
@@ -671,7 +671,7 @@ export async function dispatchReceivedReports(env,{limit=8,budgetMs=150000}={}){
   if(context){const db=typeof context.db.withSession==='function'?context.db.withSession('first-primary'):context.db,now=Date.now(),row=await db.prepare("SELECT EXISTS (SELECT 1 FROM gsis_absence_transport WHERE namespace=? AND ((state='queued' AND available_at<=?) OR (state='claimed' AND lease_until<=?))) AS has_work").bind(context.namespace,now,now).first();
    // D1 applies captured attendance directly; nextAbsenceIntake has no second
    // queue in this authority. A newly arriving report is picked up next wake.
-   if(row?.has_work===0)return {transport:{enabled:true,claimed:0,forwarded:0,pending:0,needsReview:0},intake:{claimed:0,applied:0,deferred:0,needsReview:0,notificationsQueued:0,...(!configuredSecret(gsisApiSecret(env,'ROSTER_SERVICE_SECRET'))?{configured:false}:{})},duplicateRecovery:await recoverDuplicateIntake(env),hasMore:false};
+   if(row?.has_work===0)return {transport:{enabled:true,claimed:0,forwarded:0,pending:0,needsReview:0},intake:{claimed:0,applied:0,deferred:0,needsReview:0,notificationsQueued:0,...(!configuredSecret(gsisApiSecret(env))?{configured:false}:{})},duplicateRecovery:await recoverDuplicateIntake(env),hasMore:false};
   }
  }
  const started=Date.now(),transport=await forwardAbsenceTransport(env,{limit,budgetMs:Math.min(budgetMs,60000)});
@@ -741,8 +741,8 @@ function inboxConfiguration(env){
  // Presence and format only. Never expose values or infer live provider/cron health.
  const valid={WHATSAPP_ENABLED:env.WHATSAPP_ENABLED==='true',WHATSAPP_INBOX_MEDIA:!!env.WHATSAPP_INBOX_MEDIA,WHATSAPP_API_VERSION:/^v\d+\.\d+$/.test(env.WHATSAPP_API_VERSION||'')};
  for(const field of ['WHATSAPP_ACCOUNT_ID','WHATSAPP_PHONE_NUMBER_ID','WHATSAPP_TEMPLATE_ACCOUNT_ID'])valid[field]=/^\d{5,30}$/.test(env[field]||'');
- for(const field of ['WHATSAPP_APP_SECRET','WHATSAPP_VERIFY_TOKEN','WHATSAPP_ACCESS_TOKEN','ROSTER_SERVICE_SECRET'])valid[field]=configuredSecret(field==='ROSTER_SERVICE_SECRET'?gsisApiSecret(env,field):env[field]);
- const capture=['WHATSAPP_ENABLED','WHATSAPP_ACCOUNT_ID','WHATSAPP_PHONE_NUMBER_ID','WHATSAPP_APP_SECRET','WHATSAPP_VERIFY_TOKEN','ROSTER_SERVICE_SECRET'],replies=['WHATSAPP_ENABLED','WHATSAPP_PHONE_NUMBER_ID','WHATSAPP_API_VERSION','WHATSAPP_ACCESS_TOKEN','ROSTER_SERVICE_SECRET'];
+ for(const field of ['WHATSAPP_APP_SECRET','WHATSAPP_VERIFY_TOKEN','WHATSAPP_ACCESS_TOKEN','GSIS_SECRET'])valid[field]=configuredSecret(field==='GSIS_SECRET'?gsisApiSecret(env):env[field]);
+ const capture=['WHATSAPP_ENABLED','WHATSAPP_ACCOUNT_ID','WHATSAPP_PHONE_NUMBER_ID','WHATSAPP_APP_SECRET','WHATSAPP_VERIFY_TOKEN','GSIS_SECRET'],replies=['WHATSAPP_ENABLED','WHATSAPP_PHONE_NUMBER_ID','WHATSAPP_API_VERSION','WHATSAPP_ACCESS_TOKEN','GSIS_SECRET'];
  const groups={capture,replies,voice:[...replies,'WHATSAPP_INBOX_MEDIA'],images:[...replies,'WHATSAPP_INBOX_MEDIA'],templates:[...replies,'WHATSAPP_TEMPLATE_ACCOUNT_ID']};
  return {enabled:valid.WHATSAPP_ENABLED,liveVerified:false,...Object.fromEntries(Object.entries(groups).map(([key,fields])=>{const missing=fields.filter(field=>!valid[field]);return [key,{configured:missing.length===0,missing}];}))};
 }
@@ -1029,8 +1029,8 @@ function notificationConfig(env,requireEnabled=true,diagnostic=null){
   if(requireEnabled&&env.WHATSAPP_ENABLED!=='true')throw Error('Notifications are disabled.');
   field='WHATSAPP_PHONE_NUMBER_ID';if(!/^\d{5,30}$/.test(env[field]||''))throw Error('WhatsApp setup is incomplete.');
   field='WHATSAPP_API_VERSION';if(!/^v\d+\.\d+$/.test(env[field]||''))throw Error('WhatsApp setup is incomplete.');
-  for(field of ['WHATSAPP_ACCESS_TOKEN','WHATSAPP_APP_SECRET','ROSTER_SERVICE_SECRET','EXTERNAL_LINK_SECRET']){
-   if(!configuredSecret(field==='ROSTER_SERVICE_SECRET'?gsisApiSecret(env,field):env[field]))throw Error('WhatsApp setup is incomplete.');
+  for(field of ['WHATSAPP_ACCESS_TOKEN','WHATSAPP_APP_SECRET','GSIS_SECRET','EXTERNAL_LINK_SECRET']){
+   if(!configuredSecret(field==='GSIS_SECRET'?gsisApiSecret(env):env[field]))throw Error('WhatsApp setup is incomplete.');
   }
   field='ROSTER_PUBLIC_ORIGIN';publicOrigin(env);
   field='APPS_SCRIPT_URL';const endpoint=new URL(env[field]||'');
@@ -1257,8 +1257,8 @@ export async function enqueueNotificationWake(env,purpose='gsis-notification-wak
  if(!['gsis-notification-wake-v1','gsis-roster-import-wake-v1','gsis-roster-backup-wake-v1'].includes(purpose))throw Error('Invalid wake purpose.');
  if(!env.NOTIFICATION_DISPATCH_URL)return {queued:false,mode:'scheduled'};
  const url=new URL(env.NOTIFICATION_DISPATCH_URL);if(url.protocol!=='https:'||url.username||url.password||url.search||url.hash||url.pathname!=='/dispatch')throw Error('Invalid notification dispatcher URL.');
- if(!configuredSecret(gsisApiSecret(env,'ROSTER_SERVICE_SECRET')))throw Error('Notification wake secret is not configured.');
- const body=await sign({purpose,timestamp:Date.now(),nonce:crypto.randomUUID()},gsisApiSecret(env,'ROSTER_SERVICE_SECRET'));
+ if(!configuredSecret(gsisApiSecret(env)))throw Error('Notification wake secret is not configured.');
+ const body=await sign({purpose,timestamp:Date.now(),nonce:crypto.randomUUID()},gsisApiSecret(env));
  const response=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body),redirect:'manual',signal:AbortSignal.timeout(8000)});
  if(!response.ok)throw Error('Notification wake could not be queued. The scheduled worker will recover the durable intent.');
  return {queued:true,mode:'immediate'};
@@ -1470,7 +1470,7 @@ export async function dispatchDeliveryReviewReports(env,now=Date.now()){
  if(edgeRosterEnabled(env)&&!await edgeDispatchHasWork(env,'deliveryReview',date))return {reported:0,pending:0,date,alreadyReported:true};
  // This is only a warm-isolate read optimisation. The backend owns the durable
  // daily receipt and exact issue settlement across cold starts and other Workers.
- if(!edgeRosterEnabled(env)&&deliveryReportCompletion?.date===date&&deliveryReportCompletion.url===env.APPS_SCRIPT_URL&&deliveryReportCompletion.secret===gsisApiSecret(env,'ROSTER_SERVICE_SECRET'))return {reported:0,pending:0,date,alreadyReported:true};
+ if(!edgeRosterEnabled(env)&&deliveryReportCompletion?.date===date&&deliveryReportCompletion.url===env.APPS_SCRIPT_URL&&deliveryReportCompletion.secret===gsisApiSecret(env))return {reported:0,pending:0,date,alreadyReported:true};
  let monitor={state:'disabled',checkedAt:Date.now()};
  if(env.WHATSAPP_ENABLED==='true'){
   const diagnostic={};let config;
@@ -1489,7 +1489,7 @@ export async function dispatchDeliveryReviewReports(env,now=Date.now()){
  // template bodies, recipient numbers, provider payloads or private links.
  const result=await serviceBackend(env,{operation:'deliveryReviewMailDispatch',monitor});
  if(!result.ok)throw rosterScheduledFailure(result);
- if(result.data?.date===date&&(result.data.reported===1||result.data.alreadyReported===true))deliveryReportCompletion={date,url:env.APPS_SCRIPT_URL,secret:gsisApiSecret(env,'ROSTER_SERVICE_SECRET')};
+ if(result.data?.date===date&&(result.data.reported===1||result.data.alreadyReported===true))deliveryReportCompletion={date,url:env.APPS_SCRIPT_URL,secret:gsisApiSecret(env)};
  return result.data;
 }
 
@@ -1521,7 +1521,7 @@ export async function diagnoseNotificationConnections(env,scheduledTime=Date.now
   configuration.field='CALENDAR_APPS_SCRIPT_URL';
   const calendar=new URL(env.CALENDAR_APPS_SCRIPT_URL||'');
   if(calendar.protocol!=='https:'||calendar.hostname!=='script.google.com'||!/^\/macros\/s\/[^/]+\/exec$/.test(calendar.pathname))throw Error();
-  configuration.field='CALENDAR_PROXY_SECRET';if(!configuredSecret(gsisApiSecret(env,'CALENDAR_PROXY_SECRET')))throw Error();
+  configuration.field='GSIS_SECRET';if(!configuredSecret(gsisApiSecret(env)))throw Error();
  }catch(error){if(error?.code==='GSIS_SECRET_INVALID')configuration.field='GSIS_SECRET';return {diagnosticBuild,enabled:true,readOnly:true,connectionsReady:false,sendingTested:false,checks:[{name:'configuration',ok:false,code:'CONFIGURATION_INCOMPLETE',field:configuration.field,reason:env[configuration.field]===undefined||env[configuration.field]===null||env[configuration.field]===''?'MISSING_OR_EMPTY':'INVALID_VALUE'}]};}
  const checks=await Promise.all([
   (async()=>{

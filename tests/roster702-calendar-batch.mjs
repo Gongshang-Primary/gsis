@@ -39,7 +39,8 @@ assert.equal(calendarPost({action:'rosterDate',payload:{date:keys[0]},service:'g
 assert.equal(h.audit.writes,beforeWrites);assert.equal(h.audit.calendarCalls.length,0);
 
 const gateway=await import(toWorkerModuleURL('data:text/javascript;base64,'+Buffer.from(fs.readFileSync('roster-update/public/_worker.js','utf8')).toString('base64')));
-const env={APPS_SCRIPT_URL:'https://script.google.com/macros/s/roster-test/exec',BRIDGE_SECRET:'s'.repeat(40),CALENDAR_APPS_SCRIPT_URL:'https://script.google.com/macros/s/calendar-test/exec',CALENDAR_PROXY_SECRET:'synthetic-secret'.repeat(3)},who={email:'teacher@gsps.edu.sg',subject:'teacher'};
+const env={APPS_SCRIPT_URL:'https://script.google.com/macros/s/roster-test/exec',GSIS_SECRET:'s'.repeat(40),CALENDAR_APPS_SCRIPT_URL:'https://script.google.com/macros/s/calendar-test/exec',CALENDAR_PROXY_SECRET:'synthetic-secret'.repeat(3)},who={email:'teacher@gsps.edu.sg',subject:'teacher'};
+h.props.set('GSIS_SECRET',env.GSIS_SECRET); // Align the synthetic Calendar peer with the migrated Roster caller.
 const input={operation:'saveAbsence',date:keys[0],from:keys[0],to:keys.at(-1),revision:4,requestId:crypto.randomUUID(),calendarByDate:{[keys[0]]:{date:keys[0],schoolDay:false,parity:'odd'}}};
 const oldFetch=globalThis.fetch,oldTimeout=AbortSignal.timeout,oldInfo=console.info;
 let calls=[];
@@ -54,13 +55,13 @@ try{
  assert.equal(calls.length,1);assert.equal(Object.keys(trusted.calendarByDate).length,62);assert.equal(trusted.calendarByDate[keys[0]].schoolDay,true);assert.equal(trusted.calendarByDate[keys[0]].available,true);assert.equal(trusted.requestId,input.requestId);assert.equal(trusted.revision,4);
  // Round trip through the authenticated Worker and actual Calendar HTTP
  // boundary: one Calendar request, then one signed Deploy request.
- const origin='https://roster.test',issued=Date.now(),session=await gateway.sign({purpose:'gsis-session-v1',origin,...who,issued,expires:issued+60000},env.BRIDGE_SECRET+'|gsis-browser-session-v1|'+origin),cookie='__Host-gsis_session='+Buffer.from(session.payload).toString('base64url')+'.'+session.signature;
+ const origin='https://roster.test',issued=Date.now(),session=await gateway.sign({purpose:'gsis-session-v1',origin,...who,issued,expires:issued+60000},env.GSIS_SECRET+'|gsis-browser-session-v1|'+origin),cookie='__Host-gsis_session='+Buffer.from(session.payload).toString('base64url')+'.'+session.signature;
  let endToEndDeadlines=[];AbortSignal.timeout=ms=>{endToEndDeadlines.push(ms);return oldTimeout(ms);};calls=[];console.info=()=>{};
  globalThis.fetch=async(url,options)=>{
   calls.push(String(url));
   if(String(url)===env.CALENDAR_APPS_SCRIPT_URL)return new Response(h.sandbox.doPost({postData:{contents:options.body}}).text);
   assert.equal(String(url),env.APPS_SCRIPT_URL);const envelope=JSON.parse(options.body),command=JSON.parse(envelope.payload);
-  assert.equal(envelope.signature,(await gateway.sign(command,env.BRIDGE_SECRET)).signature);assert.equal(command.input.requestId,input.requestId);assert.equal(command.input.revision,input.revision);assert.equal(Object.keys(command.input.calendarByDate).length,62);assert.equal(command.input.calendarByDate[keys[0]].schoolDay,true);
+  assert.equal(envelope.signature,(await gateway.sign(command,env.GSIS_SECRET)).signature);assert.equal(command.input.requestId,input.requestId);assert.equal(command.input.revision,input.revision);assert.equal(Object.keys(command.input.calendarByDate).length,62);assert.equal(command.input.calendarByDate[keys[0]].schoolDay,true);
   return Response.json({ok:true,data:{revision:5}});
  };
  const response=await gateway.default.fetch(new Request(origin+'/api/operations',{method:'POST',headers:{Origin:origin,Cookie:cookie},body:JSON.stringify(input)}),env);

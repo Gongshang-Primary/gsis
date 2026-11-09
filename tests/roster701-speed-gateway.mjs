@@ -5,8 +5,8 @@ import {webcrypto} from 'node:crypto';
 globalThis.crypto??=webcrypto;
 const source=fs.readFileSync(process.env.ROSTER_GATEWAY_SOURCE||'roster-update/public/_worker.js','utf8');
 const M=await import(toWorkerModuleURL('data:text/javascript;base64,'+Buffer.from(source).toString('base64')));
-const origin='https://roster.test',date='2026-10-15',env={APPS_SCRIPT_URL:'https://script.google.com/macros/s/roster/exec',BRIDGE_SECRET:'b'.repeat(40),CALENDAR_APPS_SCRIPT_URL:'https://script.google.com/macros/s/calendar/exec',CALENDAR_PROXY_SECRET:'c'.repeat(40)};
-const now=Date.now(),signed=await M.sign({purpose:'gsis-session-v1',origin,email:'teacher@gsps.edu.sg',subject:'teacher',issued:now,expires:now+60000},env.BRIDGE_SECRET+'|gsis-browser-session-v1|'+origin);
+const origin='https://roster.test',date='2026-10-15',env={APPS_SCRIPT_URL:'https://script.google.com/macros/s/roster/exec',GSIS_SECRET:'b'.repeat(40),CALENDAR_APPS_SCRIPT_URL:'https://script.google.com/macros/s/calendar/exec',CALENDAR_PROXY_SECRET:'c'.repeat(40)};
+const now=Date.now(),signed=await M.sign({purpose:'gsis-session-v1',origin,email:'teacher@gsps.edu.sg',subject:'teacher',issued:now,expires:now+60000},env.GSIS_SECRET+'|gsis-browser-session-v1|'+origin);
 const cookie='__Host-gsis_session='+Buffer.from(signed.payload).toString('base64url')+'.'+signed.signature;
 let calls=[],forwarded=[],revision=1,calendarDown=false;
 globalThis.fetch=async(url,options)=>{
@@ -18,7 +18,7 @@ globalThis.fetch=async(url,options)=>{
   return Response.json({ok:true,result:envelope.action==='rosterDates'?{dates:envelope.payload.dates.map(date=>({date,schoolDay:true,parity:'odd'}))}:{date:envelope.payload.date,schoolDay:true,parity:'odd'}});
  }
  const payload=JSON.parse(envelope.payload);forwarded.push(payload);
- assert.equal((await M.sign(payload,env.BRIDGE_SECRET)).signature,envelope.signature);
+ assert.equal((await M.sign(payload,env.GSIS_SECRET)).signature,envelope.signature);
  assert.equal(payload.identity.email,'teacher@gsps.edu.sg');
  return Response.json({ok:true,data:{revision}});
 };

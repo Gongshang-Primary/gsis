@@ -6,8 +6,9 @@ import {webcrypto} from 'node:crypto';
 globalThis.crypto??=webcrypto;
 const require=createRequire(import.meta.url),{makeHarness}=require('./calendar/backend_harness.cjs'),h=makeHarness();
 const gateway=await import(toWorkerModuleURL('data:text/javascript;base64,'+Buffer.from(fs.readFileSync('roster-update/public/_worker.js','utf8')).toString('base64')));
-const origin='https://roster.test',env={APPS_SCRIPT_URL:'https://script.google.com/macros/s/absence-year-roster/exec',BRIDGE_SECRET:'synthetic-bridge-secret-'.repeat(3),CALENDAR_APPS_SCRIPT_URL:'https://script.google.com/macros/s/absence-year-calendar/exec',CALENDAR_PROXY_SECRET:'synthetic-secret'.repeat(3)},who={email:'teacher@gsps.edu.sg',subject:'synthetic-teacher'};
-const issued=Date.now(),session=await gateway.sign({purpose:'gsis-session-v1',origin,...who,issued,expires:issued+60000},env.BRIDGE_SECRET+'|gsis-browser-session-v1|'+origin),cookie='__Host-gsis_session='+Buffer.from(session.payload).toString('base64url')+'.'+session.signature;
+const origin='https://roster.test',env={APPS_SCRIPT_URL:'https://script.google.com/macros/s/absence-year-roster/exec',GSIS_SECRET:'synthetic-bridge-secret-'.repeat(3),CALENDAR_APPS_SCRIPT_URL:'https://script.google.com/macros/s/absence-year-calendar/exec',CALENDAR_PROXY_SECRET:'synthetic-secret'.repeat(3)},who={email:'teacher@gsps.edu.sg',subject:'synthetic-teacher'};
+h.props.set('GSIS_SECRET',env.GSIS_SECRET); // Align the synthetic Calendar peer with the migrated Roster caller.
+const issued=Date.now(),session=await gateway.sign({purpose:'gsis-session-v1',origin,...who,issued,expires:issued+60000},env.GSIS_SECRET+'|gsis-browser-session-v1|'+origin),cookie='__Host-gsis_session='+Buffer.from(session.payload).toString('base64url')+'.'+session.signature;
 const days=(from,to)=>Array.from({length:(Date.parse(to)-Date.parse(from))/86400000+1},(_,n)=>new Date(Date.parse(from)+n*86400000).toISOString().slice(0,10));
 const yearly={operation:'saveAbsence',date:'2028-01-01',from:'2028-01-01',to:'2028-12-31',staffId:'alice',staffIds:['alice','bob'],typeId:'parental',periods:[2,3],reliefRequired:true,revision:7,requestId:crypto.randomUUID(),instructionsByStaffDate:{alice:{'2028-01-03':{'lesson-a':'Use the shared workbook.'}},bob:{'2028-01-03':{'lesson-b':'Complete pages 1–3.'}}}};
 const released=year=>({Year:year,Status:'ACTIVE',ReleasedToTeachers:'Yes'}),baseYears=[released(2026),released(2027),released(2028),released(2029)];
@@ -23,13 +24,13 @@ try{
  globalThis.fetch=async(url,options)=>{
   if(String(url)===env.CALENDAR_APPS_SCRIPT_URL){
    const body=JSON.parse(options.body),dates=body.action==='rosterDates'?body.payload.dates:[body.payload.date];
-   assert(['rosterDate','rosterDates'].includes(body.action));assert(dates.length<=62);assert.equal(body.actor.email,who.email);assert.equal(body.proxySecret,env.CALENDAR_PROXY_SECRET);
+   assert(['rosterDate','rosterDates'].includes(body.action));assert(dates.length<=62);assert.equal(body.actor.email,who.email);assert.equal(body.proxySecret,env.GSIS_SECRET);
    calls.push({kind:'calendar',dates,bytes:Buffer.byteLength(options.body)});
    let result=JSON.parse(h.sandbox.doPost({postData:{contents:options.body}}).text);if(responseTransform)result=responseTransform(result,body);
    return Response.json(result);
   }
   assert.equal(String(url),env.APPS_SCRIPT_URL,'fixture forbids live or unexpected endpoints');
-  const envelope=JSON.parse(options.body),command=JSON.parse(envelope.payload);assert.equal(envelope.signature,(await gateway.sign(command,env.BRIDGE_SECRET)).signature);assert.equal(command.action,'rosterOperations');assert.equal(command.identity.email,who.email);
+  const envelope=JSON.parse(options.body),command=JSON.parse(envelope.payload);assert.equal(envelope.signature,(await gateway.sign(command,env.GSIS_SECRET)).signature);assert.equal(command.action,'rosterOperations');assert.equal(command.identity.email,who.email);
   calls.push({kind:'backend',bytes:Buffer.byteLength(options.body),characters:options.body.length});backendCommands.push(command);
   return Response.json({ok:true,data:{revision:8,savedIds:['synthetic-accepted-batch'],requestId:command.input.requestId}});
  };

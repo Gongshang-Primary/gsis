@@ -16,7 +16,7 @@ async function fixture(jobs={},properties={}){
  const store=GSiSEdgeStore.open(db,'deploy'),state={index:{versions:[],active:null,published:null,publicationSchema:1,revision:0,requests:[]},drafts:{},publications:{},receipts:{},deltas:{},leases:{},properties,jobs};
  const imported=await store.importState({state,actor:identity.email,requestId:crypto.randomUUID(),source:{test:true}});
  await store.transition({from:'imported',to:'active',expectedRevision:imported.revision,actor:identity.email,proof:{legacyWritesDisabled:true,sourceDigest:imported.sourceDigest,verifiedRecords:imported.importedRecords}});
- const env={GSIS_JOBS:db,DEPLOY_EDGE_AUTHORITY:'d1',APPS_SCRIPT_URL:'https://script.google.com/macros/s/test/exec',BRIDGE_SECRET:'x'.repeat(32)};
+ const env={GSIS_JOBS:db,DEPLOY_EDGE_AUTHORITY:'d1',APPS_SCRIPT_URL:'https://script.google.com/macros/s/test/exec',GSIS_SECRET:'x'.repeat(32)};
  const reset=()=>{events.length=0;sessions.length=0;};reset();
  return {sql,db,store,env,events,sessions,reset,setAfterPreflight(fn){afterPreflight=fn;},setFailPreflight(){failPreflight=true;},close:()=>sql.close()};
 }

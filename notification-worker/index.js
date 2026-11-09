@@ -9,15 +9,15 @@ import {readRosterCutoverFreeze} from '../shared/roster-cutover-freeze.js';
 const quietMode=(db,at)=>typeof readQuietMode==='function'?readQuietMode(db,at):Promise.resolve({active:false});
 import {dispatchNotifications,scheduledRoster,diagnoseNotificationConnections,dispatchInboxPending,dispatchWebhookJobs,dispatchReceivedReports,dispatchPeerMail,dispatchAllocationAudit,dispatchVenuesSync,dispatchGoogleBackup,dispatchDriveOutputs,dispatchDailyOutputs,dispatchRosterImports,dispatchReferencesRefresh} from '../roster-update/public/_worker.js';
 /* GSIS_API_SECRET_BEGIN */
-// First-party API credentials share one operator-selected setting. Browser
-// sessions, private relief links and third-party credentials stay independent.
-function gsisApiSecret(env,legacyName){
+// Roster/Deploy transport requires one setting without legacy fallback.
+// Browser sessions retain their existing purpose- and origin-bound derivation.
+function gsisApiSecret(env){
  const value=env?.GSIS_SECRET;
- if(value!==undefined||Object.prototype.hasOwnProperty.call(env||{},'GSIS_SECRET')){
-  if(typeof value!=='string'||!/^[!-~]{32,8000}$/.test(value))throw Object.assign(Error('GSIS_SECRET must contain 32 to 8000 printable ASCII characters without spaces.'),{status:503,code:'GSIS_SECRET_INVALID'});
-  return value;
+ if(typeof value!=='string'||!/^[!-~]{32,8000}$/.test(value)){
+  throw Object.assign(Error('GSIS_SECRET must contain 32 to 8000 printable ASCII characters without spaces.'),
+   {status:503,code:'GSIS_SECRET_INVALID'});
  }
- return env?.[legacyName];
+ return value;
 }
 
 /* GSIS_API_SECRET_END */
@@ -167,7 +167,7 @@ export default {
   env=(typeof resolveRosterAuthorityEnvironment==='function'?await resolveRosterAuthorityEnvironment(env):rosterRecoveryEnvironment(env));
   if(new URL(req.url).pathname!=='/dispatch'||req.method!=='POST')return new Response('Not found',{status:404,headers:{'Cache-Control':'no-store'}});
   try{writable(env);}catch{return Response.json({ok:false,error:'Background work is paused for recovery.'},{status:503,headers:{'Cache-Control':'no-store'}});}
-  let serviceSecret;try{serviceSecret=gsisApiSecret(env,'ROSTER_SERVICE_SECRET');}catch(error){return Response.json({ok:false,code:error.code,error:error.message},{status:503,headers:{'Cache-Control':'no-store'}});}
+  let serviceSecret;try{serviceSecret=gsisApiSecret(env);}catch(error){return Response.json({ok:false,code:error.code,error:error.message},{status:503,headers:{'Cache-Control':'no-store'}});}
   if(!env.NOTIFICATION_QUEUE||typeof serviceSecret!=='string'||serviceSecret.length<32)return Response.json({ok:false,error:'Immediate notification queue is not configured.'},{status:503});
   try{
    const text=await req.text();if(text.length>4096)throw Error();const envelope=JSON.parse(text);

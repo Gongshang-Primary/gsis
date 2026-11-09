@@ -5,7 +5,7 @@ import {webcrypto} from 'node:crypto';
 globalThis.crypto??=webcrypto;
 process.on('uncaughtException',error=>{console.error(error.stack.replace(/data:text\/javascript;base64,[A-Za-z0-9+/=]+/g,'worker-source'));process.exitCode=1;});
 const M=await import(toWorkerModuleURL('data:text/javascript;base64,'+Buffer.from(fs.readFileSync('roster-update/public/_worker.js','utf8')).toString('base64')));
-const env={APPS_SCRIPT_URL:'https://script.google.com/macros/s/roster/exec',BRIDGE_SECRET:'fixture-bridge-'.repeat(4),ROSTER_SERVICE_SECRET:'fixture-service-'.repeat(4),CALENDAR_APPS_SCRIPT_URL:'https://script.google.com/macros/s/calendar/exec',CALENDAR_PROXY_SECRET:'fixture-calendar-'.repeat(4)},who={email:'alice@gsps.edu.sg',subject:'alice'},date='2026-10-26',requestId='11111111-1111-4111-8111-111111111111';
+const env={APPS_SCRIPT_URL:'https://script.google.com/macros/s/roster/exec',GSIS_SECRET:'fixture-bridge-'.repeat(4),ROSTER_SERVICE_SECRET:'fixture-service-'.repeat(4),CALENDAR_APPS_SCRIPT_URL:'https://script.google.com/macros/s/calendar/exec',CALENDAR_PROXY_SECRET:'fixture-calendar-'.repeat(4)},who={email:'alice@gsps.edu.sg',subject:'alice'},date='2026-10-26',requestId='11111111-1111-4111-8111-111111111111';
 let calls=[];
 globalThis.fetch=async()=>{throw Error('Capture must not call Calendar');};
 const capture=await M.trustedOperationsInput({operation:'saveAbsence',intake:true,requestId,from:'2026-01-01',to:'2026-12-31',fullDay:true,calendarByDate:{forged:true},identity:{email:'forged'},service:'forged'},env,who);

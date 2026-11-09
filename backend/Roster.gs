@@ -94,7 +94,7 @@ function deployWebAppUrl_(){
 function rosterDiagnosticBuild_(){return GSIS_DEPLOY_VERSION+'-roster-diag1';}
 function rosterDiagnosticText_(value){
  let text=String(value||'');
- try{const p=props_();for(const key of ['GSIS_SECRET','BRIDGE_SECRET','CONTACTS_BRIDGE_SECRET']){const secret=p.getProperty(key);if(secret)text=text.split(secret).join('[secret]');}}catch(ignore){}
+ try{const p=props_();for(const key of ['GSIS_SECRET']){const secret=p.getProperty(key);if(secret)text=text.split(secret).join('[secret]');}}catch(ignore){}
  return text.replace(/https?:\/\/\S+/gi,'[URL]').replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi,'[email]').replace(/[A-Za-z0-9_+/=-]{28,}/g,'[identifier]').slice(0,900);
 }
 function rosterDiagnosticError_(error){
@@ -102,7 +102,7 @@ function rosterDiagnosticError_(error){
  if(error?.rosterDrive)return error.message;
  if(['DEPLOY_URL_CONFIGURATION','GSIS_SECRET_INVALID'].includes(error?.code))return error.message;
  const message=String(error?.message||error||'');
- const safe=['Relief records are full. Ask Admin to review storage capacity before retrying this same report.','Invalid request','Invalid signature','Expired request','Invalid identity','Request too large','Run setupDeploy.','Configure Contacts API connection in Deploy Script Properties.','Contacts returned an invalid response. Check its existing web-app deployment and access settings; your draft is retained.','Contacts did not return verified Roster authority. Update the existing Contacts web app deployment.','Roster register needs review.','Another save is running. Retry this save.','SMC membership is required to manage baseline timetables.','BRIDGE_SECRET is missing or too short.','CONTACTS_API_URL must be the existing Contacts /exec URL.','CONTACTS_BRIDGE_SECRET is missing or too short.','Run this check using the school account that owns the deployment.','Contacts did not return boolean rosterSMC. Check its deployed version.','No published /exec URL was found for this script.'];
+ const safe=['Relief records are full. Ask Admin to review storage capacity before retrying this same report.','Invalid request','Invalid signature','Expired request','Invalid identity','Request too large','Run setupDeploy.','Configure Contacts API connection in Deploy Script Properties.','Contacts returned an invalid response. Check its existing web-app deployment and access settings; your draft is retained.','Contacts did not return verified Roster authority. Update the existing Contacts web app deployment.','Roster register needs review.','Another save is running. Retry this save.','SMC membership is required to manage baseline timetables.','GSIS_SECRET is missing or invalid.','CONTACTS_API_URL must be the existing Contacts /exec URL.','CONTACTS_GSIS_SECRET is missing or invalid.','Run this check using the school account that owns the deployment.','Contacts did not return boolean rosterSMC. Check its deployed version.','No published /exec URL was found for this script.'];
  if(safe.includes(message))return message;
  if(error?.name==='SyntaxError')return 'Invalid JSON or script syntax. See the phase and source location.';
  if(/permission|access denied|authoriz|scope|not have access/i.test(message))return 'Google service access or authorisation failed. Check the deployment account and permissions.';
@@ -156,15 +156,15 @@ function diagnoseRoster(){
  const report={backendVersion:GSIS_DEPLOY_VERSION,diagnosticBuild:rosterDiagnosticBuild_(),readOnly:true,checks:[],recent:showRosterDiagnostics()};
  const check=(name,fn)=>{try{const value=fn();report.checks.push({name,ok:true,...value});return value;}catch(e){report.checks.push({name,ok:false,status:e.status||null,...(e.code==='DEPLOY_URL_CONFIGURATION'?{category:'configuration'}:{}),message:rosterDiagnosticError_(e),...(e.rosterDrive?{drive:e.rosterDrive}:{})});return null;}};
  try{
-  check('Connection settings',()=>{const p=props_();if((gsisApiSecret_('BRIDGE_SECRET')||'').length<32)throw Error('BRIDGE_SECRET is missing or too short.');if(!/^https:\/\/script\.google\.com\/macros\/s\/[^/]+\/exec$/.test(p.getProperty('CONTACTS_API_URL')||''))throw Error('CONTACTS_API_URL must be the existing Contacts /exec URL.');if((gsisApiSecret_('CONTACTS_BRIDGE_SECRET')||'').length<32)throw Error('CONTACTS_BRIDGE_SECRET is missing or too short.');return {configured:true};});
+  check('Connection settings',()=>{const p=props_();if((gsisApiSecret_()||'').length<32)throw Error('GSIS_SECRET is missing or invalid.');if(!/^https:\/\/script\.google\.com\/macros\/s\/[^/]+\/exec$/.test(p.getProperty('CONTACTS_API_URL')||''))throw Error('CONTACTS_API_URL must be the existing Contacts /exec URL.');if((gsisApiSecret_()||'').length<32)throw Error('CONTACTS_GSIS_SECRET is missing or invalid.');return {configured:true};});
   const identity=check('Editor school identity',()=>{const email=Session.getEffectiveUser().getEmail().toLowerCase();if(!/^[^@\s]+@gsps\.edu\.sg$/.test(email))throw Error('Run this check using the school account that owns the deployment.');return {identity:{email,subject:email}};});
   // Remove the identity immediately; it is used only in the signed read requests.
   const who=identity?.identity;if(identity)delete report.checks[report.checks.length-1].identity;
   if(who)check('Contacts Roster authority',()=>{const c=contacts_(who,false,'deploySnapshot',{authorityOnly:true,rosterAuthority:true});if(typeof c?.user?.rosterSMC!=='boolean')throw Error('Contacts did not return boolean rosterSMC. Check its deployed version.');return {accessVerified:true,smc:c.user.rosterSMC};});
   check('Roster folders and register',()=>{for(const id of [ROSTER_ROOT,ROSTER_ARCHIVE,ROSTER_DATA])rosterFolder_(id);const index=rosterIndex_();return {revision:index.revision,timetables:index.entries.length};});
   if(who)check('Published Roster profile',()=>{
-   const url=deployWebAppUrl_(),secret=gsisApiSecret_('BRIDGE_SECRET');
-   if(!secret||secret.length<32)throw Error('BRIDGE_SECRET is missing or too short.');
+   const url=deployWebAppUrl_(),secret=gsisApiSecret_();
+   if(!secret||secret.length<32)throw Error('GSIS_SECRET is missing or invalid.');
    const diagnosticId=Utilities.getUuid(),payload=JSON.stringify({action:'rosterProfile',input:{},identity:who,timestamp:Date.now(),nonce:diagnosticId,traceId:diagnosticId});
    const response=UrlFetchApp.fetch(url,{method:'post',contentType:'application/json',payload:JSON.stringify({payload,signature:signature_(payload,secret)}),muteHttpExceptions:true,followRedirects:true}),raw=response.getContentText();
    let result;try{result=JSON.parse(raw);}catch(e){return {ok:false,diagnosticId,httpStatus:response.getResponseCode(),format:/^\s*</.test(raw)?'html':'invalid-json',message:'Published app returned no JSON envelope. Check its web app access and deployment.'};}

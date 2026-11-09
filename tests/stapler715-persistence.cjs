@@ -4,7 +4,7 @@ const S=require('../shared/roster-stapler.js'),O=require('../shared/roster-opera
 const source=fs.readFileSync(path.join(root,'backend/Code.gs'),'utf8'),post=source.slice(source.indexOf('function doPost(e){'),source.indexOf('\nfunction auth_',source.indexOf('function doPost(e){')));
 function blob(value,type,name){const bytes=Buffer.from(value);return {getBytes:()=>[...bytes],getDataAsString:()=>bytes.toString('utf8'),getContentType:()=>type,getName:()=>name};}
 function harness(day,people){
- const dir=fs.mkdtempSync(path.join(os.tmpdir(),'gsis715-save-')),file=path.join(dir,'operations.json'),secret='715-regression-secret-'.repeat(3),properties=new Map([['BRIDGE_SECRET',secret],['ROSTER_OPERATIONS_FILE','ops-file']]);
+ const dir=fs.mkdtempSync(path.join(os.tmpdir(),'gsis715-save-')),file=path.join(dir,'operations.json'),secret='715-regression-secret-'.repeat(3),properties=new Map([["GSIS_SECRET",secret],['ROSTER_OPERATIONS_FILE','ops-file']]);
  fs.writeFileSync(file,JSON.stringify(O.initial()));let reads=0,writes=0,failWrite=false,loseResponse=false;
  const now=Date.parse(day.date+'T06:00:00+08:00'),identity={email:'admin@gsps.edu.sg',subject:'verified-test-subject'},contacts={user:{rosterStaffId:people[0].id,rosterSMC:true,rosterAdmin:true},rosterPeople:people,rosterSMCIds:[people[0].id],rosterAdminIds:[people[0].id]};
  const context={today:day.date,now,iso:new Date(now).toISOString(),minute:360,user:{...identity,staffId:people[0].id,smc:true,admin:true},people,days:{[day.date]:day},baselineDays:{[day.date]:day},timetableEntries:[{id:day.id,from:'2026-01-01',to:'2026-12-31'}],uuid:crypto.randomUUID,smcIds:[people[0].id],notificationsConfigured:false,adminRecipients:[]};

@@ -3,10 +3,10 @@ const fs=require('node:fs'),vm=require('node:vm'),crypto=require('node:crypto'),
 const contacts=require('./contacts-data.cjs'),deploy=require('./storage.cjs'),secret='fixture-lord-service-key-32-characters';contacts.ctx.console={...console,info(){},error(){}};deploy.ctx.console={...console,info(){},error(){},log(){}};
 const signed=(source,input={operation:'manifest'},changes={})=>{const payload=JSON.stringify({action:'lordService',service:'gsis-lord-v1',source,timestamp:Date.now(),nonce:crypto.randomUUID(),input,...changes});return {postData:{contents:JSON.stringify({payload,signature:crypto.createHmac('sha256',secret).update(payload).digest('hex')})}};};
 for(const h of [contacts,deploy]){
- h.props.set('LORD_BRIDGE_SECRET',secret);h.ctx.Utilities.computeHmacSha256Signature=(s,k)=>[...crypto.createHmac('sha256',k).update(s).digest()];h.ctx.ContentService={MimeType:{JSON:'json'},createTextOutput:text=>({text,setMimeType(){return this;}})};
+ h.props.set('LORD_BRIDGE_SECRET',secret);h.props.set('GSIS_SECRET',secret);h.ctx.Utilities.computeHmacSha256Signature=(s,k)=>[...crypto.createHmac('sha256',k).update(s).digest()];h.ctx.ContentService={MimeType:{JSON:'json'},createTextOutput:text=>({text,setMimeType(){return this;}})};
  for(const file of ['backend/LordBridge.gs',h===contacts?'backend/Contacts_Lord.gs':'backend/LordDeploy.gs'])vm.runInContext(fs.readFileSync(file,'utf8'),h.ctx);
 }
-contacts.props.set('GSIS_SECRET',secret); // Only the migrated Contacts provider changes its configuration name.
+contacts.props.set('GSIS_SECRET',secret); // Migrated Contacts and Deploy providers use the canonical setting; LORD product code stays unchanged.
 const call=(h,event)=>{h.ctx.lordEvent=event;return JSON.parse(vm.runInContext('doPost(lordEvent).text',h.ctx));};
 let checks=0;const test=(name,fn)=>{try{fn();checks++;console.log('PASS',name);}catch(e){console.error('FAIL',name);throw e;}};
 const contactsPost=(input,changes)=>call(contacts,signed('contacts',input,changes)),deployPost=(input,changes)=>call(deploy,signed('deploy',input,changes));
@@ -67,7 +67,7 @@ test('class labels use the exact published classKey convention without a second 
  const reader=deploy.ctx.lordDeployDocument_;let expected;deploy.ctx.lordDeployDocument_=(...args)=>{const d=reader(...args);d.classes[0].shortName='1A';d.classes[0].level='1';expected={id:d.classes[0].ref,name:'11A'};return d;};const r=deployPost({operation:'snapshot'});assert.equal(r.ok,true,JSON.stringify(r));assert.equal(r.data.classes.find(c=>c.id===expected.id).name,expected.name);deploy.ctx.lordDeployDocument_=reader;
 });
 test('the Roster build cannot serve the Deploy source even with a valid LORD signature',()=>{
- let opens=0;const context=vm.createContext({console:{info(){},error(){},log(){}},PropertiesService:{getScriptProperties:()=>({getProperty:key=>key==='LORD_BRIDGE_SECRET'?secret:null})},Utilities:deploy.ctx.Utilities,ContentService:deploy.ctx.ContentService,SpreadsheetApp:{openById(){opens++;throw Error('Wrong backend must not open a workbook');}}});
+ let opens=0;const context=vm.createContext({console:{info(){},error(){},log(){}},PropertiesService:{getScriptProperties:()=>({getProperty:key=>key==='GSIS_SECRET'?secret:null})},Utilities:deploy.ctx.Utilities,ContentService:deploy.ctx.ContentService,SpreadsheetApp:{openById(){opens++;throw Error('Wrong backend must not open a workbook');}}});
  vm.runInContext(fs.readFileSync('backend/Code.gs','utf8').replace("const GSIS_BACKEND_KIND='deploy';","const GSIS_BACKEND_KIND='roster';"),context);context.event=signed('deploy');const r=JSON.parse(vm.runInContext('doPost(event).text',context));assert.equal(r.ok,false);assert.equal(r.status,503);assert.equal(opens,0);
 });
 console.log('PASS '+checks+' signed LORD source contracts.');

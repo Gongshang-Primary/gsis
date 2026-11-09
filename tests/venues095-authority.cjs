@@ -2,7 +2,7 @@
 const assert=require('node:assert/strict'),vm=require('node:vm'),fs=require('node:fs'),crypto=require('node:crypto');
 const {ctx,book,props}=require('./storage.cjs'),copy=x=>JSON.parse(JSON.stringify(x));
 ctx.console={log(){},info(){},warn(){},error(){}};
-const secret='fixture-physical-room-source-32-characters';props.set('VENUES_BRIDGE_SECRET',secret);props.set('LORD_BRIDGE_SECRET',secret);
+const secret='fixture-physical-room-source-32-characters';props.set('VENUES_BRIDGE_SECRET',secret);props.set('GSIS_SECRET',secret);props.set('LORD_BRIDGE_SECRET',secret);
 ctx.ContentService={MimeType:{JSON:'json'},createTextOutput:text=>({text,setMimeType(){return this;}})};
 ctx.Utilities.computeHmacSha256Signature=(s,k)=>[...crypto.createHmac('sha256',k).update(s).digest()];
 const signed=(action,service,input)=>{const payload=JSON.stringify({action,service,source:'deploy',timestamp:Date.now(),nonce:crypto.randomUUID(),input});return {postData:{contents:JSON.stringify({payload,signature:crypto.createHmac('sha256',secret).update(payload).digest('hex')})}};};

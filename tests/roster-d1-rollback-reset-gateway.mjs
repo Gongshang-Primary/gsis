@@ -3,8 +3,8 @@ import {createRequire} from 'node:module';
 import {createHmac} from 'node:crypto';
 import gateway from '../roster-update/public/_worker.js';
 const require=createRequire(import.meta.url),database=require('./helpers/chunked-import-db.cjs'),Store=require('../shared/edge-store.js'),db=database(),previousFetch=globalThis.fetch;
-const env={GSIS_JOBS:db,ROSTER_D1_PREPARE:'import',ROSTER_EDGE_AUTHORITY:'legacy',ROSTER_PUBLIC_ORIGIN:'https://roster.gsps.edu.sg',APPS_SCRIPT_URL:'https://script.google.com/macros/s/reset-gateway/exec',BRIDGE_SECRET:'b'.repeat(40),ROSTER_SERVICE_SECRET:'s'.repeat(40),GOOGLE_CLIENT_ID:'fixture-client'};
-const now=Date.now(),session=JSON.stringify({purpose:'gsis-session-v1',origin:env.ROSTER_PUBLIC_ORIGIN,email:'admin@gsps.edu.sg',subject:'admin',issued:now,expires:now+3600000}),signature=createHmac('sha256',env.BRIDGE_SECRET+'|gsis-browser-session-v1|'+env.ROSTER_PUBLIC_ORIGIN).update(session).digest('hex'),cookie='__Host-gsis_session='+Buffer.from(session).toString('base64url')+'.'+signature;
+const env={GSIS_JOBS:db,ROSTER_D1_PREPARE:'import',ROSTER_EDGE_AUTHORITY:'legacy',ROSTER_PUBLIC_ORIGIN:'https://roster.gsps.edu.sg',APPS_SCRIPT_URL:'https://script.google.com/macros/s/reset-gateway/exec',GSIS_SECRET:'b'.repeat(40),ROSTER_SERVICE_SECRET:'s'.repeat(40),GOOGLE_CLIENT_ID:'fixture-client'};
+const now=Date.now(),session=JSON.stringify({purpose:'gsis-session-v1',origin:env.ROSTER_PUBLIC_ORIGIN,email:'admin@gsps.edu.sg',subject:'admin',issued:now,expires:now+3600000}),signature=createHmac('sha256',env.GSIS_SECRET+'|gsis-browser-session-v1|'+env.ROSTER_PUBLIC_ORIGIN).update(session).digest('hex'),cookie='__Host-gsis_session='+Buffer.from(session).toString('base64url')+'.'+signature;
 let admin=false,fenced=false;
 const send=async(auth=true)=>{const response=await gateway.fetch(new Request(env.ROSTER_PUBLIC_ORIGIN+'/api/edge/migration',{method:'POST',headers:{Origin:env.ROSTER_PUBLIC_ORIGIN,'Content-Type':'application/json',...(auth?{Cookie:cookie}:{})},body:JSON.stringify({operation:'resetAfterRollback',requestId:'gateway-reset-request'})}),env);return {status:response.status,body:await response.json()};};
 try{

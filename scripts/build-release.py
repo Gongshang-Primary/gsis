@@ -66,6 +66,8 @@ for source, targets in api_secret_sources:
   helper_source=({'backend/ApiSecret.gs':'backend/ContactsApiSecret.gs','shared/gsis-api-secret.js':'shared/contacts-api-secret.js'}.get(source,source) if target in {'Contacts_Code.gs','contacts-update/public/_worker.js'} else source)
   if target in {'calendar-backend/Code.gs','calendar-update/public/_worker.js'}:
    helper_source={'backend/ApiSecret.gs':'backend/CalendarApiSecret.gs','shared/gsis-api-secret.js':'shared/calendar-api-secret.js'}.get(source,source)
+  if target in {'backend/Code.gs','public/_worker.js','roster-update/public/_worker.js','public/edge-deploy.js','roster-update/public/edge-roster.js','roster-update/public/edge-timetable-cache.js','shared/edge-venues-fence.js','shared/backend-service.js','notification-worker/index.js'}:
+   helper_source={'backend/ApiSecret.gs':'backend/RosterDeployApiSecret.gs','shared/gsis-api-secret.js':'shared/roster-deploy-api-secret.js'}.get(source,source)
   block='/* '+marker+'_BEGIN */\n'+(root/helper_source).read_text()+'\n/* '+marker+'_END */'
   path=root/target
   content=path.read_text()

@@ -4,7 +4,7 @@ function lordSourceHash_(value){return Utilities.computeDigest(Utilities.DigestA
 function lordSourceAuthenticate_(envelope,source){
  const fail=()=>lordSourceError_(401,'SOURCE_UNAUTHORIZED','Invalid LORD reference service request.');
  if(!envelope||typeof envelope.payload!=='string'||envelope.payload.length>6000||typeof envelope.signature!=='string'||!/^[a-f0-9]{64}$/.test(envelope.signature)||Object.keys(envelope).some(k=>!['payload','signature'].includes(k)))fail();
- const secret=gsisApiSecret_('LORD_BRIDGE_SECRET');if(!secret||secret.length<32)lordSourceError_(503,'SOURCE_UNAVAILABLE','Configure the LORD reference service connection.');
+ const secret=gsisApiSecret_();if(!secret||secret.length<32)lordSourceError_(503,'SOURCE_UNAVAILABLE','Configure the LORD reference service connection.');
  const signature=Utilities.computeHmacSha256Signature(envelope.payload,secret).map(b=>('0'+((b+256)%256).toString(16)).slice(-2)).join('');let mismatch=0;for(let i=0;i<64;i++)mismatch|=signature.charCodeAt(i)^envelope.signature.charCodeAt(i);if(mismatch)fail();
  let req;try{req=JSON.parse(envelope.payload);}catch(_){fail();}
  if(!req||req.action!=='lordService'||req.service!=='gsis-lord-v1'||req.source!==source||Object.keys(req).some(k=>!['action','service','source','timestamp','nonce','input'].includes(k))||!Number.isFinite(req.timestamp)||Math.abs(Date.now()-req.timestamp)>60000||!/^[-\w]{36}$/.test(req.nonce||''))fail();

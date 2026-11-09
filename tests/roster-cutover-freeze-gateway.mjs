@@ -4,8 +4,8 @@ import {createHmac} from 'node:crypto';
 import gateway from '../roster-update/public/_worker.js';
 import {beginRosterCutoverFreeze,syncRosterCutoverFreeze} from '../shared/roster-cutover-freeze.js';
 const require=createRequire(import.meta.url),database=require('./helpers/chunked-import-db.cjs'),db=database(),oldFetch=globalThis.fetch;
-const env={GSIS_JOBS:db,ROSTER_D1_PREPARE:'import',ROSTER_PUBLIC_ORIGIN:'https://roster.gsps.edu.sg',APPS_SCRIPT_URL:'https://script.google.com/macros/s/freeze-gateway/exec',BRIDGE_SECRET:'b'.repeat(40),ROSTER_SERVICE_SECRET:'s'.repeat(40),GOOGLE_CLIENT_ID:'fixture-client'};
-const now=Date.now(),session=JSON.stringify({purpose:'gsis-session-v1',origin:env.ROSTER_PUBLIC_ORIGIN,email:'admin@gsps.edu.sg',subject:'admin',issued:now,expires:now+3600000}),signature=createHmac('sha256',env.BRIDGE_SECRET+'|gsis-browser-session-v1|'+env.ROSTER_PUBLIC_ORIGIN).update(session).digest('hex'),cookie='__Host-gsis_session='+Buffer.from(session).toString('base64url')+'.'+signature;
+const env={GSIS_JOBS:db,ROSTER_D1_PREPARE:'import',ROSTER_PUBLIC_ORIGIN:'https://roster.gsps.edu.sg',APPS_SCRIPT_URL:'https://script.google.com/macros/s/freeze-gateway/exec',GSIS_SECRET:'b'.repeat(40),ROSTER_SERVICE_SECRET:'s'.repeat(40),GOOGLE_CLIENT_ID:'fixture-client'};
+const now=Date.now(),session=JSON.stringify({purpose:'gsis-session-v1',origin:env.ROSTER_PUBLIC_ORIGIN,email:'admin@gsps.edu.sg',subject:'admin',issued:now,expires:now+3600000}),signature=createHmac('sha256',env.GSIS_SECRET+'|gsis-browser-session-v1|'+env.ROSTER_PUBLIC_ORIGIN).update(session).digest('hex'),cookie='__Host-gsis_session='+Buffer.from(session).toString('base64url')+'.'+signature;
 async function send(input,{auth=true,origin=env.ROSTER_PUBLIC_ORIGIN,path='/api/edge/migration'}={}){const r=await gateway.fetch(new Request(env.ROSTER_PUBLIC_ORIGIN+path,{method:'POST',headers:{Origin:origin,'Content-Type':'application/json',...(auth?{Cookie:cookie}:{})},body:JSON.stringify(input)}),env);return {status:r.status,body:await r.json()};}
 let admin=false,calls=0;
 try{

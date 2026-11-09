@@ -1,13 +1,13 @@
 /* GSIS_API_SECRET_BEGIN */
-// First-party API credentials share one operator-selected setting. Browser
-// sessions, private relief links and third-party credentials stay independent.
-function gsisApiSecret(env,legacyName){
+// Roster/Deploy transport requires one setting without legacy fallback.
+// Browser sessions retain their existing purpose- and origin-bound derivation.
+function gsisApiSecret(env){
  const value=env?.GSIS_SECRET;
- if(value!==undefined||Object.prototype.hasOwnProperty.call(env||{},'GSIS_SECRET')){
-  if(typeof value!=='string'||!/^[!-~]{32,8000}$/.test(value))throw Object.assign(Error('GSIS_SECRET must contain 32 to 8000 printable ASCII characters without spaces.'),{status:503,code:'GSIS_SECRET_INVALID'});
-  return value;
+ if(typeof value!=='string'||!/^[!-~]{32,8000}$/.test(value)){
+  throw Object.assign(Error('GSIS_SECRET must contain 32 to 8000 printable ASCII characters without spaces.'),
+   {status:503,code:'GSIS_SECRET_INVALID'});
  }
- return env?.[legacyName];
+ return value;
 }
 
 /* GSIS_API_SECRET_END */
@@ -38,7 +38,7 @@ function schoolIdentity(who,now=Date.now()){
  if(!who||! /^[^@\s]+@gsps\.edu\.sg$/i.test(who.email||'')||typeof who.subject!=='string'||!who.subject||who.subject.length>240||!Number.isFinite(who.expiresAt)||who.expiresAt<=now)fail(401,'GSIS_BACKEND_IDENTITY','A current school session is required.');
  return {email:who.email.toLowerCase(),subject:who.subject,expiresAt:who.expiresAt};
 }
-async function keyFor(env,usage){if(typeof gsisApiSecret(env,'GSIS_BACKEND_SECRET')!=='string'||gsisApiSecret(env,'GSIS_BACKEND_SECRET').length<32)fail(503,'GSIS_BACKEND_CONFIG','Configure the private service credential.');return crypto.subtle.importKey('raw',encoder.encode(gsisApiSecret(env,'GSIS_BACKEND_SECRET')),{name:'HMAC',hash:'SHA-256'},false,[usage]);}
+async function keyFor(env,usage){if(typeof gsisApiSecret(env)!=='string'||gsisApiSecret(env).length<32)fail(503,'GSIS_BACKEND_CONFIG','Configure the private service credential.');return crypto.subtle.importKey('raw',encoder.encode(gsisApiSecret(env)),{name:'HMAC',hash:'SHA-256'},false,[usage]);}
 async function envelopeRequest(env,purpose,data){
  if(!PURPOSES.has(purpose))fail(403,'GSIS_BACKEND_PURPOSE','This private operation is not available.');
  const expectedOrigin=originFor(env,domainFor(purpose)),origin=env.GSIS_REQUEST_ORIGIN||expectedOrigin;
@@ -80,7 +80,7 @@ export async function callOperationalBackend(env,purpose,data){
 export function backendDomainEnv(env,domain){
  if(!['roster','deploy'].includes(domain))fail(503,'GSIS_BACKEND_CONFIG','Unknown operational domain.');
  const prefix=domain.toUpperCase();
- return {...env,APPS_SCRIPT_URL:env[prefix+'_APPS_SCRIPT_URL'],BRIDGE_SECRET:env[prefix+'_BRIDGE_SECRET'],GOOGLE_CLIENT_ID:env[prefix+'_GOOGLE_CLIENT_ID'],SESSION_DAYS:env[prefix+'_SESSION_DAYS'],GSIS_BACKEND:undefined,GSIS_BACKEND_REQUIRED:'false',GSIS_BACKEND_INTERNAL:true,GSIS_REQUEST_ORIGIN:originFor(env,domain)};
+ return {...env,APPS_SCRIPT_URL:env[prefix+'_APPS_SCRIPT_URL'],GOOGLE_CLIENT_ID:env[prefix+'_GOOGLE_CLIENT_ID'],SESSION_DAYS:env[prefix+'_SESSION_DAYS'],GSIS_BACKEND:undefined,GSIS_BACKEND_REQUIRED:'false',GSIS_BACKEND_INTERNAL:true,GSIS_REQUEST_ORIGIN:originFor(env,domain)};
 }
 export function permittedRelayPath(domain,path){
  if(domain==='deploy')return ['/api/edge/service','/api/venues-source','/api/lord-source'].includes(path);

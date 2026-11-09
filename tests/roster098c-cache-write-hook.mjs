@@ -2,8 +2,8 @@ import assert from 'node:assert/strict';
 import {createHmac,webcrypto} from 'node:crypto';
 import worker from '../roster-update/public/_worker.js';
 globalThis.crypto??=webcrypto;
-const origin='https://roster.gsps.edu.sg',now=Date.now(),env={BRIDGE_SECRET:'fixture-secret-'.repeat(4),GOOGLE_CLIENT_ID:'fixture',APPS_SCRIPT_URL:'https://script.google.com/macros/s/fixture/exec',ROSTER_SNAPSHOT_CACHE:'true',ROSTER_TIMETABLE_SNAPSHOTS:{get(){},put(){}},GSIS_JOBS:{prepare(){throw Error('Fixture cache unavailable');},batch(){throw Error('Fixture cache unavailable');}}};
-const payload=JSON.stringify({purpose:'gsis-session-v1',origin,email:'admin@gsps.edu.sg',subject:'fixture',issued:now,expires:now+3600000}),cookie='__Host-gsis_session='+Buffer.from(payload).toString('base64url')+'.'+createHmac('sha256',env.BRIDGE_SECRET+'|gsis-browser-session-v1|'+origin).update(payload).digest('hex');
+const origin='https://roster.gsps.edu.sg',now=Date.now(),env={GSIS_SECRET:'fixture-secret-'.repeat(4),GOOGLE_CLIENT_ID:'fixture',APPS_SCRIPT_URL:'https://script.google.com/macros/s/fixture/exec',ROSTER_SNAPSHOT_CACHE:'true',ROSTER_TIMETABLE_SNAPSHOTS:{get(){},put(){}},GSIS_JOBS:{prepare(){throw Error('Fixture cache unavailable');},batch(){throw Error('Fixture cache unavailable');}}};
+const payload=JSON.stringify({purpose:'gsis-session-v1',origin,email:'admin@gsps.edu.sg',subject:'fixture',issued:now,expires:now+3600000}),cookie='__Host-gsis_session='+Buffer.from(payload).toString('base64url')+'.'+createHmac('sha256',env.GSIS_SECRET+'|gsis-browser-session-v1|'+origin).update(payload).digest('hex');
 const post=(body,path='/api/operations')=>new Request(origin+path,{method:'POST',headers:{Origin:origin,Cookie:cookie},body:JSON.stringify(body)});
 const fetchBefore=globalThis.fetch,logBefore=console.error;const work=[],calls=[],logs=[];let result={ok:true,data:{saved:true,revision:7}},release,arrived;const waiting=new Promise(resolve=>arrived=resolve);
 // Node may print its own warnings through console.error; keep only structured log entries.

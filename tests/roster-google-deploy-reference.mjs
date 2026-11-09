@@ -8,7 +8,7 @@ const state={index:{versions:[],published:null,revision:0,publicationSchema:1,re
 model.dispatch({action:'change',input:{operation:'create',name:'2026 Fixture',requestId:crypto.randomUUID()},identity},{user:{email:identity.email,roles:['Admin','KP']},people:[],sysFields:{},roleCatalogue:[],authoritative:true});
 const document=structuredClone(model.readDocument(state.index.versions[0]));Object.assign(document,{from:'2026-01-01',to:'2026-12-31',teachers:[{id:'one',name:'One',active:true,role:'Teacher',groups:[],profile:{'Basic Name':'One',Role:'Teacher',Active:'Y','EO Appt Level':'GEO3'}},{id:'two',name:'Two',active:true,role:'Teacher',groups:[],profile:{'Basic Name':'Two',Role:'Teacher',Active:'Y','EO Appt Level':'GEO3'}}],assignments:[]});
 let entry={...state.index.versions[0],commit:'published-fixture-1',revision:7,from:document.from,to:document.to},now=Date.now(),calls=0,fail=false;const originalFetch=globalThis.fetch,originalNow=Date.now,originalWarn=console.warn,warnings=[];
-const google=database(),d1=database(),env={GSIS_JOBS:google,APPS_SCRIPT_URL:'https://script.google.com/macros/s/roster-fixture/exec',ROSTER_SERVICE_SECRET:'s'.repeat(40)};
+const google=database(),d1=database(),env={GSIS_JOBS:google,APPS_SCRIPT_URL:'https://script.google.com/macros/s/roster-fixture/exec',GSIS_SECRET:'s'.repeat(40)};
 const clean=value=>{const copy=structuredClone(value);delete copy.edgeRevision;delete copy.source?.checkedAt;return copy;};
 try{
  Date.now=()=>now;

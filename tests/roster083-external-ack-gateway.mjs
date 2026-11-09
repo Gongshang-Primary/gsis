@@ -2,7 +2,7 @@ import {toWorkerModuleURL} from './helpers/worker-module.cjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 const M=await import(toWorkerModuleURL('data:text/javascript;base64,'+Buffer.from(fs.readFileSync('roster-update/public/_worker.js','utf8')).toString('base64')));
-const env={ROSTER_PUBLIC_ORIGIN:'https://roster.example.test',EXTERNAL_LINK_SECRET:'synthetic-link-'.repeat(4),ROSTER_SERVICE_SECRET:'synthetic-service-'.repeat(4),APPS_SCRIPT_URL:'https://script.google.com/macros/s/test/exec'};
+const env={ROSTER_PUBLIC_ORIGIN:'https://roster.example.test',EXTERNAL_LINK_SECRET:'synthetic-link-'.repeat(4),GSIS_SECRET:'synthetic-service-'.repeat(4),APPS_SCRIPT_URL:'https://script.google.com/macros/s/test/exec'};
 const date=new Date(Date.now()+8*3600000).toISOString().slice(0,10),claims={staffId:'fixture-teacher',date,purpose:'duties',expiresAt:Date.now()+3600000},token=await M.createCapability(claims,env);
 let calls=[];
 globalThis.fetch=async(url,init)=>{assert.equal(String(url),env.APPS_SCRIPT_URL);const input=JSON.parse(JSON.parse(init.body).payload).input;calls.push(input);return Response.json({ok:true,data:{savedIds:[input.timetableNoticeId||input.snapshotIds[0]]}});};

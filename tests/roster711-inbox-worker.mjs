@@ -3,9 +3,9 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 
 const worker=await import(toWorkerModuleURL('data:text/javascript;base64,'+Buffer.from(fs.readFileSync('roster-update/public/_worker.js','utf8')).toString('base64')));
-const env={WHATSAPP_ENABLED:'true',WHATSAPP_MENU_ENABLED:'false',WHATSAPP_PHONE_NUMBER_ID:'123456789',WHATSAPP_ACCOUNT_ID:'223456789',WHATSAPP_TEMPLATE_ACCOUNT_ID:'323456789',WHATSAPP_API_VERSION:'v23.0',WHATSAPP_ACCESS_TOKEN:'private-access-'.repeat(8),WHATSAPP_APP_SECRET:'private-app-'.repeat(8),WHATSAPP_VERIFY_TOKEN:'private-verify-'.repeat(8),ROSTER_SERVICE_SECRET:'private-service-'.repeat(8),BRIDGE_SECRET:'private-bridge-'.repeat(8),EXTERNAL_LINK_SECRET:'private-link-'.repeat(8),ROSTER_PUBLIC_ORIGIN:'https://roster.example.test',APPS_SCRIPT_URL:'https://script.google.com/macros/s/test/exec'};
+const env={WHATSAPP_ENABLED:'true',WHATSAPP_MENU_ENABLED:'false',WHATSAPP_PHONE_NUMBER_ID:'123456789',WHATSAPP_ACCOUNT_ID:'223456789',WHATSAPP_TEMPLATE_ACCOUNT_ID:'323456789',WHATSAPP_API_VERSION:'v23.0',WHATSAPP_ACCESS_TOKEN:'private-access-'.repeat(8),WHATSAPP_APP_SECRET:'private-app-'.repeat(8),WHATSAPP_VERIFY_TOKEN:'private-verify-'.repeat(8),ROSTER_SERVICE_SECRET:'private-service-'.repeat(8),GSIS_SECRET:'private-bridge-'.repeat(8),EXTERNAL_LINK_SECRET:'private-link-'.repeat(8),ROSTER_PUBLIC_ORIGIN:'https://roster.example.test',APPS_SCRIPT_URL:'https://script.google.com/macros/s/test/exec'};
 const origin=env.ROSTER_PUBLIC_ORIGIN,who={email:'smc@gsps.edu.sg',subject:'test-subject'},now=Date.now();
-const session=await worker.sign({purpose:'gsis-session-v1',origin,...who,issued:now,expires:now+86400000},env.BRIDGE_SECRET+'|gsis-browser-session-v1|'+origin);
+const session=await worker.sign({purpose:'gsis-session-v1',origin,...who,issued:now,expires:now+86400000},env.GSIS_SECRET+'|gsis-browser-session-v1|'+origin);
 const cookie='__Host-gsis_session='+Buffer.from(session.payload).toString('base64url')+'.'+session.signature;
 const ok=data=>Response.json({ok:true,data});
 const reply={id:'reply-1',claimId:'claim-1',to:'6590000000',kind:'text',text:'A human reply.',replyWindowExpiresAt:Date.now()+60000};
@@ -15,7 +15,7 @@ globalThis.fetch=async(input,init={})=>{
  const url=new URL(input);let payload;
  if(url.href===env.APPS_SCRIPT_URL){
   const signed=JSON.parse(init.body);payload=JSON.parse(signed.payload);
-  assert.equal(signed.signature,(await worker.sign(payload,payload.action==='rosterService'?env.ROSTER_SERVICE_SECRET:env.BRIDGE_SECRET)).signature);
+  assert.equal(signed.signature,(await worker.sign(payload,payload.action==='rosterService'?env.GSIS_SECRET:env.GSIS_SECRET)).signature);
  }else if(init.body)payload=JSON.parse(init.body);
  calls.push({url,init,payload});return handler(url,init,payload);
 };

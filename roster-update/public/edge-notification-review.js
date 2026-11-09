@@ -12,7 +12,7 @@ function rosterDeliveryReviewMonitor_(input,previous){
  if(state==='disabled')return [];
  if(state==='failed')return [...(previous||[]).filter(i=>i.group==='configuration'),{id:'monitor',group:'monitoring',status:'check_failed',cause:'The template approval check could not be completed. This does not confirm a delivery failure.',action:'Check the Worker connection and Meta account access; the background check will retry.'}];
  if(state==='configuration'){
-  const fields=['WHATSAPP_PHONE_NUMBER_ID','WHATSAPP_API_VERSION','WHATSAPP_ACCESS_TOKEN','WHATSAPP_APP_SECRET','ROSTER_SERVICE_SECRET','EXTERNAL_LINK_SECRET','ROSTER_PUBLIC_ORIGIN','APPS_SCRIPT_URL','WHATSAPP_VERIFY_TOKEN','WHATSAPP_ACCOUNT_ID','WHATSAPP_TEMPLATE_ACCOUNT_ID','CONTACTS_PUBLIC_URL','WHATSAPP_TEMPLATES_JSON'];
+  const fields=['WHATSAPP_PHONE_NUMBER_ID','WHATSAPP_API_VERSION','WHATSAPP_ACCESS_TOKEN','WHATSAPP_APP_SECRET','EXTERNAL_LINK_SECRET','ROSTER_PUBLIC_ORIGIN','APPS_SCRIPT_URL','WHATSAPP_VERIFY_TOKEN','WHATSAPP_ACCOUNT_ID','WHATSAPP_TEMPLATE_ACCOUNT_ID','CONTACTS_PUBLIC_URL','WHATSAPP_TEMPLATES_JSON'];
   const field=fields.includes(value.field)?value.field:'WhatsApp configuration';
   return [{id:'configuration',group:'configuration',status:'invalid',field,cause:'An enabled WhatsApp configuration could not be validated.',action:'Check '+field+' in the Worker settings and verify its approved template contract.'}];
  }

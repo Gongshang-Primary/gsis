@@ -9,7 +9,7 @@ const require=createRequire(import.meta.url),adapter=require('./roster701-adapte
 globalThis.crypto??=webcrypto;
 const gateway=await import(toWorkerModuleURL('data:text/javascript;base64,'+fs.readFileSync('roster-update/public/_worker.js').toString('base64')));
 const source=fs.readFileSync('backend/Code.gs','utf8'),start=source.indexOf('function doPost(e){'),post=source.slice(start,source.indexOf('\nfunction auth_',start));
-const origin='https://roster.test',env={APPS_SCRIPT_URL:'https://script.google.com/macros/s/roster/exec',BRIDGE_SECRET:'synthetic-email-settings-bridge-secret-0123456789'};
+const origin='https://roster.test',env={APPS_SCRIPT_URL:'https://script.google.com/macros/s/roster/exec',GSIS_SECRET:'synthetic-email-settings-bridge-secret-0123456789'};
 const h=adapter();
 vm.runInContext(fs.readFileSync('backend/RosterOperations.gs','utf8'),h.scope);
 h.scope.GSISRosterStapler=require('../shared/roster-stapler.js');
@@ -21,8 +21,8 @@ let contactsCalls=0,backendCalls=0,backgroundCalls=0,failMode='';
 const properties=h.scope.props_(),transportProperties=h.scope.PropertiesService.getScriptProperties();
 Object.assign(h.scope,{
  GSIS_DEPLOY_VERSION:'0.8.2',GSISSheets:{resetStats(){}},
- props_:()=>({...properties,getProperty:key=>key==='BRIDGE_SECRET'?env.BRIDGE_SECRET:properties.getProperty(key)}),
- PropertiesService:{getScriptProperties:()=>({getProperty:key=>key==='BRIDGE_SECRET'?env.BRIDGE_SECRET:transportProperties.getProperty(key)})},
+ props_:()=>({...properties,getProperty:key=>key==="GSIS_SECRET"?env.GSIS_SECRET:properties.getProperty(key)}),
+ PropertiesService:{getScriptProperties:()=>({getProperty:key=>key==="GSIS_SECRET"?env.GSIS_SECRET:transportProperties.getProperty(key)})},
  signature_:(payload,secret)=>createHmac('sha256',secret).update(payload).digest('hex'),same_:(a,b)=>a===b,
  rosterDiagnostic_(){},rosterDiagnosticError_:error=>error.message,rosterDiagnosticText_:text=>text,
  rosterStage_(){},rosterFailureDetail_:()=>({backendVersion:'0.8.2',failureStage:'save'}),
@@ -38,7 +38,7 @@ Object.assign(h.scope,{
 vm.runInContext(fs.readFileSync('backend/ApiSecret.gs','utf8'),h.scope);
 require('./helpers/load-roster-diagnostic-build.cjs')(h.scope);
 vm.runInContext(post,h.scope);
-const now=Date.now(),signed=await gateway.sign({purpose:'gsis-session-v1',origin,email:'alice@gsps.edu.sg',subject:'synthetic-google-subject',issued:now,expires:now+60000},env.BRIDGE_SECRET+'|gsis-browser-session-v1|'+origin);
+const now=Date.now(),signed=await gateway.sign({purpose:'gsis-session-v1',origin,email:'alice@gsps.edu.sg',subject:'synthetic-google-subject',issued:now,expires:now+60000},env.GSIS_SECRET+'|gsis-browser-session-v1|'+origin);
 const cookie='__Host-gsis_session='+Buffer.from(signed.payload).toString('base64url')+'.'+signed.signature;
 const oldFetch=globalThis.fetch,oldInfo=console.info,oldError=console.error;
 console.info=console.error=()=>{};

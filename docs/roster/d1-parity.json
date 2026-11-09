@@ -4968,7 +4968,7 @@
    "outcome": {
     "family": "venues-source",
     "ok": false,
-    "status": 503,
+    "status": 403,
     "code": null,
     "network": [],
     "missing": false,
@@ -10191,6 +10191,11 @@
     },
     {
      "file": "roster-update/public/_worker.js",
+     "line": 452,
+     "handler": "sessionRoute"
+    },
+    {
+     "file": "roster-update/public/_worker.js",
      "line": 454,
      "handler": "sessionRoute"
     }
@@ -10321,11 +10326,6 @@
    "sources": [
     {
      "file": "roster-update/public/_worker.js",
-     "line": 280,
-     "handler": "(module)"
-    },
-    {
-     "file": "roster-update/public/_worker.js",
      "line": 288,
      "handler": "(module)"
     },
@@ -10336,7 +10336,7 @@
     }
    ],
    "caller": "roster-update/public/_worker.js",
-   "handler": "roster-update/public/_worker.js:280",
+   "handler": "roster-update/public/_worker.js:288",
    "outcome": {
     "family": "http-route",
     "ok": false,

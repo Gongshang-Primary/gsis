@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import {webcrypto} from 'node:crypto';
 globalThis.crypto??=webcrypto;
 const worker=await import(toWorkerModuleURL('data:text/javascript;base64,'+fs.readFileSync('roster-update/public/_worker.js').toString('base64')));
-const env={CALENDAR_APPS_SCRIPT_URL:'https://script.google.com/macros/s/calendar/exec',CALENDAR_PROXY_SECRET:'c'.repeat(40)},who={email:'smc@gsps.edu.sg',subject:'smc'},calls=[];
+const env={CALENDAR_APPS_SCRIPT_URL:'https://script.google.com/macros/s/calendar/exec',GSIS_SECRET:'c'.repeat(40)},who={email:'smc@gsps.edu.sg',subject:'smc'},calls=[];
 globalThis.fetch=async(url,options)=>{const request=JSON.parse(options.body);calls.push(request);const dates=request.payload.dates||[request.payload.date];return Response.json({ok:true,result:request.action==='rosterDates'?{dates:dates.map(date=>({date,schoolDay:true,parity:'odd'}))}:{date:dates[0],schoolDay:true,parity:'odd'}});};
 const result=await worker.trustedOperationsInput({operation:'read',view:'schoolAbsences',from:'2026-01-01',to:'2027-12-31',calendarByDate:{forged:true},identity:{admin:true}},env,who);
 assert.equal(calls.length,0,'complete saved-record range needs no Calendar or per-day loop');assert.deepEqual(result.calendarByDate,{});assert.equal(result.identity,undefined);assert.equal(result.from,'2026-01-01');assert.equal(result.to,'2027-12-31');

@@ -540,7 +540,7 @@ function hash_(x){return Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_2
 function signature_(s,key){return Utilities.computeHmacSha256Signature(s,key,Utilities.Charset.UTF_8).map(b=>('0'+((b+256)%256).toString(16)).slice(-2)).join('')}
 function same_(a,b){if(typeof b!=='string'||a.length!==b.length)return false;let n=0;for(let i=0;i<a.length;i++)n|=a.charCodeAt(i)^b.charCodeAt(i);return n===0}
 function book_(){return SpreadsheetApp.openById(props_().getProperty('DEPLOY_SHEET_ID')||DEPLOY_ID)}
-function setupDeploy(){gsisRequireBackendRole_('deploy');const b=book_();[['deploy_index',['Key','JSON']],['deploy_documents',['Version ID','Commit ID','Part','JSON']]].forEach(([name,h])=>{let s=b.getSheetByName(name)||b.insertSheet(name);if(!s.getLastRow())s.appendRow(h);else if(JSON.stringify(s.getRange(1,1,1,h.length).getValues()[0])!==JSON.stringify(h))throw Error('Unexpected headers in '+name)});const s=b.getSheetByName('deploy_index');if(!s.getRange('B2').getValue())s.getRange('A2:B2').setValues([['index',JSON.stringify({revision:0,active:null,versions:[],requests:[]})]]);if(!gsisApiSecret_('BRIDGE_SECRET'))props_().setProperty('BRIDGE_SECRET',Utilities.getUuid()+Utilities.getUuid());return 'Ready. Set CONTACTS_API_URL and your chosen GSIS_SECRET in Script Properties; deploy as a web app.'}
+function setupDeploy(){gsisApiSecret_();gsisRequireBackendRole_('deploy');const b=book_();[['deploy_index',['Key','JSON']],['deploy_documents',['Version ID','Commit ID','Part','JSON']]].forEach(([name,h])=>{let s=b.getSheetByName(name)||b.insertSheet(name);if(!s.getLastRow())s.appendRow(h);else if(JSON.stringify(s.getRange(1,1,1,h.length).getValues()[0])!==JSON.stringify(h))throw Error('Unexpected headers in '+name)});const s=b.getSheetByName('deploy_index');if(!s.getRange('B2').getValue())s.getRange('A2:B2').setValues([['index',JSON.stringify({revision:0,active:null,versions:[],requests:[]})]]);return 'Ready. Set CONTACTS_API_URL and your chosen GSIS_SECRET in Script Properties; deploy as a web app.'}
 function index_(b){const sheet=b.getSheetByName('deploy_index'),raw=GSISSheets.enabled()?GSISSheets.read(sheet,2,2,1,1,false,{flush:false})[0][0]:sheet.getRange('B2').getValue();if(!raw)error_(503,'Run setupDeploy first.');return JSON.parse(raw)}
 function document_(b,entry,scope){if(entry.store)return fieldRead_(b,entry,scope);const rows=b.getSheetByName('deploy_documents').getRange(entry.row,1,entry.parts,4).getValues();if(rows.some((r,i)=>r[0]!==entry.id||r[1]!==entry.commit||Number(r[2])!==i))error_(503,'Stored document is inconsistent.');return model_(JSON.parse(rows.map(r=>r[3]).join('')))}
 function persist_(b,idx,d,requestId){return fieldPersist_(b,idx,d,requestId);}
@@ -571,7 +571,7 @@ function contactsCatalogueCache_(namespace,knownHash,value){
 }
 function contacts_(identity,authorityOnly,action='deploySnapshot',input=null){
  rosterStage_('contacts-config');
- const p=props_(),url=p.getProperty('CONTACTS_API_URL'),key=gsisApiSecret_('CONTACTS_BRIDGE_SECRET');if(!url||!/^https:\/\/script\.google\.com\/macros\/s\/[^/]+\/exec$/.test(url)||!key||key.length<32)error_(503,'Configure Contacts API connection in Deploy Script Properties.');
+ const p=props_(),url=p.getProperty('CONTACTS_API_URL'),key=gsisApiSecret_();if(!url||!/^https:\/\/script\.google\.com\/macros\/s\/[^/]+\/exec$/.test(url)||!key||key.length<32)error_(503,'Configure Contacts API connection in Deploy Script Properties.');
  const request={...(input||{authorityOnly:!!authorityOnly})},conditional=action==='deploySnapshot'&&!authorityOnly&&!request.authorityOnly&&request.readOnly===true,namespace=hash_([url]);
  // Browser cursors bind version-owned HR context; this independent cache binds Contacts source data.
  const cached=conditional?contactsCatalogueCache_(namespace,null):null;delete request.knownCatalogueHash;if(cached)request.knownCatalogueHash=cached.hash;
@@ -614,16 +614,16 @@ function doPost(e){
   if(parsedRequest?.action==='venuesSource'){const data=gsisBackendKind_()==='roster'?rosterVenuesSource_(env):venuesDeploySource_(env);return out_({ok:true,data});}
   if(parsedRequest?.action==='lordService'){deployTrace_.action='lordService';const data=lordDeployService_(env);deployTrace_.authenticated=true;return out_({ok:true,data});}
   if(parsedRequest?.action==='rosterService'){
-   const serviceSecret=gsisApiSecret_('ROSTER_SERVICE_SECRET');
+   const serviceSecret=gsisApiSecret_();
    if(!serviceSecret||serviceSecret.length<32||!same_(signature_(env.payload,serviceSecret),env.signature))error_(401,'Invalid service signature');
    const r=parsedRequest;if(r.service!=='gsis-roster-notifier-v1'||!Number.isFinite(r.timestamp)||Math.abs(Date.now()-r.timestamp)>60000||! /^[\w-]{36}$/.test(r.nonce||''))error_(401,'Expired service request');
    deployTrace_.action=r.action;deployTrace_.authenticated=true;deployTrace_.rosterDiagnostic=true;deployTrace_.operation=/^[A-Za-z][A-Za-z0-9]{0,63}$/.test(r.input?.operation||'')?r.input.operation:undefined;deployTrace_.commandId=/^[\w-]{36}$/.test(r.input?.requestId||'')?r.input.requestId:undefined;if(/^[\w-]{36}$/.test(r.traceId||''))deployTrace_.requestId=r.traceId;gsisRequireBackendAction_(r.action);return out_({ok:true,data:rosterServiceDispatch_(r)});
   }
   deployTrace_.phase='bridge-config';
-  const secret=gsisApiSecret_('BRIDGE_SECRET');if(!secret||secret.length<32)error_(503,gsisBackendKind_()==='roster'?'Configure BRIDGE_SECRET in Roster Script Properties.':'Run setupDeploy.');
+  const secret=gsisApiSecret_();if(!secret||secret.length<32)error_(503,gsisBackendKind_()==='roster'?'Configure GSIS_SECRET in Roster Script Properties.':'Run setupDeploy.');
   deployTrace_.phase='bridge-signature';
   if(typeof env?.payload!=='string'||!same_(signature_(env.payload,secret),env.signature))error_(401,'Invalid signature');
-  deployTrace_.phase='request-payload';const req=parsedRequest===undefined?JSON.parse(env.payload):parsedRequest;
+  deployTrace_.phase='request-payload';const req=parsedRequest===undefined?JSON.parse(env.payload):parsedRequest;if(Object.prototype.hasOwnProperty.call(req,'service'))error_(403,'A service request cannot perform a browser action.');
   // Full dated plans already have a 1.9 MB model limit. Bound the decoded request plus metadata; ASCII escaping on the signed wire is not plan size.
   const staplerSave=req.action==='rosterOperations'&&(['saveStapler','importStapler'].includes(req.input?.operation)||req.input?.operation==='receiptStatus'&&['saveStapler','importStapler'].includes(req.input?.command?.operation));
   if(req.action!=='rosterUpload'&&(staplerSave?unescape(encodeURIComponent(JSON.stringify(req))).length>4100000:raw.length>600000))error_(400,'Request too large');
@@ -651,7 +651,7 @@ function doPost(e){
   const driveOutputFailure=deployTrace_.authenticated&&deployTrace_.action==='rosterService'&&deployTrace_.operation==='edgeDriveOutput';
   if(driveOutputFailure)e=rosterDriveOutputError_(e);
   if(!importFailure.failureReason&&(deployTrace_.rosterDiagnostic||!deployTrace_.action))rosterDiagnostic_('roster-backend-failed',{status:e.status||503,...rosterAbsenceFailureDetail_(e),message:rosterDiagnosticError_(e),stack:rosterDiagnosticText_(String(e.stack||'').split('\n').filter(line=>/^\s*at /.test(line)).slice(0,4).join('\n'))});
-  if(/^roster/.test(deployTrace_.action)&&(e.status||503)>=500){
+  if(e.code==='GSIS_SECRET_INVALID')return out_({ok:false,status:503,code:e.code,error:e.message});if(/^roster/.test(deployTrace_.action)&&(e.status||503)>=500){
    const diagnosticId=deployTrace_.requestId;
    return out_({ok:false,status:503,error:driveOutputFailure?e.message:'Roster is temporarily unavailable.',diagnosticId,...rosterFailureDetail_(e),...rosterAbsenceFailureDetail_(e),...importFailure});
   }
@@ -2336,7 +2336,7 @@ function deployWebAppUrl_(){
 function rosterDiagnosticBuild_(){return GSIS_DEPLOY_VERSION+'-roster-diag1';}
 function rosterDiagnosticText_(value){
  let text=String(value||'');
- try{const p=props_();for(const key of ['GSIS_SECRET','BRIDGE_SECRET','CONTACTS_BRIDGE_SECRET']){const secret=p.getProperty(key);if(secret)text=text.split(secret).join('[secret]');}}catch(ignore){}
+ try{const p=props_();for(const key of ['GSIS_SECRET']){const secret=p.getProperty(key);if(secret)text=text.split(secret).join('[secret]');}}catch(ignore){}
  return text.replace(/https?:\/\/\S+/gi,'[URL]').replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi,'[email]').replace(/[A-Za-z0-9_+/=-]{28,}/g,'[identifier]').slice(0,900);
 }
 function rosterDiagnosticError_(error){
@@ -2344,7 +2344,7 @@ function rosterDiagnosticError_(error){
  if(error?.rosterDrive)return error.message;
  if(['DEPLOY_URL_CONFIGURATION','GSIS_SECRET_INVALID'].includes(error?.code))return error.message;
  const message=String(error?.message||error||'');
- const safe=['Relief records are full. Ask Admin to review storage capacity before retrying this same report.','Invalid request','Invalid signature','Expired request','Invalid identity','Request too large','Run setupDeploy.','Configure Contacts API connection in Deploy Script Properties.','Contacts returned an invalid response. Check its existing web-app deployment and access settings; your draft is retained.','Contacts did not return verified Roster authority. Update the existing Contacts web app deployment.','Roster register needs review.','Another save is running. Retry this save.','SMC membership is required to manage baseline timetables.','BRIDGE_SECRET is missing or too short.','CONTACTS_API_URL must be the existing Contacts /exec URL.','CONTACTS_BRIDGE_SECRET is missing or too short.','Run this check using the school account that owns the deployment.','Contacts did not return boolean rosterSMC. Check its deployed version.','No published /exec URL was found for this script.'];
+ const safe=['Relief records are full. Ask Admin to review storage capacity before retrying this same report.','Invalid request','Invalid signature','Expired request','Invalid identity','Request too large','Run setupDeploy.','Configure Contacts API connection in Deploy Script Properties.','Contacts returned an invalid response. Check its existing web-app deployment and access settings; your draft is retained.','Contacts did not return verified Roster authority. Update the existing Contacts web app deployment.','Roster register needs review.','Another save is running. Retry this save.','SMC membership is required to manage baseline timetables.','GSIS_SECRET is missing or invalid.','CONTACTS_API_URL must be the existing Contacts /exec URL.','CONTACTS_GSIS_SECRET is missing or invalid.','Run this check using the school account that owns the deployment.','Contacts did not return boolean rosterSMC. Check its deployed version.','No published /exec URL was found for this script.'];
  if(safe.includes(message))return message;
  if(error?.name==='SyntaxError')return 'Invalid JSON or script syntax. See the phase and source location.';
  if(/permission|access denied|authoriz|scope|not have access/i.test(message))return 'Google service access or authorisation failed. Check the deployment account and permissions.';
@@ -2398,15 +2398,15 @@ function diagnoseRoster(){
  const report={backendVersion:GSIS_DEPLOY_VERSION,diagnosticBuild:rosterDiagnosticBuild_(),readOnly:true,checks:[],recent:showRosterDiagnostics()};
  const check=(name,fn)=>{try{const value=fn();report.checks.push({name,ok:true,...value});return value;}catch(e){report.checks.push({name,ok:false,status:e.status||null,...(e.code==='DEPLOY_URL_CONFIGURATION'?{category:'configuration'}:{}),message:rosterDiagnosticError_(e),...(e.rosterDrive?{drive:e.rosterDrive}:{})});return null;}};
  try{
-  check('Connection settings',()=>{const p=props_();if((gsisApiSecret_('BRIDGE_SECRET')||'').length<32)throw Error('BRIDGE_SECRET is missing or too short.');if(!/^https:\/\/script\.google\.com\/macros\/s\/[^/]+\/exec$/.test(p.getProperty('CONTACTS_API_URL')||''))throw Error('CONTACTS_API_URL must be the existing Contacts /exec URL.');if((gsisApiSecret_('CONTACTS_BRIDGE_SECRET')||'').length<32)throw Error('CONTACTS_BRIDGE_SECRET is missing or too short.');return {configured:true};});
+  check('Connection settings',()=>{const p=props_();if((gsisApiSecret_()||'').length<32)throw Error('GSIS_SECRET is missing or invalid.');if(!/^https:\/\/script\.google\.com\/macros\/s\/[^/]+\/exec$/.test(p.getProperty('CONTACTS_API_URL')||''))throw Error('CONTACTS_API_URL must be the existing Contacts /exec URL.');if((gsisApiSecret_()||'').length<32)throw Error('CONTACTS_GSIS_SECRET is missing or invalid.');return {configured:true};});
   const identity=check('Editor school identity',()=>{const email=Session.getEffectiveUser().getEmail().toLowerCase();if(!/^[^@\s]+@gsps\.edu\.sg$/.test(email))throw Error('Run this check using the school account that owns the deployment.');return {identity:{email,subject:email}};});
   // Remove the identity immediately; it is used only in the signed read requests.
   const who=identity?.identity;if(identity)delete report.checks[report.checks.length-1].identity;
   if(who)check('Contacts Roster authority',()=>{const c=contacts_(who,false,'deploySnapshot',{authorityOnly:true,rosterAuthority:true});if(typeof c?.user?.rosterSMC!=='boolean')throw Error('Contacts did not return boolean rosterSMC. Check its deployed version.');return {accessVerified:true,smc:c.user.rosterSMC};});
   check('Roster folders and register',()=>{for(const id of [ROSTER_ROOT,ROSTER_ARCHIVE,ROSTER_DATA])rosterFolder_(id);const index=rosterIndex_();return {revision:index.revision,timetables:index.entries.length};});
   if(who)check('Published Roster profile',()=>{
-   const url=deployWebAppUrl_(),secret=gsisApiSecret_('BRIDGE_SECRET');
-   if(!secret||secret.length<32)throw Error('BRIDGE_SECRET is missing or too short.');
+   const url=deployWebAppUrl_(),secret=gsisApiSecret_();
+   if(!secret||secret.length<32)throw Error('GSIS_SECRET is missing or invalid.');
    const diagnosticId=Utilities.getUuid(),payload=JSON.stringify({action:'rosterProfile',input:{},identity:who,timestamp:Date.now(),nonce:diagnosticId,traceId:diagnosticId});
    const response=UrlFetchApp.fetch(url,{method:'post',contentType:'application/json',payload:JSON.stringify({payload,signature:signature_(payload,secret)}),muteHttpExceptions:true,followRedirects:true}),raw=response.getContentText();
    let result;try{result=JSON.parse(raw);}catch(e){return {ok:false,diagnosticId,httpStatus:response.getResponseCode(),format:/^\s*</.test(raw)?'html':'invalid-json',message:'Published app returned no JSON envelope. Check its web app access and deployment.'};}
@@ -5610,7 +5610,7 @@ function rosterOperationsReadReconcile_(s,ctx){
  }finally{deployUnlock_(lock);}
 }
 function rosterServiceContacts_(){
- const endpoint=props_().getProperty('CONTACTS_API_URL'),secret=gsisApiSecret_('ROSTER_SERVICE_SECRET');if(!endpoint||!/^https:\/\/script\.google\.com\/macros\/s\/[^/]+\/exec$/.test(endpoint)||!secret||secret.length<32)error_(503,'Configure the Contacts endpoint and shared Roster service secret.');
+ const endpoint=props_().getProperty('CONTACTS_API_URL'),secret=gsisApiSecret_();if(!endpoint||!/^https:\/\/script\.google\.com\/macros\/s\/[^/]+\/exec$/.test(endpoint)||!secret||secret.length<32)error_(503,'Configure the Contacts endpoint and shared Roster service secret.');
  const payload=JSON.stringify({action:'rosterServiceDirectory',service:'gsis-roster-notifier-v1',input:{},timestamp:Date.now(),nonce:Utilities.getUuid()}),response=UrlFetchApp.fetch(endpoint,{method:'post',contentType:'application/json',payload:JSON.stringify({payload,signature:signature_(payload,secret)}),muteHttpExceptions:true});
  let body;try{body=JSON.parse(response.getContentText());}catch(e){error_(503,'Contacts service directory is unavailable.');}if(!body.ok||!Array.isArray(body.data?.rosterPeople))error_(503,'Contacts service directory is unavailable.');return {identity:{email:'roster-service',subject:'service'},c:body.data};
 }
@@ -8517,7 +8517,7 @@ function rosterDeliveryReviewMonitor_(input,previous){
  if(state==='disabled')return [];
  if(state==='failed')return [...(previous||[]).filter(i=>i.group==='configuration'),{id:'monitor',group:'monitoring',status:'check_failed',cause:'The template approval check could not be completed. This does not confirm a delivery failure.',action:'Check the Worker connection and Meta account access; the background check will retry.'}];
  if(state==='configuration'){
-  const fields=['GSIS_SECRET','WHATSAPP_PHONE_NUMBER_ID','WHATSAPP_API_VERSION','WHATSAPP_ACCESS_TOKEN','WHATSAPP_APP_SECRET','ROSTER_SERVICE_SECRET','EXTERNAL_LINK_SECRET','ROSTER_PUBLIC_ORIGIN','APPS_SCRIPT_URL','WHATSAPP_VERIFY_TOKEN','WHATSAPP_ACCOUNT_ID','WHATSAPP_TEMPLATE_ACCOUNT_ID','CONTACTS_PUBLIC_URL','WHATSAPP_TEMPLATES_JSON'];
+  const fields=['GSIS_SECRET','WHATSAPP_PHONE_NUMBER_ID','WHATSAPP_API_VERSION','WHATSAPP_ACCESS_TOKEN','WHATSAPP_APP_SECRET','EXTERNAL_LINK_SECRET','ROSTER_PUBLIC_ORIGIN','APPS_SCRIPT_URL','WHATSAPP_VERIFY_TOKEN','WHATSAPP_ACCOUNT_ID','WHATSAPP_TEMPLATE_ACCOUNT_ID','CONTACTS_PUBLIC_URL','WHATSAPP_TEMPLATES_JSON'];
   const field=fields.includes(value.field)?value.field:'WhatsApp configuration';
   return [{id:'configuration',group:'configuration',status:'invalid',field,cause:'An enabled WhatsApp configuration could not be validated.',action:'Check '+field+' in the Worker settings and verify its approved template contract.'}];
  }
@@ -9533,7 +9533,7 @@ function lordSourceHash_(value){return Utilities.computeDigest(Utilities.DigestA
 function lordSourceAuthenticate_(envelope,source){
  const fail=()=>lordSourceError_(401,'SOURCE_UNAUTHORIZED','Invalid LORD reference service request.');
  if(!envelope||typeof envelope.payload!=='string'||envelope.payload.length>6000||typeof envelope.signature!=='string'||!/^[a-f0-9]{64}$/.test(envelope.signature)||Object.keys(envelope).some(k=>!['payload','signature'].includes(k)))fail();
- const secret=gsisApiSecret_('LORD_BRIDGE_SECRET');if(!secret||secret.length<32)lordSourceError_(503,'SOURCE_UNAVAILABLE','Configure the LORD reference service connection.');
+ const secret=gsisApiSecret_();if(!secret||secret.length<32)lordSourceError_(503,'SOURCE_UNAVAILABLE','Configure the LORD reference service connection.');
  const signature=Utilities.computeHmacSha256Signature(envelope.payload,secret).map(b=>('0'+((b+256)%256).toString(16)).slice(-2)).join('');let mismatch=0;for(let i=0;i<64;i++)mismatch|=signature.charCodeAt(i)^envelope.signature.charCodeAt(i);if(mismatch)fail();
  let req;try{req=JSON.parse(envelope.payload);}catch(_){fail();}
  if(!req||req.action!=='lordService'||req.service!=='gsis-lord-v1'||req.source!==source||Object.keys(req).some(k=>!['action','service','source','timestamp','nonce','input'].includes(k))||!Number.isFinite(req.timestamp)||Math.abs(Date.now()-req.timestamp)>60000||!/^[-\w]{36}$/.test(req.nonce||''))fail();
@@ -9578,13 +9578,13 @@ function lordDeployService_(envelope){
 /* GSIS_LORD_DEPLOY_SOURCE_END */
 
 /* GSIS_VENUES_SOURCE_BRIDGE_BEGIN */
-// A separate read-only service credential; never delegates a school-user role.
+// Read-only service boundary; transport authentication never delegates a school-user role.
 function venuesSourceError_(status,code,message){throw Object.assign(Error(message),{status,code});}
 function venuesSourceHash_(value){return Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256,JSON.stringify(value)).map(b=>('0'+((b+256)%256).toString(16)).slice(-2)).join('');}
 function venuesSourceAuthenticate_(envelope,source){
  const deny=()=>venuesSourceError_(401,'VENUES_SOURCE_AUTH','Invalid Venues source request.');
  if(!envelope||typeof envelope.payload!=='string'||envelope.payload.length>120000||typeof envelope.signature!=='string'||!/^[a-f0-9]{64}$/.test(envelope.signature)||Object.keys(envelope).some(k=>!['payload','signature'].includes(k)))deny();
- const secret=gsisApiSecret_('VENUES_BRIDGE_SECRET');if(!secret||secret.length<32)venuesSourceError_(503,'VENUES_SOURCE_SETUP','Configure VENUES_BRIDGE_SECRET for the Venues source service.');
+ const secret=gsisApiSecret_();if(!secret||secret.length<32)venuesSourceError_(503,'VENUES_SOURCE_SETUP','Configure GSIS_SECRET for the Venues source service.');
  const signature=Utilities.computeHmacSha256Signature(envelope.payload,secret).map(b=>('0'+((b+256)%256).toString(16)).slice(-2)).join('');let diff=0;for(let i=0;i<64;i++)diff|=signature.charCodeAt(i)^envelope.signature.charCodeAt(i);if(diff)deny();
  let request;try{request=JSON.parse(envelope.payload);}catch(_){deny();}
  if(!request||request.action!=='venuesSource'||request.service!=='gsis-venues-v1'||request.source!==source||Object.keys(request).some(k=>!['action','service','source','timestamp','nonce','input'].includes(k))||!Number.isFinite(request.timestamp)||Math.abs(Date.now()-request.timestamp)>60000||!/^[-\w]{36}$/.test(request.nonce||''))deny();
@@ -9602,11 +9602,11 @@ function venuesSourceResult_(source,key,input,value,updatedAt){
 /* GSIS_VENUES_SOURCE_BRIDGE_END */
 
 /* GSIS_VENUES_ROSTER_SOURCE_BEGIN */
-/* Venues coordination is optional until its two connection properties are set.
+/* Venues coordination is optional until its connection URL is set.
    A durable pending fence blocks reservations across independent ScriptLocks. */
 function rosterVenuesConfig_(){
- const p=props_(),url=p.getProperty('VENUES_APPS_SCRIPT_URL');if(!url&&!p.getProperty('VENUES_BRIDGE_SECRET'))return null;const secret=gsisApiSecret_('VENUES_BRIDGE_SECRET');
- if(!/^https:\/\/script\.google\.com\/macros\/s\/[\w-]+\/exec$/.test(url||'')||!secret||secret.length<32)venuesSourceError_(503,'VENUES_SOURCE_SETUP','Set both VENUES_APPS_SCRIPT_URL and VENUES_BRIDGE_SECRET in Roster, or remove both until Venues is installed.');return {url,secret};
+ const p=props_(),url=p.getProperty('VENUES_APPS_SCRIPT_URL');if(!url)return null;const secret=gsisApiSecret_();
+ if(!/^https:\/\/script\.google\.com\/macros\/s\/[\w-]+\/exec$/.test(url||'')||!secret||secret.length<32)venuesSourceError_(503,'VENUES_SOURCE_SETUP','Set VENUES_APPS_SCRIPT_URL and GSIS_SECRET in Roster; omit the URL until Venues is installed.');return {url,secret};
 }
 function rosterVenuesMarker_(){let marker;try{marker=JSON.parse(props_().getProperty('ROSTER_VENUES_SOURCE')||'null');}catch(_){}return marker;}
 // Diagnostics have their own signed, read/recovery-only route. Normal source
@@ -10268,7 +10268,7 @@ function deployEdgeFence_(req){
  if(['change','lease','acknowledgeNotices','renameCampusUnit'].includes(req?.action))error_(409,'Deploy writes have moved to the Worker. Use the v0.9.4 Deploy viewport.');
 }
 function deployEdgeForward_(action,input,identity){
- const p=props_(),url=p.getProperty('DEPLOY_EDGE_URL'),secret=gsisApiSecret_('DEPLOY_EDGE_SECRET');
+ const p=props_(),url=p.getProperty('DEPLOY_EDGE_URL'),secret=gsisApiSecret_();
  if(!/^https:\/\/[^/]+\/api\/edge\/service$/.test(url||'')||!secret||secret.length<32)error_(503,'Configure the Deploy Worker service bridge.');
  const payload=JSON.stringify({service:'gsis-deploy-edge-v1',action,input:input||{},identity:identity||null,timestamp:Date.now(),nonce:Utilities.getUuid()}),response=UrlFetchApp.fetch(url,{method:'post',contentType:'application/json',payload:JSON.stringify({payload,signature:signature_(payload,secret)}),muteHttpExceptions:true});let body;
  try{body=JSON.parse(response.getContentText());}catch(ignore){error_(503,'Deploy Worker returned an invalid service response.');}if(!body.ok){const codes=['VENUES_SOURCE_AUTH','VENUES_SOURCE_SETUP','VENUES_SOURCE_INPUT','VENUES_SOURCE_PENDING','VENUES_SOURCE_CHANGED','VENUES_SOURCE_INVALID','VENUES_FENCE_PENDING','SOURCE_CHANGED','SOURCE_INVALID','SOURCE_UNAVAILABLE'];throw Object.assign(Error(body.error||'Deploy Worker is unavailable.'),{status:body.status||503,...(codes.includes(body.code)?{code:body.code}:{})});}return body.data;
@@ -10291,7 +10291,7 @@ function deployEdgeAdapter_(req){
   if(p.operation==='fence'){
    if(!Number.isInteger(p.expectedRevision)||idx.revision!==p.expectedRevision)error_(409,'Deploy changed after export. Import the current data before fencing.');
    if(!/^[a-f0-9]{64}$/.test(p.sourceDigest||'')||!Number.isInteger(p.verifiedRecords)||p.verifiedRecords<1)error_(400,'Verified import proof required.');
-   const properties=props_();if(!properties.getProperty('DEPLOY_EDGE_URL')||!gsisApiSecret_('DEPLOY_EDGE_SECRET'))error_(503,'Configure DEPLOY_EDGE_URL and DEPLOY_EDGE_SECRET before fencing.');
+   const properties=props_();if(!properties.getProperty('DEPLOY_EDGE_URL')||!gsisApiSecret_())error_(503,'Configure DEPLOY_EDGE_URL and GSIS_SECRET before fencing.');
    properties.setProperty('DEPLOY_EDGE_MODE','fenced');properties.setProperty('DEPLOY_EDGE_FENCE',JSON.stringify({at:new Date().toISOString(),revision:idx.revision,sourceDigest:p.sourceDigest,actor:req.identity.email}));
    return {legacyWritesDisabled:true,sourceDigest:p.sourceDigest,verifiedRecords:p.verifiedRecords,revision:idx.revision};
   }
@@ -10927,14 +10927,14 @@ function rosterEdgeExportAbandon_(req){
 /* GSIS_ROSTER_EDGE_MIGRATION_END */
 
 /* GSIS_API_SECRET_BEGIN */
-// Server-to-server transport only. Session keys, private links and provider credentials stay separate.
-function gsisApiSecret_(legacyName){
- const properties=PropertiesService.getScriptProperties(),value=properties.getProperty('GSIS_SECRET');
- if(value!==null&&value!==undefined){
-  if(typeof value!=='string'||! /^[!-~]{32,8000}$/.test(value))throw Object.assign(Error('GSIS_SECRET must contain 32 to 8000 printable ASCII characters without spaces.'),{status:503,code:'GSIS_SECRET_INVALID'});
-  return value;
+// Roster/Deploy transport requires one setting and never reads a legacy fallback.
+function gsisApiSecret_(){
+ const value=PropertiesService.getScriptProperties().getProperty('GSIS_SECRET');
+ if(typeof value!=='string'||! /^[!-~]{32,8000}$/.test(value)){
+  throw Object.assign(
+   Error('GSIS_SECRET must contain 32 to 8000 printable ASCII characters without spaces.'),{status:503,code:'GSIS_SECRET_INVALID'});
  }
- return properties.getProperty(legacyName)||'';
+ return value;
 }
 
 /* GSIS_API_SECRET_END */

@@ -5,7 +5,7 @@ import {createRequire} from 'node:module';
 
 const require=createRequire(import.meta.url),fixture=require('./roster701-fixture.cjs');
 const worker=await import(toWorkerModuleURL('data:text/javascript;base64,'+Buffer.from(fs.readFileSync('roster-update/public/_worker.js','utf8')).toString('base64')));
-const env={WHATSAPP_ENABLED:'true',WHATSAPP_MENU_ENABLED:'true',WHATSAPP_CURRENT_RELIEF_URL:'https://roster.diveanalytics.com/',WHATSAPP_PHONE_NUMBER_ID:'123456789',WHATSAPP_ACCOUNT_ID:'223456789',WHATSAPP_API_VERSION:'v23.0',WHATSAPP_ACCESS_TOKEN:'private-access-'.repeat(8),WHATSAPP_APP_SECRET:'private-app-'.repeat(8),ROSTER_SERVICE_SECRET:'private-service-'.repeat(8),APPS_SCRIPT_URL:'https://script.google.com/macros/s/test/exec',ROSTER_PUBLIC_ORIGIN:'https://roster.example.test'};
+const env={WHATSAPP_ENABLED:'true',WHATSAPP_MENU_ENABLED:'true',WHATSAPP_CURRENT_RELIEF_URL:'https://roster.diveanalytics.com/',WHATSAPP_PHONE_NUMBER_ID:'123456789',WHATSAPP_ACCOUNT_ID:'223456789',WHATSAPP_API_VERSION:'v23.0',WHATSAPP_ACCESS_TOKEN:'private-access-'.repeat(8),WHATSAPP_APP_SECRET:'private-app-'.repeat(8),GSIS_SECRET:'private-service-'.repeat(8),APPS_SCRIPT_URL:'https://script.google.com/macros/s/test/exec',ROSTER_PUBLIC_ORIGIN:'https://roster.example.test'};
 const to='6591234567',rows=worker.menuReply({to,action:'menu'},env).interactive.action.sections[0].rows;
 assert.deepEqual(rows[0],{id:'gsis_report_absence',title:'Report Absence',description:'Open the current relief system'});
 assert.deepEqual(rows.slice(1).map(r=>[r.id,r.title]),[['gsis_urgent','Urgent Message'],['gsis_layout','School Layout'],['gsis_devices','Collect / Return ICT'],['gsis_office','Call General Office']]);
@@ -39,7 +39,7 @@ let f=serviceFixture();const sent=[],retained=[],operations=[];
 globalThis.fetch=async(url,options={})=>{
  if(String(url)===env.APPS_SCRIPT_URL){
   const envelope=JSON.parse(options.body),payload=JSON.parse(envelope.payload),input=payload.input;
-  assert.equal(envelope.signature,(await worker.sign(payload,env.ROSTER_SERVICE_SECRET)).signature);
+  assert.equal(envelope.signature,(await worker.sign(payload,env.GSIS_SECRET)).signature);
   assert.equal(payload.action,'rosterService');operations.push(input.operation);
   if(input.operation==='inboxIngest'){retained.push(input.message);return Response.json({ok:true,data:{recorded:true}});}
   if(input.operation==='inboundMessage'){assert.equal(input.inboxMode,true);return Response.json({ok:true,data:f.O.inboundMessage(f.state,f.ctx,input)});}

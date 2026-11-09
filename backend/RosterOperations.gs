@@ -935,7 +935,7 @@ function rosterOperationsReadReconcile_(s,ctx){
  }finally{deployUnlock_(lock);}
 }
 function rosterServiceContacts_(){
- const endpoint=props_().getProperty('CONTACTS_API_URL'),secret=gsisApiSecret_('ROSTER_SERVICE_SECRET');if(!endpoint||!/^https:\/\/script\.google\.com\/macros\/s\/[^/]+\/exec$/.test(endpoint)||!secret||secret.length<32)error_(503,'Configure the Contacts endpoint and shared Roster service secret.');
+ const endpoint=props_().getProperty('CONTACTS_API_URL'),secret=gsisApiSecret_();if(!endpoint||!/^https:\/\/script\.google\.com\/macros\/s\/[^/]+\/exec$/.test(endpoint)||!secret||secret.length<32)error_(503,'Configure the Contacts endpoint and shared Roster service secret.');
  const payload=JSON.stringify({action:'rosterServiceDirectory',service:'gsis-roster-notifier-v1',input:{},timestamp:Date.now(),nonce:Utilities.getUuid()}),response=UrlFetchApp.fetch(endpoint,{method:'post',contentType:'application/json',payload:JSON.stringify({payload,signature:signature_(payload,secret)}),muteHttpExceptions:true});
  let body;try{body=JSON.parse(response.getContentText());}catch(e){error_(503,'Contacts service directory is unavailable.');}if(!body.ok||!Array.isArray(body.data?.rosterPeople))error_(503,'Contacts service directory is unavailable.');return {identity:{email:'roster-service',subject:'service'},c:body.data};
 }

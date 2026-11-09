@@ -4,9 +4,9 @@ import deploy from '../public/_worker.js';
 import {verifyBackendEnvelope,forwardOperationalRequest} from '../shared/backend-service.js';
 
 const rosterOrigin='https://roster.gsps.edu.sg',deployOrigin='https://deploy.gsps.edu.sg',source='https://script.google.com/macros/s/source/exec';
-const common={GOOGLE_CLIENT_ID:'client',APPS_SCRIPT_URL:source,BRIDGE_SECRET:'browser-secret'.repeat(4),ROSTER_PUBLIC_ORIGIN:rosterOrigin,DEPLOY_PUBLIC_ORIGIN:deployOrigin,GSIS_BACKEND_REQUIRED:'true',GSIS_BACKEND_SECRET:'private-secret'.repeat(4),ROSTER_EDGE_AUTHORITY:'d1'};
+const common={GOOGLE_CLIENT_ID:'client',APPS_SCRIPT_URL:source,GSIS_SECRET:'browser-secret'.repeat(4),ROSTER_PUBLIC_ORIGIN:rosterOrigin,DEPLOY_PUBLIC_ORIGIN:deployOrigin,GSIS_BACKEND_REQUIRED:'true',GSIS_BACKEND_SECRET:'private-secret'.repeat(4),ROSTER_EDGE_AUTHORITY:'d1'};
 const email='teacher@gsps.edu.sg';
-async function cookie(origin){const now=Date.now(),signed=await rosterSign({purpose:'gsis-session-v1',origin,email,subject:'verified',issued:now,expires:now+86400000},common.BRIDGE_SECRET+'|gsis-browser-session-v1|'+origin);return '__Host-gsis_session='+Buffer.from(signed.payload).toString('base64url')+'.'+signed.signature;}
+async function cookie(origin){const now=Date.now(),signed=await rosterSign({purpose:'gsis-session-v1',origin,email,subject:'verified',issued:now,expires:now+86400000},common.GSIS_SECRET+'|gsis-browser-session-v1|'+origin);return '__Host-gsis_session='+Buffer.from(signed.payload).toString('base64url')+'.'+signed.signature;}
 const cookies={[rosterOrigin]:await cookie(rosterOrigin),[deployOrigin]:await cookie(deployOrigin)},calls=[];
 const binding={async fetch(request){const command=await verifyBackendEnvelope(request,common);calls.push(command);
  if(command.purpose.endsWith('-http'))return new Response('inner-handler-response',{status:207,headers:{'Content-Type':'text/plain'}});
@@ -22,7 +22,7 @@ const env={...common,GSIS_BACKEND:binding,ASSETS:{async fetch(){return new Respo
 const post=(origin,path,input={},extra={})=>new Request(origin+path,{method:'POST',headers:{Origin:origin,Cookie:cookies[origin],...extra},body:JSON.stringify(input)});
 const googleCalls=[],oldFetch=globalThis.fetch;globalThis.fetch=async(url,init)=>{
  assert.equal(String(url),source,'only the configured Google Roster backend may be contacted');const envelope=JSON.parse(init.body),request=JSON.parse(envelope.payload);
- assert.equal(envelope.signature,(await rosterSign(request,common.BRIDGE_SECRET)).signature);googleCalls.push(request);return Response.json({ok:true,data:{saved:true}});
+ assert.equal(envelope.signature,(await rosterSign(request,common.GSIS_SECRET)).signature);googleCalls.push(request);return Response.json({ok:true,data:{saved:true}});
 };
 try{
  for(const [path,action,input] of [['/api/profile','rosterProfile',{}],['/api/read','rosterRead',{view:'names',calendar:false}],['/api/upload','rosterUpload',{}],['/api/update','rosterUpdate',{}],['/api/operations','rosterOperations',{operation:'read',date:'2026-10-27'}]]){

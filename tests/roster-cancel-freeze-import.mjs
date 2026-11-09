@@ -11,7 +11,7 @@ const deferred=()=>{let resolve;const promise=new Promise(r=>{resolve=r;});retur
 
 function fixture(){
  const db=database(),previous=globalThis.fetch,calls=[],snapshots=new Map();let freeze={available:true,active:false,state:'cancelled',requestId:crypto.randomUUID(),frozenAt:new Date().toISOString()},pause=null;
- const env={GSIS_JOBS:db,ROSTER_D1_PREPARE:'import',ROSTER_EDGE_AUTHORITY:'legacy',ROSTER_PUBLIC_ORIGIN:'https://roster.gsps.edu.sg',APPS_SCRIPT_URL:'https://script.google.com/macros/s/cancel-fixture/exec',BRIDGE_SECRET:'b'.repeat(40),ROSTER_SERVICE_SECRET:'s'.repeat(40),CALENDAR_APPS_SCRIPT_URL:'https://script.google.com/macros/s/calendar-fixture/exec',CALENDAR_PROXY_SECRET:'c'.repeat(40)};
+ const env={GSIS_JOBS:db,ROSTER_D1_PREPARE:'import',ROSTER_EDGE_AUTHORITY:'legacy',ROSTER_PUBLIC_ORIGIN:'https://roster.gsps.edu.sg',APPS_SCRIPT_URL:'https://script.google.com/macros/s/cancel-fixture/exec',GSIS_SECRET:'b'.repeat(40),ROSTER_SERVICE_SECRET:'s'.repeat(40),CALENDAR_APPS_SCRIPT_URL:'https://script.google.com/macros/s/calendar-fixture/exec',CALENDAR_PROXY_SECRET:'c'.repeat(40)};
  const source={sourceDigest:'a'.repeat(64),state:O.initial(),index:{schema:1,revision:0,entries:[],receipts:[]}};
  source.state.synthetic=Array.from({length:180},(_,i)=>({id:'row-'+i,date:'2026-11-03',text:'fixture'.repeat(1000)}));
  globalThis.fetch=async(_url,options)=>{

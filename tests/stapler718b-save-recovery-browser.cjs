@@ -16,7 +16,7 @@ const supplied=process.argv[2]?JSON.parse(fs.readFileSync(process.argv[2],'utf8'
   const oldFetch=globalThis.fetch,oldError=console.error;let called=false;
   try{
    console.error=()=>{};globalThis.fetch=async()=>{called=true;return Response.json({ok:false,status:401,error:'Invalid signature',diagnosticId:'aaaaaaaa-1111-4222-8333-bbbbbbbbbbbb',backendVersion:'0.7.018b',failureStage:'bridge-signature'});};
-   const response=await gateway.default.fetch(new Request(origin+'/api/operations',{method:'POST',headers:{Origin:origin,Cookie:browserSession?'':cookie},body:JSON.stringify(input)}),{BRIDGE_SECRET:secret,APPS_SCRIPT_URL:'https://script.google.com/macros/s/synthetic-stapler-recovery/exec'});
+   const response=await gateway.default.fetch(new Request(origin+'/api/operations',{method:'POST',headers:{Origin:origin,Cookie:browserSession?'':cookie},body:JSON.stringify(input)}),{GSIS_SECRET:secret,APPS_SCRIPT_URL:'https://script.google.com/macros/s/synthetic-stapler-recovery/exec'});
    assert.equal(called,!browserSession,'only an authenticated browser request can reach the backend');
    return {status:response.status,result:await response.json()};
   }finally{globalThis.fetch=oldFetch;console.error=oldError;}

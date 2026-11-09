@@ -9,7 +9,7 @@ const gateway=await import(toWorkerModuleURL('data:text/javascript;base64,'+Buff
 const bundled=await import('../notification-worker/dashboard-worker.mjs');
 assert.equal(fs.readFileSync('notification-worker/dashboard-worker.mjs','utf8'),fs.readFileSync('notification-worker/dashboard-worker.txt','utf8'));
 assert.deepEqual(bundled.WHATSAPP_CONTRACTS,gateway.WHATSAPP_CONTRACTS);
-const env={WHATSAPP_ENABLED:'false',ROSTER_AUTOMATION_ENABLED:'false',WHATSAPP_MENU_ENABLED:'false',WHATSAPP_TEMPLATES_JSON:'{}',WHATSAPP_PHONE_NUMBER_ID:'123456789',WHATSAPP_ACCOUNT_ID:'223456789',WHATSAPP_TEMPLATE_ACCOUNT_ID:'323456789',WHATSAPP_API_VERSION:'v26.0',WHATSAPP_ACCESS_TOKEN:'test-token-'.repeat(8),WHATSAPP_APP_SECRET:'test-app-'.repeat(8),WHATSAPP_VERIFY_TOKEN:'test-verify-'.repeat(8),ROSTER_SERVICE_SECRET:'test-service-'.repeat(8),EXTERNAL_LINK_SECRET:'test-link-'.repeat(8),ROSTER_PUBLIC_ORIGIN:'https://roster.example.test',CONTACTS_PUBLIC_URL:'https://contacts.example.test',APPS_SCRIPT_URL:'https://script.google.com/macros/s/deploy-test/exec',CALENDAR_APPS_SCRIPT_URL:'https://script.google.com/macros/s/calendar-test/exec',CALENDAR_PROXY_SECRET:'test-calendar-'.repeat(8)};
+const env={WHATSAPP_ENABLED:'false',ROSTER_AUTOMATION_ENABLED:'false',WHATSAPP_MENU_ENABLED:'false',WHATSAPP_TEMPLATES_JSON:'{}',WHATSAPP_PHONE_NUMBER_ID:'123456789',WHATSAPP_ACCOUNT_ID:'223456789',WHATSAPP_TEMPLATE_ACCOUNT_ID:'323456789',WHATSAPP_API_VERSION:'v26.0',WHATSAPP_ACCESS_TOKEN:'test-token-'.repeat(8),WHATSAPP_APP_SECRET:'test-app-'.repeat(8),WHATSAPP_VERIFY_TOKEN:'test-verify-'.repeat(8),GSIS_SECRET:'test-service-'.repeat(8),EXTERNAL_LINK_SECRET:'test-link-'.repeat(8),ROSTER_PUBLIC_ORIGIN:'https://roster.example.test',CONTACTS_PUBLIC_URL:'https://contacts.example.test',APPS_SCRIPT_URL:'https://script.google.com/macros/s/deploy-test/exec',CALENDAR_APPS_SCRIPT_URL:'https://script.google.com/macros/s/calendar-test/exec',CALENDAR_PROXY_SECRET:'test-calendar-'.repeat(8)};
 const event={scheduledTime:Date.parse('2026-10-15T08:00:00Z')};
 // Keep diagnostics and notification claims in the fixture's afternoon window.
 Date.now=()=>event.scheduledTime;
@@ -39,7 +39,7 @@ function responses(input,init={}){
  if(url.pathname.includes('/deploy-test/')){
   const req=JSON.parse(body.payload);
   assert.equal(req.action,'rosterService');assert.equal(req.service,'gsis-roster-notifier-v1');assert.deepEqual(req.input,{operation:'connectionStatus'});
-  return gateway.sign(req,env.ROSTER_SERVICE_SECRET).then(expected=>{assert.equal(body.signature,expected.signature);return Response.json({ok:true,data:{readOnly:true,contactsReady:true,staffData:'must never be returned or logged'}});});
+  return gateway.sign(req,env.GSIS_SECRET).then(expected=>{assert.equal(body.signature,expected.signature);return Response.json({ok:true,data:{readOnly:true,contactsReady:true,staffData:'must never be returned or logged'}});});
  }
  assert(url.pathname.includes('/calendar-test/'));assert.equal(body.action,'rosterDate');assert.equal(body.service,'gsis-roster-notifier-v1');
  return Response.json({ok:true,result:{date:body.payload.date,schoolDay:true,parity:'odd',staffData:'must never be returned or logged'}});
@@ -51,7 +51,7 @@ assert(result.readOnly&&result.connectionsReady&&!result.sendingTested);
 assert.equal(result.checks.find(c=>c.name==='metaTemplates').approved,0);
 assert.equal(calls.length,4);
 assert(!JSON.stringify(result).includes('staffData'));
-for(const value of [env.WHATSAPP_ACCESS_TOKEN,env.WHATSAPP_APP_SECRET,env.ROSTER_SERVICE_SECRET])assert(!JSON.stringify(result).includes(value));
+for(const value of [env.WHATSAPP_ACCESS_TOKEN,env.WHATSAPP_APP_SECRET,env.GSIS_SECRET])assert(!JSON.stringify(result).includes(value));
 const output=[];const info=console.info;console.info=value=>output.push(JSON.parse(value));
 try{
  calls=[];

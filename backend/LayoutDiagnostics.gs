@@ -15,8 +15,8 @@ function diagnoseLayout601(){
   if(response.ok!==true||response.data?.layoutRevision!==current.revision)throw Error('Layout response contract differs.');return {};
  });
  check('Published web app response',()=>{
-  const url=deployWebAppUrl_(),secret=gsisApiSecret_('BRIDGE_SECRET');
-  if(!secret||secret.length<32)throw Error('BRIDGE_SECRET is missing or too short.');
+  const url=deployWebAppUrl_(),secret=gsisApiSecret_();
+  if(!secret||secret.length<32)throw Error('GSIS_SECRET is missing or invalid.');
   const nonce=Utilities.getUuid(),payload=JSON.stringify({action:'publicLayout',input:{year:current?.year||2026},identity:null,timestamp:Date.now(),nonce,traceId:nonce});
   const response=UrlFetchApp.fetch(url,{method:'post',contentType:'application/json',payload:JSON.stringify({payload,signature:signature_(payload,secret)}),muteHttpExceptions:true,followRedirects:true}),raw=response.getContentText();
   let result;try{result=JSON.parse(raw);}catch(e){throw Error('The published web app returned '+response.getResponseCode()+' with '+(/^\s*</.test(raw)?'HTML':'invalid JSON')+'. Check deployment access, the deployed version and execution logs.');}

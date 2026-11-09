@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import test from 'node:test';
 const source=fs.readFileSync('roster-update/public/_worker.js','utf8');
 const M=await import(toWorkerModuleURL('data:text/javascript;base64,'+Buffer.from(source+'\n//# sourceURL=roster-worker-capabilities.mjs').toString('base64')));
-const env={ROSTER_PUBLIC_ORIGIN:'https://roster.example.test',EXTERNAL_LINK_SECRET:'synthetic-current-key-'.repeat(3),ROSTER_SERVICE_SECRET:'synthetic-service-'.repeat(3),APPS_SCRIPT_URL:'https://script.google.com/macros/s/test/exec'};
+const env={ROSTER_PUBLIC_ORIGIN:'https://roster.example.test',EXTERNAL_LINK_SECRET:'synthetic-current-key-'.repeat(3),GSIS_SECRET:'synthetic-service-'.repeat(3),APPS_SCRIPT_URL:'https://script.google.com/macros/s/test/exec'};
 const issuedAt=Date.parse('2026-10-21T00:00:00Z'),week=7*86400000;
 const base={staffId:'fixture-teacher',date:'2026-10-21',purpose:'duties',issuedAt,expiresAt:issuedAt+week};
 await test('private timetable expiry remains fixed across issuance retries and valid until exactly168 hours',async()=>{

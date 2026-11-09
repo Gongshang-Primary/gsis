@@ -7,7 +7,7 @@ function deployLock_(){return true;}function deployUnlock_(){}function gsisRequi
 function book_(){return state;}function index_(){return state.index;}function fieldIndexWrite_(b,idx){state.index=idx;}
 function fieldRecover_(){return state.index;}function draftReadScope_(){return null;}
 function props_(){return {getProperty:key=>key==='LEASES'?JSON.stringify(state.leases||{}):(state.properties||{})[key]||null,setProperty:(key,value)=>{if(key==='LEASES')state.leases=JSON.parse(value);else (state.properties||(state.properties={}))[key]=value;},deleteProperty:key=>{delete (state.properties||{})[key];}};}
-function gsisApiSecret_(legacyName){if(typeof runtime.apiSecret!=='function')error_(503,'The signed integration credential is unavailable.');return runtime.apiSecret(legacyName);}
+function gsisApiSecret_(){if(typeof runtime.apiSecret!=='function')error_(503,'The signed integration credential is unavailable.');return runtime.apiSecret();}
 function document_(b,en){const source=en.edgePublished?'publications':'drafts',prefix=(en.edgePublished?en.commit:en.id)+'|',fields={};for(const [key,value] of Object.entries(state[source]||{}))if(key.startsWith(prefix))fields[key.slice(prefix.length)]=value;if(!fields['[]'])error_(503,'Deploy version data is missing.');return GSISFields.inflate(fields);}
 function cleanOld_(b,id){for(const key of Object.keys(state.drafts||{}))if(key.startsWith(id+'|'))delete state.drafts[key];}
 function contacts_(identity,authorityOnly,action='deploySnapshot',input=null){return runtime.integration('contacts',action,input||{authorityOnly:!!authorityOnly},identity);}

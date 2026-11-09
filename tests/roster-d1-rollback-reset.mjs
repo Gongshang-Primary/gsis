@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import {createRequire} from 'node:module';
 import {edgeRosterMigration} from '../roster-update/public/edge-roster.js';
 const require=createRequire(import.meta.url),Store=require('../shared/edge-store.js'),Import=require('../shared/roster-import.js'),database=require('./helpers/chunked-import-db.cjs');
-const db=database(),who={email:'admin@gsps.edu.sg'},env={GSIS_JOBS:db,ROSTER_EDGE_AUTHORITY:'legacy',APPS_SCRIPT_URL:'https://script.google.com/macros/s/reset-fixture/exec',BRIDGE_SECRET:'b'.repeat(40),ROSTER_SERVICE_SECRET:'s'.repeat(40)},oldFetch=globalThis.fetch;
+const db=database(),who={email:'admin@gsps.edu.sg'},env={GSIS_JOBS:db,ROSTER_EDGE_AUTHORITY:'legacy',APPS_SCRIPT_URL:'https://script.google.com/macros/s/reset-fixture/exec',GSIS_SECRET:'b'.repeat(40),ROSTER_SERVICE_SECRET:'s'.repeat(40)},oldFetch=globalThis.fetch;
 let fenced=false,admin=true,loseReply=false,cleanupCalls=0,loseCleanup=true;
 try{
  globalThis.fetch=async(_,options)=>{const req=JSON.parse(JSON.parse(options.body).payload),op=req.input.operation;if(op==='edgeReferences')return Response.json({ok:true,data:{adminVerified:admin,legacyWritesDisabled:fenced}});if(op==='edgeFenceStatus')return Response.json({ok:true,data:{legacyWritesDisabled:fenced}});if(op==='edgeExportAbandon'){cleanupCalls++;assert.equal(req.input.importActor,'importer@gsps.edu.sg');if(loseCleanup){loseCleanup=false;throw Error('Google cleanup response lost');}return Response.json({ok:true,data:{adminVerified:true,abandoned:true,sessionId:req.input.sessionId,resetRequestId:req.input.resetRequestId}});}throw Error('Unexpected Google operation '+op);};

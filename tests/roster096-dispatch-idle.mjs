@@ -14,7 +14,7 @@ function database(){
 }
 async function activate(db,scope,state){const store=GSiSEdgeStore.open(db,scope),head=await store.importState({state,actor:'setup',requestId:crypto.randomUUID()});await store.transition({from:'imported',to:'active',expectedRevision:head.revision,actor:'setup',proof:{legacyWritesDisabled:true,sourceDigest:head.sourceDigest,verifiedRecords:head.importedRecords}});return store;}
 async function fixture(state=O.initial()){
- const db=database(),store=await activate(db,'roster',state),env={GSIS_JOBS:db,ROSTER_EDGE_AUTHORITY:'d1',ROSTER_AUTOMATION_ENABLED:'true',ROSTER_PUBLIC_ORIGIN:'https://roster.gsps.edu.sg',APPS_SCRIPT_URL:'https://script.google.com/macros/s/fixture/exec',ROSTER_SERVICE_SECRET:'s'.repeat(32),WHATSAPP_ENABLED:'true',WHATSAPP_PHONE_NUMBER_ID:'123456789',WHATSAPP_API_VERSION:'v22.0',WHATSAPP_ACCESS_TOKEN:'a'.repeat(40),WHATSAPP_APP_SECRET:'b'.repeat(40),EXTERNAL_LINK_SECRET:'c'.repeat(40),WHATSAPP_VERIFY_TOKEN:'d'.repeat(40),WHATSAPP_ACCOUNT_ID:'123456789',WHATSAPP_TEMPLATE_ACCOUNT_ID:'123456789',CONTACTS_PUBLIC_URL:'https://contacts.gsps.edu.sg/',WHATSAPP_TEMPLATES_JSON:'{}'};
+ const db=database(),store=await activate(db,'roster',state),env={GSIS_JOBS:db,ROSTER_EDGE_AUTHORITY:'d1',ROSTER_AUTOMATION_ENABLED:'true',ROSTER_PUBLIC_ORIGIN:'https://roster.gsps.edu.sg',APPS_SCRIPT_URL:'https://script.google.com/macros/s/fixture/exec',GSIS_SECRET:'s'.repeat(32),WHATSAPP_ENABLED:'true',WHATSAPP_PHONE_NUMBER_ID:'123456789',WHATSAPP_API_VERSION:'v22.0',WHATSAPP_ACCESS_TOKEN:'a'.repeat(40),WHATSAPP_APP_SECRET:'b'.repeat(40),EXTERNAL_LINK_SECRET:'c'.repeat(40),WHATSAPP_VERIFY_TOKEN:'d'.repeat(40),WHATSAPP_ACCOUNT_ID:'123456789',WHATSAPP_TEMPLATE_ACCOUNT_ID:'123456789',CONTACTS_PUBLIC_URL:'https://contacts.gsps.edu.sg/',WHATSAPP_TEMPLATES_JSON:'{}'};
  db.statements.length=0;db.sessions.length=0;return {db,store,env};
 }
 const peerToken=row=>createHash('sha256').update(JSON.stringify(N.peerMailReviewFields(row))).digest('hex');
@@ -138,7 +138,7 @@ await test('dispatch probes use narrow indexes despite 2000 completed history ro
  insert(db,'dailyEmploymentMail','id:recover',{id:'recover',status:'sending',claimedAt:'2020-01-01'});assert.equal(await edge.edgeDispatchHasWork(env,'employmentMail'),true,'expired employment claim remains indexed');
 });
 await test('D1 scheduler wrapper does not call Calendar HTTP before edge preflight',async()=>{
- const {db,env}=await fixture();env.CALENDAR_APPS_SCRIPT_URL='https://script.google.com/macros/s/calendar-fixture/exec';env.CALENDAR_PROXY_SECRET='calendar-secret'.repeat(4);let networkCalls=0;globalThis.fetch=()=>{networkCalls++;throw Error('unexpected Calendar HTTP');};
+ const {db,env}=await fixture();env.CALENDAR_APPS_SCRIPT_URL='https://script.google.com/macros/s/calendar-fixture/exec';env.GSIS_SECRET='calendar-secret'.repeat(4);let networkCalls=0;globalThis.fetch=()=>{networkCalls++;throw Error('unexpected Calendar HTTP');};
  try{await scheduledRoster(env,Date.now());}catch{}
  assert.equal(networkCalls,0,'D1 uses verified references, not the legacy Calendar HTTP adapter');
  try{await scheduledRoster({...env,ROSTER_EDGE_AUTHORITY:'legacy'},Date.now());}catch{}

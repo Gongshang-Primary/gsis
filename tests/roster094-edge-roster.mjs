@@ -40,12 +40,12 @@ console.log('PASS Roster D1 attendance, idempotent retry, no-relief edit, stale-
 
 // Import is resumable per scope, export is reviewable before activation, and
 // legacy writers are never fenced for a different imported source digest.
-const migrationDb=database(),migrationEnv={...env,GSIS_JOBS:migrationDb,BRIDGE_SECRET:'b'.repeat(32),ROSTER_SERVICE_SECRET:'s'.repeat(32),CALENDAR_APPS_SCRIPT_URL:'https://script.google.com/macros/s/calendar/exec',CALENDAR_PROXY_SECRET:'c'.repeat(32)};
+const migrationDb=database(),migrationEnv={...env,GSIS_JOBS:migrationDb,GSIS_SECRET:'b'.repeat(32),ROSTER_SERVICE_SECRET:'s'.repeat(32),CALENDAR_APPS_SCRIPT_URL:'https://script.google.com/macros/s/calendar/exec',CALENDAR_PROXY_SECRET:'c'.repeat(32)};
 const legacy={schema:1,state:O.initial(),index:{revision:3,entries:[],receipts:[]},sourceDigest:'a'.repeat(64),adminVerified:true};let fences=0;
 const frozenImports=new Map(),abandonedImports=[];let expectedRestart=null;
 globalThis.fetch=async(url,options)=>{const body=JSON.parse(options.body);if(body.action==='rosterDates')return Response.json({ok:true,result:{dates:body.payload.dates.map(date=>({date,schoolDay:true,parity:'odd'}))}});const request=JSON.parse(body.payload),op=request.input.operation;if(op==='edgeExportManifest'){const input=request.input,binding={actor:request.identity.email,requestId:input.requestId,sessionId:input.sessionId};let frozen=frozenImports.get(binding.sessionId);if(!frozen){frozen=Import.freeze(legacy,binding,{hash:sha256Hex});frozenImports.set(binding.sessionId,frozen);}return Response.json({ok:true,data:{adminVerified:true,sessionId:binding.sessionId,manifest:frozen.manifest,manifestDigest:frozen.manifestDigest}});}if(op==='edgeExportPart'){const frozen=frozenImports.get(request.input.sessionId),part=frozen.manifest.parts.find(row=>row.id===request.input.partId);return Response.json({ok:true,data:{adminVerified:true,sessionId:request.input.sessionId,manifestDigest:frozen.manifestDigest,partId:part.id,payload:frozen.parts[frozen.manifest.parts.indexOf(part)]}});}if(op==='edgeExportAbandon'){
  assert.equal(String(url),migrationEnv.APPS_SCRIPT_URL);assert.equal(request.action,'rosterOperations');assert.equal(request.identity.email,who.email);
- assert.equal(body.signature,createHmac('sha256',migrationEnv.BRIDGE_SECRET).update(body.payload).digest('hex'),'abandonment must use the authenticated administrator bridge');
+ assert.equal(body.signature,createHmac('sha256',migrationEnv.GSIS_SECRET).update(body.payload).digest('hex'),'abandonment must use the authenticated administrator bridge');
  assert(expectedRestart,'an active scope must refuse restart before Google abandonment');assert.deepEqual(request.input,{operation:'edgeExportAbandon',requestId:expectedRestart.importRequestId,sessionId:expectedRestart.sessionId,resetRequestId:expectedRestart.resetRequestId});
  assert(frozenImports.has(request.input.sessionId),'abandonment targets the retained original source');abandonedImports.push(request.input.sessionId);
  return Response.json({ok:true,data:{adminVerified:true,abandoned:true,sessionId:request.input.sessionId,resetRequestId:request.input.resetRequestId}});
@@ -83,7 +83,7 @@ console.log('PASS independent absence+peer capture, quota-free tentative request
 // would miss an externalRespond accidentally bypassing respondMutual quotas.
 const peerRequest=peerState.requests[0],approval={operation:'externalRespond',requestId:crypto.randomUUID(),decision:'approve',capability:{purpose:'mutual',staffId:'bob',requestId:peerRequest.id,date:schoolDate,issuedAt:Date.now(),expiresAt:Date.now()+3600000}},peerStore=GSiSEdgeStore.open(peerDb,'roster');
 const approvalBefore=await peerStore.load();
-await assert.rejects(edgeRosterService(peerEnv,approval),error=>error.status===503&&error.code==='DEPLOY_EDGE_CONFIG');
+await assert.rejects(edgeRosterService(peerEnv,approval),error=>error.status===503&&error.code==='GSIS_SECRET_INVALID');
 assert.equal((await peerStore.head()).revision,approvalBefore.revision,'unavailable quota must not commit any business or receipt state');
 assert.equal(await peerStore.receipt('external:bob',approval.requestId),null,'an unverified approval remains safely retryable');
 assert.deepEqual((await peerStore.load()).state,approvalBefore.state);

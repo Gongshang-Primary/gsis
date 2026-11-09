@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import {webcrypto} from 'node:crypto';
 globalThis.crypto??=webcrypto;
 const worker=await import(toWorkerModuleURL('data:text/javascript;base64,'+Buffer.from(fs.readFileSync('roster-update/public/_worker.js','utf8')).toString('base64')));
-const env={BRIDGE_SECRET:'b'.repeat(40),CALENDAR_APPS_SCRIPT_URL:'https://script.google.com/macros/s/calendar/exec',CALENDAR_PROXY_SECRET:'c'.repeat(40)},who={email:'smc@gsps.edu.sg',subject:'smc'},date='2026-10-26',now=Date.parse(date+'T00:00:00Z');
+const env={GSIS_SECRET:'b'.repeat(40),CALENDAR_APPS_SCRIPT_URL:'https://script.google.com/macros/s/calendar/exec',CALENDAR_PROXY_SECRET:'c'.repeat(40)},who={email:'smc@gsps.edu.sg',subject:'smc'},date='2026-10-26',now=Date.parse(date+'T00:00:00Z');
 let checkedTime=now,calls=[],revision='a'.repeat(64),malformed=false;
 globalThis.fetch=async(url,options)=>{
  const body=JSON.parse(options.body);calls.push(body);assert.equal(body.actor.email,who.email);
@@ -19,7 +19,7 @@ revision='b'.repeat(64);checkedTime=now+600002;const changed=await worker.cached
 checkedTime=now;for(const proof of [{...first.calendarCache,payload:first.calendarCache.payload.replace('odd','even')},{...first.calendarCache,signature:'0'.repeat(64)}]){
  const n=calls.length;await worker.cachedCalendarWindow(env,[date],who,proof,now);assert.equal(calls.length,n+1);assert.equal(calls.at(-1).payload.knownRevision,undefined);
 }
-const n=calls.length;await worker.cachedCalendarWindow({...env,BRIDGE_SECRET:'z'.repeat(40)},[date],who,first.calendarCache,now);assert.equal(calls.length,n+1,'secret rotation invalidates old proof');
+const n=calls.length;await worker.cachedCalendarWindow({...env,GSIS_SECRET:'z'.repeat(40)},[date],who,first.calendarCache,now);assert.equal(calls.length,n+1,'secret rotation invalidates old proof');
 malformed=true;const invalid=await worker.cachedCalendarWindow(env,[date],who,null,now);assert.equal(invalid.calendarCache,undefined);assert.equal(invalid.calendarByDate[date].available,false);malformed=false;
 const mutation=await worker.trustedOperationsInput({operation:'saveAbsence',date,calendarCache:first.calendarCache},env,who);assert.equal(calls.at(-1).action,'rosterDate');assert.equal(mutation.calendarCache,undefined,'client proof never enters mutation/receipt semantics');
 const output={};await worker.trustedOperationsInput({operation:'allocationVersion',date,calendarCache:first.calendarCache},env,who,output,now);assert.ok(output.calendarCache);

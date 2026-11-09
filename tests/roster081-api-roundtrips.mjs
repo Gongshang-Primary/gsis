@@ -22,7 +22,8 @@ for(const change of [{proxySecret:'wrong'},{service:'wrong'},{action:'saveEvent'
 assert.equal(h.audit.writes,writesBefore,'Service date reads do not mutate Calendar');
 
 const worker=await import(toWorkerModuleURL('data:text/javascript;base64,'+Buffer.from(fs.readFileSync('roster-update/public/_worker.js','utf8')).toString('base64')));
-const env={APPS_SCRIPT_URL:'https://script.google.com/macros/s/roster-test/exec',BRIDGE_SECRET:'b'.repeat(40),ROSTER_SERVICE_SECRET:'s'.repeat(40),ROSTER_AUTOMATION_ENABLED:'true',CALENDAR_APPS_SCRIPT_URL:'https://script.google.com/macros/s/calendar-test/exec',CALENDAR_PROXY_SECRET:'synthetic-secret'.repeat(3)};
+const env={APPS_SCRIPT_URL:'https://script.google.com/macros/s/roster-test/exec',GSIS_SECRET:'b'.repeat(40),ROSTER_SERVICE_SECRET:'s'.repeat(40),ROSTER_AUTOMATION_ENABLED:'true',CALENDAR_APPS_SCRIPT_URL:'https://script.google.com/macros/s/calendar-test/exec',CALENDAR_PROXY_SECRET:'synthetic-secret'.repeat(3)};
+h.props.set('GSIS_SECRET',env.GSIS_SECRET); // Align the synthetic Calendar peer with the migrated Roster caller.
 const oldFetch=globalThis.fetch,oldTimeout=AbortSignal.timeout;
 let calls=[],forwarded=[],deadlines=[];
 try{
@@ -30,7 +31,7 @@ try{
  globalThis.fetch=async(url,options)=>{
   calls.push(String(url));const body=JSON.parse(options.body);
   if(String(url)===env.CALENDAR_APPS_SCRIPT_URL){assert.equal(body.action,'rosterDates');assert.deepEqual(body.payload.dates,dates);assert.equal(body.service,'gsis-roster-notifier-v1');assert.equal(body.actor,undefined);return new Response(h.sandbox.doPost({postData:{contents:options.body}}).text);}
-  assert.equal(String(url),env.APPS_SCRIPT_URL);const payload=JSON.parse(body.payload);forwarded.push(payload);assert.equal(body.signature,(await worker.sign(payload,env.ROSTER_SERVICE_SECRET)).signature);return Response.json({ok:true,data:{accepted:true}});
+  assert.equal(String(url),env.APPS_SCRIPT_URL);const payload=JSON.parse(body.payload);forwarded.push(payload);assert.equal(body.signature,(await worker.sign(payload,env.GSIS_SECRET)).signature);return Response.json({ok:true,data:{accepted:true}});
  };
  const stamp=Date.parse('2026-10-20T16:00:00+08:00');
  assert.equal((await worker.scheduledRoster(env,stamp)).accepted,true);

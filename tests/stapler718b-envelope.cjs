@@ -5,7 +5,7 @@ globalThis.crypto??=crypto.webcrypto;
 const source=fs.readFileSync('backend/Code.gs','utf8'),start=source.indexOf('function doPost(e){'),post=source.slice(start,source.indexOf('\nfunction auth_',start)),secret='synthetic-718b-envelope-secret-0123456789';
 let dispatched=0,contacts=0;
 const scope=vm.createContext({GSIS_DEPLOY_VERSION:'0.7.018b',GSISSheets:{resetStats(){}},props_:()=>({getProperty:()=>secret}),out_:x=>x,error_:(status,message)=>{throw Object.assign(Error(message),{status});},contacts_:()=>{contacts++;return {};},rosterDispatch_:()=>{dispatched++;return {accepted:true};},rosterDiagnostic_(){},rosterStage_(){},rosterDiagnosticError_:e=>e.message,rosterDiagnosticText_:x=>x,rosterFailureDetail_:()=>({failureStage:'bridge-signature'}),Utilities:{getUuid:crypto.randomUUID,Charset:{UTF_8:'utf8'},computeHmacSha256Signature:(s,key,charset)=>[...crypto.createHmac('sha256',Buffer.from(key,charset)).update(s,charset).digest()]}});
-scope.PropertiesService={getScriptProperties:()=>({getProperty:key=>key==='BRIDGE_SECRET'?secret:null})};require('./load-backend-role.cjs')(scope,'roster');
+scope.PropertiesService={getScriptProperties:()=>({getProperty:key=>key==="GSIS_SECRET"?secret:null})};require('./load-backend-role.cjs')(scope,'roster');
 vm.runInContext(fs.readFileSync('backend/ApiSecret.gs','utf8'),scope);
 require('./helpers/load-roster-diagnostic-build.cjs')(scope);
 vm.runInContext(source.match(/^function signature_\([^\n]+/m)[0]+'\n'+source.match(/^function same_\([^\n]+/m)[0]+'\n'+post,scope);
