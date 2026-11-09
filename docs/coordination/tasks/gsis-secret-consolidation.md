@@ -1,6 +1,6 @@
 # gsis-secret-consolidation: reduce all transport secrets to one GSIS_SECRET
 
-- Status: Contacts #102 and Calendar #104 merged; edge-queue design #105 and release p #106 merged. Roster/Deploy implementation is prepared on the branch below; the owner approved the bounded two-file parity refresh on 9 November and full verification is in progress. It targets the next release, not p.
+- Status: Contacts #102, Calendar #104 and Roster/Deploy #107 merged; edge-queue design #105 and release p #106 merged. Roster/Deploy merged (#107 at 2247f72 as 03782ca, 9 Nov 12:12 SGT). Next in the queue: edge-queue P1 (Deploy), then secret consolidation — Venues, then LORD.
 - Owner/model: Codex
 - Reviewer/model: Muse
 - Last updated (Asia/Singapore): 9 Nov 2026
