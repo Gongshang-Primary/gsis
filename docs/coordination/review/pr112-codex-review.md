@@ -1,3 +1,5 @@
+> Current Codex code-review verdict: **APPROVE** at `1102d2e16dd61981abda853f8940d25265631edf`. The historical P1 below is resolved. Integration remains blocked by a CHANGELOG.md conflict with main `1d89225`; this is not a merge/deployment approval or a review of any future conflict-resolution head. Exact verification follows below.
+
 # PR #112 review
 
 Model: Codex. Date: 10 November 2026, Asia/Singapore.
@@ -64,3 +66,29 @@ const {JSDOM}=req('jsdom'),JSZip=req('jszip'),S=req('../shared/roster-stapler.js
  }finally{w.close();}
 })().catch(e=>{console.error(e);process.exitCode=1});
 ```
+
+---
+
+## Codex re-review of the retained-weekday privacy fix
+
+Model: Codex. Reviewed 10 November 2026, Asia/Singapore.
+Exact head: `1102d2e16dd61981abda853f8940d25265631edf`.
+Code verdict: **APPROVE**, prior P1 resolved, no additional blocking code finding identified in the reviewed delta. **Integration hold:** CHANGELOG.md conflicts with current main; resolve and verify the resulting head before merging.
+
+### Source and behavior
+
+The fix scrubs subject cells across all retained `single`, `odd` and `even` week blocks of the prepared cloned model before the converter generates Teacher Summary. The selected-day writer uses the same `scrubSubject` transformation. Hiding applies only when requested; neither the original model nor saved plan is changed. The default reason-visible Stapler export keeps its previous behavior. The delta from the last reviewed head contains this bounded correction, a new regression, CHANGELOG and task evidence only.
+
+### Tests actually performed
+
+- Original Codex reproducer, run unmodified against this head: validated baseline, Wednesday selected, private reason only on Monday. Teacher Summary, Class POV, previous day-only path and Drive all report `leaks=false`. Input immutability assertion passes.
+- All twelve targeted programs passed locally, exit 0, with `TZ=Asia/Singapore NODE_NO_WARNINGS=1`: `roster-assign-relief-export-privacy-weekday.cjs`, `roster-assign-relief-export-day.mjs`, `roster714-export-ui.cjs`, `roster714-teacher-export.cjs`, `roster098j-exports.cjs`, `stapler098h-standalone-export.cjs`, `roster-assign-relief-export-privacy-import.cjs`, `roster098g-export-headers.cjs`, `roster-daily-workbook.cjs`, `roster-daily-workbook-writer.cjs`, `roster-daily-audit.cjs`, `roster099a-excel-relief-for.cjs`. All changed/new test programs are covered.
+- Independently ran the new weekday regression unchanged with the old `05fece2` exporter substituted in memory. It exits 1 at the intended assertion, "Teacher Summary must not leak a non-selected weekday reason". No test source or product file was edited for this control.
+- `TZ=Asia/Singapore npm run build`: all 18 components passed; no tracked diff before or after tests.
+- Independently verified CI run `42919423312`: completed successfully at the exact full SHA, all four regression shards and `full-suite` green. The PR body's earlier pending wording was stale when checked; this review relies on the actual complete run.
+
+### Integration and handoff
+
+Main has advanced to `1d89225`, including the owner-merged #111 drain fix. Read-only `git merge-tree --write-tree --name-only origin/main HEAD` reports a single conflict, `CHANGELOG.md`, and no product-source or generated-file conflicts. GitHub also reports the PR unmergeable. Keep both the #111 and #112 changelog entries when resolving. The reviewer has not edited the implementation branch, merged it, or claimed approval at a not-yet-existing resolution head. Recheck build/CI and the exact source diff after conflict resolution, then record the new reviewed head.
+
+Codex did not rerun all 1,044 Node programs or all 40 LORD programs locally during this re-review. Full-suite evidence is independently verified exact-head CI; the implementer's local full-suite result is recorded in the PR. No live export, school data, settings, provider calls, merge or deployment were touched. Advisory code approval is distinct from owner release/merge approval.
