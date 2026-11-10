@@ -1,6 +1,6 @@
 # roster-intake-instruction-drafts-drain: Scheduled drain applies pending relief-instruction drafts on the edge path
 
-- Status: implemented; exact-head full local suite and CI pending (Model: Codex)
+- Status: merged (#111 at d886d1c as 0f51376, 11 Nov 06:13 SGT)
 - Owner/model: Codex
 - Reviewer/model: Muse
 - Last updated (Asia/Singapore): 2026-11-10 ~19:06
