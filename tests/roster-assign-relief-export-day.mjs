@@ -20,23 +20,36 @@ const clone=value=>JSON.parse(JSON.stringify(value));
   // Regression (Codex review, PR #109): an imported plan annotates the absent lesson itself — the tile subject already carries the reason. The download must strip it, as the Drive file does. Only the tile subject is annotated; the source stays as the baseline recorded it.
   const annotatedTile=data.teacherSummary.plan.tiles.find(t=>t.kind==='lesson'&&t.location==='grid'&&t.teacherId==='alice'&&t.period===2);assert(annotatedTile,'alice P2 lesson tile exists');annotatedTile.subject='EL (absent — PRIVATE_SYNTHETIC_MEDICAL)';
   const before=JSON.stringify(data);
-  // Download: Stapler relief workbook, selected date only, with absence reasons hidden.
-  const download=await w.RosterStaplerExport.makeReliefWorkbook(data,null,{hideAbsenceReasons:true});
-  assert.equal(download.filename,'2026 Oct 14 Relief current saved - Teachers TTb saved 2026 Oct 14 0905h.xlsx');
-  assert.deepEqual(Array.from(download.sheetNames),['Teacher Summary']);
-  const downloadZip=await JSZip.loadAsync(await download.blob.arrayBuffer()),downloadXml=await downloadZip.file('xl/worksheets/sheet1.xml').async('string'),downloadStyles=await downloadZip.file('xl/styles.xml').async('string'),downloadDoc=new JSDOM(downloadXml,{contentType:'application/xml'}).window.document,downloadStylesDoc=new JSDOM(downloadStyles,{contentType:'application/xml'}).window.document;
-  const text=(doc,ref)=>doc.querySelector('c[r="'+ref+'"]')?.textContent||'',fill=(doc,ref)=>downloadStylesDoc.querySelector('fills').children[Number(downloadStylesDoc.querySelector('cellXfs').children[Number(doc.querySelector('c[r="'+ref+'"]').getAttribute('s'))].getAttribute('fillId'))].querySelector('fgColor')?.getAttribute('rgb');
-  assert.match(text(downloadDoc,'A1'),/All teachers.*Current saved plan and allocations.*Confirmed suspended timetable, not yet published/);
-  assert.match(text(downloadDoc,'A2'),/Selected date only.*Revision \d+; allocation \d+/);
-  assert.deepEqual(['A5','A9','A13','A17','A21'].map(ref=>text(downloadDoc,ref)),['Alice','Bob','Charlie','Dora','Activated Relief']);
-  assert.doesNotMatch(downloadXml,/Empty Active Teacher/);
-  assert.doesNotMatch(downloadXml,/\[(Draft|Published|Completed)\]|PRIVATE MEDICAL|UNCONFIRMED/i);
-  assert.doesNotMatch(downloadXml,/PRIVATE_SYNTHETIC_MEDICAL/,'reason embedded in the imported lesson tile must not leak into the download');
-  assert.match(downloadXml,/\[Combined\]/);assert.match(downloadXml,/\[Repurposed recess duty\]/);
-  assert.match(text(downloadDoc,'D5'),/EL \(absent\)/);assert.equal(fill(downloadDoc,'D5'),'FFD9D9D9');
-  assert.match(text(downloadDoc,'D9'),/MA \(for Alice\) \+ EL \(for Alice\) \[Combined\]/);assert.equal(fill(downloadDoc,'D9'),'FFFFC000');
-  assert.match(text(downloadDoc,'E17'),/Recess supervision \[Repurposed recess duty\]/);
-  const downloadPane=downloadDoc.querySelector('pane');assert.equal(downloadPane.getAttribute('xSplit'),'1');assert.equal(downloadPane.getAttribute('ySplit'),'4');assert.equal(downloadPane.getAttribute('topLeftCell'),'B5');
+  // Baseline source for the Stapler layout, built from the fixture day exactly as the Stapler screen export receives it.
+  const day=f.ctx.days[f.date],week={days:['Monday','Tuesday','Wednesday','Thursday','Friday'],perDay:17,maxPeriod:16,blocks:day.teachers.map(t=>({name:t.name,cells:Array.from({length:5},()=>structuredClone(t.cells)).flat()}))};
+  const baseline={modelId:data.teacherSummary.plan.baselineId,model:{layoutMode:'odd-even',odd:structuredClone(week),even:structuredClone(week),maxPeriod:16,teacherCount:day.teachers.length,timing:{startMinutes:420,periodMinutes:30,normalLastPeriod:16},recesses:[]}};
+  assert.equal(w.RosterStaplerExport.canUseBaseline(data.teacherSummary.plan,baseline),true,'the fixture baseline matches the suspended plan');
+  // Download: Stapler standalone layout (Teacher Summary + Class POV), selected date only, with absence reasons hidden.
+  const download=await w.RosterStaplerExport.makeReliefWorkbook(data,baseline,{hideAbsenceReasons:true,includeClassPov:true});
+  assert.equal(download.filename,'2026 Oct 14 Stapler - Teachers TTb saved 2026 Oct 14 0905h.xlsx');
+  assert.deepEqual(Array.from(download.sheetNames),['Teacher Summary','Class POV']);
+  const downloadZip=await JSZip.loadAsync(await download.blob.arrayBuffer()),sheet1Xml=await downloadZip.file('xl/worksheets/sheet1.xml').async('string'),sheet2Xml=await downloadZip.file('xl/worksheets/sheet2.xml').async('string'),stylesXml=await downloadZip.file('xl/styles.xml').async('string');
+  const sheet1Doc=new JSDOM(sheet1Xml,{contentType:'application/xml'}).window.document,classDoc=new JSDOM(sheet2Xml,{contentType:'application/xml'}).window.document,stylesDoc=new JSDOM(stylesXml,{contentType:'application/xml'}).window.document;
+  const text=(doc,ref)=>doc.querySelector('c[r="'+ref+'"]')?.textContent||'',fill=(doc,ref)=>stylesDoc.querySelector('fills').children[Number(stylesDoc.querySelector('cellXfs').children[Number(doc.querySelector('c[r="'+ref+'"]').getAttribute('s'))].getAttribute('fillId'))].querySelector('fgColor')?.getAttribute('rgb');
+  // Teacher Summary: Stapler title, empty second row, weekday row, Start/End, Teacher + period numbers, teachers from row 6. Wednesday is dayIndex 2, perDay 17, so its columns start at AJ (36); P2 is AL (38), P3 is AM (39).
+  assert.equal(text(sheet1Doc,'A1'),'Teacher Summary · 2026-10-14 · Current Stapler plan');
+  assert.equal(text(sheet1Doc,'A2'),'');
+  assert.equal(text(sheet1Doc,'AJ3'),'Wednesday');
+  assert.equal(text(sheet1Doc,'A4'),'Start / End');assert.equal(text(sheet1Doc,'AJ4'),'07:00\n07:30');
+  assert.equal(text(sheet1Doc,'A5'),'Teacher');assert.equal(text(sheet1Doc,'AJ5'),'0');assert.equal(text(sheet1Doc,'AK5'),'1');assert.equal(text(sheet1Doc,'AL5'),'2');
+  assert.deepEqual(['A6','A10','A14','A18','A22'].map(ref=>text(sheet1Doc,ref)),['Alice','Bob','Charlie','Dora','Activated Relief']);
+  assert.match(text(sheet1Doc,'AL6'),/EL \(absent\)/);assert.equal(fill(sheet1Doc,'AL6'),'FFD9D9D9');
+  assert.match(text(sheet1Doc,'AL10'),/MA \(for Alice\) \+ EL \(for Alice\) \[Combined\]/);assert.equal(fill(sheet1Doc,'AL10'),'FFFFC000');
+  assert.match(text(sheet1Doc,'AM18'),/Recess supervision \[Repurposed recess duty\]/);
+  const downloadPane=sheet1Doc.querySelector('pane');assert.equal(downloadPane.getAttribute('xSplit'),'1');assert.equal(downloadPane.getAttribute('ySplit'),'5');assert.equal(downloadPane.getAttribute('topLeftCell'),'B6');
+  // Class POV: same date, same privacy rules. The absence reason must not leak through the absence label or an imported tile subject.
+  assert.match(text(classDoc,'A1'),/Class POV · 2026-10-14/);
+  for(const xml of [sheet1Xml,sheet2Xml]){
+   assert.doesNotMatch(xml,/Empty Active Teacher/);
+   assert.doesNotMatch(xml,/\[(Draft|Published|Completed)\]|PRIVATE MEDICAL|UNCONFIRMED/i);
+   assert.doesNotMatch(xml,/PRIVATE_SYNTHETIC_MEDICAL/,'reason embedded in the imported lesson tile must not leak into the download');
+  }
+  assert.match(sheet1Xml,/\[Combined\]/);assert.match(sheet1Xml,/\[Repurposed recess duty\]/);
   // Drive file: daily renderer, same teachers, same privacy rules.
   const drive=edge.dailyTeacherWorkbook(data,{packageFiles:GSISExcel.packageFiles});
   assert.equal(drive.filename,f.date+' Relief.xlsx');
@@ -46,6 +59,6 @@ const clone=value=>JSON.parse(JSON.stringify(value));
   assert.equal(page.rows.find(r=>r.teacherId==='bob').colours[2],'orange');assert.equal(page.rows.find(r=>r.teacherId==='alice').colours[2],'grey');
   const local=edge.dailyTeacherPage({...data,localSnapshot:{state:'Save unconfirmed'}});assert.match(local.status,/Local snapshot.*Save unconfirmed/);
   assert.equal(JSON.stringify(data),before,'export does not mutate its input');
-  console.log('PASS selected-day workbook: baseline + ad hoc teachers only, Stapler download and Drive file list the same teachers, frozen panes, privacy and duty tags');
+  console.log('PASS Stapler download: Teacher Summary + Class POV, baseline + ad hoc teachers only, frozen panes, privacy and duty tags; Drive file unchanged');
  }finally{w.close();}
 })().catch(error=>{console.error(error);process.exitCode=1;});

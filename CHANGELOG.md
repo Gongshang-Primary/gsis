@@ -1,3 +1,7 @@
+# Pending: Assign Relief Export Excel uses the Stapler workbook layout, 10 November 2026
+
+Model: Muse. Assign Relief → Export Excel now produces the Stapler standalone workbook layout from the Nov 5 screenshot: filename "<date> Stapler - Teachers TTb saved <date> <time>h.xlsx", sheets "Teacher Summary" and "Class POV", A1 "Teacher Summary · <date> · Current Stapler plan", weekday row, "Start / End" row, "Teacher" row with period numbers, teachers from row 6, with the relief overlay colours as before. It still lists only baseline-named plus ad hoc relief teachers for the selected date only, and still hides absence reasons (including reasons embedded in imported lessons, in both sheets). When no usable baseline is available it falls back to the relief-workbook layout. The Drive daily file and the Stapler screen's own export are unchanged. See docs/coordination/tasks/assign-relief-export-stapler-format.md.
+
 # Pending: Assign Relief Export Excel lists baseline-named teachers plus ad hoc relief teachers only, 10 November 2026
 
 Model: Muse. Assign Relief → Export Excel and the Drive daily file list only the teachers named in the baseline timetable plus ad hoc relief teachers, relief assignees and absent teachers; every other active teacher no longer appears. The download returns to the Stapler relief workbook for the selected date only (Teacher Summary, Stapler colours and legend), with absence reasons kept hidden. See docs/coordination/tasks/assign-relief-export-baseline-adhoc.md.
