@@ -2,6 +2,10 @@
 
 Model: Muse. Fix for Codex's P1 review of PR #112: when absence reasons are hidden, the full-week Teacher Summary now scrubs the whole cloned baseline model before the converter renders it, so a reason in a non-selected weekday's baseline cell no longer leaks into the download. The selected day's tiles, the Class POV, the day-only path and the Drive file were already clean. The standalone export still shows reasons. A validated-baseline regression covers an annotated non-selected weekday. See docs/coordination/tasks/assign-relief-export-stapler-format.md.
 
+# Pending: scheduled D1 relief-instruction draft drain, 10 November 2026
+
+Model: Codex. The scheduled received-report drain now processes retained edge instruction/peer drafts even when attendance transport is idle, and after forwarding fresh reports. Reuses the existing bounded, idempotent processor and preserves timetable-ID/parity review fences. Synthetic regression covers seven retained drafts, fresh capture, both scope mismatches and repeated no-op ticks. No live data, settings, release/export branch changes or deployment. See docs/coordination/tasks/roster-intake-instruction-drafts-drain.md.
+
 # Pending: Assign Relief Export Excel uses the Stapler workbook layout, 10 November 2026
 
 Model: Muse. Assign Relief → Export Excel now produces the Stapler standalone workbook layout from the Nov 5 screenshot: filename "<date> Stapler - Teachers TTb saved <date> <time>h.xlsx", sheets "Teacher Summary" and "Class POV", A1 "Teacher Summary · <date> · Current Stapler plan", weekday row, "Start / End" row, "Teacher" row with period numbers, teachers from row 6, with the relief overlay colours as before. It still lists only baseline-named plus ad hoc relief teachers for the selected date only, and still hides absence reasons (including reasons embedded in imported lessons, in both sheets). When no usable baseline is available it falls back to the relief-workbook layout. The Drive daily file and the Stapler screen's own export are unchanged. See docs/coordination/tasks/assign-relief-export-stapler-format.md.
