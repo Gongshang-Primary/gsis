@@ -1,9 +1,9 @@
 # assign-relief-export-stapler-format: Assign Relief Export Excel matches the Stapler workbook layout
 
-- Status: claimed
+- Status: Codex changes requested at 05fece2 (P1, 11 Nov); fix in progress
 - Owner/model: Muse
 - Reviewer/model: Codex
-- Last updated (Asia/Singapore): 2026-11-10 ~18:35
+- Last updated (Asia/Singapore): 2026-11-11 ~06:4x
 - Branch: muse/assign-relief-export-stapler-format
 - Base SHA: e590c29
 - Current head SHA (or PR head; avoid self-referential commit hashes):
@@ -31,6 +31,7 @@
 - Deliberate calls: A2 stays empty in the Stapler layout (matches the screenshot; the revision/allocation line is preserved in the Class POV subtitle). The "selected date only" scope means the relief content is for the selected date only; the workbook itself shows the full week (all 5 days), scrolled to the selected day, exactly as the screenshot does. The Drive daily file is unchanged (daily renderer, one sheet).
 - Tests: `tests/roster-assign-relief-export-day.mjs` rewritten for the Stapler layout (baseline built from the fixture day, `canUseBaseline` asserted true; filename, sheet names, A1, A2 empty, weekday row AJ3 'Wednesday', A4 'Start / End', AJ4 '07:00\n07:30', A5 'Teacher', AJ5 '0', AK5 '1', AL5 '2', teachers A6/A10/A14/A18/A22, overlay cells AL6/AL10/AM18 with fills, pane ySplit=5/B6, Class POV A1 and privacy in both sheets). `tests/roster714-export-ui.cjs` updated (filename 'Stapler…', 2 sheets, sheet1 carries 'Current Stapler plan', Class POV subtitle carries 'Local snapshot'/'not saved'). Drive assertions unchanged in both.
 - Negative control: the rewritten test FAILS on the unmodified q exporter (filename '2026 Oct 14 Relief current saved - …' instead of '2026 Oct 14 Stapler - …'), verified by stashing the two source files and running the new test against the old code. The stash was restored and the test passes again.
+- P1 fix (11 Nov, Codex review of #112 at 05fece2): the full-week Teacher Summary leaked absence reasons from non-selected weekdays. The converter renders all five weekdays from the cloned baseline model, but the tile loop only rewrites the selected day's columns, so a Monday baseline cell (`EL (absent — PRIVATE_OTHER_DAY)`) survived into the download despite `hideAbsenceReasons:true`. Fix: `makeWorkbook` now scrubs the whole cloned model (every week block's subject cells, with the daily renderer's exact two replaces, via a shared `scrubSubject` helper also used by the tile loop) before the converter runs. The model is a clone (`prepare`), so the caller's baseline is untouched; the standalone path has no model and is unaffected. New regression `tests/roster-assign-relief-export-privacy-weekday.cjs` (validated baseline via the real `R.validate`, Wednesday selected, reason only on Monday): download Teacher Summary + Class POV, day-only path and Drive file all omit the sentinel; Monday cell C6 reads 'EL (absent)'; input data/baseline unchanged after rendering; the standalone export still shows the reason. Negative control: the new test FAILS on the pre-fix exporter (stashed source file) and PASSES with the fix.
 
 ## Verification
 Exact command, tested commit, outcome and evidence. Explicitly list checks not run.
@@ -40,11 +41,14 @@ Exact command, tested commit, outcome and evidence. Explicitly list checks not r
 - Canonical build (10 Nov, TZ=Asia/Singapore npm run build at dda9bfa, main clone and worktree): PASS, 18 components, no diff (git status clean after the build in both trees).
 - Full local suite at dda9bfa (10 Nov, TZ=Asia/Singapore, GSIS_BROWSER_EXECUTABLE/ROSTER_TEST_CHROMIUM/LORD_TEST_CHROMIUM=~/.cache/ms-playwright/chromium-1234/chrome-linux64/chrome; worktree ~/workspace/gsis-work/git-clone/wt-hotfix): **Node 1043/1043, LORD 40/40**. The worktree run.cjs run reported 1040/1043 with exactly 3 failures (tests/package.cjs, tests/pages096-packaged-worker.cjs, tests/paid097-bundles.cjs), all caused by missing build artifacts (the worktree had not been built yet: "Missing installation component: Contacts_Frontend_v0.9.9.zip" and ENOENT on GSiS_v0.9.9_Deployment.zip). After the canonical build in the worktree, all 3 pass individually (package.cjs "Verified 0.9.9 suite", pages096 and paid097 PASS). LORD suite in the worktree: {"releaseVersion":"0.9.9","passedPrograms":40,"failedPrograms":0}, exit 0. Logs: ~/workspace/gsis-work/hotfix-full-suite-3.log (Node), ~/workspace/gsis-work/hotfix-lord-suite-1.log (LORD).
 - Note: two earlier full-suite attempts in the main clone are NOT relied on. The first was killed at 399 tests by a VM restart. The second reported 1043/1043 but ran while another agent switched the shared clone's branch mid-run (reflog: checkout to deploy/2026-11-10-v0.9.9q at 19:06 SGT), so it is discarded; the worktree run above is the trustworthy result.
+- P1 fix verification (11 Nov, worktree wt-hotfix, TZ=Asia/Singapore, GSIS_BROWSER_EXECUTABLE/ROSTER_TEST_CHROMIUM/LORD_TEST_CHROMIUM=~/.cache/ms-playwright/chromium-1234/chrome-linux64/chrome): Codex's P1 reproducer (/tmp/pr112-p1-probe.cjs) now passes — newTeacherSummaryLeaks=false, Class POV/day-only/Drive still false, input data/baseline unchanged. New regression tests/roster-assign-relief-export-privacy-weekday.cjs PASSES on the fix and FAILS on the pre-fix exporter (stashed source file, doesNotMatch at the PRIVATE_OTHER_DAY assertion). 12 targeted export tests all PASS (the 7 hotfix tests + the 2 privacy tests + roster098g/roster-daily-workbook/roster-daily-workbook-writer/roster-daily-audit/roster099a). Canonical build PASS, 18 components, no diff. **Full local suite: 1044/1044 Node + 40/40 LORD, EXIT:0** (log ~/workspace/gsis-work/hotfix-p1-full-suite-1.log). Full CI pending at the new head.
 - Full CI: not yet run (draft PR only after CI is green at the exact head).
 - Not tested: a live Assign Relief export (no live data or settings touched); the fallback path when no baseline is available is exercised only by the existing standalone tests (roster-assign-relief-export-privacy-import, stapler098h), not by a UI click without a baseline.
 
 ## Review
 Reviewer/model, reviewed SHA, findings, resolution. Advisory review is not human approval.
+
+- Codex review of #112 at 05fece2 (11 Nov ~06:12 SGT, recorded on main as 1d89225): **changes requested**, one P1 privacy finding — the full-week Teacher Summary leaks absence reasons from non-selected weekdays despite `hideAbsenceReasons:true`. Reproduced by Codex with a validated synthetic baseline (Wednesday selected, only Monday has `EL (absent — PRIVATE_OTHER_DAY)`): new Teacher Summary leaks=true; new Class POV=false; prior day-only path=false; Drive=false. CI run 42812090570 green at 05fece2; build no diff; 11 targeted tests passed; merge-tree clean. Fix in progress (see Decisions and changes); re-review pending at the corrected head.
 
 ## Deployment
 Not deployed unless supported by explicit environment/version/time evidence. State staging and production separately.

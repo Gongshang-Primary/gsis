@@ -7,6 +7,8 @@ window.RosterStaplerExport=(()=>{
  const days=['Monday','Tuesday','Wednesday','Thursday','Friday'];
  const norm=value=>String(value??'').trim().normalize('NFKC').toLowerCase().replace(/\s+/g,' ');
  const clone=value=>JSON.parse(JSON.stringify(value));
+ // Strip an embedded absence reason from a subject, exactly as the daily renderer does (roster-export.js dailyTeacherPage). 'EL (absent — <reason>)' becomes 'EL (absent)'; 'Absent — <reason>' becomes 'Absent'.
+ const scrubSubject=value=>String(value||'').replace(/^Absent — [\s\S]+$/i,'Absent').replace(/\s*\((absent|dropped) — [\s\S]+\)$/i,' ($1)');
  const nodes=(root,name)=>Array.from(root.getElementsByTagNameNS('*',name));
  const cellText=cell=>nodes(cell,'t').map(t=>t.textContent||'').join('');
  const key=(teacher,period)=>teacher+'|'+period;
@@ -80,6 +82,8 @@ window.RosterStaplerExport=(()=>{
   const plan=clone(input),summary=options.reliefSummary;
   if(summary)for(const teacher of summary.addedTeachers||[])if(!plan.teachers.some(t=>t.staffId===teacher.staffId))plan.teachers.push(clone(teacher));
   const standalone=baselineResult==null,prepared=standalone?await standaloneWorkbook(plan):prepare(plan,baselineResult),{model,dayIndex,perDay,teacherRows,blocks}=prepared;
+  // The converter renders every retained weekday from the cloned baseline model, but the tile loop below only rewrites the selected day's columns. When reasons are hidden, scrub the whole cloned model first so no other weekday leaks a reason. The model is a clone (prepare), so the caller's baseline is untouched.
+  if(model&&options.hideAbsenceReasons===true)for(const weekKey of ['single','odd','even']){const weekModel=model[weekKey];if(!weekModel)continue;for(const block of weekModel.blocks||[])for(const cell of block.cells||[])cell[0]=scrubSubject(cell[0]);}
   const outputName=filename(plan.date,options.eventName,options.now),output=prepared.output||await window.RosterConverter.makeWorkbook(model,{preserveWeeks:true});
   const sheetName=standalone?'Teacher Summary':plan.parity==='single'?'Teachers':plan.parity==='odd'?'Odd Week':'Even Week',sheetIndex=output.sheetNames.indexOf(sheetName);
   if(sheetIndex<0)fail('The selected timetable week is missing from the workbook.');
@@ -107,7 +111,7 @@ window.RosterStaplerExport=(()=>{
    const values=[tile.subject,tile.classIds.map(id=>classes.get(id)).join(', '),tile.venue,tile.group];
    if(original){if(tile.subject===source.subject)values[0]=original[0];if(JSON.stringify(tile.classIds)===JSON.stringify(source.classIds))values[1]=original[1];if(tile.venue===source.venue)values[2]=original[2];if(tile.group===source.group)values[3]=original[3];}
    // An imported lesson can already carry its absence reason in the subject. The overlay's includeReasons only covers its own labels, so strip the embedded reason here too, exactly as the daily renderer does (roster-export.js dailyTeacherPage).
-   if(options.hideAbsenceReasons===true)values[0]=String(values[0]||'').replace(/^Absent — [\s\S]+$/i,'Absent').replace(/\s*\((absent|dropped) — [\s\S]+\)$/i,' ($1)');
+   if(options.hideAbsenceReasons===true)values[0]=scrubSubject(values[0]);
    const colour=window.GSISRosterStapler.tileState(plan,tile)==='original'?'clear':!tile.baselineId?'pink':'green';write(tile.teacherId,tile.period,values,colour);
   }
   for(const mat of plan.mats.filter(m=>m.target==='teacher'))for(let p=mat.fromPeriod;p<=mat.toPeriod;p++){
