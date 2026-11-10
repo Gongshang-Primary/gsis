@@ -1,11 +1,11 @@
 # roster-intake-instruction-drafts-drain: Scheduled drain applies pending relief-instruction drafts on the edge path
 
-- Status: proposed
+- Status: claimed before implementation (Model: Codex)
 - Owner/model: Codex
 - Reviewer/model: Muse
 - Last updated (Asia/Singapore): 2026-11-10 ~19:06
 - Branch: codex/roster-intake-instruction-drafts-drain
-- Base SHA: 11dc0c5
+- Base SHA: a1e2954b07e1ae125e06ff38ab2be2616cd57b63
 - Current head SHA (or PR head; avoid self-referential commit hashes):
 - PR:
 - User-authorised scope: Make the scheduled drain apply pending relief-instruction drafts on the edge (D1) path, so absence reports stop sitting at "Relief instructions are being checked" ("Needs attention") after the absence is saved. The fix is to run the draft processor on the normal schedule, not only in the wake-fallback case.
@@ -34,3 +34,5 @@ Not deployed unless supported by explicit environment/version/time evidence. Sta
 ## Handoff
 - Remaining work: implement, verify per the acceptance checks, open a draft PR naming Muse at the exact head.
 - The owner's broader point — relief instructions are for-info and should simply be forwarded to the teacher receiving the duty — is a separate policy decision. This task only fixes the stuck drafts by running the existing processor with its existing scope check. Do not remove the check here.
+
+- Claim: Model: Codex, 10 November 2026. Owner-authorized branch created from current main a1e2954. Muse reviews the exact implementation head. No live operations or changes to release/export branches are authorized.
