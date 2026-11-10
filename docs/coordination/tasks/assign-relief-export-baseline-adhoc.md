@@ -24,6 +24,11 @@
 
 ## Verification
 Exact command, tested commit, outcome and evidence. Explicitly list checks not run.
+- Rewritten test `tests/roster-assign-relief-export-day.mjs`: PASS at f4bd39a. Negative control: the same test FAILS on the pre-change code (assertion: an active teacher without a baseline lesson is not added) — stash pop restored the change.
+- `tests/stapler098h-standalone-export.cjs`, `tests/roster714-teacher-export.cjs`, `tests/roster098j-exports.cjs`, `tests/roster-daily-workbook.cjs`, `tests/roster-daily-workbook-writer.cjs`, `tests/roster-daily-audit.cjs`, `tests/roster099a-excel-relief-for.cjs`: all PASS at f4bd39a.
+- Full suite, first run (branch a3092fb, `npm test`, Chromium env wrongly set to `/usr/bin/chromium`, which does not exist on this VM): 921/1042 Node, EXIT 1. 120 of the 121 failures are the missing Chromium executable (`browserType.launch: Failed to launch chromium because executable doesn't exist at /usr/bin/chromium`), an environment mistake, not a code regression. The one real failure was `tests/roster714-export-ui.cjs:30` — the Export Excel filename is now the Stapler filename; the test's expectation was updated to it and the test passes. The full suite is being re-run with the correct Chromium path (`~/.cache/ms-playwright/chromium-1234/chrome-linux64/chrome`).
+- Canonical build at a3092fb: PASS, no diff (verified by rebuilding at the head; `git status` clean).
+- Not run locally: the full local suite with the correct Chromium path (re-running now); CI is the gate. The `exportRelief` button wiring and `localExportSnapshot` have no direct test (see Decisions).
 
 ## Review
 Reviewer/model, reviewed SHA, findings, resolution. Advisory review is not human approval.
