@@ -1,3 +1,5 @@
+> Current Codex verdict: **APPROVE at `63e82b752cd48a3813d7463022227c78739ba4ea`**. The conflict-resolution commit has now been reviewed. Prior privacy findings and the CHANGELOG integration hold are resolved. GitHub reports this exact head mergeable. The older verdicts/holds below are historical; current evidence is appended. This is advisory review, not a merge or deployment claim.
+
 > Current Codex code-review verdict: **APPROVE** at `1102d2e16dd61981abda853f8940d25265631edf`. The historical P1 below is resolved. Integration remains blocked by a CHANGELOG.md conflict with main `1d89225`; this is not a merge/deployment approval or a review of any future conflict-resolution head. Exact verification follows below.
 
 # PR #112 review
@@ -92,3 +94,31 @@ The fix scrubs subject cells across all retained `single`, `odd` and `even` week
 Main has advanced to `1d89225`, including the owner-merged #111 drain fix. Read-only `git merge-tree --write-tree --name-only origin/main HEAD` reports a single conflict, `CHANGELOG.md`, and no product-source or generated-file conflicts. GitHub also reports the PR unmergeable. Keep both the #111 and #112 changelog entries when resolving. The reviewer has not edited the implementation branch, merged it, or claimed approval at a not-yet-existing resolution head. Recheck build/CI and the exact source diff after conflict resolution, then record the new reviewed head.
 
 Codex did not rerun all 1,044 Node programs or all 40 LORD programs locally during this re-review. Full-suite evidence is independently verified exact-head CI; the implementer's local full-suite result is recorded in the PR. No live export, school data, settings, provider calls, merge or deployment were touched. Advisory code approval is distinct from owner release/merge approval.
+
+---
+
+## Codex re-review of conflict-resolution head 63e82b7
+
+Model: Codex. Reviewed 10 November 2026, Asia/Singapore.
+Exact head: `63e82b752cd48a3813d7463022227c78739ba4ea`.
+Verdict: **APPROVE**. No outstanding blocking finding identified. This verdict explicitly covers the merge/conflict-resolution commit, superseding the integration hold at `1102d2e`.
+
+### Merge resolution audit
+
+- Verified both parents: previously reviewed privacy-fix head `1102d2e16dd61981abda853f8940d25265631edf` and main `1d892259e9862339720dfc9400a06159dee0a324`.
+- Inspected `git show --remerge-diff`. CHANGELOG.md is the only manual resolution, retaining the #112 privacy/format entries and the #111 scheduled instruction-drain entry.
+- Independently audited Git blobs for every path against both parents and their merge base. Every non-conflicting file exactly matches the appropriate parent; no unexpected product, generated, test or coordination edit was introduced by conflict resolution. Every changelog paragraph from both parents remains present.
+- Privacy exporter/test source remains exactly the approved `1102d2e` version. The merged #111 drain and its generated bundles come from main unchanged.
+
+### Verification actually performed at this exact head
+
+- Separate detached worktree at `63e82b7`.
+- `TZ=Asia/Singapore npm run build`: all 18 components passed, no tracked diff before or after tests.
+- Thirteen local programs passed, all exit 0, with `TZ=Asia/Singapore NODE_NO_WARNINGS=1`: `roster-assign-relief-export-privacy-weekday.cjs`, `roster-assign-relief-export-day.mjs`, `roster714-export-ui.cjs`, `roster714-teacher-export.cjs`, `roster098j-exports.cjs`, `stapler098h-standalone-export.cjs`, `roster-assign-relief-export-privacy-import.cjs`, `roster098g-export-headers.cjs`, `roster-daily-workbook.cjs`, `roster-daily-workbook-writer.cjs`, `roster-daily-audit.cjs`, `roster099a-excel-relief-for.cjs`, `roster-intake-instruction-drafts-drain.mjs`.
+- Original retained-weekday privacy reproducer passes: validated baseline, Wednesday selected, reason only on Monday; Teacher Summary, Class POV, day-only path and Drive all report no leak. Input immutability assertion passes.
+- Independently verified CI run `42925005084` completed successfully at this full head: all four regression shards plus full-suite green.
+- Merge-tree against fetched main `47c176b` succeeds with no conflicts. Rechecked GitHub: the PR still names the reviewed full SHA, `mergeable=true`, `mergeable_state=clean`.
+
+### Limits and handoff
+
+Codex did not rerun the complete local Node/LORD suite during this merge re-review; full-suite evidence is the independently verified exact-head CI. No live export, Google/D1 data, provider call, settings change, implementation-branch edit, merge or deployment was performed. The owner may merge this reviewed head; deployment is a separate action. Any later implementation/conflict-resolution commit needs review at its exact head.
