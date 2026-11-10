@@ -1,3 +1,5 @@
+> Current Codex verdict, 10 November 2026: **APPROVE** at `27f80a106184fa5029005ba1cebc80ef448242b5`. The earlier P1 finding at `7ee7afe` is resolved. The re-review and exact verification evidence are appended below. This is advisory model approval; the owner merges and deploys.
+
 # Review: PR #109 — Assign Relief Export Excel and Drive daily file list baseline + ad hoc teachers only
 
 - Reviewer: Codex (relayed by the owner)
@@ -100,3 +102,34 @@ const download=await w.RosterStaplerExport.makeReliefWorkbook(data,null,{hideAbs
 for(const [label,book] of [['new-download',download],['previous-renderer-and-drive',drive]]){const zip=await JSZip.loadAsync(await book.blob.arrayBuffer()),xml=await zip.file('xl/worksheets/sheet1.xml').async('string');console.log(label,JSON.stringify({privateReasonPresent:xml.includes('PRIVATE_SYNTHETIC_MEDICAL'),absenceText:(xml.match(/[^<>]*PRIVATE_SYNTHETIC_MEDICAL[^<>]*/g)||[])}));}
 }finally{w.close();}})().catch(e=>{console.error(e);process.exitCode=1});
 ```
+
+---
+
+## Codex re-review at 27f80a1
+
+Model: Codex. Date: 10 November 2026, Asia/Singapore.
+
+Exact reviewed head: `27f80a106184fa5029005ba1cebc80ef448242b5`.
+Verdict: **APPROVE**. No outstanding blocking findings identified in the reviewed scope. The prior P1 privacy finding is resolved.
+
+### Fix verification
+
+The tile writer now strips existing absence annotations when `hideAbsenceReasons` is true, after selecting the actual exported subject value and before writing it. It uses the same normalization as the Drive daily renderer. This handles both `EL (absent — reason)` and `Absent — reason`, including annotations created through the real offline Relief importer. The fix changes exported values, preserving the saved plan/provenance and the standalone export's existing reason-visible behavior.
+
+- Ran the original Codex synthetic valid-import reproduction against this exact head: new download `privateReasonPresent=false`; previous renderer/Drive `privateReasonPresent=false`.
+- Ran the new valid-import regression. It validates the imported plan, proves both annotation forms are present in the input, asserts the reason is absent from both outputs, pins the remaining absence/cover labels, and confirms the reason remains visible when hiding is not requested.
+- Independently ran the negative control by substituting the original `7ee7afe` exporter in memory while running the new regression unchanged: exit 1 at the expected assertion, "download with reasons hidden must not contain the imported reason". No product files or fixtures were edited. An initial sandboxed attempt could not spawn git; the outside-sandbox retry produced the stated assertion failure, not an environment failure.
+
+### Evidence at this exact head
+
+- `TZ=Asia/Singapore npm run build`: passed all 18 components; no tracked diff before or after tests.
+- Eleven targeted programs passed locally, all exit 0, with `TZ=Asia/Singapore NODE_NO_WARNINGS=1`: `roster-assign-relief-export-day.mjs`, `roster-assign-relief-export-privacy-import.cjs`, `roster714-export-ui.cjs`, `stapler098h-standalone-export.cjs`, `stapler714-import.cjs`, `roster714-teacher-export.cjs`, `roster098j-exports.cjs`, `roster-daily-workbook.cjs`, `roster-daily-workbook-writer.cjs`, `roster-daily-audit.cjs`, `roster099a-excel-relief-for.cjs`. All three changed/new test programs were included.
+- Independently verified GitHub CI run `42764335423`, attempt 2: completed successfully at the reviewed full SHA; all four regression shards and `full-suite` passed. This is the successful rerun; the earlier browser preparation timeout is not counted as a pass.
+- Reviewed the complete delta from the original review head: only the two-line exporter correction, strengthened existing export test, new valid-import regression and task documentation. No unrelated product changes.
+- Merge-tree against fetched main `d111fab` succeeded without conflicts. Rechecked the PR still names the reviewed head before recording the verdict.
+
+### Limits and handoff
+
+Codex ran the targeted programs and verified full CI; Codex did not rerun the full 1,043-program Node suite or 40 LORD programs locally during this re-review. No live Google/D1 reads/writes, provider calls, deployment, merge or settings change was performed.
+
+The PR body/task still understate existing UI coverage: `roster714-export-ui.cjs` clicks Export Excel, exercises the local snapshot path while offline and inspects the generated XLSX. This documentation caveat is not a blocker. The owner may merge this reviewed head; deployment remains a separate owner action. Any further implementation commits require review of the new exact head.
