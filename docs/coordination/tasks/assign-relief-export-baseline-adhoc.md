@@ -1,13 +1,13 @@
 # assign-relief-export-baseline-adhoc: Assign Relief "Export Excel" lists baseline-named teachers + ad hoc relief teachers only, day only, Stapler formatting
 
-- Status: claimed
+- Status: review (draft PR #109 open, Codex reviews)
 - Owner/model: Muse
 - Reviewer/model: Codex
 - Last updated (Asia/Singapore): 2026-11-10
 - Branch: muse/assign-relief-export-baseline-adhoc
 - Base SHA: 5a4ab02
-- Current head SHA (or PR head; avoid self-referential commit hashes):
-- PR:
+- Current head SHA (or PR head; avoid self-referential commit hashes): e6581a3455b51f2235b3c399529def75ccd9dc3c
+- PR: #109
 - User-authorised scope: owner 10 Nov 2026 ("fix please") — restore the Assign Relief → Export Excel behaviour the owner wants: one sheet for the selected date only, comprising only names named in the baseline timetable plus ad hoc relief teachers, looking like the 5 Nov 2026 Stapler Teacher Summary screenshot (time + period-number headers, 4 rows per teacher, Stapler colours).
 - Files/domains owned (include generated outputs): roster-update/public/roster-operations-ui.js (localExportSnapshot, exportRelief), roster-update/public/roster-stapler-export.js (Stapler relief workbook, if the download returns to it), roster-update/public/roster-export.js (only if the daily renderer gains a scope option), tests proving the narrowed scope and the formatting, CHANGELOG.md, generated bundles via the canonical build only.
 - Out of scope: the Drive daily file, unless the owner picks "Drive file too" (see Decisions); no live data, no deploy, no merge (owner merges).
