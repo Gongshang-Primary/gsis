@@ -1,6 +1,6 @@
 # assign-relief-export-baseline-adhoc: Assign Relief "Export Excel" lists baseline-named teachers + ad hoc relief teachers only, day only, Stapler formatting
 
-- Status: review (draft PR #109 open; Codex requested changes at 7ee7afe, fix at f70cbe0 awaits re-review)
+- Status: merged (#109 at 27f80a1 as 7e78799, 10 Nov 16:39 SGT)
 - Owner/model: Muse
 - Reviewer/model: Codex
 - Last updated (Asia/Singapore): 2026-11-10
