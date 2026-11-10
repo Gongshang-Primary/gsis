@@ -666,12 +666,22 @@ async function recoverDuplicateIntake(env){
  catch(error){const code=error?.code==='ABSENCE_TRANSPORT_STORAGE'?'ABSENCE_TRANSPORT_STORAGE':'ROSTER_INTAKE_RECOVERY';console.error(JSON.stringify({event:'roster-intake-duplicate-recovery-deferred',code}));return {available:false,code};}
 }
 export async function dispatchReceivedReports(env,{limit=8,budgetMs=150000}={}){
+ const drainEdgeDrafts=async()=>{
+  const result=await serviceBackend(env,{operation:'processEdgePeerProposals'});
+  if(!result.ok)throw rosterScheduledFailure(result);
+  return result.data;
+ };
  if(edgeRosterEnabled(env)){
   const context=await absenceTransportContext_(env);
   if(context){const db=typeof context.db.withSession==='function'?context.db.withSession('first-primary'):context.db,now=Date.now(),row=await db.prepare("SELECT EXISTS (SELECT 1 FROM gsis_absence_transport WHERE namespace=? AND ((state='queued' AND available_at<=?) OR (state='claimed' AND lease_until<=?))) AS has_work").bind(context.namespace,now,now).first();
    // D1 applies captured attendance directly; nextAbsenceIntake has no second
    // queue in this authority. A newly arriving report is picked up next wake.
-   if(row?.has_work===0)return {transport:{enabled:true,claimed:0,forwarded:0,pending:0,needsReview:0},intake:{claimed:0,applied:0,deferred:0,needsReview:0,notificationsQueued:0,...(!configuredSecret(gsisApiSecret(env))?{configured:false}:{})},duplicateRecovery:await recoverDuplicateIntake(env),hasMore:false};
+   if(row?.has_work===0){
+    // Saved attendance can still own pending instruction/peer drafts. Cron must
+    // process them even when there is no transport capture left to forward.
+    const edgeDrafts=await drainEdgeDrafts();
+    return {transport:{enabled:true,claimed:0,forwarded:0,pending:0,needsReview:0},intake:{claimed:0,applied:0,deferred:0,needsReview:0,notificationsQueued:0,...(!configuredSecret(gsisApiSecret(env))?{configured:false}:{})},duplicateRecovery:await recoverDuplicateIntake(env),edgeDrafts,hasMore:edgeDrafts.pending>0||edgeDrafts.instructions?.pending>0};
+   }
   }
  }
  const started=Date.now(),transport=await forwardAbsenceTransport(env,{limit,budgetMs:Math.min(budgetMs,60000)});
@@ -680,8 +690,9 @@ export async function dispatchReceivedReports(env,{limit=8,budgetMs=150000}={}){
  // alive even when every attempted item succeeded; cron remains a backstop.
  // Fresh captures have priority. A parked report's recovery failure must not
  // block new attendance; return its unavailable state for diagnostics/retry.
+ const edgeDrafts=edgeRosterEnabled(env)?await drainEdgeDrafts():undefined;
  const duplicateRecovery=edgeRosterEnabled(env)?(budgetMs-(Date.now()-started)>1000?await recoverDuplicateIntake(env):{available:false,code:'RECOVERY_BUDGET_DEFERRED'}):undefined;
- return {transport,intake,...(duplicateRecovery?{duplicateRecovery}:{}),hasMore:transport.claimed>=limit||intake.claimed>=limit||intake.hasMore===true};
+ return {transport,intake,...(duplicateRecovery?{duplicateRecovery}:{}),...(edgeDrafts?{edgeDrafts}:{}),hasMore:transport.claimed>=limit||intake.claimed>=limit||intake.hasMore===true||edgeDrafts?.pending>0||edgeDrafts?.instructions?.pending>0};
 }
 export async function assertAbsenceTransportReady(env,dates,includePeers=false,who){
  if(backendAvailable(env)){await callOperationalBackend(env,'roster-transport',{operation:'ready',dates,includePeers,identity:who});return;}

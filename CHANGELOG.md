@@ -1,3 +1,7 @@
+# Pending: scheduled D1 relief-instruction draft drain, 10 November 2026
+
+Model: Codex. The scheduled received-report drain now processes retained edge instruction/peer drafts even when attendance transport is idle, and after forwarding fresh reports. Reuses the existing bounded, idempotent processor and preserves timetable-ID/parity review fences. Synthetic regression covers seven retained drafts, fresh capture, both scope mismatches and repeated no-op ticks. No live data, settings, release/export branch changes or deployment. See docs/coordination/tasks/roster-intake-instruction-drafts-drain.md.
+
 # Pending: Assign Relief Export Excel lists baseline-named teachers plus ad hoc relief teachers only, 10 November 2026
 
 Model: Muse. Assign Relief → Export Excel and the Drive daily file list only the teachers named in the baseline timetable plus ad hoc relief teachers, relief assignees and absent teachers; every other active teacher no longer appears. The download returns to the Stapler relief workbook for the selected date only (Teacher Summary, Stapler colours and legend), with absence reasons kept hidden. See docs/coordination/tasks/assign-relief-export-baseline-adhoc.md.
