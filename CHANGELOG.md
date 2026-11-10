@@ -1,3 +1,7 @@
+# Pending: Assign Relief Export Excel lists baseline-named teachers plus ad hoc relief teachers only, 10 November 2026
+
+Model: Muse. Assign Relief → Export Excel and the Drive daily file list only the teachers named in the baseline timetable plus ad hoc relief teachers, relief assignees and absent teachers; every other active teacher no longer appears. The download returns to the Stapler relief workbook for the selected date only (Teacher Summary, Stapler colours and legend), with absence reasons kept hidden. See docs/coordination/tasks/assign-relief-export-baseline-adhoc.md.
+
 # Pending: Contacts transport requires GSIS_SECRET, 7 November 2026
 
 Model: Codex. Contacts-only first step of the secret-consolidation series: require GSIS_SECRET for transport, retain the session purpose/origin derivation, preserve service envelope boundaries and fail closed on missing/invalid configuration. The build selects Contacts-specific helpers; other apps and independent session/private-link/provider secrets are unchanged. Adds a scoped legacy-read CI guard and signing/session regressions. Deployment requires the same GSIS_SECRET value at both Contacts ends and aligned active peers; keep legacy configuration until the new pair is live and verified. This is not the live Contacts configuration fix. See docs/coordination/tasks/gsis-secret-consolidation.md.

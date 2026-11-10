@@ -106,6 +106,8 @@ window.RosterStaplerExport=(()=>{
    const source=tile.source,original=tile.baselineId?blocks.get(source.teacherId)?.cells[dayIndex*perDay+source.period]:null;
    const values=[tile.subject,tile.classIds.map(id=>classes.get(id)).join(', '),tile.venue,tile.group];
    if(original){if(tile.subject===source.subject)values[0]=original[0];if(JSON.stringify(tile.classIds)===JSON.stringify(source.classIds))values[1]=original[1];if(tile.venue===source.venue)values[2]=original[2];if(tile.group===source.group)values[3]=original[3];}
+   // An imported lesson can already carry its absence reason in the subject. The overlay's includeReasons only covers its own labels, so strip the embedded reason here too, exactly as the daily renderer does (roster-export.js dailyTeacherPage).
+   if(options.hideAbsenceReasons===true)values[0]=String(values[0]||'').replace(/^Absent — [\s\S]+$/i,'Absent').replace(/\s*\((absent|dropped) — [\s\S]+\)$/i,' ($1)');
    const colour=window.GSISRosterStapler.tileState(plan,tile)==='original'?'clear':!tile.baselineId?'pink':'green';write(tile.teacherId,tile.period,values,colour);
   }
   for(const mat of plan.mats.filter(m=>m.target==='teacher'))for(let p=mat.fromPeriod;p<=mat.toPeriod;p++){
@@ -114,7 +116,7 @@ window.RosterStaplerExport=(()=>{
   if(summary){
    const read=(id,p)=>{const row=teacherRows.get(id);if(row===undefined)fail('An operational teacher is missing from the workbook. Refresh Name Bridge and retry.');return Array.from({length:4},(_,i)=>cellText(cells.get(column(startColumn+p)+(row+i))));};
    const period=p=>{if(!Number.isInteger(p)||p<0||p>=perDay)fail('An operational period does not match this timetable.');};
-   window.RosterExport.applyReliefSummary(summary,{read,write,periodCount:perDay});
+   window.RosterExport.applyReliefSummary(summary,{read,write,periodCount:perDay,includeReasons:options.hideAbsenceReasons!==true});
    const setHeader=(address,text)=>{const cell=cells.get(address);cell.replaceChildren();cell.setAttribute('t','inlineStr');cell.setAttribute('s',style(Number(cell.getAttribute('s')||0),'clear'));const is=doc.createElementNS(ns,'is'),t=doc.createElementNS(ns,'t');t.setAttributeNS('http://www.w3.org/XML/1998/namespace','xml:space','preserve');t.textContent=text;is.append(t);cell.append(is);};
    const planStatus=({confirmed:'Confirmed suspended timetable, not yet published',published:'Published suspended timetable',baseline:'Baseline timetable'})[summary.staplerStatus]||'Baseline timetable';
    setHeader('A1','All teachers · '+plan.date+' · '+(options.snapshotLabel||'Current saved plan and allocations')+' · '+planStatus);
@@ -153,9 +155,9 @@ window.RosterStaplerExport=(()=>{
   await window.RosterExport.fitWorkbookRows(zip);
   return {blob:await zip.generateAsync({type:'blob',compression:'DEFLATE',mimeType:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}),filename:outputName,sheetNames:['Teacher Summary','Class POV']};
  }
- async function makeReliefWorkbook(data,baselineResult){
+ async function makeReliefWorkbook(data,baselineResult,options={}){
   const summary=data?.teacherSummary;if(!summary?.plan||!Array.isArray(summary.absences)||!Array.isArray(summary.assignments)||!Array.isArray(summary.demands)||summary.plan.date!==data.date)fail('The full teacher summary is unavailable. Refresh and retry.');
-  return makeWorkbook(summary.plan,baselineResult,{reliefSummary:summary,eventName:data.localSnapshot?'Relief local snapshot':'Relief current saved',snapshotLabel:data.snapshotLabel,now:data.exportedAt,revision:data.revision,allocationRevision:data.allocationRevision});
+  return makeWorkbook(summary.plan,baselineResult,{reliefSummary:summary,eventName:data.localSnapshot?'Relief local snapshot':'Relief current saved',snapshotLabel:data.snapshotLabel,now:data.exportedAt,revision:data.revision,allocationRevision:data.allocationRevision,hideAbsenceReasons:options.hideAbsenceReasons===true});
  }
  // Class POV uses the selected day's effective plan, never the baseline workbook.
  async function makeClassWorkbook(data){
