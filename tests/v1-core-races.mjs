@@ -44,6 +44,26 @@ await runCases([
     f.state.session.revoked = true; f.bumpCore(); resume.resolve();
     assert.equal((await pending).outcome, 'deny');
   }],
+  ['A14 concurrent resources allow while same-binding older evaluations reject', async () => {
+    for (const differentResource of [true, false]) {
+      const f = fixture(), arrived = deferred(), resume = deferred(); let first = true;
+      const a = createAuthority({ ...f.options, readContacts: async q => {
+        const snapshot = await f.readContacts(q);
+        if (first) { first = false; arrived.resolve(); await resume.promise; }
+        return snapshot;
+      } });
+      const request = { ...f.request, action: 'deploy.read' };
+      const older = a.resolveAuthority(request, f.context); await arrived.promise;
+      // Keep provider sequences/content unchanged: same-binding rejection must
+      // come from overlap ordering, not from a newer evidence watermark.
+      const newer = await a.resolveAuthority({ ...request, requestId: 'newer',
+        resource: { ...request.resource, resourceId: differentResource ? 'plan-2' : 'plan-1' } }, f.context);
+      resume.resolve(); const delayed = await older;
+      assert.equal(newer.outcome, 'allow');
+      assert.equal(delayed.outcome, differentResource ? 'allow' : 'deny');
+      assert.equal(delayed.reasonCode, differentResource ? 'CAPABILITY_ALLOWED' : 'AUTHORITY_CHANGED');
+    }
+  }],
   ['A14 older delayed response cannot replace newer evidence', async () => {
     const f = fixture(), arrived = deferred(), resume = deferred(); let first = true;
     const a = createAuthority({ ...f.options, readContacts: async q => {

@@ -1,14 +1,14 @@
 # v1-core-t1a: isolated Core identity and current Deploy authority
 
-- Status: implementation prepared; exact-head full verification and Claude review pending
+- Status: PR #118 review correction prepared; updated-head CI and Claude re-review pending
 - Owner/model: Codex
 - Coordinator: ChatGPT, v1 only
 - Reviewer/model: Claude, independent review of the exact head; never edit this branch
-- Last updated (Asia/Singapore): 2026-11-12T04:42:29.826506+08:00
+- Last updated (Asia/Singapore): 2026-11-12T06:17:56.918528+08:00
 - Branch: codex/v1-core-t1a
 - Pre-claim main SHA: 9bd0dcc2960819f3610bebb336bc2cb982dfd1a6
 - Base SHA: the accepted claim-only commit containing this record
-- PR: pending implementation and verification
+- PR: https://github.com/helper-gsps/gsis/pull/118
 
 ## Owner authority and V1C arrangement
 
@@ -97,3 +97,15 @@ Exact-head run 43098819119 at 97a685c failed shard 1: `v1-core-isolation.mjs` in
 ### Keep task diff checks bounded to T1A
 
 The fixed-base allowlist and runner-baseline comparison are task acceptance gates, not permanent restrictions on future production/other-v1 commits. They now run automatically for GitHub's `refs/heads/codex/v1-core-t1a`, or when the reviewer explicitly sets `T1A_BASE_SHA=c4c1de8aed5c9f062cbdc7e6ed83deb721fbb3c3`. Normal future branch regression runs retain discovery/shard-partition and Core dependency isolation checks without comparing unrelated future changes to T1A's file allowlist. This avoids coupling the isolated library's tests to all subsequent repository development. Both task-scoped and ordinary modes were verified locally, including inherited shard variables. No production tests, runner or CI configuration changed.
+
+### Claude review correction: F1 and F2
+
+Read `docs/coordination/review/pr118-claude-review.md` from `claude/beautiful-dirac-uiflqu`. Claude requested changes against `11f7329af97bcd728d94028362f7ecbfa689d837`; the owner explicitly authorised this correction on the existing task/branch. Refreshed main (still `c4c1de8aed5c9f062cbdc7e6ed83deb721fbb3c3`), the review/implementation branches, open PRs and PR #118 checks. The previous head's five CI checks passed; that result is not evidence for this correction.
+
+F1: `inFlight` now uses the existing full request/context binding. Concurrent reads of different resources in one session can both allow; overlapping same-binding requests still reject the older result. The deterministic deferred-provider test holds evidence unchanged, varies only resource/request IDs, and checks both outcomes. It failed on the reviewed implementation (`deny` instead of `allow`) and passes with the fix. The existing sequence-rollback race test remains intact.
+
+F2: the contract now requires T1D to refresh trusted keys once for unknown `kid`, return 401 if a successful refresh still has no matching key, and preserve 503 for actual provider unavailability. No identity-verifier or T1D implementation change.
+
+Correction inventory: `v1/core/authority.mjs`, `tests/v1-core-races.mjs`, `docs/v1/core/T1A_CONTRACT.md`, and this task record; all within the twelve-file allowlist. No additional LANES or reviewer-branch edits.
+
+Pre-commit verification: `TZ=Asia/Singapore npm run build` passed without tracked build drift; the five `TZ=Asia/Singapore node tests/v1-core-{identity,session,authority,races,isolation}.mjs` programs ran individually and passed 26 grouped cases. Isolation used `T1A_BASE_SHA=c4c1de8aed5c9f062cbdc7e6ed83deb721fbb3c3` and verified the complete PR allowlist, production dependency boundary and discovery of 1056 programs. `git diff --check` passed. Exact correction SHA and final CI outcomes will be recorded in PR #118 after commit/push, keeping earlier-head evidence distinct. Claude must re-review the updated head. Runtime UAT remains **Not tested**; no merge, deployment or live operations.

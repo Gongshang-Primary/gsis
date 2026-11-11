@@ -91,8 +91,8 @@ export function createAuthority({ clock, schoolId, callers, readCore, readContac
       if (previousDecision !== undefined) {
         requireValue(issued.has(previousDecision) && issued.get(previousDecision) === binding(request, context), 'AUTHORITY_CHANGED');
       }
-      // Overlapping responses for the same actor/session cannot replace a later-started evaluation.
-      flightKey = JSON.stringify([context.actorAccountId, context.sessionId]);
+      // Only overlapping evaluations with the same request/context binding supersede each other.
+      flightKey = binding(request, context);
       order = ++serial; inFlight.set(flightKey, order);
       const query = { schemaVersion: 1, schoolId, evaluationId: decisionId,
         requestedAt: evaluatedAt, actorAccountId: context.actorAccountId, sessionId: context.sessionId,
