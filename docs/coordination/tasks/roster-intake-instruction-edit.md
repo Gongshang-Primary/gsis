@@ -1,11 +1,11 @@
 # roster-intake-instruction-edit: SMC can edit the absence record itself so stuck relief instructions apply ("make it hit")
 
-- Status: proposed
+- Status: in progress; published Codex claim retained
 - Owner/model: Codex
 - Reviewer/model: Muse
 - Last updated (Asia/Singapore): 2026-11-11 ~14:50
 - Branch: codex/roster-intake-instruction-edit
-- Base SHA: 6b97fe1 (re-check main's head before branching; #114 must be merged first — lane R is serial, one open task at a time)
+- Base SHA: 68b4e7929bf4ffa6f24ec6b1417d312e564c3dd8 (verified current main; #114 owner-merged as 9989142)
 - Current head SHA (or PR head; avoid self-referential commit hashes):
 - PR:
 - User-authorised scope: On a received report whose relief instructions are at 'needsReview' (ABSENCE_CHANGED or INSTRUCTION_SOURCE_CHANGED), give the SMC an "Edit absence" action in context (in the intake receipt, next to "Retry processing") that opens the existing absence edit dialog for the absence the instructions belong to. The SMC corrects the absence record's details (periods, type, relief setting) so the instructions match and apply ("hit"). After saving the absence edit, the instructions are re-applied (the draft is retried) and the receiving teacher sees them in My Relief Duties. The instruction text itself is NOT edited in this task — the original submitted text is retained. This corrects the earlier draft of this task, which wrongly scoped it as editing the instruction text; the owner corrected it (11 Nov ~14:50): "i meant editing the absence record itself instead".
