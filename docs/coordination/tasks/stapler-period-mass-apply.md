@@ -1,11 +1,11 @@
 # stapler-period-mass-apply: One down arrow at each period header writes the same venue, group and/or class down the whole period (mass assembly)
 
-- Status: proposed (URGENT, cuts the queue — owner, 11 Nov ~17:49, "cut queue inject"; wanted by tonight in the next release)
+- Status: blocked on the explicit duplicate-coverage stop condition; Model: Codex investigation complete, no implementation started
 - Owner/model: Codex
 - Reviewer/model: Muse
 - Last updated (Asia/Singapore): 2026-11-11 ~17:49
 - Branch: codex/stapler-period-mass-apply
-- Base SHA: re-check main's head before branching (lane R serial; this jumps ahead of `roster-relief-instructions-info-only`, which follows after this PR merges)
+- Base SHA: 522094e9ba63617e41dc9fb352e8f7717e0d03f3 (verified current main before branching)
 - Current head SHA (or PR head; avoid self-referential commit hashes):
 - PR:
 - Owner ruling (11 Nov, verbatim in substance): "currently we have the yellow highlighted functions in class which mass-writes the value across the whole row. wish for 1 single down arrow (see red arrow) at each period header that allows us to write the same venue, group and/or class. on click, opens a overlay for us to key in the values. used for creating the same mass-assembly across whole school. wish to have by tonight in next release"
@@ -58,3 +58,13 @@ Not deployed unless supported by explicit environment/version/time evidence. Sta
 - Do not change live data, settings, or release branches.
 
 - Claim: Model: Codex, 11 November 2026. Owner-authorized branch created from current main. Muse reviews the exact implementation head. No live operations or changes to release branches are authorized.
+
+## Codex investigation: duplicate coverage requires owner ruling
+
+Model: Codex, 11 November 2026. Branch `codex/stapler-period-mass-apply` created from current main `522094e9ba63617e41dc9fb352e8f7717e0d03f3`. No product implementation, live operations or changes to the existing info-only PR #115. The new priority supersedes the previous queue ordering; #115 remains a draft.
+
+The task explicitly requires stopping if a uniform classIds patch would duplicate coverage. A synthetic in-memory plan with two teachers at P2, one assigned Synthetic A and the other Synthetic B, confirms this case. Applying the existing validated tile-edit classIds operation to both tiles with `[class-a]` succeeds: Synthetic A then has two simultaneous lesson tiles and Synthetic B has none. The original plan is unchanged. The class-slot validator currently rejects recess overlaps but permits simultaneous lesson tiles for a class. Consequently, the new period bulk operation cannot rely on existing validation to prevent this case.
+
+Evidence: `TZ=Asia/Singapore node /tmp/stapler-mass-apply-duplicate-proof.cjs` passed against the exact main model copied to `/tmp/stapler-mass-apply-model.js`. This is a diagnostic reproduction using synthetic data, not an implementation acceptance test. No canonical build, full local suite or CI was run for a product implementation because none was made.
+
+Recommended bounded resolution, pending owner direction: allow Venue and Group across all existing lesson tiles; allow Class only if the requested replacement creates no new duplicate coverage, otherwise reject the whole apply without changing any field and ask the user to leave Class blank. Do not merge tiles, drop original class coverage, alter teachers or create tiles. Owner direction is required before implementing that behavior because the task says stop and report.
