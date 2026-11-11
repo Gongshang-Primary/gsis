@@ -5,7 +5,7 @@
 - Reviewer/model: Muse
 - Last updated (Asia/Singapore): 2026-11-11 ~10:05
 - Branch: codex/edge-receipt-accepted
-- Base SHA: db57e3e (re-check main's head before branching)
+- Base SHA: 65d7bb5efe0fc8dfeedb8d852bab0a703f84c441 (current main verified before branching)
 - Current head SHA (or PR head; avoid self-referential commit hashes):
 - PR:
 - User-authorised scope: Make the edge (D1) `receiptStatus` return `accepted` as a boolean in all branches, matching the Google receipt contract, so the frontend retry of an unconfirmed reliefBatch can confirm (receipt found) or re-send (receipt not found) instead of always throwing "Save confirmation is unavailable".
@@ -41,3 +41,19 @@ Not deployed unless supported by explicit environment/version/time evidence. Sta
 - The 11 Nov stuck draft is recovered by the retry once this fix is deployed; do not delete or re-submit the report, and do not clear receipts to reverse anything. If the original batch applied online, the retry confirms it; if it did not, the retry re-sends it.
 
 - Claim: Model: Codex, 11 November 2026. Owner-authorized branch created from current main. Muse reviews the exact implementation head. No live operations or changes to release branches are authorized.
+
+## Codex implementation and evidence
+
+Model: Codex. Branch `codex/edge-receipt-accepted`, base `65d7bb5efe0fc8dfeedb8d852bab0a703f84c441`. The existing main-published claim is retained; documentation-only commit `78c46aa` recorded the checked branch base before implementation. Muse reviews the exact final head.
+
+- Product change is confined to the existing `receiptStatus` handler in `roster-update/public/edge-roster.js`. A native D1 receipt returns its unchanged hydrated payload plus `accepted:true`. A missing receipt returns `accepted:false`, `confirmation:'unconfirmed'`, `found:false` and the original request ID. The legacy receipt already returns `accepted:true`; the retained absence branch already receives `accepted:true` from `receiptResult`/`edgeIntakeEntries`. Both branches were verified and left unchanged.
+- No frontend, draft, recording, save path, D1 store, digest lookup, timeout, operation allowlist, binding, flag or authority changes. Canonical build regenerates the notification and operations Worker `.mjs` / `.txt` copies embedding this code; generated files are not hand-edited. The parity guard passes without changing its inventory because source reference lines and probe outcomes do not move.
+- Added only `tests/edge-receipt-accepted.mjs`. The existing pure relief fixture executes a real reliefBatch and produces an allocation view through the native `mutateEdgeRoster`/D1 commit boundary. Actual `edgeRosterBackend` receiptStatus reads use an in-memory SQLite D1 database and synthetic school identities. Tests cover found/missing receipts, original request identity, preserved persisted allocation payload and acceptance metadata, same-request replay without another business apply, changed-command rejection, actor isolation, legacy fallback and absence fallback without a native receipt, and no mutations from lookups.
+- Before the handler fix the regression failed at the expected found/missing accepted-field assertions. Legacy and retained absence tests already passed. Logs are retained locally at `/tmp/edge-receipt-red-complete.log`. A fixture initialization issue and comparison of pre-serialization versus persisted JSON were corrected during test development; the passing test compares the recovered payload exactly to the actual persisted receipt rather than altering the stored result.
+- After the fix the new regression and all ten focused programs passed: new receipt test, `roster094-edge-roster.mjs`, `roster089-receipt-refresh-browser.cjs`, `roster080-batch.cjs`, `roster080-batch-backend.cjs`, `roster080-batch-ui.cjs`, `roster080-batch-browser.cjs`, `roster-intake-instruction-drafts-drain.mjs`, `roster099n-intake-overlap.mjs`, `roster-d1-parity.mjs`. Singapore timezone was used; browser checks used the available Chromium. Canonical build passed all 18 components before those checks. A final-head no-diff build/full local suite and all-five-job CI remain the PR gates; only actual final results are reported in the PR handoff.
+
+### Owner handoff and limits
+
+The owner redeploys the reviewed Worker code on the existing active Roster route and preserves bindings, authority, settings, receipt IDs and browser drafts. Then retry the same retained save in the original browser: a stored receipt permits replay confirmation; a missing receipt permits resending the original batch with its original request ID. This fix does not shorten the timeout or prevent lost responses. Do not delete the stuck draft, clear receipts, or manufacture another request ID to test recovery. Rollback is the previous code while retaining the same operational data and identities.
+
+No actual 11 November stuck draft/report, live D1/Google data, provider endpoint, secret value or setting was inspected or changed. No merge, deployment or main push occurred. Release branches were not edited. Local tests are synthetic and do not establish live recovery; the owner verifies the original retry after deployment.
