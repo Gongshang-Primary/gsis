@@ -36,10 +36,10 @@ const rejected=(fn,status,pattern)=>assert.throws(fn,e=>e.status===status&&(!pat
 }
 {
  const h=adapter(),bad=batch(h,undefined,{instructionsByStaffDate:{alice:{[h.date]:{}},bob:{[h.date]:{'obsolete-lesson':'Wrong source'}}}});
- rejected(()=>h.call(bad,smc(h)),409,/Lessons changed/);assert.equal(h.counts().writes,0);assert.equal(h.state().absences.length,0);
+ h.call(bad,smc(h));assert.equal(h.counts().writes,1);assert.equal(h.state().absences.length,2);assert.equal(h.state().absences.find(a=>a.staffId==='bob').instructions['obsolete-lesson'],'Wrong source');
  for(const extra of [{instructionsByDate:{}},{instructionsByStaffDate:[]},{instructionsByStaffDate:{charlie:{}}},{instructionsByStaffDate:{alice:{'2026-12-31':{}}}},{instructionsByStaffDate:{alice:[]}}])rejected(()=>h.call(batch(h,undefined,extra),smc(h)),400);
- assert.equal(h.counts().writes,0);
- const f=require('./roster701-fixture.cjs')(),before=copy(f.state.absences);rejected(()=>O.apply(f.state,f.ctx,{...bad,date:f.date}),409,/Lessons changed/);assert.deepEqual(f.state.absences,before,'shared apply also prepares all teacher rows before mutation');
+ assert.equal(h.counts().writes,1);
+ const f=require('./roster701-fixture.cjs')(),before=copy(f.state.absences);O.apply(f.state,f.ctx,{...bad,date:f.date});assert.equal(f.state.absences.length,2);assert.equal(f.state.absences.find(a=>a.staffId==='bob').instructions['obsolete-lesson'],'Wrong source','shared apply retains unmatched information on the correct absent teacher');
 }
 {
  const h=adapter(),a=batch(h,['alice','bob']),b=batch(h,['charlie','dora']);h.beforeLock(()=>h.call(b,smc(h)));h.call(a,smc(h));
@@ -69,8 +69,7 @@ const rejected=(fn,status,pattern)=>assert.throws(fn,e=>e.status===status&&(!pat
  // teachers' instructions against that source before the atomic commit.
  const h=adapter();let changed=false;const old=O.previewAbsence(h.ctx,{id:'preview',staffId:'alice',date:h.date,periods:[2],noReliefSubjects:[]})[0];
  h.scope.rosterOperationsReferenceStamp_=ctx=>{if(!changed){changed=true;h.ctx.days[h.date].teachers.find(t=>t.staffId==='alice').cells[2]=['SC','4A','C1-01',''];return 'changed-reference';}return h.scope.rosterOperationsReferenceKey_(ctx);};
- rejected(()=>h.call(batch(h,undefined,{instructionsByStaffDate:{alice:{[h.date]:{[old.lessonKey]:'Outdated lesson'}}}}),smc(h)),409,/Lessons changed/);
- assert.equal(h.counts().contexts,2);assert.equal(h.counts().writes,0);assert.equal(h.state().absences.length,0);
+ h.call(batch(h,undefined,{instructionsByStaffDate:{alice:{[h.date]:{[old.lessonKey]:'Outdated lesson'}}}}),smc(h));assert.equal(h.counts().contexts,2,'source-manifest fence still forces a fresh preparation');assert.equal(h.counts().writes,1);assert.equal(h.state().absences.length,2);assert.equal(h.state().absences.find(a=>a.staffId==='alice').instructions[old.lessonKey],'Outdated lesson');
 }
 {
  // Exercise the production context builder, including its compact teacher-cell

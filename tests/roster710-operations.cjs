@@ -50,7 +50,7 @@ const assert=require('node:assert/strict'),fixture=require('./roster701-fixture.
  assert.throws(()=>h.call({...command,id:saved.savedId,revision:loaded.revision,requestId:crypto.randomUUID(),periods:[2]}),/changed/);assert.deepEqual(h.state(),committed,'stale same-record edit cannot replace the saved report');
  h.ctx.days[h.date].teachers.find(t=>t.staffId==='bob').cells[4]=['EL','4A','C1-01',''];
  const oldPolicy={...preview,staffId:'bob',periods:[4],noReliefSubjects:[]},oldKey=h.O.previewAbsence(h.ctx,oldPolicy)[0].lessonKey;
- assert.throws(()=>h.call({...command,staffId:'bob',periods:[4],requestId:crypto.randomUUID(),instructionsByDate:{[h.date]:{[oldKey]:'Outdated excluded lesson'}}}),/Lessons changed/);assert.deepEqual(h.state(),committed,'old policy instruction keys are rejected by current lesson validation');
+ h.call({...command,staffId:'bob',periods:[4],requestId:crypto.randomUUID(),instructionsByDate:{[h.date]:{[oldKey]:'Outdated excluded lesson'}}});const retained=h.state().absences.find(a=>a.staffId==='bob');assert.equal(retained.instructions[oldKey],'Outdated excluded lesson');assert.equal(h.O.instructionNotesView(retained,h.ctx)[0].match,'general','excluded lesson text is retained as information without changing policy');assert.deepEqual(h.state().systemConfig,policy);
 }
 {
  const {O,state,ctx,date}=fixture();ctx.days={};state.staplerPlans.push({date,baselineId:'b',revision:1,draft:{schema:1}});assert.equal(O.read(state,ctx,{operation:'staplerDates'}).dates[0].date,date,'date list needs no current timetable');

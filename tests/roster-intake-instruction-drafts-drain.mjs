@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import {createRequire} from 'node:module';
 import {GSiSEdgeStore} from '../roster-update/public/edge-store.js';
 import {GSISRosterOperations as O,GSISRoster as R} from '../roster-update/public/edge-roster-domain.js';
-import {edgeRosterBackend,loadEdgeRoster,edgeRosterClock} from '../roster-update/public/edge-roster.js';
+import {edgeRosterBackend,loadEdgeRoster,edgeRosterClock,mutateEdgeRoster} from '../roster-update/public/edge-roster.js';
 import {dispatchReceivedReports} from '../roster-update/public/_worker.js';
 import {captureAbsenceTransport} from '../shared/roster-absence-transport.js';
 import {sha256Hex} from '../roster-update/public/edge-deploy-sha256.js';
@@ -28,7 +28,7 @@ async function fixture(count){
  const noteKey=date+':2:'+JSON.stringify(lesson);
  const command=(i,scope={timetableId:key,parity:'single',staplerRevision:0})=>({operation:'saveAbsence',intake:true,requestId:crypto.randomUUID(),date,staffId:people[i].id,typeId:'mc',fullDay:true,reliefRequired:true,receiptOnly:true,instructionsByDate:{[date]:{[noteKey]:'Synthetic retained instruction '+i}},expectedInstructionScopes:{[date]:scope}});
  const who=i=>({email:people[i].email,subject:people[i].id});
- async function capture(i,scope){const cmd=command(i,scope),reply=(await edgeRosterBackend(env,'rosterOperations',cmd,who(i),crypto.randomUUID())).result;assert.equal(reply.ok,true,JSON.stringify(reply));assert.equal(reply.data.absenceApplied,true);assert.equal(reply.data.instructionState,'pending');return cmd;}
+ async function capture(i,scope){const cmd=command(i,scope),reply=(await edgeRosterBackend(env,'rosterOperations',cmd,who(i),crypto.randomUUID())).result;assert.equal(reply.ok,true,JSON.stringify(reply));assert.equal(reply.data.absenceApplied,true);return cmd;}
  return {db,env,store,people,date,noteKey,command,who,capture,state:async()=>(await loadEdgeRoster(env)).state};
 }
 
@@ -36,9 +36,10 @@ try{
  // Already-forwarded attendance is the live failure case: no transport work is due.
  const idle=await fixture(7);
  try{
-  for(let i=0;i<7;i++)await idle.capture(i);
-  assert.equal((await idle.state()).edgeInstructionDrafts.filter(d=>d.status==='pending').length,7);
-  for(let tick=0;tick<3;tick++)assert.equal((await dispatchReceivedReports(idle.env)).transport.claimed,0);
+  const commands=[];for(let i=0;i<7;i++)commands.push(await idle.capture(i));
+  await mutateEdgeRoster(idle.env,{actor:'fixture',requestId:crypto.randomUUID(),command:{operation:'fixtureLegacyDrafts'},needsContext:false,apply(state,ctx){state.edgeInstructionDrafts=commands.map((command,i)=>({id:command.requestId,actor:idle.who(i).email,identity:idle.who(i),date:idle.date,command,savedIds:[state.absences[i].id],status:i%2?'pending':'needsReview',createdAt:ctx.iso}));for(const a of state.absences){a.instructions={};a.instructionNotes={};a.instructionAuthors={};}return {};}});
+  assert.equal((await idle.state()).edgeInstructionDrafts.filter(d=>['pending','needsReview'].includes(d.status)).length,7);
+  assert.equal((await dispatchReceivedReports(idle.env)).transport.claimed,0);
   const applied=await idle.state();
   assert.equal(applied.edgeInstructionDrafts.filter(d=>d.status==='applied').length,7,'scheduled idle drain applies all retained drafts in bounded batches');
   for(let i=0;i<7;i++)assert.equal(applied.absences.find(a=>a.staffId===idle.people[i].id).instructions[idle.noteKey],'Synthetic retained instruction '+i);
@@ -54,20 +55,18 @@ try{
   assert.equal((await busy.state()).absences.length,0);
   const drained=await dispatchReceivedReports(busy.env);
   assert.equal(drained.transport.forwarded,1);
-  const saved=await busy.state();assert.equal(saved.edgeInstructionDrafts[0].status,'applied');
+  const saved=await busy.state();assert.equal((saved.edgeInstructionDrafts||[]).length,0,'new transport commits notes without deferred work');
   assert.equal(saved.absences[0].instructions[busy.noteKey],'Synthetic retained instruction 0');
  }finally{busy.db.sql.close();}
- // Preserve both source fences; attendance and the original draft remain retained.
+ // Obsolete source fields remain compatible but cannot gate information.
  const stale=await fixture(2);
  try{
   await stale.capture(0,{timetableId:'retired-baseline',parity:'single',staplerRevision:0});
   await stale.capture(1,{timetableId:'synthetic-baseline',parity:'odd',staplerRevision:0});
   await dispatchReceivedReports(stale.env);
-  const reviewed=await stale.state();assert.equal(reviewed.absences.length,2);
-  for(const draft of reviewed.edgeInstructionDrafts){assert.equal(draft.status,'needsReview');assert.equal(draft.reasonCode,'INSTRUCTION_SOURCE_CHANGED');assert(draft.command.instructionsByDate[stale.date][stale.noteKey]);}
-  for(const absence of reviewed.absences)assert.deepEqual(absence.instructions,{});
-  const head=await stale.store.head();await dispatchReceivedReports(stale.env);
-  assert.deepEqual(await stale.state(),reviewed);assert.equal((await stale.store.head()).revision,head.revision);
+  const saved=await stale.state();assert.equal(saved.absences.length,2);assert.equal((saved.edgeInstructionDrafts||[]).length,0);
+  for(let i=0;i<2;i++)assert.equal(saved.absences[i].instructions[stale.noteKey],'Synthetic retained instruction '+i);
+  const head=await stale.store.head();await dispatchReceivedReports(stale.env);assert.deepEqual(await stale.state(),saved);assert.equal((await stale.store.head()).revision,head.revision);
  }finally{stale.db.sql.close();}
- console.log('PASS scheduled D1 drain applies pending instructions with idle or busy transport, retains timetable/parity review fences and is idempotent');
+ console.log('PASS scheduled D1 drain migrates legacy instruction statuses on an idle tick; fresh transport saves notes atomically without source fences or deferred work; replay is a no-op');
 }finally{globalThis.fetch=previousFetch;}

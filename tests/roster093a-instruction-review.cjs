@@ -21,7 +21,5 @@ async function setup(){
 (async()=>{const t=await setup();try{
  t.preview();t.input('[data-instruction]','Retain this exact text');t.f.day.staplerRevision=1;
  t.$('[data-save-instructions]').click();await t.idle();
- assert.equal(t.f.state.absences.length,0);assert(t.$('[data-review-draft-instructions]'),'changed source offers explicit review');assert.match(t.$('[data-instructions-area]').textContent,/Previous instruction text/);
- t.$('[data-review-draft-instructions]').click();t.$('[data-save-instructions]').click();await t.idle();
- assert.equal(t.f.state.absences.length,1);assert.match(JSON.stringify(t.f.state.absences[0].instructions),/Retain this exact text/);console.log('REVIEW PASS stale-scope409 explicit review/rebase and retry accepts original instruction');
+ assert.equal(t.f.state.absences.length,1,'changed timetable never blocks attendance');assert.equal(t.$('[data-review-draft-instructions]'),null,'there is no instruction review gate');assert.match(JSON.stringify(t.f.state.absences[0].instructions),/Retain this exact text/);console.log('PASS changed instruction source saves attendance and original text without a review task');
  }finally{t.dom.window.close();}})().catch(e=>{console.error(e);process.exitCode=1;});

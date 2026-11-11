@@ -21,7 +21,7 @@ try{
  for(let i=0;i<2000;i++){
   row('roster','audit','audit-'+i,{date:today});
   row('roster','edgePeerProposals','peer-'+i,{status:'applied'},i);
-  row('roster','edgeInstructionDrafts','instruction-'+i,{status:'needsReview'},i);
+  row('roster','edgeInstructionDrafts','instruction-'+i,{status:'withdrawn'},i);
   row('roster','acknowledgements','ack-'+i,{snapshotId:'historic-'+i});
   row('deploy','jobs','job-'+i,{state:'complete',input:{payload:'retained payload'}});
  }
@@ -33,8 +33,9 @@ try{
  row('roster','publicationSnapshots','upcoming',{date:today,kind:'assigned',assignment:{date:today,timeStart:'11:10'}});assert.equal(sql.prepare(scheduled.text).get(...scheduled.args).reminders,1);
  row('roster','acknowledgements','current-ack',{snapshotId:'upcoming'});assert.equal(sql.prepare(scheduled.text).get(...scheduled.args).reminders,0,'current acknowledgement remains visible');
  trace.length=0;const proposals=await edgeRosterService(env,{operation:'processEdgePeerProposals'});assert.equal(proposals.pending,0);assert.equal(proposals.instructions.pending,0);
- const pending=trace.filter(probe=>probe.text.includes("json_extract(value_json,'$.status')='pending'"));assert.equal(pending.length,2);
+ const pending=trace.filter(probe=>probe.text.includes("json_extract(value_json,'$.status')='pending'"));assert.equal(pending.length,1);
  for(const probe of pending){const details=uses(probe,'gsis_edge_pending_service');assert(!details.some(detail=>detail.includes('TEMP B-TREE')),details.join('\n'));const collection=probe.args[0];for(const position of [9,3,7,1])row('roster',collection,'pending-'+position,{status:'pending'},position);assert.deepEqual(sql.prepare(probe.text).all(...probe.args).map(result=>JSON.parse(result.value_json).id),['pending-1','pending-3','pending-7'],'pending order and bound are unchanged');}
+ const migration=trace.find(probe=>probe.text.includes('INDEXED BY gsis_edge_instruction_migration'));assert(migration);const migrationPlan=uses(migration,'gsis_edge_instruction_migration');assert(!migrationPlan.some(detail=>detail.includes('TEMP B-TREE')),migrationPlan.join('\n'));for(const position of [9,3,7,1])row('roster','edgeInstructionDrafts','pending-'+position,{status:'pending'},position);row('roster','edgeInstructionDrafts','review-11',{status:'needsReview'},11);assert.deepEqual(sql.prepare(migration.text).all(...migration.args).map(result=>JSON.parse(result.value_json).id),['pending-1','pending-3','pending-7','pending-9','review-11'],'one-time instruction migration includes every open legacy status in order');
  trace.length=0;await runDeployHandoffs(env,{email:'fixture@example.test'});
  const deploy=trace.find(probe=>probe.text.includes('handoff_schedule_json'));uses(deploy,'gsis_edge_pending_handoffs');assert.equal(sql.prepare(deploy.text).all(...deploy.args).length,0);
  row('deploy','jobs','new',{state:'pending',input:{privatePayload:'must stay in D1'}});row('deploy','jobs','expired',{state:'running',leaseUntil:now-1});

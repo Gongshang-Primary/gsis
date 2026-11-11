@@ -431,7 +431,7 @@ var GSISRosterOperations=(()=>{
  function mutualChoice(s,ctx,recipientId,d,ds,combination,ignoreRequestId,options={}){if(!allocation().reliefCandidateEligible(staff(ctx,recipientId)))fail(403,'This staff category is not included in relief candidates.');if(peerReservation(s,ctx,recipientId,d,ds.map(row=>row.period),ignoreRequestId))fail(409,'This colleague already has a peer arrangement awaiting approval in a selected period.');if(ignoreRequestId)s={...s,requests:s.requests.filter(row=>row.id!==ignoreRequestId)};if(combination){if(ds.length!==1)fail(400,'Combine one lesson and period at a time.');const c=allocation().manualRanks(allocation().manualModel(s,ctx,d),ds[0]).find(t=>t.staffId===recipientId);if(!c?.combineAllowed)fail(409,'This colleague cannot combine that class during this period.');return c;}const av=availability(s,ctx,recipientId,d,ds.map(x=>x.period),ds.map(x=>x.id),undefined,ds,options);if(!av.available||!av.external&&av.warnings.length)fail(409,[...av.reasons,...av.warnings].join(' '));return av;}
  function expiry(ctx,d){return Math.min(ctx.now+7*86400000,Date.parse(d+'T23:59:59+08:00')+86400000);}
  function ensurePrivateLink(s,ctx,staffId,d){allocation().ensure(s);const key='duties|'+staffId+'|'+d;let link=s.privateLinks[key];if(!link){link={staffId,date:d,purpose:'duties',issuedAt:ctx.now,expiresAt:ctx.now+7*86400000};s.privateLinks[key]=link;}return copy(link);}
- function queue(s,ctx,kind,recipientId,d,data,requestId,key){if(s.outbox.some(j=>j.key===key))return;const p=staff(ctx,recipientId);s.outbox.push({id:ctx.uuid(),key,kind,recipientId,mobile:mobile(p.mobile),name:p.name,date:d,requestId:requestId||null,data,status:'queued',createdAt:ctx.iso,expiresAt:expiry(ctx,d),linkIssuedAt:ctx.now,linkExpiresAt:ctx.now+7*86400000,attempts:0});}
+ function queue(s,ctx,kind,recipientId,d,data,requestId,key){if(s.outbox.some(j=>j.key===key))return;const personal=kind==='conditional_relief_instruction'&&data?.personal===true,p=personal?ctx.people.find(x=>x.id===recipientId):staff(ctx,recipientId);s.outbox.push({id:ctx.uuid(),key,kind,recipientId,mobile:p?mobile(p.mobile):'',name:p?.name||'',date:d,requestId:requestId||null,data,status:p?'queued':'blocked',...(!p?{error:'Recipient authority unavailable. Restore the recipient in Contacts before retrying delivery.'}:{}),createdAt:ctx.iso,expiresAt:expiry(ctx,d),linkIssuedAt:ctx.now,linkExpiresAt:ctx.now+7*86400000,attempts:0});}
  function snapshot(a,dem,ctx){const person=staff(ctx,a.staffId);return {...a,...dem,staffId:person.id,relieverName:person.name,absentId:dem.staffId,absentName:dem.name,id:a.id,demandId:dem.id,sourceKey:JSON.stringify([dem.timetableId,dem.subject,dem.className,dem.venue,dem.groupName]),instructions:ctx.instruction||'',customInstructions:ctx.customInstruction||''};}
  function sameLessonIdentity(a,d){if(!a||!d)return false;const ids=r=>(r.absentIds?.length?r.absentIds:[r.absentId||r.staffId]).slice().sort();return a.date===d.date&&a.period===d.period&&String(a.className||'').trim()===String(d.className||'').trim()&&JSON.stringify(ids(a))===JSON.stringify(ids(d));}
  function lessonStillExists(a,dd){const ids=a.absentIds?.length?a.absentIds:[a.absentId],classes=String(a.className||'').split(' + ').map(v=>v.trim());return ids.every(id=>{const c=dd.teachers.find(t=>t.staffId===id)?.cells?.[a.period];return c?.some(v=>String(v).trim())&&classes.includes(String(c[1]||'').trim());});}
@@ -510,14 +510,14 @@ var GSISRosterOperations=(()=>{
    if(reason){const released=invalidate(s,ctx,a,reason);changed=released||changed;if((ctx.reconcilePreflight||released&&a.status==='cancelled')&&a.sharedLessonKey&&a.replaces){const prior=s.assignments.find(r=>r.id===a.replaces&&r.sharedLessonKey&&r.staffId===a.staffId);if(prior)changed=invalidate(s,ctx,prior,reason)||changed;}}
    else if(ctx.reconcilePreflight){
     if(a.sharedLessonKey&&lookup.has(a.demandId)&&!A.manualDecision(s,a.date,a.demandId)){
-     const dem=lookup.get(a.demandId),next=snapshot(a,dem,{...ctx,instruction:assignmentInstructions(s,dem),customInstruction:customText(s,dem)});
+     const dem=lookup.get(a.demandId),next=snapshot(a,dem,{...ctx,instruction:assignmentInstructions(s,dem,ctx),customInstruction:customText(s,dem)});
      if(JSON.stringify(a.members)!==JSON.stringify(next.members)&&A.periodStarted(ctx,a.date,a.period,a))invalidate(s,ctx,a,'Shared lesson membership changed after the period started.');
     }
     continue;
    }
    else if(a.invalidCover){delete a.invalidCover;delete a.reviewReason;a.reviewRequired=!!a.workloadReview;A.bumpDay(s,a.date);A.addAudit(s,ctx,'manual-choice-valid',{date:a.date,ids:[a.id]});changed=true;}
    else if(a.sharedLessonKey&&lookup.has(a.demandId)&&!A.manualDecision(s,a.date,a.demandId)){
-    const dem=lookup.get(a.demandId),next=snapshot(a,dem,{...ctx,instruction:assignmentInstructions(s,dem),customInstruction:customText(s,dem)}),membersChanged=JSON.stringify(a.members)!==JSON.stringify(next.members);
+    const dem=lookup.get(a.demandId),next=snapshot(a,dem,{...ctx,instruction:assignmentInstructions(s,dem,ctx),customInstruction:customText(s,dem)}),membersChanged=JSON.stringify(a.members)!==JSON.stringify(next.members);
     if(membersChanged&&A.periodStarted(ctx,a.date,a.period,a)){changed=invalidate(s,ctx,a,'Shared lesson membership changed after the period started.')||changed;}
     else if(membersChanged&&a.status==='published'){
      const replacement={...next,id:ctx.uuid(),status:'draft',protected:true,replaces:a.id,version:1,createdAt:ctx.iso,createdBy:ctx.user.email};delete replacement.publishedAt;delete replacement.publishedBy;s.assignments.push(replacement);A.bumpDay(s,a.date);A.addAudit(s,ctx,'shared-lesson-members-draft',{date:a.date,ids:[replacement.id],previous:a.id,absenceIds:replacement.absenceIds});changed=true;
@@ -528,7 +528,7 @@ var GSISRosterOperations=(()=>{
   if(!ctx.reconcilePreflight)for(const r of s.requests)if((!ctx.reconcileOnlyDate||r.date===ctx.reconcileOnlyDate)&&!ctx.reconcileBlockedDates?.has(r.date)&&r.status==='pending'&&(r.expiresAt<ctx.now||r.date<ctx.today||r.demandIds.some(id=>{if(!ctx.days[r.date]||ctx.days[r.date].verified===false)return false;const prior=r.lessons.find(x=>x.id===id),current=requestLookup.get(id)||[...requestLookup.values()].find(d=>sameLessonIdentity(prior,d));return !current||!prior||!sameLessonIdentity(prior,current);}))){r.status='cancelled';r.reason='Request expired or lesson changed.';r.updatedAt=ctx.iso;changed=true;}
   for(const dem of ds){if(ctx.reconcileOnlyDate&&dem.date!==ctx.reconcileOnlyDate||ctx.reconcileBlockedDates?.has(dem.date)||A.manualDecisionForDemand(s,dem)||!dem.sharedLessonKey||!dem.sharedPresentIds.length||A.periodStarted(ctx,dem.date,dem.period,dem))continue;const existing=A.effectiveAssignments(s).find(a=>a.demandId===dem.id);if(existing){if(existing.origin!=='automatic')continue;if(!releaseAssignment(s,ctx,existing,'A timetabled co-teacher is present.'))continue;}
    if(ctx.reconcilePreflight)continue;
-   const target=dem.sharedPresentIds[0],base=ctx.days[dem.date].teachers.find(t=>t.staffId===target).cells[dem.period],row=snapshot({id:ctx.uuid(),staffId:target,status:'draft',origin:'shared-subject',replaces:existing?.replaces||null,protected:true,combination:true,sameClass:true,originalLesson:copy(base),rCost:0,version:1,createdAt:ctx.iso,createdBy:'shared subject rule'},dem,{...ctx,instruction:assignmentInstructions(s,dem),customInstruction:customText(s,dem)});s.assignments.push(row);A.bumpDay(s,dem.date);A.addAudit(s,ctx,'shared-lesson-combine',{date:dem.date,ids:[row.id],absenceIds:dem.absenceIds,staffId:target});changed=true;
+   const target=dem.sharedPresentIds[0],base=ctx.days[dem.date].teachers.find(t=>t.staffId===target).cells[dem.period],row=snapshot({id:ctx.uuid(),staffId:target,status:'draft',origin:'shared-subject',replaces:existing?.replaces||null,protected:true,combination:true,sameClass:true,originalLesson:copy(base),rCost:0,version:1,createdAt:ctx.iso,createdBy:'shared subject rule'},dem,{...ctx,instruction:assignmentInstructions(s,dem,ctx),customInstruction:customText(s,dem)});s.assignments.push(row);A.bumpDay(s,dem.date);A.addAudit(s,ctx,'shared-lesson-combine',{date:dem.date,ids:[row.id],absenceIds:dem.absenceIds,staffId:target});changed=true;
   }
   return changed;
  }
@@ -538,7 +538,7 @@ var GSISRosterOperations=(()=>{
   const dd=ctx.days[a.date];if(!dd)return null;
   return JSON.stringify([1,a.id,a.staffId,a.date,a.typeId,absencePeriods(ctx,a),a.coverage||null,a.reliefRequired,a.noReliefSubjects||null,a.deletedAt||null,dd.id,dd.parity,dd.staplerRevision||0,dd.schoolDay,dd.verified,lessons(ctx,a).map(l=>[l.period,l.lessonKey,l.timeStart,l.timeEnd])]);
  }
- function absencePublic(a,ctx){return {...a,periods:copy(absencePeriods(ctx,a)),timetablePending:absenceTimingPending(ctx,a),...(ctx.days[a.date]?{instructionScope:instructionScope(a,ctx)}:{}),noReliefSubjects:copy(Array.isArray(a.noReliefSubjects)?a.noReliefSubjects:['PD','BLK','BLOCK','IMP'].map(value=>({type:'exact',value}))),editable:a.date>=ctx.today&&!a.deletedAt&&((ctx.user.smc||ctx.user.admin)||a.staffId===ctx.user.staffId)};}
+ function absencePublic(a,ctx){return {...a,instructionMatches:instructionNotesView(a,ctx),periods:copy(absencePeriods(ctx,a)),timetablePending:absenceTimingPending(ctx,a),...(ctx.days[a.date]?{instructionScope:instructionScope(a,ctx)}:{}),noReliefSubjects:copy(Array.isArray(a.noReliefSubjects)?a.noReliefSubjects:['PD','BLK','BLOCK','IMP'].map(value=>({type:'exact',value}))),editable:a.date>=ctx.today&&!a.deletedAt&&((ctx.user.smc||ctx.user.admin)||a.staffId===ctx.user.staffId)};}
  function dutiesView(s,ctx,p){
   const id=ctx.user.staffId,d=date(p.date||ctx.today),ownAssignments=[...s.assignments.filter(a=>a.staffId===id&&!a.publicationWithheldAt&&!s.dailyPublicationStates?.[a.date]),...[...latestPublications(s).values()].filter(v=>v.staffId===id&&s.dailyPublicationStates?.[v.date]&&v.kind!=='cancelled').map(v=>({...v.assignment,instructions:v.instructions,customInstructions:v.customInstructions}))],requests=s.requests.filter(r=>r.recipientId===id||r.staffId===id),ids=new Set([id,...requests.flatMap(r=>[r.recipientId,r.staffId])]);
   return {pendingNotices:acknowledgementView(s,ctx),timetableNotices:ownTimetableNotices(s,ctx),revision:s.revision,timetableSource:timetableSource(s,ctx,d),allocationRevision:s.dayRevisions?.[d]||0,date:d,today:ctx.today,user:copy(ctx.user),quotaUnits:'periods/week',people:ctx.people.filter(x=>ids.has(x.id)).map(({id,name})=>({id,name})),types:[],periods:[],timetable:null,absences:[],ownAbsences:[],demands:[],assignments:copy(ownAssignments.filter(a=>a.date===d&&a.status==='published')),mutualRequests:copy(requests),adhoc:[],myDuties:ownAssignments.filter(a=>['published','completed'].includes(a.status)&&!a.noRelief&&!a.remove).map(publicDuty),myDutyUpdates:[],warnings:[],notifications:{configured:ctx.notificationsConfigured===true,pending:s.outbox.filter(j=>j.status==='queued'&&j.recipientId===id).length},checkedAt:ctx.iso};
@@ -579,26 +579,74 @@ var GSISRosterOperations=(()=>{
   const changes=p.instructionChanges,ids=p.absenceIds||[p.absenceId];
   if(!Array.isArray(changes)||!changes.length||!Array.isArray(ids)||ids.length!==changes.length||new Set(changes.map(c=>c?.absenceId)).size!==changes.length||changes.some(c=>!ids.includes(c?.absenceId)))fail(400,'Select valid absence instruction changes.');
   const records=new Map(instructionRecords(s,ctx,ids).map(a=>[a.id,a]));
-  const selected=day(ctx,date(p.date||ctx.today));
-  if(p.expectedTimetableId!==selected.id||p.expectedParity!==selected.parity||p.expectedStaplerRevision!==(selected.staplerRevision||0))fail(409,'The timetable changed. Refresh instructions and review your draft.');
   // Prepare every merge before modifying any record; one conflict rejects the batch.
   return changes.map(change=>{
-   const a=records.get(change.absenceId);editable(ctx,a);if(absenceTimingPending(ctx,a))fail(409,'The absence is saved. Add relief instructions when a verified school timetable is available.');
-   const scope=p.expectedInstructionScopes?.[a.id];if(typeof scope!=='string'||scope!==instructionScope(a,ctx))fail(409,'The absence or its lessons changed. Refresh instructions and review your draft.');
+   const a=records.get(change.absenceId);editable(ctx,a);
    const lessonSnapshot=lessons(ctx,a),known=new Set(lessonSnapshot.map(l=>l.lessonKey)),base=instructionMap(change.base,known),values=instructionMap(change.values,known),keys=Object.keys(values);
    if(keys.length!==Object.keys(base).length||keys.some(key=>!Object.prototype.hasOwnProperty.call(base,key)))fail(400,'Each changed instruction needs its original value.');
    if(typeof change.baseInstructionsNA!=='boolean'||typeof change.instructionsNA!=='boolean')fail(400,'Set the original and new instruction status.');
    const instructions={...(a.instructions||{})};
-   for(const key of keys){if(base[key]===values[key])continue;const current=instructions[key]||'';if(current!==base[key]&&current!==values[key])fail(409,'These lesson instructions were changed by another user. Refresh and review your draft.');instructions[key]=values[key];}
-   let instructionsNA=a.instructionsNA===true;if(change.baseInstructionsNA!==change.instructionsNA){if(instructionsNA!==change.baseInstructionsNA&&instructionsNA!==change.instructionsNA)fail(409,'The instruction status changed. Refresh and review your draft.');instructionsNA=change.instructionsNA;}
+   for(const key of keys){if(base[key]===values[key])continue;const current=instructions[key]||'';instructions[key]=values[key];}
+   let instructionsNA=a.instructionsNA===true;if(change.baseInstructionsNA!==change.instructionsNA){instructionsNA=change.instructionsNA;}
    return {a,instructions,instructionsNA,lessonSnapshot};
   });
  }
  function instructionRecords(s,ctx,ids){if(!Array.isArray(ids)||!ids.length||ids.length>366*150||new Set(ids).size!==ids.length)fail(400,'Select valid absence records.');const byId=new Map(s.absences.map(a=>[a.id,a])),rows=ids.map(id=>{const a=byId.get(id);if(!a)fail(404,'Absence record not found.');return a;});absenceDates({dates:rows.map(a=>a.date)},ctx);return rows;}
+ // Lesson keys describe the submitted note; they are not a write precondition.
  function instructionMap(input,known){
-  if(!input||typeof input!=='object'||Array.isArray(input))fail(400,'Invalid relief instructions.');const out={};
-  for(const [key,value] of Object.entries(input)){if(!known.has(key))fail(409,'Lessons changed. Refresh instructions.');if(typeof value!=='string'||value.length>8000)fail(400,'Instructions must be text of at most 8000 characters.');out[key]=value;}return out;
+  if(input===undefined||input===null)return {};
+  if(typeof input==='string')return {'submitted-note':input};
+  if(typeof input!=='object'||Array.isArray(input))return {'submitted-note':JSON.stringify(input)};
+  return Object.fromEntries(Object.entries(input).map(([key,value])=>[key,typeof value==='string'?value:JSON.stringify(value)]));
  }
+ function originalInstructionLesson(key,snapshot=[]){
+  const saved=snapshot.find(row=>row.lessonKey===key);if(saved)return {lessonKey:key,period:saved.period,className:saved.className||'',subject:saved.subject||'',venue:saved.venue||''};
+  try{const match=/^(\d{4}-\d{2}-\d{2}):(\d+):(.*)$/.exec(key);if(match){const cell=JSON.parse(match[3]);if(Array.isArray(cell))return {lessonKey:key,period:Number(match[2]),subject:String(cell[0]||''),className:String(cell[1]||''),venue:String(cell[2]||'')};}}catch{}
+  return {lessonKey:key,period:null,className:'',subject:'',venue:''};
+ }
+ function retainInstructionNotes(a,input,ctx){
+  const incoming=instructionMap(input),values={...(a.instructions||{})},authors={...(a.instructionAuthors||{})},notes={...(a.instructionNotes||{})};let changed=false;
+  for(const [key,value] of Object.entries(incoming)){
+   const previous=values[key],old=notes[key],author=authors[key]||{actor:a.instructionsUpdatedBy||a.reportedBy,at:a.instructionsUpdatedAt||a.reportedAt};
+   if(previous!==value){changed=true;authors[key]={actor:ctx.user.email,at:ctx.reportedAt||ctx.iso,sequence:ctx.reportSequence||0};}
+   const history=(old?.history||[]).slice();if(previous!==undefined&&previous!==value)history.push({text:previous,...author});
+   notes[key]={...(old||originalInstructionLesson(ctx.instructionOriginalKeys?.[key]||key,a.lessonSnapshot||[])),lessonKey:key,...(ctx.instructionOriginalKeys?.[key]?{originalLessonKey:ctx.instructionOriginalKeys[key]}:{}),text:value,author:authors[key]?.actor||author.actor,at:authors[key]?.at||author.at,history};values[key]=value;
+  }
+  a.instructions=values;a.instructionAuthors=authors;a.instructionNotes=notes;
+  if(changed){a.instructionsUpdatedBy=ctx.user.email;a.instructionsUpdatedAt=ctx.reportedAt||ctx.iso;}
+  return changed;
+ }
+ function instructionNotesView(a,ctx,available){
+  if(!Object.values(a.instructions||{}).some(text=>typeof text==='string'&&text.trim()))return [];
+  let current=available;
+  if(!current)try{current=ctx?.days?.[a.date]?.teachers?lessons(ctx,a):a.lessonSnapshot||[];}catch{current=[];}
+  return Object.entries(a.instructions||{}).filter(([,text])=>typeof text==='string'&&text.trim()).map(([key,text])=>{
+   const original=a.instructionNotes?.[key]||originalInstructionLesson(key,a.lessonSnapshot||[]);let matches=[],match='general';
+   try{
+    matches=current.filter(row=>row.lessonKey===(original.originalLessonKey||original.lessonKey||key));if(matches.length)match='lesson';
+    if(!matches.length){matches=current.filter(row=>row.period===original.period&&row.className===original.className);if(matches.length)match='period+class';}
+    if(!matches.length){matches=current.filter(row=>row.period===original.period);if(matches.length)match='period';}
+   }catch{matches=[];match='general';}
+   return {lessonKey:key,text,originalLesson:{lessonKey:original.originalLessonKey||original.lessonKey||key,period:original.period,className:original.className,subject:original.subject,venue:original.venue},author:a.instructionAuthors?.[key]?.actor||original.author||a.reportedBy,at:a.instructionAuthors?.[key]?.at||original.at||a.reportedAt,match,matchedLessonKeys:matches.map(row=>row.lessonKey),matchedPeriods:matches.map(row=>row.period),matchedLessons:matches.map(({lessonKey,period,className})=>({lessonKey,period,className}))};
+  });
+ }
+ function generalInstructionText(a,note){const old=note.originalLesson,label=[old.period===null||old.period===undefined?'':('P'+old.period),old.className,old.subject].filter(Boolean).join(' ')||'as submitted';return 'Note from '+a.name+' (original lesson: '+label+')\n'+note.text;}
+ function dutyInstructionNotes(s,dem,ctx){
+  const a=s.absences.find(row=>row.id===dem.absenceId);if(!a||a.deletedAt||a.instructionsNA||dem.date&&a.date!==dem.date||dem.absentId&&dem.absentId!==a.staffId)return [];
+  const available=ctx?.informationOnlyGeneral?[]:ctx?.days?.[a.date]?.teachers?undefined:[...(a.lessonSnapshot||[]),dem];
+  return instructionNotesView(a,ctx,available).filter(note=>note.match==='general'||note.matchedLessonKeys.includes(dem.lessonKey)||note.originalLesson.period===dem.period||!dem.lessonKey&&note.matchedLessons.some(row=>row.period===dem.period&&row.className===dem.className)).map(note=>({...note,absenceId:a.id,absentTeacherId:a.staffId,text:note.match==='general'?generalInstructionText(a,note):note.text}));
+ }
+ function instructionMembers(s,dem){
+  if(dem.members?.length)return dem.members;
+  if((dem.absenceIds||[]).length<2)return null;
+  return dem.absenceIds.map(id=>s.absences.find(a=>a.id===id)).filter(a=>a&&a.date===dem.date&&(!dem.absentIds||dem.absentIds.includes(a.staffId))).map(a=>({...dem,members:undefined,absenceIds:undefined,absenceId:a.id,absentId:a.staffId,name:a.name}));
+ }
+ function personalInstructionRules(s,ctx,a,prior){
+  const members=instructionMembers(s,a)||[{...a,absenceId:a.absenceId}],rules=[];
+  for(const member of members){const notes=dutyInstructionNotes(s,member,ctx);if(!notes.length)continue;const id='absence-notes:'+member.absenceId,text=notes.map(note=>note.text).join('\n\n'),old=prior?.conditionalRules?.find(rule=>rule.id===id);rules.push({id,version:old?.text===text?old.version:(old?.version||0)+1,text,personal:true,general:notes.some(note=>note.match==='general'),absentTeacherId:notes[0].absentTeacherId});}
+  return rules;
+ }
+
  // R17: allocation, accounting and notification commands share the existing atomic store.
  function allocation(){return typeof GSISRosterAllocation!=='undefined'?GSISRosterAllocation:require('./roster-allocation.js');}
  // Dates, identities and authority stay server-owned; the plan is a versioned draft in the same atomic document.
@@ -924,7 +972,7 @@ const sha256Hex=text=>sha256Bytes(text).map(n=>n.toString(16).padStart(2,'0')).j
    record.workloadWarnings=validateStaplerCaps(s,ctx,d,record,plan,false);
    retainConfirmedStaplerSnapshot(record,s.audit);record.draft=stapler().canonical(plan);record.revision++;record.confirmed=false;record.updatedAt=ctx.iso;record.updatedBy=ctx.user.email;allocation().addAudit(s,ctx,op,{date:d,staplerRevision:record.revision,...(s.systemConfig?.verboseLogging===false?{}:{timetableChanges:staplerPlanChanges(previous,plan)})});return {savedIds:[d],staplerRevision:record.revision};
   }
-  if(!record?.draft)fail(409,'Save the draft before confirming.');const plan=stapler().snapshotPlan(record.draft);validateStaplerPlan(s,ctx,d,record,plan);plan.status='confirmed';stapler().acceptStored(plan);record.draft=stapler().canonical(plan);record.confirmed=true;record.confirmedAt=ctx.iso;record.confirmedBy=ctx.user.email;record.confirmedPlan=record.draft;record.confirmedRevision=record.revision;syncStaplerReservations(s,ctx,d,record,plan);allocation().bumpDay(s,d);allocation().addAudit(s,ctx,'confirmStapler',{date:d,staplerRevision:record.revision});return {savedIds:[d],staplerRevision:record.revision,confirmed:true};
+  if(!record?.draft)fail(409,'Save the draft before confirming.');const plan=stapler().snapshotPlan(record.draft);validateStaplerPlan(s,ctx,d,record,plan);plan.status='confirmed';stapler().acceptStored(plan);record.draft=stapler().canonical(plan);record.confirmed=true;record.confirmedAt=ctx.iso;record.confirmedBy=ctx.user.email;record.confirmedPlan=record.draft;record.confirmedRevision=record.revision;syncStaplerReservations(s,ctx,d,record,plan);syncLessonInstructions(s,composeStaplerContext(s,ctx),s.absences.filter(a=>a.date===d&&!a.deletedAt).map(a=>a.id));allocation().bumpDay(s,d);allocation().addAudit(s,ctx,'confirmStapler',{date:d,staplerRevision:record.revision});return {savedIds:[d],staplerRevision:record.revision,confirmed:true};
  }
  function validateStaplerPlan(s,ctx,d,record,plan){
 const next=stapler().effectiveDay(plan,ctx.baselineDays?.[d]||ctx.days[d]);for(const a of s.assignments.filter(a=>a.date===d&&['published','completed'].includes(a.status)&&!a.noRelief&&!a.remove&&!a.combination)){const cell=next.teachers.find(t=>t.staffId===a.staffId)?.cells[a.period];if(cell?.some(Boolean))fail(409,'Published relief would double-book '+staff(ctx,a.staffId).name+' at period '+a.period+'. Clear or rearrange that relief first.');}
@@ -987,6 +1035,13 @@ const next=stapler().effectiveDay(plan,ctx.baselineDays?.[d]||ctx.days[d]);for(c
   for(const [d,publication] of Object.entries(publications))for(const row of publication.teachers)if(!row.snapshotIds)legacy.add(d+'|'+row.staffId);
   for(const v of s.publicationSnapshots){const publication=publications[v.date];if(!publication||legacy.has(v.date+'|'+v.staffId)&&Date.parse(v.publishedAt)<=Date.parse(publication.publishedAt))latest.set(v.assignmentId+'|'+v.staffId,v);}
   for(const [d,publication] of Object.entries(publications))for(const row of publication.teachers)for(const id of row.snapshotIds||[]){const v=byId.get(id);if(v&&v.date===d&&v.staffId===row.staffId)latest.set(v.assignmentId+'|'+v.staffId,v);}
+  // A later note update changes information and acknowledgement, never the
+  // frozen allocation captured by the day publication.
+  const positions=new Map(s.publicationSnapshots.map((v,i)=>[v.id,i]));
+  for(const v of s.publicationSnapshots){if(v.kind!=='instructions'||v.informationOnly!==true)continue;const key=v.assignmentId+'|'+v.staffId,captured=latest.get(key);if(!captured||(positions.get(v.id)||0)<=(positions.get(captured.id)||0))continue;
+   const a=captured.assignment,b=v.assignment;if(a.date!==b.date||a.period!==b.period||a.staffId!==b.staffId||a.absentId!==b.absentId||a.absenceId!==b.absenceId||JSON.stringify(a.absenceIds||[])!==JSON.stringify(b.absenceIds||[]))continue;
+   latest.set(key,{...captured,id:v.id,revision:v.revision,kind:'instructions',publishedAt:v.publishedAt,instructions:v.instructions,conditionalRules:[...(captured.conditionalRules||[]).filter(rule=>!rule.personal),...(v.conditionalRules||[]).filter(rule=>rule.personal)],assignment:{...captured.assignment,instructions:v.instructions}});
+  }
   return latest;
  }
  // An unchanged day notice may capture replacement assignment IDs on republish.
@@ -1008,7 +1063,7 @@ const next=stapler().effectiveDay(plan,ctx.baselineDays?.[d]||ctx.days[d]);for(c
  }
  function publicationSnapshot(s,ctx,a,kind='assigned'){
   const existing=s.publicationSnapshots.filter(x=>x.assignmentId===a.id&&x.staffId===a.staffId),rev=(existing.at(-1)?.revision||0)+1;
-  const v={id:ctx.uuid(),assignmentId:a.id,revision:rev,staffId:a.staffId,date:a.date,period:a.period,kind,publishedAt:ctx.iso,publishedBy:ctx.user.email,assignment:copy(a),instructions:String(a.instructions||''),customInstructions:String(a.customInstructions||''),conditionalRules:matchingCustom(s,a).map(r=>({id:r.id,version:r.version,text:r.text}))};s.publicationSnapshots.push(v);return v;
+  const v={id:ctx.uuid(),assignmentId:a.id,revision:rev,staffId:a.staffId,date:a.date,period:a.period,kind,publishedAt:ctx.iso,publishedBy:ctx.user.email,assignment:copy(a),instructions:String(a.instructions||''),customInstructions:String(a.customInstructions||''),conditionalRules:[...matchingCustom(s,a).map(r=>({id:r.id,version:r.version,text:r.text})),...personalInstructionRules(s,ctx,a,existing.at(-1))]};s.publicationSnapshots.push(v);return v;
  }
  // A removed lesson withdraws only its captured duty. Never rebuild an authorized
  // publication or communication from the current draft, attendance or baseline.
@@ -1099,16 +1154,30 @@ const next=stapler().effectiveDay(plan,ctx.baselineDays?.[d]||ctx.days[d]);for(c
   const groupIds=dem.groupIds||[];
   return s.customInstructions.filter(r=>!r.deletedAt&&r.enabled!==false&&(!(r.levels||[]).length||(r.levels||[]).includes(dem.level||primaryLevel(dem.className)))&&(!(r.periods||[]).length||(r.periods||[]).includes(dem.period))&&(!(r.classNames||[]).length||(r.classNames||[]).includes(dem.className))&&(!(r.groupIds||[]).length||r.groupIds.some(id=>groupIds.includes(id)))).sort((a,b)=>a.id.localeCompare(b.id));
  }
- function queueConditional(s,ctx,values){
+ function instructionMessagePeriods(values){const sorted=values.slice().sort((a,b)=>a.period-b.period);return sorted.map(v=>'P'+v.period+' · '+v.assignment.timeStart+' to '+v.assignment.timeEnd).join('; ');}
+ function queueConditional(s,ctx,values,{personalOnly=false}={}){
+  const personal=[];
   for(const v of values){if(v.kind==='cancelled')continue;
    const prior=s.publicationSnapshots.filter(x=>x.assignmentId===v.assignmentId&&x.staffId===v.staffId&&x.id!==v.id).at(-1);
-   for(const rule of matchingCustom(s,v.assignment)){
+   for(const rule of v.conditionalRules||matchingCustom(s,v.assignment)){
+    if(personalOnly&&!rule.personal)continue;
     const previous=prior?.conditionalRules?.find(r=>r.id===rule.id);
-    if(previous?.version===rule.version&&previous.text===rule.text&&publishedOnDate(prior.publishedAt,v.date))continue;
-    queue(s,ctx,'conditional_relief_instruction',v.staffId,v.date,{templateKey:'conditional_relief_instruction',acknowledge:true,snapshotIds:[v.id],assignmentId:v.assignmentId,absentTeacherId:v.assignment.absentId,absentTeacherName:ctx.people.find(p=>p.id===v.assignment.absentId)?.name||'',absentTeacherContact:absentTeacherContact(ctx.people.find(p=>p.id===v.assignment.absentId)),ruleId:rule.id,ruleVersion:rule.version,className:v.assignment.className,periodAndTime:'P'+v.period+' · '+v.assignment.timeStart+' to '+v.assignment.timeEnd,instruction:rule.text,summary:rule.text},null,'conditional:'+v.id+':'+rule.id+':'+rule.version);
+    if(previous?.version===rule.version&&previous.text===rule.text&&(rule.personal||publishedOnDate(prior.publishedAt,v.date)))continue;
+    if(rule.personal){personal.push({v,rule});continue;}
+    queue(s,ctx,'conditional_relief_instruction',v.staffId,v.date,{templateKey:'conditional_relief_instruction',acknowledge:true,snapshotIds:[v.id],assignmentId:v.assignmentId,absentTeacherId:v.assignment.absentId,absentTeacherName:ctx.people.find(p=>p.id===v.assignment.absentId)?.name||'',absentTeacherContact:absentTeacherContact(ctx.people.find(p=>p.id===v.assignment.absentId)),ruleId:rule.id,ruleVersion:rule.version,className:v.assignment.className,periodAndTime:instructionMessagePeriods([v]),instruction:rule.text,summary:rule.text},null,'conditional:'+v.id+':'+rule.id+':'+rule.version);
    }
   }
+  // One instruction message per covering duty block, including general notes.
+  const groups=[];
+  for(const item of personal.sort((a,b)=>a.v.period-b.v.period)){
+   const {v,rule}=item,key=JSON.stringify([v.staffId,v.date,rule.id,rule.version,rule.text,v.assignment.className,v.assignment.subject,v.assignment.venue]),group=groups.find(g=>g.key===key&&g.values.at(-1).period+1===v.period&&g.values.at(-1).assignment.timeEnd===v.assignment.timeStart);
+   if(group)group.values.push(v);else groups.push({key,rule,values:[v]});
+  }
+  for(const {rule,values:rows} of groups){const v=rows[0],teacher=ctx.people.find(p=>p.id===rule.absentTeacherId),ids=rows.map(row=>row.id);
+   queue(s,ctx,'conditional_relief_instruction',v.staffId,v.date,{templateKey:'conditional_relief_instruction',acknowledge:true,personal:true,snapshotIds:ids,assignmentId:v.assignmentId,absentTeacherId:rule.absentTeacherId,absentTeacherName:teacher?.name||'',absentTeacherContact:absentTeacherContact(teacher),ruleId:rule.id,ruleVersion:rule.version,className:v.assignment.className,periodAndTime:instructionMessagePeriods(rows),instruction:rule.text,summary:rule.text},null,'conditional-notes:'+ids.join(':')+':'+rule.id+':'+rule.version);
+  }
  }
+
  function queuePublication(s,ctx,rows){
   const grouped=new Map();for(const v of rows){if(s.dailyPublicationStates?.[v.date])continue;const key=v.staffId+'|'+v.date;if(!grouped.has(key))grouped.set(key,[]);grouped.get(key).push(v);}
   for(const values of grouped.values()){
@@ -1121,6 +1190,7 @@ const next=stapler().effectiveDay(plan,ctx.baselineDays?.[d]||ctx.days[d]);for(c
    if(urgent.length)smcAlert(s,ctx,d,'urgent:'+urgent.map(x=>x.id).join(':'),'Urgent published relief: '+urgent.map(v=>'P'+v.period+' '+v.assignment.timeStart+' '+v.assignment.className+' '+v.assignment.subject+' '+(v.assignment.venue||'')).join('; '),true,'smc_alert',{templateKey:'relief_urgent_smc',snapshotIds:urgent.map(v=>v.id),assignedTeacherId:id,assignedTeacherName:staff(ctx,id).name,startAt:assignmentStart(urgent[0].assignment)});
    queueConditional(s,ctx,values);
   }
+  queueConditional(s,ctx,rows.filter(row=>s.dailyPublicationStates?.[row.date]),{personalOnly:true});
  }
  // Build indexes once per claim batch. Validation never trusts stale browser or outbox snapshots.
  function notificationIndex(s){
@@ -1140,7 +1210,8 @@ const next=stapler().effectiveDay(plan,ctx.baselineDays?.[d]||ctx.days[d]);for(c
    if(!summaryNeeded(index,j.recipientId,j.date,summary))return 'An unchanged or newer absence summary was already sent.';
   }
   const today=new Date(now+8*3600000).toISOString().slice(0,10);
-  if(j.kind==='stapler_timetable'&&data.dailyPublication===true){if(j.date<today)return 'Published timetable notification is for a past day.';}
+  if(j.kind==='conditional_relief_instruction'&&data.personal===true){if(j.date<today)return 'Relief instruction notification is for a past day.';}
+  else if(j.kind==='stapler_timetable'&&data.dailyPublication===true){if(j.date<today)return 'Published timetable notification is for a past day.';}
   else if(currentDayNotice&&(j.date!==today||j.createdAt&&!publishedOnDate(j.createdAt,j.date)))return 'Published notices are available only for the current Singapore workday.';
   if(j.kind==='stapler_timetable'&&data.communicationSnapshot){const snap=data.communicationSnapshot;if(snap.date!==j.date||snap.teachers?.length!==1||snap.teachers[0].staffId!==j.recipientId)return 'Recipient communication snapshot is invalid.';const state=dailyNoticeState({...s,absences:[],dailyPublicationStates:{...s.dailyPublicationStates,[j.date]:snap}},j.date,j.recipientId);if(state.delivery.jobId&&state.delivery.jobId!==j.id)return 'Another durable notification already covers this timetable, or its delivery outcome needs review.';data.templateKey='stapler_timetable';data.acknowledge=true;data.summary=dailyNoticeMessage();}else if(j.kind==='stapler_timetable'&&data.dailyPublication){const publication=s.dailyPublicationStates?.[j.date],teacher=publication?.teachers.find(t=>t.staffId===j.recipientId),state=dailyNoticeState(s,j.date,j.recipientId);if(!state.eligible)return state.reason;if(!teacher||!parsedTimetableFingerprint(teacher.fingerprint)||dailyJobFingerprint(s,publication,teacher,j)!==state.fingerprint)return 'Timetable notification was superseded.';if(state.delivery.jobId&&state.delivery.jobId!==j.id)return 'Another durable notification already covers this timetable, or its delivery outcome needs review.';data.templateKey='stapler_timetable';data.acknowledge=true;data.timetableNoticeId=timetableNoticeId(publication,teacher);data.summary=dailyNoticeMessage();data.attendanceAbsentPeriods=state.absentPeriods;}else if(j.kind==='stapler_timetable'){const record=s.staplerPlans.find(r=>r.date===j.date);if(!record?.published||!publishedOnDate(record.publishedAt,j.date)||(record.notifiedFingerprints?.[j.recipientId]||'baseline')!==data.fingerprint)return 'Timetable notification was superseded.';const attendance=legacyTimetableAttendance(s,j,record);if(attendance.issue)return attendance.issue;data.summary=dailyNoticeMessage();if(attendance.state)data.attendanceAbsentPeriods=attendance.state.absentPeriods;data.templateKey='stapler_timetable';data.acknowledge=true;data.timetableNoticeId=timetableNoticeSource(s,j.date,j.recipientId).row?.noticeId;}
   if(j.kind==='stapler_request'||j.kind==='stapler_decision'){const request=s.staplerRequests.find(r=>r.id===data.planningRequestId&&r.date===j.date);if(!request||request.retiredAt||j.kind==='stapler_request'&&(request.status!=='pending'||request.sponsorId!==j.recipientId)||j.kind==='stapler_decision'&&((data.audience==='stapler-sponsor'?request.sponsorId!==j.recipientId:request.staffId!==j.recipientId)||request.status!==data.decision))return 'Planning request notification was superseded.';data.requesterId=request.staffId;data.requesterName=request.name;}
@@ -1168,10 +1239,12 @@ const next=stapler().effectiveDay(plan,ctx.baselineDays?.[d]||ctx.days[d]);for(c
     if(data.mutualChange&&own.some(v=>v.kind==='cancelled'&&v.assignment.mutual))data.templateKey='mutual_override';else if(own.some(v=>v.kind!=='assigned'))data.templateKey='relief_updated';else if(data.templateKey!=='relief_urgent')data.templateKey='relief_assignment';
     data.summary=data.templateKey==='mutual_override'?publicationSummary(own):shortPublicationSummary(own,data.templateKey==='relief_updated');
    }else if(j.kind==='conditional_relief_instruction'){
-    const v=values.find(v=>v.staffId===j.recipientId&&v.kind!=='cancelled');if(!v)return 'Conditional instruction recipient changed.';
-    const a=index.assignments.get(v.assignmentId),rule=(v.conditionalRules||[]).find(r=>r.id===data.ruleId&&r.version===data.ruleVersion);
-    if(!a||!['published','completed'].includes(a.status)||a.staffId!==j.recipientId||a.date!==j.date||v.date!==j.date||a.absentId!==v.assignment.absentId||!rule)return 'Conditional instruction is no longer published for this teacher.';
-    data.absentTeacherId=v.assignment.absentId;data.instruction=rule.text;data.templateKey='conditional_relief_instruction';data.checkedPublicationId=v.id;data.className=v.assignment.className;data.periodAndTime='P'+v.period+' · '+v.assignment.timeStart+' to '+v.assignment.timeEnd;
+    const eligible=values.filter(v=>v.staffId===j.recipientId&&v.kind!=='cancelled').filter(v=>(v.conditionalRules||[]).some(r=>r.id===data.ruleId&&r.version===data.ruleVersion));
+    const v=eligible[0];if(!v)return 'Conditional instruction recipient or text changed.';
+    const a=index.assignments.get(v.assignmentId),rule=v.conditionalRules.find(r=>r.id===data.ruleId&&r.version===data.ruleVersion);
+    if(!a||!['published','completed'].includes(a.status)||a.staffId!==j.recipientId||a.date!==j.date||v.date!==j.date||a.absentId!==v.assignment.absentId)return 'Conditional instruction is no longer published for this teacher.';
+    if(data.personal){data.snapshotIds=[...new Set(eligible.map(row=>row.id))];data.periodAndTime=instructionMessagePeriods(eligible);}else data.periodAndTime=instructionMessagePeriods([v]);
+    data.absentTeacherId=rule.absentTeacherId||v.assignment.absentId;data.instruction=rule.text;data.templateKey='conditional_relief_instruction';data.checkedPublicationId=v.id;data.className=v.assignment.className;
    }else{
     const pending=values.filter(v=>v.kind!=='cancelled'&&!index.ack.has(v.staffId+'|'+v.id)&&index.assignments.get(v.assignmentId)?.status==='published');
     if(!pending.length)return 'Duty acknowledged, cancelled or superseded.';
@@ -1233,7 +1306,7 @@ const next=stapler().effectiveDay(plan,ctx.baselineDays?.[d]||ctx.days[d]);for(c
   if(!manual&&ctx.allocationBudgetCheck)ctx.allocationBudgetCheck();
   if(!proposal.coverageProven){smcAlert(s,ctx,d,'solver-budget:'+cycleKey,'Optimisation reached its deterministic search bound. The last valid draft is retained for SMC review.',false);captureOptimisationRun(s,{id:ctx.uuid(),date:d,key:cycleKey,at:ctx.iso,status:'bounded',upperBound:proposal.upperBound,priority1Idle:proposal.priority1Idle,solver:proposal.solver,decisionEvidence:proposal.decisionEvidence});return {paused:true,reason:'Coverage could not be certified within the search bound.',savedIds:[]};}
   if(proposal.changed){const byDem=new Map(demand(ctx,s,d).map(x=>[x.id,x]));for(const a of existing)if(!proposal.assignments.some(x=>x.demandId===a.demandId&&x.staffId===a.staffId&&x.period===a.period&&A.cost(x)===A.cost(a)&&!!x.repurposedDuty===!!a.repurposedDuty)){changes.push({demandId:a.demandId,period:a.period,from:a.staffId,to:proposal.assignments.find(x=>x.demandId===a.demandId)?.staffId||null});a.status='cancelled';a.cancellationReason='Automatic reoptimisation';a.cancelledAt=ctx.iso;if(a.replaces&&!proposal.assignments.some(x=>x.demandId===a.demandId))s.assignments.push({...copy(a),id:ctx.uuid(),status:'draft',origin:'automatic',protected:false,remove:true,noRelief:false,rCost:0,createdAt:ctx.iso,createdBy:'automatic'});}
-   for(const x of proposal.assignments){if(existing.some(a=>a.status==='draft'&&a.demandId===x.demandId&&a.staffId===x.staffId&&a.period===x.period&&A.cost(a)===A.cost(x)&&!!a.repurposedDuty===!!x.repurposedDuty))continue;const dem=byDem.get(x.demandId);if(!dem)fail(409,'Relief demand changed.');const abs=s.absences.find(a=>a.id===dem.absenceId),row=snapshot({id:ctx.uuid(),demandId:dem.id,staffId:x.staffId,status:'draft',origin:'automatic',protected:false,mutual:false,noRelief:false,remove:false,replaces:replacementAncestry.get(dem.id)||null,rCost:x.rCost??1,repurposedDuty:x.repurposedDuty===true,version:1,createdAt:ctx.iso,createdBy:'automatic'},dem,{...ctx,instruction:assignmentInstructions(s,dem),customInstruction:customText(s,dem)});for(const removal of s.assignments.filter(a=>a.demandId===dem.id&&a.status==='draft'&&a.remove)){removal.status='cancelled';removal.cancelledAt=ctx.iso;}s.assignments.push(row);savedIds.push(row.id);if(!changes.some(c=>c.demandId===dem.id))changes.push({demandId:dem.id,period:dem.period,from:null,to:x.staffId});
+   for(const x of proposal.assignments){if(existing.some(a=>a.status==='draft'&&a.demandId===x.demandId&&a.staffId===x.staffId&&a.period===x.period&&A.cost(a)===A.cost(x)&&!!a.repurposedDuty===!!x.repurposedDuty))continue;const dem=byDem.get(x.demandId);if(!dem)fail(409,'Relief demand changed.');const abs=s.absences.find(a=>a.id===dem.absenceId),row=snapshot({id:ctx.uuid(),demandId:dem.id,staffId:x.staffId,status:'draft',origin:'automatic',protected:false,mutual:false,noRelief:false,remove:false,replaces:replacementAncestry.get(dem.id)||null,rCost:x.rCost??1,repurposedDuty:x.repurposedDuty===true,version:1,createdAt:ctx.iso,createdBy:'automatic'},dem,{...ctx,instruction:assignmentInstructions(s,dem,ctx),customInstruction:customText(s,dem)});for(const removal of s.assignments.filter(a=>a.demandId===dem.id&&a.status==='draft'&&a.remove)){removal.status='cancelled';removal.cancelledAt=ctx.iso;}s.assignments.push(row);savedIds.push(row.id);if(!changes.some(c=>c.demandId===dem.id))changes.push({demandId:dem.id,period:dem.period,from:null,to:x.staffId});
     const tied=proposal.candidates.filter(c=>c.staffId===x.staffId||Number.isFinite(c.annual)&&Number.isFinite(proposal.candidates.find(v=>v.staffId===x.staffId)?.annual)&&Math.abs(c.annual-proposal.candidates.find(v=>v.staffId===x.staffId).annual)<=1);s.rotationEvents.push({id:ctx.uuid(),sequence:s.rotationEvents.length+1,year:Y,assignmentId:row.id,staffId:row.staffId,candidates:tied.map(c=>c.staffId).sort(),at:ctx.iso,source:'automatic'});
    }A.bumpDay(s,d);A.addAudit(s,ctx,fillOnly?'autoAllocate':'optimise',{date:d,ids:savedIds,reason:proposal.reason,changes,fairness:proposal.fairness,preferences:proposal.preferences,ruleEnabled:proposal.ruleEnabled,workloadLimits:proposal.workloadLimits,policyScore:proposal.policyScore,configUpdatedAt:s.systemConfig.updatedAt||null,candidates:proposal.candidates});
   }
@@ -1321,10 +1394,11 @@ const next=stapler().effectiveDay(plan,ctx.baselineDays?.[d]||ctx.days[d]);for(c
  function syncLessonInstructions(s,ctx,absenceIds){
   const wanted=new Set(absenceIds),notices=[];
   for(const a of s.assignments){if(!(wanted.has(a.absenceId)||(a.absenceIds||[]).some(id=>wanted.has(id)))||!['draft','published'].includes(a.status)||a.noRelief||a.remove||allocation().periodEnded(ctx,a.date,a.period,a))continue;
-   const next=assignmentInstructions(s,a);if(String(a.instructions||'')===next)continue;
-   if(a.status==='published'&&!s.publicationSnapshots.some(v=>v.assignmentId===a.id))publicationSnapshot(s,{...ctx,iso:a.publishedAt||ctx.iso},a);
-   a.instructions=next;a.version=(a.version||1)+1;a.updatedAt=ctx.iso;allocation().bumpDay(s,a.date);
-   if(a.status==='published')notices.push(publicationSnapshot(s,ctx,a,'instructions'));
+   let next;try{next=assignmentInstructions(s,a,ctx);}catch{next=(a.absenceIds||[a.absenceId]).flatMap(id=>{const absence=s.absences.find(row=>row.id===id&&!row.deletedAt);return absence?instructionNotesView(absence,null,[]).map(note=>generalInstructionText(absence,note)):[];}).join('\n\n');}if(String(a.instructions||'')===next)continue;
+   if(a.status==='published'&&!s.publicationSnapshots.some(v=>v.assignmentId===a.id)){const baseline=publicationSnapshot(s,{...ctx,iso:a.publishedAt||ctx.iso},a);baseline.conditionalRules=baseline.conditionalRules.filter(rule=>!rule.personal);}
+   const captured=a.status==='published'&&s.dailyPublicationStates?.[a.date]?latestPublications(s).get(a.id+'|'+a.staffId):null;
+   a.instructions=next;a.instructionsUpdatedAt=ctx.iso;
+   if(a.status==='published'){const notice=publicationSnapshot(s,ctx,captured?{...captured.assignment,instructions:next}:a,'instructions');notice.informationOnly=true;if(captured)notice.conditionalRules=[...(captured.conditionalRules||[]).filter(rule=>!rule.personal),...notice.conditionalRules.filter(rule=>rule.personal)];notices.push(notice);}
   }queuePublication(s,ctx,notices);
  }
  function noReliefApply(s,ctx,p){
@@ -1351,7 +1425,7 @@ const next=stapler().effectiveDay(plan,ctx.baselineDays?.[d]||ctx.days[d]);for(c
    const old=s.assignments.find(x=>x.id===a.replaces&&['published','completed'].includes(x.status));
    if(old){if(old.mutual&&old.requestId)peerRequestIds.add(old.requestId);if(!s.publicationSnapshots.some(v=>v.assignmentId===old.id))publicationSnapshot(s,{...ctx,iso:old.publishedAt||ctx.iso},old);if(A.periodStarted(ctx,old.date,old.period,old)){old.actualReviewRequired=true;old.actualStatusBeforeReplacement=old.status;a.accountingPending=!a.noRelief&&!a.remove;}old.status='cancelled';old.cancelledAt=ctx.iso;old.cancellationReason='Published replacement';old.version=(old.version||1)+1;if(!old.noRelief)notices.push(publicationSnapshot(s,ctx,old,'cancelled'));}
    delete a.publicationWithheldAt;delete a.publicationWithheldBy;a.status=a.remove?'cancelled':a.status==='completed'?'completed':'published';a.publishedAt=ctx.iso;a.publishedBy=ctx.user.email;a.version=(a.version||1)+1;
-   if(!a.noRelief&&!a.remove){a.instructions=assignmentInstructions(s,a);a.customInstructions=customText(s,a);notices.push(publicationSnapshot(s,ctx,a));}savedIds.push(a.id);
+   if(!a.noRelief&&!a.remove){a.instructions=assignmentInstructions(s,a,ctx);a.customInstructions=customText(s,a);notices.push(publicationSnapshot(s,ctx,a));}savedIds.push(a.id);
   }
   if(rows.length||withheld.length){if(!s.massPublications[d])s.massPublications[d]={at:ctx.iso,by:ctx.user.email,reason:auditReason||null,changes:review.changes};A.bumpDay(s,d);if(p.notifyMode===undefined)queuePublication(s,ctx,notices);
    const requesters=new Map();for(const id of peerRequestIds){const r=s.requests.find(r=>r.id===id);if(r){if(!requesters.has(r.staffId))requesters.set(r.staffId,[]);requesters.get(r.staffId).push(id);}}
@@ -1492,7 +1566,7 @@ const next=stapler().effectiveDay(plan,ctx.baselineDays?.[d]||ctx.days[d]);for(c
   return changes;
  }
  function publicationPreview(s,ctx,d){
-  const previous=s.dailyPublicationStates?.[d],assignments=allocation().effectiveAssignments(s,true).map(a=>a.date===d&&a.status==='draft'?{...a,status:'published',instructions:assignmentInstructions(s,a),customInstructions:customText(s,a)}:a),projected={...s,assignments};
+  const previous=s.dailyPublicationStates?.[d],assignments=allocation().effectiveAssignments(s,true).map(a=>a.date===d&&a.status==='draft'?{...a,status:'published',instructions:assignmentInstructions(s,a,ctx),customInstructions:customText(s,a)}:a),projected={...s,assignments};
   const snapshot=dailyPublication(projected,ctx,d,previous,true),changes=publicationChangedPeriods(projected,snapshot,previous),changedTeachers=snapshot.teachers.filter(row=>changes.has(row.staffId)&&ctx.people.some(person=>person.id===row.staffId)).map(({staffId,name})=>({staffId,name}));
   return {previousRevision:previous?.revision||0,count:changedTeachers.length,changedTeachers};
  }
@@ -1547,7 +1621,7 @@ const next=stapler().effectiveDay(plan,ctx.baselineDays?.[d]||ctx.days[d]);for(c
  }
  // Recipient snapshots live in the durable notification intent; publication stays independent.
  function communicationState(s,ctx,d){
-  const assignments=allocation().effectiveAssignments(s,true).map(a=>a.date===d&&a.status==='draft'?{...a,status:'published',instructions:assignmentInstructions(s,a),customInstructions:customText(s,a)}:a),projected={...s,assignments},published=s.dailyPublicationStates?.[d],previousRows=new Map((published?.teachers||[]).map(row=>[row.staffId,row]));
+  const assignments=allocation().effectiveAssignments(s,true).map(a=>a.date===d&&a.status==='draft'?{...a,status:'published',instructions:assignmentInstructions(s,a,ctx),customInstructions:customText(s,a)}:a),projected={...s,assignments},published=s.dailyPublicationStates?.[d],previousRows=new Map((published?.teachers||[]).map(row=>[row.staffId,row]));
   for(const job of s.outbox)if(job.date===d&&job.data?.communicationSnapshot&&(!published||job.data.publicationRevision>published.revision))for(const row of job.data.communicationSnapshot.teachers)if(row.staffId===job.recipientId)previousRows.set(row.staffId,row);
   const previous={...published,date:d,revision:published?.revision||0,publishedAt:published?.publishedAt||ctx.iso,periods:ctx.days[d]?.periods||[],teachers:[...previousRows.values()]},snapshot=dailyPublication(projected,ctx,d,previous);
   for(const row of snapshot.teachers){
@@ -1635,10 +1709,10 @@ const next=stapler().effectiveDay(plan,ctx.baselineDays?.[d]||ctx.days[d]);for(c
  function publishDay(s,ctx,p){
   smc(ctx);const dateIssue=publishDateIssue(ctx,date(p.date||ctx.today),s);if(dateIssue)fail(403,dateIssue);
   if(p.expectedPublicationRevision!==undefined&&(!Number.isSafeInteger(p.expectedPublicationRevision)||p.expectedPublicationRevision<0||p.expectedPublicationRevision!==(s.dailyPublicationStates?.[date(p.date||ctx.today)]?.revision||0)))fail(409,'The published timetable changed. Refresh and review the affected teachers before publishing.','PUBLICATION_CONFLICT');
-  p={...p,notifyMode:'none'};if(!['all','affected','none'].includes(p.notifyMode))fail(400,'Choose a valid publication notification option.');const d=date(p.date||ctx.today),before=s.outbox.length,previous=s.dailyPublicationStates?.[d],result=publishAssignments(s,ctx,p),record=s.staplerPlans.find(r=>r.date===d),plan=readyStaplerPlan(record,s.audit);if(plan){stapler().validate(plan);record.published=stapler().canonical(stapler().copyValidated(plan));record.publishedRevision=confirmedStaplerSnapshot(record,s.audit).revision;record.publishedAt=ctx.iso;record.publishedBy=ctx.user.email;for(const row of s.importedRelief.filter(r=>r.origin==='stapler'&&r.date===d&&r.status==='draft'))row.status='published';}
+  p={...p,notifyMode:'none'};if(!['all','affected','none'].includes(p.notifyMode))fail(400,'Choose a valid publication notification option.');const d=date(p.date||ctx.today),before=s.outbox.length,snapshotStart=s.publicationSnapshots.length,previous=s.dailyPublicationStates?.[d],result=publishAssignments(s,ctx,p),record=s.staplerPlans.find(r=>r.date===d),plan=readyStaplerPlan(record,s.audit);if(plan){stapler().validate(plan);record.published=stapler().canonical(stapler().copyValidated(plan));record.publishedRevision=confirmedStaplerSnapshot(record,s.audit).revision;record.publishedAt=ctx.iso;record.publishedBy=ctx.user.email;for(const row of s.importedRelief.filter(r=>r.origin==='stapler'&&r.date===d&&r.status==='draft'))row.status='published';}
   // Publication and notification are separate user actions; discard any reconciliation notices
   // created inside this transaction and replace them with the selected day-level recipient set.
-  s.outbox.splice(before);const snapshot=dailyPublication(s,ctx,d,previous);preserveCommunicationAcknowledgements(s,ctx,snapshot,previous);const changes=publicationChangedPeriods(s,snapshot,previous);if(p.notifyMode==='affected')for(const row of snapshot.teachers)if(changes.has(row.staffId))row.targetedCorrectionPeriods=changes.get(row.staffId);preserveEquivalentAcknowledgements(s,ctx,snapshot);s.dailyPublicationStates[d]=snapshot;const recipients=new Set(snapshot.teachers.filter(t=>dailyNoticeState(s,d,t.staffId).eligible&&(p.notifyMode==='all'||p.notifyMode==='affected'&&changes.has(t.staffId))).map(t=>t.staffId)),notifications=queueDailyNotices(s,ctx,snapshot,recipients);allocation().addAudit(s,ctx,'publishDaily',{date:d,publicationRevision:snapshot.revision,notifyMode:p.notifyMode,staffIds:[...recipients]});return {...result,...notifications,publishedRevision:snapshot.revision};
+  s.outbox.splice(before);const snapshot=dailyPublication(s,ctx,d,previous);preserveCommunicationAcknowledgements(s,ctx,snapshot,previous);const changes=publicationChangedPeriods(s,snapshot,previous);if(p.notifyMode==='affected')for(const row of snapshot.teachers)if(changes.has(row.staffId))row.targetedCorrectionPeriods=changes.get(row.staffId);preserveEquivalentAcknowledgements(s,ctx,snapshot);s.dailyPublicationStates[d]=snapshot;queueConditional(s,ctx,s.publicationSnapshots.slice(snapshotStart),{personalOnly:true});const recipients=new Set(snapshot.teachers.filter(t=>dailyNoticeState(s,d,t.staffId).eligible&&(p.notifyMode==='all'||p.notifyMode==='affected'&&changes.has(t.staffId))).map(t=>t.staffId)),notifications=queueDailyNotices(s,ctx,snapshot,recipients);allocation().addAudit(s,ctx,'publishDaily',{date:d,publicationRevision:snapshot.revision,notifyMode:p.notifyMode,staffIds:[...recipients]});return {...result,...notifications,notificationsQueued:s.outbox.length-before,publishedRevision:snapshot.revision};
  }
  function acknowledgePublications(s,ctx,p){
   if(!ctx.user.staffId)fail(403,'A staff identity is required.');const supplied=p.snapshotIds||[],hasTimetable=p.timetableNoticeId!==undefined;
@@ -1705,7 +1779,7 @@ const next=stapler().effectiveDay(plan,ctx.baselineDays?.[d]||ctx.days[d]);for(c
   for(const date of changedDates)allocation().bumpDay(s,date);queuePublication(s,ctx,notices);return {savedIds:[row.id],savedId:row.id};
  }
 
- function assignmentInstructions(s,dem){if(dem.members)return dem.members.map(m=>{const note=assignmentInstructions(s,m);return note?m.name+': '+note:'';}).filter(Boolean).join('\n\n');const a=s.absences.find(a=>a.id===dem.absenceId);return a?.instructionsNA?'':a?.instructions?.[dem.lessonKey]||'';}
+ function assignmentInstructions(s,dem,ctx){const members=instructionMembers(s,dem);if(members)return members.map(m=>{const note=assignmentInstructions(s,m,ctx);return note?m.name+': '+note:'';}).filter(Boolean).join('\n\n');return dutyInstructionNotes(s,dem,ctx).map(note=>note.text).join('\n\n');}
  function manualApply(s,ctx,p){
   smc(ctx);const A=allocation(),op=p.operation,d=date(p.date||ctx.today);A.ensure(s);
   if(op==='undo'){
@@ -1728,7 +1802,7 @@ const next=stapler().effectiveDay(plan,ctx.baselineDays?.[d]||ctx.days[d]);for(c
   const savedIds=[];
   for(let i=0;i<ds.length;i++){
    const dem=ds[i],before=decisionValue(s,ctx,dem),old=existing.find(a=>a.demandId===dem.id);if(old?.status==='draft'){old.status='cancelled';old.cancelledAt=ctx.iso;old.cancellationReason=op==='combine'?'SMC class combination':'SMC reassignment';}
-   const row=snapshot({id:ctx.uuid(),staffId:person.id,demandId:dem.id,status:'draft',origin:'smc',protected:true,oneClick:!changingProtected&&!warnings.length,version:1,combination:op==='combine',sameClass:op==='combine'&&rankings[i].sameClass,originalLesson:op==='combine'?copy(rankings[i].combineBase):null,repurposedDuty:op!=='combine'&&rankings[i]?.repurposedDuty===true,rCost:op==='combine'||rankings[i]?.repurposedDuty?0:1,noRelief:false,remove:false,replaces:['published','completed'].includes(old?.status)?old.id:old?.replaces||null,createdAt:ctx.iso,createdBy:ctx.user.email,employmentPeriodOverride:op!=='combine'&&rankings[i]?.employmentPeriodRestricted===true,overrideReason:reason,overrideWarnings:warnings},dem,{...ctx,instruction:assignmentInstructions(s,dem),customInstruction:customText(s,dem)});
+   const row=snapshot({id:ctx.uuid(),staffId:person.id,demandId:dem.id,status:'draft',origin:'smc',protected:true,oneClick:!changingProtected&&!warnings.length,version:1,combination:op==='combine',sameClass:op==='combine'&&rankings[i].sameClass,originalLesson:op==='combine'?copy(rankings[i].combineBase):null,repurposedDuty:op!=='combine'&&rankings[i]?.repurposedDuty===true,rCost:op==='combine'||rankings[i]?.repurposedDuty?0:1,noRelief:false,remove:false,replaces:['published','completed'].includes(old?.status)?old.id:old?.replaces||null,createdAt:ctx.iso,createdBy:ctx.user.email,employmentPeriodOverride:op!=='combine'&&rankings[i]?.employmentPeriodRestricted===true,overrideReason:reason,overrideWarnings:warnings},dem,{...ctx,instruction:assignmentInstructions(s,dem,ctx),customInstruction:customText(s,dem)});
    s.assignments.push(row);savedIds.push(row.id);recordManualDecision(s,ctx,dem,'assignment',row,before,op,warnings);A.addAudit(s,ctx,op,{date:dem.date,ids:[row.id],previous:old?.id||null,reason:reason||null,warnings,employmentPeriodOverride:row.employmentPeriodOverride,combination:row.combination,originalLesson:row.originalLesson});
   }
   updateHealthWarnings(s,ctx,[d]);return {savedIds,savedId:savedIds[0]};
@@ -1797,15 +1871,15 @@ const next=stapler().effectiveDay(plan,ctx.baselineDays?.[d]||ctx.days[d]);for(c
  // Intake resubmissions reuse existing row identities. Work on a candidate so a
  // later conflicting date cannot leave an earlier date partially applied.
  function mergeSubmittedInstructions(a,input,ctx){
-  const at=ctx.reportedAt||ctx.iso,sequence=ctx.reportSequence||0,values={...(a.instructions||{})},authors=copy(a.instructionAuthors||{});
+  const at=ctx.reportedAt||ctx.iso,sequence=ctx.reportSequence||0,values={...(a.instructions||{})},authors=copy(a.instructionAuthors||{}),originalKeys={};
   for(const [key,value] of Object.entries(input||{})){
    if(!String(value).trim())continue; // A repeat with blank fields is not deletion.
    const prior=authors[key]||(Object.prototype.hasOwnProperty.call(values,key)?{actor:a.instructionsUpdatedBy||a.reportedBy,at:a.instructionsUpdatedAt||a.reportedAt,sequence:0}:{actor:a.reportedBy,at:a.reportedAt,sequence:0});
    if(Date.parse(at)<Date.parse(prior.at)||at===prior.at&&sequence<(prior.sequence||0))continue;
-   if(values[key]&&values[key]!==value&&prior.actor&&prior.actor!==ctx.user.email)fail(409,'These instructions were written by another person. Review the changed instructions.','ABSENCE_INSTRUCTIONS_CONFLICT');
-   values[key]=value;authors[key]={actor:ctx.user.email,at,sequence};
+   const target=values[key]&&values[key]!==value&&prior.actor&&prior.actor!==ctx.user.email?key+'|info|'+encodeURIComponent(ctx.user.email)+'|'+at+'|'+sequence:key;
+   if(target!==key)originalKeys[target]=key;values[target]=value;authors[target]={actor:ctx.user.email,at,sequence};
   }
-  return {instructions:values,instructionAuthors:authors};
+  return {instructions:values,instructionAuthors:authors,originalKeys};
  }
  function resubmissionIntervals(rows,dd){
   const values=rows.flatMap(a=>absenceIntervals(a,dd)).map(r=>({startMinutes:r.startMinutes,endMinutes:r.endMinutes})).sort((a,b)=>a.startMinutes-b.startMinutes),result=[];
@@ -1820,7 +1894,7 @@ const next=stapler().effectiveDay(plan,ctx.baselineDays?.[d]||ctx.days[d]);for(c
    // 0.9.9a: the latest action wins. A deletion saved after this report supersedes it.
    if(candidate.absences.some(a=>a.deletedAt&&Date.parse(a.deletedAt)>=Date.parse(incomingAt)&&a.date===date&&samePerson(ctx,a.staffId,staffId)&&absenceOverlap(a,requested,dd)))continue;
    const overlapping=candidate.absences.filter(a=>!a.deletedAt&&a.date===date&&samePerson(ctx,a.staffId,staffId)&&absenceOverlap(a,requested,dd));
-   if(!overlapping.length){const command={...p,staffId,date};delete command.staffIds;delete command.dates;delete command.from;delete command.to;const r=apply(candidate,{...ctx,resubmission:false},command);for(const id of r.savedIds){const a=candidate.absences.find(a=>a.id===id);a.lastSubmissionAt=incomingAt;a.lastSubmissionSequence=sequence;if(Object.keys(a.instructions||{}).length){const notes=mergeSubmittedInstructions({...a,instructions:{},instructionAuthors:{}},a.instructions,ctx);Object.assign(a,notes);}}savedIds.push(...r.savedIds);continue;}
+   if(!overlapping.length){const command={...p,staffId,date};delete command.staffIds;delete command.dates;delete command.from;delete command.to;const r=apply(candidate,{...ctx,resubmission:false},command);for(const id of r.savedIds){const a=candidate.absences.find(a=>a.id===id);a.lastSubmissionAt=incomingAt;a.lastSubmissionSequence=sequence;if(Object.keys(a.instructions||{}).length){const notes=mergeSubmittedInstructions({...a,instructions:{},instructionAuthors:{}},a.instructions,ctx);a.instructions=notes.instructions;a.instructionAuthors=notes.instructionAuthors;}}savedIds.push(...r.savedIds);continue;}
    const stale=a=>Date.parse(incomingAt)<Date.parse(a.lastSubmissionAt||a.reportedAt)||incomingAt===(a.lastSubmissionAt||a.reportedAt)&&sequence<(a.lastSubmissionSequence||0);
    if(overlapping.every(stale)){savedIds.push(...overlapping.map(a=>a.id));continue;}
    // 0.9.9a: saved portions newer than this report keep their coverage; older portions follow it.
@@ -1854,7 +1928,7 @@ const next=stapler().effectiveDay(plan,ctx.baselineDays?.[d]||ctx.days[d]);for(c
     const unchanged=sameCoverage&&p.typeId===a.typeId&&(p.reasonDetail||'')===(a.reasonDetail||'')&&(p.reliefRequired!==false)===(a.reliefRequired!==false)&&(p.remarks===undefined||p.remarks===(a.remarks||''))&&(!merged||JSON.stringify(merged.instructions)===JSON.stringify(a.instructions||{}))&&(command.instructionsNA===undefined||command.instructionsNA===a.instructionsNA);
     if(unchanged){a.lastSubmissionAt=incomingAt;a.lastSubmissionSequence=sequence;if(merged)a.instructionAuthors=merged.instructionAuthors;savedIds.push(a.id);continue;}
     const before=JSON.stringify([a.periods,a.coverage,a.typeId,a.reasonDetail,a.reliefRequired,a.instructions,a.instructionsNA,a.remarks]);
-    apply(candidate,{...ctx,resubmission:false},command);
+    apply(candidate,{...ctx,resubmission:false,instructionOriginalKeys:merged?.originalKeys},command);
     const updated=candidate.absences.find(x=>x.id===a.id);if(merged)updated.instructionAuthors=merged.instructionAuthors;
     updated.lastSubmissionAt=incomingAt;updated.lastSubmissionSequence=sequence;
     if(before!==JSON.stringify([updated.periods,updated.coverage,updated.typeId,updated.reasonDetail,updated.reliefRequired,updated.instructions,updated.instructionsNA,updated.remarks]))changes.push(a.id);savedIds.push(a.id);
@@ -1876,28 +1950,24 @@ const next=stapler().effectiveDay(plan,ctx.baselineDays?.[d]||ctx.days[d]);for(c
    const object=value=>value&&typeof value==='object'&&!Array.isArray(value),dated=value=>object(value)&&Object.keys(value).every(key=>days.includes(key));
    if(p.instructionsByDate!==undefined&&(!object(p.instructionsByDate)||people.length>1||p.instructionsByStaffDate!==undefined))fail(400,'Supply dated instructions for each selected teacher.');
    if(p.instructionsByStaffDate!==undefined&&(!object(p.instructionsByStaffDate)||Object.entries(p.instructionsByStaffDate).some(([id,value])=>!staffIds.includes(id)||!dated(value))))fail(400,'Supply valid dated instructions for the selected teachers.');
-   if(p.expectedInstructionScopes!==undefined&&(!dated(p.expectedInstructionScopes)||Object.values(p.expectedInstructionScopes).some(scope=>!object(scope)||typeof scope.timetableId!=='string'||!Number.isInteger(scope.staplerRevision)||typeof scope.parity!=='string')))fail(400,'Supply valid dated timetable sources for the instruction draft.');
-   const reference=days.map(key=>day(ctx,key)).find(dd=>dd.periods.length),fallbackRanges=!requestedCoverage&&reference?periods({days:{reference}},'reference',p.periods).map(n=>reference.periods.find(t=>t.period===n)).map(({startMinutes,endMinutes})=>({startMinutes,endMinutes})):null,prepared=[],overlapByDate=new Map();let preparedCharacters=0;
+   const reference=days.map(key=>day(ctx,key)).find(dd=>dd.periods.length),fallbackRanges=!requestedCoverage&&reference?periods({days:{reference}},'reference',p.periods).map(n=>reference.periods.find(t=>t.period===n)).map(({startMinutes,endMinutes})=>({startMinutes,endMinutes})):null,prepared=[],duplicateInstructions=[],overlapByDate=new Map();let preparedCharacters=0;
    for(const a of s.absences)if(!a.deletedAt){if(!overlapByDate.has(a.date))overlapByDate.set(a.date,[]);overlapByDate.get(a.date).push(a);}
    // Validate every teacher and date before changing a single absence record.
    for(const dayKey of days){const dd=day(ctx,dayKey),timing=dd.periods,coverage=requestedCoverage||(!timing.length&&fallbackRanges?{kind:'timeRanges',ranges:fallbackRanges}:null);
-    const expected=p.expectedInstructionScopes?.[dayKey];if(expected&&(expected.timetableId!==dd.id||expected.parity!==dd.parity||expected.staplerRevision!==(dd.staplerRevision||0)))fail(409,'The timetable for this instruction draft changed. Review your retained instructions.');
     if(!timing.length&&!coverage)fail(400,'No timetable is available. Choose full day or start and end times.');
     if(type.allowedPeriods&&!timing.length)fail(409,'Period timings are required to verify this absence type. Retry when the timetable is available.');
     const ps=coverage?allocation().absencePeriods({coverage},dd):periods(ctx,dayKey,p.periods),ranges=coverage?absenceIntervals({coverage},dd):[];
     if(type.allowedPeriods&&ps.some(n=>!type.allowedPeriods.includes(n))||type.minStartMinutes!==null&&(ps.some(n=>timing.find(t=>t.period===n).startMinutes<type.minStartMinutes)||ranges.some(r=>r.startMinutes<type.minStartMinutes)))fail(400,'The absence type is not permitted in these periods.');
     for(const person of people){
     const overlapping=(overlapByDate.get(dayKey)||[]).filter(a=>a.id!==p.id&&samePerson(ctx,a.staffId,person.id)&&absenceOverlap(a,{periods:ps,coverage},dd)),prior=overlapping[0];
-    if(ctx.intakeDeduplicate===true&&!p.id&&overlapping.length===1&&prior.typeId===type.id&&(prior.reasonDetail||'')===reasonDetail&&(prior.reliefRequired!==false)===(p.reliefRequired!==false)&&JSON.stringify(resubmissionIntervals([prior],dd))===JSON.stringify(resubmissionIntervals([{periods:ps,coverage}],dd))){duplicateIds.push(prior.id);continue;}
+    if(ctx.intakeDeduplicate===true&&!p.id&&overlapping.length===1&&prior.typeId===type.id&&(prior.reasonDetail||'')===reasonDetail&&(prior.reliefRequired!==false)===(p.reliefRequired!==false)&&JSON.stringify(resubmissionIntervals([prior],dd))===JSON.stringify(resubmissionIntervals([{periods:ps,coverage}],dd))){duplicateInstructions.push({a:prior,input:(p.instructionsByStaffDate?.[person.id]||p.instructionsByDate)?.[dayKey]});duplicateIds.push(prior.id);continue;}
     if(overlapping.length)fail(409,'This absence overlaps an existing entry. Edit that entry or select different periods.','ABSENCE_OVERLAP');
     const a=existing?copy(existing):{id:ctx.uuid(),staffId:person.id,name:person.name,date:dayKey,reportedBy:ctx.user.email,reportedById:ctx.user.staffId,reportedByName:ctx.people.find(x=>x.id===ctx.user.staffId)?.name||ctx.user.email,reportedAt:reportContext.iso,instructions:{},instructionsNA:false,noReliefSubjects:copy(s.systemConfig.noReliefSubjects)};
     Object.assign(a,{lastSubmissionAt:ctx.reportedAt||ctx.iso,lastSubmissionSequence:ctx.reportedAt?(ctx.reportSequence||0):Number.MAX_SAFE_INTEGER,periods:ps,typeId:type.id,typeLabel:type.label,reasonDetail,remarks:p.remarks===undefined?(a.remarks||''):text(p.remarks||''),reliefRequired:p.reliefRequired!==false,updatedBy:ctx.user.email,updatedAt:ctx.iso});
     if(coverage)a.coverage=copy(coverage);else delete a.coverage;
     a.timetablePending=absenceTimingPending(ctx,a);a.lessonSnapshot=lessons(ctx,a);a.periodSnapshot=copy(timing);
-    const input=(p.instructionsByStaffDate?.[person.id]||p.instructionsByDate)?.[dayKey];if(input!==undefined){const out=instructionMap(input,new Set(a.lessonSnapshot.map(l=>l.lessonKey)));a.instructionAuthors=a.instructionAuthors||{};for(const key of new Set([...Object.keys(a.instructions||{}),...Object.keys(out)]))if((a.instructions?.[key]||'')!==(out[key]||''))a.instructionAuthors[key]={actor:ctx.user.email,at:ctx.reportedAt||ctx.iso,sequence:ctx.reportedAt?(ctx.reportSequence||0):Number.MAX_SAFE_INTEGER};a.instructions=out;}
+    const input=(p.instructionsByStaffDate?.[person.id]||p.instructionsByDate)?.[dayKey];if(input!==undefined)retainInstructionNotes(a,input,ctx);
     if(p.instructionsNA!==undefined)a.instructionsNA=p.instructionsNA===true;
-    // Empty unresolved snapshots are not a completed instruction submission.
-    if(a.timetablePending&&!existing){a.instructions={};a.instructionsNA=coverage?.kind==='fullDay'&&p.instructionsNA===true;}
     // Match the durable document ceiling while validating before any append.
     // Count actual rows/lessons, so long leave does not impose a small teacher cap.
     preparedCharacters+=JSON.stringify(a).length;if(preparedCharacters>12000000)fail(413,'This absence selection is too large to save together. Shorten the date range or select fewer teachers.');
@@ -1905,18 +1975,15 @@ const next=stapler().effectiveDay(plan,ctx.baselineDays?.[d]||ctx.days[d]);for(c
     }
    }
    savedIds.push(...duplicateIds);
+   for(const {a,input} of duplicateInstructions){if(input!==undefined)retainInstructionNotes(a,input,ctx);if(p.instructionsNA!==undefined)a.instructionsNA=p.instructionsNA===true;}
    for(const a of prepared){if(existing){Object.assign(existing,a);if(!a.coverage)delete existing.coverage;}else s.absences.push(a);savedIds.push(a.id);}
   }else if(op==='deleteAbsences'){if(p.confirm!==true||!Array.isArray(p.ids)||!p.ids.length)fail(400,'Confirm the selected absence deletions.');const rows=p.ids.map(getAbs);rows.forEach(a=>editable(ctx,a));rows.forEach(a=>{a.deletedAt=ctx.iso;a.deletedBy=ctx.user.email;});
    const deleted=new Set(p.ids),remaining=allDemand(ctx,s);for(const a of allocation().effectiveAssignments(s,true)){if(![a.absenceId,...(a.absenceIds||[])].some(id=>deleted.has(id))||remaining.some(d=>d.id===a.demandId||a.sharedLessonKey&&d.sharedLessonKey===a.sharedLessonKey)||allocation().periodStarted(ctx,a.date,a.period,a))continue;releaseAssignment(s,{...ctx,draftBatch:true,manualMutation:true},a,'Absence deleted; this lesson no longer requires cover.');}
    savedIds=p.ids;
   }else if(op==='saveInstructions'&&p.instructionChanges!==undefined){
-   const patches=instructionPatches(s,ctx,p);for(const {a,instructions,instructionsNA,lessonSnapshot} of patches){a.instructionAuthors=a.instructionAuthors||{};for(const key of new Set([...Object.keys(a.instructions||{}),...Object.keys(instructions)]))if((a.instructions?.[key]||'')!==(instructions[key]||''))a.instructionAuthors[key]={actor:ctx.user.email,at:ctx.iso,sequence:0};a.instructionsUpdatedBy=ctx.user.email;a.instructionsUpdatedAt=ctx.iso;Object.assign(a,{instructions,instructionsNA,lessonSnapshot,updatedAt:ctx.iso});savedIds.push(a.id);}
+   const patches=instructionPatches(s,ctx,p);for(const {a,instructions,instructionsNA} of patches){retainInstructionNotes(a,instructions,ctx);a.instructionsNA=instructionsNA;savedIds.push(a.id);}
   }else if(op==='saveInstructions'){
-   for(const a of instructionRecords(s,ctx,p.absenceIds||[p.absenceId])){editable(ctx,a);if(absenceTimingPending(ctx,a))fail(409,'The absence is saved. Add relief instructions when a verified school timetable is available.');const known=new Set(lessons(ctx,a).map(l=>l.lessonKey));
-    const input=p.instructionsByDate?p.instructionsByDate[a.date]:p.instructions,merged=ctx.intakeInstructions?mergeSubmittedInstructions(a,instructionMap(input||{},known),ctx):null;const out=merged?merged.instructions:input===undefined?a.instructions:instructionMap(input,known);
-    a.instructionAuthors=a.instructionAuthors||{};for(const key of new Set([...Object.keys(a.instructions||{}),...Object.keys(out)]))if((a.instructions?.[key]||'')!==(out[key]||''))a.instructionAuthors[key]={actor:ctx.user.email,at:ctx.iso,sequence:0};a.instructionsUpdatedBy=ctx.user.email;a.instructionsUpdatedAt=ctx.iso;a.lessonSnapshot=lessons(ctx,a);a.instructions=out;if(merged)a.instructionAuthors=merged.instructionAuthors;a.instructionsNA=merged?(!Object.values(out).some(v=>String(v).trim())&&a.instructionsNA===true):p.instructionsNA===true;a.updatedAt=ctx.iso;savedIds.push(a.id);
-
-   }
+   for(const a of instructionRecords(s,ctx,p.absenceIds||[p.absenceId])){editable(ctx,a);const input=p.instructionsByDate?p.instructionsByDate[a.date]:p.instructions;if(input!==undefined){const merged=ctx.intakeInstructions?mergeSubmittedInstructions(a,instructionMap(input),ctx):null;retainInstructionNotes(a,merged?merged.instructions:input,{...ctx,instructionOriginalKeys:merged?.originalKeys});if(merged)a.instructionAuthors=merged.instructionAuthors;}if(p.instructionsNA!==undefined)a.instructionsNA=p.instructionsNA===true;savedIds.push(a.id);}
   }else if(op==='saveAdhoc'){smc(ctx);if(d<ctx.today)fail(403,'Past daily relief records are view only.');const person=staff(ctx,p.staffId);if(person.adhocEligible===false)fail(400,'This staff group is not eligible for ad hoc relief.');const ps=periods(ctx,d,p.periods),employment=text(person.employment||'',40);let a=s.adhoc.find(x=>x.staffId===person.id&&x.date===d&&!x.deletedAt);const changed=!a||a.employment!==employment||JSON.stringify([...(a.periods||[])].sort((a,b)=>a-b))!==JSON.stringify([...ps].sort((a,b)=>a-b));if(!a){a={id:ctx.uuid(),staffId:person.id,date:d};s.adhoc.push(a);}Object.assign(a,{periods:ps,employment,updatedAt:ctx.iso,updatedBy:ctx.user.email});if(changed){a.replanPending=true;allocation().bumpDay(s,d);}savedIds=[a.id];
   }else if(op==='deleteAdhoc'){smc(ctx);const a=s.adhoc.find(x=>x.id===p.id&&!x.deletedAt);if(!a)fail(404,'Daily relief entry not found.');if(a.date<ctx.today)fail(403,'Past daily relief records are view only.');a.deletedAt=ctx.iso;a.replanPending=true;savedIds=[a.id];
   }else if(op==='saveTypes'){admin(ctx);if(!Array.isArray(p.types)||!p.types.length||p.types.length>80)fail(400,'Supply 1 to 80 absence types.');const ids=new Set();s.types=p.types.map(t=>{const id=text(t.id,60);if(!/^[a-zA-Z0-9_-]+$/.test(id)||ids.has(id))fail(400,'Absence type IDs must be unique.');ids.add(id);const label=text(t.label,100);if(!label)fail(400,'Name each absence type.');if(t.allowedPeriods!=null&&!Array.isArray(t.allowedPeriods))fail(400,'Invalid allowed periods.');const allowed=t.allowedPeriods==null?null:[...new Set(t.allowedPeriods)];if(allowed&&allowed.some(n=>!Number.isInteger(n)||n<0||n>39))fail(400,'Invalid allowed periods.');for(const k of ['afterMinutes','minStartMinutes'])if(t[k]!=null&&(!Number.isInteger(t[k])||t[k]<0||t[k]>1439))fail(400,'Invalid time rule.');return {id,label,requiresDetail:t.requiresDetail===true||id==='others',allowSelectAll:t.allowSelectAll!==false,allowedPeriods:allowed,afterMinutes:t.afterMinutes??null,minStartMinutes:t.minStartMinutes??null,todayOnly:t.todayOnly===true};});
@@ -1927,8 +1994,9 @@ const next=stapler().effectiveDay(plan,ctx.baselineDays?.[d]||ctx.days[d]);for(c
   if(op==='requestMutual'&&p.proposalOnly===true){for(const date of new Set(s.requests.filter(r=>savedIds.includes(r.id)).map(r=>r.date)))allocation().bumpDay(s,date);allocation().addAudit(s,ctx,op,{date:d,ids:savedIds});return {savedIds,savedId:savedIds[0]||null};}
   // Only the server's durable intake projection selects this boundary. Attendance
   // facts are committed before unrelated allocation repair or capacity accounting.
-  if(op==='saveAbsence'&&ctx.attendanceOnly===true){const changedIds=savedIds.filter(id=>!duplicateIds.includes(id)),wanted=new Set(changedIds);for(const date of new Set(s.absences.filter(a=>wanted.has(a.id)).map(a=>a.date)))allocation().bumpDay(s,date);if(changedIds.length){absenceAlerts(s,ctx,p,changedIds);essentialDecisionAudit(s,ctx,op,{date:d,ids:changedIds,attendanceOnly:true});}if(duplicateIds.length)essentialDecisionAudit(s,ctx,'absence-already-recorded',{date:d,ids:duplicateIds,intakeRequestId:p.requestId,reason:'Exact duplicate attendance already recorded.'});return {savedIds,savedId:savedIds[0]||null,...(duplicateIds.length?{duplicateIds,alreadyRecorded:duplicateIds.length===savedIds.length}:{})};}
+  if(op==='saveAbsence'&&ctx.attendanceOnly===true){syncLessonInstructions(s,ctx,savedIds);const changedIds=savedIds.filter(id=>!duplicateIds.includes(id)),wanted=new Set(changedIds);for(const date of new Set(s.absences.filter(a=>wanted.has(a.id)).map(a=>a.date)))allocation().bumpDay(s,date);if(changedIds.length){absenceAlerts(s,ctx,p,changedIds);essentialDecisionAudit(s,ctx,op,{date:d,ids:changedIds,attendanceOnly:true});}if(duplicateIds.length)essentialDecisionAudit(s,ctx,'absence-already-recorded',{date:d,ids:duplicateIds,intakeRequestId:p.requestId,reason:'Exact duplicate attendance already recorded.'});return {savedIds,savedId:savedIds[0]||null,...(duplicateIds.length?{duplicateIds,alreadyRecorded:duplicateIds.length===savedIds.length}:{})};}
   if(op==='saveAbsence'||op==='saveInstructions')syncLessonInstructions(s,ctx,savedIds);
+  if(op==='saveInstructions'){essentialDecisionAudit(s,ctx,op,{date:d,ids:savedIds,informationOnly:true});return {savedIds,savedId:savedIds[0]||null};}
   reconcile(s,ctx);for(const dayKey of Object.keys(ctx.days)){if(['saveAbsence','deleteAbsences','assign','noRelief','removeAssignment','requestMutual','respondMutual','deleteAdhoc'].includes(op)){allocation().bumpDay(s,dayKey);updateHealthWarnings(s,ctx,[dayKey]);}}if(op==='saveAbsence')absenceAlerts(s,ctx,p,savedIds);allocation().addAudit(s,ctx,op,{date:d,ids:savedIds});return {savedIds,savedId:savedIds[0]||null};
  }
  function urgentMessageParts(message){
@@ -2087,6 +2155,6 @@ const next=stapler().effectiveDay(plan,ctx.baselineDays?.[d]||ctx.days[d]);for(c
   }
   return {revision:s.revision,candidates:project(p.demandIds||[]),quotaUnits:'periods/week'};
  }if(op==='audit'){if(!(ctx.user.smc||ctx.user.admin))fail(403,'SMC or Admin access is required.');return {revision:s.revision,audit:copy(s.audit.filter(x=>!p.date||x.date===p.date).slice(-500))};}if(op==='prunePreview'){admin(ctx);const r=pruneRange(p);if(r.to>=ctx.today)fail(400,'Prune only past dates.');const selection=pruneSelection(s,r,ctx.now),counts=Object.fromEntries(Object.entries({...selection.lists,...selection.maps}).map(([key,rows])=>[key,rows.length]));return {revision:s.revision,counts,count:Object.values(counts).reduce((a,b)=>a+b,0),storage:storageReport(s,ctx)};}if(op==='externalLink'){smc(ctx);staff(ctx,p.staffId);const d=date(p.date);if(!s.adhoc.some(x=>x.staffId===p.staffId&&x.date===d&&!x.deletedAt))fail(403,'Activate this external teacher for the selected date first.');return {revision:s.revision,capability:ensurePrivateLink(s,ctx,p.staffId,d)};}return view(s,ctx,p);}
- return {intakeReviewProjection,allocationPriorityLog,normalizeDriveDaily,normalizeDriveBackup,effectiveTimetableDay,previewStaplerMigration,migrateStaplerPlans,previewTimetableReconcile,confirmTimetableReconcile,historyCoverage,openingBalancesView,saveOpeningBalances,resolvedTimetableId,reconcileOperational,archiveColdSelection,archiveApplySelection,COLD_COLLECTIONS,COLD_SYSTEM_OPERATIONS,shortPublicationSummary,allocationMode,allocationLearningView,communicationState,communicationProjection,resolveDutiesCapability,acknowledgeDutiesCapability,acknowledgeCommunication,previewRestoreStapler,mergeSubmittedInstructions,resubmissionIntervals,subtractAbsenceIntervals,absenceDates,absenceStaffIds,cellProvenance,essentialDecisionAudit,schoolAbsencesRange,schoolAbsencesView,currentDuty,manualRecoveryDemands,teacherDailyUpdate,confirmedStaplerSnapshot,confirmedStaplerProjection,mayViewConfirmed,mergeStaplerPlans,staplerPlanPatch,applyStaplerPlanPatch,ensurePrivateLink,cellDecision,cellDecisions,returnAutomatic,dailyNoticeState,publishedContentFingerprint,latestPublications,timetableNotice,pendingSummary,defaultSmcSummaryTimes,normalizeSmcSummaryTimes,smcSummarySlot,summaryAbsences,scheduledSummaryCurrent,staplerPermission,teacherSponsor,dutyEligible,absenceEligible,seedNameBridges,matchTimetableNames,nameBridgesView,readyStaplerPlan,dailyNotifyView,notifyDaily,operationalSettings,normalizeNoReliefSubjects,matchesNoReliefSubject,systemConfigView,dailyEmploymentView,queueDailyEmployment,employmentEmail,staplerDatesView,absentTeacherContact,refreshStaplerNotifications,timetableDay,dailyTimetable,clock,dutyWindow,dutyRosterView,staplerView,staplerApply,composeStaplerContext,publishAudit,recessActiveOn,recessGroups,recessSettingsApply,availabilityView,cellSourceKey,allocationCellView,notificationReadinessView,reportFormView,reportView,inboundMessage,queue,smcAlert,systemAlert,notificationIndex,notificationCurrent,matchingCustom,queueConditional,publicationSummary,recessDemand,recessView,recessApply,recessPeriods,publicDuty,dailyExport,noReliefApply,publishDay,acknowledgePublications,notificationHistory,acknowledgementView,syncLessonInstructions,customApply,customText,primaryLevel,allocationProjection,manualApply,assignmentInstructions,allocation,scheduledTick,dutySMC,healthRead,updateHealthWarnings,releaseAssignment,publicationSnapshot,queuePublication,pendingPublications,initial,validateState,defaults,dates,date,mobile,needsCover,previewAbsence:lessons,availability,demand,candidates,apply,read,view,reconcile,invalidate,READS};
+ return {samePerson,instructionNotesView,retainInstructionNotes,intakeReviewProjection,allocationPriorityLog,normalizeDriveDaily,normalizeDriveBackup,effectiveTimetableDay,previewStaplerMigration,migrateStaplerPlans,previewTimetableReconcile,confirmTimetableReconcile,historyCoverage,openingBalancesView,saveOpeningBalances,resolvedTimetableId,reconcileOperational,archiveColdSelection,archiveApplySelection,COLD_COLLECTIONS,COLD_SYSTEM_OPERATIONS,shortPublicationSummary,allocationMode,allocationLearningView,communicationState,communicationProjection,resolveDutiesCapability,acknowledgeDutiesCapability,acknowledgeCommunication,previewRestoreStapler,mergeSubmittedInstructions,resubmissionIntervals,subtractAbsenceIntervals,absenceDates,absenceStaffIds,cellProvenance,essentialDecisionAudit,schoolAbsencesRange,schoolAbsencesView,currentDuty,manualRecoveryDemands,teacherDailyUpdate,confirmedStaplerSnapshot,confirmedStaplerProjection,mayViewConfirmed,mergeStaplerPlans,staplerPlanPatch,applyStaplerPlanPatch,ensurePrivateLink,cellDecision,cellDecisions,returnAutomatic,dailyNoticeState,publishedContentFingerprint,latestPublications,timetableNotice,pendingSummary,defaultSmcSummaryTimes,normalizeSmcSummaryTimes,smcSummarySlot,summaryAbsences,scheduledSummaryCurrent,staplerPermission,teacherSponsor,dutyEligible,absenceEligible,seedNameBridges,matchTimetableNames,nameBridgesView,readyStaplerPlan,dailyNotifyView,notifyDaily,operationalSettings,normalizeNoReliefSubjects,matchesNoReliefSubject,systemConfigView,dailyEmploymentView,queueDailyEmployment,employmentEmail,staplerDatesView,absentTeacherContact,refreshStaplerNotifications,timetableDay,dailyTimetable,clock,dutyWindow,dutyRosterView,staplerView,staplerApply,composeStaplerContext,publishAudit,recessActiveOn,recessGroups,recessSettingsApply,availabilityView,cellSourceKey,allocationCellView,notificationReadinessView,reportFormView,reportView,inboundMessage,queue,smcAlert,systemAlert,notificationIndex,notificationCurrent,matchingCustom,queueConditional,publicationSummary,recessDemand,recessView,recessApply,recessPeriods,publicDuty,dailyExport,noReliefApply,publishDay,acknowledgePublications,notificationHistory,acknowledgementView,syncLessonInstructions,customApply,customText,primaryLevel,allocationProjection,manualApply,assignmentInstructions,allocation,scheduledTick,dutySMC,healthRead,updateHealthWarnings,releaseAssignment,publicationSnapshot,queuePublication,pendingPublications,initial,validateState,defaults,dates,date,mobile,needsCover,previewAbsence:lessons,availability,demand,candidates,apply,read,view,reconcile,invalidate,READS};
 })();
 if(typeof module!=='undefined'&&module.exports)module.exports=GSISRosterOperations;

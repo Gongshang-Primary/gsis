@@ -21,7 +21,7 @@ for(const periods of [[2,3,4],[3,4]]){const f=setup();const id=f.save([2,3]).sav
 }
 {
  const f=setup();f.save([2,3]);const key=f.state.absences[0].lessonSnapshot[0].lessonKey;f.advance();f.save([2,3],{instructionsByDate:{[f.date]:{[key]:'New'}}});const latest=f.state.absences[0].instructions[key];f.ctx.reportedAt=new Date(f.ctx.now-5000).toISOString();f.save([2,3],{instructionsByDate:{[f.date]:{[key]:'Old'}}});assert.equal(f.state.absences[0].instructions[key],latest);
- f.advance();f.ctx.user={...f.ctx.user,email:'bob@gsps.edu.sg',staffId:'bob'};assert.throws(()=>f.save([2,3],{instructionsByDate:{[f.date]:{[key]:'Different author'}}}),e=>e.code==='ABSENCE_INSTRUCTIONS_CONFLICT');
+ f.advance();f.ctx.user={...f.ctx.user,email:'bob@gsps.edu.sg',staffId:'bob'};f.save([2,3],{instructionsByDate:{[f.date]:{[key]:'Different author'}}});assert.equal(f.state.absences[0].instructions[key],latest,'resubmission retains another author’s current note');assert(Object.values(f.state.absences[0].instructions).includes('Different author'),'new author information is retained separately without blocking attendance');
 }
 {
  const f=setup();const a=f.save([2]).savedIds[0],b=f.save([4]).savedIds[0];f.advance();const r=f.save([2,3,4]);assert.equal(f.state.absences.filter(a=>!a.deletedAt).length,3);assert(r.savedIds.includes(a)&&r.savedIds.includes(b));assert.deepEqual(f.state.absences.flatMap(a=>a.periods).sort(),[2,3,4]);
