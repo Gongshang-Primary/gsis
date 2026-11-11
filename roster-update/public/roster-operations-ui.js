@@ -1671,8 +1671,15 @@ var RosterOpsUI = (() => {
   b.dataset.exporting='true';b.disabled=true;b.innerHTML='<span class="ops-spinner" aria-hidden="true"></span> Exporting…';
   try{
    if((full||classPov)&&!window.RosterStaplerExport)throw Error('The timetable workbook exporter could not load. Refresh and retry.');
-   const book=classPov?await window.RosterStaplerExport.makeClassWorkbook(data):full?await window.RosterStaplerExport.makeReliefWorkbook(data,null,{hideAbsenceReasons:true}):await RosterExport.makeWorkbook([RosterExport.dailyRelief(data)]);
-   const url=URL.createObjectURL(book.blob),a=document.createElement('a');a.href=url;a.download=book.filename||'GSiS Relief '+data.date+'.xlsx';a.click();setTimeout(()=>URL.revokeObjectURL(url),5000);if(isLive(s)&&s.date===date)say(s,(classPov?'Class POV':full?'All-teacher':'Daily relief')+' Excel created from your local snapshot. '+data.localSnapshot.state+'. Relief instructions are excluded.');
+   // The Stapler layout needs the exact baseline the suspended plan was built from. It is warmed when the page loads; load it on demand if it has not arrived yet. Without a usable baseline the download falls back to the relief-workbook layout.
+   let baseline=null;
+   if(full){
+    baseline=s.exportBaseline||null;
+    if(!baseline&&s.ctx.localTimetable){try{baseline=await s.ctx.localTimetable(date);}catch{baseline=null;}}
+    if(baseline&&!window.RosterStaplerExport.canUseBaseline(data.teacherSummary.plan,baseline))baseline=null;
+   }
+   const book=classPov?await window.RosterStaplerExport.makeClassWorkbook(data):full?await window.RosterStaplerExport.makeReliefWorkbook(data,baseline,{hideAbsenceReasons:true,includeClassPov:true}):await RosterExport.makeWorkbook([RosterExport.dailyRelief(data)]);
+   const url=URL.createObjectURL(book.blob),a=document.createElement('a');a.href=url;a.download=book.filename||'GSiS Relief '+data.date+'.xlsx';a.click();setTimeout(()=>URL.revokeObjectURL(url),5000);if(isLive(s)&&s.date===date)say(s,(classPov?'Class POV':full?(baseline?'Teacher Summary':'All-teacher'):'Daily relief')+' Excel created from your local snapshot. '+data.localSnapshot.state+'. Relief instructions are excluded.');
   }catch(e){if(isLive(s)&&s.date===date)say(s,e.message||'Export failed. Retry.',true);}finally{delete b.dataset.exporting;if(b.isConnected){b.disabled=false;b.textContent=label;freshness(s);}}
  }
  function drawAcknowledgements(s,host){

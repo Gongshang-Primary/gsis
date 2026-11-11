@@ -7,6 +7,8 @@ window.RosterStaplerExport=(()=>{
  const days=['Monday','Tuesday','Wednesday','Thursday','Friday'];
  const norm=value=>String(value??'').trim().normalize('NFKC').toLowerCase().replace(/\s+/g,' ');
  const clone=value=>JSON.parse(JSON.stringify(value));
+ // Strip an embedded absence reason from a subject, exactly as the daily renderer does (roster-export.js dailyTeacherPage). 'EL (absent — <reason>)' becomes 'EL (absent)'; 'Absent — <reason>' becomes 'Absent'.
+ const scrubSubject=value=>String(value||'').replace(/^Absent — [\s\S]+$/i,'Absent').replace(/\s*\((absent|dropped) — [\s\S]+\)$/i,' ($1)');
  const nodes=(root,name)=>Array.from(root.getElementsByTagNameNS('*',name));
  const cellText=cell=>nodes(cell,'t').map(t=>t.textContent||'').join('');
  const key=(teacher,period)=>teacher+'|'+period;
@@ -80,6 +82,8 @@ window.RosterStaplerExport=(()=>{
   const plan=clone(input),summary=options.reliefSummary;
   if(summary)for(const teacher of summary.addedTeachers||[])if(!plan.teachers.some(t=>t.staffId===teacher.staffId))plan.teachers.push(clone(teacher));
   const standalone=baselineResult==null,prepared=standalone?await standaloneWorkbook(plan):prepare(plan,baselineResult),{model,dayIndex,perDay,teacherRows,blocks}=prepared;
+  // The converter renders every retained weekday from the cloned baseline model, but the tile loop below only rewrites the selected day's columns. When reasons are hidden, scrub the whole cloned model first so no other weekday leaks a reason. The model is a clone (prepare), so the caller's baseline is untouched.
+  if(model&&options.hideAbsenceReasons===true)for(const weekKey of ['single','odd','even']){const weekModel=model[weekKey];if(!weekModel)continue;for(const block of weekModel.blocks||[])for(const cell of block.cells||[])cell[0]=scrubSubject(cell[0]);}
   const outputName=filename(plan.date,options.eventName,options.now),output=prepared.output||await window.RosterConverter.makeWorkbook(model,{preserveWeeks:true});
   const sheetName=standalone?'Teacher Summary':plan.parity==='single'?'Teachers':plan.parity==='odd'?'Odd Week':'Even Week',sheetIndex=output.sheetNames.indexOf(sheetName);
   if(sheetIndex<0)fail('The selected timetable week is missing from the workbook.');
@@ -107,7 +111,7 @@ window.RosterStaplerExport=(()=>{
    const values=[tile.subject,tile.classIds.map(id=>classes.get(id)).join(', '),tile.venue,tile.group];
    if(original){if(tile.subject===source.subject)values[0]=original[0];if(JSON.stringify(tile.classIds)===JSON.stringify(source.classIds))values[1]=original[1];if(tile.venue===source.venue)values[2]=original[2];if(tile.group===source.group)values[3]=original[3];}
    // An imported lesson can already carry its absence reason in the subject. The overlay's includeReasons only covers its own labels, so strip the embedded reason here too, exactly as the daily renderer does (roster-export.js dailyTeacherPage).
-   if(options.hideAbsenceReasons===true)values[0]=String(values[0]||'').replace(/^Absent — [\s\S]+$/i,'Absent').replace(/\s*\((absent|dropped) — [\s\S]+\)$/i,' ($1)');
+   if(options.hideAbsenceReasons===true)values[0]=scrubSubject(values[0]);
    const colour=window.GSISRosterStapler.tileState(plan,tile)==='original'?'clear':!tile.baselineId?'pink':'green';write(tile.teacherId,tile.period,values,colour);
   }
   for(const mat of plan.mats.filter(m=>m.target==='teacher'))for(let p=mat.fromPeriod;p<=mat.toPeriod;p++){
@@ -117,12 +121,15 @@ window.RosterStaplerExport=(()=>{
    const read=(id,p)=>{const row=teacherRows.get(id);if(row===undefined)fail('An operational teacher is missing from the workbook. Refresh Name Bridge and retry.');return Array.from({length:4},(_,i)=>cellText(cells.get(column(startColumn+p)+(row+i))));};
    const period=p=>{if(!Number.isInteger(p)||p<0||p>=perDay)fail('An operational period does not match this timetable.');};
    window.RosterExport.applyReliefSummary(summary,{read,write,periodCount:perDay,includeReasons:options.hideAbsenceReasons!==true});
-   const setHeader=(address,text)=>{const cell=cells.get(address);cell.replaceChildren();cell.setAttribute('t','inlineStr');cell.setAttribute('s',style(Number(cell.getAttribute('s')||0),'clear'));const is=doc.createElementNS(ns,'is'),t=doc.createElementNS(ns,'t');t.setAttributeNS('http://www.w3.org/XML/1998/namespace','xml:space','preserve');t.textContent=text;is.append(t);cell.append(is);};
-   const planStatus=({confirmed:'Confirmed suspended timetable, not yet published',published:'Published suspended timetable',baseline:'Baseline timetable'})[summary.staplerStatus]||'Baseline timetable';
-   setHeader('A1','All teachers · '+plan.date+' · '+(options.snapshotLabel||'Current saved plan and allocations')+' · '+planStatus);
-   setHeader('A2','Subject / Class / Venue / Group · Orange: relief · Grey: absent / vacated · Green: changed lesson · Pink: extra lesson · Blue: teacher suspension. '+(standalone?'Selected date only.':'Other days show baseline.')+' Revision '+options.revision+'; allocation '+options.allocationRevision+'.');
-   const merges=nodes(doc,'mergeCells')[0];for(const r of [1,2]){if(!standalone){const merge=doc.createElementNS(ns,'mergeCell');merge.setAttribute('ref','A'+r+':'+column(1+5*perDay)+r);merges.append(merge);}nodes(doc,'row').find(row=>row.getAttribute('r')===String(r)).setAttribute('ht',r===1?'30':standalone?'48':'36');}merges.setAttribute('count',merges.children.length);
-   if(!standalone){const setup=doc.createElementNS(ns,'pageSetup');setup.setAttribute('orientation','landscape');setup.setAttribute('paperSize','9');setup.setAttribute('fitToWidth','1');setup.setAttribute('fitToHeight','0');doc.documentElement.append(setup);}
+   // The Stapler layout (includeClassPov) keeps the screen export's header: plannerWorkbook sets A1 to the Stapler title and A2 stays empty. The relief-workbook header below is only for the standalone/two-week relief layout.
+   if(!options.includeClassPov){
+    const setHeader=(address,text)=>{const cell=cells.get(address);cell.replaceChildren();cell.setAttribute('t','inlineStr');cell.setAttribute('s',style(Number(cell.getAttribute('s')||0),'clear'));const is=doc.createElementNS(ns,'is'),t=doc.createElementNS(ns,'t');t.setAttributeNS('http://www.w3.org/XML/1998/namespace','xml:space','preserve');t.textContent=text;is.append(t);cell.append(is);};
+    const planStatus=({confirmed:'Confirmed suspended timetable, not yet published',published:'Published suspended timetable',baseline:'Baseline timetable'})[summary.staplerStatus]||'Baseline timetable';
+    setHeader('A1','All teachers · '+plan.date+' · '+(options.snapshotLabel||'Current saved plan and allocations')+' · '+planStatus);
+    setHeader('A2','Subject / Class / Venue / Group · Orange: relief · Grey: absent / vacated · Green: changed lesson · Pink: extra lesson · Blue: teacher suspension. '+(standalone?'Selected date only.':'Other days show baseline.')+' Revision '+options.revision+'; allocation '+options.allocationRevision+'.');
+    const merges=nodes(doc,'mergeCells')[0];for(const r of [1,2]){if(!standalone){const merge=doc.createElementNS(ns,'mergeCell');merge.setAttribute('ref','A'+r+':'+column(1+5*perDay)+r);merges.append(merge);}nodes(doc,'row').find(row=>row.getAttribute('r')===String(r)).setAttribute('ht',r===1?'30':standalone?'48':'36');}merges.setAttribute('count',merges.children.length);
+    if(!standalone){const setup=doc.createElementNS(ns,'pageSetup');setup.setAttribute('orientation','landscape');setup.setAttribute('paperSize','9');setup.setAttribute('fitToWidth','1');setup.setAttribute('fitToHeight','0');doc.documentElement.append(setup);}
+   }
   }
   const serialize=doc=>new XMLSerializer().serializeToString(doc).replace(/(<(?:\w+:)?t(?:\s[^>]*)?>)([\s\S]*?)(<\/(?:\w+:)?t>)/g,(_,open,text,close)=>open+text.replace(/\r/g,'&#13;').replace(/\n/g,'&#10;')+close);
   zip.file(sheetPath,serialize(doc));zip.file('xl/styles.xml',serialize(styles));
@@ -131,7 +138,7 @@ window.RosterStaplerExport=(()=>{
   return {blob:await zip.generateAsync({type:'blob',compression:'DEFLATE',mimeType:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}),filename:outputName,sheetNames:output.sheetNames};
  }
  async function plannerWorkbook(zip,teacherPath,plan,options,outputName){
-  const snapshotLabel=options.snapshotLabel||'Current Stapler plan · '+plan.date+' · '+(options.standalone?'Selected date only.':'Other weekdays in Teacher Summary show baseline.'),data={date:plan.date,revision:options.revision??'local',allocationRevision:options.allocationRevision??'local',exportedAt:options.now??new Date().toISOString(),snapshotLabel,teacherSummary:options.reliefSummary||{plan,absences:[],assignments:[],demands:[]}};
+  const snapshotLabel=options.snapshotLabel||'Current Stapler plan · '+plan.date+' · '+(options.standalone?'Selected date only.':'Other weekdays in Teacher Summary show baseline.'),data={date:plan.date,revision:options.revision??'local',allocationRevision:options.allocationRevision??'local',exportedAt:options.now??new Date().toISOString(),snapshotLabel,hideAbsenceReasons:options.hideAbsenceReasons===true,teacherSummary:options.reliefSummary||{plan,absences:[],assignments:[],demands:[]}};
   const classOutput=await makeClassWorkbook(data),classZip=await JSZip.loadAsync(await classOutput.blob.arrayBuffer());
   const [teacherText,classText,teacherStyleText,classStyleText]=await Promise.all([zip.file(teacherPath).async('string'),classZip.file('xl/worksheets/sheet1.xml').async('string'),zip.file('xl/styles.xml').async('string'),classZip.file('xl/styles.xml').async('string')]);
   const teacher=xml(teacherText),classes=xml(classText),styles=xml(teacherStyleText),classStyles=xml(classStyleText),offsets={};
@@ -139,7 +146,8 @@ window.RosterStaplerExport=(()=>{
   const targetXfs=nodes(styles,'cellXfs')[0],styleOffset=targetXfs.children.length;
   for(const original of [...nodes(classStyles,'cellXfs')[0].children]){const xf=styles.importNode(original,true);for(const [attribute,name] of [['fontId','fonts'],['fillId','fills'],['borderId','borders']])xf.setAttribute(attribute,Number(xf.getAttribute(attribute)||0)+offsets[name]);targetXfs.append(xf);}targetXfs.setAttribute('count',targetXfs.children.length);
   for(const cell of nodes(classes,'c'))cell.setAttribute('s',Number(cell.getAttribute('s')||0)+styleOffset);
-  if(!options.reliefSummary){const title=nodes(teacher,'c').find(c=>c.getAttribute('r')==='A1');nodes(title,'t')[0].textContent='Teacher Summary · '+plan.date+' · Current Stapler plan';}
+  // The Stapler title applies to the screen export and to the relief download alike; the relief-workbook "All teachers" header is only used when there is no Class POV view.
+  {const title=nodes(teacher,'c').find(c=>c.getAttribute('r')==='A1');nodes(title,'t')[0].textContent='Teacher Summary · '+plan.date+' · Current Stapler plan';}
   const workbook=xml(await zip.file('xl/workbook.xml').async('string')),sheets=nodes(workbook,'sheets')[0];sheets.replaceChildren();
   for(const [i,name] of ['Teacher Summary','Class POV'].entries()){const sheet=workbook.createElementNS(ns,'sheet');sheet.setAttribute('name',name);sheet.setAttribute('sheetId',i+1);sheet.setAttributeNS('http://schemas.openxmlformats.org/officeDocument/2006/relationships','r:id','rId'+(i+1));sheets.append(sheet);}
   nodes(workbook,'definedNames')[0]?.remove();const defined=workbook.createElementNS(ns,'definedNames');
@@ -157,7 +165,9 @@ window.RosterStaplerExport=(()=>{
  }
  async function makeReliefWorkbook(data,baselineResult,options={}){
   const summary=data?.teacherSummary;if(!summary?.plan||!Array.isArray(summary.absences)||!Array.isArray(summary.assignments)||!Array.isArray(summary.demands)||summary.plan.date!==data.date)fail('The full teacher summary is unavailable. Refresh and retry.');
-  return makeWorkbook(summary.plan,baselineResult,{reliefSummary:summary,eventName:data.localSnapshot?'Relief local snapshot':'Relief current saved',snapshotLabel:data.snapshotLabel,now:data.exportedAt,revision:data.revision,allocationRevision:data.allocationRevision,hideAbsenceReasons:options.hideAbsenceReasons===true});
+  // The Stapler layout needs the exact baseline for the full-week headers and the Class POV view; without it the download falls back to the relief-workbook layout.
+  const staplerLayout=options.includeClassPov===true&&!!baselineResult;
+  return makeWorkbook(summary.plan,baselineResult,{reliefSummary:summary,eventName:staplerLayout?'Stapler':(data.localSnapshot?'Relief local snapshot':'Relief current saved'),includeClassPov:staplerLayout,snapshotLabel:data.snapshotLabel,now:data.exportedAt,revision:data.revision,allocationRevision:data.allocationRevision,hideAbsenceReasons:options.hideAbsenceReasons===true});
  }
  // Class POV uses the selected day's effective plan, never the baseline workbook.
  async function makeClassWorkbook(data){
@@ -186,9 +196,11 @@ window.RosterStaplerExport=(()=>{
    const className=tile.classIds.map(id=>classes.find(c=>c.id===id)?.name||'').join(', ');
    const matched=checks.find(({d})=>norm(d.subject)===norm(tile.subject)&&norm(d.className)===norm(className)&&norm(d.venue)===norm(tile.venue)&&norm(d.groupName)===norm(tile.group))||(checks.length===1?checks[0]:null);
    const a=matched?.a,substitute=absence?cover(name,a):null;
-   const label=substitute||(absence?name+' (absent — '+(absence.reason||'Unspecified')+' — '+(matched&&!a?'unresolved':'no relief')+')':name);
+   const label=substitute||(absence?name+' (absent'+(data.hideAbsenceReasons?'':' — '+(absence.reason||'Unspecified'))+' — '+(matched&&!a?'unresolved':'no relief')+')':name);
    const colour=substitute?'orange':window.GSISRosterStapler.tileState(plan,tile)==='original'?'clear':!tile.baselineId?'pink':'green';
-   const text=[label,tile.subject,tile.venue,tile.group].filter(Boolean).join('\n');
+   // An imported lesson can already carry its absence reason in the subject; strip it when reasons are hidden, exactly as the Teacher Summary does.
+   const subject=data.hideAbsenceReasons?String(tile.subject||'').replace(/^Absent — [\s\S]+$/i,'Absent').replace(/\s*\((absent|dropped) — [\s\S]+\)$/i,' ($1)'):tile.subject;
+   const text=[label,subject,tile.venue,tile.group].filter(Boolean).join('\n');
    for(const id of tile.classIds)add(id,tile.period,text,colour);
   }
   for(const {d,a} of recess){
