@@ -1,11 +1,11 @@
 # roster-relief-instructions-info-only: Relief instructions never block a report; they always reach the relief teacher
 
-- Status: proposed (URGENT, lane R next)
+- Status: in progress (URGENT, lane R; Model: Codex claim)
 - Owner/model: Codex
 - Reviewer/model: Muse
 - Last updated (Asia/Singapore): 2026-11-11 ~16:30
 - Branch: codex/roster-relief-instructions-info-only
-- Base SHA: re-check main's head before branching (lane R serial; take this before any other lane R task not yet started)
+- Base SHA: 32b6f9ce108de03ac5032579f3f6cbcbd5511f32 (verified current main, fresh branch; no superseded implementation carried over)
 - Current head SHA (or PR head; avoid self-referential commit hashes):
 - PR:
 - Owner ruling (11 Nov, verbatim): "the 'relief instructions' are stopping relief reports from landing properly. the 'relief instructions' are for-info and doesn't not affect relief allocation. they need to be conveyed to the teachers receiving the relief duty. via whatsapp and in their relief duty details in roster.gsps.edu.sg"
@@ -85,3 +85,7 @@
 Exact command, tested commit, outcome and evidence. Explicitly list checks not run.
 
 ## Review
+
+## Claim
+
+Model: Codex, 11 November 2026. Branch `codex/roster-relief-instructions-info-only` from current main `32b6f9ce108de03ac5032579f3f6cbcbd5511f32`. Muse reviews the exact implementation head. The owner's latest ruling supersedes instruction-edit and orphan-close. The old instruction-edit branch remains unmerged with no PR; its incomplete local suite was stopped. No live operations, allocation changes, row deletion, merge or deployment are authorized.
