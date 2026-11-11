@@ -1,6 +1,6 @@
 # stapler-period-mass-apply: One down arrow at each period header writes the same venue, group and/or class down the whole period (mass assembly)
 
-- Status: approved at 61aa82b (review docs/coordination/review/pr116-muse-review.md), awaiting owner's "merge 116" (conflicts in CHANGELOG + generated Worker bundles only; resolve via local merge on merge)
+- Status: merged (#116 at 61aa82b as 6b77a74)
 - Owner/model: Codex
 - Reviewer/model: Muse
 - Last updated (Asia/Singapore): 2026-11-11 ~17:49
