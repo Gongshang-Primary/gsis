@@ -60,7 +60,14 @@ await runCases([
     assert.throws(() => audit.projectSecurityAudit({ ...privileged, outcome: 'deny' }));
   }],
   ['A18 existing runner discovers all five new tests without changing selection', async () => {
-    const selected = JSON.parse(execFileSync(process.execPath, ['tests/run.cjs','--list'], { encoding: 'utf8' }));
+    const inventoryEnv = { ...process.env };
+    delete inventoryEnv.GSIS_TEST_SHARD_INDEX; delete inventoryEnv.GSIS_TEST_SHARD_TOTAL;
+    const list = env => JSON.parse(execFileSync(process.execPath, ['tests/run.cjs','--list'], { encoding: 'utf8', env }));
+    const selected = list(inventoryEnv);
+    const shards = [1,2,3,4].flatMap(index => list({ ...inventoryEnv,
+      GSIS_TEST_SHARD_INDEX: String(index), GSIS_TEST_SHARD_TOTAL: '4' }));
+    assert.equal(new Set(shards).size, shards.length, 'shards must not duplicate programs');
+    assert.deepEqual([...shards].sort(), [...selected].sort(), 'shards must cover the exact full inventory');
     for (const file of files.filter(f => f.startsWith('tests/'))) assert(selected.includes(file.slice(6)), file);
     const base = process.env.T1A_BASE_SHA || 'c4c1de8aed5c9f062cbdc7e6ed83deb721fbb3c3';
     const currentRunner = readFileSync('tests/run.cjs','utf8');
