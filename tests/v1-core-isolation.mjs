@@ -8,6 +8,10 @@ const files = ['v1/core/contracts.mjs','v1/core/google-identity.mjs','v1/core/se
   'docs/v1/core/T1A_CONTRACT.md','tests/v1-core-identity.mjs','tests/v1-core-session.mjs','tests/v1-core-authority.mjs',
   'tests/v1-core-races.mjs','tests/v1-core-isolation.mjs','docs/coordination/tasks/v1-core-t1a.md'];
 const git = (...args) => execFileSync('git', args, { encoding: 'utf8' }).trim();
+// The PR diff check is a task gate, not a permanent freeze on unrelated development.
+const taskBase = process.env.T1A_BASE_SHA || (process.env.GITHUB_REF === 'refs/heads/codex/v1-core-t1a'
+  ? 'c4c1de8aed5c9f062cbdc7e6ed83deb721fbb3c3' : null);
+if (taskBase) assert.match(taskBase, /^[a-f0-9]{40}$/);
 await runCases([
   ['A11 foreign-school boundaries fail without disclosure', async () => {
     for (const foreign of ['request','resource','context','account','session','facts','preview','grant']) {
@@ -69,20 +73,25 @@ await runCases([
     assert.equal(new Set(shards).size, shards.length, 'shards must not duplicate programs');
     assert.deepEqual([...shards].sort(), [...selected].sort(), 'shards must cover the exact full inventory');
     for (const file of files.filter(f => f.startsWith('tests/'))) assert(selected.includes(file.slice(6)), file);
-    const base = process.env.T1A_BASE_SHA || 'c4c1de8aed5c9f062cbdc7e6ed83deb721fbb3c3';
+    if (taskBase) {
+    const base = taskBase;
     const currentRunner = readFileSync('tests/run.cjs','utf8');
     assert.equal(currentRunner, execFileSync('git', ['show',`${base}:tests/run.cjs`], { encoding: 'utf8' }));
     const before = git('ls-tree','-r','--name-only',base,'tests').split('\n').filter(f => /\.(mjs|cjs)$/.test(f));
     const tracked = new Set(git('ls-files').split('\n'));
     for (const path of before) assert(tracked.has(path), `existing test deleted: ${path}`);
+    }
     console.log(`Runner selects ${selected.length} programs; all existing test files and runner retained.`);
   }],
-  ['A18 exact allowlist, no production imports/configuration/generated output drift', async () => {
-    const base = process.env.T1A_BASE_SHA || 'c4c1de8aed5c9f062cbdc7e6ed83deb721fbb3c3';
+  ['A18 dependency isolation and requested PR allowlist', async () => {
+    if (taskBase) {
+    const base = taskBase;
     const allowed = new Set([...files, 'docs/coordination/LANES.md']);
     const changes = git('diff','--name-only',base).split('\n').filter(Boolean);
     const untracked = git('ls-files','--others','--exclude-standard').split('\n').filter(Boolean);
     for (const file of [...changes,...untracked]) assert(allowed.has(file), `outside allowlist: ${file}`);
+    console.log('T1A exact diff allowlist verified against', base);
+    } else console.log('T1A diff scope not requested; permanent dependency isolation remains checked.');
     const acorn = await import('acorn');
     for (const file of files.filter(f => f.startsWith('v1/core/'))) {
       const source = readFileSync(file, 'utf8'); const ast = acorn.parse(source, { ecmaVersion: 'latest', sourceType: 'module' });
