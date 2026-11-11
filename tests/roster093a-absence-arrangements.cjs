@@ -20,9 +20,9 @@ for(const kind of ['changedLesson','unavailable','wrongStaff','changedBaseline',
  const f=setup();f.ctx.days[f.date].staplerRevision=8;assert.doesNotThrow(()=>O.apply(f.state,f.ctx,{...f.p,ownArrangementsByStaffDate:{alice:{[f.date]:[f.pick]}}}),'unrelated suspended edits keep exact selected lesson valid');
 }
 {
- const f=setup(),before=JSON.stringify(f.state);assert.throws(()=>O.apply(f.state,f.ctx,{...f.p,instructionsByDate:{[f.date]:{[f.pick.lessonKey]:'Read page 2'}},expectedInstructionScopes:{[f.date]:{timetableId:'old',parity:'even',staplerRevision:0}}}),e=>e.status===409);assert.equal(JSON.stringify(f.state),before);
+ const f=setup();O.apply(f.state,f.ctx,{...f.p,instructionsByDate:{[f.date]:{[f.pick.lessonKey]:'Read page 2'}},expectedInstructionScopes:{[f.date]:{timetableId:'old',parity:'even',staplerRevision:0}}});assert.equal(f.state.absences.length,1);assert.equal(f.state.absences[0].instructions[f.pick.lessonKey],'Read page 2');
 }
-console.log('PASS read-only draft colleague preview, atomic absence+requests, stale source/candidate/combination rollback, unrelated suspended edit and instruction source guard');
+console.log('PASS read-only draft colleague preview, atomic absence+requests, stale source/candidate/combination rollback, unrelated suspended edit and information-only instruction source compatibility');
 {
  const fs=require('node:fs'),vm=require('node:vm'),{createRequire}=require('node:module'),load={require:createRequire(require.resolve('./roster096-absence-adapter.cjs')),console};vm.createContext(load);vm.runInContext(fs.readFileSync('tests/roster096-absence-adapter.cjs','utf8').split('const reject=')[0]+';this.adapter=adapter;',load);
  const draft=h=>{const lesson=O.previewAbsence(h.ctx,{id:'preview',staffId:'alice',date:h.date,periods:[2],reliefRequired:true})[0];return h.command('alice',{receiptOnly:true,ownArrangementsByStaffDate:{alice:{[h.date]:[{period:2,recipientId:'bob',combination:false,lessonKey:lesson.lessonKey,expectedTimetableId:'baseline',expectedParity:'even',expectedStaplerRevision:0}]}}});};

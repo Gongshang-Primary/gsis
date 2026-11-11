@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
+import {GSiSEdgeStore} from '../roster-update/public/edge-store.js';
 import {fixture,publishDuties} from './helpers/relief-info-fixture.mjs';
 import {edgeRosterBackend,mutateEdgeRoster,edgeRosterService} from '../roster-update/public/edge-roster.js';
 import {GSISRosterOperations as O,GSISRosterStapler as S} from '../roster-update/public/edge-roster-domain.js';
@@ -40,7 +41,7 @@ try{
   const instructionJobs=updated.outbox.filter(j=>j.kind==='conditional_relief_instruction');assert.equal(O.notificationCurrent(updated,instructionJobs.at(-1),Date.now()),null);assert(O.notificationCurrent(updated,instructionJobs[0],Date.now()),'superseded queued text cannot send again');
   assert.deepEqual(updated.assignments.map(({instructions,instructionsUpdatedAt,...row})=>row),beforeAllocation,'note edits change no allocation fields or ownership');assert.deepEqual(updated.dayRevisions,beforeDays,'notes do not advance allocation revision');
   assert.equal((await api({operation:'read',view:'duties',date:f.date},f.who(2))).myDuties[0].instructions,'Updated after publish');
-  const snapshot=updated.publicationSnapshots.at(-1);await api({operation:'acknowledge',requestId:crypto.randomUUID(),date:f.date,snapshotIds:[snapshot.id]},f.who(2));
+  const snapshot=updated.publicationSnapshots.at(-1);assert.equal(snapshot.informationOnly,true,'only an authorized note update overlays frozen publication information');await api({operation:'acknowledge',requestId:crypto.randomUUID(),date:f.date,snapshotIds:[snapshot.id]},f.who(2));
   assert.equal((await api({operation:'read',view:'duties',date:f.date},f.who(2))).myDuties[0].instructions,'Updated after publish','acknowledgement never hides note details');
   await api({operation:'saveInstructions',requestId:crypto.randomUUID(),absenceId:a.id,date:f.date,instructions:{[f.noteKey]:'Updated after publish'}});
   assert.equal((await f.state()).outbox.filter(j=>j.kind==='conditional_relief_instruction').length,2,'saving unchanged text sends no duplicate');
@@ -49,6 +50,13 @@ try{
 
 
  }finally{f.db.sql.close();}
+ const missingRecipient=await fixture();
+ try{
+  await missingRecipient.capture(0);const id=(await missingRecipient.state()).absences[0].id;await publishDuties(missingRecipient,[id]);
+  const store=GSiSEdgeStore.open(missingRecipient.db,'roster-references'),before=await store.load(),next=structuredClone(before.state);next.contacts.rosterPeople=next.contacts.rosterPeople.filter(p=>p.id!==missingRecipient.people[2].id);await store.commit({before:before.state,after:next,expectedRevision:before.revision,actor:'fixture',requestId:crypto.randomUUID(),digest:await GSiSEdgeStore.digest(next),result:{}});
+  const p={operation:'saveAbsence',requestId:crypto.randomUUID(),intake:true,id,staffId:missingRecipient.people[0].id,date:missingRecipient.date,typeId:'mc',fullDay:true,reliefRequired:true,instructionsByDate:{[missingRecipient.date]:{[missingRecipient.noteKey]:'Retain information despite a missing notification recipient'}}},reply=(await edgeRosterBackend(missingRecipient.env,'rosterOperations',p,missingRecipient.who(0),crypto.randomUUID())).result;
+  assert.equal(reply.ok,true,JSON.stringify(reply));assert.equal(reply.data.intakeState,'applied','notification identity failures cannot hold an absence');const state=await missingRecipient.state();assert.equal(state.absences[0].instructions[missingRecipient.noteKey],p.instructionsByDate[missingRecipient.date][missingRecipient.noteKey]);assert.equal(state.outbox.filter(j=>j.kind==='conditional_relief_instruction').at(-1).status,'blocked','unverified recipients cannot receive a message');
+ }finally{missingRecipient.db.sql.close();}
  const changed=await fixture();
  try{
   const cmd=await changed.capture(0,{timetableId:'old',parity:'odd',staplerRevision:0}),id=(await changed.state()).absences[0].id;
@@ -80,12 +88,14 @@ try{
    state.edgeInstructionDrafts=commands.map((command,i)=>({id:command.requestId,actor:migration.who(i).email,identity:migration.who(i),date:migration.date,command:structuredClone(command),savedIds:[state.absences[i].id],status:i%2?'pending':'needsReview',reasonCode:'INSTRUCTION_SOURCE_CHANGED',createdAt:ctx.iso}));
    state.absences[1].date=new Date(Date.parse(ctx.today)-86400000).toISOString().slice(0,10);state.absences[2].deletedAt=ctx.iso;
    state.edgeInstructionDrafts[0].command.instructionsByDate[migration.date][migration.noteKey]='Older retained note';
+   const wrong=migration.command(3);wrong.instructionsByDate[migration.date][migration.noteKey]='Must never reach a different teacher';state.edgeInstructionDrafts.push({id:wrong.requestId,actor:migration.who(3).email,date:migration.date,command:wrong,savedIds:[state.absences[0].id],status:'needsReview',createdAt:ctx.iso});
+
    return {};
   }});
   const before=await migration.state();await edgeRosterService(migration.env,{operation:'processEdgePeerProposals'});const after=await migration.state();
   assert.equal(after.edgeInstructionDrafts.length,before.edgeInstructionDrafts.length,'migration deletes no draft rows');assert.equal(after.absences.length,before.absences.length,'migration deletes no absence rows');
   assert.equal(after.edgeInstructionDrafts[0].status,'applied');assert.equal(after.edgeInstructionDrafts[1].status,'withdrawn');assert.equal(after.edgeInstructionDrafts[2].status,'withdrawn');
-  for(const job of after.edgeInstructionDrafts)assert(job.resolutionReason);
+  for(const job of after.edgeInstructionDrafts)assert(job.resolutionReason);assert.equal(after.edgeInstructionDrafts[3].status,'withdrawn');assert(!Object.values(after.absences[0].instructions).includes('Must never reach a different teacher'),'migration checks original staff binding before applying any retained text');
   assert.equal(after.absences[0].instructions[migration.noteKey],'Synthetic retained instruction 0','migration preserves newer saved notes');assert(Object.values(after.absences[0].instructions).includes('Older retained note'),'conflicting retained text stays as another original note');
   assert.deepEqual(after.absences[1],before.absences[1]);assert.deepEqual(after.absences[2],before.absences[2]);
   const head=await migration.store.head();await edgeRosterService(migration.env,{operation:'processEdgePeerProposals'});assert.deepEqual(await migration.state(),after,'migration replay changes nothing');assert.equal((await migration.store.head()).revision,head.revision);

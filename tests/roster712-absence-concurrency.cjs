@@ -85,8 +85,7 @@ const reject=(fn,status,pattern)=>assert.throws(fn,error=>error.status===status&
  h.update(s=>s.types=O.defaults());h.ctx.people.find(p=>p.id==='alice').groups=['Support'];reject(()=>h.call(h.command()),403,/staff category/);
  h.ctx.people.find(p=>p.id==='alice').groups=[];const old=O.previewAbsence(h.ctx,{id:'preview',staffId:'alice',date:h.date,periods:[2],noReliefSubjects:[]})[0];
  h.ctx.days[h.date].teachers[0].cells[2]=['MA','4B','C2-02',''];
- reject(()=>h.call(h.command('alice',{instructionsByDate:{[h.date]:{[old.lessonKey]:'Old lesson'}}})),409,/Lessons changed/);
- assert.equal(h.counts().writes,1);const response=h.call(h.command());assert.equal(h.state().absences.find(a=>a.id===response.savedId).lessonSnapshot[0].subject,'MA');
+ const retainedCommand=h.command('alice',{instructionsByDate:{[h.date]:{[old.lessonKey]:'Old lesson'}}}),response=h.call(retainedCommand);assert.equal(h.state().absences.find(a=>a.id===response.savedId).instructions[old.lessonKey],'Old lesson');assert.equal(h.counts().writes,2);assert(h.call(retainedCommand).replayed);assert.equal(h.state().absences.find(a=>a.id===response.savedId).lessonSnapshot[0].subject,'MA');
  assert.equal(h.state().absences.find(a=>a.id===response.savedId).lessonSnapshot[0].className,'4B');
 }
 {

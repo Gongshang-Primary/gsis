@@ -67,8 +67,8 @@ async function setup(compact=false){
   const t=await setup();try{
    t.preview();t.$('[data-save-instructions]').click();await t.idle();t.input('[data-instruction]','My retained edit.');
    const record=t.f.state.absences[0],key=Object.keys(record.instructions)[0];record.instructions[key]='A concurrent saved edit.';t.f.state.revision++;
-   t.$('[data-save-instructions]').click();await t.idle();assert(t.$('[data-instruction-review]'),'a same-cell conflict offers a comparison');assert.equal(t.$('[data-instruction]').value,'My retained edit.');assert.match(t.$('[data-instruction-review]').textContent,/A concurrent saved edit/);assert.equal(t.$('[data-save-instructions]').disabled,true);
-   t.$('[data-keep-instruction-edits]').click();assert.equal(t.$('[data-save-instructions]').disabled,false);t.$('[data-save-instructions]').click();await t.idle();assert.equal(t.f.state.absences[0].instructions[key],'My retained edit.','explicit keep rebases against the compared latest value');
+   t.$('[data-save-instructions]').click();await t.idle();assert.equal(t.$('[data-instruction-review]'),null,'information saves have no source-comparison gate');assert.equal(t.$('[data-instruction]').value,'My retained edit.');t.$('[data-save-instructions]').click();await t.idle();assert.equal(t.f.state.absences[0].instructions[key],'My retained edit.');assert(t.f.state.absences[0].instructionNotes[key].history.some(row=>row.text==='A concurrent saved edit.'),'concurrent text remains in history');
+
   }finally{t.dom.window.close();}
  }
  {
@@ -82,8 +82,8 @@ async function setup(compact=false){
   const t=await setup();try{
    t.preview();t.$('[data-save-instructions]').click();await t.idle();t.input('[data-instruction]','Text from the old lesson.');
    t.f.day.teachers[0].cells[2]=['MA','5A','C5-01',''];t.f.day.staplerRevision=2;t.f.state.revision++;await t.$('[data-ops-refresh]').onclick();await t.idle();
-   assert(t.$('[data-keep-instruction-edits]'),'changed timetable offers explicit source review');t.$('[data-keep-instruction-edits]').click();assert.match(t.$('[data-instruction-review]').textContent,/Text from the old lesson/,'old lesson text stays available for copying');assert.equal(t.$('[data-save-instructions]').disabled,false);
-   t.input('[data-instruction]','Reviewed current lesson text.');t.$('[data-save-instructions]').click();await t.idle();assert.match(JSON.stringify(t.f.state.absences[0].instructions),/Reviewed current lesson text/);
+   assert.equal(t.$('[data-keep-instruction-edits]'),null,'changed timetable is not an instruction review gate');assert.match(t.$('[data-retained-instruction-notes]').textContent,/Text from the old lesson/);assert.equal(t.$('[data-save-instructions]').disabled,false);
+   t.input('[data-instruction]','Reviewed current lesson text.');t.$('[data-save-instructions]').click();await t.idle();assert.match(JSON.stringify(t.f.state.absences[0].instructions),/Reviewed current lesson text/);assert.match(JSON.stringify(t.f.state.absences[0].instructions),/Text from the old lesson/,'unmatched original text is retained alongside current input');
   }finally{t.dom.window.close();}
  }
  console.log('PASS v0.8.4 compact suspended candidates, immediate unsaved dialog, close isolation, responsive dates, retained focus/drafts, surgical instruction saves, explicit conflict recovery and multi-date NA preservation.');
