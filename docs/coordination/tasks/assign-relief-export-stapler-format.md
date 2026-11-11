@@ -1,6 +1,6 @@
 # assign-relief-export-stapler-format: Assign Relief Export Excel matches the Stapler workbook layout
 
-- Status: Codex changes requested at 05fece2 (P1, 11 Nov); fix in progress
+- Status: merged (#112 at 63e82b7 as 3e63684, 11 Nov 08:39 SGT)
 - Owner/model: Muse
 - Reviewer/model: Codex
 - Last updated (Asia/Singapore): 2026-11-11 ~06:4x
