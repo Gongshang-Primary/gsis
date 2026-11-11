@@ -1,6 +1,6 @@
 # roster-relief-instructions-info-only: Relief instructions never block a report; they always reach the relief teacher
 
-- Status: approved at aeb4aa7 (review docs/coordination/review/pr115-muse-review.md), awaiting owner's "merge 115"
+- Status: merged (#115 at aeb4aa7 as 15d3aa4)
 - Owner/model: Codex
 - Reviewer/model: Muse
 - Last updated (Asia/Singapore): 2026-11-11 ~16:30
