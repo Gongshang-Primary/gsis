@@ -1,6 +1,6 @@
 # stapler-period-mass-apply: One down arrow at each period header writes the same venue, group and/or class down the whole period (mass assembly)
 
-- Status: proposed (URGENT, cuts the queue — owner, 11 Nov ~17:49, "cut queue inject"; wanted by tonight in the next release)
+- Status: approved at 61aa82b (review docs/coordination/review/pr116-muse-review.md), awaiting owner's "merge 116" (conflicts in CHANGELOG + generated Worker bundles only; resolve via local merge on merge)
 - Owner/model: Codex
 - Reviewer/model: Muse
 - Last updated (Asia/Singapore): 2026-11-11 ~17:49
