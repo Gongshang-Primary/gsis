@@ -1,6 +1,6 @@
 # edge-receipt-accepted: Edge receiptStatus returns `accepted` as a boolean, so the retry of an unconfirmed reliefBatch can confirm or re-send
 
-- Status: approved at ad0c164 (review docs/coordination/review/pr114-muse-review.md), awaiting owner's "merge 114"
+- Status: merged (#114 at ad0c164 as 9989142)
 - Owner/model: Codex
 - Reviewer/model: Muse
 - Last updated (Asia/Singapore): 2026-11-11 ~10:05
