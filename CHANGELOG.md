@@ -1,3 +1,7 @@
+# Pending: edge receiptStatus confirms saved or missing batch receipts, 11 November 2026
+
+Model: Codex. D1 receiptStatus now returns accepted:true for a stored receipt and accepted:false with confirmation:unconfirmed for a missing receipt. This restores the existing unconfirmed reliefBatch retry contract without changing the frontend check, save path, store, recording, timeout or existing legacy/absence receipt behavior. Native D1 regression covers both outcomes, preserved allocation payload, actor/digest binding, legacy/absence receipts, replay and read-only lookups. No live recovery or deployment. See docs/coordination/tasks/edge-receipt-accepted.md.
+
 # Pending: Assign Relief Export Excel hides absence reasons on every retained weekday, 11 November 2026
 
 Model: Muse. Fix for Codex's P1 review of PR #112: when absence reasons are hidden, the full-week Teacher Summary now scrubs the whole cloned baseline model before the converter renders it, so a reason in a non-selected weekday's baseline cell no longer leaks into the download. The selected day's tiles, the Class POV, the day-only path and the Drive file were already clean. The standalone export still shows reasons. A validated-baseline regression covers an annotated non-selected weekday. See docs/coordination/tasks/assign-relief-export-stapler-format.md.
