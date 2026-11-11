@@ -23,16 +23,17 @@ const history=(t,id)=>Array.from(t.w.document.querySelectorAll('[data-intake-his
  {
   const t=await setup();try{
    t.entries.push(t.receipt('done'),t.receipt('review',{intakeState:'needsReview'}),t.receipt('peer',{peerState:'pending',mutualRequestIds:['peer-created']}),t.receipt('notes',{instructionState:'needsReview'}),t.receipt('queued',{transportState:'queued'}));
-   await t.render();assert.equal(t.$('[data-intake-attention]').textContent,'Needs attention (4)');
-   for(const id of ['review','peer','notes','queued']){assert(active(t,id));assert.equal(active(t,id).dataset.intakeState,'attention');assert.equal(active(t,id).querySelector('[data-dismiss-intake]'),null);}
+   await t.render();assert.equal(t.$('[data-intake-attention]').textContent,'Needs attention (3)');
+   for(const id of ['review','peer','queued']){assert(active(t,id));assert.equal(active(t,id).dataset.intakeState,'attention');assert.equal(active(t,id).querySelector('[data-dismiss-intake]'),null);}
+   assert.equal(active(t,'notes').dataset.intakeState,'completed','retained notes are not an attention task');
    const before=JSON.stringify(t.f.state),calls=t.calls.length;
    active(t,'done').querySelector('[data-dismiss-intake]').click();assert.equal(active(t,'done'),undefined);assert(history(t,'done'));assert.equal(t.calls.length,calls,'dismissal never calls a backend mutation');assert.equal(JSON.stringify(t.f.state),before);
    persisted=t.snapshot();assert.equal(Object.keys(persisted).length,1);assert(!JSON.stringify(persisted).includes('private report payload'));assert(!JSON.stringify(persisted).includes('alice@'));assert(!JSON.stringify(persisted).includes('absence-done'));
    await t.refresh();assert.equal(active(t,'done'),undefined,'refresh preserves dismissal');
-   t.$('[data-intake-history]').open=true;history(t,'done').querySelector('[data-restore-intake]').click();assert(active(t,'done'));assert.equal(history(t,'done'),undefined);assert.equal(t.$('[data-intake-attention]').textContent,'Needs attention (4)');
-   t.$('[data-clear-completed-intake]').click();assert.equal(active(t,'done'),undefined);assert.equal(t.w.document.querySelectorAll('[data-intake-active] [data-intake-receipt]').length,4);
-   const done=t.entries[0];done.instructionState='pending';await t.refresh();assert(active(t,'done'),'new pending work reappears');assert.equal(history(t,'done'),undefined);assert.equal(t.$('[data-intake-attention]').textContent,'Needs attention (5)');
-   done.instructionState='none';await t.refresh();assert(active(t,'done'),'observed pending invalidates old dismissal even after returning to the same completion');active(t,'done').querySelector('[data-dismiss-intake]').click();done.savedIds.push('new-absence-id');await t.refresh();assert(active(t,'done'),'changed completion fingerprint reappears');
+   t.$('[data-intake-history]').open=true;history(t,'done').querySelector('[data-restore-intake]').click();assert(active(t,'done'));assert.equal(history(t,'done'),undefined);assert.equal(t.$('[data-intake-attention]').textContent,'Needs attention (3)');
+   t.$('[data-clear-completed-intake]').click();assert.equal(active(t,'done'),undefined);assert.equal(t.w.document.querySelectorAll('[data-intake-active] [data-intake-receipt]').length,3);
+   const done=t.entries[0];done.instructionState='pending';await t.refresh();assert.notEqual(active(t,'done')?.dataset.intakeState,'attention','legacy instruction status is informational');assert.equal(active(t,'done')?.querySelector('[data-retry-intake]'),null);done.peerState='pending';await t.refresh();assert(active(t,'done'),'new pending peer work reappears');assert.equal(history(t,'done'),undefined);assert.equal(t.$('[data-intake-attention]').textContent,'Needs attention (4)');
+   done.peerState='none';done.instructionState='none';await t.refresh();assert(active(t,'done'),'observed pending invalidates old dismissal even after returning to the same completion');active(t,'done').querySelector('[data-dismiss-intake]').click();done.savedIds.push('new-absence-id');await t.refresh();assert(active(t,'done'),'changed completion fingerprint reappears');
    active(t,'done').querySelector('[data-dismiss-intake]').click();t.ctx.profile={...t.ctx.profile,user:{...t.ctx.profile.user,email:'another@gsps.edu.sg',staffId:'another'}};await t.render();assert(active(t,'done'),'another signed-in user never inherits dismissal');
    const unknown=t.receipt('unknown',{peerState:'new-unrecognised-state'});t.entries.push(unknown);await t.refresh();assert.equal(active(t,'unknown').querySelector('[data-dismiss-intake]'),null,'unknown processing states fail closed');
   }finally{t.dom.window.close();}

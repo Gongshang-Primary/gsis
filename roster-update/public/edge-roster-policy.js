@@ -6,9 +6,15 @@ const rosterOperationsDigest_=value=>sha256(JSON.stringify(value));
 const rosterOperationsPackPlans_=value=>value;
 function rosterOperationsConflict_(code,message){throw Object.assign(Error(message),{status:409,code});}
 
+// Notes describe duties; they do not change absence coverage or allocation.
+function rosterOperationsAllocationRow_(collection,row){
+ if(!['absences','assignments'].includes(collection))return row;
+ const {instructions,instructionsNA,instructionAuthors,instructionsUpdatedBy,instructionsUpdatedAt,instructionNotes,...allocation}=row;
+ return allocation;
+}
 function rosterOperationsDayToken_(s,ctx,d){
- d=GSISRosterOperations.date(d);const packed=rosterOperationsPackPlans_(s),excluded=new Set(['outbox','audit','receipts','deliveryEvents','smcAlerts','acknowledgements','publicationSnapshots','optimisationRuns','inboundEvents','dailyEmploymentMail','dailyEmploymentSnapshots']);
- const rows={};for(const [key,value] of Object.entries(packed))if(Array.isArray(value)&&!excluded.has(key))rows[key]=value.filter(r=>r&&typeof r==='object'&&(r.date===d||r.actual?.date===d));
+ d=GSISRosterOperations.date(d);const packed=rosterOperationsPackPlans_(s),excluded=new Set(['edgeInstructionDrafts','edgeAbsenceReceipts','outbox','audit','receipts','deliveryEvents','smcAlerts','acknowledgements','publicationSnapshots','optimisationRuns','inboundEvents','dailyEmploymentMail','dailyEmploymentSnapshots']);
+ const rows={};for(const [key,value] of Object.entries(packed))if(Array.isArray(value)&&!excluded.has(key))rows[key]=value.filter(r=>r&&typeof r==='object'&&(r.date===d||r.actual?.date===d)).map(row=>rosterOperationsAllocationRow_(key,row));
  const active=GSISRoster.active(ctx.timetableEntries||[],d),bridges={...s,nameBridges:s.nameBridges.slice()};GSISRosterOperations.seedNameBridges(bridges,ctx.people||[]);
  return rosterOperationsDigest_({schema:1,date:d,rows,dayRevision:s.dayRevisions[d]||0,publication:s.dailyPublicationStates?.[d]?.revision||0,baseline:active||ctx.days[d]?.id||null,customInstructions:s.customInstructions.filter(r=>!r.deletedAt),systemConfig:s.systemConfig,nameBridges:bridges.nameBridges,types:s.types,recessSettings:s.recessSettings});
 }
@@ -17,7 +23,7 @@ function rosterOperationsSettingsToken_(s){return rosterOperationsDigest_({schem
 // Row tokens provide optimistic concurrency for edits to one recorded absence.
 // They cover the durable record, not its date-dependent display projection.
 
-function rosterOperationsAbsenceToken_(row){return rosterOperationsDigest_({schema:1,absence:row});}
+function rosterOperationsAbsenceToken_(row){return rosterOperationsDigest_({schema:1,absence:rosterOperationsAllocationRow_('absences',row)});}
 
 function rosterOperationsDeletionCheck_(s,p){
  const tokens=p.expectedAbsenceTokens;if(!Array.isArray(p.ids)||!p.ids.length||p.ids.some(id=>typeof id!=='string')||new Set(p.ids).size!==p.ids.length||!tokens||typeof tokens!=='object'||Array.isArray(tokens))error_(400,'Reload the selected absence records before deleting.');

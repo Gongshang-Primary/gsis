@@ -1,0 +1,17 @@
+import assert from 'node:assert/strict';
+import {GSISRosterOperations as O} from '../roster-update/public/edge-roster-domain.js';
+import {rosterOperationsDayToken_,rosterOperationsAbsenceToken_,rosterOperationsPreparedCheck_} from '../roster-update/public/edge-roster-policy.js';
+const date='2026-11-12',state=O.initial(),ctx={today:date,people:[],timetableEntries:[],days:{[date]:{id:'synthetic-baseline'}}};
+state.absences.push({id:'synthetic-absence',staffId:'synthetic-teacher',date,periods:[2],typeId:'mc',reliefRequired:true,instructions:{'synthetic-note':'Original text'},instructionAuthors:{'synthetic-note':{actor:'synthetic@gsps.edu.sg',at:date+'T00:00:00Z'}}});
+state.assignments.push({id:'synthetic-duty',date,staffId:'synthetic-cover',absenceId:'synthetic-absence',period:2,status:'published',origin:'smc',protected:true,version:1,instructions:'Original text'});
+const token=rosterOperationsDayToken_(state,ctx,date),absenceToken=rosterOperationsAbsenceToken_(state.absences[0]);
+state.absences[0].instructions['synthetic-note']='Updated information only';
+state.absences[0].instructionNotes={'synthetic-note':{text:'Updated information only',author:'synthetic@gsps.edu.sg'}};state.assignments[0].instructions='Updated information only';state.assignments[0].instructionsUpdatedAt=date+'T00:02:00Z';state.edgeInstructionDrafts=[{id:'old',date,status:'withdrawn'}];state.edgeAbsenceReceipts=[{id:'receipt',date,command:{instructionsByDate:{}}}];
+assert.equal(rosterOperationsDayToken_(state,ctx,date),token,'information-only text must not invalidate allocation/publication authority');
+assert.equal(rosterOperationsAbsenceToken_(state.absences[0]),absenceToken,'note edits must not block a saved absence correction');
+assert.doesNotThrow(()=>rosterOperationsPreparedCheck_(state,ctx,{operation:'publish',date,revision:state.revision,expectedDayToken:token}));
+state.assignments[0].staffId='another-cover';assert.notEqual(rosterOperationsDayToken_(state,ctx,date),token,'actual allocation ownership still invalidates authority');state.assignments[0].staffId='synthetic-cover';
+state.absences[0].periods=[3];
+assert.notEqual(rosterOperationsAbsenceToken_(state.absences[0]),absenceToken);
+assert.notEqual(rosterOperationsDayToken_(state,ctx,date),token,'actual absence coverage changes must still invalidate allocation/publication authority');
+console.log('PASS information-only edits preserve day authority; actual coverage changes retain the existing conflict fence');

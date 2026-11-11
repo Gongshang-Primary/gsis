@@ -6,8 +6,8 @@
 - Last updated (Asia/Singapore): 2026-11-11 ~16:30
 - Branch: codex/roster-relief-instructions-info-only
 - Base SHA: 32b6f9ce108de03ac5032579f3f6cbcbd5511f32 (verified current main, fresh branch; no superseded implementation carried over)
-- Current head SHA (or PR head; avoid self-referential commit hashes):
-- PR:
+- Current head SHA (or PR head; avoid self-referential commit hashes): exact implementation head and final gate results are recorded in the draft PR body.
+- PR: open only after local and CI gates pass at the exact implementation head.
 - Owner ruling (11 Nov, verbatim): "the 'relief instructions' are stopping relief reports from landing properly. the 'relief instructions' are for-info and doesn't not affect relief allocation. they need to be conveyed to the teachers receiving the relief duty. via whatsapp and in their relief duty details in roster.gsps.edu.sg"
 - Supersedes: `roster-intake-instruction-edit` (edit the absence "to make it hit") and `roster-intake-instruction-orphan-close` (close/dismiss stuck drafts). Under this ruling, no instruction can be stuck, so neither is needed as written. Their acceptance points that still apply are folded in below. Do not build them separately.
 
@@ -81,11 +81,42 @@
 ## Decisions and changes
 - 11 Nov ~16:20 (owner "withdraw the 7"): Claude set 7 drafts dated 10 Nov to `withdrawn` (roster head revision 10693), and earlier draft adbaa6cc… (revision 10683). Records kept.
 
+## Implementation and deployment handoff
+
+Model: Codex. New D1 attendance saves retain original note text, original lesson descriptors, author/time and edit history in the same mutation. They create no instruction draft. Duplicate/recovery projections retain notes too. Matching uses original key, period/class, period, then an explicitly labelled general note, scoped to the exact absence and day. Shared duties include only their linked absences. SMC read-only note details show the match. Explicit no-instructions selections keep their existing meaning.
+
+Instruction-only saves update information and publication snapshots without reconciliation, assignment ownership/version changes or allocation-revision changes. Note-free authority tokens keep note changes and transport/migration metadata out of allocation/publication and absence-edit conflicts; genuine coverage/ownership changes still invalidate them. The allocator source is unchanged. A stale resubmission cannot replace another author's note: both remain, with original descriptor/author information.
+
+Publishing queues informational notes through the approved `conditional_relief_instruction` / `gsis_relief_instruction_v1` template, including future published duties. Ordinary timetable WhatsApp notifications remain a separate action. Consecutive periods in one covering duty block share one note message. A later text change creates one update; unchanged text and superseded queued versions do not send again. The live duty projection overlays only the changed information onto frozen published allocation details.
+
+Legacy pending/needsReview drafts are migrated on the existing scheduled received-report drain, including an idle tick. Future live entries receive their retained notes; past/deleted entries close to withdrawn with a plain reason. Current saved notes are preserved if retained text differs. A partial index keeps completed history out of the migration probe. The second migration run is a no-op. No rows are deleted.
+
+Deploy files that change:
+
+- Notification Worker: `notification-worker/dashboard-worker.mjs` (equivalent `.txt` mirror).
+- Operations Worker: `operations-worker/dashboard-worker.mjs` (equivalent `.txt` mirror).
+- Roster Pages: `roster-update/public/edge-roster.js`, `edge-roster-policy.js`, generated `edge-roster-domain.js`, generated `roster-operations-model.js`, and `roster-operations-ui.js`.
+- Canonical build also regenerates `Roster_Backend_v0.9.9.gs`, `Deploy_Backend_v0.9.9.gs` and `backend/Code.gs`. Google is frozen: these generated Google artifacts are **not deploy targets** for this task. The frozen Google journal/coarse-revision exception is explicit in `docs/roster/D1_PARITY.md`.
+
+Owner deployment order: Notification Worker first, Operations Worker second, Roster Pages third, preserving existing flags, bindings, URLs, credentials and crons. The normal scheduled drain performs migration; no live action was performed during this build. Open editors may need one refresh across deployment because authority-token contents change. Do not clear receipts or rows during rollout/rollback. Code rollback retains all note/history data, but the previous code does not provide the new tolerant/general-note guarantees.
+
 ## Verification
-Exact command, tested commit, outcome and evidence. Explicitly list checks not run.
+
+- Red evidence on main `32b6f9ce108de03ac5032579f3f6cbcbd5511f32`: a stale-scope intake returns instruction `pending`; the new acceptance test expects immediate landed attendance and notes in one revision. The note-only day-token regression also fails on main and passes with the approved field filter.
+- `tests/roster-relief-instructions-info-only.mjs`: real SQLite D1, synthetic R2/Contacts, actual edge dispatcher and publication/notification rules. Covers atomic saves, duplicate transport recovery, exact text/author retention, ordered matching, a real confirmed Stapler import, general duty blocks, note delivery and acknowledgement, changed/unchanged WhatsApp outcomes, wrong-teacher/day isolation, allocation invariance, malformed original-lesson parsing, migration of both open statuses, preserved current text and idempotent replay.
+- `tests/roster-relief-instructions-info-only-policy.mjs`: note-only token stability; actual absence coverage and assignment ownership changes still invalidate authority.
+- `tests/roster-relief-instructions-info-only-browser.mjs`: Chromium with the real UI and native synthetic backend proves SMC note/match visibility, no instruction retry/attention task, and on-day duty text before/after acknowledgement. Screenshot: `/tmp/info-only-smc-notes.png` in the build workspace.
+- Existing instruction/recovery/receipt tests that asserted superseded blocking semantics now assert retained information, history and tolerant matching. Ownership denial, atomic validation, peer workflows, chronology, migration fences and indexed idle probes remain tested.
+- Final-head canonical build, full local Node/LORD suite and all five CI jobs must pass before opening the draft PR. The exact head, commands, results and CI run ID are recorded in the PR body after execution.
+- Not tested: live D1/Google, production browser recovery, actual provider delivery, deployment or live configuration. No live data/settings/provider calls were made.
+
 
 ## Review
 
 ## Claim
 
 Model: Codex, 11 November 2026. Branch `codex/roster-relief-instructions-info-only` from current main `32b6f9ce108de03ac5032579f3f6cbcbd5511f32`. Muse reviews the exact implementation head. The owner's latest ruling supersedes instruction-edit and orphan-close. The old instruction-edit branch remains unmerged with no PR; its incomplete local suite was stopped. No live operations, allocation changes, row deletion, merge or deployment are authorized.
+
+- Scope approval, 11 November 2026: owner said "Include the bounded policy change" for `roster-update/public/edge-roster-policy.js`, prepared as `/tmp/info-only-policy-scope.patch`. Filter note fields out of allocation/publication day tokens and apply the same filter to absence-edit tokens, preserving coverage and allocation conflict fences. A regression demonstrates the current note-only day-token invalidation and verifies that genuine coverage changes still conflict.
+
+- Scope approval, 11 November 2026: owner said "Include the generated parity catalog" for `docs/roster/d1-parity.json`, paired with the required Markdown Google-only exception. All 272 operations, recorded probe outcomes and missing-handler counts remain unchanged; source references are regenerated.
