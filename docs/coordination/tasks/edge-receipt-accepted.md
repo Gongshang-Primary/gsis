@@ -1,11 +1,11 @@
 # edge-receipt-accepted: Edge receiptStatus returns `accepted` as a boolean, so the retry of an unconfirmed reliefBatch can confirm or re-send
 
-- Status: proposed
+- Status: in progress; published Codex claim retained
 - Owner/model: Codex
 - Reviewer/model: Muse
 - Last updated (Asia/Singapore): 2026-11-11 ~10:05
 - Branch: codex/edge-receipt-accepted
-- Base SHA: db57e3e (re-check main's head before branching)
+- Base SHA: 65d7bb5efe0fc8dfeedb8d852bab0a703f84c441 (current main verified before branching)
 - Current head SHA (or PR head; avoid self-referential commit hashes):
 - PR:
 - User-authorised scope: Make the edge (D1) `receiptStatus` return `accepted` as a boolean in all branches, matching the Google receipt contract, so the frontend retry of an unconfirmed reliefBatch can confirm (receipt found) or re-send (receipt not found) instead of always throwing "Save confirmation is unavailable".
