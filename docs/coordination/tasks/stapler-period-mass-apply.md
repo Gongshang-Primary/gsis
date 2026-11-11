@@ -1,6 +1,6 @@
 # stapler-period-mass-apply: One down arrow at each period header writes the same venue, group and/or class down the whole period (mass assembly)
 
-- Status: blocked on the explicit duplicate-coverage stop condition; Model: Codex investigation complete, no implementation started
+- Status: in progress (Model: Codex; owner resolved duplicate-coverage stop condition)
 - Owner/model: Codex
 - Reviewer/model: Muse
 - Last updated (Asia/Singapore): 2026-11-11 ~17:49
@@ -68,3 +68,7 @@ The task explicitly requires stopping if a uniform classIds patch would duplicat
 Evidence: `TZ=Asia/Singapore node /tmp/stapler-mass-apply-duplicate-proof.cjs` passed against the exact main model copied to `/tmp/stapler-mass-apply-model.js`. This is a diagnostic reproduction using synthetic data, not an implementation acceptance test. No canonical build, full local suite or CI was run for a product implementation because none was made.
 
 Recommended bounded resolution, pending owner direction: allow Venue and Group across all existing lesson tiles; allow Class only if the requested replacement creates no new duplicate coverage, otherwise reject the whole apply without changing any field and ask the user to leave Class blank. Do not merge tiles, drop original class coverage, alter teachers or create tiles. Owner direction is required before implementing that behavior because the task says stop and report.
+
+## Owner resolution, 11 November 2026
+
+Owner: "take the latest action as canonical. user relies on undo function to undo." This supersedes the duplicate-coverage stop condition and the proposed rejection above. Apply the selected class list to every existing lesson tile starting in the chosen period, including when that produces identical class coverage on several tiles. Preserve tile identities, teachers, periods and recess; do not merge or delete tiles. Use one existing local command/Undo entry for the whole apply, so Undo restores all prior values and any newly created custom class. Blank fields still leave values unchanged. No remote save until Save to online.
