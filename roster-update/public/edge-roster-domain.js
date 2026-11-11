@@ -2995,7 +2995,19 @@ var GSISRosterStapler=(()=>{
    const same=next.mats.find(m=>m.target===target&&m.targetId===targetId&&m.fromPeriod===from.period&&m.toPeriod===to.period);if(same)same.reason=reason;else next.mats.push({id:newId(next,'mat'),target,targetId,fromPeriod:from.period,toPeriod:to.period,reason});
   }else if(type==='removeMat'){next.mats=next.mats.filter(m=>m.id!==command.matId);
   }else if(type==='bulkEdit'){
-   if(!next.classes.some(c=>c.id===command.classId))fail('Choose a class.');const patch=command.patch||{};if(Object.keys(patch).some(k=>!['subject','venue','group'].includes(k)))fail('Only Subject, Venue and Group can be changed together.',400);for(const t of next.tiles.filter(t=>t.kind==='lesson'&&t.classIds.includes(command.classId)&&(!Array.isArray(command.periods)||command.periods.includes(t.period))))for(const [key,value] of Object.entries(patch))t[key]=text(value);
+   const column=command.classId===undefined,patch=command.patch||{};
+   if(column){
+    if(!Array.isArray(command.periods)||!command.periods.length)fail('Choose a valid timetable period.',400);
+    command.periods.forEach(id=>period(next,id));
+    if(Object.keys(patch).some(key=>!['venue','group','classIds'].includes(key)))fail('Only Venue, Group and Class can be changed by period.',400);
+    const tiles=next.tiles.filter(t=>t.kind==='lesson'&&t.location==='grid'&&command.periods.includes(t.period)),values={};
+    for(const key of ['venue','group'])if(patch[key]!==undefined){const value=text(patch[key]);if(value)values[key]=value;}
+    if(patch.classIds!==undefined||command.customClasses!==undefined){const ids=selectedClasses(next,patch.classIds===undefined?[]:patch.classIds,command.customClasses);if(ids.some(id=>!next.classes.some(c=>c.id===id)))fail('Choose valid classes.',400);if(ids.length)values.classIds=ids;}
+    if(!tiles.some(t=>Object.entries(values).some(([key,value])=>JSON.stringify(t[key])!==JSON.stringify(value))))return plan;
+    for(const t of tiles)for(const [key,value] of Object.entries(values))t[key]=Array.isArray(value)?value.slice():value;
+   }else{
+    if(!next.classes.some(c=>c.id===command.classId))fail('Choose a class.');if(Object.keys(patch).some(k=>!['subject','venue','group'].includes(k)))fail('Only Subject, Venue and Group can be changed together.',400);for(const t of next.tiles.filter(t=>t.kind==='lesson'&&t.classIds.includes(command.classId)&&(!Array.isArray(command.periods)||command.periods.includes(t.period))))for(const [key,value] of Object.entries(patch))t[key]=text(value);
+   }
   }else if(type==='recessLevelMove'){
    const t=tile(),group=recessGroups(next).find(g=>g.tileIds.includes(t.id));if(!group)fail('Choose a placed recess block.');const classSet=new Set(group.classIds),memberIds=new Set(group.tileIds),members=next.tiles.filter(t=>memberIds.has(t.id)),order=next.periods.slice().sort((a,b)=>a.startMinutes-b.startMinutes),target=order.findIndex(p=>p.period===command.period);if(target<0)fail('Choose a valid period.',400);let index=order.findIndex(p=>p.period===t.period);
    const toPit=(card,reason)=>{card.location='pit';card.period=null;const teacher=next.teachers.find(p=>p.staffId===card.teacherId),message=classNames(next,card.classIds)+' '+(card.subject||'lesson')+' ('+(teacher?.name||card.teacherId)+') moved to Card Pit: '+reason+'.';next.warnings=next.warnings||[];if(!next.warnings.includes(message))next.warnings.push(message);};

@@ -1,3 +1,7 @@
+# Pending: Stapler period-wide mass apply, 11 November 2026
+
+Model: Codex. Editable Stapler teacher and class grids now have one down arrow per period. Its dialog applies optional Venue, Group and Class values to existing lesson tiles starting in that period. Blank fields preserve current values; recess and empty cells stay unchanged. The latest Class selection is canonical, per the owner ruling, even when several tiles receive the same class list. One local Undo restores the entire action, including any custom class. Changes remain local until Save to online; allocation, relief, publication and WhatsApp code are unchanged. See docs/coordination/tasks/stapler-period-mass-apply.md.
+
 # Pending: edge receiptStatus confirms saved or missing batch receipts, 11 November 2026
 
 Model: Codex. D1 receiptStatus now returns accepted:true for a stored receipt and accepted:false with confirmation:unconfirmed for a missing receipt. This restores the existing unconfirmed reliefBatch retry contract without changing the frontend check, save path, store, recording, timeout or existing legacy/absence receipt behavior. Native D1 regression covers both outcomes, preserved allocation payload, actor/digest binding, legacy/absence receipts, replay and read-only lookups. No live recovery or deployment. See docs/coordination/tasks/edge-receipt-accepted.md.

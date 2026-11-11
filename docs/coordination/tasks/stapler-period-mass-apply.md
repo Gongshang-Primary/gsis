@@ -72,3 +72,15 @@ Recommended bounded resolution, pending owner direction: allow Venue and Group a
 ## Owner resolution, 11 November 2026
 
 Owner: "take the latest action as canonical. user relies on undo function to undo." This supersedes the duplicate-coverage stop condition and the proposed rejection above. Apply the selected class list to every existing lesson tile starting in the chosen period, including when that produces identical class coverage on several tiles. Preserve tile identities, teachers, periods and recess; do not merge or delete tiles. Use one existing local command/Undo entry for the whole apply, so Undo restores all prior values and any newly created custom class. Blank fields still leave values unchanged. No remote save until Save to online.
+
+## Implementation and validation handoff
+
+Model: Codex. The existing `bulkEdit` path now accepts a period-only selection and optional Venue, Group and Class values. Blank fields and empty class selection leave values untouched. Existing lesson tiles are selected by their start period; recess, other periods and empty cells are unchanged. Class IDs are validated and custom classes use the existing class creation helper. The existing class-row Subject/Venue/Group path is unchanged.
+
+Both editable grids use the shared header button and one dialog with the existing class picker. The whole action uses one existing local command-history entry. Changed and already-matching counts are reported; a fully matching apply changes neither plan nor Undo history. No network save happens until Save to online. The owner's latest-action ruling supersedes the duplicate-coverage stop condition above; this may intentionally leave multiple lesson tiles with the same class coverage. Undo is local session history and the existing Save flow clears it.
+
+Evidence: the new model regression fails on the original code with "Choose a class" and passes after the period extension. The new Chromium regression passes for both header locations, Venue/Group application, canonical class replacement, changed/already-matching counts, existing and custom class selection, whole-action Undo/Redo, local-only edits and read-only controls. Full local suite and exact-head CI are required before opening a draft PR; actual final results and SHA are recorded in the PR body.
+
+Deploy files: Roster Pages `roster-stapler-ui.js` and the regenerated `roster-stapler-model.js` and `edge-roster-domain.js`; regenerated Notification and Operations Worker bundles contain the shared model. Canonical generated Google bundles are retained in git, but Google stays frozen; no Google redeploy is performed or claimed. No settings, credentials, data, flags or release branches were changed. Owner decides deployment; this feature is available only after the updated assets are deployed.
+
+The browser regression additionally forces a full server-driven redraw after Save and verifies all period controls remain available. Controls are disabled during busy/blocked access and omitted for read-only plans. Nine targeted Stapler regression programs passed before this final redraw check; the final full suite repeats all selected tests.
