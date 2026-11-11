@@ -10,6 +10,15 @@ export function createSecurityAudit({ clock, sink, timeoutMs = 1000 } = {}) {
     requireValue(['allow','deny','unavailable'].includes(event.outcome) &&
       (Object.hasOwn(HTTP_STATUS, event.reasonCode) || event.reasonCode === 'CAPABILITY_ALLOWED'));
     requireValue(event.action === null || ACTIONS.includes(event.action));
+    if (event.action === 'deploy.edit' || event.action === 'deploy.publish') requireValue(id(event.operationId));
+    if (event.kind === 'privileged-decision') {
+      requireValue(event.outcome === 'allow' && event.reasonCode === 'CAPABILITY_ALLOWED' &&
+        ACTIONS.includes(event.action) && id(event.actorAccountId) && id(event.policyVersion) && id(event.coreRevision));
+    } else {
+      requireValue(event.outcome !== 'allow' && Object.hasOwn(HTTP_STATUS, event.reasonCode));
+    }
+    if (event.kind === 'impersonation-denial') requireValue(id(event.actorAccountId) && id(event.previewAccountId) &&
+      event.outcome === 'deny' && event.reasonCode === 'IMPERSONATION_DENIED');
     const result = { schemaVersion: 1, kind: event.kind, eventId: event.eventId, requestId: event.requestId,
       schoolId: event.schoolId, action: event.action, outcome: event.outcome,
       reasonCode: event.reasonCode, recordedAt: serverNow(clock) };

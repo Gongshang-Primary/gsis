@@ -47,6 +47,17 @@ await runCases([
     }
     assert.throws(() => audit.projectSecurityAudit({ ...event, schemaVersion: 2 }));
     assert.throws(() => audit.projectSecurityAudit({ ...event, kind: 'all-staff-export' }));
+    for (const key of ['actorAccountId','previewAccountId','operationId']) {
+      const incomplete = { ...event }; delete incomplete[key];
+      assert.throws(() => audit.projectSecurityAudit(incomplete), key);
+    }
+    const privileged = { ...event, kind: 'privileged-decision', outcome: 'allow', reasonCode: 'CAPABILITY_ALLOWED' };
+    assert.equal(audit.projectSecurityAudit(privileged).outcome, 'allow');
+    for (const key of ['actorAccountId','policyVersion','coreRevision']) {
+      const incomplete = { ...privileged }; delete incomplete[key];
+      assert.throws(() => audit.projectSecurityAudit(incomplete), key);
+    }
+    assert.throws(() => audit.projectSecurityAudit({ ...privileged, outcome: 'deny' }));
   }],
   ['A18 existing runner discovers all five new tests without changing selection', async () => {
     const selected = JSON.parse(execFileSync(process.execPath, ['tests/run.cjs','--list'], { encoding: 'utf8' }));
