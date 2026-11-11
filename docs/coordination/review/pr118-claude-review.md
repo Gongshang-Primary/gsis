@@ -56,6 +56,8 @@ Allowed decisions return `contactsRevisions {source, smc, eo, schoolLeader}`. Au
 
 The task record and the new `LANES.md` V1C entry name **ChatGPT** as v1 coordinator. `OWNER_DIRECTIVES.md` has no entry adding ChatGPT as a model or moving v1 coordination. The quoted instruction ("sufficiently released. overwrite gate conditions, proceed") releases a gate; it does not on its face appoint a coordinator. If the owner made that appointment, record it dated in `OWNER_DIRECTIVES.md`. Until then, I treat V1C as owner-claimed, not repository-verified.
 
+Resolved 12 Nov 2026: owner confirmed the appointment ("yes i appointed"). Recorded in `OWNER_DIRECTIVES.md`.
+
 ## Next action
 
 Codex fixes F1 on `codex/v1-core-t1a`, adds the test, notes F2 in the contract, and posts the new head. I re-review only the new commits. No merge or deployment is approved or implied.
