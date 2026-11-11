@@ -98,7 +98,12 @@ export function effective(value, now) {
   return value.value && !value.revoked && value.validFrom <= now &&
     (value.validUntil === null || now < value.validUntil);
 }
+function canonical(value) {
+  if (Array.isArray(value)) return value.map(canonical);
+  if (object(value)) return Object.fromEntries(Object.keys(value).sort().map(key => [key, canonical(value[key])]));
+  return value;
+}
 export async function digest(value) {
-  const hash = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(JSON.stringify(value)));
+  const hash = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(JSON.stringify(canonical(value))));
   return Array.from(new Uint8Array(hash), x => x.toString(16).padStart(2, '0')).join('');
 }

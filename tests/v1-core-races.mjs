@@ -99,5 +99,21 @@ await runCases([
       assert.equal((await f.authority.revalidateAuthority({ ...f.request, ...patch }, old, f.context)).reasonCode, 'AUTHORITY_CHANGED');
     assert.equal((await f.authority.revalidateAuthority({ ...f.request, expectedAuthorityRevision: '0'.repeat(64) }, old, f.context)).reasonCode, 'AUTHORITY_CHANGED');
     assert.equal((await f.authority.revalidateAuthority({ ...f.request, requestId: 'retry-2', expectedAuthorityRevision: old.authorityRevision }, old, f.context)).outcome, 'allow');
+    const reorderedRequest = { ...f.request, resource: Object.fromEntries(Object.entries(f.request.resource).reverse()) };
+    assert.equal((await f.authority.revalidateAuthority(reorderedRequest, old, f.context)).outcome, 'allow');
+    const g = fixture(); let reads = 0;
+    function reverse(value) {
+      if (Array.isArray(value)) return value.map(reverse);
+      if (value && typeof value === 'object') return Object.fromEntries(Object.entries(value).reverse().map(([k,v]) => [k,reverse(v)]));
+      return value;
+    }
+    const a = createAuthority({ ...g.options, readCore: async q => {
+      const record = await g.readCore(q); return ++reads % 2 ? record : reverse(record);
+    } });
+    const decision = await a.resolveAuthority(g.request, g.context);
+    assert.equal(decision.outcome, 'allow', 'JSON key order is not an authority change');
+    assert.equal((await a.revalidateAuthority(g.request, decision, g.context)).outcome, 'allow');
+    g.state.account.linkageRevision = 'changed-without-sequence';
+    assert.equal((await a.revalidateAuthority(g.request, decision, g.context)).reasonCode, 'AUTHORITY_CHANGED');
   }],
 ]);

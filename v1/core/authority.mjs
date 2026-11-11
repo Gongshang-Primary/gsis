@@ -49,7 +49,7 @@ function evidenceBody(value) {
   const { evaluationId, asOf, ...body } = value; return body;
 }
 function binding(request, context) {
-  return JSON.stringify([request.schoolId,request.action,request.resource,request.operationId ?? null,
+  return JSON.stringify([request.schoolId,request.action,request.resource.domain,request.resource.schoolId,request.resource.resourceId ?? null,request.operationId ?? null,
     context.serviceId,context.actorAccountId,context.sessionId,context.previewAccountId ?? null]);
 }
 
