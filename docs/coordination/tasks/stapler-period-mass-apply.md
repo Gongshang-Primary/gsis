@@ -5,7 +5,7 @@
 - Reviewer/model: Muse
 - Last updated (Asia/Singapore): 2026-11-11 ~17:49
 - Branch: codex/stapler-period-mass-apply
-- Base SHA: re-check main's head before branching (lane R serial; this jumps ahead of `roster-relief-instructions-info-only`, which follows after this PR merges)
+- Base SHA: 522094e9ba63617e41dc9fb352e8f7717e0d03f3 (verified current main before branching)
 - Current head SHA (or PR head; avoid self-referential commit hashes):
 - PR:
 - Owner ruling (11 Nov, verbatim in substance): "currently we have the yellow highlighted functions in class which mass-writes the value across the whole row. wish for 1 single down arrow (see red arrow) at each period header that allows us to write the same venue, group and/or class. on click, opens a overlay for us to key in the values. used for creating the same mass-assembly across whole school. wish to have by tonight in next release"
@@ -58,3 +58,29 @@ Not deployed unless supported by explicit environment/version/time evidence. Sta
 - Do not change live data, settings, or release branches.
 
 - Claim: Model: Codex, 11 November 2026. Owner-authorized branch created from current main. Muse reviews the exact implementation head. No live operations or changes to release branches are authorized.
+
+## Codex investigation: duplicate coverage requires owner ruling
+
+Model: Codex, 11 November 2026. Branch `codex/stapler-period-mass-apply` created from current main `522094e9ba63617e41dc9fb352e8f7717e0d03f3`. No product implementation, live operations or changes to the existing info-only PR #115. The new priority supersedes the previous queue ordering; #115 remains a draft.
+
+The task explicitly requires stopping if a uniform classIds patch would duplicate coverage. A synthetic in-memory plan with two teachers at P2, one assigned Synthetic A and the other Synthetic B, confirms this case. Applying the existing validated tile-edit classIds operation to both tiles with `[class-a]` succeeds: Synthetic A then has two simultaneous lesson tiles and Synthetic B has none. The original plan is unchanged. The class-slot validator currently rejects recess overlaps but permits simultaneous lesson tiles for a class. Consequently, the new period bulk operation cannot rely on existing validation to prevent this case.
+
+Evidence: `TZ=Asia/Singapore node /tmp/stapler-mass-apply-duplicate-proof.cjs` passed against the exact main model copied to `/tmp/stapler-mass-apply-model.js`. This is a diagnostic reproduction using synthetic data, not an implementation acceptance test. No canonical build, full local suite or CI was run for a product implementation because none was made.
+
+Recommended bounded resolution, pending owner direction: allow Venue and Group across all existing lesson tiles; allow Class only if the requested replacement creates no new duplicate coverage, otherwise reject the whole apply without changing any field and ask the user to leave Class blank. Do not merge tiles, drop original class coverage, alter teachers or create tiles. Owner direction is required before implementing that behavior because the task says stop and report.
+
+## Owner resolution, 11 November 2026
+
+Owner: "take the latest action as canonical. user relies on undo function to undo." This supersedes the duplicate-coverage stop condition and the proposed rejection above. Apply the selected class list to every existing lesson tile starting in the chosen period, including when that produces identical class coverage on several tiles. Preserve tile identities, teachers, periods and recess; do not merge or delete tiles. Use one existing local command/Undo entry for the whole apply, so Undo restores all prior values and any newly created custom class. Blank fields still leave values unchanged. No remote save until Save to online.
+
+## Implementation and validation handoff
+
+Model: Codex. The existing `bulkEdit` path now accepts a period-only selection and optional Venue, Group and Class values. Blank fields and empty class selection leave values untouched. Existing lesson tiles are selected by their start period; recess, other periods and empty cells are unchanged. Class IDs are validated and custom classes use the existing class creation helper. The existing class-row Subject/Venue/Group path is unchanged.
+
+Both editable grids use the shared header button and one dialog with the existing class picker. The whole action uses one existing local command-history entry. Changed and already-matching counts are reported; a fully matching apply changes neither plan nor Undo history. No network save happens until Save to online. The owner's latest-action ruling supersedes the duplicate-coverage stop condition above; this may intentionally leave multiple lesson tiles with the same class coverage. Undo is local session history and the existing Save flow clears it.
+
+Evidence: the new model regression fails on the original code with "Choose a class" and passes after the period extension. The new Chromium regression passes for both header locations, Venue/Group application, canonical class replacement, changed/already-matching counts, existing and custom class selection, whole-action Undo/Redo, local-only edits and read-only controls. Full local suite and exact-head CI are required before opening a draft PR; actual final results and SHA are recorded in the PR body.
+
+Deploy files: Roster Pages `roster-stapler-ui.js` and the regenerated `roster-stapler-model.js` and `edge-roster-domain.js`; regenerated Notification and Operations Worker bundles contain the shared model. Canonical generated Google bundles are retained in git, but Google stays frozen; no Google redeploy is performed or claimed. No settings, credentials, data, flags or release branches were changed. Owner decides deployment; this feature is available only after the updated assets are deployed.
+
+The browser regression additionally forces a full server-driven redraw after Save and verifies all period controls remain available. Controls are disabled during busy/blocked access and omitted for read-only plans. Nine targeted Stapler regression programs passed before this final redraw check; the final full suite repeats all selected tests.
