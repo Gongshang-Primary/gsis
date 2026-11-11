@@ -26,6 +26,7 @@
 ## Decisions and changes
 
 - Live example (Claude, read-only D1 check, 11 Nov): Sri Asilah reported 12 Nov P5-P9 on 6 Nov 12:13 (request adbaa6cc-a44c-4107-bdb9-f24953842de7) with "Lesson swap with Syahirah". The absence 99094fed-7bff-4689-9261-d1d3805a13d0 was deleted 7 Nov 10:26 by the owner and re-entered as 8607afdb-adbc-4190-8782-38a029250bef (P5-P7, no instructions, no relief needed). Draft status: needsReview, ABSENCE_CHANGED, retryCount 1. Claude's direct D1 fix (status → withdrawn) was blocked by the safety check. The owner can apply the SQL Claude gave in chat, or wait for this task; after release, the processor closes it automatically (acceptance 2).
+- Live fix done (owner "go D1 write", 11 Nov ~16:10): Claude set draft adbaa6cc… to `withdrawn` with resolvedBy/resolutionReason at roster head revision 10683 (head bumped first). Record kept. Seven other drafts are still needsReview: all 10 Nov, absences live, code INSTRUCTIONS_NEED_REVIEW (likely the pre-#111 drain failure). Left untouched for the owner.
 - Relation to `roster-intake-instruction-edit` (Muse wrote it, Codex builds it): that task handles an absence that *exists but mismatches* (edit it, then the note applies). Its acceptance 3 says the deleted case "fails plainly". This task makes the deleted case close cleanly instead of staying stuck.
 
 ## Verification
