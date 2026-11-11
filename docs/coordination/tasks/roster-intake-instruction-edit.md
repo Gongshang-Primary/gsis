@@ -1,6 +1,6 @@
 # roster-intake-instruction-edit: SMC can edit the absence record itself so stuck relief instructions apply ("make it hit")
 
-- Status: proposed
+- Status: superseded by `roster-relief-instructions-info-only` (owner ruling 11 Nov: instructions are for-info and must never block a report); do not build
 - Owner/model: Codex
 - Reviewer/model: Muse
 - Last updated (Asia/Singapore): 2026-11-11 ~14:50

@@ -1,6 +1,6 @@
 # roster-intake-instruction-orphan-close: Close or dismiss relief instructions whose absence was deleted
 
-- Status: proposed
+- Status: superseded by `roster-relief-instructions-info-only` (owner ruling 11 Nov: instructions are for-info and must never block a report); do not build
 - Owner/model: Codex
 - Reviewer/model: Muse
 - Last updated (Asia/Singapore): 2026-11-11 ~16:00
