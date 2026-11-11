@@ -1,3 +1,7 @@
+# Pending: SMC absence correction retries retained relief instructions, 11 November 2026
+
+Model: Codex. Received reports with ABSENCE_CHANGED or INSTRUCTION_SOURCE_CHANGED now offer SMC/Admin an Edit absence action. It reuses the existing absence editor and atomically reconciles only the selected item against the current timetable before retrying its retained instructions. Original submitted text and receipt identity remain unchanged. Deleted entries show recovery guidance; stale editors, unmatched lessons and conflicting text fail without dropping instructions. Other drafts retain their timetable-ID/parity fence. Synthetic D1 and receipt-UI regression covers application to My Relief Duties and idempotent replay. No live data/settings changes or deployment. See docs/coordination/tasks/roster-intake-instruction-edit.md.
+
 # Pending: edge receiptStatus confirms saved or missing batch receipts, 11 November 2026
 
 Model: Codex. D1 receiptStatus now returns accepted:true for a stored receipt and accepted:false with confirmation:unconfirmed for a missing receipt. This restores the existing unconfirmed reliefBatch retry contract without changing the frontend check, save path, store, recording, timeout or existing legacy/absence receipt behavior. Native D1 regression covers both outcomes, preserved allocation payload, actor/digest binding, legacy/absence receipts, replay and read-only lookups. No live recovery or deployment. See docs/coordination/tasks/edge-receipt-accepted.md.
