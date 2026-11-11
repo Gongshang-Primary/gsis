@@ -46,6 +46,7 @@ Kept for the record. Gemini/Jules no longer receives jobs; its branches no longe
 - After the pilot the coordinator reports quality (correctness, rule-following, test discipline) and the owner decides whether lanes K, L and Y open to Gemini.
 
 ## Current assignments (update on every change)
+**Codex, lane R (owner 11 Nov):** `tasks/roster-intake-instruction-orphan-close.md`: auto-close or Dismiss relief instructions whose absence was deleted. Starts after `roster-intake-instruction-edit` merges (same files).
 **PR plan while Claude is away:** `plans/2026-11-handover-pr-plan.md` (Codex C1-C13, Muse M1-M4, owner decisions).
 **Reviewer handover (owner 6 Nov):** Muse reviews Codex PRs; Codex reviews Muse PRs; owner merges. See `HANDOVER_REVIEWER.md`.
 **Codex priority (owner 6 Nov 12:50, "put priority")**: A) roster-intake-overlap-message (Review report on D1 + plain reasons) and B) roster-d1-parity-sweep (inventory PR today, then ports) come first.
