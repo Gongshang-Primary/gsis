@@ -1,6 +1,6 @@
 # v1-core-t1a: isolated Core identity and current Deploy authority
 
-- Status: claimed
+- Status: implementation prepared; exact-head full verification and Claude review pending
 - Owner/model: Codex
 - Coordinator: ChatGPT, v1 only
 - Reviewer/model: Claude, independent review of the exact head; never edit this branch
@@ -50,3 +50,30 @@ Tests: not run yet. Runtime UAT: **Not tested**. No cross-D1 atomicity claim. Li
 ## Review and deployment
 
 Claude review pending. No self-approval. Any later code change requires review of the updated head. Not merged, not deployed. No live operations.
+
+## Implementation evidence and exact-head handoff convention
+
+Accepted claim-only commit: `c4c1de8aed5c9f062cbdc7e6ed83deb721fbb3c3`. Implementation branch starts there. Main claims were reread after the non-force claim push; no intervening claim appeared. Owner allocation override and scoped V1C arrangement above remain controlling. The additive LANES entry is the only coordination exception outside the twelve implementation files.
+
+Implemented five independent modules and five top-level test programs, plus the contract. The contract documents provider schemas, failure mappings, current capability policy, preview field scope, opaque evidence/provenance, per-instance rejection of older responses, and unresolved cross-D1 intervals. A13 deliberately includes a counterexample where a synthetic unsafe consumer could write after post-check revocation; this is not a production race guarantee.
+
+Pre-commit engineering checks: A01–A18 represented in 25 grouped cases across the five programs. Early identity/session/authority smoke checks ran before the first canonical build; they are not the final verification gate. `TZ=Asia/Singapore npm run build` then succeeded, rebuilding 18 components with no tracked generated-output drift. The initial isolation test failed because its AST walker visited metadata objects without a node type; the walker now limits inspection to actual AST nodes, and the rerun passed. No production change was needed. Existing test runner discovers 1056 programs including all five new programs. These observations describe the pre-commit tree, not an exact-head full-suite pass.
+
+Final verification commands at the implementation commit (results and the exact tested SHA will be recorded in the PR body, avoiding a self-referential evidence commit):
+
+```
+TZ=Asia/Singapore npm run build
+TZ=Asia/Singapore node tests/v1-core-identity.mjs
+TZ=Asia/Singapore node tests/v1-core-session.mjs
+TZ=Asia/Singapore node tests/v1-core-authority.mjs
+TZ=Asia/Singapore node tests/v1-core-races.mjs
+TZ=Asia/Singapore node tests/v1-core-isolation.mjs
+TZ=Asia/Singapore node tests/run.cjs --list
+TZ=Asia/Singapore NODE_NO_WARNINGS=1 ROSTER_TEST_CHROMIUM=/usr/bin/chromium GSIS_BROWSER_EXECUTABLE=/usr/bin/chromium npm test
+git diff --exit-code
+git diff --name-only c4c1de8aed5c9f062cbdc7e6ed83deb721fbb3c3 HEAD
+```
+
+The existing runner excludes its historical programs/comparison branches unchanged; no exclusions are added. Full suite and CI are pending at this commit's creation. See the bounded T1A PR for actual final head/base, command outcomes, run IDs and any failures/omissions. Do not infer a pass from this task record. Claude review remains pending until independently published against the exact head. Every subsequent code commit requires updated review.
+
+Runtime UAT remains **Not tested**. No live Google keys/identities, Contacts, Service Binding, D1, provider delivery, browser auth route, deployment or production data tested. Rollback is removal of the unused library/tests/docs; no data or configuration rollback. Integration remains gated by T1B/T1D and demonstrated consumer ordering. No merge or deployment authorised.
