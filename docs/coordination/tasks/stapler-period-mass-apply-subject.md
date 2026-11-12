@@ -1,6 +1,6 @@
 # stapler-period-mass-apply-subject: Mass column fill (period mass-apply) needs a Subject field too
 
-- Status: approved (Muse, 12 Nov 2026, at 196cac2; awaits owner merge)
+- Status: merged (#124 at 196cac2 as a7da2c2)
 - Owner/model: Codex
 - Reviewer/model: Muse
 - Last updated (Asia/Singapore): 2026-11-12 16:45
