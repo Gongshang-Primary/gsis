@@ -553,6 +553,26 @@
       "bodySha256": "516d26993d6eb3f8fd5d8fe5864d35a2875fd5e4260bcaa75853a95fff252741",
       "submissionState": "PENDING",
       "id": "1846305353057485"
+    },
+    "lse_notice": {
+      "name": "gsis_lse_notice_v1",
+      "language": "en_GB",
+      "category": "UTILITY",
+      "id": "1130191476390314",
+      "fields": [
+        "duty_smc_name",
+        "absent_teacher_name",
+        "duty_date"
+      ],
+      "body": "*Leave School Early*\n\nHi {{1}}, {{2}} has applied for LSE on {{3}}.\n\nFor info, thank you!",
+      "bodySha256": "8b0e0026b74883219f90d97f7db02a2bea79951fb5fc204f63f06bbc5390cf3b",
+      "submissionState": "APPROVED",
+      "staticUrlButtons": [
+        {
+          "text": "Open Roster",
+          "url": "https://roster.gsps.edu.sg/"
+        }
+      ]
     }
   },
   "observedOn": "2026-10-18"
