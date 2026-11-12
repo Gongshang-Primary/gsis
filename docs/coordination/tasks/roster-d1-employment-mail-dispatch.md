@@ -1,6 +1,6 @@
 # roster-d1-employment-mail-dispatch: Daily Employment Update emails send on D1
 
-- Status: implemented; local validation in progress (Model: Codex)
+- Status: merged (#130 at 5a0fd06 as c9aec8b, local merge: CHANGELOG both entries, generated bundles rebuilt after #127; 13 Nov); awaiting owner deploy
 - Owner/model: Codex
 - Reviewer/model: **Claude** (owner exception 12 Nov: "owner approve to skip muse for just these 2 tasks and claude to review. muse to sit and skip these 2 only"). Muse does not review this task.
 - Last updated (Asia/Singapore): 2026-11-13

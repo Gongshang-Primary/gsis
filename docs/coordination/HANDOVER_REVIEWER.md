@@ -1,7 +1,7 @@
 # Reviewer handover: Muse reviews, Codex builds (from 6 Nov 2026)
 
 Owner instruction (6 Nov): "make plans for Muse to take over as reviewer and codex to continue coding grunt as your tokens run out".
-Claude remains coordinator/reviewer while available; when Claude is unavailable, this file is the rulebook. Owner merges and deploys, always.
+**Coordinator: Muse** (owner 13 Nov: "return coordinator to muse"). Muse coordinates and reviews Codex PRs; Codex reviews Muse PRs; Claude reviews only when the owner names Claude for a task. This file is the rulebook. Owner merges and deploys, always.
 
 ## 1. Roles
 | Role | Who | Notes |
@@ -10,9 +10,9 @@ Claude remains coordinator/reviewer while available; when Claude is unavailable,
 | Reviewer | **Muse** (Claude when available) | Reviews every Codex PR at its exact head. |
 | Reviewer of Muse's own PRs | **Codex** | Two-model rule: nobody reviews or merges their own work. Muse's builder tasks (Venues, Stapler teacher search, edge queue) are reviewed by Codex. |
 | Merge / deploy / settings | **Owner** | Reviewer says "approve"; owner says "merge N". The reviewer may perform the merge on the owner's explicit word. |
-| Coordinator duties (task records, LANES, release builds) | Muse when Claude is unavailable | Docs-only commits to main are allowed for task records, reviews and release notes. |
+| Coordinator duties (task records, LANES, release builds, prompts) | **Muse** (from 13 Nov) | Docs-only commits to main are allowed for task records, reviews and release notes. |
 
-**Owner exception (12 Nov):** Claude, not Muse, reviews `roster-d1-full-backup-fix` and `roster-d1-employment-mail-dispatch`. Muse skips those two only.
+**Owner exception (12 Nov), closed 13 Nov:** Claude reviewed `roster-d1-full-backup-fix` (#127) and `roster-d1-employment-mail-dispatch` (#130); both merged. Muse reviews all Codex PRs again.
 
 ## 2. Review checklist (every PR, exact head)
 1. Record the exact head SHA; review nothing else. If the head moves, re-review.
@@ -44,6 +44,12 @@ Claude remains coordinator/reviewer while available; when Claude is unavailable,
 - **Owner/ops items**: `gsis_system_alert_v1` pending Meta approval (id 1846305353057485; keep `enabled:false` until approved); 5 WhatsApp routes ready for buttons (`docs/reference/whatsapp-v2-buttons-status.md`); 5 Nov relief counts to add to opening balances; Venues `VENUES_ROSTER_WORKER_URL` + Pages `VENUES_BRIDGE_SECRET` check; close #88 (superseded) and #83 (after #90).
 - **Codex queue** (LANES.md): old backlog (rebase or close 1-4 Nov PRs) → capture contracts for contact_review/relief_unacknowledged/relief_urgent_smc v2 → LSE notice wiring → live updates (idle backoff, then push) → allocation rules rework (rules book first, shadow mode).
 - **Muse builder queue**: Venues D1 route verification → Stapler teacher search → edge queue design note → Deploy P1.
+
+## 5b. Handback to Muse (13 Nov)
+- Merged, not deployed: #127 full D1 backup fix (ccdcba3), #130 employment mail on D1 (c9aec8b). Muse: include both in the next release; DEPLOY_STEPS must say (1) wait for one verified full backup (check manifest `timings`, `missingCacheParts`) and one verified restore test before the owner enables `system_alert` (APPROVED by Meta, id 1846305353057485); (2) the first employment drain cancels the 12 old emails (6-12 Nov) and sends only today's.
+- Open live issues for Muse to track with the owner: SMC duty roster empty, so `TIMETABLE_RECONCILE_BLOCKED` and inbox duty alerts reach nobody (69 smcAlerts `no-duty-recipient` since 6 Nov); Excel export timeouts (13 on 12 Nov) and clash refusals; 1 peer email to Fadzriel (13 Nov) uncertain.
+- Relief instructions are info only (owner 11 Nov; `roster-relief-instructions-info-only`, merged #115 per Codex). 8 stuck drafts were withdrawn by hand on 11 Nov.
+- v1 track: ChatGPT coordinates; #125 (T1B) merged 16eb139. T1C must create a Contacts reader per request (128-stream cap).
 
 ## 6. Reference
 - D1 `gsis-jobs` 0e8359f6-d86a-4a8d-9fcb-59aa6819fcf2. Drive home base 1pVI5eS4NWxbr8Ct0-2mmYVZEQZwa68_Z; Daily Relief 1SY-pUUcQWKB9auDFAbSzYhZcy90Ei4vN; Backups 1J6Ac1Cb-yj5kX3WaTAKIpZ3Riqlltnk9; Allocation Audit 1imeTP73ZowWLIAWZPP_fsh7_8SbRKqZI; Releases 1aY_cKNr0MzW3Pl-LActB09AR2INQsT7D.

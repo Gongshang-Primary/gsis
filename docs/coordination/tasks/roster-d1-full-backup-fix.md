@@ -1,6 +1,6 @@
 # roster-d1-full-backup-fix: Make the full D1 backup succeed, then prove a restore
 
-- Status: implemented; final validation in progress (URGENT, Model: Codex)
+- Status: merged (#127 at 73d057b as ccdcba3, 13 Nov); awaiting owner deploy
 - Owner/model: Codex
 - Reviewer/model: **Claude** (owner exception 12 Nov: "owner approve to skip muse for just these 2 tasks and claude to review. muse to sit and skip these 2 only"). Muse does not review this task.
 - Last updated (Asia/Singapore): 2026-11-12 ~20:00

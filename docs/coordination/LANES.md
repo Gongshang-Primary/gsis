@@ -1,6 +1,6 @@
 # Lanes and job coordination (three models)
 
-Owner and release decision: Song Wee. Coordinator: **Claude** (owner directive 31 Oct 2026: "add gemini to agents, be coordinator of jobs and lanes").
+Owner and release decision: Song Wee. Coordinator: **Muse** (owner 13 Nov: "return coordinator to muse"). Previously Claude (owner directive 31 Oct 2026). Claude reviews only when the owner names Claude for a task.
 
 The coordinator assigns each job to a lane and a model, keeps this file and the queue current, writes each model's prompt for the owner to paste, and reviews every PR at its exact head. The owner merges and deploys. The coordinator does not merge without the owner's word.
 
@@ -46,7 +46,7 @@ Kept for the record. Gemini/Jules no longer receives jobs; its branches no longe
 - After the pilot the coordinator reports quality (correctness, rule-following, test discipline) and the owner decides whether lanes K, L and Y open to Gemini.
 
 ## Current assignments (update on every change)
-**Codex, lane R URGENT (owner 12 Nov), reviewer Claude (Muse skips these 2 only):** 1) `tasks/roster-d1-full-backup-fix.md` (no full D1 backup has ever verified), then 2) `tasks/roster-d1-employment-mail-dispatch.md` (Daily Employment Update not sent since 6 Nov). Owner exception: Claude reviews; Muse does not review these two; all other Codex tasks keep Muse as reviewer.
+**Done 13 Nov (merged #127, #130; awaiting deploy). Owner exception ended; Muse reviews again.** Was: Codex, lane R URGENT (owner 12 Nov), reviewer Claude: 1) `tasks/roster-d1-full-backup-fix.md` (no full D1 backup has ever verified), then 2) `tasks/roster-d1-employment-mail-dispatch.md` (Daily Employment Update not sent since 6 Nov). Owner exception: Claude reviews; Muse does not review these two; all other Codex tasks keep Muse as reviewer.
 **Codex, lane R URGENT (owner 11 Nov):** `tasks/roster-relief-instructions-info-only.md`: relief instructions are info only, never block a report, always reach the relief teacher (Roster duty details + WhatsApp). Muse reviews. Supersedes `roster-intake-instruction-edit` and `roster-intake-instruction-orphan-close`.
 **PR plan while Claude is away:** `plans/2026-11-handover-pr-plan.md` (Codex C1-C13, Muse M1-M4, owner decisions).
 **Reviewer handover (owner 6 Nov):** Muse reviews Codex PRs; Codex reviews Muse PRs; owner merges. See `HANDOVER_REVIEWER.md`.
