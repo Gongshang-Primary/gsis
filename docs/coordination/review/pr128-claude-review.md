@@ -49,3 +49,16 @@ The plan and task record are dated 13 Nov; one evidence row cites main at `b8530
 ## Next action
 
 Codex adds M1 to the plan (Contacts acceptance rules and tests) and posts the new head. Owner answers the plan's two open questions and, if willing, L1. Implementation stays blocked until the coordinator scopes it.
+
+## Re-review at `ba7f6d746955949922343f521635ca8315379277` (13 Nov 2026)
+
+**Verdict: approve** (advisory; plan only, implementation stays blocked until the owner answers and the coordinator scopes it).
+
+Changes since 74df90a: one commit, the same two files, 18 added lines, nothing removed.
+
+1. M1 resolved. No self-acceptance for any of the three fields, including Admins and aliases of the same Staff ID; ambiguous linkage blocks. SMC=true and School Leader=true need non-subject Admin approval bound to the exact proposal; a changed proposal voids it. Audit of proposer, accepter, time, operation ID and approver, committed with the acceptance; audit failure fails the acceptance. Matching future tests added, asserting persisted fields.
+2. Rerun at the head: two-file scope and links pass; `git diff --check` clean; merge-tree against origin/main `61c628f` clean.
+
+Note (low, no change needed): "no bootstrap bypass" means an Admin can never approve their own SMC or School Leader record. That is fine because Admin access does not depend on Contacts. Keep at least two Admins so one is always available to approve the other's subject records and to cover absence.
+
+L1 (inactive staff in the go-live gate) still awaits the owner's choice.
