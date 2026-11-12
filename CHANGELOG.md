@@ -1,3 +1,7 @@
+## Unreleased: timetabled occupancy wording
+
+Deploy and Roster use the approved individual occupancy and relief quota wording in calculations, statistics, help, tooltips and Excel headers. Current configured budgets, formulas, policy names and data fields are unchanged.
+
 # Pending: D1 Drive backup progress and cache-loss recovery, 12 November 2026
 
 Model: Codex. Completed, failed and expired runs remove their transient captured copies while retaining every ledger row and manifest. Full/increment exports and their scheduled worker renew ownership from actual progress, retain stage timings, and wait an hour after failures. Missing or corrupt derived timetable-cache entries are listed in `missingCacheParts` and omitted; authoritative digest failures remain fatal. Verified full/restore results appear in System Health. Per-day Admin alert identities survive recovery, which closes incidents without resetting blocked delivery history. Synthetic coverage includes 14,081 records, scheduled restore, increments, a 20-minute export/competing cron and retained blocked alerts. No live configuration, template activation, provider calls, merge or deployment. See docs/coordination/tasks/roster-d1-full-backup-fix.md.

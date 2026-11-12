@@ -21,10 +21,11 @@ try{
  vm.runInContext(fs.readFileSync('public/vendor/katex/katex.min.js','utf8'),dom.getInternalVMContext());
  run(`Object.assign(v(),${before});tab='Ledger';render();`);
  const table=win.document.querySelector('.workload-ledger'),headers=[...table.tHead.rows[0].cells].map(c=>c.textContent.replace(/[↕▴▾]/g,'').trim());
- assert.equal(headers[headers.indexOf('Actual total')+1],'Target');assert.equal(headers[headers.indexOf('Target')+1],'At-load range');
+ assert.equal(headers[headers.indexOf('Actual (timetabled) occupancy')+1],'Target');assert.equal(headers[headers.indexOf('Target')+1],'At-load range');
  assert.ok(win.document.querySelector('.ledger-formula .katex'));assert.ok(win.document.querySelector('.ledger-formula math'));assert.equal(win.document.querySelectorAll('.katex-error').length,0);
  const rt=[...table.tBodies[0].rows].find(r=>r.cells[0].textContent==='r');assert.equal(rt.cells[1].textContent,'—');assert.equal(rt.cells[headers.indexOf('Target')].textContent,'—');
  run(fs.readFileSync('shared/table-tools.js','utf8'));const exported=win.GSISTableTools.snapshot(table);assert.ok(exported.headers.includes('Target'));
  run('window.katex=undefined;render()');assert.match(win.document.querySelector('.ledger-formula').textContent,/A = actual FTT/);
 }finally{dom.window.close();}
 console.log('PASS 603 Ledger full-time denominator, non-teaching actuals, FAJT, RT, part-time stacking, unavailable inputs, unchanged cap, rendered LaTeX, adjacent values and export.');
+

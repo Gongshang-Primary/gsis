@@ -42,3 +42,8 @@ Deploy, Stats tab (`public/workload-ui.js` / `public/app.js`):
 | weekly quota / quota (highlighted) | weekly relief quota, R / relief quota — owner ruling 1 Nov ~21:20 |
 
 Visible text only, same rule as above. Also update any help text, tooltips and Excel headers that show the same terms, in Deploy and Roster (and Contacts/Layout if they show them).
+
+## Backlog refresh claim, 6 November 2026
+
+Codex resumes #48 under the owner's instruction to clear the backlog continuously. Reconstruct only the approved visible wording on main 69efd3ab9f0dbbb31f1a3bc7da9c86b3dc2ea348. Preserve configured target settings, current workload arithmetic, fresh-start/history handling and policy names. Rebuild generated frontend output. Claude reviews the new exact head; owner merges. No live operations.
+
