@@ -7125,7 +7125,7 @@ var GSISRosterStapler=(()=>{
   for(const id of rows)for(const n of [...new Set(periods)]){
    period(next,n);
    if(original.some(t=>(byClass?t.classIds.includes(id):t.teacherId===id)&&span(previous,t).includes(n)))continue;
-   const tile=addLessonTile(next,{teacherId:byClass?command.teacherId:id,period:n,subject:row?values.subject||'':'',venue:values.venue||'',group:values.group||''},byClass?[id]:values.classIds||[]);
+   const tile=addLessonTile(next,{teacherId:byClass?command.teacherId:id,period:n,subject:values.subject||'',venue:values.venue||'',group:values.group||''},byClass?[id]:values.classIds||[]);
    for(const other of active(next))if(other.id!==tile.id&&overlaps(next,tile,other)){
     if(other.teacherId===tile.teacherId)fail('Teacher already has a lesson at P'+n+'. No changes were applied.');
     if(other.classIds.some(id=>tile.classIds.includes(id)))fail('Class already covered at P'+n+'. No changes were applied.');
@@ -7295,9 +7295,9 @@ var GSISRosterStapler=(()=>{
    if(column){
     if(!Array.isArray(command.periods)||!command.periods.length)fail('Choose a valid timetable period.',400);
     command.periods.forEach(id=>period(next,id));
-    if(Object.keys(patch).some(key=>!['venue','group','classIds'].includes(key)))fail('Only Venue, Group and Class can be changed by period.',400);
+    if(Object.keys(patch).some(key=>!['subject','venue','group','classIds'].includes(key)))fail('Only Subject, Venue, Group and Class can be changed by period.',400);
     const tiles=next.tiles.filter(t=>t.kind==='lesson'&&t.location==='grid'&&command.periods.includes(t.period)),values={};
-    for(const key of ['venue','group'])if(patch[key]!==undefined){const value=text(patch[key]);if(value)values[key]=value;}
+    for(const key of ['subject','venue','group'])if(patch[key]!==undefined){const value=text(patch[key]);if(value)values[key]=value;}
     if(patch.classIds!==undefined||command.customClasses!==undefined){const ids=selectedClasses(next,patch.classIds===undefined?[]:patch.classIds,command.customClasses);if(ids.some(id=>!next.classes.some(c=>c.id===id)))fail('Choose valid classes.',400);if(ids.length)values.classIds=ids;}
     if(!command.createTiles&&!tiles.some(t=>Object.entries(values).some(([key,value])=>JSON.stringify(t[key])!==JSON.stringify(value))))return plan;
     for(const t of tiles)for(const [key,value] of Object.entries(values))t[key]=Array.isArray(value)?value.slice():value;

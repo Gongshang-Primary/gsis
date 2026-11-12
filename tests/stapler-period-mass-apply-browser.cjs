@@ -17,7 +17,7 @@ const assert=require('node:assert/strict'),path=require('node:path'),{chromium}=
   const texts=()=>page.locator('[data-pane=teacher] [data-tile]').allTextContents(),before=await texts();
   await page.locator('[data-pane=teacher] [data-period-apply="2"]').click();await page.locator('dialog [name=venue]').fill('Room A');await page.locator('dialog .primary').click();assert.match(await page.locator('[data-stapler-message]').innerText(),/Applied to 1 lesson tile; 1 already matches/);await page.locator('[data-undo]').click();assert.deepEqual(await texts(),before);
   await page.locator('[data-pane=teacher] [data-period-apply="2"]').click();
-  assert.equal(await page.locator('dialog [name=subject]').count(),0);
+  assert.equal(await page.locator('dialog [name=subject]').getAttribute('maxlength'),'500');
   await page.locator('dialog [name=venue]').fill('Assembly Hall');await page.locator('dialog [name=group]').fill('Whole school');
   await page.locator('dialog summary').click();await page.locator('dialog [name=classIds][value=a]').check();
   await page.locator('dialog .primary').click();assert.match(await page.locator('[data-stapler-message]').innerText(),/Applied to 2 lesson tiles/);

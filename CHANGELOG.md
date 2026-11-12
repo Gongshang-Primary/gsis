@@ -1,3 +1,7 @@
+# Pending: Subject in Stapler period mass-apply, 12 November 2026
+
+Model: Codex. The period overlay now offers an optional Subject input with suggestions from lesson tiles. A filled value updates existing tiles and newly created column tiles; blank preserves existing subjects, and an already-matching value makes no change. Creation choices, teacher selection, conflict handling, Undo, row actions and Save to online behavior are unchanged. Intended for the next release after t; no release branch, live settings or deployment changed. See docs/coordination/tasks/stapler-period-mass-apply-subject.md.
+
 # Pending: Stapler mass-apply can fill empty cells, 12 November 2026
 
 Model: Codex. Class-row arrows and period-header dialogs now ask whether to update existing lesson tiles only (default) or create tiles in empty cells too. New tiles use the row identity and an explicitly selected teacher where needed. Recess and occupied/spanned cells are not filled. A teacher/class conflict rejects the entire apply; one local Undo restores changed values and removes every created tile. No write occurs until Save to online. Ships after release t; no release branch, live data/settings, allocation, relief, publication or notification change. See docs/coordination/tasks/stapler-mass-apply-create-tiles.md.
