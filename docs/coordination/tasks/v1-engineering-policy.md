@@ -1,6 +1,6 @@
 # v1-engineering-policy: skills and Rust-inspired standards
 
-- Status: prepared for exact-head verification and Claude review
+- Status: merged (#119 at 4e105dceb761d4af9fc48c8bfbf03625547769e7 as c782c0c27ad0734acd6cf6d4fffbbdb23772cde1)
 - Owner/model: Codex
 - Coordinator: ChatGPT, v1 only
 - Reviewer/model: Claude, exact-head independent review
@@ -29,3 +29,8 @@ Claim only; no implementation or verification yet. Final PR records exact head/b
 The four requested documents separate discovery/priority, selective skill use, twelve testable engineering principles, and acceptance evidence. Root AGENTS.md has only the additive discovery reference. Original production instructions are byte-preserved as a prefix. No third-party skill implementation/text was copied or executed; principles are project-specific applications of the owner's requirements. Enforcement is explicitly task/review based; no automated enforcement is claimed.
 
 `python3 /workspace/work/check-v1-policy.py` passed before commit: all Markdown relative links resolve, root prefix is unchanged, all twelve principle rows and six approaches are present, and only the six authorised/workflow documentation paths changed. `git diff --check` passed. Manual content review checked all twelve principles against the owner request, the stated precedence order, source attribution, explicit owner conflict arbitration, branch-review discovery and unchanged production/release authority. No application tests were added for prose. Build and exact-head CI results will be recorded in the PR; pending checks are not represented as passed. Runtime UAT remains Not tested. Claude's independent review is pending. Rollback removes these instructions/reference; no runtime or data rollback is needed.
+
+
+## Owner-authorised sequential merge — 12 November 2026
+
+Model: Codex. Owner explicitly instructed: merge #120, then #119, then #118. #120 was already merged as 0c4d1a3a43869c0b4bb87068d6c8b3f70dff1958 at head 5fc068471f129709d0b3f4b6d7804453250da91a. Verified Claude's #119 approval in docs/coordination/review/pr119-claude-review.md at main 2790ec25de6d14ef1ea3b354774ef72b06d1a5b7; L1–L4 are owner-accepted nonblocking follow-ups. Exact-head CI run 43129824397: full-suite and all four shards successful. No GitHub review submissions or unresolved review threads. GitHub reported clean mergeability; intervening main changes are disjoint coordination documents. Marked ready and merged with expected head SHA, merge method merge. Main confirmed at the merge SHA above. Earlier pending-review statements are historical and superseded by this record. No new local build/test run; relied on published exact-head review and refreshed CI. No deployment, infrastructure changes, live data access or T1B work.
