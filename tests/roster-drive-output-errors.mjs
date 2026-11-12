@@ -36,4 +36,9 @@ await notify('backup',now+2,1);assert.equal(sent.length,2);await notify('daily',
 enabled=false;await notify('daily',now+2*86400000,12);assert.equal(sent.length,3);
 enabled=true;let lostId;await assert.rejects(notifyOutputAlert(db,{kind:'continuity',now,health:{warnings:['failure']},message:'failed',enabled:async()=>true},async h=>{lostId=h.alertId;throw Error('response lost');}));
 await notifyOutputAlert(db,{kind:'continuity',now,health:{warnings:['failure']},message:'failed',enabled:async()=>true},async h=>{assert.equal(h.alertId,lostId);return {queued:true};});
+let resolutions=0;
+await notifyOutputAlert(db,{kind:'backup',now,health:{warnings:[]},message:'recovered',enabled:async()=>false},async h=>{assert.equal(h.resolved,true);resolutions++;return {resolved:true};});
+await notifyOutputAlert(db,{kind:'backup',now,health:{warnings:[]},message:'recovered',enabled:async()=>false},async()=>assert.fail('already resolved'));
+assert.equal(resolutions,1);assert.equal(db.sql.prepare("SELECT queued FROM gsis_output_alerts WHERE kind='backup'").get().queued,2);
+await notify('backup',now+5,1);assert.equal(sent.length,3,'same-day recovery never resets delivery identity');
 db.sql.close();console.log('sanitised errors in ledger/manifest/health, expired-run retry and late-writer fence, daily alert identities and disabled silence pass');

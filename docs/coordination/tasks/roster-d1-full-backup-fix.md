@@ -1,6 +1,6 @@
 # roster-d1-full-backup-fix: Make the full D1 backup succeed, then prove a restore
 
-- Status: investigating (URGENT, Model: Codex)
+- Status: implemented; final validation in progress (URGENT, Model: Codex)
 - Owner/model: Codex
 - Reviewer/model: **Claude** (owner exception 12 Nov: "owner approve to skip muse for just these 2 tasks and claude to review. muse to sit and skip these 2 only"). Muse does not review this task.
 - Last updated (Asia/Singapore): 2026-11-12 ~20:00
@@ -88,3 +88,28 @@ The task names scheduling in `_worker.js` / `notification-worker/index.js`, but 
 - Passed existing `roster-drive-backup.mjs`, `roster-drive-jobs.mjs`, `roster-drive-restore.mjs`, and updated `roster-drive-output-errors.mjs`. The latter now requires expiry backoff before retry instead of its former immediate-retry policy.
 - `TZ=Asia/Singapore npm run build` completed; generated Worker bundles regenerated. Final clean-build verification, full local suite, CI, alert recovery acceptance and the draft PR are **not complete**.
 - Employment-mail task not started; lane R remains serial. No live data/settings, WhatsApp templates, production R2 objects, main branch, deployment or merge changed.
+
+
+## Approved completion (Model: Codex, 12 Nov)
+
+Owner answered **"include"** for the bounded addition of `roster-update/public/edge-roster-backup-jobs.js` and `roster-update/public/system-health.js`. The prepared patch is now applied. No further scope expansion was required; the existing parity guard and all 272 probes pass without catalog changes.
+
+- Both the export lease and outer scheduled-worker lease renew from measured progress and completed bridge calls. The fixed elapsed-time rejection is replaced by ownership checks; lease duration remains 15 minutes. A synthetic 20-minute R2 export with a competing cron verifies that the second invocation skips and the single original full run verifies. There is no independent heartbeat timer that could keep a stuck task alive.
+- Failed full/increment attempts back off for one hour from failure, including expired attempts, and the scheduled job exposes `backoff`, `backoffSeconds`, `readyAt` and `SKIPPED_BACKOFF` to the existing job-health recorder.
+- The scheduled restore drill verifies the newly written 14,081-record full in the fixture. TIER_ONE round-trips; subsequent increment verifies. Full plus scheduled drill measured 15,987 ms locally; the full's export stages were 24 ms capture, 45 ms tier one, 8,052 ms tier two, 341 ms compression and 28 ms simulated upload. These numbers describe local synthetic adapters, not production/provider performance.
+- Recovery resolves matching Admin incident records and retains the per-day identity. It does not change, retry or remove delivery records. Tests retain 12 blocked history rows byte-for-byte across recovery and prove repeat failures do not queue another same-day alert.
+- System Health displays the last verified full timestamp and compressed size and the last restore-test result/time. The scheduler continues to own the existing daily/weekly cadence. No crons, templates or live configuration were changed.
+
+### Root cause and limits of evidence
+
+The missing-cache failure is reproduced against the real cleanup implementation. The lease failure is structurally reproducible: an active export does not renew either lease; the next two-minute cron expires it at the first observation after 15 minutes (typically 16). The fix proves progress across that boundary and fences a competing cron. The old fixed 12-minute check also rejected otherwise progressing work on its next Drive call. The provided ledger evidence cannot identify the exact production stage before interruption; the new durable `progress`/`timings` fields provide that attribution. Do not describe the synthetic timing as a live diagnosis or claim production backups are verified before the owner checks them.
+
+### Deploy and rollback (owner only)
+
+1. Deploy the rebuilt Roster Pages output (including the backup modules, alert recovery and `system-health.js`), notification Worker `dashboard-worker.mjs`, and operations Worker `dashboard-worker.mjs` through the normal bundle/release process. Generated `.txt` copies match. No Apps Script source change is needed; keep its existing verified Drive adapter.
+2. Preserve current bindings, URLs, credentials, Google authority, existing cron entries and Drive backup configuration. This PR does not enable backups or WhatsApp templates.
+3. With backup scheduling already enabled, wait for a **verified full** ledger row with a Drive file ID and digest, then a **verified restore-test** row. Check the full's `missingCacheParts` and stage diagnostics, the new System Health lines, and later an increment. A failure must show backoff rather than start another full every two minutes.
+4. Only after the owner verifies the full and restore test should the owner consider enabling the approved `system_alert` template. Retain all 12 blocked historical delivery rows; do not retry them. Enabling that template is not an action in this PR.
+5. Roll back by redeploying the previous Worker/Pages build while preserving configuration and all ledger, capture and delivery rows. No data deletion or credential change is needed. Existing source/scratch restore behavior is unchanged; this repair adds no R2 deletion and removes captured-row pruning.
+
+Reviewer: **Claude**, at the final PR head. Full-suite results and CI run ID will be recorded after final verification. Employment mail remains queued behind this task because its Worker/health/generated files overlap; no employment implementation has started.

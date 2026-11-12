@@ -175,7 +175,8 @@ export async function backupStatus(db,{now=Date.now()}={}){
  const c=primary(db),latest=await c.prepare("SELECT * FROM gsis_backup_ledger WHERE kind IN ('full','increment') ORDER BY started_at DESC LIMIT 1").first(),verified=await c.prepare("SELECT * FROM gsis_backup_ledger WHERE kind IN ('full','increment') AND status='verified' ORDER BY started_at DESC LIMIT 1").first(),full=await c.prepare("SELECT * FROM gsis_backup_ledger WHERE kind='full' AND status='verified' ORDER BY started_at DESC LIMIT 1").first(),recent=(await c.prepare("SELECT status FROM gsis_backup_ledger WHERE kind IN ('full','increment') AND status<>'running' ORDER BY started_at DESC LIMIT 2").all()).results||[];
  const warnings=[];if(!verified||now-verified.started_at>2*HOUR)warnings.push('increment-overdue');if(!full||now-full.started_at>26*HOUR)warnings.push('full-overdue');if(recent.length===2&&recent.every(r=>r.status==='failed'))warnings.push('two-failures');const config=await readBackupConfig(db);if(verified?.bytes_raw>config.sizeAlertMiB*1024*1024)warnings.push('size-threshold');
  const aux=(await c.prepare("SELECT kind,status FROM (SELECT kind,status,ROW_NUMBER() OVER(PARTITION BY kind ORDER BY started_at DESC,id DESC) n FROM gsis_backup_ledger WHERE kind IN ('continuity','restore-test')) WHERE n<=2").all()).results;for(const kind of ['continuity','restore-test']){const recent=aux.filter(r=>r.kind===kind);if(recent.length===2&&recent.every(r=>r.status==='failed'))warnings.push(kind+'-failed');}
- return {available:true,lastVerifiedAt:verified?.finished_at||null,lastCapturedAt:verified?.started_at||null,lastFullAt:full?.finished_at||null,bytes:verified?.bytes_compressed||0,status:latest?.status||'not-run',lastError:latest?.error||'',lastCode:JSON.parse(latest?.manifest_json||'{}').outputError?.code||latest?.error||'',lastAttemptAt:latest?.started_at||null,nextAttemptAt:latest?.status==='failed'?Math.max(latest.finished_at||0,latest.started_at)+HOUR:null,lastFullBytes:full?.bytes_compressed||0,progress:JSON.parse(latest?.manifest_json||'{}').progress||null,warnings};
+ const restore=await c.prepare("SELECT status,started_at,finished_at FROM gsis_backup_ledger WHERE kind='restore-test' ORDER BY started_at DESC,id DESC LIMIT 1").first();
+ return {available:true,lastRestoreTest:restore?{status:restore.status,at:restore.finished_at||restore.started_at}:null,lastVerifiedAt:verified?.finished_at||null,lastCapturedAt:verified?.started_at||null,lastFullAt:full?.finished_at||null,bytes:verified?.bytes_compressed||0,status:latest?.status||'not-run',lastError:latest?.error||'',lastCode:JSON.parse(latest?.manifest_json||'{}').outputError?.code||latest?.error||'',lastAttemptAt:latest?.started_at||null,nextAttemptAt:latest?.status==='failed'?Math.max(latest.finished_at||0,latest.started_at)+HOUR:null,lastFullBytes:full?.bytes_compressed||0,progress:JSON.parse(latest?.manifest_json||'{}').progress||null,warnings};
 }
 // Renewal is tied to observed progress, never a timer that can keep a stuck
 // operation alive forever. Both identity and unexpired ownership are required.
@@ -227,7 +228,15 @@ export async function expireBackupRuns(db,now){
  await c.prepare("UPDATE gsis_backup_ledger SET status='failed',error='BACKUP_LEASE_EXPIRED',finished_at=?,duration_ms=MAX(0,?-started_at),lease_until=0 WHERE status='running' AND kind IN ('full','increment') AND lease_until<=?").bind(now,now,now).run();
 }
 export async function notifyOutputAlert(db,{kind,now,health,message,enabled},alert){
- if(!alert||!health.warnings.length||!await enabled())return;
+ if(!alert)return;
+ if(!health.warnings.length){
+  // queued=2 means resolved. Retain the daily identity so another failure on
+  // the same day cannot resend a blocked or already delivered notification.
+  const open=(await db.prepare('SELECT day,alert_id FROM gsis_output_alerts WHERE kind=? AND queued=1').bind(kind).all()).results||[];
+  for(const row of open){const result=await alert({...health,kind,message,resolved:true,alertId:row.alert_id});if(result?.resolved===true)await db.prepare('UPDATE gsis_output_alerts SET queued=2 WHERE kind=? AND day=? AND queued=1').bind(kind,row.day).run();}
+  return;
+ }
+ if(!await enabled())return;
  const day=singaporeBackupDate(now),id='drive-'+kind+'-'+day;
  await db.prepare('INSERT OR IGNORE INTO gsis_output_alerts(kind,day,alert_id) VALUES(?,?,?)').bind(kind,day,id).run();
  const row=await db.prepare('SELECT * FROM gsis_output_alerts WHERE kind=? AND day=?').bind(kind,day).first();

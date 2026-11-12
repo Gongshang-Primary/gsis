@@ -1,3 +1,7 @@
+# Pending: D1 Drive backup progress and cache-loss recovery, 12 November 2026
+
+Model: Codex. Full/increment exports and their scheduled worker renew ownership from actual progress, retain stage timings, and wait an hour after failures. Missing or corrupt derived timetable-cache entries are listed in `missingCacheParts` and omitted; authoritative digest failures remain fatal. Verified full/restore results appear in System Health. Per-day Admin alert identities survive recovery, which closes incidents without resetting blocked delivery history. Synthetic coverage includes 14,081 records, scheduled restore, increments, a 20-minute export/competing cron and retained blocked alerts. No live configuration, template activation, provider calls, merge or deployment. See docs/coordination/tasks/roster-d1-full-backup-fix.md.
+
 # Pending: Subject in Stapler period mass-apply, 12 November 2026
 
 Model: Codex. The period overlay now offers an optional Subject input with suggestions from lesson tiles. A filled value updates existing tiles and newly created column tiles; blank preserves existing subjects, and an already-matching value makes no change. Creation choices, teacher selection, conflict handling, Undo, row actions and Save to online behavior are unchanged. Intended for the next release after t; no release branch, live settings or deployment changed. See docs/coordination/tasks/stapler-period-mass-apply-subject.md.
