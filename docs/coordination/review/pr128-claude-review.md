@@ -62,3 +62,11 @@ Changes since 74df90a: one commit, the same two files, 18 added lines, nothing r
 Note (low, no change needed): "no bootstrap bypass" means an Admin can never approve their own SMC or School Leader record. That is fine because Admin access does not depend on Contacts. Keep at least two Admins so one is always available to approve the other's subject records and to cover absence.
 
 L1 (inactive staff in the go-live gate) still awaits the owner's choice.
+
+## Owner answers (13 Nov 2026)
+
+1. Verification source: owner's own review (not an HR list).
+2. Proposed presentation (EO status, school section and appointment shown separately): accepted.
+3. L1: inactive staff are left out of the go-live readiness check. Only active staff must be complete. On reactivation, the person is denied with "records incomplete" until a Power User accepts all three records. No default or bulk values. Recorded in `OWNER_DIRECTIVES.md`.
+
+The plan still says the readiness report includes inactive entries and that all unresolved rows block go-live. Codex must update the plan to match answer 3 (inactive staff may still be listed for information, but do not block) and add tests: inactive staff with blanks do not block; reactivation without complete records is denied with the missing-evidence code; reactivation during or after the scan invalidates readiness evidence.
