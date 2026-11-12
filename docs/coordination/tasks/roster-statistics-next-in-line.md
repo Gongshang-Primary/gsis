@@ -52,3 +52,9 @@ Fix: when the accumulated quota is 0, show "0 periods done; no relief quota reco
 Model: Codex. Refresh against current main through refreshed #46 at 4ccda08dd64ab337b7e662715ef371a396646098. Use current allocator balances and unchanged ranking key, including opening balances and current fresh-start coverage. Keep the projection read-only and Admin/SMC-only. No allocation policy changes. Build and full CI required; owner merges.
 
 Current refresh: totals come from allocator balances, including confirmed opening balances and commitments. The date label follows My Calculations after fresh start; last relief date uses only retained records after the opening cutoff. Excel metadata uses the fairness basis, independent of the activity table mode. No allocator formula or sorting policy changes.
+
+## Backlog stacked rebase (Model: Codex, 13 Nov)
+
+Reviewer: Muse at the new exact PR head. Original child head `6b67088d99bd3c8aed12072452fe0f784929ef22` was rebased relative to its old #46 parent `c1b29487e61136ff55a1f578c51893ff733b0e2e` onto #46's new CI-green head `72f14067716b8fbba42bae0ca5fd00869f0f6c86`. Its GitHub base stays `codex/roster-relief-count`; do not retarget main until #46 merges. Only generated Worker bundles conflicted and were regenerated canonically.
+
+The existing PR adds `statisticsRPercent`, so the current parity catalog now has 273 entries. Its D1 handler succeeds in the synthetic probe; all 272 previous outcomes remain identical. Ten local programs pass: four affected statistics programs, both parent relief-count programs, fresh-start accounting, statistics contrast and both parity checks. Build/repeat build and merge-tree against the new parent are clean. Fresh exact-head CI is recorded in PR #47; old approvals do not approve the rebased head. No new policy, live actions, merge or main push.
