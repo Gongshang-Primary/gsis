@@ -27,7 +27,7 @@ The injected `readCurrent` receives that frozen query plus server `requestedAt`.
 ```
 {schemaVersion:1, kind:'current',
  observation:{evaluationId, requestedAt, asOf},
- snapshot:{schemaVersion:1, schoolId, staffId, profile, snapshotId,
+ snapshot:{schemaVersion:1, source:'contacts', schoolId, staffId, profile, snapshotId,
    revision, sequence, fields, groups, dependencies, catalogueRefs, catalogues}}
 ```
 

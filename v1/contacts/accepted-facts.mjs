@@ -4,8 +4,8 @@ import { LIMITS, GROUPS, PROFILES, check, exact, id, instant, list, unique, now,
 import { validateCatalogues } from './catalogues.mjs';
 
 async function validate(snapshot, q) {
-  exact(snapshot,['schemaVersion','schoolId','staffId','profile','snapshotId','revision','sequence','fields','groups','dependencies','catalogueRefs','catalogues']);
-  check(snapshot.schemaVersion===1 && snapshot.profile===q.profile && id(snapshot.snapshotId) && id(snapshot.revision) && instant(snapshot.sequence));
+  exact(snapshot,['schemaVersion','source','schoolId','staffId','profile','snapshotId','revision','sequence','fields','groups','dependencies','catalogueRefs','catalogues']);
+  check(snapshot.schemaVersion===1 && snapshot.source==='contacts' && snapshot.profile===q.profile && id(snapshot.snapshotId) && id(snapshot.revision) && instant(snapshot.sequence));
   check(snapshot.schoolId===q.schoolId,'SCHOOL_MISMATCH'); check(snapshot.staffId===q.staffId,'STAFF_MISMATCH');
   validateFields(snapshot.fields,q.profile);
   exact(snapshot.groups,PROFILES[q.profile]);

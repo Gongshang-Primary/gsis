@@ -60,3 +60,5 @@ Final exact tested SHA, CI link/outcomes and command evidence will be in the bou
 ### Catalogue response scope correction
 
 After first commit 831e10e, final contract inspection found catalogue results relied on caller context for school/Staff ID. A regression failed because schoolId was absent. The result now explicitly retains schoolId, staffId, profile and source revision/sequence alongside its existing snapshot digest and observation; the regression passes. Earlier CI run 43211049375 is superseded, not final-head evidence. No ownership or file-scope change.
+
+The final source-matrix check also made `source:'contacts'` explicit in the broad snapshot schema, matching the published plan (not just the narrow Core response). A negative case rejects a Deploy-owned snapshot. Run 43211049375 and the run at 46810dd are superseded by this final schema correction; final-head evidence is recorded in the PR.
