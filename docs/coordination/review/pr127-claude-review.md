@@ -21,3 +21,10 @@
 
 ## For the owner
 After finding 1 is fixed and re-verified at the new head, I will approve. No other change needed.
+
+## Re-review at 73d057b (Claude)
+- Verdict: **approve**.
+- Finding 1 fixed: `finishBackup` now deletes the run's captured rows in the same batch as the terminal ledger update, guarded by the run's lease token and a terminal status (verified or failed). Lease-expired runs have their captures deleted together with the expiry update. The ledger and manifest are untouched.
+- Tests: `roster-drive-backup-progress.mjs` now asserts that captures are gone after expiry, after an explicit failure and after a verified run, and that a new active capture is kept. Local at the head: PASS roster-drive-backup-progress, roster-drive-backup-cache-loss, roster-drive-backup, roster-drive-restore. Canonical build: no diff. Merge-tree against main: clean.
+- CI at the head: full-suite success (131472530538); shards 1-4 success.
+- Owner after deploy: wait for one verified full (check the manifest's `timings` and `missingCacheParts`) and one verified restore test, then consider enabling `system_alert`.
