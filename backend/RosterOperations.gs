@@ -845,6 +845,7 @@ function rosterOperationsDispatchCore_(req,c){gsisRequireBackendRole_('roster');
  if(op==='acknowledge')return rosterAcknowledgementDispatch_(req,c);
  if(op==='statisticsCalendar'){const user=rosterOperationsAuthority_(c,req.identity);if(!user.smc&&!user.admin)error_(403,'SMC or Admin access is required.');return {allowed:true};}
  if(op==='statistics')return rosterStatisticsRead_(req,c,p);
+ if(op==='statisticsRPercent')return rosterStatisticsRPercent_(req,c);
  if(op==='saveAbsence'||op==='saveInstructions')return rosterAbsenceDispatch_(req,c);
  if(op==='read'&&p.view==='allocationLearning')return rosterOperationsAllocationLearning_(req,c);
  if(op==='publish'&&(p.publicationAcknowledgement===true||p.compact===true))return rosterOperationsPublishDispatch_(req,c);

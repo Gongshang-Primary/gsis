@@ -5879,6 +5879,7 @@ function rosterOperationsDispatchCore_(req,c){gsisRequireBackendRole_('roster');
  if(op==='acknowledge')return rosterAcknowledgementDispatch_(req,c);
  if(op==='statisticsCalendar'){const user=rosterOperationsAuthority_(c,req.identity);if(!user.smc&&!user.admin)error_(403,'SMC or Admin access is required.');return {allowed:true};}
  if(op==='statistics')return rosterStatisticsRead_(req,c,p);
+ if(op==='statisticsRPercent')return rosterStatisticsRPercent_(req,c);
  if(op==='saveAbsence'||op==='saveInstructions')return rosterAbsenceDispatch_(req,c);
  if(op==='read'&&p.view==='allocationLearning')return rosterOperationsAllocationLearning_(req,c);
  if(op==='publish'&&(p.publicationAcknowledgement===true||p.compact===true))return rosterOperationsPublishDispatch_(req,c);
@@ -7074,7 +7075,7 @@ var GSISRosterAllocation = (() => {
   }
   function mayOptimise(ctx,d){const start=Date.parse(addDays(d,-1)+'T16:00:00+08:00'),end=Date.parse(d+'T06:29:59.999+08:00');return ctx.now>=start&&ctx.now<=end;}
   function warningEvents(s,ctx,summary){ensure(s);const quiet=schedule(ctx.now).quiet,events=[];for(const p of summary.periods){if(periodStarted(ctx,summary.date,p.period))continue;const key=summary.date+':'+p.period,old=s.healthWarningState[key]||{seen:[],episode:0};if(p.green.length>2){s.healthWarningState[key]={seen:[],episode:old.seen.length?old.episode+1:old.episode,last:p.green.length};continue;}if(!old.seen.includes(p.green.length)){events.push({key:'capacity:'+key+':'+old.episode+':'+p.green.length,period:p.period,count:p.green.length,date:summary.date,quiet});old.seen.push(p.green.length);}old.last=p.green.length;s.healthWarningState[key]=old;}return events;}
-  return {initialiseFreshStartAccounting,freshStartOpeningBalances,openingBalance,openingAmount,validOpeningDate,openingCutoff,personalCompletion,deploymentTeachingEvidence,sreBasis,dailyRosterCalculation,reliefCandidateEligible,normalizeSubjectPatterns,matchesSubjectPattern,absencePeriods,defaultConsecutiveSubjectRules,normalizeConsecutiveSubjectRules,manualDecision,manualDecisionForDemand,manualOwnership,defaultSubjectFamilies,normalizeSubjectFamilies,normalizeTeachingGroupOverrides,subjectResolver,lessonSubject,teachingProfile,defaultRestrictedPeriods,defaultEmploymentRestrictions,preferenceRules,workloadRules,ruleToggles,workloadLimits,preferenceOrder,sameVenue,teacherSource,recessDuty,manualAssignments,manualModel,withManualAssignments,manualRanks,isClassLesson,ensure,clone,fail,norm,addDays,monday,year,cost,active,protectedAssignment,effectiveAssignments,accounted,corrected,initialiseHistory,annual,balances,weekQuota,captureWeek,addAudit,assertNewAuditIds,bumpDay,prepareClock,preparedClockConflict,periodStarted,periodEnded,reliefCompleted,teacherContext,eligibility,runAt,opportunities,health,rotation,ranked,optimise,score,solveCoverage,schedule,mayOptimise,warningEvents,pendingPeerRequests};
+  return {rankingUtilisation,initialiseFreshStartAccounting,freshStartOpeningBalances,openingBalance,openingAmount,validOpeningDate,openingCutoff,personalCompletion,deploymentTeachingEvidence,sreBasis,dailyRosterCalculation,reliefCandidateEligible,normalizeSubjectPatterns,matchesSubjectPattern,absencePeriods,defaultConsecutiveSubjectRules,normalizeConsecutiveSubjectRules,manualDecision,manualDecisionForDemand,manualOwnership,defaultSubjectFamilies,normalizeSubjectFamilies,normalizeTeachingGroupOverrides,subjectResolver,lessonSubject,teachingProfile,defaultRestrictedPeriods,defaultEmploymentRestrictions,preferenceRules,workloadRules,ruleToggles,workloadLimits,preferenceOrder,sameVenue,teacherSource,recessDuty,manualAssignments,manualModel,withManualAssignments,manualRanks,isClassLesson,ensure,clone,fail,norm,addDays,monday,year,cost,active,protectedAssignment,effectiveAssignments,accounted,corrected,initialiseHistory,annual,balances,weekQuota,captureWeek,addAudit,assertNewAuditIds,bumpDay,prepareClock,preparedClockConflict,periodStarted,periodEnded,reliefCompleted,teacherContext,eligibility,runAt,opportunities,health,rotation,ranked,optimise,score,solveCoverage,schedule,mayOptimise,warningEvents,pendingPeerRequests};
 })();
 if(typeof module!=='undefined'&&module.exports)module.exports=GSISRosterAllocation;
 
@@ -9165,6 +9166,24 @@ var GSISRosterStatistics = (() => {
   for(const row of [...facts.absenceRows,...facts.activityRows,...facts.importedWeekly])if(!people.some(p=>p.id===row.staffId))people.push({id:row.staffId,name:row.name});
   return {schema:SCHEMA,...(state.freshStart?.effectiveDate?{historyCoverage:{since:state.freshStart.effectiveDate,archiveUrl:'/archive.html'}}:{}),from:r.from,to:r.to,today:ctx.today,checkedAt:ctx.iso,revision:state.revision,trackingFrom,people,...facts,coverage,warnings};
  }
+ // This is a read projection of the allocator's key, not another R formula.
+ function fairness(state,ctx,quota={}){
+  if(!ctx?.user?.smc&&!ctx?.user?.admin)fail(403,'Statistics is available to SMC and Admin only.');
+  const allocator=A(),today=date(ctx.today),from=state.freshStart?.effectiveDate?.slice(0,4)===today.slice(0,4)?state.freshStart.effectiveDate:today.slice(0,4)+'-01-01',evidence=allocator.deploymentTeachingEvidence(quota,today),inRange=today>=quota.from&&today<=quota.to;
+  const day={periods:state.dailyPublicationStates?.[today]?.periods||ctx.days?.[today]?.periods||[],teachers:inRange?(quota.rows||[]).map(r=>({...r,staffId:r.id})):[],deployTeachingEvidence:evidence};
+  const context={...ctx,quotaRequested:true,days:{...ctx.days,[today]:day},baselineDays:{[today]:day}},balances=allocator.balances(state,context,today),records=allocator.accounted(state,context),last=new Map(),rows=[],warnings=[];
+  for(const row of records)if((row.accountingYear||allocator.year(row.date))===today.slice(0,4)&&row.date>=from&&row.date<=today&&allocator.reliefCompleted(row,context)&&allocator.cost(row)>0){const opening=allocator.openingBalance(state,row.staffId,today.slice(0,4));if(opening&&row.date<=opening.asOfDate)continue;if(!last.has(row.staffId)||last.get(row.staffId)<row.date)last.set(row.staffId,row.date);}
+  for(const person of ctx.people||[]){const balance=balances.get(person.id),sreMode=allocator.sreBasis(person,evidence);if(!person.active||!allocator.reliefCandidateEligible(person)||!balance||!(balance.entitlement>0)||balance.dailyRoster||sreMode==='daily')continue;
+   if(sreMode==='unknown'){warnings.push('Some SRE ranking values are unavailable until published teaching evidence is verified.');continue;}
+   const percentage=allocator.rankingUtilisation({annual:balance.utilisation,sreMode,R:balance.R,remaining:balance.remaining});if(!Number.isFinite(percentage))continue;
+   const done=balance.completed;rows.push({staffId:person.id,name:person.name||person.id,completed:done,committed:balance.committed,entitlement:balance.entitlement,percentage,lastReliefDate:last.get(person.id)||null,basis:sreMode==='long-term'?'Weekly SRE':'Annual',historyVerified:balance.historyVerified});
+  }
+  rows.sort((a,b)=>a.percentage-b.percentage||a.completed-b.completed||a.name.localeCompare(b.name,'en',{numeric:true})||a.staffId.localeCompare(b.staffId));rows.forEach((r,i)=>r.rank=i+1);
+  if(state.freshStart)warnings.push('Totals include confirmed opening balances and later records. Last relief date uses retained records only.');
+  if(!quota.source)warnings.push('Current Deploy quota information is unavailable; weekly SRE rankings may be omitted.');
+  if(rows.some(r=>!r.historyVerified))warnings.push('Some annual relief history is not verified. Missing history is not proof of no work.');
+  return {schema:SCHEMA,from,to:today,today,checkedAt:ctx.iso,revision:state.revision,rows,warnings:[...new Set(warnings)]};
+ }
  function markTracking(state,ctx){if(!state.statisticsTrackingFrom){state.statisticsTrackingFrom=date(state.freshStart?.effectiveDate||ctx.today);return true;}return false;}
  function captureBeforePrune(state,selection,ctx){
   const removed=new Set();for(const key of ['absences','assignments','importedRelief'])for(const row of selection.lists?.[key]||[])if(row.date){removed.add(row.date);const corrected=key==='absences'?row:A().corrected(state,row);if(corrected.date)removed.add(corrected.date);}
@@ -9211,7 +9230,7 @@ var GSISRosterStatistics = (() => {
   if(['term','semester'].includes(id)){const list=calendar[id==='term'?'terms':'semesters']||[],past=list.filter(x=>x.to<today).sort((a,b)=>b.to.localeCompare(a.to));if(!past.length)return null;return {from:date(past[0].from),to:date(past[0].to)};}
   return null;
  }
- return {schema:SCHEMA,maxDays:MAX_DAYS,date,range,dates,addDays,project,aggregate,preset,markTracking,captureBeforePrune};
+ return {schema:SCHEMA,maxDays:MAX_DAYS,date,range,dates,addDays,project,fairness,aggregate,preset,markTracking,captureBeforePrune};
 })();
 if(typeof module!=='undefined'&&module.exports)module.exports=GSISRosterStatistics;
 
@@ -9255,6 +9274,13 @@ function rosterStatisticsRead_(req,c,p){
  if(bytes>12000000)error_(413,'This Statistics range has too many detailed records. Choose a shorter date range.');
  const result={schema:1,key,bytes,encoding,checkedAt:ctx.iso,revision:state.revision,today:ctx.today,data:encoding==='gzip-base64-v1'?Utilities.base64Encode(Utilities.gzip(blob).getBytes()):json};
  rosterStatisticsCache_(key+':'+encoding,result);return result;
+}
+
+// Current-year fairness is independent of the activity report's date filters.
+function rosterStatisticsRPercent_(req,c){
+ const user=rosterOperationsAuthority_(c,req.identity);if(!user.smc&&!user.admin)error_(403,'Statistics is available to SMC and Admin only.');
+ const today=rosterToday_(),now=Date.now(),sg=new Date(now+28800000),ctx={user,people:rosterOperationsPeople_(c),today,minute:sg.getUTCHours()*60+sg.getUTCMinutes(),now,iso:new Date(now).toISOString()};
+ return GSISRosterStatistics.fairness(rosterOperationsState_(true),ctx,rosterOperationsQuota_([today]));
 }
 
 /* GSIS_ROSTER_STATISTICS_STORE_END */
