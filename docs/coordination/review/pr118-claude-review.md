@@ -61,3 +61,18 @@ Resolved 12 Nov 2026: owner confirmed the appointment ("yes i appointed"). Recor
 ## Next action
 
 Codex fixes F1 on `codex/v1-core-t1a`, adds the test, notes F2 in the contract, and posts the new head. I re-review only the new commits. No merge or deployment is approved or implied.
+
+## Re-review at `57686a304ddd75109e1ad76eaa11de5ad34004d0` (12 Nov 2026)
+
+**Verdict: approve** (advisory model review; owner merges).
+
+Changes since 11f7329: one commit, four allowlisted files (`authority.mjs`, `T1A_CONTRACT.md`, `v1-core-races.mjs`, task record).
+
+1. F1 fixed: `inFlight` now keyed by the full `binding(request, context)`. My original probe now returns `allow | allow`.
+2. New A14 case covers both sides: different resources both allow; same binding still rejects the older response with unchanged evidence, so the test proves ordering, not watermarks.
+3. F2 recorded in the contract as a T1D requirement.
+4. Local, exact head, `TZ=Asia/Singapore`, after `npm ci`: identity 3/3, session 3/3, authority 7/7, races 9/9, isolation 4/4 (with `T1A_BASE_SHA`). 26 cases. `npm run build`: no drift. `git merge-tree` against origin/main `c4c1de8`: clean.
+
+Not run by me: full `npm test`. CI for this head: Codex reports pending; I could not read GitHub checks. The owner should merge only after the full-suite check is green at `57686a3`.
+
+Residual, accepted: two parallel evaluations with the same binding (same resource, or list reads with no `resourceId`) still reject the older one with retryable 409. Documented. F3 to F5 stay open for T1B/T1D.
