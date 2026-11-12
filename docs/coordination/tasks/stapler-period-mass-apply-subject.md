@@ -1,11 +1,11 @@
 # stapler-period-mass-apply-subject: Mass column fill (period mass-apply) needs a Subject field too
 
-- Status: proposed
+- Status: in progress (Model: Codex)
 - Owner/model: Codex
 - Reviewer/model: Muse
 - Last updated (Asia/Singapore): 2026-11-12 16:45
 - Branch: codex/stapler-period-mass-apply-subject
-- Base SHA: f0cc784 (current main, verified before branching)
+- Base SHA: c7590be14d027c3da3aec5f0f4aed9d4c5c2d7fb (verified current main including this task record; replaces the earlier f0cc784 reference)
 - Current head SHA (or PR head; avoid self-referential commit hashes):
 - PR:
 - User-authorised scope: Add a Subject field to the period mass-apply (mass column fill) overlay dialog. Owner request, 12 Nov 16:45 SGT, with a screenshot of the P3 dialog showing Venue, Group and Classes but no Subject. This supersedes the #116 out-of-scope note ("Subject in the overlay (the owner asked for venue, group and/or class only)"). Urgent, for the next release after v0.9.9t. Codex is free (#123 merged); this is the next task.
@@ -57,3 +57,7 @@ Not deployed unless supported by explicit environment/version/time evidence. Sta
 - Do not change live data, settings, or release branches.
 
 - Claim: Model: Codex, 12 November 2026. Owner-authorized request, next after #123. Branch created from current main. Muse reviews the exact implementation head. No live operations or changes to release branches are authorized.
+
+## Implementation claim
+
+Model: Codex. Fresh branch `codex/stapler-period-mass-apply-subject` from verified current main `c7590be14d027c3da3aec5f0f4aed9d4c5c2d7fb`, before product edits. The existing task claim is retained. This task supersedes the earlier no-Subject restriction only; creation behavior, class-row actions and release t remain unchanged.
