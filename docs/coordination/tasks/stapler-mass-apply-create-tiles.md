@@ -1,6 +1,6 @@
 # stapler-mass-apply-create-tiles: Whole row / whole column mass-apply offers "only write to cells with tiles" or "create tiles in empty cells"
 
-- Status: approved (Muse, 12 Nov 2026, at e506e81; awaits owner merge)
+- Status: merged (#123 at e506e81 as cdf8cd5)
 - Owner/model: Codex
 - Reviewer/model: Muse
 - Last updated (Asia/Singapore): 2026-11-12 15:14
