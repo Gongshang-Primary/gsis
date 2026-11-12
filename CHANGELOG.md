@@ -1,3 +1,7 @@
+# Pending: Stapler mass-apply can fill empty cells, 12 November 2026
+
+Model: Codex. Class-row arrows and period-header dialogs now ask whether to update existing lesson tiles only (default) or create tiles in empty cells too. New tiles use the row identity and an explicitly selected teacher where needed. Recess and occupied/spanned cells are not filled. A teacher/class conflict rejects the entire apply; one local Undo restores changed values and removes every created tile. No write occurs until Save to online. Ships after release t; no release branch, live data/settings, allocation, relief, publication or notification change. See docs/coordination/tasks/stapler-mass-apply-create-tiles.md.
+
 # Pending: dedicated LSE notice to duty SMC, 12 November 2026
 
 Model: Codex. First saved Leave School Early reports queue the approved information-only LSE notice for the verified duty SMC and skip generic emergency alerts. Staff/date identity prevents duplicate notices on edits, retries, resubmissions and re-reporting. Disabled or missing-duty outcomes remain visible in Daily Notify. Quiet-hour delivery requires the durable LSE event and still verifies the recipient and template. No live configuration, messages or deployment. See docs/coordination/tasks/roster-lse-notice.md.

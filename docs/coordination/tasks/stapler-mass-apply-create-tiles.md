@@ -71,3 +71,22 @@ Not deployed unless supported by explicit environment/version/time evidence. Sta
 ## Implementation claim
 
 Model: Codex, 12 November 2026. Fresh branch `codex/stapler-mass-apply-create-tiles` from current main `937da37f898e94998b77f5a62aee6e8ffac2ad8b`, before product edits. The existing task claim is retained. Muse reviews the exact head. Release t and all release branches remain untouched; Venues consolidation remains held.
+
+## Implementation and review handoff
+
+Model: Codex. Both dialogs ask the fill choice on every use, defaulting to existing tiles only. The class-row arrow waits for confirmation before writing. The period dialog preserves optional Venue/Group/Class fields. Creation uses the originating teacher/class view, and row/class-view creation requires an explicit teacher from the plan through the existing picker. No choice or selected teacher is carried into the next dialog.
+
+`bulkEdit` reuses the same lesson-construction helper as `addTile`, including immutable original card details and unique IDs. Empty cells are identified from the prior plan using its span helper; recess and occupied/spanned cells are not filled. Existing values and all new tiles are prepared on a cloned plan. Every new tile is checked for teacher and class overlap against the resulting plan, including earlier new tiles in this apply. Any conflict rejects the entire command with no change. This new-tile conflict fence preserves #116's canonical class-selection behavior for existing-tile-only applies.
+
+One command adds one local Undo entry. Undo restores changed values and removes all created tiles; Redo restores the same action. Changes remain local until Save to online. The result reports changed, created and already-matching tile counts. Teacher/class catalogs, timing, recess, allocation, relief, publication and notification code are unchanged. A shared class-view teacher cannot be assigned to several simultaneous new cells: that is an atomic teacher conflict under the task's hard rule, not a partial fill.
+
+Verification completed before the final commit:
+
+- New model test fails on the original code because no tiles are created. It passes with row, teacher-column and class-column creation; identity; no-teacher rejection; default no-create mode; recess spans; class/teacher conflicts; and rollback after a second-candidate conflict.
+- Chromium proves both per-use choices, default (a), conditional teacher selection, all three creation modes, conflict reporting, changed/created counts, no network write before Save, and one-step Undo/Redo. The existing class-arrow test now confirms choice (a) before applying, preserving its field/Pit/recess/baseline assertions.
+- Twelve focused regression programs passed. Actual full local/CI results and exact final head are recorded in the draft PR body only after those gates run. Browser path in this workspace: `/usr/bin/chromium` (verified executable), with TZ=Asia/Singapore and NODE_NO_WARNINGS=1.
+- D1 parity guard is run against the canonical build; no parity catalog change is intended.
+
+Deployment handoff, owner only after review and merge: this change belongs to the next release after v0.9.9t. No release branch, label or t bundle was changed or rebuilt. Updated Roster Pages files are `roster-stapler-ui.js`, generated `roster-stapler-model.js` and generated `edge-roster-domain.js`; canonical Notification and Operations Worker bundles also include the shared model. Keep flags, URLs, bindings and settings. Google stays frozen; regenerated Google artifacts are committed for canonical parity, not a Google deployment request. Refresh the planner after deployment and verify both defaults, a valid creation and its Undo with non-live fixtures. Code rollback uses prior artifacts; retain saved plan history and never delete rows or saved tiles as rollback.
+
+Not tested: live school records, real Google/D1/provider endpoints, production deployment or live browser sessions. All new fixtures are synthetic. No review, merge or deployment is claimed.
