@@ -1,3 +1,7 @@
+## PR #58 refresh, 6 November 2026
+
+Refresh the test-only D1 activation acceptance harness on current main. Verify current cron authority resolution, disabled allocation-cycle gating and no hidden job failures at t+20.
+
 # Pending: D1 Drive backup progress and cache-loss recovery, 12 November 2026
 
 Model: Codex. Completed, failed and expired runs remove their transient captured copies while retaining every ledger row and manifest. Full/increment exports and their scheduled worker renew ownership from actual progress, retain stage timings, and wait an hour after failures. Missing or corrupt derived timetable-cache entries are listed in `missingCacheParts` and omitted; authoritative digest failures remain fatal. Verified full/restore results appear in System Health. Per-day Admin alert identities survive recovery, which closes incidents without resetting blocked delivery history. Synthetic coverage includes 14,081 records, scheduled restore, increments, a 20-minute export/competing cron and retained blocked alerts. No live configuration, template activation, provider calls, merge or deployment. See docs/coordination/tasks/roster-d1-full-backup-fix.md.
