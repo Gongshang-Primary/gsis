@@ -12,6 +12,8 @@ Claude remains coordinator/reviewer while available; when Claude is unavailable,
 | Merge / deploy / settings | **Owner** | Reviewer says "approve"; owner says "merge N". The reviewer may perform the merge on the owner's explicit word. |
 | Coordinator duties (task records, LANES, release builds) | Muse when Claude is unavailable | Docs-only commits to main are allowed for task records, reviews and release notes. |
 
+**Owner exception (12 Nov):** Claude, not Muse, reviews `roster-d1-full-backup-fix` and `roster-d1-employment-mail-dispatch`. Muse skips those two only.
+
 ## 2. Review checklist (every PR, exact head)
 1. Record the exact head SHA; review nothing else. If the head moves, re-review.
 2. CI: the **full-suite** check is green for a complete run at that SHA. A cancelled duplicate run shows as "failure" — check run IDs (`gh api repos/helper-gsps/gsis/commits/<sha>/check-runs`) and rely on a complete green run.
