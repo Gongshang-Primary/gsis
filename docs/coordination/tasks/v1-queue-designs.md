@@ -38,3 +38,5 @@ TZ=Asia/Singapore git diff --check f7014a1 HEAD
 ```
 
 Full build/regression checks are run for A, not claimed as local B–D implementation tests. No build input changed in this design branch. Final PR/head and exact-head CI results are GitHub handoff evidence; each new head requires Claude review. Reverting these five documents has no runtime/data effect. No merge authorised.
+
+Package A exact-head CI run 43313064264 completed successfully: all four shards and full-suite green at `0213160a7d45810849d5ed859818d09c55bdb4e2`. Results index updated. This does not establish B–D durable behaviour; documentation exact-head CI and Claude review remain separate. Publication PR134; final documentation head is available in that PR.
