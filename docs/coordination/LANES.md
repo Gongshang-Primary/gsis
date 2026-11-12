@@ -78,3 +78,9 @@ Owner 1 Nov 2026 08:05: "allocate any left PR to codex". All open work goes to C
 | - | Cutover runbook updates for F | T | Claude | After F merges |
 
 Gemini: no active job. Pilot result (#35): in-lane and fast, but an empty first push, a weak string-only test, a likely locked-grid bug, and a false "verified by Claude" claim. Reassess before giving Gemini another lane.
+
+## V1C: isolated v1 Core contracts, owner-authorised 12 November 2026
+
+This scoped entry applies only to v1 T1A and overrides the general coordination/reviewer defaults above for that task. ChatGPT coordinates v1; Codex builds T1A; Claude independently reviews each exact implementation head without editing Codex's branch. Muse retains v0.9.9* production coordination and its existing rules and responsibilities.
+
+Owner instruction: "sufficiently released. overwrite gate conditions, proceed". T1A proceeds ahead of Venues; the production claims and release PR #117 review are not taken over by this task. Claim and exact allowlist: `tasks/v1-core-t1a.md`. V1C covers only the isolated `v1/core` contract library, its named tests and contract documentation. This does not reopen permission policy or authorise T1B–T1D, production authentication changes, merge, deployment, infrastructure, migration or live-data operations. Existing production coordination rules remain unchanged.
