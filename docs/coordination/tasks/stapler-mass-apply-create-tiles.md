@@ -1,11 +1,11 @@
 # stapler-mass-apply-create-tiles: Whole row / whole column mass-apply offers "only write to cells with tiles" or "create tiles in empty cells"
 
-- Status: proposed
+- Status: in progress (Model: Codex)
 - Owner/model: Codex
 - Reviewer/model: Muse
 - Last updated (Asia/Singapore): 2026-11-12 15:14
 - Branch: codex/stapler-mass-apply-create-tiles
-- Base SHA: 6c71e7a6641393540233b3b402acdf081b8c0c47 (current main, verified before branching)
+- Base SHA: 937da37f898e94998b77f5a62aee6e8ffac2ad8b (verified current main, including this task record; supersedes the earlier 6c71e7a base)
 - Current head SHA (or PR head; avoid self-referential commit hashes):
 - PR:
 - User-authorised scope: Add a fill choice to both Stapler mass-apply functions (the class-row Subject/Venue/Group mass-write and the period-header down-arrow mass-apply). Urgent owner injection, 12 Nov 15:14 SGT, for immediate release. This jumps the Codex queue (Venues secret consolidation held). Ships in the next release after v0.9.9t (release t is already built and verified; do not rebuild it).
@@ -67,3 +67,7 @@ Not deployed unless supported by explicit environment/version/time evidence. Sta
 - Do not change live data, settings, or release branches.
 
 - Claim: Model: Codex, 12 November 2026. Owner-authorized urgent injection, jumps the Codex queue. Branch created from current main. Muse reviews the exact implementation head. No live operations or changes to release branches are authorized.
+
+## Implementation claim
+
+Model: Codex, 12 November 2026. Fresh branch `codex/stapler-mass-apply-create-tiles` from current main `937da37f898e94998b77f5a62aee6e8ffac2ad8b`, before product edits. The existing task claim is retained. Muse reviews the exact head. Release t and all release branches remain untouched; Venues consolidation remains held.
