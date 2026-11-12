@@ -1,11 +1,11 @@
 # roster-d1-full-backup-fix: Make the full D1 backup succeed, then prove a restore
 
-- Status: proposed (URGENT)
+- Status: investigating (URGENT, Model: Codex)
 - Owner/model: Codex
 - Reviewer/model: **Claude** (owner exception 12 Nov: "owner approve to skip muse for just these 2 tasks and claude to review. muse to sit and skip these 2 only"). Muse does not review this task.
 - Last updated (Asia/Singapore): 2026-11-12 ~20:00
 - Branch: codex/roster-d1-full-backup-fix
-- Base SHA: re-check main's head before branching
+- Base SHA: e72e8ad4028261852956888f3676e486251751e7 (verified current main)
 - Current head SHA (or PR head; avoid self-referential commit hashes):
 - PR:
 - User-authorised scope: owner, 12 Nov ("write tasks that fix these errors"). Make the scheduled full backup of Roster D1 reach `verified` in Drive, and make the restore test pass against it. Stop the failure loop and the alert storm it would cause.
@@ -63,3 +63,7 @@ Changing which collections are backed up (TIER_ONE/TIER_TWO) unless needed for t
 Exact command, tested commit, outcome and evidence. Explicitly list checks not run.
 
 ## Review
+
+## Claim
+
+Model: Codex. Branch `codex/roster-d1-full-backup-fix` from verified current main `e72e8ad4028261852956888f3676e486251751e7`, before implementation edits. The info-only task is already merged (#115). Reviewer is Claude under the owner exception. Investigation uses local synthetic D1/R2/Drive fixtures only. No limit changes, live reads/writes, row or object deletion, template activation, merge or deployment are authorized. Employment-mail work follows this task in serial order.
