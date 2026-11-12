@@ -77,7 +77,7 @@
     }
    ],
    "caller": "roster-update/public/_worker.js, operations-worker/index.js",
-   "handler": "roster-update/public/edge-notifications.js:79 edgeInboxBackend",
+   "handler": "roster-update/public/edge-notifications.js:80 edgeInboxBackend",
    "outcome": {
     "family": "inbox",
     "ok": true,
@@ -4381,7 +4381,7 @@
     }
    ],
    "caller": "roster-update/public/_worker.js",
-   "handler": "roster-update/public/edge-notifications.js:71 edgeNotificationService",
+   "handler": "roster-update/public/edge-notifications.js:72 edgeNotificationService",
    "outcome": {
     "family": "notification-service",
     "ok": false,
@@ -4412,7 +4412,7 @@
     }
    ],
    "caller": "roster-update/public/_worker.js",
-   "handler": "roster-update/public/edge-notifications.js:65 supportsEdgeNotificationOperation",
+   "handler": "roster-update/public/edge-notifications.js:66 supportsEdgeNotificationOperation",
    "outcome": {
     "family": "notification-service",
     "ok": false,
@@ -4520,7 +4520,7 @@
     }
    ],
    "caller": "roster-update/public/_worker.js, roster-update/public/roster-inbox-ui.js",
-   "handler": "roster-update/public/edge-notifications.js:81 edgeInboxBackend",
+   "handler": "roster-update/public/edge-notifications.js:82 edgeInboxBackend",
    "outcome": {
     "family": "inbox",
     "ok": false,
@@ -4638,7 +4638,7 @@
     }
    ],
    "caller": "roster-update/public/_worker.js, roster-update/public/roster-inbox-ui.js, roster-update/public/roster.js",
-   "handler": "roster-update/public/edge-notifications.js:80 edgeInboxBackend",
+   "handler": "roster-update/public/edge-notifications.js:81 edgeInboxBackend",
    "outcome": {
     "family": "inbox",
     "ok": true,
@@ -4673,7 +4673,7 @@
     }
    ],
    "caller": "roster-update/public/_worker.js",
-   "handler": "roster-update/public/edge-notifications.js:80 edgeInboxBackend",
+   "handler": "roster-update/public/edge-notifications.js:81 edgeInboxBackend",
    "outcome": {
     "family": "inbox",
     "ok": false,
@@ -4744,7 +4744,7 @@
     }
    ],
    "caller": "roster-update/public/_worker.js, roster-update/public/roster-inbox-ui.js, operations-worker/index.js",
-   "handler": "roster-update/public/edge-notifications.js:81 edgeInboxBackend",
+   "handler": "roster-update/public/edge-notifications.js:82 edgeInboxBackend",
    "outcome": {
     "family": "inbox",
     "ok": false,
@@ -4852,7 +4852,7 @@
     }
    ],
    "caller": "roster-update/public/_worker.js, roster-update/public/roster-inbox-ui.js",
-   "handler": "roster-update/public/edge-notifications.js:81 edgeInboxBackend",
+   "handler": "roster-update/public/edge-notifications.js:82 edgeInboxBackend",
    "outcome": {
     "family": "inbox",
     "ok": false,
@@ -4898,7 +4898,7 @@
     }
    ],
    "caller": "roster-update/public/_worker.js, roster-update/public/roster-inbox-ui.js, roster-update/public/roster.js",
-   "handler": "roster-update/public/edge-notifications.js:81 edgeInboxBackend",
+   "handler": "roster-update/public/edge-notifications.js:82 edgeInboxBackend",
    "outcome": {
     "family": "inbox",
     "ok": true,
@@ -4938,7 +4938,7 @@
     }
    ],
    "caller": "roster-update/public/_worker.js, roster-update/public/roster-inbox-ui.js, roster-update/public/roster.js",
-   "handler": "roster-update/public/edge-notifications.js:80 edgeInboxBackend",
+   "handler": "roster-update/public/edge-notifications.js:81 edgeInboxBackend",
    "outcome": {
     "family": "inbox",
     "ok": false,
