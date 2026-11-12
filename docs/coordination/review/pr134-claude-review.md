@@ -55,3 +55,5 @@ Still in force (not changed by this decision): nobody accepts their own SMC, EO 
 Residual risk, recorded once for the owner: two Power Users can grant each other SMC. Recommended cheap control, not a blocker: notify all Admins on every SMC or School Leader change, so a wrong grant is seen the same day.
 
 Action: the v1 coordinator records this in `OWNER_DIRECTIVES.md` and has the EO plan and B design updated by pull request before B is scoped.
+
+Owner follow-up (13 Nov 2026): "no need notification". No Admin notification on SMC or School Leader changes. The acceptance audit remains the only record. Residual risk (mutual SMC grants between Power Users) accepted by the owner.
