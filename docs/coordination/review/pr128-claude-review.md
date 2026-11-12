@@ -70,3 +70,17 @@ L1 (inactive staff in the go-live gate) still awaits the owner's choice.
 3. L1: inactive staff are left out of the go-live readiness check. Only active staff must be complete. On reactivation, the person is denied with "records incomplete" until a Power User accepts all three records. No default or bulk values. Recorded in `OWNER_DIRECTIVES.md`.
 
 The plan still says the readiness report includes inactive entries and that all unresolved rows block go-live. Codex must update the plan to match answer 3 (inactive staff may still be listed for information, but do not block) and add tests: inactive staff with blanks do not block; reactivation without complete records is denied with the missing-evidence code; reactivation during or after the scan invalidates readiness evidence.
+
+## Re-review at `7a9a2b72521aafbcb0c105cdd32546a50c5d993a` (13 Nov 2026)
+
+**Verdict: approve** (advisory). Plan only; building needs ChatGPT's separate scope.
+
+Changes since ba7f6d7: one commit, same two files.
+
+1. Owner answers applied correctly: owner's own review as verification source; separate EO status/section/appointment screen accepted; inactive staff excluded from the blocking go-live population, listed for information only, with no default or bulk values.
+2. Good addition: unknown or unverified active status does not silently exclude a person; coverage stays incomplete until resolved. This stops anyone from clearing the gate by marking people inactive.
+3. Readiness is bound to the active-population revision; a reactivation during or after the scan invalidates it.
+4. The three requested tests are present. Open-questions block removed.
+5. Rerun at the head: two-file scope and links pass; `git diff --check` clean; merge-tree against origin/main clean.
+
+No new findings. Owner rechecks CI at this head before merge.
