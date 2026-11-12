@@ -91,7 +91,7 @@ for(const module of [gateway,bundle]){
 // Both browser and dashboard modules must preserve disabled defaults and the compact contracts.
 for(const name of ['templates.activation.json','templates.disabled.example.json']){
  const raw=fs.readFileSync('notification-worker/'+name,'utf8'),templates=JSON.parse(raw);
- assert(Buffer.byteLength(raw)<5120);assert.equal(Object.keys(templates).length,name==='templates.activation.json'?22:21);
+ assert(Buffer.byteLength(raw)<5120);assert.equal(Object.keys(templates).length,name==='templates.activation.json'?23:21);
  for(const [key,value] of Object.entries(templates)){
   const base=gateway.WHATSAPP_CONTRACTS[key],c=[base,...Object.values(base.variants||{})].find(contract=>contract.name===value.name);assert(c,'Configured template must match a known exact contract: '+key);assert.equal(value.name,c.name);assert.equal(value.language,c.language);assert.equal(value.bodySha256,c.bodySha256);assert.equal(value.summaryMaxCharacters,1024);
   assert.equal(value.enabled,name==='templates.activation.json'&&key!=='system_alert','Pending system alert stays disabled until approved and activated');
