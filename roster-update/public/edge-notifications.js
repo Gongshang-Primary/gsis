@@ -40,7 +40,7 @@ async function edgeDispatchProbe(env,kind,date){
    `r.collection='requests' AND json_extract(r.value_json,'$.status')='pending' AND CAST(json_extract(r.value_json,'$.expiresAt') AS REAL)>? AND json_extract(r.value_json,'$.date')>=?`,
    `r.collection='smcAlerts' AND json_extract(r.value_json,'$.status')='open' AND json_extract(r.value_json,'$.key') LIKE 'delivery:peer-mail:%'
     AND EXISTS(SELECT 1 FROM gsis_edge_records mail WHERE mail.scope='roster' AND mail.collection='peerMail' AND mail.record_id='id:'||substr(json_extract(r.value_json,'$.key'),length('delivery:peer-mail:')+1) AND (json_extract(mail.value_json,'$.status') IN ('sent','cancelled') OR json_extract(mail.value_json,'$.reviewReceipt.schema')=1 AND json_extract(mail.value_json,'$.reviewReceipt.fingerprint')=json_extract(mail.value_json,'$.healthReceipt.fingerprint')))`],
-  employmentMail:[`r.collection='dailyEmploymentMail' AND json_extract(r.value_json,'$.status') IN ('queued','sending')`]
+  employmentMail:[`r.collection='dailyEmploymentMail' AND json_extract(r.value_json,'$.status') IN ('queued','sending') AND ((json_extract(r.value_json,'$.status')='queued' AND json_extract(r.value_json,'$.date')<=?) OR (json_extract(r.value_json,'$.status')='sending' AND json_extract(r.value_json,'$.claimedAt')<?))`]
  };
  let predicate,args=[];
  if(kind==='deliveryReview'){
@@ -49,6 +49,7 @@ async function edgeDispatchProbe(env,kind,date){
  }else{
   if(!Object.hasOwn(pending,kind))fail(400,'Unknown dispatch queue.');
   if(kind==='notifications'){const now=Date.now();args=[now,now];}
+  if(kind==='employmentMail'){const now=Date.now();args=[new Date(now+28800000).toISOString().slice(0,10),new Date(now-600000).toISOString()];}
   if(kind==='peerMail'){const now=Date.now();args=[now,new Date(now+28800000).toISOString().slice(0,10)];}
   predicate=pending[kind].map(where=>`EXISTS (SELECT 1 FROM gsis_edge_records r WHERE r.scope='roster' AND r.record_id<>'$' AND ${where})`).join(' OR ');
  }
@@ -155,18 +156,31 @@ export async function dispatchEdgePeerMail(env,sendMail){
  return {...summary,pending:1};
 }
 export async function dispatchEdgeEmploymentMail(env,sendMail){
- const outcome={sent:0,failed:0,uncertain:0,blocked:0},origin=String(env.ROSTER_PUBLIC_ORIGIN||'').replace(/\/$/,'');
+ const outcome={sent:0,failed:0,uncertain:0,blocked:0,cancelled:0},origin=String(env.ROSTER_PUBLIC_ORIGIN||'').replace(/\/$/,'');
  if(!/^https:\/\/[^\s/?#]+$/.test(origin))return {...outcome,blocked:1,reason:'Configure ROSTER_PUBLIC_ORIGIN.'};
  if(!await edgeDispatchHasWork(env,'employmentMail'))return outcome;
  for(let count=0;count<5;count++){
   const claim=await service(env,{operation:'claimEmploymentMail'},(state,ctx)=>{
    const addresses=new Set(ctx.people.flatMap(p=>[p.email,p.cesEmail,...(p.emails||[])]).filter(Boolean).map(value=>String(value).trim().toLowerCase()));
-   for(const row of state.dailyEmploymentMail||[])if(row.status==='sending'&&ctx.now-Date.parse(row.claimedAt)>600000){row.status='uncertain';row.error='Email acceptance was not confirmed. Check the mailbox before sending again.';}
-   const job=(state.dailyEmploymentMail||[]).find(row=>row.status==='queued');if(!job)return {job:null};const snapshot=state.dailyEmploymentSnapshots.find(row=>row.date===job.date);
-   if(!snapshot||!addresses.has(job.to)){job.status='blocked';job.error=!snapshot?'The original report snapshot is unavailable.':'The selected email is no longer in Contacts.';return {blocked:true};}
-   job.status='sending';job.claimId=crypto.randomUUID();job.claimedAt=ctx.iso;return {job:clone(job),mail:{to:job.to,subject:job.subject,...GSISRosterOperations.employmentEmail(snapshot,origin),name:'GSiS Roster'}};
+   let cancelled=0,uncertain=0;
+   for(const row of (state.dailyEmploymentMail||[]).filter(row=>row.status==='queued'&&row.date<ctx.today).slice(0,50)){
+    row.status='cancelled';row.error='STALE_BACKLOG: date passed before D1 dispatch was fixed';row.completedAt=ctx.iso;cancelled++;
+   }
+   for(const row of (state.dailyEmploymentMail||[]).filter(row=>row.status==='sending'&&ctx.now-Date.parse(row.claimedAt)>600000).slice(0,50)){
+    row.status='uncertain';row.error='Email acceptance was not confirmed. Check the mailbox before sending again.';uncertain++;
+   }
+   const job=(state.dailyEmploymentMail||[]).find(row=>row.status==='queued'&&row.date===ctx.today);if(!job)return {job:null,cancelled,uncertain};
+   const snapshot=state.dailyEmploymentSnapshots.find(row=>row.date===job.date);
+   if(!snapshot){job.status='failed';job.error='The original report snapshot is unavailable.';job.completedAt=ctx.iso;return {failed:true,cancelled,uncertain};}
+   if(!addresses.has(job.to)){job.status='blocked';job.error='The selected email is no longer in Contacts.';return {blocked:true,cancelled,uncertain};}
+   if(state.dailyEmploymentMail.some(row=>row!==job&&row.date===job.date&&row.key===job.key&&row.to===job.to&&['sending','sent','uncertain'].includes(row.status))){
+    job.status='cancelled';job.error='This report identity already has a delivery attempt. Check its recorded outcome.';job.completedAt=ctx.iso;return {cancelled:cancelled+1,uncertain,skip:true};
+   }
+   let content;try{content=GSISRosterOperations.employmentEmail(snapshot,origin);}catch{job.status='failed';job.error='The original report snapshot could not be read.';job.completedAt=ctx.iso;return {failed:true,cancelled,uncertain};}
+   job.status='sending';job.claimId=crypto.randomUUID();job.claimedAt=ctx.iso;return {job:clone(job),cancelled,uncertain,mail:{to:job.to,subject:job.subject,...content,name:'GSiS Roster'}};
   });
-  if(claim.blocked){outcome.blocked++;continue;}if(!claim.job)return outcome;
+  outcome.cancelled+=claim.cancelled||0;outcome.uncertain+=claim.uncertain||0;
+  if(claim.failed){outcome.failed++;continue;}if(claim.blocked){outcome.blocked++;continue;}if(claim.skip)continue;if(!claim.job)return outcome;
   let status='uncertain',error='Email acceptance was not confirmed. Check the mailbox before sending again.',notSent=false;
   try{const result=await sendMail({operation:'sendEdgeMail',id:claim.job.id,claimId:claim.job.claimId,mail:claim.mail});if(result.ok&&result.data?.accepted===true){status='sent';error='';}else if(result.ok&&result.data?.notSent===true){status='queued';notSent=true;error='Email service is unavailable; no message was sent.';}}catch{}
   await service(env,{operation:'settleEmploymentMail'},(state,ctx)=>{const row=state.dailyEmploymentMail.find(row=>row.id===claim.job.id&&row.claimId===claim.job.claimId);if(!row)fail(409,'Email claim changed.');if(['sending','uncertain'].includes(row.status)){row.status=status;row.error=error;if(status==='sent')row.sentAt=ctx.iso;}return {recorded:true};},false);

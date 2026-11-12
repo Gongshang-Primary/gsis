@@ -7,7 +7,7 @@ import {readQuietMode} from '../shared/roster-quiet-mode.js';
 import {readRosterCutoverFreeze} from '../shared/roster-cutover-freeze.js';
 // Test harnesses load this file with its imports removed; treat quiet mode as off there.
 const quietMode=(db,at)=>typeof readQuietMode==='function'?readQuietMode(db,at):Promise.resolve({active:false});
-import {dispatchNotifications,scheduledRoster,diagnoseNotificationConnections,dispatchInboxPending,dispatchWebhookJobs,dispatchReceivedReports,dispatchPeerMail,dispatchAllocationAudit,dispatchVenuesSync,dispatchGoogleBackup,dispatchDriveOutputs,dispatchDailyOutputs,dispatchRosterImports,dispatchReferencesRefresh} from '../roster-update/public/_worker.js';
+import {dispatchNotifications,scheduledRoster,diagnoseNotificationConnections,dispatchInboxPending,dispatchWebhookJobs,dispatchReceivedReports,dispatchPeerMail,dispatchDailyEmploymentReports,dispatchAllocationAudit,dispatchVenuesSync,dispatchGoogleBackup,dispatchDriveOutputs,dispatchDailyOutputs,dispatchRosterImports,dispatchReferencesRefresh} from '../roster-update/public/_worker.js';
 /* GSIS_API_SECRET_BEGIN */
 // Roster/Deploy transport requires one setting without legacy fallback.
 // Browser sessions retain their existing purpose- and origin-bound derivation.
@@ -126,7 +126,8 @@ export default {
     // Reuse the same durable outbox. Never reconstruct or reset provider claims.
     if(result?.notificationsQueued>0||receiptResult?.intake?.notificationsQueued>0){await notifications;await send();}
    })();
-   await Promise.all([imports,backup,received,notifications,inbox,ingress,peerMail,planning]);
+   const employment=env.ROSTER_EDGE_AUTHORITY==='d1'?(async()=>{await planning;return run('employment-mail','roster-employment-mail-drain',()=>dispatchDailyEmploymentReports(env));})():Promise.resolve();
+   await Promise.all([imports,backup,received,notifications,inbox,ingress,peerMail,planning,employment]);
    // Venues has its own five-minute job after the minute work. Re-read quiet
    // mode at dispatch so an SMC can pause it while those earlier jobs finish.
    if(Math.floor(event.scheduledTime/60000)%5===0&&typeof dispatchVenuesSync==='function'&&!await quietNow())await run('venues-sync','roster-venues-sync',async()=>await quietNow()?{skipped:true}:dispatchVenuesSync(env));

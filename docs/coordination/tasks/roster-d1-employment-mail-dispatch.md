@@ -1,11 +1,11 @@
 # roster-d1-employment-mail-dispatch: Daily Employment Update emails send on D1
 
-- Status: proposed
+- Status: implemented; local validation in progress (Model: Codex)
 - Owner/model: Codex
 - Reviewer/model: **Claude** (owner exception 12 Nov: "owner approve to skip muse for just these 2 tasks and claude to review. muse to sit and skip these 2 only"). Muse does not review this task.
-- Last updated (Asia/Singapore): 2026-11-12 ~20:00
+- Last updated (Asia/Singapore): 2026-11-13
 - Branch: codex/roster-d1-employment-mail-dispatch
-- Base SHA: re-check main's head before branching. Lane R is serial: take this after `roster-d1-full-backup-fix` unless its files do not overlap (state which in the PR).
+- Base SHA: 61c628f13ff9edbacabd9a7f2044bb25b7594915 (verified current main before claim).
 - Current head SHA (or PR head; avoid self-referential commit hashes):
 - PR:
 - User-authorised scope: owner, 12 Nov ("write tasks that fix these errors"). The scheduled Daily Employment Update is queued every school morning but never sent on D1. Make it send, with the same claim/settle safety as today. Deal with the backlog once.
@@ -47,3 +47,39 @@ Changing recipients, time or content of the email; Google backend changes or red
 Exact command, tested commit, outcome and evidence. Explicitly list checks not run.
 
 ## Review
+
+
+## Claim (Model: Codex, 13 Nov)
+
+Branch `codex/roster-d1-employment-mail-dispatch` from verified main `61c628f13ff9edbacabd9a7f2044bb25b7594915`. Evidence read before implementation. Reviewer: Claude under the owner exception.
+
+The owner directed starting this task after posting the corrected PR #127 head for re-review. That was done at `73d057b0c6fc28bf0fc0dbfd81085e9c04c102a3`, with all five CI jobs green in run `43299901288` and a clean canonical build. This explicit sequence supersedes waiting for #127 to merge. The tasks overlap in generated Worker bundles and potentially the health display; this branch starts from main without importing the unmerged backup implementation. The full local #127 rerun continues in its separate worktree.
+
+No main push, force-push, merge, deployment, live reads/writes, provider calls or WhatsApp activation. Claim recorded on this branch before product edits, consistent with the owner's no-main-push rule.
+
+
+Owner approved including `roster-update/public/system-health.js` on 13 Nov ("yes to include"), limited to displaying the Employment email row's actual last sent time and failed/uncertain counts.
+
+Root cause confirmed before implementation: the minute cron never calls `dispatchDailyEmploymentReports`, while the Pages save path does. Both D1 employment and peer mail already use `sendEdgeMail`; `rosterServiceDispatch_` returns the mail-only handler before the frozen Google writer guard. No Google backend change is needed.
+
+
+## Implementation (Model: Codex, 13 Nov)
+
+- Under D1 authority, the existing minute cron calls `dispatchDailyEmploymentReports` after the scheduled planning attempt, so reports queued by that attempt can drain without any browser request. An existing backlog also drains when automatic allocation is off. No new cron or provider is introduced.
+- The D1 dispatcher keeps its five-claim bound. Each claim performs bounded stale/expired maintenance (up to 50 of each), cancels past queued rows with the required `STALE_BACKLOG` reason, skips future queued dates, fails a missing/unreadable original snapshot without sending, and keeps expired sending rows uncertain. Terminal rows are retained. Duplicate delivery identities cannot launch a second send.
+- Google remains send-only: the existing signed `sendEdgeMail` handler runs before `rosterEdgeAssertLegacyWrite_`. A regression uses that real backend dispatcher/handler with a throwing write fence and synthetic MailApp; only the existing GSIS_SECRET-signed mail handoff is accepted. No backend edit or redeploy is required.
+- `gsis_job_health` records each employment drain, including idle minutes. The displayed last-send timestamp is independently aggregated from retained D1 sent rows; successful/idle housekeeping cannot impersonate a mail send. Failed/uncertain counts contain no recipients or mail content.
+
+## Deploy / rollback (owner only)
+
+Deploy the regenerated notification Worker and operations Worker bundles, and the Roster Pages output including `_worker.js`, `edge-notifications.js`, `system-health.js` and shared health code. Preserve the existing minute cron, URLs, bindings, transport-secret alignment and WhatsApp settings. No configuration change, provider change or Google backend redeploy is required. On first drain, past queued dates are cancelled as specified; only today's queued mail may send. Check Employment email last sent, failed/uncertain counts and the retained row outcomes. Do not retry uncertain mail blindly.
+
+Rollback is the prior Worker/Pages code, preserving every mail row and its status, claim ID and send evidence. Never reset an uncertain/sent row to queued. No live deployment, data change, merge or send is performed by this task.
+
+## Test evidence in progress
+
+`tests/roster-employment-mail-drain.mjs` uses real in-memory D1, the real minute scheduler and the actual Google mail-only handler under a frozen writer guard. It proves scheduled sends without Pages; unchanged snapshot content/subject; 12-row stale cancellation with today's mail sent; absent-snapshot failure; future-date deferral; 10-minute uncertainty; repeated no-op maintenance; independent last-send health; Pages/cron race; ambiguous response no-resend; duplicate identity suppression; and the five-send bound. The same test fails against the original scheduler because it sends no queued reports. Existing idle-probe fixtures now include the real queued row's date so due/future filtering is tested rather than an incomplete row.
+
+Local checkpoint: the new regression, both Worker transport suites, the existing idle-probe suite, and health/UI/peer-mail checks pass. The baseline scheduler fails the new no-Pages-send regression, as expected. Test discovery includes all 1,080 current programs and the new employment regression. The canonical build succeeds and regenerates the four Worker artifacts. The parity guard requires only 10 shifted handler references in each generated catalog; its proposed refresh is awaiting owner inclusion approval before final validation/CI.
+
+Owner approved the generated `docs/roster/d1-parity.json` and `docs/roster/D1_PARITY.md` refresh on 13 Nov ("include"). Only 10 handler line references in each file change; all 272 operations, probe outcomes and missing-handler counts remain unchanged. The approval resolves the pending catalog scope gate above.

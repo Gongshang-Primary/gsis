@@ -1,6 +1,9 @@
 # Pending: D1 Drive backup progress and cache-loss recovery, 12 November 2026
 
 Model: Codex. Completed, failed and expired runs remove their transient captured copies while retaining every ledger row and manifest. Full/increment exports and their scheduled worker renew ownership from actual progress, retain stage timings, and wait an hour after failures. Missing or corrupt derived timetable-cache entries are listed in `missingCacheParts` and omitted; authoritative digest failures remain fatal. Verified full/restore results appear in System Health. Per-day Admin alert identities survive recovery, which closes incidents without resetting blocked delivery history. Synthetic coverage includes 14,081 records, scheduled restore, increments, a 20-minute export/competing cron and retained blocked alerts. No live configuration, template activation, provider calls, merge or deployment. See docs/coordination/tasks/roster-d1-full-backup-fix.md.
+# Pending: scheduled D1 employment email, 13 November 2026
+
+Model: Codex. The minute worker drains queued Daily Employment Updates through the existing signed Google mail-only adapter after scheduled planning, without a Pages request. Past queued rows cancel with a retained stale-backlog reason, absent snapshots fail without blank mail, and expired or ambiguous sends stay uncertain. The five-send bound and D1 claim/settlement prevent duplicate sends. System Health reports each drain and shows the actual last sent time plus failed/uncertain counts. No recipients, email content, cron configuration, provider, Google backend or WhatsApp settings changed. See docs/coordination/tasks/roster-d1-employment-mail-dispatch.md.
 
 # Pending: Subject in Stapler period mass-apply, 12 November 2026
 
