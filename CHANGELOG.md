@@ -1,3 +1,7 @@
+# Pending: scheduled D1 employment email, 13 November 2026
+
+Model: Codex. The minute worker drains queued Daily Employment Updates through the existing signed Google mail-only adapter after scheduled planning, without a Pages request. Past queued rows cancel with a retained stale-backlog reason, absent snapshots fail without blank mail, and expired or ambiguous sends stay uncertain. The five-send bound and D1 claim/settlement prevent duplicate sends. System Health reports each drain and shows the actual last sent time plus failed/uncertain counts. No recipients, email content, cron configuration, provider, Google backend or WhatsApp settings changed. See docs/coordination/tasks/roster-d1-employment-mail-dispatch.md.
+
 # Pending: Subject in Stapler period mass-apply, 12 November 2026
 
 Model: Codex. The period overlay now offers an optional Subject input with suggestions from lesson tiles. A filled value updates existing tiles and newly created column tiles; blank preserves existing subjects, and an already-matching value makes no change. Creation choices, teacher selection, conflict handling, Undo, row actions and Save to online behavior are unchanged. Intended for the next release after t; no release branch, live settings or deployment changed. See docs/coordination/tasks/stapler-period-mass-apply-subject.md.

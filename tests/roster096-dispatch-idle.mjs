@@ -69,7 +69,7 @@ await test('peer and employment gates preserve recovery and new request discover
  insert(db,'requests','id:request',{id:'request',status:'pending',expiresAt:1,date:'2020-01-01'});assert.equal(await edge.edgeDispatchHasWork(env,'peerMail'),false,'expired proposals without live mail need no new sync');
  db.sql.prepare("DELETE FROM gsis_edge_records WHERE collection='requests'").run();
  for(const status of ['queued','blocked','sending','uncertain']){insert(db,'peerMail','id:mail',{id:'mail',status,claimExpiresAt:1});assert.equal(await edge.edgeDispatchHasWork(env,'peerMail'),true,status);}
- for(const status of ['queued','sending']){insert(db,'dailyEmploymentMail','id:mail',{id:'mail',status,claimedAt:'2020-01-01'});assert.equal(await edge.edgeDispatchHasWork(env,'employmentMail'),true,status);}
+ for(const status of ['queued','sending']){insert(db,'dailyEmploymentMail','id:mail',{id:'mail',status,date:new Date(Date.now()+28800000).toISOString().slice(0,10),claimedAt:'2020-01-01'});assert.equal(await edge.edgeDispatchHasWork(env,'employmentMail'),true,status);}
  insert(db,'dailyEmploymentMail','id:mail',{id:'mail',status:'sent'});assert.equal(await edge.edgeDispatchHasWork(env,'employmentMail'),false);
 });
 await test('idle peer mail reports no drain and does not count completed history',async()=>{

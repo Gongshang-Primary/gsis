@@ -58,7 +58,7 @@ export async function recordJobHealth(env,event){
  assertRecoveryWritable(env);const now=nowValue(event?.now),row=eventProjection(event,now),db=env?.GSIS_JOBS;if(!db||typeof db.prepare!=='function')return {recorded:false,code:'NOT_CONFIGURED'};
  await ensure(db);const session=primary(db),values=[row.job,row.status,row.code,row.httpStatus,row.traceId,row.startedAt,row.finishedAt,row.eventAt,now],encoded=JSON.stringify(row.counts),detail=JSON.stringify(row.diagnostics);
  // MAX retains actual success/failure evidence even when a slower run finishes late.
- const latest=`INSERT INTO gsis_job_health(job,status,code,http_status,trace_id,started_at,finished_at,event_at,recorded_at,last_success_at,last_failure_at,counts_json,diagnostic_json) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(job) DO UPDATE SET ${['status','code','http_status','trace_id','started_at','finished_at','event_at','recorded_at','counts_json','diagnostic_json'].map(key=>`${key}=CASE WHEN excluded.event_at>=gsis_job_health.event_at THEN excluded.${key} ELSE gsis_job_health.${key} END`).join(',')},last_success_at=CASE WHEN excluded.last_success_at IS NULL THEN gsis_job_health.last_success_at WHEN gsis_job_health.last_success_at IS NULL THEN excluded.last_success_at ELSE MAX(gsis_job_health.last_success_at,excluded.last_success_at) END,last_failure_at=CASE WHEN excluded.last_failure_at IS NULL THEN gsis_job_health.last_failure_at WHEN gsis_job_health.last_failure_at IS NULL THEN excluded.last_failure_at ELSE MAX(gsis_job_health.last_failure_at,excluded.last_failure_at) END WHERE excluded.status NOT IN ('idle','skipped') OR gsis_job_health.status<>excluded.status OR gsis_job_health.code<>excluded.code OR gsis_job_health.http_status IS NOT excluded.http_status OR gsis_job_health.counts_json<>excluded.counts_json OR excluded.event_at>=gsis_job_health.event_at+300000`;
+ const latest=`INSERT INTO gsis_job_health(job,status,code,http_status,trace_id,started_at,finished_at,event_at,recorded_at,last_success_at,last_failure_at,counts_json,diagnostic_json) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(job) DO UPDATE SET ${['status','code','http_status','trace_id','started_at','finished_at','event_at','recorded_at','counts_json','diagnostic_json'].map(key=>`${key}=CASE WHEN excluded.event_at>=gsis_job_health.event_at THEN excluded.${key} ELSE gsis_job_health.${key} END`).join(',')},last_success_at=CASE WHEN excluded.last_success_at IS NULL THEN gsis_job_health.last_success_at WHEN gsis_job_health.last_success_at IS NULL THEN excluded.last_success_at ELSE MAX(gsis_job_health.last_success_at,excluded.last_success_at) END,last_failure_at=CASE WHEN excluded.last_failure_at IS NULL THEN gsis_job_health.last_failure_at WHEN gsis_job_health.last_failure_at IS NULL THEN excluded.last_failure_at ELSE MAX(gsis_job_health.last_failure_at,excluded.last_failure_at) END WHERE excluded.job='employment-mail' OR excluded.status NOT IN ('idle','skipped') OR gsis_job_health.status<>excluded.status OR gsis_job_health.code<>excluded.code OR gsis_job_health.http_status IS NOT excluded.http_status OR gsis_job_health.counts_json<>excluded.counts_json OR excluded.event_at>=gsis_job_health.event_at+300000`;
  const statements=[
   session.prepare(latest).bind(...values,row.status==='success'?row.eventAt:null,row.status==='failure'?row.eventAt:null,encoded,detail),
   ...(row.status==='failure'?[session.prepare('INSERT INTO gsis_job_health_history(job,status,code,http_status,trace_id,started_at,finished_at,event_at,recorded_at,counts_json,diagnostic_json) VALUES(?,?,?,?,?,?,?,?,?,?,?)').bind(...values,encoded,detail)]:[]),
@@ -66,7 +66,8 @@ export async function recordJobHealth(env,event){
  ];
  // Failure history is independent of idle/success volume. Healthy beats cannot
  // evict a diagnostic. Identical idle/skipped summaries write at most every five
- // minutes; transitions and changed counts remain immediate. Age pruning uses
+ // minutes; transitions and changed counts remain immediate. Employment mail
+ // records each scheduled drain, including idle runs. Age pruning uses
  // its small index even when there are no new failures.
  // Batch is atomic on D1: summaries and retained evidence refer to the same event.
  assertRecoveryWritable(env);for(const result of await session.batch(statements))checked(result);return {recorded:true};
@@ -98,8 +99,15 @@ async function readAllocationPreparation(db){
  const runs=(result.results||[]).filter(row=>/^20\d\d-\d\d-\d\d$/.test(row.date)&&['running','committing','completed','failed','cancelled','cancelling','uncertain','abandoned'].includes(row.state)).map(row=>({date:row.date,state:row.state,authority:'d1',startedAt:timestamp(row.started_at),preparationMs:clock(row.preparation_ms),preparationAttempts:Number.isSafeInteger(row.preparation_attempts)&&row.preparation_attempts>=0?row.preparation_attempts:0}));
  return {available:true,runs};
 }
+async function readEmploymentMail(db){
+ if(!await tableExists(db,'gsis_edge_records'))return {available:false};
+ // Aggregate only operational metadata; recipients and message bodies stay private.
+ const row=await db.prepare("SELECT MAX(CASE WHEN json_extract(value_json,'$.status')='sent' THEN json_extract(value_json,'$.sentAt') END) last_sent_at,COALESCE(SUM(json_extract(value_json,'$.status')='failed'),0) failed,COALESCE(SUM(json_extract(value_json,'$.status')='uncertain'),0) uncertain FROM gsis_edge_records WHERE scope='roster' AND collection='dailyEmploymentMail' AND record_id<>'$'").first();
+ const issues=(await db.prepare("SELECT json_extract(value_json,'$.date') date,json_extract(value_json,'$.status') status,json_extract(value_json,'$.error') error FROM gsis_edge_records WHERE scope='roster' AND collection='dailyEmploymentMail' AND record_id<>'$' AND json_extract(value_json,'$.status') IN ('failed','uncertain') ORDER BY record_date DESC,record_id LIMIT 20").all()).results||[];
+ return {available:true,lastSentAt:timestamp(row?.last_sent_at),failed:row?.failed||0,uncertain:row?.uncertain||0,issues:issues.map(issue=>({date:/^20\d\d-\d\d-\d\d$/.test(issue.date||'')?issue.date:'Date unavailable',status:issue.status,reason:outputFailure({message:issue.error||'Check the recorded delivery outcome.'}).message}))};
+}
 export async function readSystemHealth(env,{now=Date.now(),jobsOnly=false}={}){
- const checkedAt=nowValue(now),db=env?.GSIS_JOBS,output={checkedAt,storage:{configured:!!db,available:false},jobs:[],recentFailures:[],backlog:{available:false,items:[]},timetables:{available:false},cleanup:{available:false},allocationPreparation:{available:false}};
+ const checkedAt=nowValue(now),db=env?.GSIS_JOBS,output={checkedAt,storage:{configured:!!db,available:false},jobs:[],recentFailures:[],backlog:{available:false,items:[]},timetables:{available:false},cleanup:{available:false},allocationPreparation:{available:false},employmentMail:{available:false}};
  if(jobsOnly)Object.assign(output.storage,{healthAvailable:false,historyAvailable:false});
  if(!db||typeof db.prepare!=='function')return output;
  try{
@@ -112,6 +120,7 @@ export async function readSystemHealth(env,{now=Date.now(),jobsOnly=false}={}){
   output.jobs=(jobs.results||[]).map(rowProjection).filter(Boolean);output.recentFailures=(failures.results||[]).map(rowProjection).filter(Boolean);output.storage.available=true;
   try{output.cutoverFreeze=await readRosterCutoverFreeze(env,{now:checkedAt});}catch{output.cutoverFreeze={available:false,code:'ROSTER_CUTOVER_STATUS_UNAVAILABLE'};}
   if(env.ROSTER_EDGE_AUTHORITY==='d1')try{output.allocationPreparation=await readAllocationPreparation(session);}catch{output.allocationPreparation={available:false};}
+  if(env.ROSTER_EDGE_AUTHORITY==='d1')try{output.employmentMail=await readEmploymentMail(session);}catch{output.employmentMail={available:false};}
   if(jobsOnly)return output;
   // A missing optional schema cannot convert healthy storage into a false empty
   // backlog. Each section independently says whether it could be checked.
