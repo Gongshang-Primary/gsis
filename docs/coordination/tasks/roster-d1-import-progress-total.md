@@ -60,3 +60,9 @@ Rebased onto peer-mail health local debf45f / remote521dedec (after inactive1B a
 Model: Codex. Refresh only truthful import progress onto main 69efd3ab9f0dbbb31f1a3bc7da9c86b3dc2ea348. Exclude the old held stack's inactive-teacher, weekly-R and peer-mail changes. Preserve current checkpoint input digests, reduced-step diagnostics, resumable budgets and request fences. Add response-only work counters and current UI compatibility tests. No retained import bytes or behavior changes. Full CI and Claude exact-head review required; owner merges.
 
 Current refresh validation: fixed totals and current record-scopes stage, legacy/new UI combinations, malformed metadata refusal, D1 projection, production-shaped packed fixture and preparation Worker pass. Current budget fixture stays below 60 seconds per simulated call. Byte comparison against current main covers source/work/parts/checkpoints, manifest and call sequence. Historical measurements above are retained only as old evidence.
+
+## Backlog rebase (Model: Codex, 13 Nov)
+
+Reviewer: Muse at the new exact PR head. Original head `e03cfda4bf7a83e4cbfdcbd29e0401342ca3fccc` was consolidated with exact original tree `9b99f7d785cbfdc8713793d4980177682d55d458` preserved before rebasing onto fetched main `a03a332` (coordination records after the supplied base). Only generated Worker bundles conflicted; canonical regeneration resolved them. Product intent, preparation limits and protocol remain unchanged.
+
+Canonical build and repeat build pass with no diff; merge-tree against the fetched main is clean. All five affected programs pass, plus chunked-import, server-continuation and both parity checks (nine current programs total). An optional historical filename, `tests/edge-store-transport-guard.cjs`, is absent from current main and could not run; it is not counted as a pass. Fresh exact-head CI will be recorded in PR #42. Earlier approvals do not approve the new head. No live actions, merge or main push.
