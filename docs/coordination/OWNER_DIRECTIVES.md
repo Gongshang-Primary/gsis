@@ -4,6 +4,7 @@ Song Wee's standing instructions. They override WORKFLOW.md defaults. Newest fir
 
 | Date (SGT) | Directive | Applies to |
 | --- | --- | --- |
+| 12 Nov 2026 | Standing v1 handoff rule: when switching between Work, Chat and Codex, use the GSiS Git repository's v1 documentation as the transfer medium. Publish the required plans, source references, decisions and handoff context under docs/v1/ before handing over; provide the repository path, branch and exact commit link so the receiving agent can retrieve them. Do not rely on chat-only text or local-file transfer as the sole handoff source. Preserve planning/approval status; publishing a handoff does not authorise implementation, merge of other work, deployment or live-data operations. | v1; Work, Chat, Codex |
 | 12 Nov 2026 | v1 quality gates: after two v1 tasks, assess which gates are useful and trim the rest, but always retain the required security and recovery checks even when they find no defects. | v1 (all models) |
 | 12 Nov 2026 | When ChatGPT (v1) and Muse (v0.9.9*) both want Codex at the same time, the owner decides which comes first (owner: "user"). Coordinators raise the clash to the owner; neither reassigns Codex alone. | ChatGPT, Muse, Codex |
 | 12 Nov 2026 | Owner appointed ChatGPT as v1 coordinator (owner confirmed to Claude: "yes i appointed"). Scope as in LANES.md V1C: ChatGPT coordinates v1; Codex builds; Claude reviews each exact head. Muse keeps v0.9.9* production coordination. Grants no merge, deploy, migration or live-data authority. | v1 (V1C) |
