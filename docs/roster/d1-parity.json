@@ -410,7 +410,7 @@
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 2155,
+     "line": 2161,
      "handler": "read"
     },
     {
@@ -475,7 +475,7 @@
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 1960,
+     "line": 1966,
      "handler": "apply"
     },
     {
@@ -500,7 +500,7 @@
     }
    ],
    "caller": "roster-update/public/_worker.js, roster-update/public/external.js, roster-update/public/roster-acknowledgement-ui.js",
-   "handler": "shared/roster-operations.js:1960 apply",
+   "handler": "shared/roster-operations.js:1966 apply",
    "outcome": {
     "family": "operations",
     "ok": false,
@@ -649,7 +649,7 @@
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 2155,
+     "line": 2161,
      "handler": "read"
     }
    ],
@@ -933,22 +933,22 @@
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 1843,
+     "line": 1849,
      "handler": "reliefBatch"
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 1960,
+     "line": 1966,
      "handler": "apply"
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 2019,
+     "line": 2025,
      "handler": "apply"
     }
    ],
    "caller": "roster-update/public/roster-operations-model.js, roster-update/public/roster-operations-ui.js, operations-worker/index.js",
-   "handler": "shared/roster-operations.js:1843 reliefBatch",
+   "handler": "shared/roster-operations.js:1849 reliefBatch",
    "outcome": {
     "family": "operations",
     "ok": false,
@@ -995,7 +995,7 @@
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 2176,
+     "line": 2182,
      "handler": "read"
     },
     {
@@ -1065,17 +1065,17 @@
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 1337,
+     "line": 1343,
      "handler": "allocationMode"
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 1341,
+     "line": 1347,
      "handler": "r17Apply"
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 1960,
+     "line": 1966,
      "handler": "apply"
     },
     {
@@ -1126,7 +1126,7 @@
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 2155,
+     "line": 2161,
      "handler": "read"
     }
    ],
@@ -1326,7 +1326,7 @@
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 2155,
+     "line": 2161,
      "handler": "read"
     }
    ],
@@ -1434,37 +1434,37 @@
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 1811,
+     "line": 1817,
      "handler": "manualApply"
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 1815,
+     "line": 1821,
      "handler": "manualApply"
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 1823,
+     "line": 1829,
      "handler": "manualApply"
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 1824,
+     "line": 1830,
      "handler": "manualApply"
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 1843,
+     "line": 1849,
      "handler": "reliefBatch"
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 1960,
+     "line": 1966,
      "handler": "apply"
     }
    ],
    "caller": "roster-update/public/archive.js, roster-update/public/roster-operations-model.js, roster-update/public/roster-operations-ui.js",
-   "handler": "shared/roster-operations.js:1811 manualApply",
+   "handler": "shared/roster-operations.js:1817 manualApply",
    "outcome": {
     "family": "operations",
     "ok": false,
@@ -1496,17 +1496,17 @@
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 1354,
+     "line": 1360,
      "handler": "r17Apply"
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 1960,
+     "line": 1966,
      "handler": "apply"
     }
    ],
    "caller": "roster-update/public/roster-operations-model.js, roster-update/public/roster-operations-ui.js, operations-worker/index.js",
-   "handler": "shared/roster-operations.js:1354 r17Apply",
+   "handler": "shared/roster-operations.js:1360 r17Apply",
    "outcome": {
     "family": "operations",
     "ok": false,
@@ -1583,17 +1583,17 @@
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 575,
+     "line": 581,
      "handler": "view"
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 960,
+     "line": 966,
      "handler": "staplerApply"
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 1960,
+     "line": 1966,
      "handler": "apply"
     },
     {
@@ -1640,7 +1640,7 @@
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 1960,
+     "line": 1966,
      "handler": "apply"
     }
    ],
@@ -1739,17 +1739,17 @@
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 1350,
+     "line": 1356,
      "handler": "r17Apply"
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 1960,
+     "line": 1966,
      "handler": "apply"
     }
    ],
    "caller": "roster-update/public/roster-operations-model.js, roster-update/public/roster-operations-ui.js, operations-worker/index.js",
-   "handler": "shared/roster-operations.js:1350 r17Apply",
+   "handler": "shared/roster-operations.js:1356 r17Apply",
    "outcome": {
     "family": "operations",
     "ok": false,
@@ -1811,27 +1811,27 @@
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 575,
+     "line": 581,
      "handler": "view"
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 863,
+     "line": 869,
      "handler": "createOrImportStapler"
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 864,
+     "line": 870,
      "handler": "createOrImportStapler"
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 961,
+     "line": 967,
      "handler": "staplerApply"
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 1960,
+     "line": 1966,
      "handler": "apply"
     },
     {
@@ -1898,12 +1898,12 @@
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 575,
+     "line": 581,
      "handler": "view"
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 2155,
+     "line": 2161,
      "handler": "read"
     },
     {
@@ -1958,12 +1958,12 @@
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 575,
+     "line": 581,
      "handler": "view"
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 2155,
+     "line": 2161,
      "handler": "read"
     },
     {
@@ -2053,12 +2053,12 @@
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 575,
+     "line": 581,
      "handler": "view"
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 2155,
+     "line": 2161,
      "handler": "read"
     }
    ],
@@ -2094,7 +2094,7 @@
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 2155,
+     "line": 2161,
      "handler": "read"
     }
    ],
@@ -2150,17 +2150,17 @@
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 575,
+     "line": 581,
      "handler": "view"
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 964,
+     "line": 970,
      "handler": "staplerApply"
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 1960,
+     "line": 1966,
      "handler": "apply"
     },
     {
@@ -2170,7 +2170,7 @@
     }
    ],
    "caller": "roster-update/public/_worker.js, roster-update/public/roster-operations-model.js, roster-update/public/roster-stapler-ui.js",
-   "handler": "shared/roster-operations.js:575 view",
+   "handler": "shared/roster-operations.js:581 view",
    "outcome": {
     "family": "operations",
     "ok": false,
@@ -2235,12 +2235,12 @@
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 1999,
+     "line": 2005,
      "handler": "apply"
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 2019,
+     "line": 2025,
      "handler": "apply"
     },
     {
@@ -2282,17 +2282,17 @@
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 2007,
+     "line": 2013,
      "handler": "apply"
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 2019,
+     "line": 2025,
      "handler": "apply"
     }
    ],
    "caller": "roster-update/public/roster-operations-model.js, roster-update/public/roster-operations-ui.js, operations-worker/index.js",
-   "handler": "shared/roster-operations.js:2007 apply",
+   "handler": "shared/roster-operations.js:2013 apply",
    "outcome": {
     "family": "operations",
     "ok": false,
@@ -2334,17 +2334,17 @@
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 575,
+     "line": 581,
      "handler": "view"
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 1781,
+     "line": 1787,
      "handler": "customApply"
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 1960,
+     "line": 1966,
      "handler": "apply"
     },
     {
@@ -2406,12 +2406,12 @@
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 575,
+     "line": 581,
      "handler": "view"
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 1960,
+     "line": 1966,
      "handler": "apply"
     },
     {
@@ -2458,17 +2458,17 @@
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 347,
+     "line": 349,
      "handler": "recessApply"
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 1960,
+     "line": 1966,
      "handler": "apply"
     }
    ],
    "caller": "roster-update/public/roster-operations-model.js, roster-update/public/roster-operations-ui.js, operations-worker/index.js",
-   "handler": "shared/roster-operations.js:347 recessApply",
+   "handler": "shared/roster-operations.js:349 recessApply",
    "outcome": {
     "family": "operations",
     "ok": false,
@@ -2530,27 +2530,27 @@
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 575,
+     "line": 581,
      "handler": "view"
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 901,
+     "line": 907,
      "handler": "staplerLifecycle"
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 903,
+     "line": 909,
      "handler": "staplerLifecycle"
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 962,
+     "line": 968,
      "handler": "staplerApply"
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 1960,
+     "line": 1966,
      "handler": "apply"
     },
     {
@@ -2819,12 +2819,12 @@
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 575,
+     "line": 581,
      "handler": "view"
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 2155,
+     "line": 2161,
      "handler": "read"
     },
     {
@@ -3834,7 +3834,7 @@
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 2155,
+     "line": 2161,
      "handler": "read"
     }
    ],
@@ -3952,7 +3952,7 @@
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 2176,
+     "line": 2182,
      "handler": "read"
     },
     {
@@ -4099,7 +4099,7 @@
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 2155,
+     "line": 2161,
      "handler": "read"
     }
    ],
@@ -4155,7 +4155,7 @@
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 2155,
+     "line": 2161,
      "handler": "read"
     },
     {
@@ -4232,17 +4232,17 @@
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 1343,
+     "line": 1349,
      "handler": "r17Apply"
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 1960,
+     "line": 1966,
      "handler": "apply"
     }
    ],
    "caller": "roster-update/public/roster-operations-model.js, roster-update/public/roster-operations-ui.js, operations-worker/index.js",
-   "handler": "shared/roster-operations.js:1343 r17Apply",
+   "handler": "shared/roster-operations.js:1349 r17Apply",
    "outcome": {
     "family": "operations",
     "ok": false,
@@ -4304,22 +4304,22 @@
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 575,
+     "line": 581,
      "handler": "view"
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 862,
+     "line": 868,
      "handler": "createOrImportStapler"
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 961,
+     "line": 967,
      "handler": "staplerApply"
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 1960,
+     "line": 1966,
      "handler": "apply"
     },
     {
@@ -5041,7 +5041,7 @@
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 1960,
+     "line": 1966,
      "handler": "apply"
     }
    ],
@@ -5144,22 +5144,22 @@
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 575,
+     "line": 581,
      "handler": "view"
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 894,
+     "line": 900,
      "handler": "staplerLifecycle"
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 962,
+     "line": 968,
      "handler": "staplerApply"
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 1960,
+     "line": 1966,
      "handler": "apply"
     },
     {
@@ -5221,12 +5221,12 @@
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 575,
+     "line": 581,
      "handler": "view"
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 2155,
+     "line": 2161,
      "handler": "read"
     },
     {
@@ -5328,17 +5328,17 @@
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 1960,
+     "line": 1966,
      "handler": "apply"
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 2019,
+     "line": 2025,
      "handler": "apply"
     }
    ],
    "caller": "roster-update/public/roster-allocation.js, roster-update/public/roster-operations-model.js, roster-update/public/roster-operations-ui.js",
-   "handler": "shared/roster-operations.js:1960 apply",
+   "handler": "shared/roster-operations.js:1966 apply",
    "outcome": {
     "family": "operations",
     "ok": false,
@@ -5559,12 +5559,12 @@
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 575,
+     "line": 581,
      "handler": "view"
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 1960,
+     "line": 1966,
      "handler": "apply"
     }
    ],
@@ -5606,7 +5606,7 @@
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 2155,
+     "line": 2161,
      "handler": "read"
     },
     {
@@ -5677,12 +5677,12 @@
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 1341,
+     "line": 1347,
      "handler": "r17Apply"
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 1960,
+     "line": 1966,
      "handler": "apply"
     },
     {
@@ -5919,7 +5919,7 @@
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 2155,
+     "line": 2161,
      "handler": "read"
     }
    ],
@@ -5960,7 +5960,7 @@
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 2155,
+     "line": 2161,
      "handler": "read"
     }
    ],
@@ -5995,7 +5995,7 @@
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 2155,
+     "line": 2161,
      "handler": "read"
     }
    ],
@@ -6070,7 +6070,7 @@
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 2011,
+     "line": 2017,
      "handler": "apply"
     },
     {
@@ -6122,7 +6122,7 @@
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 2176,
+     "line": 2182,
      "handler": "read"
     },
     {
@@ -6228,7 +6228,7 @@
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 1960,
+     "line": 1966,
      "handler": "apply"
     }
    ],
@@ -6310,12 +6310,12 @@
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 575,
+     "line": 581,
      "handler": "view"
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 1960,
+     "line": 1966,
      "handler": "apply"
     },
     {
@@ -6452,7 +6452,7 @@
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 2155,
+     "line": 2161,
      "handler": "read"
     },
     {
@@ -6760,7 +6760,7 @@
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 1960,
+     "line": 1966,
      "handler": "apply"
     }
    ],
@@ -6797,17 +6797,17 @@
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 1960,
+     "line": 1966,
      "handler": "apply"
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 2019,
+     "line": 2025,
      "handler": "apply"
     }
    ],
    "caller": "roster-update/public/roster-operations-model.js, roster-update/public/roster-operations-ui.js, operations-worker/index.js",
-   "handler": "shared/roster-operations.js:1960 apply",
+   "handler": "shared/roster-operations.js:1966 apply",
    "outcome": {
     "family": "operations",
     "ok": false,
@@ -6864,22 +6864,22 @@
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 575,
+     "line": 581,
      "handler": "view"
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 889,
+     "line": 895,
      "handler": "staplerLifecycle"
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 962,
+     "line": 968,
      "handler": "staplerApply"
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 1960,
+     "line": 1966,
      "handler": "apply"
     },
     {
@@ -7041,17 +7041,17 @@
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 2009,
-     "handler": "apply"
-    },
-    {
-     "file": "shared/roster-operations.js",
-     "line": 2013,
+     "line": 2015,
      "handler": "apply"
     },
     {
      "file": "shared/roster-operations.js",
      "line": 2019,
+     "handler": "apply"
+    },
+    {
+     "file": "shared/roster-operations.js",
+     "line": 2025,
      "handler": "apply"
     },
     {
@@ -7123,17 +7123,17 @@
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 575,
+     "line": 581,
      "handler": "view"
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 963,
+     "line": 969,
      "handler": "staplerApply"
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 1960,
+     "line": 1966,
      "handler": "apply"
     },
     {
@@ -7143,7 +7143,7 @@
     }
    ],
    "caller": "roster-update/public/_worker.js, roster-update/public/roster-operations-model.js, roster-update/public/roster-stapler-ui.js",
-   "handler": "shared/roster-operations.js:575 view",
+   "handler": "shared/roster-operations.js:581 view",
    "outcome": {
     "family": "operations",
     "ok": false,
@@ -7221,17 +7221,17 @@
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 575,
+     "line": 581,
      "handler": "view"
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 965,
+     "line": 971,
      "handler": "staplerApply"
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 1960,
+     "line": 1966,
      "handler": "apply"
     },
     {
@@ -7355,17 +7355,17 @@
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 2010,
+     "line": 2016,
      "handler": "apply"
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 2019,
+     "line": 2025,
      "handler": "apply"
     }
    ],
    "caller": "roster-update/public/roster-operations-model.js, roster-update/public/roster-operations-ui.js, operations-worker/index.js",
-   "handler": "shared/roster-operations.js:2010 apply",
+   "handler": "shared/roster-operations.js:2016 apply",
    "outcome": {
     "family": "operations",
     "ok": false,
@@ -7499,27 +7499,27 @@
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 575,
+     "line": 581,
      "handler": "view"
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 873,
+     "line": 879,
      "handler": "staplerLifecycle"
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 881,
+     "line": 887,
      "handler": "staplerLifecycle"
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 962,
+     "line": 968,
      "handler": "staplerApply"
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 1960,
+     "line": 1966,
      "handler": "apply"
     },
     {
@@ -7632,17 +7632,17 @@
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 1843,
+     "line": 1849,
      "handler": "reliefBatch"
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 1960,
+     "line": 1966,
      "handler": "apply"
     }
    ],
    "caller": "roster-update/public/roster-operations-model.js, roster-update/public/roster-operations-ui.js, operations-worker/index.js",
-   "handler": "shared/roster-operations.js:1843 reliefBatch",
+   "handler": "shared/roster-operations.js:1849 reliefBatch",
    "outcome": {
     "family": "operations",
     "ok": false,
@@ -7809,27 +7809,27 @@
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 1960,
+     "line": 1966,
      "handler": "apply"
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 1961,
+     "line": 1967,
      "handler": "apply"
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 2016,
+     "line": 2022,
      "handler": "apply"
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 2017,
+     "line": 2023,
      "handler": "apply"
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 2019,
+     "line": 2025,
      "handler": "apply"
     },
     {
@@ -7890,12 +7890,12 @@
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 2006,
+     "line": 2012,
      "handler": "apply"
     }
    ],
    "caller": "roster-update/public/roster-operations-model.js, roster-update/public/roster-operations-ui.js, operations-worker/index.js",
-   "handler": "shared/roster-operations.js:2006 apply",
+   "handler": "shared/roster-operations.js:2012 apply",
    "outcome": {
     "family": "operations",
     "ok": false,
@@ -7937,12 +7937,12 @@
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 575,
+     "line": 581,
      "handler": "view"
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 1960,
+     "line": 1966,
      "handler": "apply"
     },
     {
@@ -8014,12 +8014,12 @@
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 575,
+     "line": 581,
      "handler": "view"
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 1960,
+     "line": 1966,
      "handler": "apply"
     },
     {
@@ -8070,22 +8070,22 @@
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 2002,
+     "line": 2008,
      "handler": "apply"
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 2004,
+     "line": 2010,
      "handler": "apply"
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 2017,
+     "line": 2023,
      "handler": "apply"
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 2018,
+     "line": 2024,
      "handler": "apply"
     },
     {
@@ -8147,12 +8147,12 @@
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 575,
+     "line": 581,
      "handler": "view"
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 1960,
+     "line": 1966,
      "handler": "apply"
     },
     {
@@ -8199,7 +8199,7 @@
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 1960,
+     "line": 1966,
      "handler": "apply"
     },
     {
@@ -8209,7 +8209,7 @@
     }
    ],
    "caller": "roster-update/public/_worker.js, roster-update/public/roster-operations-model.js, roster-update/public/roster-operations-ui.js",
-   "handler": "shared/roster-operations.js:1960 apply",
+   "handler": "shared/roster-operations.js:1966 apply",
    "outcome": {
     "family": "operations",
     "ok": false,
@@ -8245,12 +8245,12 @@
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 1960,
+     "line": 1966,
      "handler": "apply"
     }
    ],
    "caller": "roster-update/public/roster-operations-model.js, roster-update/public/roster-operations-ui.js, operations-worker/index.js",
-   "handler": "shared/roster-operations.js:1960 apply",
+   "handler": "shared/roster-operations.js:1966 apply",
    "outcome": {
     "family": "operations",
     "ok": false,
@@ -8312,7 +8312,7 @@
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 1960,
+     "line": 1966,
      "handler": "apply"
     },
     {
@@ -8322,7 +8322,7 @@
     }
    ],
    "caller": "roster-update/public/_worker.js, roster-update/public/roster-operations-model.js, roster-update/public/roster-operations-ui.js",
-   "handler": "shared/roster-operations.js:1960 apply",
+   "handler": "shared/roster-operations.js:1966 apply",
    "outcome": {
     "family": "operations",
     "ok": false,
@@ -8378,18 +8378,8 @@
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 575,
+     "line": 581,
      "handler": "view"
-    },
-    {
-     "file": "shared/roster-operations.js",
-     "line": 960,
-     "handler": "staplerApply"
-    },
-    {
-     "file": "shared/roster-operations.js",
-     "line": 965,
-     "handler": "staplerApply"
     },
     {
      "file": "shared/roster-operations.js",
@@ -8398,7 +8388,17 @@
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 1960,
+     "line": 971,
+     "handler": "staplerApply"
+    },
+    {
+     "file": "shared/roster-operations.js",
+     "line": 972,
+     "handler": "staplerApply"
+    },
+    {
+     "file": "shared/roster-operations.js",
+     "line": 1966,
      "handler": "apply"
     },
     {
@@ -8475,12 +8475,12 @@
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 575,
+     "line": 581,
      "handler": "view"
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 1960,
+     "line": 1966,
      "handler": "apply"
     },
     {
@@ -8522,12 +8522,12 @@
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 2008,
+     "line": 2014,
      "handler": "apply"
     }
    ],
    "caller": "roster-update/public/roster-operations-model.js, roster-update/public/roster-operations-ui.js",
-   "handler": "shared/roster-operations.js:2008 apply",
+   "handler": "shared/roster-operations.js:2014 apply",
    "outcome": {
     "family": "operations",
     "ok": false,
@@ -8635,12 +8635,12 @@
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 575,
+     "line": 581,
      "handler": "view"
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 1960,
+     "line": 1966,
      "handler": "apply"
     }
    ],
@@ -8752,17 +8752,17 @@
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 575,
+     "line": 581,
      "handler": "view"
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 1781,
+     "line": 1787,
      "handler": "customApply"
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 1960,
+     "line": 1966,
      "handler": "apply"
     },
     {
@@ -8824,17 +8824,17 @@
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 575,
+     "line": 581,
      "handler": "view"
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 1342,
+     "line": 1348,
      "handler": "r17Apply"
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 1960,
+     "line": 1966,
      "handler": "apply"
     },
     {
@@ -8844,7 +8844,7 @@
     }
    ],
    "caller": "roster-update/public/_worker.js, roster-update/public/roster-duty-ui.js, roster-update/public/roster-operations-model.js",
-   "handler": "shared/roster-operations.js:575 view",
+   "handler": "shared/roster-operations.js:581 view",
    "outcome": {
     "family": "operations",
     "ok": false,
@@ -8885,17 +8885,17 @@
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 1843,
+     "line": 1849,
      "handler": "reliefBatch"
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 1960,
+     "line": 1966,
      "handler": "apply"
     }
    ],
    "caller": "roster-update/public/roster-operations-model.js, roster-update/public/roster-operations-ui.js, operations-worker/index.js",
-   "handler": "shared/roster-operations.js:1843 reliefBatch",
+   "handler": "shared/roster-operations.js:1849 reliefBatch",
    "outcome": {
     "family": "operations",
     "ok": false,
@@ -9025,12 +9025,12 @@
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 575,
+     "line": 581,
      "handler": "view"
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 2155,
+     "line": 2161,
      "handler": "read"
     }
    ],
@@ -9101,12 +9101,12 @@
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 575,
+     "line": 581,
      "handler": "view"
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 2155,
+     "line": 2161,
      "handler": "read"
     },
     {
@@ -9274,12 +9274,12 @@
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 575,
+     "line": 581,
      "handler": "view"
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 2155,
+     "line": 2161,
      "handler": "read"
     },
     {
@@ -9335,7 +9335,7 @@
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 2155,
+     "line": 2161,
      "handler": "read"
     },
     {
@@ -9421,7 +9421,7 @@
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 2155,
+     "line": 2161,
      "handler": "read"
     },
     {
@@ -9647,17 +9647,17 @@
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 1843,
+     "line": 1849,
      "handler": "reliefBatch"
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 1960,
+     "line": 1966,
      "handler": "apply"
     }
    ],
    "caller": "roster-update/public/roster-operations-model.js, roster-update/public/roster-operations-ui.js, operations-worker/index.js",
-   "handler": "shared/roster-operations.js:1843 reliefBatch",
+   "handler": "shared/roster-operations.js:1849 reliefBatch",
    "outcome": {
     "family": "operations",
     "ok": false,
@@ -9694,17 +9694,17 @@
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 1804,
+     "line": 1810,
      "handler": "manualApply"
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 1960,
+     "line": 1966,
      "handler": "apply"
     }
    ],
    "caller": "roster-update/public/roster-operations-model.js, roster-update/public/roster-operations-ui.js, operations-worker/index.js",
-   "handler": "shared/roster-operations.js:1804 manualApply",
+   "handler": "shared/roster-operations.js:1810 manualApply",
    "outcome": {
     "family": "operations",
     "ok": false,
@@ -9815,17 +9815,17 @@
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 1349,
+     "line": 1355,
      "handler": "r17Apply"
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 1960,
+     "line": 1966,
      "handler": "apply"
     }
    ],
    "caller": "roster-update/public/roster-operations-model.js, roster-update/public/roster-operations-ui.js, operations-worker/index.js",
-   "handler": "shared/roster-operations.js:1349 r17Apply",
+   "handler": "shared/roster-operations.js:1355 r17Apply",
    "outcome": {
     "family": "operations",
     "ok": false,
@@ -10625,7 +10625,7 @@
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 576,
+     "line": 582,
      "handler": "view"
     },
     {
@@ -10635,7 +10635,7 @@
     }
    ],
    "caller": "roster-update/public/_worker.js, roster-update/public/roster-operations-model.js, roster-update/public/roster-operations-ui.js",
-   "handler": "shared/roster-operations.js:576 view",
+   "handler": "shared/roster-operations.js:582 view",
    "outcome": {
     "family": "operations",
     "ok": true,
@@ -10666,17 +10666,17 @@
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 575,
+     "line": 581,
      "handler": "view"
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 2155,
+     "line": 2161,
      "handler": "read"
     }
    ],
    "caller": "roster-update/public/roster-learning.js, roster-update/public/roster-operations-model.js",
-   "handler": "shared/roster-operations.js:575 view",
+   "handler": "shared/roster-operations.js:581 view",
    "outcome": {
     "family": "operations",
     "ok": true,
@@ -10763,12 +10763,12 @@
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 575,
+     "line": 581,
      "handler": "view"
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 2155,
+     "line": 2161,
      "handler": "read"
     },
     {
@@ -10814,7 +10814,7 @@
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 575,
+     "line": 581,
      "handler": "view"
     },
     {
@@ -10870,7 +10870,7 @@
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 575,
+     "line": 581,
      "handler": "view"
     }
    ],
@@ -10905,7 +10905,7 @@
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 575,
+     "line": 581,
      "handler": "view"
     }
    ],
@@ -10946,7 +10946,7 @@
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 575,
+     "line": 581,
      "handler": "view"
     },
     {
@@ -10996,7 +10996,7 @@
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 575,
+     "line": 581,
      "handler": "view"
     }
    ],
@@ -11046,12 +11046,12 @@
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 575,
+     "line": 581,
      "handler": "view"
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 576,
+     "line": 582,
      "handler": "view"
     },
     {
@@ -11218,12 +11218,12 @@
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 575,
+     "line": 581,
      "handler": "view"
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 576,
+     "line": 582,
      "handler": "view"
     },
     {
@@ -11268,7 +11268,7 @@
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 575,
+     "line": 581,
      "handler": "view"
     },
     {
@@ -11365,7 +11365,7 @@
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 575,
+     "line": 581,
      "handler": "view"
     },
     {
@@ -11456,7 +11456,7 @@
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 2155,
+     "line": 2161,
      "handler": "read"
     },
     {
@@ -11486,17 +11486,17 @@
    "sources": [
     {
      "file": "shared/roster-operations.js",
-     "line": 575,
+     "line": 581,
      "handler": "view"
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 576,
+     "line": 582,
      "handler": "view"
     }
    ],
    "caller": "roster-update/public/roster-operations-model.js, roster-update/public/roster-operations-ui.js, roster-update/public/roster-stapler-export.js",
-   "handler": "shared/roster-operations.js:575 view",
+   "handler": "shared/roster-operations.js:581 view",
    "outcome": {
     "family": "operations",
     "ok": true,
@@ -11562,12 +11562,12 @@
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 575,
+     "line": 581,
      "handler": "view"
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 576,
+     "line": 582,
      "handler": "view"
     },
     {
@@ -11643,7 +11643,7 @@
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 575,
+     "line": 581,
      "handler": "view"
     },
     {
@@ -11693,12 +11693,12 @@
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 575,
+     "line": 581,
      "handler": "view"
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 1960,
+     "line": 1966,
      "handler": "apply"
     },
     {
@@ -11748,12 +11748,12 @@
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 576,
+     "line": 582,
      "handler": "view"
     }
    ],
    "caller": "roster-update/public/roster-allocation.js, roster-update/public/roster-operations-model.js, roster-update/public/roster-operations-ui.js",
-   "handler": "shared/roster-operations.js:576 view",
+   "handler": "shared/roster-operations.js:582 view",
    "outcome": {
     "family": "operations",
     "ok": true,
@@ -11794,7 +11794,7 @@
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 575,
+     "line": 581,
      "handler": "view"
     }
    ],
@@ -11845,7 +11845,7 @@
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 575,
+     "line": 581,
      "handler": "view"
     }
    ],
@@ -11880,12 +11880,12 @@
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 575,
+     "line": 581,
      "handler": "view"
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 2155,
+     "line": 2161,
      "handler": "read"
     }
    ],
@@ -11971,7 +11971,7 @@
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 575,
+     "line": 581,
      "handler": "view"
     }
    ],
@@ -12012,7 +12012,7 @@
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 575,
+     "line": 581,
      "handler": "view"
     }
    ],
@@ -12042,12 +12042,12 @@
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 575,
+     "line": 581,
      "handler": "view"
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 2155,
+     "line": 2161,
      "handler": "read"
     }
    ],
@@ -12088,12 +12088,12 @@
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 575,
+     "line": 581,
      "handler": "view"
     },
     {
      "file": "shared/roster-operations.js",
-     "line": 2155,
+     "line": 2161,
      "handler": "read"
     }
    ],
