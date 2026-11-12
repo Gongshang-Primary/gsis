@@ -17,6 +17,6 @@ assert.throws(()=>apply({classIds:null}),/valid classes/);
 assert.throws(()=>apply({classIds:['missing']}),/Invalid lesson card|valid class/);assert.equal(JSON.stringify(plan),before,'invalid class is atomic');
 assert.throws(()=>S.apply(plan,{type:'bulkEdit',patch:{venue:'Hall'}}),/period/);
 assert.throws(()=>S.apply(plan,{type:'bulkEdit',periods:[999],patch:{venue:'Hall'}}),/period/);
-assert.throws(()=>apply({subject:'Assembly'}),/Venue|field/,'period overlay has no Subject operation');
+assert.throws(()=>apply({teacherId:'teacher-empty'}),/Subject|field/,'period overlay cannot overwrite teacher identity');
 const row=S.apply(plan,{type:'bulkEdit',classId:'a',patch:{subject:'Updated row'}});assert(row.tiles.filter(t=>t.kind==='lesson'&&t.classIds.includes('a')).every(t=>t.subject==='Updated row'),'existing row Subject mass-write is unchanged');
 console.log('PASS period bulk apply: venue/group, blank no-op, recess/empty-cell isolation, canonical classes, custom/invalid classes, unchanged values and row compatibility');

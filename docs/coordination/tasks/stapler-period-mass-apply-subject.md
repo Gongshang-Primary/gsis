@@ -61,3 +61,15 @@ Not deployed unless supported by explicit environment/version/time evidence. Sta
 ## Implementation claim
 
 Model: Codex. Fresh branch `codex/stapler-period-mass-apply-subject` from verified current main `c7590be14d027c3da3aec5f0f4aed9d4c5c2d7fb`, before product edits. The existing task claim is retained. This task supersedes the earlier no-Subject restriction only; creation behavior, class-row actions and release t remain unchanged.
+
+## Implementation and handoff
+
+Model: Codex. The period dialog now renders Subject before Venue and Group, with the same optional-field placeholder and 500-character limit. Its datalist comes from lesson-tile subjects only. The column patch accepts Subject and uses the existing blank-value, matching-value and validation rules. Newly created column tiles carry the requested Subject in both their current and original card details; a blank Subject leaves existing tiles unchanged and creates blank-subject tiles. Row creation behavior is unchanged.
+
+The existing creation choice, teacher/class pickers, conflict rejection, Undo/Redo, recess exclusion and Save to online path are reused without modification. No allocation, relief, publication, WhatsApp, configuration or release logic changed. The old no-Subject restriction is superseded by this task.
+
+Validation: the new model regression fails on the original code because Subject is rejected. It passes for Subject-only isolation, untouched other periods/recess/fields, blank/matching values, the 500-character limit, both creation views and rollback on a creation conflict. Browser checks verify the field, placeholder/limit, lesson-only datalist, changed and already-matching counts, creation with Subject and existing teacher-choice/Undo behavior. The old invalid-field test now rejects teacherId, which remains unsupported in a period patch. Full local, clean-build and exact-head CI results belong in the draft PR body after they complete. Browser path in this workspace is `/usr/bin/chromium`; all three browser environment variables use it with TZ=Asia/Singapore.
+
+Owner deployment: include this change in the next release after v0.9.9t. Release t, its label and all release branches are untouched. Changed Roster Pages assets are `roster-stapler-ui.js`, generated `roster-stapler-model.js` and generated `edge-roster-domain.js`. Canonical Notification and Operations Worker bundles also include the shared model. Google remains frozen; regenerated Google artifacts are tracked parity outputs, not a request to redeploy Google. Preserve flags, bindings, URLs and credentials. Refresh an open planner after deployment. Rolling back the UI removes the new input but must retain saved plans and their Subject values.
+
+Not tested: live school records, production sessions, Google/D1/provider endpoints or deployment. All new fixtures are synthetic. No merge or deployment performed.

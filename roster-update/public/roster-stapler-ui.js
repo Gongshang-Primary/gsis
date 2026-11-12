@@ -474,12 +474,12 @@
  function applyPeriod(s,n,type){
   if(!editable(s))return;
   const p=s.plan.periods.find(p=>periodNumber(p)===n);if(!p)return;
-  const values=key=>[...new Set(s.plan.tiles.map(t=>t[key]).filter(Boolean))].sort((a,b)=>a.localeCompare(b)),needsTeacher=type==='class';
-  const el=dialog(s,'Apply values to '+periodLabel(p),'<form><div class="fields">'+['venue','group'].map(key=>'<label>'+({venue:'Venue',group:'Group'}[key])+'<input name="'+key+'" maxlength="500" list="period-'+key+'" placeholder="Leave blank to keep current values"><datalist id="period-'+key+'">'+values(key).map(value=>'<option value="'+esc(value)+'">').join('')+'</datalist></label>').join('')+'</div>'+classPicker(s,[])+bulkChoice('column',needsTeacher)+'<p class="hint">Blank fields stay unchanged on existing tiles. Recess is never filled. Changes stay local until Save to online. Undo restores the previous values.</p><button type="submit" class="primary">Apply to period</button></form>');
+  const values=key=>[...new Set(s.plan.tiles.filter(t=>key!=='subject'||t.kind==='lesson').map(t=>t[key]).filter(Boolean))].sort((a,b)=>a.localeCompare(b)),needsTeacher=type==='class';
+  const el=dialog(s,'Apply values to '+periodLabel(p),'<form><div class="fields">'+['subject','venue','group'].map(key=>'<label>'+({subject:'Subject',venue:'Venue',group:'Group'}[key])+'<input name="'+key+'" maxlength="500" list="period-'+key+'" placeholder="Leave blank to keep current values"><datalist id="period-'+key+'">'+values(key).map(value=>'<option value="'+esc(value)+'">').join('')+'</datalist></label>').join('')+'</div>'+classPicker(s,[])+bulkChoice('column',needsTeacher)+'<p class="hint">Blank fields stay unchanged on existing tiles. Recess is never filled. Changes stay local until Save to online. Undo restores the previous values.</p><button type="submit" class="primary">Apply to period</button></form>');
   bindFields(s,el,{classIds:[]});const form=el.querySelector('form');bindBulkChoice(s,form,needsTeacher);
   form.onsubmit=e=>{
    e.preventDefault();if(!editable(s)||!form.reportValidity())return;
-   const tiles=s.plan.tiles.filter(t=>t.kind==='lesson'&&t.location==='grid'&&t.period===n),patch={venue:form.elements.venue.value,group:form.elements.group.value,classIds:[...form.querySelectorAll('[name=classIds]:checked')].map(c=>c.value)};
+   const tiles=s.plan.tiles.filter(t=>t.kind==='lesson'&&t.location==='grid'&&t.period===n),patch={subject:form.elements.subject.value,venue:form.elements.venue.value,group:form.elements.group.value,classIds:[...form.querySelectorAll('[name=classIds]:checked')].map(c=>c.value)};
    applyBulk(s,el,{type:'bulkEdit',periods:[n],view:type,patch,customClasses:customClasses(form),createTiles:form.elements.bulkMode.value==='create',...(needsTeacher?{teacherId:form.elements.teacherId.value}:{})},tiles);
   };
  }
