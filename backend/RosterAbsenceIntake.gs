@@ -35,7 +35,7 @@ function rosterAbsenceIntakeLocked_(work){
 }
 function rosterAbsenceIntakeCommand_(input){
  if(!input||typeof input!=='object'||Array.isArray(input)||!['saveAbsence','requestMutual'].includes(input.operation)||typeof input.requestId!=='string'||!/^[-\w]{36}$/.test(input.requestId)||input.intake!==true)error_(400,'Supply the original absence or peer request.');
- const command=rosterAbsenceIntakeCopy_(input);for(const key of ['calendarByDate','trustedNow','trustedIntakeAt','pendingTransportDates','notificationsReady','schedulerAvailable'])delete command[key];
+ const command=rosterAbsenceIntakeCopy_(input);for(const key of ['calendarByDate','trustedNow','trustedIntakeAt','pendingTransportDates','notificationsReady','lseNoticeEnabled','schedulerAvailable'])delete command[key];
  if(JSON.stringify(command).length>220000)error_(413,'The absence report is too large. Shorten the instructions.');return command;
 }
 function rosterAbsenceIntakeMatch_(row,identity,digest){if(row.actor!==identity.email)error_(403,'This absence receipt belongs to another reporter.');if(row.digest!==digest)error_(409,'This request ID was used for a different report.');return row;}

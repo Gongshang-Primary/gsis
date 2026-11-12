@@ -1,3 +1,7 @@
+# Pending: dedicated LSE notice to duty SMC, 12 November 2026
+
+Model: Codex. First saved Leave School Early reports queue the approved information-only LSE notice for the verified duty SMC and skip generic emergency alerts. Staff/date identity prevents duplicate notices on edits, retries, resubmissions and re-reporting. Disabled or missing-duty outcomes remain visible in Daily Notify. Quiet-hour delivery requires the durable LSE event and still verifies the recipient and template. No live configuration, messages or deployment. See docs/coordination/tasks/roster-lse-notice.md.
+
 # Pending: Stapler period-wide mass apply, 11 November 2026
 
 Model: Codex. Editable Stapler teacher and class grids now have one down arrow per period. Its dialog applies optional Venue, Group and Class values to existing lesson tiles starting in that period. Blank fields preserve current values; recess and empty cells stay unchanged. The latest Class selection is canonical, per the owner ruling, even when several tiles receive the same class list. One local Undo restores the entire action, including any custom class. Changes remain local until Save to online; allocation, relief, publication and WhatsApp code are unchanged. See docs/coordination/tasks/stapler-period-mass-apply.md.

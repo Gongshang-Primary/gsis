@@ -91,7 +91,7 @@ function rosterNotificationEligible_(s,j,now,fresh,index,allowed){
  j.mobile=GSISRosterOperations.mobile(person.mobile);j.name=person.name;j.external=person.active!==true;
  if(!/^\d{8,15}$/.test(j.mobile))return 'Recipient mobile number is missing or invalid. Contact the teacher directly.';
  // Explicit Notify actions and proven emergency-absence events bypass quiet hours.
- if(j.kind!=='urgent_forward'&&!GSISRosterOperations.scheduledSummaryCurrent(s,j)&&!rosterNotificationManual_(s,j)&&!rosterNotificationEmergency_(s,j)&&GSISRosterAllocation.schedule(now).quiet)return 'quiet';
+ if(j.kind!=='urgent_forward'&&!GSISRosterOperations.scheduledSummaryCurrent(s,j)&&!rosterNotificationManual_(s,j)&&!rosterNotificationEmergency_(s,j)&&!GSISRosterOperations.lseNoticeCurrent(s,j)&&GSISRosterAllocation.schedule(now).quiet)return 'quiet';
  if(j.kind==='smc_report'&&now-Date.parse(j.createdAt)>30*60000)return 'Superseded by the next consolidated report.';
  if(j.data.scheduledSummary&&GSISRosterOperations.pendingSummary(index,j))return 'pending-summary';
  if(!allowed.has(j.data.templateKey))return 'blocked';

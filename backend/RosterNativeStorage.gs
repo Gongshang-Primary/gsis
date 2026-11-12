@@ -16,7 +16,7 @@ function rosterNativeSplitWrite_(id,value,property){
 function rosterNativeReceiptMatches_(receipt,command,actor){
  if(receipt.actor!==actor)return false;
  if(!receipt.edgeDigest)return receipt.digest===rosterOperationsCommandDigest_(command);
- const value={...command};for(const key of ['calendarByDate','calendarCache','trustedNow','trustedIntakeAt','notificationsReady','schedulerAvailable'])delete value[key];
+ const value={...command};for(const key of ['calendarByDate','calendarCache','trustedNow','trustedIntakeAt','notificationsReady','lseNoticeEnabled','schedulerAvailable'])delete value[key];
  const stable=v=>v===null||typeof v!=='object'?v:Array.isArray(v)?v.map(stable):Object.fromEntries(Object.keys(v).sort().map(key=>[key,stable(v[key])]));
  const digest=Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256,JSON.stringify(stable(value))).map(n=>(n&255).toString(16).padStart(2,'0')).join('');
  return receipt.edgeDigest===digest;
