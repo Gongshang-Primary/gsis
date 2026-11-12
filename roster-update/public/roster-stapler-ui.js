@@ -228,7 +228,7 @@
   const ghosts=tiles.filter(t=>!model().sameCell([t.subject,t.classIds.map(id=>classes.get(id)||id).join(', '),t.venue,t.group],current.get(t.teacherId)?.[t.period]));
   s.comparisonCache={plan:s.plan,tiles,ghosts};return ghosts;
  }
- function periodHeader(s,p){return '<th scope="col">'+esc(periodLabel(p))+(s.data.canEdit?' <button type="button" data-period-apply="'+periodNumber(p)+'" aria-label="Apply values to '+esc(periodLabel(p))+' lesson tiles" title="Apply Venue, Group or Class to this period"'+(!editable(s)?' disabled':'')+'>↓</button>':'')+'</th>';}
+ function periodHeader(s,p,type){return '<th scope="col">'+esc(periodLabel(p))+(s.data.canEdit?' <button type="button" data-period-apply="'+periodNumber(p)+'" data-period-view="'+type+'" aria-label="Apply values to '+esc(periodLabel(p))+' lesson tiles" title="Apply Venue, Group or Class to this period"'+(!editable(s)?' disabled':'')+'>↓</button>':'')+'</th>';}
  function matrix(s,type){
   const query=s.filters[type].normalize('NFKC').toLowerCase(),periods=s.plan.periods||[],tiles=s.plan.tiles.filter(t=>t.location==='grid'),ghosts=comparisonGhosts(s),idOf=r=>type==='teacher'?r.staffId:r.id;
   const groups=type==='class'&&s.recessMode!=='individual'?model().recessGroups(s.plan):[],groupByClass=new Map();
@@ -236,7 +236,7 @@
   const rows=type==='teacher'?people(s):s.plan.classes.map((row,index)=>({row,index})).sort((a,b)=>(a.row.level||7)-(b.row.level||7)||(groupByClass.get(a.row.id)?.order??groups.length)-(groupByClass.get(b.row.id)?.order??groups.length)||a.index-b.index).map(x=>x.row).filter(row=>String(row.name).normalize('NFKC').toLowerCase().includes(query));
   for(const group of groups)group.visibleRows=rows.filter(row=>group.classIds.includes(idOf(row)));
   const cells=new Map(),oldCells=new Map(),continuingCells=new Map(),matCells=new Map(),put=(map,key,item)=>{if(!map.has(key))map.set(key,[]);map.get(key).push(item);},ids=t=>type==='teacher'?[t.teacherId]:t.classIds;for(const t of tiles)for(const id of ids(t)){put(cells,id+'|'+t.period,t);if(t.kind==='recess')for(const n of model().tilePeriods(s.plan,t))if(n!==t.period)put(continuingCells,id+'|'+n,t);}for(const t of ghosts)for(const id of ids(t))put(oldCells,id+'|'+t.period,t);for(const m of s.plan.mats||[])if(m.target===type)for(const p of periods)if(periodNumber(p)>=m.fromPeriod&&periodNumber(p)<=m.toPeriod)put(matCells,m.targetId+'|'+periodNumber(p),m);
-  const head='<tr><th class="planner-name"><input type="search" data-filter="'+type+'" aria-label="Find a '+type+'" placeholder="Find a '+type+'…" value="'+esc(s.filters[type])+'"></th>'+periods.map(p=>periodHeader(s,p)).join('')+'</tr>';
+  const head='<tr><th class="planner-name"><input type="search" data-filter="'+type+'" aria-label="Find a '+type+'" placeholder="Find a '+type+'…" value="'+esc(s.filters[type])+'"></th>'+periods.map(p=>periodHeader(s,p,type)).join('')+'</tr>';
   return '<table class="planner-grid"><thead>'+ (type==='teacher'?head:'<tr><th class="planner-name"><input type="search" data-filter="class" aria-label="Find a class" placeholder="Find a class…" value="'+esc(s.filters.class)+'"></th>'+periods.map(()=>'<th aria-hidden="true"></th>').join('')+'</tr>')+'</thead><tbody>'+rows.map(row=>{const id=idOf(row);return '<tr data-row-name="'+esc(String(row.name||row.timetableName||'').normalize('NFKC').toLowerCase())+'"'+(!String(row.name||row.timetableName||'').normalize('NFKC').toLowerCase().includes(query)?' hidden':'')+'><th class="planner-name" scope="row"><span>'+esc(row.name||row.timetableName)+'</span>'+(type==='class'&&row.adhoc&&s.data.canEdit?'<button class="planner-class-edit" data-edit-class="'+esc(id)+'" aria-label="Rename or delete '+esc(row.name)+'">✎</button>':'')+(type==='class'&&s.data.canEdit?classFields(s,row):'')+'</th>'+periods.map(p=>{
    const n=periodNumber(p),group=groupByClass.get(id);
    if(group?.periods.includes(n)){
@@ -244,7 +244,7 @@
     const start=periods.find(p=>periodNumber(p)===group.period).startMinutes,label='P'+group.level+' Recess',scope='All '+group.classIds.length+' '+(group.classIds.length===1?'class':'classes'),timing=clock(start)+'–'+clock(start+group.durationMinutes),markers=group.classIds.flatMap(cid=>group.periods.flatMap(n=>(matCells.get(cid+'|'+n)||[]).map(m=>className(s,cid)+': '+m.reason)));
     return '<td data-target="class" data-row="'+esc(id)+'" data-period="'+n+'" data-periods="'+group.periods.join(',')+'" rowspan="'+group.visibleRows.length+'" colspan="'+group.periods.length+'" class="planner-recess-cell"><div class="planner-level-recess'+(s.selected===group.tileId?' selected':'')+'" data-recess-group="'+esc(group.tileId)+'" data-tile="'+esc(group.tileId)+'" draggable="'+!!s.data.canEdit+'" tabindex="0" role="button" aria-pressed="'+(s.selected===group.tileId)+'" aria-label="'+esc(label+', Canteen, '+scope+', '+timing+'. Drag or use left and right arrow keys to swap lessons.')+'"><div class="planner-recess-label"><strong>'+esc(label)+'</strong><span>Canteen</span><span>'+esc(timing)+'</span><small>'+esc(scope)+'</small>'+(group.visibleRows.length<group.classIds.length?'<small>'+group.visibleRows.length+' shown</small>':'')+(markers.length?'<small class="planner-recess-markers">'+[...new Set(markers)].map(esc).join('; ')+'</small>':'')+'</div></div></td>';
    }
-   const key=id+'|'+n,cards=cells.get(key)||[],continuations=continuingCells.get(key)||[],old=oldCells.get(key)||[],mats=matCells.get(key)||[];return '<td data-target="'+type+'" data-row="'+esc(id)+'" data-period="'+n+'" tabindex="'+(s.data.canEdit?'0':'-1')+'" aria-label="'+esc(row.name)+' '+esc(periodLabel(p))+'" class="'+(mats.length?'deskmat':'')+'">'+mats.map(m=>'<span class="deskmat-label" title="'+esc(m.reason)+'">'+esc(m.reason)+'</span>').join('')+old.map(t=>tileHtml(s,t,true)).join('')+cards.map(t=>tileHtml(s,t)).join('')+continuations.map(t=>'<div class="planner-recess-continuation">Recess continues</div>').join('')+'</td>';}).join('')+'</tr>';}).join('')+'</tbody>'+(type==='class'?'<tfoot><tr><th class="planner-name" scope="row">Periods</th>'+periods.map(p=>periodHeader(s,p)).join('')+'</tr></tfoot>':'')+'</table>'+(rows.length?'':'<p class="hint">No matching '+(type==='teacher'?'teachers':'classes')+'.</p>');
+   const key=id+'|'+n,cards=cells.get(key)||[],continuations=continuingCells.get(key)||[],old=oldCells.get(key)||[],mats=matCells.get(key)||[];return '<td data-target="'+type+'" data-row="'+esc(id)+'" data-period="'+n+'" tabindex="'+(s.data.canEdit?'0':'-1')+'" aria-label="'+esc(row.name)+' '+esc(periodLabel(p))+'" class="'+(mats.length?'deskmat':'')+'">'+mats.map(m=>'<span class="deskmat-label" title="'+esc(m.reason)+'">'+esc(m.reason)+'</span>').join('')+old.map(t=>tileHtml(s,t,true)).join('')+cards.map(t=>tileHtml(s,t)).join('')+continuations.map(t=>'<div class="planner-recess-continuation">Recess continues</div>').join('')+'</td>';}).join('')+'</tr>';}).join('')+'</tbody>'+(type==='class'?'<tfoot><tr><th class="planner-name" scope="row">Periods</th>'+periods.map(p=>periodHeader(s,p,type)).join('')+'</tr></tfoot>':'')+'</table>'+(rows.length?'':'<p class="hint">No matching '+(type==='teacher'?'teachers':'classes')+'.</p>');
  }
  function drawComparison(s){
   const holder=s.ctx.container.querySelector('[data-comparison]');if(!holder)return;
@@ -273,7 +273,7 @@
   root.querySelectorAll('[data-scroll]').forEach(el=>{el.scrollLeft=scrolls[el.dataset.scroll]?.left||s.scrollLeft||0;el.scrollTop=scrolls[el.dataset.scroll]?.top||0;el.onscroll=()=>{s.scrollLeft=el.scrollLeft;root.querySelectorAll('[data-scroll]').forEach(other=>{if(other!==el&&other.scrollLeft!==el.scrollLeft)other.scrollLeft=el.scrollLeft;});};});
   root.querySelectorAll('[data-filter]').forEach(input=>input.oninput=()=>{const type=input.dataset.filter,q=input.value.normalize('NFKC').toLowerCase();s.filters[type]=input.value;if(type==='class'){drawTables(s,'class');return;}root.querySelectorAll('[data-scroll="'+type+'"] [data-row-name]').forEach(row=>row.hidden=!row.dataset.rowName.includes(q));root.querySelectorAll('[data-filter="'+type+'"]').forEach(other=>{if(other!==input)other.value=input.value;});});
   if(field){const next=root.querySelector('[data-filter="'+field+'"]');next?.focus();try{next?.setSelectionRange(pos,pos);}catch{}}
-  root.querySelectorAll('[data-period-apply]').forEach(button=>button.onclick=()=>applyPeriod(s,Number(button.dataset.periodApply)));
+  root.querySelectorAll('[data-period-apply]').forEach(button=>button.onclick=()=>applyPeriod(s,Number(button.dataset.periodApply),button.dataset.periodView));
   root.querySelectorAll('[data-edit-class]').forEach(b=>b.onclick=()=>editClass(s,b.dataset.editClass));
   root.querySelectorAll('[data-class-fields]').forEach(group=>{const values=classValues.get(group.dataset.classFields)||{};group.querySelectorAll('form').forEach(form=>{const field=form.dataset.classFieldForm,input=form.querySelector('input');input.value=values[input.name]||'';form.onsubmit=e=>{e.preventDefault();applyClassField(s,group.dataset.classFields,field,input);};});});
  }
@@ -453,34 +453,42 @@
  function tileFields(form){return {teacherId:form.elements.teacherId.value,subject:form.elements.subject.value,venue:form.elements.venue.value,group:form.elements.group.value,classIds:[...form.querySelectorAll('[name=classIds]:checked')].map(c=>c.value)};}
  function customClasses(form){return [...form.querySelectorAll('[name=customClasses]:checked')].map(c=>c.value).concat(form.elements.customClass.value.trim()||[]);}
  function editTile(s,id){if(!editable(s))return;const t=s.plan.tiles.find(t=>t.id===id);if(!t){tell(s,'Select a card first.');return;}if(t.kind==='recess'){tell(s,'Choose Whole cohort or One class in Move recess, then move purple tiles within their class rows. Use Reset recesses to restore defaults.');return;}const el=dialog(s,t.importedRelief?'Reassign relief':'Edit teacher tile',(t.importedRelief?'<p>Original lesson: '+esc(name(s,t.importedRelief.lesson.teacherId)+' · '+t.importedRelief.lesson.subject+' · P'+t.importedRelief.lesson.period)+'. Removing or reassigning this tile keeps that lesson.</p>':'')+'<form>'+fields(s,t)+'<button type="submit" class="primary">Apply changes</button></form>');bindFields(s,el,t);el.querySelector('form').onsubmit=e=>{e.preventDefault();if(!e.target.reportValidity())return;if(command(s,{type:'edit',tileId:id,patch:tileFields(e.target),customClasses:customClasses(e.target)}))closeDialog();else el.querySelector('[data-dialog-message]').textContent=s.ctx.container.querySelector('[data-stapler-message]').textContent;};}
- function applyPeriod(s,n){
+ function bulkChoice(axis,needsTeacher){
+  return '<fieldset><legend>Apply to</legend><label><input type="radio" name="bulkMode" value="existing" checked> Only write values to cells with tiles</label><label><input type="radio" name="bulkMode" value="create"> In empty cells, create tiles to fill whole '+axis+'</label></fieldset>'+(needsTeacher?'<div data-bulk-teacher hidden><div data-bulk-teacher-picker></div><input type="hidden" name="teacherId" value=""><p class="hint">Choose the teacher for newly created lesson tiles.</p></div>':'');
+ }
+ function bindBulkChoice(s,form,needsTeacher){
+  const section=form.querySelector('[data-bulk-teacher]'),update=()=>{if(section)section.hidden=form.elements.bulkMode.value!=='create';};form.querySelectorAll('[name=bulkMode]').forEach(input=>input.onchange=update);update();
+  if(needsTeacher&&window.RosterOpsUI?.teacherPicker)window.RosterOpsUI.teacherPicker(form.querySelector('[data-bulk-teacher-picker]'),people(s).map(p=>({id:p.staffId,name:p.name,timetableName:p.timetableName})),'',id=>{form.elements.teacherId.value=id;},'Teacher');
+ }
+ function applyBulk(s,el,input,tiles){
+  if(!editable(s))return;
+  try{
+   if(input.createTiles&&input.view!=='teacher'&&!people(s).some(p=>p.staffId===input.teacherId))throw Error('Choose a teacher before creating tiles.');
+   if(!tiles.length&&!input.createTiles)throw Error('There are no existing lesson tiles to update.');
+   const next=model().apply(s.plan,input),previousIds=new Set(s.plan.tiles.map(t=>t.id)),after=new Map(next.tiles.map(t=>[t.id,t])),changed=tiles.filter(t=>JSON.stringify(t)!==JSON.stringify(after.get(t.id))).length,created=next.tiles.filter(t=>!previousIds.has(t.id)).length,matched=tiles.length-changed;
+   if(!changed&&!created){el.querySelector('[data-dialog-message]').textContent='Already matches all '+tiles.length+' lesson tiles. No changes made.';return;}
+   if(command(s,input)){closeDialog();tell(s,'Applied to '+changed+' lesson '+(changed===1?'tile':'tiles')+(matched?'; '+matched+' already '+(matched===1?'matches':'match'):'')+'. Created '+created+' '+(created===1?'tile':'tiles')+'. Changes stay local until Save to online. Undo restores the previous values and removes created tiles.');}
+   else el.querySelector('[data-dialog-message]').textContent=s.ctx.container.querySelector('[data-stapler-message]').textContent;
+  }catch(error){el.querySelector('[data-dialog-message]').textContent=error.message;}
+ }
+ function applyPeriod(s,n,type){
   if(!editable(s))return;
   const p=s.plan.periods.find(p=>periodNumber(p)===n);if(!p)return;
-  const values=key=>[...new Set(s.plan.tiles.map(t=>t[key]).filter(Boolean))].sort((a,b)=>a.localeCompare(b));
-  const el=dialog(s,'Apply values to '+periodLabel(p),'<form><div class="fields">'+['venue','group'].map(key=>'<label>'+({venue:'Venue',group:'Group'}[key])+'<input name="'+key+'" maxlength="500" list="period-'+key+'" placeholder="Leave blank to keep current values"><datalist id="period-'+key+'">'+values(key).map(value=>'<option value="'+esc(value)+'">').join('')+'</datalist></label>').join('')+'</div>'+classPicker(s,[])+'<p class="hint">Blank fields stay unchanged. Applies to existing lesson tiles starting in this period. Changes stay local until Save to online. Undo restores the previous values.</p><button type="submit" class="primary">Apply to period</button></form>');
-  bindFields(s,el,{classIds:[]});
-  el.querySelector('form').onsubmit=e=>{
-   e.preventDefault();if(!editable(s)||!e.target.reportValidity())return;
-   const form=e.target,tiles=s.plan.tiles.filter(t=>t.kind==='lesson'&&t.location==='grid'&&t.period===n),patch={venue:form.elements.venue.value,group:form.elements.group.value,classIds:[...form.querySelectorAll('[name=classIds]:checked')].map(c=>c.value)},input={type:'bulkEdit',periods:[n],patch,customClasses:customClasses(form)};
-   try{
-    if(!tiles.length){el.querySelector('[data-dialog-message]').textContent='There are no lesson tiles starting in this period.';return;}
-    const next=model().apply(s.plan,input),changed=tiles.filter(t=>JSON.stringify(t)!==JSON.stringify(next.tiles.find(row=>row.id===t.id))).length,matched=tiles.length-changed;
-    if(!changed){el.querySelector('[data-dialog-message]').textContent='Already matches all '+tiles.length+' lesson tiles. No changes made.';return;}
-    if(command(s,input)){closeDialog();tell(s,'Applied to '+changed+' lesson '+(changed===1?'tile':'tiles')+(matched?'; '+matched+' already '+(matched===1?'matches':'match'):'')+'. Changes stay local until Save to online. Undo restores the previous values.');}
-    else el.querySelector('[data-dialog-message]').textContent=s.ctx.container.querySelector('[data-stapler-message]').textContent;
-   }catch(error){el.querySelector('[data-dialog-message]').textContent=error.message;}
+  const values=key=>[...new Set(s.plan.tiles.map(t=>t[key]).filter(Boolean))].sort((a,b)=>a.localeCompare(b)),needsTeacher=type==='class';
+  const el=dialog(s,'Apply values to '+periodLabel(p),'<form><div class="fields">'+['venue','group'].map(key=>'<label>'+({venue:'Venue',group:'Group'}[key])+'<input name="'+key+'" maxlength="500" list="period-'+key+'" placeholder="Leave blank to keep current values"><datalist id="period-'+key+'">'+values(key).map(value=>'<option value="'+esc(value)+'">').join('')+'</datalist></label>').join('')+'</div>'+classPicker(s,[])+bulkChoice('column',needsTeacher)+'<p class="hint">Blank fields stay unchanged on existing tiles. Recess is never filled. Changes stay local until Save to online. Undo restores the previous values.</p><button type="submit" class="primary">Apply to period</button></form>');
+  bindFields(s,el,{classIds:[]});const form=el.querySelector('form');bindBulkChoice(s,form,needsTeacher);
+  form.onsubmit=e=>{
+   e.preventDefault();if(!editable(s)||!form.reportValidity())return;
+   const tiles=s.plan.tiles.filter(t=>t.kind==='lesson'&&t.location==='grid'&&t.period===n),patch={venue:form.elements.venue.value,group:form.elements.group.value,classIds:[...form.querySelectorAll('[name=classIds]:checked')].map(c=>c.value)};
+   applyBulk(s,el,{type:'bulkEdit',periods:[n],view:type,patch,customClasses:customClasses(form),createTiles:form.elements.bulkMode.value==='create',...(needsTeacher?{teacherId:form.elements.teacherId.value}:{})},tiles);
   };
  }
  function applyClassField(s,id,field,input){
   if(!editable(s))return;
-  const label={subject:'Subject',venue:'Venue',group:'Group'}[field],value=input.value.trim(),tiles=s.plan.tiles.filter(t=>t.kind==='lesson'&&t.classIds.includes(id));
+  const label={subject:'Subject',venue:'Venue',group:'Group'}[field],value=input.value.trim();
   if(!value){tell(s,'Enter '+label+' before applying it to '+className(s,id)+'.');input.focus();return;}
-  if(!tiles.length){tell(s,'There are no lesson tiles for '+className(s,id)+'.');return;}
-  if(tiles.every(t=>t[field]===value)){tell(s,label+' already matches all '+className(s,id)+' lesson tiles.');return;}
-  if(command(s,{type:'bulkEdit',classId:id,patch:{[field]:value}})){
-   tell(s,label+' applied to '+tiles.length+' lesson tiles for '+className(s,id)+'. Changes stay local until Save to online.');
-   const group=[...s.ctx.container.querySelectorAll('[data-class-fields]')].find(el=>el.dataset.classFields===id);group?.querySelector('[data-class-field-form="'+field+'"] button')?.focus();
-  }
+  const el=dialog(s,'Apply '+label+' to '+className(s,id),'<form><p>'+esc(label)+': '+esc(value)+'</p>'+bulkChoice('row',true)+'<p class="hint">Recess is never filled. Changes stay local until Save to online.</p><button type="submit" class="primary">Apply to row</button></form>'),form=el.querySelector('form');bindBulkChoice(s,form,true);
+  form.onsubmit=e=>{e.preventDefault();if(!editable(s)||!form.reportValidity())return;applyBulk(s,el,{type:'bulkEdit',classId:id,patch:{[field]:value},createTiles:form.elements.bulkMode.value==='create',teacherId:form.elements.teacherId.value},s.plan.tiles.filter(t=>t.kind==='lesson'&&t.classIds.includes(id)));};
  }
  function suspend(s){
   if(!editable(s))return;const options=s.plan.periods.map(p=>'<option value="'+periodNumber(p)+'">'+esc(periodLabel(p))+'</option>').join(''),baselineTeachers=new Set((s.plan.baseline?.tiles||[]).map(t=>t.teacherId));

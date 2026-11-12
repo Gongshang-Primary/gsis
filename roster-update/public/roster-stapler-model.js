@@ -30,6 +30,25 @@ var GSISRosterStapler=(()=>{
  function classNames(plan,ids){return ids.map(id=>plan.classes.find(c=>c.id===id)?.name||id).join(', ');}
  function source(tile){return {teacherId:tile.teacherId,classIds:tile.classIds.slice(),period:tile.period,subject:tile.subject,venue:tile.venue,group:tile.group};}
  function newId(plan,prefix){let n=plan.nextId||1,id;do{id=prefix+':'+n++;}while(plan.tiles.some(t=>t.id===id)||plan.mats.some(t=>t.id===id)||plan.classes.some(c=>c.id===id));plan.nextId=n;return id;}
+ function addLessonTile(plan,value,classes){
+  const tile={id:newId(plan,'extra'),kind:'lesson',teacherId:text(value.teacherId,200),classIds:classes.slice(),period:Number.isInteger(value.period)?value.period:null,location:Number.isInteger(value.period)?'grid':'pit',subject:text(value.subject||''),venue:text(value.venue||''),group:text(value.group||''),baselineId:null};tile.source=source(tile);plan.tiles.push(tile);return tile;
+ }
+ function bulkCreateTiles(next,previous,command,values){
+  const row=command.classId!==undefined,byClass=row||command.view==='class';
+  if(!row&&!['teacher','class'].includes(command.view))fail('Choose a teacher or class view for filling empty cells.',400);
+  if(byClass&&!next.teachers.some(t=>t.staffId===command.teacherId))fail('Choose a valid teacher before creating tiles.',400);
+  const rows=row?[command.classId]:byClass?previous.classes.map(c=>c.id):previous.teachers.map(t=>t.staffId),periods=row?(Array.isArray(command.periods)?command.periods:previous.periods.map(p=>p.period)):command.periods;
+  const original=active(previous);
+  for(const id of rows)for(const n of [...new Set(periods)]){
+   period(next,n);
+   if(original.some(t=>(byClass?t.classIds.includes(id):t.teacherId===id)&&span(previous,t).includes(n)))continue;
+   const tile=addLessonTile(next,{teacherId:byClass?command.teacherId:id,period:n,subject:row?values.subject||'':'',venue:values.venue||'',group:values.group||''},byClass?[id]:values.classIds||[]);
+   for(const other of active(next))if(other.id!==tile.id&&overlaps(next,tile,other)){
+    if(other.teacherId===tile.teacherId)fail('Teacher already has a lesson at P'+n+'. No changes were applied.');
+    if(other.classIds.some(id=>tile.classIds.includes(id)))fail('Class already covered at P'+n+'. No changes were applied.');
+   }
+  }
+ }
  function selectedClasses(plan,ids,custom=[]){
   if(!Array.isArray(ids)||!Array.isArray(custom)||custom.length>100)fail('Choose valid classes.',400);
   const selected=ids.map(id=>text(id,200));for(const raw of custom){const name=text(raw,160);if(!name)continue;let cls=plan.classes.find(c=>classKey(c.name)===classKey(name));if(!cls){cls={id:newId(plan,'adhoc-class'),name,level:null,traditional:false,venue:'',adhoc:true};plan.classes.push(cls);}selected.push(cls.id);}return [...new Set(selected)];
@@ -180,7 +199,7 @@ var GSISRosterStapler=(()=>{
    else{for(const t of next.tiles)if(t.classIds.includes(cls.id)){t.classIds=t.classIds.filter(id=>id!==cls.id);t.location='pit';t.period=null;}next.mats=next.mats.filter(m=>m.target!=='class'||m.targetId!==cls.id);next.classes=next.classes.filter(c=>c.id!==cls.id);}
   }else if(type==='addTile'){
    const quantity=command.quantity??1;if(!Number.isInteger(quantity)||quantity<1||quantity>100)fail('Choose a quantity from 1 to 100.',400);
-   const v=command.tile||{},classes=selectedClasses(next,v.classIds||[],command.customClasses);for(let i=0;i<quantity;i++){const t={id:newId(next,'extra'),kind:'lesson',teacherId:text(v.teacherId,200),classIds:classes.slice(),period:Number.isInteger(v.period)?v.period:null,location:Number.isInteger(v.period)?'grid':'pit',subject:text(v.subject||''),venue:text(v.venue||''),group:text(v.group||''),baselineId:null};t.source=source(t);next.tiles.push(t);}
+   const v=command.tile||{},classes=selectedClasses(next,v.classIds||[],command.customClasses);for(let i=0;i<quantity;i++){addLessonTile(next,v,classes);}
   }else if(type==='suspend'){
    const target=command.target,targetId=text(command.targetId,200),reason=text(command.reason,240);if(!reason)fail('Enter a suspension reason.',400);const from=period(next,command.fromPeriod),to=period(next,command.toPeriod);if(from.startMinutes>to.startMinutes)fail('Choose an end after the start.',400);
    if(target==='teacher'&&!next.baseline.teachers.some(t=>t.staffId===targetId))fail('Suspend a teacher present in the baseline.');if(!['teacher','class'].includes(target))fail('Choose a teacher or class.',400);
@@ -189,6 +208,7 @@ var GSISRosterStapler=(()=>{
   }else if(type==='removeMat'){next.mats=next.mats.filter(m=>m.id!==command.matId);
   }else if(type==='bulkEdit'){
    const column=command.classId===undefined,patch=command.patch||{};
+   if(command.createTiles!==undefined&&typeof command.createTiles!=='boolean')fail('Choose whether to create tiles.',400);
    if(column){
     if(!Array.isArray(command.periods)||!command.periods.length)fail('Choose a valid timetable period.',400);
     command.periods.forEach(id=>period(next,id));
@@ -196,10 +216,12 @@ var GSISRosterStapler=(()=>{
     const tiles=next.tiles.filter(t=>t.kind==='lesson'&&t.location==='grid'&&command.periods.includes(t.period)),values={};
     for(const key of ['venue','group'])if(patch[key]!==undefined){const value=text(patch[key]);if(value)values[key]=value;}
     if(patch.classIds!==undefined||command.customClasses!==undefined){const ids=selectedClasses(next,patch.classIds===undefined?[]:patch.classIds,command.customClasses);if(ids.some(id=>!next.classes.some(c=>c.id===id)))fail('Choose valid classes.',400);if(ids.length)values.classIds=ids;}
-    if(!tiles.some(t=>Object.entries(values).some(([key,value])=>JSON.stringify(t[key])!==JSON.stringify(value))))return plan;
+    if(!command.createTiles&&!tiles.some(t=>Object.entries(values).some(([key,value])=>JSON.stringify(t[key])!==JSON.stringify(value))))return plan;
     for(const t of tiles)for(const [key,value] of Object.entries(values))t[key]=Array.isArray(value)?value.slice():value;
+    if(command.createTiles)bulkCreateTiles(next,plan,command,values);
    }else{
     if(!next.classes.some(c=>c.id===command.classId))fail('Choose a class.');if(Object.keys(patch).some(k=>!['subject','venue','group'].includes(k)))fail('Only Subject, Venue and Group can be changed together.',400);for(const t of next.tiles.filter(t=>t.kind==='lesson'&&t.classIds.includes(command.classId)&&(!Array.isArray(command.periods)||command.periods.includes(t.period))))for(const [key,value] of Object.entries(patch))t[key]=text(value);
+    if(command.createTiles)bulkCreateTiles(next,plan,command,patch);
    }
   }else if(type==='recessLevelMove'){
    const t=tile(),group=recessGroups(next).find(g=>g.tileIds.includes(t.id));if(!group)fail('Choose a placed recess block.');const classSet=new Set(group.classIds),memberIds=new Set(group.tileIds),members=next.tiles.filter(t=>memberIds.has(t.id)),order=next.periods.slice().sort((a,b)=>a.startMinutes-b.startMinutes),target=order.findIndex(p=>p.period===command.period);if(target<0)fail('Choose a valid period.',400);let index=order.findIndex(p=>p.period===t.period);
