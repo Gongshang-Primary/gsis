@@ -43,3 +43,15 @@ These three designs total about 280 lines for work not yet scheduled. The qualit
 ## Next action
 
 Owner decides B1 and whether to rescope C per C1. ChatGPT scopes the next isolated task after those answers. No implementation is approved by this review.
+
+## Owner decision on B1 (13 Nov 2026)
+
+Owner: "admin and power users for all contacts operations", confirmed as **either role alone**: an Admin or a Contacts Power User may propose and accept any Contacts record on their own, including adding or removing SMC and School Leader.
+
+Effect: this supersedes the Admin-approval rule for SMC=true and School Leader=true in the merged EO plan (`docs/v1/contacts/EO_AUTHORITY_READINESS_PLAN.md`, acceptance controls) and in the Package B design matrix. B1 is closed by owner decision.
+
+Still in force (not changed by this decision): nobody accepts their own SMC, EO or School Leader record, by permanent Staff ID and across alternate accounts; every acceptance is audited with proposer, accepter, time and operation ID; MKE+SMC is rejected.
+
+Residual risk, recorded once for the owner: two Power Users can grant each other SMC. Recommended cheap control, not a blocker: notify all Admins on every SMC or School Leader change, so a wrong grant is seen the same day.
+
+Action: the v1 coordinator records this in `OWNER_DIRECTIVES.md` and has the EO plan and B design updated by pull request before B is scoped.
