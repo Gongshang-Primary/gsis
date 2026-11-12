@@ -3,6 +3,7 @@ from pathlib import Path
 import zipfile, shutil, subprocess, re, tempfile, os, sys, hashlib
 from contextlib import contextmanager
 def roster_backend_source(code, component_version):
+ code=re.sub(r'/\* GSIS_DEPLOY_QUEUE_([A-Z_]+)_BEGIN \*/[\s\S]*?/\* GSIS_DEPLOY_QUEUE_\1_END \*/', '', code)
  # Deploy owns Layout routes, the campus seed and the local aSc exporter. Roster retains the
  # live venue identities used by Relief/Deploy quota and timetable helpers.
  for marker in ['GSIS_LAYOUT_DATA','GSIS_LAYOUT_REPOSITORY','GSIS_LAYOUT_DIAGNOSTICS','GSIS_LAYOUT_SEED','GSIS_ASC_EXPORT']:
@@ -169,6 +170,14 @@ assert 'function buildCampus' in (root/'layout-update/public/landmark.html').rea
 # initialized; tests and preview hosts also remove this one trailing boot call.
 app=root/'public/app.js'
 app.write_text(re.sub(r'^controls\(\);startSignIn\(\);\s*$', '', app.read_text(), flags=re.M).rstrip()+'\n\ncontrols();startSignIn();\n')
+# P1 adds one Deploy-only canonical module. Preserve all bytes outside its marker.
+queue_target=root/'backend/Code.gs'
+queue_content=queue_target.read_text()
+queue_marker='GSIS_DEPLOY_QUEUE_MODULE'
+queue_block='/* '+queue_marker+'_BEGIN */\n'+(root/'shared/edge-command-queue.js').read_text()+'\n'+(root/'backend/DeployCommandQueue.gs').read_text()+'\n/* '+queue_marker+'_END */'
+queue_pattern=r'/\* '+queue_marker+r'_BEGIN \*/[\s\S]*?/\* '+queue_marker+r'_END \*/'
+assert len(re.findall(queue_pattern,queue_content))<=1, 'Duplicate Deploy queue module'
+queue_target.write_text(re.sub(queue_pattern,lambda _:queue_block,queue_content) if re.search(queue_pattern,queue_content) else queue_content+queue_block)
 subprocess.run(['node',str(root/'scripts/build-edge-deploy.cjs')],cwd=root,check=True)
 subprocess.run(['node',str(root/'scripts/build-edge-modules.cjs')],cwd=root,check=True)
 code=(root/'backend/Code.gs').read_text()+'\n'+(root/'backend/Seed.gs').read_text()
@@ -243,7 +252,7 @@ try:
  commit=subprocess.check_output(['git','rev-parse','HEAD'],cwd=root,text=True,stderr=subprocess.DEVNULL).strip()
  # Only release inputs determine provenance; unrelated local review files do not.
  release_inputs=list(installation['frontends'].values())+['backend','shared','data','calendar-backend','Contacts_Code.gs',
-  'notification-worker','operations-worker','migrations','scripts','package.json','package-lock.json','release-installation-manifest.json']
+  'notification-worker','operations-worker','edge-command-worker','migrations','scripts','package.json','package-lock.json','release-installation-manifest.json']
  release_inputs += [str(members[name.format(version=version)].relative_to(root)) for name in installation['documents']]
  if 'LORD' in installation['backends']:release_inputs.append('lord-suite/Source/backend')
  if 'Venues' in installation['backends']:release_inputs.append('venues-backend')

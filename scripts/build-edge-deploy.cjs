@@ -2,7 +2,9 @@
 const fs=require('fs'),vm=require('vm'),path=require('path');
 const root=path.resolve(__dirname,'..');
 let acorn;try{acorn=require('acorn')}catch{const m={exports:{}};vm.runInNewContext(process.binding('natives')['internal/deps/acorn/acorn/dist/acorn'],{module:m,exports:m.exports});acorn=m.exports;}
-const source=fs.readFileSync(path.join(root,'backend/Code.gs'),'utf8')+'\n'+fs.readFileSync(path.join(root,'backend/Seed.gs'),'utf8');
+// Google command intents/ledger do not belong to the existing D1 Deploy domain.
+const withoutQueue=source=>source.replace(/\/\* GSIS_DEPLOY_QUEUE_([A-Z_]+)_BEGIN \*\/[\s\S]*?\/\* GSIS_DEPLOY_QUEUE_\1_END \*\//g,'');
+const source=withoutQueue(fs.readFileSync(path.join(root,'backend/Code.gs'),'utf8')+'\n'+fs.readFileSync(path.join(root,'backend/Seed.gs'),'utf8'));
 const overrides=fs.readFileSync(path.join(root,'public/edge-deploy-runtime.js'),'utf8');
 const parse=s=>acorn.parse(s,{ecmaVersion:'latest',sourceType:'module'});
 function names(node){if(node.type==='FunctionDeclaration')return [node.id.name];if(node.type==='VariableDeclaration')return node.declarations.filter(d=>d.id.type==='Identifier').map(d=>d.id.name);return [];}

@@ -1,0 +1,11 @@
+const assert=require('node:assert/strict');
+const q=require('../shared/edge-command-queue.js');
+assert.equal(q.canonical({b:1,a:[false,null,'x']}),'{"a":[false,null,"x"],"b":1}');
+for(const value of [{a:undefined},[undefined],{a:NaN},{a:Infinity}])assert.throws(()=>q.canonical(value));
+for(const text of ['{"a":1,"a":2}','{"a":{"x":1,"x":2}}','[1,]','{"a":01}','{"a":1}x'])assert.throws(()=>q.parse(text));
+assert.deepEqual(q.parse('{"a":[1,true,null,"ok"]}'),{a:[1,true,null,'ok']});
+for(const value of [{GSIS_SECRET:'synthetic'}, {nested:{authorization:'synthetic'}}, {privateReliefLink:'https://example.test'},{notes:'https://example.test/external?token=synthetic-private-link'}])assert.throws(()=>q.safePayload(value));
+assert.equal(q.receiptLabel({state:'QUEUED',submittedAt:0}),'Queued at 07:30');
+for(const [state,label]of [['RUNNING','Applying'],['CHECKING','Checking outcome'],['UNCERTAIN','Needs review'],['REJECTED','Rejected']])assert.equal(q.receiptLabel({state}),label);
+assert.equal(q.pendingCount([{state:'APPLIED',steps:[{state:'failed'}]},{state:'CHECKING'},{state:'REJECTED'}]),2);
+(async()=>{const secret='synthetic-canonical-edge-queue-key-12345';const signed=await q.sign({purpose:'edge-command-gateway-v1',timestamp:Date.now(),nonce:crypto.randomUUID()},secret);assert.equal((await q.verify(signed,secret,'edge-command-gateway-v1')).purpose,'edge-command-gateway-v1');await assert.rejects(q.verify(signed,secret,'edge-command-google-v1'));await assert.rejects(q.verify(signed,'another-synthetic-edge-queue-key-123456','edge-command-gateway-v1'));for(const s of [undefined,'short',' '.repeat(40)])await assert.rejects(q.sign({},s));console.log('PASS canonical protocol, duplicate JSON rejection, privacy, receipt labels and purpose-bound canonical-only HMAC');})().catch(e=>{console.error(e);process.exitCode=1;});

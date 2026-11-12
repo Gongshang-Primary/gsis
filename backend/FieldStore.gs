@@ -16,7 +16,7 @@ function fieldIndexText_(idx,recovery=false){
 }
 function fieldIndexWrite_(b,idx,recovery=false){gsisRequireBackendRole_('deploy');if(typeof deployEdgeFence_==='function')deployEdgeFence_({action:'change'});const text=fieldIndexText_(idx,recovery);b.getSheetByName('deploy_index').getRange('B2').setValue(text);deployFlush_();}
 function fieldJournal_(b){return fieldSheet_(b,'deploy_field_journal',['Commit','Part','JSON']);}
-function fieldJournalWrite_(b,tx,pendingIndex=tx.index,existingJournal,prepare=false){gsisRequireBackendRole_('deploy');
+function fieldJournalWrite_(b,tx,pendingIndex=tx.index,existingJournal,prepare=false){gsisRequireBackendRole_('deploy');/* GSIS_DEPLOY_QUEUE_JOURNAL_BEGIN */if(typeof deployQueueContext_!=='undefined'&&deployQueueContext_)deployQueueAttachJournal_(tx);/* GSIS_DEPLOY_QUEUE_JOURNAL_END */
  // Validate both exact index forms before creating/writing the journal or marker.
  const existing=existingJournal===undefined?b.getSheetByName('deploy_field_journal'):existingJournal;
  const text=JSON.stringify(tx),row=existing?existing.getLastRow()+1:2,parts=Math.ceil(text.length/30000),locator={row,parts,commit:tx.commit};
