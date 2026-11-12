@@ -22,12 +22,13 @@ const health=await readSystemHealth(env,{jobsOnly:true});assert.equal(health.job
 const verified=await captureBackup(db,{now:now+1});await finishBackup(db,verified,{status:'verified',manifest:{files:[],tierTwoRestoreBudget:{bytes:0,parts:0}},now:now+2});
 const stuck=await captureBackup(db,{now:now+3});let calls=0;
 const result=await runDriveBackup(env,{now:now+16*60000,bridge:async()=>{calls++;throw error;}});
-assert.equal(db.sql.prepare('SELECT status FROM gsis_backup_ledger WHERE id=?').get(stuck.id).status,'failed');assert(calls>0,'retry must not wait for hourly schedule');assert.equal(result.failed,1);assert.equal(result.failure.outputError.googleCode,'ROSTER_DRIVE_OUTPUT');
+assert.equal(db.sql.prepare('SELECT status FROM gsis_backup_ledger WHERE id=?').get(stuck.id).status,'failed');assert.equal(calls,0,'an expired run waits for the failure backoff');assert.equal(result.code,'SKIPPED_BACKOFF');
+const retry=await runDriveBackup(env,{now:now+76*60000,bridge:async()=>{calls++;throw error;}});assert(calls>0);assert.equal(retry.failed,1);assert.equal(retry.failure.outputError.googleCode,'ROSTER_DRIVE_OUTPUT');
 await assert.rejects(finishBackup(db,stuck,{status:'verified',now:now+16*60000}),e=>e.code==='BACKUP_LEASE');
 assert.equal(db.sql.prepare("SELECT COUNT(*) n FROM gsis_backup_ledger WHERE status='running'").get().n,0);
-const disabledRun=await captureBackup(db,{now:now+17*60000});
+const disabledRun=await captureBackup(db,{now:now+77*60000});
 await db.prepare("UPDATE gsis_edge_records SET value_json=json_set(value_json,'$.enabled',json('false')) WHERE scope='roster' AND collection='systemConfig' AND record_id='key:driveBackup'").run();
-const off=await runBackupJobs(env,{now:now+33*60000,bridge:async()=>assert.fail('disabled writer'),alert:async()=>assert.fail('disabled alert')});
+const off=await runBackupJobs(env,{now:now+93*60000,bridge:async()=>assert.fail('disabled writer'),alert:async()=>assert.fail('disabled alert')});
 assert.equal(off.enabled,false);assert.equal(db.sql.prepare('SELECT status FROM gsis_backup_ledger WHERE id=?').get(disabledRun.id).status,'failed','expiry continues while output writes are disabled');
 let enabled=true;const sent=[],send=async h=>{sent.push(h);return {queued:true};},notify=(kind,time,n)=>notifyOutputAlert(db,{kind,now:time,health:{warnings:['failure'],failingDates:n},message:'Daily Drive outputs failing: '+n+' dates',enabled:async()=>enabled},send);
 await notify('daily',now,2);await notify('daily',now+1,8);assert.equal(sent.length,1);assert.equal(sent[0].message,'Daily Drive outputs failing: 2 dates');
@@ -35,4 +36,9 @@ await notify('backup',now+2,1);assert.equal(sent.length,2);await notify('daily',
 enabled=false;await notify('daily',now+2*86400000,12);assert.equal(sent.length,3);
 enabled=true;let lostId;await assert.rejects(notifyOutputAlert(db,{kind:'continuity',now,health:{warnings:['failure']},message:'failed',enabled:async()=>true},async h=>{lostId=h.alertId;throw Error('response lost');}));
 await notifyOutputAlert(db,{kind:'continuity',now,health:{warnings:['failure']},message:'failed',enabled:async()=>true},async h=>{assert.equal(h.alertId,lostId);return {queued:true};});
+let resolutions=0;
+await notifyOutputAlert(db,{kind:'backup',now,health:{warnings:[]},message:'recovered',enabled:async()=>false},async h=>{assert.equal(h.resolved,true);resolutions++;return {resolved:true};});
+await notifyOutputAlert(db,{kind:'backup',now,health:{warnings:[]},message:'recovered',enabled:async()=>false},async()=>assert.fail('already resolved'));
+assert.equal(resolutions,1);assert.equal(db.sql.prepare("SELECT queued FROM gsis_output_alerts WHERE kind='backup'").get().queued,2);
+await notify('backup',now+5,1);assert.equal(sent.length,3,'same-day recovery never resets delivery identity');
 db.sql.close();console.log('sanitised errors in ledger/manifest/health, expired-run retry and late-writer fence, daily alert identities and disabled silence pass');

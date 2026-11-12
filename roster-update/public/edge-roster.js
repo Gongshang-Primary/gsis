@@ -653,6 +653,12 @@ export async function driveOutputsEdgeRoster(env,options={}){
  },alert:health=>queueDriveOutputAlert(env,health)});
 }
 async function queueDriveOutputAlert(env,health){
+  if(health.resolved===true)return mutateEdgeRoster(env,{actor:'roster-service',requestId:'backup-alert-recovered-'+health.alertId,command:{operation:'currentDuty'},needsContext:false,domainChanged:false,apply(state){
+   const key='drive-backup:'+health.alertId;
+   for(const row of state.smcAlerts||[])if(row.key===key&&row.audience==='system-admin'&&['open','no-admin-recipient'].includes(row.status)){row.status='resolved';row.resolvedAt=new Date(Date.now()).toISOString();}
+   // Delivery history, including blocked system_alert rows, is never reset.
+   return {resolved:true};
+  }});
   if(!health.warnings.length)return {queued:false};if(GSISRosterAllocation.schedule(Date.now()).quiet||env.WHATSAPP_ENABLED!=='true')return {queued:false};
   const daily=health.kind==='daily',config=daily?await readDailyConfig(database(env)):await readBackupConfig(database(env));if(!config.enabled)return {queued:false};
   const message=health.message+'. Open System Health and the backup ledger.';

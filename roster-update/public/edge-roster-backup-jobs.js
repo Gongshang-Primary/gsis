@@ -71,13 +71,18 @@ export async function runBackupJobs(env,{bridge,continuity,alert,now=Date.now()}
  if(env.ROSTER_EDGE_AUTHORITY!=='d1')return {enabled:false,skipped:true};
  const db=primary(env.GSIS_JOBS);await schema(db);await expireBackupRuns(db,now);const config=await readBackupConfig(db);if(!config.enabled)return {enabled:false,skipped:true};
  const token=crypto.randomUUID(),claim=await db.prepare("UPDATE gsis_backup_worker SET lease_token=?,lease_until=? WHERE id=1 AND lease_until<=?").bind(token,now+15*60000,now).run();if(!claim.meta?.changes)return {enabled:true,skipped:true,code:'SKIPPED_BUSY'};
- const started=Date.now(),rawBridge=bridge;bridge=async input=>{if(Date.now()-started>12*60000)fail('BACKUP_BUDGET','The backup work will retry within its retained time budget.');const owner=await db.prepare('SELECT lease_token FROM gsis_backup_worker WHERE id=1').first();if(owner.lease_token!==token)fail('BACKUP_LEASE','This Worker no longer owns the backup run.');return rawBridge(input);};
+ const started=Date.now(),rawBridge=bridge;
+ const renew=async()=>{
+  const time=now+Math.max(0,Date.now()-started),owner=await db.prepare('UPDATE gsis_backup_worker SET lease_until=? WHERE id=1 AND lease_token=? AND lease_until>?').bind(time+15*60000,token,time).run();
+  if(!owner.meta?.changes)fail('BACKUP_LEASE','This Worker no longer owns the backup run.');
+ };
+ bridge=async input=>{await renew();const result=await rawBridge(input);await renew();return result;};
  let failures=0,failure;const today=singaporeBackupDate(now),result={};
  try{
   // Recover interrupted auxiliary attempts. No outcome is reported as verified.
   await db.prepare("UPDATE gsis_backup_ledger SET status='failed',error='BACKUP_JOB_INTERRUPTED',finished_at=?,duration_ms=MAX(0,?-started_at) WHERE status='running' AND kind NOT IN ('full','increment') AND started_at<?").bind(now,now,now-15*60000).run();
   await db.prepare("UPDATE gsis_backup_requests SET status='pending' WHERE status='running'").run();
-  result.backup=await runDriveBackup(env,{now,bridge});failures+=result.backup.failed||0;failure=result.backup.failure;
+  result.backup=await runDriveBackup(env,{now,bridge,onProgress:renew});failures+=result.backup.failed||0;failure=result.backup.failure;
   const pending=await db.prepare("SELECT * FROM gsis_backup_requests WHERE status='pending' ORDER BY created_at LIMIT 1").first();
   if(pending){
    await db.prepare("UPDATE gsis_backup_requests SET status='running' WHERE id=?").bind(pending.id).run();
@@ -105,6 +110,6 @@ export async function runBackupJobs(env,{bridge,continuity,alert,now=Date.now()}
    const warnings=health.warnings.filter(w=>kind==='backup'?!['continuity-failed','restore-test-failed'].includes(w):w===kind+'-failed');
    await notifyOutputAlert(db,{kind,now,health:{...health,warnings},message:kind==='backup'?'Drive backups need Admin attention':kind==='continuity'?'Drive continuity output failing':'Drive restore test failing',enabled:async()=>(await readBackupConfig(db)).enabled},alert);
   }
-  return {enabled:true,completed:result.backup.completed||0,failed:failures,...(failure?{failure}:{}),code:failures?'BACKUP_JOB_FAILED':health.warnings.length?'BACKUP_ATTENTION':'OK'};
+  return {enabled:true,completed:result.backup.completed||0,failed:failures,...(result.backup.backoff?{backoff:result.backup.backoff,backoffSeconds:result.backup.backoffSeconds,readyAt:result.backup.readyAt}:{}),...(failure?{failure}:{}),code:failures?'BACKUP_JOB_FAILED':result.backup.backoff?'SKIPPED_BACKOFF':health.warnings.length?'BACKUP_ATTENTION':'OK'};
  }finally{await db.prepare("UPDATE gsis_backup_worker SET lease_token='',lease_until=0 WHERE id=1 AND lease_token=?").bind(token).run();}
 }
