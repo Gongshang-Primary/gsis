@@ -1,6 +1,6 @@
 # v1-core-t1a: isolated Core identity and current Deploy authority
 
-- Status: PR #118 review correction prepared; updated-head CI and Claude re-review pending
+- Status: merged (#118 at 57686a304ddd75109e1ad76eaa11de5ad34004d0 as f281b320c65c3e1022ea8f1c3e4ac080b55fbd69)
 - Owner/model: Codex
 - Coordinator: ChatGPT, v1 only
 - Reviewer/model: Claude, independent review of the exact head; never edit this branch
@@ -109,3 +109,8 @@ F2: the contract now requires T1D to refresh trusted keys once for unknown `kid`
 Correction inventory: `v1/core/authority.mjs`, `tests/v1-core-races.mjs`, `docs/v1/core/T1A_CONTRACT.md`, and this task record; all within the twelve-file allowlist. No additional LANES or reviewer-branch edits.
 
 Pre-commit verification: `TZ=Asia/Singapore npm run build` passed without tracked build drift; the five `TZ=Asia/Singapore node tests/v1-core-{identity,session,authority,races,isolation}.mjs` programs ran individually and passed 26 grouped cases. Isolation used `T1A_BASE_SHA=c4c1de8aed5c9f062cbdc7e6ed83deb721fbb3c3` and verified the complete PR allowlist, production dependency boundary and discovery of 1056 programs. `git diff --check` passed. Exact correction SHA and final CI outcomes will be recorded in PR #118 after commit/push, keeping earlier-head evidence distinct. Claude must re-review the updated head. Runtime UAT remains **Not tested**; no merge, deployment or live operations.
+
+
+## Owner-authorised sequential merge — 12 November 2026
+
+Model: Codex. Owner explicitly instructed sequential integration: #120, #119, then #118. #120 was already merged as 0c4d1a3a43869c0b4bb87068d6c8b3f70dff1958; #119 merged as c782c0c27ad0734acd6cf6d4fffbbdb23772cde1. Refreshed main after #119 and its task-record update: 5d87ffd89363708df472be745d6f70f8f774fb32. Intervening changes are disjoint documentation; GitHub refreshed clean mergeability. Exact head unchanged from Claude's approved re-review in docs/coordination/review/pr118-claude-review.md; F1 resolved, residual same-binding retry behavior and later T1B/T1D findings remain accepted limitations. Exact-head CI run 43110579529: full-suite and all four regression shards successful. No GitHub review submissions or unresolved review threads. Marked ready and merged with expected head SHA and merge method merge. This closes the original main claim; earlier pending-review statements are historical. No new local build/test run; relied on Claude's exact-head local evidence and refreshed CI. No deployment, infrastructure changes, live data access or T1B work. Runtime UAT remains not tested.
