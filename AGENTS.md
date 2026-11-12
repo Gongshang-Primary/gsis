@@ -15,3 +15,7 @@ Apply the user's latest instructions and actual session authorization. Do not se
 ## Shared model coordination
 
 Three models work here: Codex and Muse build, Claude coordinates jobs and lanes and reviews (see `docs/coordination/LANES.md`; entry files `CLAUDE.md`). Before editing, read `docs/coordination/WORKFLOW.md`, `docs/coordination/LANES.md` and `docs/coordination/STATUS.md`. Work only in your assigned lane. Claim a bounded task using `docs/coordination/TASK_TEMPLATE.md`. One implementer owns each task/branch; Claude reviews the exact head commit (Codex may review Claude's own PRs). Check GitHub for active work before changing shared or generated files. Record handoffs in the repository, not only in chat. Follow the workflow's claim-only exception; implementation changes use pull requests. Human release approval and existing production restrictions remain in force.
+
+## GSiS v1 work
+
+For every v1 task, including implementation and tests outside `docs/v1/`, read and follow [docs/v1/AGENTS.md](docs/v1/AGENTS.md) before planning, editing or reviewing. This scoped supplement preserves the existing v0.9.9* instructions and production responsibilities.
