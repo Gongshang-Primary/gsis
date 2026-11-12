@@ -43,3 +43,7 @@ TZ=Asia/Singapore git diff --check b85304c3c8f048f464abf84ee66cc79c4c3d2d36 HEAD
 ```
 
 Initial checks at `fc4aefc`: exact two-document scope, three relative links and whitespace passed. The same checks must pass at final head after this task-record update; results go in the PR. No application, test, CI, configuration or generated files changed. Live classification, acceptance, readiness scanning, missing-evidence error changes and durable storage remain unimplemented. Next: owner answers worksheet/presentation/source questions; Claude reviews exact plan head; coordinator scopes future implementation separately.
+
+## Owner clarification follow-up (13 November 2026 SGT)
+
+Owner answered the worksheet: listed teaching modifiers, subjects and appointments are EO; 4/5 and Full-time are arrangements, with no requirement to track Non-EO arrangements for this purpose. MKEs are Education Officers in MOE Kindergarten, excluded from the primary-school EO tag; owner explicitly states MKEs will never be SMC. Listed support/professional categories are Non-EO. Updated the plan with the exact list, explicit employment/section/tag distinction and future negative/readiness tests. Revised the presentation recommendation so it cannot mislabel MKE as Non-EO. Individual verification source and presentation confirmation remain pending; no implementation authorised. Claude must review the updated head; prior-head evidence/approval cannot stand in for that review.

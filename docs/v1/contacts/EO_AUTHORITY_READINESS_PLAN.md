@@ -4,7 +4,7 @@ Model: Codex. 13 November 2026 (Asia/Singapore). **Plan only; implementation blo
 
 ## Decisions and evidence
 
-The owner clarified that EO means Education Officer and distinguishes teachers from non-teachers. Ordinary teachers, STs and TCs are EOs; EO is not a rare appointment. Blank Role and EO Appt Level cells do not establish Non-EO. Teaching duties must not be used to infer authority. The owner subsequently selected **Contacts Power User** to confirm and accept each staff member's records, and requested a list of known tags before answering classification exceptions.
+The owner clarified that EO means Education Officer and distinguishes teachers from non-teachers. Ordinary teachers, STs and TCs are EOs; EO is not a rare appointment. Blank Role and EO Appt Level cells do not establish Non-EO. Teaching duties must not be used to infer authority. The owner subsequently selected **Contacts Power User** to confirm and accept each staff member's records, and supplied the classification decisions below. The owner also confirmed: **MKEs will never be SMC**.
 
 | Evidence | Finding |
 | --- | --- |
@@ -19,9 +19,9 @@ Recovered specification: `GSIS_V1_CONSOLIDATED_SPEC_2026-11-11_REV49.md`, SHA-25
 
 ## Recommended representation and ownership
 
-Keep the existing Contacts authority field **`eo`**, an explicit accepted yes/no record keyed by school and permanent Staff ID. It carries its own revision, effective interval and provenance. Role remains the job; EO Appt Level remains appointment information. Neither is a substitute for accepted EO evidence. No new parallel authoritative boolean is needed.
+Keep the existing Contacts authority field **`eo`**, an explicit accepted yes/no record keyed by school and permanent Staff ID. It carries its own revision, effective interval and provenance. Role remains the job; EO Appt Level remains appointment information. Neither is a substitute for accepted EO evidence. No new parallel authoritative boolean is needed. Preserve the distinction between Education Officer employment status and the primary-school EO display tag: MKEs are Education Officers in MOE Kindergarten but do not receive that primary-school tag. The existing `schoolSection` classification and employment facts must retain this distinction; absence of the display tag must not manufacture Non-EO employment status. MKEs never hold SMC under the owner’s stated policy, so they cannot qualify through the SMC-and-EO Deploy route. Require accepted SMC=false evidence rather than inferring it from a tag at request time. Do not change independent Admin or School Leader policy through this clarification.
 
-Use Claude's proposed **EO Appt Level presentation** with explicit “EO” (base/no named appointment) and “Non-EO” choices, retaining approved named EO appointment choices. This is a proposed v1 Contacts editing interface, not a change to the legacy derived Deploy column. An explicit accepted selection records the EO status and, where supplied, the separate appointment reference through the Contacts owner. A named appointment cannot silently create EO authority on read: it needs an accepted staff record and consistent status. Resolve conflicts during owner review; do not guess from ST, TC, a Role mapping, a teaching timetable, name suffix, or a blank cell.
+Retain Claude's proposed **EO Appt Level presentation** for owner review, with explicit “EO” (base/no named appointment) and “Non-EO” choices and approved named EO appointment choices. The owner’s MKE clarification means a universal two-choice presentation is insufficient: it must also preserve the MKE/MK classification without labelling those staff Non-EO or adding the primary-school EO tag. Recommend showing employment status, section and appointment distinctly within the Contacts editor, using existing classifications rather than another authority flag. This is a proposed v1 Contacts editing interface, not a change to the legacy derived Deploy column. An explicit accepted selection records the EO status and, where supplied, the separate appointment reference through the Contacts owner. A named appointment cannot silently create EO authority on read: it needs an accepted staff record and consistent status. Resolve conflicts during owner review; do not guess from ST, TC, a Role mapping, a teaching timetable, name suffix, or a blank cell.
 
 A later write design must validate and commit related status/appointment changes atomically within Contacts' owning database, preserving earlier immutable revisions and stable operation identity. Deploy consumes the accepted projection and has no authority to backfill it. Do not reuse legacy Role-to-level recalculation to overwrite status. An owner-approved mapping may prepare suggestions for review; a suggestion or HR import is not accepted evidence. Contacts Power Users confirm each record. Catalogue definition governance stays with the approved catalogue owner; accepting staff assignments does not grant catalogue editing rights.
 
@@ -43,25 +43,27 @@ Do not blanket-map PROVIDER_INVALID/503 to 403. Actual timeout/unavailable remai
 
 This needs a separately reviewed Core error-contract extension plus Contacts adapter mapping, consumer handling and audit compatibility. Core's audit projector validates known reason codes and discards unapproved fields; do not assume attaching missing-field lists or evidence objects persists them. Minimal approved reason metadata suffices for this denial. Durable observation recovery remains separate **F5 OPEN**; this proposal neither closes it nor changes source revision/sequence on every read.
 
-## Owner questions and classification worksheet
+## Owner classification decisions and remaining questions
 
-Settled: EO meaning, teachers/STs/TCs are EO, no inference from teaching duties, all three explicit records before go-live, Contacts Power User accepts records. The following labels were found in specification/source, not verified against a current live catalogue. Labels overlap; they are not mutually exclusive staff types. Owner answers guide per-person review, never runtime permission inference.
+The following decisions were supplied by the owner in response to the source-derived worksheet on 13 November 2026 (Asia/Singapore). They settle the listed categories, not individual staff assignments. Contacts Power Users still confirm and accept school/Staff-ID-bound records. Labels overlap; modifiers and subject labels are not competing jobs or automatic permission grants.
 
-| Group | Known labels for owner classification |
+| Classification | Owner-confirmed labels and meaning |
 | --- | --- |
-| Employment/modifiers | BT, UT, SRE, FAJT, 4/5, Full-time; combinations such as FAJT + BT |
-| Subject/specialist | MTL, PE, Art, Music, Specialist |
-| Appointments | HOD (including HOD SM), SH, LH, AYH, SSD, YH, LT, MTT; ST and TC already confirmed EO |
-| School leaders | P, VP, SL; approved capability policy already treats School Leader as implying EO, not SMC; still require explicit consistent records |
-| Other recognised source labels | MK/MKE, SENO, Counsellor, AE, AM (ICT), ICT A/M, OM, OSO, CSO, DE, Dentist, Library/Librarian, Reception/Recep, Sci Lab, Support |
-| Membership flags (not employment categories) | SL, SC, SMC, KP, TL, SDT, CMT, SAT, Support, MK |
-| Appointment status | Acting/Ag and OF are separate modifiers, not EO evidence |
+| EO | BT, UT, SRE, FAJT; MTL, PE, Art, Music, Specialist; HOD (including HOD SM), SH, LH, AYH, SSD, YH, LT, MTT, ST, TC |
+| Employment arrangement, not EO status | 4/5 and Full-time can apply to EOs; they describe part-time/full-time arrangements. The owner does not require tracking part-time/full-time status for Non-EOs for this purpose. Do not introduce that requirement or erase existing/historical data. Neither arrangement alone proves EO. |
+| MKE / MK | MKEs are Education Officers working in MK (MOE Kindergarten). They do **not** receive the EO tag used for the primary-school section. **MKEs will never be SMC.** Preserve their actual employment classification and section; do not call them Non-EO merely because the primary-school tag is absent. |
+| Non-EO | SENO, Counsellor, AE, AM/ICT AM, ICT Manager, OM, OSO, CSO, DE, Dentist, Library/Librarian, Reception, Science Lab, Support |
+| School leaders | Existing approved policy treats School Leader as implying EO, not SMC; still require explicit consistent records. No new policy decision made here. |
+| Membership/status remain separate | SL, SC, SMC, KP, TL, SDT, CMT, SAT, Support, MK are membership labels; Acting/Ag and OF are separate modifiers. None independently substitutes for accepted EO evidence. |
 
-Sources: Revision 49 CI04/TK01/1K-B; `shared/teaching-rules.js` exclusion patterns, membership handling and defaults; Contacts MEMBERSHIP_FLAGS. Some source abbreviations are intentionally unexpanded because school meaning has not been confirmed. The source spelling is authoritative evidence of recognition, not proof of classification or completeness.
+The worksheet's historical sources were Revision 49 CI04/TK01/1K-B, `shared/teaching-rules.js` and Contacts MEMBERSHIP_FLAGS. The owner's explicit answers above control classification; legacy exclusion patterns and unspecified abbreviation aliases are not a source of authority. No live catalogue or staff assignment was inspected. Instructors/coaches or new categories not covered by these decisions remain unresolved for individual Contacts Power User review rather than receiving a guessed default.
 
-1. Which listed categories can be **Non-EO while teaching or planning**? In particular confirm UT, SRE, FAJT and MK/MKE and any outside instructors/coaches. Identify the activity/module: teaching assignments, Roster planning and Deploy access are different. Existing approved capability rules remain in force; exceptions requiring broader Deploy access need a separate policy decision.
-2. Which source should Contacts Power Users use to verify status (approved HR/staff list or owner-confirmed individual review), and are there ambiguous/historical cases needing owner resolution? No live lookup or migration is authorised by this plan.
-3. Confirm the proposed “EO”/“Non-EO” choices under the EO Appt Level presentation and the distinction from named appointments. The technical representation is the existing accepted `eo` boolean; the owner need not choose field names or schemas.
+The MKE clarification removes the hypothetical MKE-plus-SMC access case: it is an inconsistent record combination, not a new permission exception. A later acceptance/readiness design must flag it for correction and must not certify go-live with it unresolved. Do not silently alter the current Core capability matrix or treat the absence of a primary tag as missing employment evidence. The broad EO employment meaning can remain intact while accepted SMC=false prevents the derived Deploy route.
+
+Remaining owner questions (implementation stays blocked):
+
+1. Which source should Contacts Power Users use to verify individual status: an approved HR/staff list or owner-confirmed individual review? No live lookup or migration is authorised by this plan.
+2. Confirm the proposed EO Appt Level presentation, revised to distinguish MKE/MK from both primary-school EO tagging and Non-EO employment. Recommendation: keep employment status and school section explicit alongside appointment information. The owner need not choose field names or schemas.
 
 ## Later implementation and verification gates
 
@@ -70,6 +72,7 @@ Current documentation allowlist is exactly this file and `docs/coordination/task
 Required future tests (none executed by this plan):
 
 - Ordinary teacher with blank Role/level but accepted EO=true retains status through role changes; ST/TC appointment and EO coexist; explicit Non-EO=false is complete; combined tags preserve independent values and grant no access themselves.
+- MKE retains EO employment and MK section without the primary-school EO tag; accepted SMC=false prevents the derived Deploy route. MKE+SMC=true is reported as an inconsistent classification and blocks readiness. A 4/5 or Full-time label alone cannot supply EO evidence; Non-EO records are not rejected for lacking part-time/full-time tracking. No new inference occurs on read.
 - Missing EO with SMC=true and SL=false, and all three missing, return exact new code, deny/403/non-retryable; pending-only evidence cannot allow. Explicit three false records yield ordinary capability denial. Valid SMC/EO grants remain as specified; independent Admin and impersonation regressions stay intact.
 - Timeouts still yield retryable 503, stale observations conflict, malformed/wrong-school/wrong-staff evidence fails safely; future/expired/revoked interval boundaries retain established semantics. Audit projection accepts the new reason without leaking fields or inventing durable evidence.
 - Readiness detects a missing field on an inactive/provisional staff member, duplicate identity, stale catalogue dependency and last-page failure. Zero unresolved rows only passes after complete coverage; concurrent additions/changes invalidate the scan. The three fields' explicit false values do not create false positives.
