@@ -1,6 +1,6 @@
 # v1-contacts-t1b: bounded Contacts read contract
 
-- Status: implementation prepared; exact-head full CI and Claude review pending
+- Status: merged (#125 at b4cbec95b3 as 16eb139)
 - Owner/model: Codex
 - Coordinator: ChatGPT, v1 only
 - Reviewer/model: Claude, independent exact-head review
