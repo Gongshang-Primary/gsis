@@ -38,3 +38,7 @@ Implement the single label restoration, verify it, and open a small PR against m
 
 Codex resumes #60 under the owner's instruction to clear the backlog continuously. Reconstruct the single label fix on main 69efd3ab9f0dbbb31f1a3bc7da9c86b3dc2ea348; retain current Drive and Venues health labels. Preserve existing branch history while incorporating current main. Claude reviews the new exact head; owner merges. No live operations.
 
+
+## Backlog rebase, 13 November 2026
+
+Model: Codex. Reviewer: Muse at the final exact head. Rebased the original net patch onto current main; kept both changelog histories and the single import-label product change. Canonical build is unchanged. Five existing health UI programs and a temporary synthetic import job/recent-failure rendering check passed; unknown jobs remain filtered. Full exact-head CI and head will be recorded in PR #60; earlier approvals do not carry. No live operations.
