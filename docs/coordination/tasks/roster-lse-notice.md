@@ -1,6 +1,6 @@
 # roster-lse-notice: WhatsApp the duty SMC when a teacher reports Leave School Early (changelog)
 
-- Status: template APPROVED (Active, confirmed 12 Nov 2026 via WhatsApp Manager screenshot); ready for Codex build; lane R
+- Status: approved (#121 at 760b00b, Muse review docs/coordination/review/pr121-muse-review.md); template APPROVED (Active, confirmed 12 Nov 2026); lane R
 - Reviewer/model: Muse
 - Last updated (Asia/Singapore): 12 November 2026
 
