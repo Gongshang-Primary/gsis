@@ -69,3 +69,9 @@ Not deployed. No authority, live data, configuration or notification changes.
 ## Refresh claim, 6 November 2026
 
 Model: Codex. Refresh on main 69efd3ab9f0dbbb31f1a3bc7da9c86b3dc2ea348. Preserve current fresh-start opening balances and archive coverage. Carry only the display fix and accounting parity tests; earlier live observations above remain historical evidence, not a new live audit. Build and full CI required. Owner merges.
+
+## Backlog rebase (Model: Codex, 13 Nov)
+
+Reviewer: Muse at the new exact PR head. Rebased original `c1b29487e61136ff55a1f578c51893ff733b0e2e` onto fetched main `69dcc20`. The original net tree `9ccd78d72d4661829f3504e6001255aae745f363` was preserved before consolidation/rebase; there were no conflicts. No relief-count facts are fabricated and no accounting/ranking policy changes are added.
+
+Build passed with no diff. Five current programs passed: relief-count UI and native D1 accounting, fresh-start accounting, opening-balances browser and statistics contrast. Merge-tree is clean. Fresh CI will be recorded in the PR body; earlier approval does not approve this head. #47 must rebase onto this branch's new CI-green head and remain stacked. No live data, main push, merge or deployment.
