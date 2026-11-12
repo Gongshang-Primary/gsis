@@ -1,6 +1,6 @@
 # v1-eo-authority-plan: explicit EO evidence and T1D readiness
 
-- Status: claimed; documentation only
+- Status: review; owner decisions settled; updated-head check pending; documentation only
 - Owner/model: Codex; coordinator ChatGPT; independent reviewer Claude
 - Updated: 13 November 2026 (Asia/Singapore)
 - Branch: codex/v1-eo-authority-plan
@@ -17,3 +17,43 @@ Main refreshed; open PRs inspected. No open PR owns these two new documentation 
 ## Verification / handoff
 
 Pending plan publication and exact-head documentation checks. Owner answers and Claude review pending. No skill package executed; applied repository ownership, explicit-error and recovery principles manually. No runtime tests or deployments performed. Official T1B-01 and T1B-02 remain Not tested; F5 open.
+
+## Plan handoff
+
+Status: review; owner answers pending. Claim accepted on main at `61c628f`; plan branch starts there. Owner confirmed Contacts Power User acceptance; requested a known-tag worksheet before answering exceptions. Plan includes source-derived labels, distinction from live assignments and remaining questions. PR/exact review head are recorded in GitHub (avoids a self-referential hash). Reviewer: Claude; no review yet.
+
+Q01–Q05: Pass for documentation scope/design inspection: two-path allowlist, ownership and privacy boundaries, no runtime concurrency claim, no new dependencies. Q06: documentation checks pass; build, Node/LORD regressions and runtime tests not run locally (no build input changed); required exact-head CI remains pending. Q07: pending Claude review and owner answers. Q08: deployment not applicable; UAT Not tested. F5 remains open. Rollback removes documentation only.
+
+Reproducible documentation checks, run using TZ=Asia/Singapore; repeat at the PR head:
+
+```bash
+TZ=Asia/Singapore python3 - <<'PY'
+from pathlib import Path
+import re, subprocess
+base='b85304c3c8f048f464abf84ee66cc79c4c3d2d36'
+files=subprocess.check_output(['git','diff','--name-only',base,'HEAD'],text=True).splitlines()
+assert set(files)=={'docs/coordination/tasks/v1-eo-authority-plan.md','docs/v1/contacts/EO_AUTHORITY_READINESS_PLAN.md'}, files
+for f in files:
+    for target in re.findall(r'\]\(([^)]+)\)',Path(f).read_text()):
+        if '://' not in target and not target.startswith('#'):
+            assert (Path(f).parent/target.split('#')[0]).exists(), (f,target)
+print('PASS: exact documentation scope and relative links')
+PY
+TZ=Asia/Singapore git diff --check b85304c3c8f048f464abf84ee66cc79c4c3d2d36 HEAD
+```
+
+Initial checks at `fc4aefc`: exact two-document scope, three relative links and whitespace passed. The same checks must pass at final head after this task-record update; results go in the PR. No application, test, CI, configuration or generated files changed. Live classification, acceptance, readiness scanning, missing-evidence error changes and durable storage remain unimplemented. Next: owner answers worksheet/presentation/source questions; Claude reviews exact plan head; coordinator scopes future implementation separately.
+
+## Owner clarification follow-up (13 November 2026 SGT)
+
+Owner answered the worksheet: listed teaching modifiers, subjects and appointments are EO; 4/5 and Full-time are arrangements, with no requirement to track Non-EO arrangements for this purpose. MKEs are Education Officers in MOE Kindergarten, excluded from the primary-school EO tag; owner explicitly states MKEs will never be SMC. Listed support/professional categories are Non-EO. Updated the plan with the exact list, explicit employment/section/tag distinction and future negative/readiness tests. Revised the presentation recommendation so it cannot mislabel MKE as Non-EO. Individual verification source and presentation confirmation remain pending; no implementation authorised. Claude must review the updated head; prior-head evidence/approval cannot stand in for that review.
+
+## Claude M1 response (13 November 2026 SGT)
+
+Claude requested changes at `74df90ae8c7bbb03234b4f2db8f7886dbb6d2ecd`; review source PR129 head `8c056f22e331cd8520aa38172ced2fa502853abd`. Owner explicitly requested M1. Added no self-acceptance of any SMC/EO/School Leader record, Admin approval bound to SMC=true/School Leader=true proposals, acceptance audit identities/time/operation ID and future positive/negative/recovery tests. Distinguished Contacts durable acceptance audit from the current Core projector. No implementation. Two-file allowlist retained. Owner questions and independent updated-head Claude review remain pending. L1 remains an owner decision; no inactive-staff exemption or bulk default introduced. Documentation scope/link/whitespace checks are rerun at the new head; full build/runtime suites not run locally for this prose change. PR129 is reviewed separately without editing Claude's branch; verdict recorded on PR129.
+
+## Settled owner answers and final plan update (13 November 2026 SGT)
+
+Supersedes earlier pending-owner statements in this historical log. Source: PR129 `0fe0c5d02cf9dc87431395df206d5306d570be7e`, OWNER_DIRECTIVES row and PR128 review “Owner answers”. Verification source is the owner's own review; presentation accepted; inactive staff excluded from blocking readiness, optionally informational. No owner questions remain. Added future tests for inactive blanks, missing-evidence denial after reactivation and readiness invalidation for reactivation during/after a scan. Preserved M1 controls and no-default rule. ChatGPT must scope implementation as a separate task.
+
+Claude approved the prior plan at `ba7f6d746955949922343f521635ca8315379277`; the current edit needs a new exact-head check. Q07: owner decisions settled, updated-head review/check pending. Merge order: PR129 then PR128, with exact-head CI rechecked for each; PR128 held for owner's check of this edit. Documentation checks repeated at the new head; no build/runtime tests run locally. Two-file scope unchanged, F5 open, official T1B-01/T1B-02 Not tested.
