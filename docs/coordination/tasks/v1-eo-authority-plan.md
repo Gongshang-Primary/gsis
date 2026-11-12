@@ -1,6 +1,6 @@
 # v1-eo-authority-plan: explicit EO evidence and T1D readiness
 
-- Status: claimed; documentation only
+- Status: review; owner decisions settled; updated-head check pending; documentation only
 - Owner/model: Codex; coordinator ChatGPT; independent reviewer Claude
 - Updated: 13 November 2026 (Asia/Singapore)
 - Branch: codex/v1-eo-authority-plan
@@ -51,3 +51,9 @@ Owner answered the worksheet: listed teaching modifiers, subjects and appointmen
 ## Claude M1 response (13 November 2026 SGT)
 
 Claude requested changes at `74df90ae8c7bbb03234b4f2db8f7886dbb6d2ecd`; review source PR129 head `8c056f22e331cd8520aa38172ced2fa502853abd`. Owner explicitly requested M1. Added no self-acceptance of any SMC/EO/School Leader record, Admin approval bound to SMC=true/School Leader=true proposals, acceptance audit identities/time/operation ID and future positive/negative/recovery tests. Distinguished Contacts durable acceptance audit from the current Core projector. No implementation. Two-file allowlist retained. Owner questions and independent updated-head Claude review remain pending. L1 remains an owner decision; no inactive-staff exemption or bulk default introduced. Documentation scope/link/whitespace checks are rerun at the new head; full build/runtime suites not run locally for this prose change. PR129 is reviewed separately without editing Claude's branch; verdict recorded on PR129.
+
+## Settled owner answers and final plan update (13 November 2026 SGT)
+
+Supersedes earlier pending-owner statements in this historical log. Source: PR129 `0fe0c5d02cf9dc87431395df206d5306d570be7e`, OWNER_DIRECTIVES row and PR128 review “Owner answers”. Verification source is the owner's own review; presentation accepted; inactive staff excluded from blocking readiness, optionally informational. No owner questions remain. Added future tests for inactive blanks, missing-evidence denial after reactivation and readiness invalidation for reactivation during/after a scan. Preserved M1 controls and no-default rule. ChatGPT must scope implementation as a separate task.
+
+Claude approved the prior plan at `ba7f6d746955949922343f521635ca8315379277`; the current edit needs a new exact-head check. Q07: owner decisions settled, updated-head review/check pending. Merge order: PR129 then PR128, with exact-head CI rechecked for each; PR128 held for owner's check of this edit. Documentation checks repeated at the new head; no build/runtime tests run locally. Two-file scope unchanged, F5 open, official T1B-01/T1B-02 Not tested.
