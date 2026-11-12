@@ -161,7 +161,7 @@ export async function dispatchEdgeEmploymentMail(env,sendMail){
  if(!await edgeDispatchHasWork(env,'employmentMail'))return outcome;
  for(let count=0;count<5;count++){
   const claim=await service(env,{operation:'claimEmploymentMail'},(state,ctx)=>{
-   const addresses=new Set(ctx.people.flatMap(p=>[p.email,p.cesEmail,...(p.emails||[])]).filter(Boolean).map(value=>String(value).trim().toLowerCase()));
+   const addresses=new Set(ctx.people.filter(p=>p.active===true).flatMap(p=>[p.email,p.cesEmail,...(p.emails||[])]).filter(Boolean).map(value=>String(value).trim().toLowerCase()));
    let cancelled=0,uncertain=0;
    for(const row of (state.dailyEmploymentMail||[]).filter(row=>row.status==='queued'&&row.date<ctx.today).slice(0,50)){
     row.status='cancelled';row.error='STALE_BACKLOG: date passed before D1 dispatch was fixed';row.completedAt=ctx.iso;cancelled++;
