@@ -28,3 +28,7 @@ L2. Root `AGENTS.md` still opens "Three models work here … Claude coordinates 
 L3. The task record cites `python3 /workspace/work/check-v1-policy.py`, which is not in the repository. Its result cannot be reproduced. Either commit the script or describe its checks as manual.
 
 L4 (advisory, not a defect). About 135 lines of process now gate every v1 task. Each gate needs Pass/Fail/Pending/N.A. evidence. For small v1 tasks this cost may exceed the benefit. Watch the first two tasks under it; trim gates that produce no findings.
+
+## Owner disposition (12 Nov 2026)
+
+Owner accepted L1 to L4 as follow-ups, not blockers: clarify root coordination scope (L2), make documentation checks reproducible (L3), assess gate usefulness after two v1 tasks (L4) while always retaining security and recovery checks. L1 closes when the directive branch merges. Owner reports CI green at #119 `4e105dc` and #118 `57686a3`; recheck before merge. Merge order: Claude docs PR, then #119, then #118.
