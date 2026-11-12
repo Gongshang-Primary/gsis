@@ -67,3 +67,24 @@ Exact command, tested commit, outcome and evidence. Explicitly list checks not r
 ## Claim
 
 Model: Codex. Branch `codex/roster-d1-full-backup-fix` from verified current main `e72e8ad4028261852956888f3676e486251751e7`, before implementation edits. The info-only task is already merged (#115). Reviewer is Claude under the owner exception. Investigation uses local synthetic D1/R2/Drive fixtures only. No limit changes, live reads/writes, row or object deletion, template activation, merge or deployment are authorized. Employment-mail work follows this task in serial order.
+
+## Investigation checkpoint (Model: Codex, 12 Nov)
+
+- Proven cache cause: `captureBackup` copies recovery heads into `gsis_backup_items`; `runRecoveryTimetableCleanup` protects only current/previous **live** heads. Cleanup can retire a head and remove its old part after capture. The captured head remains, and the old exporter fails the entire backup. `tests/roster-drive-backup-cache-loss.mjs` reproduces this using the real cleanup implementation with entirely synthetic D1/R2 data. It fails on the original exporter with `BACKUP_OBJECT` and passes on the working change. Missing/corrupt derived entries are omitted and recorded in `missingCacheParts`; authoritative packed-audit digest failures remain fatal.
+- The observed 960,000 ms expired rows do **not** establish that export or upload consumed 16 minutes: expiry records the next scheduler's detection time. Neither the inner run lease nor the outer worker lease has a progress renewal, and there are no persisted stage timings in the original code. Exact live stage attribution remains unproven; no live reads were made.
+- Original synthetic baseline: 14,000 main records including 13,000 compressed audit-evidence records; capture 24 ms, tier-one export 45 ms, tier-two export 7,008 ms, serialization/compression 106 ms, total 7,183 ms. This local measurement does not reproduce the live delay and is not a provider throughput claim.
+- Working core change retains the 15-minute lease duration, renews it only on actual export progress, persists stage/record/time diagnostics, retains captured rows, and applies an hour of backoff after a failed run. It does not yet renew the **outer** worker lease: that change is awaiting the scope clarification below.
+- Latest synthetic full/restore check: 14,081 captured records, full verified in 7,273 ms (capture 29; tier-one export 46; tier-two export 6,880; compression 290; synthetic upload 22 ms). Restored TIER_ONE values match the normalized source. Increment follows a verified full. Tests also cover pipeline progress beyond 16 minutes, dead-run single expiry, retained captures, and hourly fault backoff. The Drive adapter is a local fixture; no live provider timing is claimed.
+- Existing daily full schedule: 02:15 Asia/Singapore; hourly increments between full backups. Weekly restore drill: Sunday 02:15 Asia/Singapore, with the existing interrupted-drill retry path.
+
+### Pending scope clarification
+
+The task names scheduling in `_worker.js` / `notification-worker/index.js`, but the outer lease, 12-minute elapsed-time check, backup runner and restore scheduling live in `roster-update/public/edge-roster-backup-jobs.js`. The requested visible health lines are rendered by `roster-update/public/system-health.js`, not `shared/edge-health.js`. Asked the owner to include these two files, limited to backup progress/lease handling, recovery alerts and the specified health lines. A proposed patch is prepared locally but **not applied**. Do not treat the core module checkpoint as a complete repair while the outer lease remains unchanged.
+
+### Checkpoint validation
+
+- Passed: `TZ=Asia/Singapore NODE_NO_WARNINGS=1 node tests/roster-drive-backup-cache-loss.mjs`; also proved its failure against the original exporter before restoring the fix.
+- Passed: `TZ=Asia/Singapore NODE_NO_WARNINGS=1 node tests/roster-drive-backup-progress.mjs` (14,081 records; full, restore, increment, progress and backoff checks).
+- Passed existing `roster-drive-backup.mjs`, `roster-drive-jobs.mjs`, `roster-drive-restore.mjs`, and updated `roster-drive-output-errors.mjs`. The latter now requires expiry backoff before retry instead of its former immediate-retry policy.
+- `TZ=Asia/Singapore npm run build` completed; generated Worker bundles regenerated. Final clean-build verification, full local suite, CI, alert recovery acceptance and the draft PR are **not complete**.
+- Employment-mail task not started; lane R remains serial. No live data/settings, WhatsApp templates, production R2 objects, main branch, deployment or merge changed.

@@ -85,8 +85,10 @@ export async function captureBackup(db,{kind='full',now=Date.now()}={}){
  const row=await c.prepare('SELECT * FROM gsis_backup_ledger WHERE id=?').bind(id).first();return row||{busy:true,skipped:true,code:'SKIPPED_BUSY'};
 }
 function counts(rows){const result={};for(const row of rows){const v=JSON.parse(row.value_json);if(row.record_id==='$'&&['array','map'].includes(v?.kind)){result[row.scope+'.'+row.collection]??=0;continue;}const key=row.scope+'.'+row.collection;result[key]=(result[key]||0)+1;}return result;}
-export async function backupPayload(env,run,tier){
+export async function backupPayload(env,run,tier,{progress=async()=>{}}={}){
  const source=(await primary(env.GSIS_JOBS).prepare('SELECT scope,collection,record_id,position,record_date,value_json,revision,deleted FROM gsis_backup_items WHERE run_id=? AND tier=? ORDER BY scope,collection,position,record_id').bind(run.id,tier).all()).results||[],objects=new Map(),visiting=new Set();
+ await progress('read-tier-'+tier,0);
+ let processed=0;
  const rewrite=async value=>{
   if(typeof value==='string'&&/^[\s]*[\[{]/.test(value)){let parsed;try{parsed=JSON.parse(value);}catch{}if(parsed&&typeof parsed==='object')return JSON.stringify(await rewrite(parsed));}
   if(!value||typeof value!=='object')return value;
@@ -94,6 +96,7 @@ export async function backupPayload(env,run,tier){
    if(!/^gsis\/roster\/.+\/[a-f0-9]{64}\.json\.gz$/.test(value.key)||! /^[a-f0-9]{64}$/.test(value.digest||'')||!value.key.endsWith('/'+value.digest+'.json.gz'))fail('BACKUP_OBJECT','Invalid timetable object reference.');
    if(!objects.has(value.key)){
     if(visiting.has(value.key))fail('BACKUP_OBJECT','Cyclic timetable object reference.');visiting.add(value.key);
+    await progress('object-tier-'+tier,processed);
     const saved=await env.ROSTER_TIMETABLE_SNAPSHOTS?.get(value.key);if(!saved)fail('BACKUP_OBJECT','A referenced timetable object is missing.');
     const raw=await boundedText(await saved.arrayBuffer());if(sha256Hex(raw)!==value.digest)fail('BACKUP_DIGEST','A timetable object failed verification.');
     const json=JSON.stringify(await rewrite(await sanitizeBackup(JSON.parse(raw)))),digest=sha256Hex(json),key=value.key.replace(/[a-f0-9]{64}\.json\.gz$/,digest+'.json.gz');
@@ -104,14 +107,40 @@ export async function backupPayload(env,run,tier){
   if(Array.isArray(value)){const result=[];for(const child of value)result.push(await rewrite(child));return result;}
   const output={};for(const [key,child] of Object.entries(value))output[key]=await rewrite(child);return output;
  };
- const rows=[],deleted=[];for(const row of source){if(row.deleted){deleted.push({scope:row.scope,collection:row.collection,record_id:row.record_id,revision:row.revision});continue;}const {deleted:_,...record}=row;let value=JSON.parse(row.value_json);if(row.scope==='cache'){
-   const versions=[];for(const label of ['current','previous']){const raw=value[label];if(!raw)continue;if(sha256Hex(raw)!==value[label+'Digest'])fail('BACKUP_DIGEST','A timetable cache manifest failed verification.');const m=JSON.parse(raw),parts=[];
-    for(const [partKey,ref] of Object.entries(m.parts||{})){if(!/^roster\/timetables\/recovery-v1\/parts\/[a-f0-9.-]+\.json\.gz$/.test(ref.objectKey||''))fail('BACKUP_OBJECT','Invalid cached timetable path.');const saved=await env.ROSTER_TIMETABLE_SNAPSHOTS?.get(ref.objectKey);if(!saved)fail('BACKUP_OBJECT','A cached timetable part is missing.');const compressed=new Uint8Array(await saved.arrayBuffer()),rawPart=await boundedText(compressed);if(sha256Hex(base64(compressed))!==ref.encodedKey||sha256Hex(rawPart)!==partKey||encoder.encode(rawPart).length!==ref.bytes)fail('BACKUP_DIGEST','A cached timetable part failed verification.');const json=JSON.stringify(await sanitizeBackup(JSON.parse(rawPart)));parts.push({sourcePart:partKey,digest:sha256Hex(json),json});}
+ const rows=[],deleted=[],missingCacheParts=[];for(const row of source){if(processed++%100===0)await progress('export-tier-'+tier,processed);if(row.deleted){deleted.push({scope:row.scope,collection:row.collection,record_id:row.record_id,revision:row.revision});continue;}const {deleted:_,...record}=row;let value=JSON.parse(row.value_json);if(row.scope==='cache'){
+   // These heads were copied at capture time. Cache cleanup only protects
+   // live heads, so a retired version can disappear while this export runs.
+   // Omit the whole derived entry; never turn an incomplete cache into a valid one.
+   const versions=[];let incomplete=false;
+   for(const label of ['current','previous']){
+    const raw=value[label];if(!raw)continue;
+    let m;
+    try{if(sha256Hex(raw)!==value[label+'Digest'])fail('BACKUP_DIGEST','A timetable cache manifest failed verification.');m=JSON.parse(raw);}
+    catch{missingCacheParts.push({scope:row.record_id,version:label,reason:'manifest-invalid'});incomplete=true;continue;}
+    const parts=[];
+    for(const [partKey,ref] of Object.entries(m.parts||{})){
+     let reason='';
+     if(!/^roster\/timetables\/recovery-v1\/parts\/[a-f0-9.-]+\.json\.gz$/.test(ref.objectKey||''))reason='reference-invalid';
+     else{
+      await progress('cache-tier-'+tier,processed);
+      const saved=await env.ROSTER_TIMETABLE_SNAPSHOTS?.get(ref.objectKey);
+      if(!saved)reason='missing';
+      else try{
+       const compressed=new Uint8Array(await saved.arrayBuffer()),rawPart=await boundedText(compressed);
+       if(sha256Hex(base64(compressed))!==ref.encodedKey||sha256Hex(rawPart)!==partKey||encoder.encode(rawPart).length!==ref.bytes)reason='digest-mismatch';
+       else{const json=JSON.stringify(await sanitizeBackup(JSON.parse(rawPart)));parts.push({sourcePart:partKey,digest:sha256Hex(json),json});}
+      }catch(error){if(!['BACKUP_SIZE','BACKUP_DIGEST'].includes(error.code)&&!(error instanceof SyntaxError)&&!(error instanceof TypeError))throw error;reason='content-invalid';}
+     }
+     if(reason){missingCacheParts.push({scope:row.record_id,version:label,partKey,reason});incomplete=true;}
+    }
     versions.push({label,header:await sanitizeBackup(m.header),payload:await sanitizeBackup(m.payload),parts});
-   }value={versions};
+   }
+   if(incomplete)continue;
+   value={versions};
   }record.value_json=JSON.stringify(await rewrite(await sanitizeBackup(value)));rows.push(record);}
+ await progress('restore-budget-tier-'+tier,processed);
  const restoreBudget=await backupRestoreBudget(rows,[...objects.values()]),exported=run.kind==='full'?rows:rows.filter(r=>r.scope==='cache'||r.revision>(r.scope==='roster'?run.revision_from:run.register_from));
- return {schema:BACKUP_FORMAT,runId:run.id,kind:run.kind,tier,startedAt:run.started_at,revisions:{roster:run.revision_to,register:run.register_to},fromRevisions:{roster:run.revision_from,register:run.register_from},counts:counts(exported),restoreBudget,replaceCache:tier===1,rows:exported,deleted,objects:[...objects.values()]};
+ return {schema:BACKUP_FORMAT,runId:run.id,kind:run.kind,tier,startedAt:run.started_at,revisions:{roster:run.revision_to,register:run.register_to},fromRevisions:{roster:run.revision_from,register:run.register_from},counts:counts(exported),restoreBudget,replaceCache:tier===1,missingCacheParts,rows:exported,deleted,objects:[...objects.values()]};
 }
 export async function backupRestoreBudget(rows,objects){
  const decode=scope=>{const selected=rows.filter(r=>r.scope===scope);return Store.decode([{collection:'$root',record_id:'$',position:0,record_date:'',value_json:JSON.stringify({keys:[...new Set(selected.map(r=>r.collection))]})},...selected]);};
@@ -133,8 +162,8 @@ export async function finishBackup(db,run,{status,manifest={},fileId='',digest='
  if(error)manifest={...manifest,outputError:outputFailure(error,'BACKUP_FAILED')};
  const files=manifest.files||[],c=primary(db),result=checked(await c.prepare("UPDATE gsis_backup_ledger SET status=?,finished_at=?,duration_ms=MAX(0,?-started_at),record_count=?,bytes_raw=?,bytes_compressed=?,drive_file_id=?,digest=?,manifest_json=?,error=?,lease_until=0 WHERE id=? AND status='running' AND lease_token=?").bind(status,now,now,files.reduce((n,f)=>n+(f.records||0),0),files.reduce((n,f)=>n+(f.bytesRaw||0),0),files.reduce((n,f)=>n+(f.bytesCompressed||0),0),fileId,digest,JSON.stringify(manifest),error?outputErrorText(error):'',run.id,run.lease_token).run());
  if(!result.meta?.changes)fail('BACKUP_LEASE','This backup run no longer owns its lease.');
- // Only transient captured copies are removed. The ledger and Drive versions stay.
- checked(await c.prepare('DELETE FROM gsis_backup_items WHERE run_id=?').bind(run.id).run());return {id:run.id,status,verified:status==='verified'};
+ // Retain captured rows as well as the ledger; this repair does not prune data.
+ return {id:run.id,status,verified:status==='verified'};
 }
 export async function backupLedger(db,{kind='',status='',date='',before=Number.MAX_SAFE_INTEGER,beforeId='~',limit=100}={}){
  if(!await primary(db).prepare("SELECT 1 present FROM sqlite_master WHERE type='table' AND name='gsis_backup_ledger'").first())return [];
@@ -146,41 +175,56 @@ export async function backupStatus(db,{now=Date.now()}={}){
  const c=primary(db),latest=await c.prepare("SELECT * FROM gsis_backup_ledger WHERE kind IN ('full','increment') ORDER BY started_at DESC LIMIT 1").first(),verified=await c.prepare("SELECT * FROM gsis_backup_ledger WHERE kind IN ('full','increment') AND status='verified' ORDER BY started_at DESC LIMIT 1").first(),full=await c.prepare("SELECT * FROM gsis_backup_ledger WHERE kind='full' AND status='verified' ORDER BY started_at DESC LIMIT 1").first(),recent=(await c.prepare("SELECT status FROM gsis_backup_ledger WHERE kind IN ('full','increment') AND status<>'running' ORDER BY started_at DESC LIMIT 2").all()).results||[];
  const warnings=[];if(!verified||now-verified.started_at>2*HOUR)warnings.push('increment-overdue');if(!full||now-full.started_at>26*HOUR)warnings.push('full-overdue');if(recent.length===2&&recent.every(r=>r.status==='failed'))warnings.push('two-failures');const config=await readBackupConfig(db);if(verified?.bytes_raw>config.sizeAlertMiB*1024*1024)warnings.push('size-threshold');
  const aux=(await c.prepare("SELECT kind,status FROM (SELECT kind,status,ROW_NUMBER() OVER(PARTITION BY kind ORDER BY started_at DESC,id DESC) n FROM gsis_backup_ledger WHERE kind IN ('continuity','restore-test')) WHERE n<=2").all()).results;for(const kind of ['continuity','restore-test']){const recent=aux.filter(r=>r.kind===kind);if(recent.length===2&&recent.every(r=>r.status==='failed'))warnings.push(kind+'-failed');}
- return {available:true,lastVerifiedAt:verified?.finished_at||null,lastCapturedAt:verified?.started_at||null,lastFullAt:full?.finished_at||null,bytes:verified?.bytes_compressed||0,status:latest?.status||'not-run',lastError:latest?.error||'',lastCode:JSON.parse(latest?.manifest_json||'{}').outputError?.code||latest?.error||'',lastAttemptAt:latest?.started_at||null,warnings};
+ return {available:true,lastVerifiedAt:verified?.finished_at||null,lastCapturedAt:verified?.started_at||null,lastFullAt:full?.finished_at||null,bytes:verified?.bytes_compressed||0,status:latest?.status||'not-run',lastError:latest?.error||'',lastCode:JSON.parse(latest?.manifest_json||'{}').outputError?.code||latest?.error||'',lastAttemptAt:latest?.started_at||null,nextAttemptAt:latest?.status==='failed'?Math.max(latest.finished_at||0,latest.started_at)+HOUR:null,lastFullBytes:full?.bytes_compressed||0,progress:JSON.parse(latest?.manifest_json||'{}').progress||null,warnings};
 }
-export async function runDriveBackup(env,{now=Date.now(),bridge,forceKind}={}){
+// Renewal is tied to observed progress, never a timer that can keep a stuck
+// operation alive forever. Both identity and unexpired ownership are required.
+export async function heartbeatBackup(db,run,{now=Date.now(),progress={}}={}){
+ const result=checked(await primary(db).prepare("UPDATE gsis_backup_ledger SET lease_until=?,manifest_json=json_set(manifest_json,'$.progress',json(?)) WHERE id=? AND status='running' AND lease_token=? AND lease_until>?").bind(now+LEASE,JSON.stringify(progress),run.id,run.lease_token,now).run());
+ if(!result.meta?.changes)fail('BACKUP_LEASE','This backup run no longer owns its lease.');
+ return now+LEASE;
+}
+export async function runDriveBackup(env,{now=Date.now(),bridge,forceKind,clock=Date.now,onProgress=async()=>{}}={}){
  if(env.ROSTER_EDGE_AUTHORITY!=='d1')return {enabled:false,skipped:true};
+ const wallStarted=clock(),currentTime=()=>now+Math.max(0,clock()-wallStarted);
  const db=env.GSIS_JOBS;await ensureBackup(db);await expireBackupRuns(db,now);const config=await readBackupConfig(db);if(!config.enabled)return {enabled:false,skipped:true};
  const latest=await primary(db).prepare("SELECT manifest_json FROM gsis_backup_ledger WHERE kind IN ('full','increment') AND status='verified' ORDER BY started_at DESC LIMIT 1").first(),previousManifest=JSON.parse(latest?.manifest_json||'{}');
  const status=await backupStatus(db,{now}),lastFull=await primary(db).prepare("SELECT started_at FROM gsis_backup_ledger WHERE kind='full' AND status='verified' ORDER BY started_at DESC LIMIT 1").first(),today=singaporeBackupDate(now),dueFull=!lastFull||previousManifest.chainRawBytes>=96*1024*1024||status.lastCode==='BACKUP_CHAIN_LIMIT'||now>=Date.parse(today+'T02:15:00+08:00')&&lastFull.started_at<Date.parse(today+'T02:15:00+08:00');
- if(!forceKind&&status.status==='failed'&&now-status.lastAttemptAt<60000)return {enabled:true,skipped:true,code:'SKIPPED_BACKOFF'};
+ if(status.status==='failed'&&now<status.nextAttemptAt)return {enabled:true,skipped:true,code:'SKIPPED_BACKOFF',backoff:1,backoffSeconds:Math.ceil((status.nextAttemptAt-now)/1000),readyAt:status.nextAttemptAt};
  if(!forceKind&&status.status!=='failed'&&!dueFull&&status.lastCapturedAt&&now-status.lastCapturedAt<HOUR)return {enabled:true,idle:true};
+ const captureStarted=clock();
  const run=await captureBackup(db,{kind:forceKind||(dueFull?'full':'increment'),now});if(run.busy)return {...run,enabled:true};
- const manifest={schema:BACKUP_FORMAT,runId:run.id,kind:run.kind,startedAt:run.started_at,revisions:{roster:run.revision_to,register:run.register_to},fromRevisions:{roster:run.revision_from,register:run.register_from},previousManifestId:JSON.parse(run.manifest_json).previousManifestId||'',chainRawBytes:run.kind==='full'?0:previousManifest.chainRawBytes||0,files:[]};
+ const manifest={schema:BACKUP_FORMAT,runId:run.id,kind:run.kind,startedAt:run.started_at,revisions:{roster:run.revision_to,register:run.register_to},fromRevisions:{roster:run.revision_from,register:run.register_from},previousManifestId:JSON.parse(run.manifest_json).previousManifestId||'',chainRawBytes:run.kind==='full'?0:previousManifest.chainRawBytes||0,files:[],missingCacheParts:[]};
+ const timings={captureMs:Math.max(0,clock()-captureStarted)},started=clock();let previous=started;
+ const progress=async(stage,records=0)=>{const time=currentTime();manifest.progress={stage,records,at:time,timings};await heartbeatBackup(db,run,{now:time,progress:manifest.progress});await onProgress({stage,records,at:time});};
+ const measured=stage=>{const time=clock();timings[stage]=(timings[stage]||0)+Math.max(0,time-previous);previous=time;};
  try{
+  await progress('captured');
   let totalBudget={bytes:0,parts:0};if(run.kind==='increment'){const prior=await db.prepare("SELECT manifest_json FROM gsis_backup_ledger WHERE kind='full' AND status='verified' ORDER BY started_at DESC LIMIT 1").first();manifest.tierTwoRestoreBudget=JSON.parse(prior?.manifest_json||'{}').tierTwoRestoreBudget;if(!manifest.tierTwoRestoreBudget)fail('BACKUP_RESTORE_LIMIT','A full backup with verified restore bounds is required.');totalBudget={...manifest.tierTwoRestoreBudget};}
   for(const tier of run.kind==='full'?[1,2]:[1]){
-   const payload=validateBackupPayload(await backupPayload(env,run,tier)),raw=JSON.stringify(payload),bytes=await gzip(raw),digest=sha256Hex(raw),name=today+'-tier'+tier+'-'+run.kind+'-r'+run.revision_from+'-'+run.revision_to+'-'+digest+'.json.gz';
+   const payload=validateBackupPayload(await backupPayload(env,run,tier,{progress}));measured('exportTier'+tier+'Ms');
+   const raw=JSON.stringify(payload),bytes=await gzip(raw),digest=sha256Hex(raw),name=today+'-tier'+tier+'-'+run.kind+'-r'+run.revision_from+'-'+run.revision_to+'-'+digest+'.json.gz';
+   manifest.missingCacheParts.push(...payload.missingCacheParts);
    manifest.chainRawBytes+=encoder.encode(raw).length;if(manifest.chainRawBytes>128*1024*1024)fail('BACKUP_CHAIN_LIMIT','A new full backup is required before this chain grows further.');
    totalBudget.bytes+=payload.restoreBudget.bytes;totalBudget.parts+=payload.restoreBudget.parts;if(totalBudget.bytes>40*1024*1024||totalBudget.parts>2048)fail('BACKUP_RESTORE_LIMIT','The complete backup exceeds the verified import restore envelope.');if(tier===2)manifest.tierTwoRestoreBudget=payload.restoreBudget;manifest.restoreBudget=totalBudget;
+   measured('compressTier'+tier+'Ms');await progress('upload-tier-'+tier,payload.rows.length);
    const response=await bridge({operation:'edgeDriveOutput',step:'writeBackup',config,date:today,name,data:base64(bytes),digest,counts:payload.counts,records:payload.rows.length});
    if(!response?.verified||response.digest!==digest||Store.canonicalJson(response.counts)!==Store.canonicalJson(payload.counts)||response.records!==payload.rows.length||typeof response.fileId!=='string')fail('BACKUP_VERIFY','Drive did not verify the backup digest and counts.');
+   measured('uploadTier'+tier+'Ms');await progress('verified-tier-'+tier,payload.rows.length);
    manifest.files.push({tier,name,fileId:response.fileId,version:response.version||'',digest,counts:payload.counts,records:payload.rows.length,bytesRaw:encoder.encode(raw).length,bytesCompressed:bytes.length});
    checked(await primary(db).prepare("UPDATE gsis_backup_ledger SET manifest_json=? WHERE id=? AND status='running' AND lease_token=?").bind(JSON.stringify(manifest),run.id,run.lease_token).run());
   }
+  await progress('upload-manifest');
   const raw=JSON.stringify(manifest),digest=sha256Hex(raw),saved=await bridge({operation:'edgeDriveOutput',step:'writeManifest',config,date:today,name:today+'-'+run.kind+'-'+run.id+'-'+digest+'.manifest.json',text:raw,digest});
   if(!saved?.verified||saved.digest!==digest||typeof saved.fileId!=='string')fail('BACKUP_VERIFY','Drive did not verify the backup manifest.');
-  await finishBackup(db,run,{status:'verified',manifest,fileId:saved.fileId,digest,now:Math.max(now,Date.now())});
+  await finishBackup(db,run,{status:'verified',manifest,fileId:saved.fileId,digest,now:currentTime()});
   return {enabled:true,verified:true,completed:1,full:run.kind==='full',sizeWarning:manifest.files.reduce((n,f)=>n+f.bytesRaw,0)>config.sizeAlertMiB*1024*1024,runId:run.id};
- }catch(error){await finishBackup(db,run,{status:'failed',manifest,error,now:Math.max(now,Date.now())});return {enabled:true,failed:1,code:safeCode(error),failure:{code:safeCode(error),outputError:outputFailure(error,'BACKUP_FAILED')},runId:run.id};}
+ }catch(error){await finishBackup(db,run,{status:'failed',manifest,error,now:currentTime()});return {enabled:true,failed:1,code:safeCode(error),failure:{code:safeCode(error),outputError:outputFailure(error,'BACKUP_FAILED')},runId:run.id};}
 }
 
 export async function expireBackupRuns(db,now){
  const c=primary(db);
- await c.batch([
-  c.prepare("UPDATE gsis_backup_ledger SET status='failed',error='BACKUP_LEASE_EXPIRED',finished_at=?,duration_ms=MAX(0,?-started_at),lease_until=0 WHERE status='running' AND kind IN ('full','increment') AND lease_until<=?").bind(now,now,now),
-  c.prepare("DELETE FROM gsis_backup_items WHERE run_id IN (SELECT id FROM gsis_backup_ledger WHERE status='failed' AND error='BACKUP_LEASE_EXPIRED')")
- ]);
+ await c.prepare("UPDATE gsis_backup_ledger SET status='failed',error='BACKUP_LEASE_EXPIRED',finished_at=?,duration_ms=MAX(0,?-started_at),lease_until=0 WHERE status='running' AND kind IN ('full','increment') AND lease_until<=?").bind(now,now,now).run();
 }
 export async function notifyOutputAlert(db,{kind,now,health,message,enabled},alert){
  if(!alert||!health.warnings.length||!await enabled())return;
