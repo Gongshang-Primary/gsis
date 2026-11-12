@@ -23,3 +23,8 @@ module.exports={setup,save,notices};
  const state=h.state(),job=state.outbox.find(j=>j.kind==='lse_notice');assert(job,'Google adapter queues the same notice');h.ctx.now=Date.parse(h.date+'T23:00:00+08:00');h.ctx.iso=new Date(h.ctx.now).toISOString();
  const call=p=>h.scope.rosterServiceDispatch_({input:p});const claimed=call({operation:'claimNotifications',allowedTemplateKeys:['lse_notice']}).notifications;assert.equal(claimed.length,1,'Google sender also bypasses quiet hours with durable proof');assert(call({operation:'prepareNotification',id:claimed[0].id,claimId:claimed[0].claimId,allowedTemplateKeys:['lse_notice']}).notification);assert.equal(h.call(input).replayed,true);
 }
+{
+ const h=require('./roster093b-absence-pipeline.cjs')(),f=setup();Object.assign(h.ctx,f.ctx);h.setState(f.state);const context=h.scope.rosterOperationsContext_;h.scope.rosterOperationsContext_=req=>({...context(req),lseNoticeEnabled:req.input.lseNoticeEnabled===true});
+ const job=h.make({staffId:'charlie',typeId:'lse',periods:[10,11]}),input={operation:'processAbsenceIntake',requestId:job.requestId,claimId:job.claimId,calendarByDate:{},notificationsReady:true,lseNoticeEnabled:true};
+ assert.equal(h.scope.rosterAbsenceIntakeProcess_({input}).absenceApplied,true);assert.equal(h.state().outbox.filter(j=>j.kind==='lse_notice').length,1,'legacy intake pipeline forwards the trusted template activation');
+}

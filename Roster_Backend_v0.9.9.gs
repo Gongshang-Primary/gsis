@@ -10135,7 +10135,7 @@ function rosterAbsenceIntakeProcess_(req){
  const p=req.input||{},job=rosterAbsenceIntakeGetClaim_(p.requestId,p.claimId),command=job.command;
  // Identity and payload are always reloaded from the durable claimed report.
  // Service input supplies only freshly verified Calendar/transport context.
- const trusted={calendarByDate:p.calendarByDate,notificationsReady:p.notificationsReady===true,schedulerAvailable:p.schedulerAvailable===true};
+ const trusted={calendarByDate:p.calendarByDate,notificationsReady:p.notificationsReady===true,lseNoticeEnabled:p.lseNoticeEnabled===true,schedulerAvailable:p.schedulerAvailable===true};
  let notificationsQueued=0,phase='absence',current={...job},review=job.instructionState==='needsReview'||job.peerState==='needsReview',steps=0,settlementError;
  const started=Date.now(),settle=outcome=>{try{const result=rosterAbsenceIntakeSettle_(job.requestId,job.claimId,outcome);current={...current,...outcome,...result};return current;}catch(error){settlementError=error;throw error;}};
  const budget=()=>steps>=4||Date.now()-started>=25000;

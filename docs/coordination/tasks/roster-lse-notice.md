@@ -62,3 +62,5 @@ Deployment, owner only after review and merge:
 - Canonical build regenerated the deployed copies. The generated parity catalog was refreshed: only 90 source and 20 handler references changed; all 272 operations and recorded outcomes, including 57 missing handlers, are unchanged.
 - Exact final-head full-suite and CI outcomes will be recorded in the draft PR body after execution. No full-suite success or live validation is claimed here before those gates finish.
 - Not tested: live D1/Google, real WhatsApp delivery, deployed configuration or production browser sessions. Tests use synthetic data and intercepted provider calls. No merge or deployment performed.
+
+The first full local run at `bcf86df` was stopped before completion, not counted as a pass. A further end-to-end check found that the legacy Google intake processor omitted the trusted LSE activation flag. A regression reproduced zero notices through that processor and the bounded fix forwards the flag into the attendance phase. The full suite is restarted at the corrected head.
