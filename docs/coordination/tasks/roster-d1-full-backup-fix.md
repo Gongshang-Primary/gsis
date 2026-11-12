@@ -110,6 +110,17 @@ The missing-cache failure is reproduced against the real cleanup implementation.
 2. Preserve current bindings, URLs, credentials, Google authority, existing cron entries and Drive backup configuration. This PR does not enable backups or WhatsApp templates.
 3. With backup scheduling already enabled, wait for a **verified full** ledger row with a Drive file ID and digest, then a **verified restore-test** row. Check the full's `missingCacheParts` and stage diagnostics, the new System Health lines, and later an increment. A failure must show backoff rather than start another full every two minutes.
 4. Only after the owner verifies the full and restore test should the owner consider enabling the approved `system_alert` template. Retain all 12 blocked historical delivery rows; do not retry them. Enabling that template is not an action in this PR.
-5. Roll back by redeploying the previous Worker/Pages build while preserving configuration and all ledger, capture and delivery rows. No data deletion or credential change is needed. Existing source/scratch restore behavior is unchanged; this repair adds no R2 deletion and removes captured-row pruning.
+5. Roll back by redeploying the previous Worker/Pages build while preserving configuration and all ledger and delivery rows. No data deletion or credential change is needed. Existing source/scratch restore behavior is unchanged; this repair adds no R2 deletion and removes only terminal transient captures.
 
 Reviewer: **Claude**, at the final PR head. Full-suite results and CI run ID will be recorded after final verification. Employment mail remains queued behind this task because its Worker/health/generated files overlap; no employment implementation has started.
+
+
+## Claude re-review correction (Model: Codex, 13 Nov)
+
+Claude requested one change in `docs/coordination/review/pr127-claude-review.md` at `94d9267`: captured `gsis_backup_items` rows are transient working copies, not the retained record. The owner's 13 Nov instruction explicitly authorizes removing them after verified, failed or lease-expired completion. This supersedes the captured-row retention noted in the historical checkpoints above.
+
+Terminal settlement now deletes only the matching run's transient items in the same transaction as its status update. Expiry cleanup is restored both in the scheduler and in direct admission of a replacement run. Ledger rows, manifests, Drive objects and authoritative Roster data are unchanged. Regression assertions cover verified completion before restore, explicit failure, scheduler expiry, admission expiry, preservation of the ledger/manifest, and survival of the replacement's active capture.
+
+Push/build/full CI and the new exact head will be reported in PR #127 for Claude's re-review. The owner also directed starting employment-mail dispatch after this revision is posted; that latest instruction supersedes waiting for the backup PR to merge. The mail change will use its own branch and PR, with this dependency stated explicitly if unmerged shared code is required.
+
+Revision checks: all eight local backup/cache/progress/restore/alert/UI programs passed. The new expiry cleanup assertion fails against the previously reviewed `94d9267` implementation and passes with this correction. The 14,081-record scheduled full/restore still passes after its temporary capture is deleted. Canonical build regenerated the Worker bundles; final-head clean rebuild and CI results are reported in the PR body.

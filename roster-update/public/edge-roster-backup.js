@@ -71,6 +71,7 @@ export async function captureBackup(db,{kind='full',now=Date.now()}={}){
  const from=kind==='full'?0:latest.revision_to,registerFrom=kind==='full'?0:latest.register_to;
  const statements=[
   c.prepare("UPDATE gsis_backup_ledger SET status='failed',error='BACKUP_LEASE_EXPIRED',finished_at=?,duration_ms=?-started_at WHERE status='running' AND kind IN ('full','increment') AND lease_until<=?").bind(now,now,now),
+  c.prepare("DELETE FROM gsis_backup_items WHERE run_id IN (SELECT id FROM gsis_backup_ledger WHERE status='failed' AND error='BACKUP_LEASE_EXPIRED')"),
   c.prepare(`INSERT INTO gsis_backup_ledger(id,started_at,kind,date,revision_from,revision_to,register_from,register_to,status,lease_token,lease_until,manifest_json) SELECT ?,?,?,?, ?,r.revision,?,t.revision,'running',?,?,? FROM gsis_edge_heads r,gsis_edge_heads t WHERE r.scope='roster' AND t.scope='roster-register' AND r.mode='active' AND t.mode='active' AND NOT EXISTS(SELECT 1 FROM gsis_backup_ledger WHERE status='running' AND kind IN ('full','increment'))`).bind(id,now,kind,singaporeBackupDate(now),from,registerFrom,token,now+LEASE,JSON.stringify({previousManifestId:kind==='increment'?latest?.drive_file_id||'':''})),
   c.prepare(`INSERT INTO gsis_backup_items(run_id,tier,scope,collection,record_id,position,record_date,value_json,revision) SELECT ?,CASE WHEN scope='roster-register' OR collection IN (${sqlList(TIER_ONE)}) THEN 1 ELSE 2 END,scope,collection,record_id,position,record_date,value_json,revision FROM gsis_edge_records WHERE EXISTS(SELECT 1 FROM gsis_backup_ledger WHERE id=?) AND collection<>'$root' AND ((scope='roster-register' AND collection IN (${sqlList(REGISTER_COLLECTIONS)})) OR (scope='roster' AND ((collection IN (${sqlList(TIER_ONE)})) OR (?='full' AND collection IN (${sqlList(TIER_TWO)})))))`).bind(id,id,kind),
   c.prepare(`INSERT INTO gsis_backup_items(run_id,tier,scope,collection,record_id,revision,deleted) SELECT ?,1,scope,collection,record_id,revision,1 FROM gsis_backup_changes WHERE deleted=1 AND ?='increment' AND revision>CASE WHEN scope='roster' THEN ? ELSE ? END AND EXISTS(SELECT 1 FROM gsis_backup_ledger WHERE id=?)`).bind(id,kind,from,registerFrom,id)
@@ -160,9 +161,9 @@ export function validateBackupPayload(payload){
 export async function finishBackup(db,run,{status,manifest={},fileId='',digest='',now=Date.now(),error}={}){
  if(!['verified','failed'].includes(status))fail('BACKUP_STATUS','Invalid backup outcome.');
  if(error)manifest={...manifest,outputError:outputFailure(error,'BACKUP_FAILED')};
- const files=manifest.files||[],c=primary(db),result=checked(await c.prepare("UPDATE gsis_backup_ledger SET status=?,finished_at=?,duration_ms=MAX(0,?-started_at),record_count=?,bytes_raw=?,bytes_compressed=?,drive_file_id=?,digest=?,manifest_json=?,error=?,lease_until=0 WHERE id=? AND status='running' AND lease_token=?").bind(status,now,now,files.reduce((n,f)=>n+(f.records||0),0),files.reduce((n,f)=>n+(f.bytesRaw||0),0),files.reduce((n,f)=>n+(f.bytesCompressed||0),0),fileId,digest,JSON.stringify(manifest),error?outputErrorText(error):'',run.id,run.lease_token).run());
+ const files=manifest.files||[],c=primary(db),results=await c.batch([c.prepare("UPDATE gsis_backup_ledger SET status=?,finished_at=?,duration_ms=MAX(0,?-started_at),record_count=?,bytes_raw=?,bytes_compressed=?,drive_file_id=?,digest=?,manifest_json=?,error=?,lease_until=0 WHERE id=? AND status='running' AND lease_token=?").bind(status,now,now,files.reduce((n,f)=>n+(f.records||0),0),files.reduce((n,f)=>n+(f.bytesRaw||0),0),files.reduce((n,f)=>n+(f.bytesCompressed||0),0),fileId,digest,JSON.stringify(manifest),error?outputErrorText(error):'',run.id,run.lease_token),c.prepare("DELETE FROM gsis_backup_items WHERE run_id=? AND EXISTS(SELECT 1 FROM gsis_backup_ledger WHERE id=? AND status IN ('verified','failed') AND lease_token=?)").bind(run.id,run.id,run.lease_token)]);const result=checked(results[0]);checked(results[1]);
  if(!result.meta?.changes)fail('BACKUP_LEASE','This backup run no longer owns its lease.');
- // Retain captured rows as well as the ledger; this repair does not prune data.
+ // Captured items are transient. The terminal ledger and manifest remain intact.
  return {id:run.id,status,verified:status==='verified'};
 }
 export async function backupLedger(db,{kind='',status='',date='',before=Number.MAX_SAFE_INTEGER,beforeId='~',limit=100}={}){
@@ -225,7 +226,7 @@ export async function runDriveBackup(env,{now=Date.now(),bridge,forceKind,clock=
 
 export async function expireBackupRuns(db,now){
  const c=primary(db);
- await c.prepare("UPDATE gsis_backup_ledger SET status='failed',error='BACKUP_LEASE_EXPIRED',finished_at=?,duration_ms=MAX(0,?-started_at),lease_until=0 WHERE status='running' AND kind IN ('full','increment') AND lease_until<=?").bind(now,now,now).run();
+ await c.batch([c.prepare("UPDATE gsis_backup_ledger SET status='failed',error='BACKUP_LEASE_EXPIRED',finished_at=?,duration_ms=MAX(0,?-started_at),lease_until=0 WHERE status='running' AND kind IN ('full','increment') AND lease_until<=?").bind(now,now,now),c.prepare("DELETE FROM gsis_backup_items WHERE run_id IN (SELECT id FROM gsis_backup_ledger WHERE status='failed' AND error='BACKUP_LEASE_EXPIRED')")]);
 }
 export async function notifyOutputAlert(db,{kind,now,health,message,enabled},alert){
  if(!alert)return;
