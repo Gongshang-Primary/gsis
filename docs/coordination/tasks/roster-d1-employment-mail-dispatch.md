@@ -1,11 +1,11 @@
 # roster-d1-employment-mail-dispatch: Daily Employment Update emails send on D1
 
-- Status: proposed
+- Status: investigating (Model: Codex)
 - Owner/model: Codex
 - Reviewer/model: **Claude** (owner exception 12 Nov: "owner approve to skip muse for just these 2 tasks and claude to review. muse to sit and skip these 2 only"). Muse does not review this task.
-- Last updated (Asia/Singapore): 2026-11-12 ~20:00
+- Last updated (Asia/Singapore): 2026-11-13
 - Branch: codex/roster-d1-employment-mail-dispatch
-- Base SHA: re-check main's head before branching. Lane R is serial: take this after `roster-d1-full-backup-fix` unless its files do not overlap (state which in the PR).
+- Base SHA: 61c628f13ff9edbacabd9a7f2044bb25b7594915 (verified current main before claim).
 - Current head SHA (or PR head; avoid self-referential commit hashes):
 - PR:
 - User-authorised scope: owner, 12 Nov ("write tasks that fix these errors"). The scheduled Daily Employment Update is queued every school morning but never sent on D1. Make it send, with the same claim/settle safety as today. Deal with the backlog once.
@@ -47,3 +47,12 @@ Changing recipients, time or content of the email; Google backend changes or red
 Exact command, tested commit, outcome and evidence. Explicitly list checks not run.
 
 ## Review
+
+
+## Claim (Model: Codex, 13 Nov)
+
+Branch `codex/roster-d1-employment-mail-dispatch` from verified main `61c628f13ff9edbacabd9a7f2044bb25b7594915`. Evidence read before implementation. Reviewer: Claude under the owner exception.
+
+The owner directed starting this task after posting the corrected PR #127 head for re-review. That was done at `73d057b0c6fc28bf0fc0dbfd81085e9c04c102a3`, with all five CI jobs green in run `43299901288` and a clean canonical build. This explicit sequence supersedes waiting for #127 to merge. The tasks overlap in generated Worker bundles and potentially the health display; this branch starts from main without importing the unmerged backup implementation. The full local #127 rerun continues in its separate worktree.
+
+No main push, force-push, merge, deployment, live reads/writes, provider calls or WhatsApp activation. Claim recorded on this branch before product edits, consistent with the owner's no-main-push rule.
