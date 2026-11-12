@@ -85,3 +85,9 @@ Gemini: no active job. Pilot result (#35): in-lane and fast, but an empty first 
 This scoped entry applies only to v1 T1A and overrides the general coordination/reviewer defaults above for that task. ChatGPT coordinates v1; Codex builds T1A; Claude independently reviews each exact implementation head without editing Codex's branch. Muse retains v0.9.9* production coordination and its existing rules and responsibilities.
 
 Owner instruction: "sufficiently released. overwrite gate conditions, proceed". T1A proceeds ahead of Venues; the production claims and release PR #117 review are not taken over by this task. Claim and exact allowlist: `tasks/v1-core-t1a.md`. V1C covers only the isolated `v1/core` contract library, its named tests and contract documentation. This does not reopen permission policy or authorise T1B–T1D, production authentication changes, merge, deployment, infrastructure, migration or live-data operations. Existing production coordination rules remain unchanged.
+
+## V1C T1B extension: bounded Contacts read library, 12 November 2026
+
+Owner accepted the recommendation to implement the bounded T1B package after reading the revised plan and final addendum at `99b56377edf8cb34d05fccac671e3fbb65962ca4` ("take your recommendation"). Codex owns `tasks/v1-contacts-t1b.md` on `codex/v1-contacts-t1b`; ChatGPT coordinates v1 and Claude reviews the exact head. The task's exact 14-path allowlist controls; this entry does not extend T1A or production permissions. Muse retains v0.9.9* responsibilities. Owner resolves actual competing allocations.
+
+The deliverable is an isolated read-only contract library with injected providers, synthetic tests and documentation. F5 stays open. No authoritative store, durable observation writer, Core changes, Contacts writes/migration, T1C/T1D implementation, production integration or deployment is authorised. Official T1B-01 and T1B-02 remain Not tested.

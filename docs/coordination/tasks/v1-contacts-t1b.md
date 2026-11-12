@@ -1,6 +1,6 @@
 # v1-contacts-t1b: bounded Contacts read contract
 
-- Status: claimed
+- Status: implementation prepared; exact-head full CI and Claude review pending
 - Owner/model: Codex
 - Coordinator: ChatGPT, v1 only
 - Reviewer/model: Claude, independent exact-head review
@@ -44,3 +44,21 @@ Pstack architect skill read and applied to module ownership and data flow (cloud
 ## Handoff
 
 Base is the accepted claim commit; final PR records exact head/base and actual commands, outcomes, omissions and limitations. Not merged/deployed. No live-data access. Durable recovery and T1D/current-owner/consumer-commit gates remain separate.
+
+## Implementation and verification evidence
+
+Accepted claim/base: `620010fb85c4d90b498d15724250af1d86a469c5`. Main/task claims were reread after the non-force claim push. Four modules and seven test programs implement B01–B12; the contract records exact schemas, source/field map, limits, historical variants, Core compatibility and remaining integration gates. The additive LANES entry scopes T1B without changing production coordination.
+
+Pre-commit: `TZ=Asia/Singapore npm run build` passed (18 components), with no tracked generated-output drift. All seven `TZ=Asia/Singapore node tests/v1-contacts-*.mjs` programs were individually invoked with `T1B_BASE_SHA=620010fb85c4d90b498d15724250af1d86a469c5`: 30 grouped cases passed. All five unchanged Core test programs passed 26 grouped cases. Discovery selects 1079 programs including all seven new tests and proves exact four-shard partition. `git diff --check` passed. The initial discovery test incorrectly treated the runner's JSON array as newline-separated paths; it failed, was corrected to parse JSON/basenames, and passed. No runner change or test exclusion.
+
+Current-reader rejection maps also protect previously observed immutable field/group/catalogue identities against reuse with changed content. They remain bounded, per-instance rejection safeguards, not durable authority. The Core adapter requires one accepted record per authority role to avoid silently changing the projected T1A fingerprint as a schedule advances at unchanged sequence; broader staff/display profiles support nonoverlapping schedules. This conservative provider requirement is documented and tested. Owner source adapters must version replacements, not reads.
+
+Q01 Pass: explicit owner acceptance, exact claim/allowlist and no overlaps. Q02 Pass: ownership/source matrix, separate content/observation and current/historical variants. Q03 Pass for synthetic library boundary: strict schemas, minimal profiles, isolation and no privilege inference; authenticated transport pending separately. Q04 Pass for library races, timeouts, revisions and idempotent content comparison; durable recovery and consumer commit interval remain open. Q05 Pass: documented bounds and no new dependencies/frameworks. Q06 focused checks pass; exact-head full CI pending at commit creation. Q07 Claude independent review pending. Q08 deployment not applicable; all runtime UAT Not tested. F5 OPEN; B11 tests explicitly demonstrate snapshot-only evidence is incomplete. No claim of a persisted observation or restart durability.
+
+Final exact tested SHA, CI link/outcomes and command evidence will be in the bounded PR body, avoiding self-referential evidence commits. Full local Node/LORD is not separately claimed; the unchanged four-shard workflow runs the full Node inventory and all LORD programs at the pushed head. No generated/build/CI/production/Core changes. Rollback removes this unused library/tests/docs; no state or configuration rollback. No merge or deployment performed.
+
+### Catalogue response scope correction
+
+After first commit 831e10e, final contract inspection found catalogue results relied on caller context for school/Staff ID. A regression failed because schoolId was absent. The result now explicitly retains schoolId, staffId, profile and source revision/sequence alongside its existing snapshot digest and observation; the regression passes. Earlier CI run 43211049375 is superseded, not final-head evidence. No ownership or file-scope change.
+
+The final source-matrix check also made `source:'contacts'` explicit in the broad snapshot schema, matching the published plan (not just the narrow Core response). A negative case rejects a Deploy-owned snapshot. Run 43211049375 and the run at 46810dd are superseded by this final schema correction; final-head evidence is recorded in the PR.
