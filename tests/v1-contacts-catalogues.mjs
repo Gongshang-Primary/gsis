@@ -3,6 +3,8 @@ await cases([
   ['B07 exact catalogue revisions and separate variants',async()=>{
     const f=fixture('staff');const r=await f.reader.readCatalogue(f.query,{catalogueId:'cat-role',revision:'cat-1'});
     assert.equal(r.kind,'catalogue');assert.equal(r.catalogue.kind,'membership-role');
+    assert.equal(r.schoolId,f.query.schoolId);assert.equal(r.staffId,f.query.staffId);assert.equal(r.profile,f.query.profile);
+    assert.equal(r.revision,f.s.revision);assert.equal(r.sequence,f.s.sequence);
     assert.equal((await f.reader.readCatalogue(f.query,{catalogueId:'cat-role',revision:'other'})).code,'REFERENCE_MISMATCH');
     for(const change of [g=>{g.s.catalogues[0].entries[0].formula='workload';},g=>{g.s.fields.role[0].value.code='unknown';},g=>{g.s.catalogues[0].revision='different';},g=>{g.s.catalogues[0].entries[0].category='role';}]) {
       const g=fixture('staff');change(g);assert.equal((await g.reader.readAcceptedFacts(g.query)).kind,'failure');

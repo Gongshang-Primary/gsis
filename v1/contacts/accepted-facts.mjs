@@ -86,7 +86,9 @@ export function createContactsReader({schoolId,clock,readCurrent,readHistorical,
         reference=bounded(reference); exact(reference,['catalogueId','revision']); check(id(reference.catalogueId)&&id(reference.revision),'MALFORMED_QUERY');
         const result=await current(input), catalogue=result.snapshot.catalogues.find(c=>refKey(c)===refKey(reference));
         check(catalogue,'REFERENCE_MISMATCH');
-        return freeze({schemaVersion:1,kind:'catalogue',catalogue, snapshotId:result.snapshot.snapshotId,
+        return freeze({schemaVersion:1,kind:'catalogue',schoolId:result.snapshot.schoolId,staffId:result.snapshot.staffId,
+          profile:result.snapshot.profile,revision:result.snapshot.revision,sequence:result.snapshot.sequence,
+          catalogue,snapshotId:result.snapshot.snapshotId,
           contentDigest:result.contentDigest,observation:result.observation});
       } catch(e) { return errorResult(e); }
     },
