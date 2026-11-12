@@ -19,9 +19,9 @@ Budget: approximately 3–5 hours of focused engineering/design work, excluding 
 Inspected main: `5aac5f7ead21fe5a0e1c5ae7b837e05050167a60`. T1B #125 and EO readiness plan #128 are merged. Read:
 - Root AGENTS.md; docs/v1/AGENTS.md.
 - docs/coordination/WORKFLOW.md, LANES.md, OWNER_DIRECTIVES.md and current task records.
-- [EO authority and readiness plan](../contacts/EO_AUTHORITY_READINESS_PLAN.md).
-- [Merged T1B contract](../contacts/T1B_CONTRACT.md).
-- [Revised plan](../contacts/T1B_REVISED_PLAN.md) and [design addendum](../contacts/T1B_CONTRACT_DESIGN_ADDENDUM.md).
+- [EO authority and readiness plan](contacts/EO_AUTHORITY_READINESS_PLAN.md).
+- [Merged T1B contract](contacts/T1B_CONTRACT.md).
+- [Revised plan](contacts/T1B_REVISED_PLAN.md) and [design addendum](contacts/T1B_CONTRACT_DESIGN_ADDENDUM.md).
 - docs/v1/engineering/QUALITY_GATES.md and RUST_PRINCIPLES.md.
 - Relevant exact-head review findings for #125 and #128.
 
