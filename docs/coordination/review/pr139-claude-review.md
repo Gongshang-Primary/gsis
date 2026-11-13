@@ -71,3 +71,30 @@ Owner: set P1, decide P2, then decide on isolated staging. Codex: pin L2 in a fo
 ## Owner decision on P2 (13 Nov 2026)
 
 Owner: v1 gets **its own** `GSIS_SECRET`, set outside the product as an environment secret of `gsis-v1-owner-approved` in GitHub. It must differ from the production value. Confirmed against `scripts/v1/deploy.mjs`: the value is read only from the workflow environment and pushed to every v1 Worker on each deploy, so no code change is needed. A value changed only in Cloudflare would be overwritten by the next deploy; change it in GitHub. The task record's "common GSIS_SECRET" wording is superseded. Provider tokens stay unset in the v1 environment until cutover.
+
+## Re-review at `957d5f05489b3329bde43da8331462aaa6afc266` (13 Nov 2026)
+
+**Verdict: approve** (advisory). The approval at `98cd5d8` carries forward only because nothing here touches application code. The pre-merge gate P1 is still open.
+
+Changes since 98cd5d8: two commits, five files. No application, schema, dependency, production or T1A/T1B change.
+
+1. L2 resolved: `actions/upload-artifact` pinned to `ea165f8d65b6e75b540449e92b4886f43607fa02`. Verified against upstream: that commit is tag `v4` and `v4.6.2`. Workflow YAML parses.
+2. L1 resolved in the runbook: after the first Admin sign-in, remove the bootstrap keys from the GitHub config, rebuild, confirm no `BOOTSTRAP_*` vars in any generated or deployed Worker, and keep the bootstrap receipt and Admin grants.
+3. P2 decision applied accurately in OPERATIONS, RELEASE and the task record: a new v1-only `GSIS_SECRET` as an environment secret; provider credentials unset until cutover; change it in GitHub, not Cloudflare. The old "common GSIS_SECRET" wording is replaced.
+4. P1 documented as an unmet pre-merge gate. Codex's authorised attempt to create the environment returned HTTP 403 ("Resource not accessible by integration"); nothing was created and no secret was generated. Recorded honestly.
+5. `git diff --check` clean; merge-tree against origin/main clean.
+
+Not rerun by me: product suite and full CI (no code changed since my 43/43 run at 98cd5d8; Codex reports both green at this head).
+
+### R1 (medium, recommend before staging): inherited repository secrets
+
+The docs rightly note that repository-level secrets with the same names would still reach the deploy job even when the environment leaves them unset; Codex could not check (HTTP 403). Two ways to close this:
+1. Owner checks GitHub Settings → Secrets and variables → Actions → Repository secrets for `WHATSAPP_*`, `TELEGRAM_*`, `GOOGLE_SERVICE_ACCOUNT`, `EMAIL_API_TOKEN` and `GSIS_SECRET`. If none exist, nothing to do.
+2. Stronger: Codex removes the seven provider `secrets.*` lines from `v1-deploy.yml` until cutover. Then no setting can leak them. Recommended.
+
+## Remaining gates (owner)
+
+1. P1, before merge: create `gsis-v1-owner-approved` in GitHub's web settings, with the owner as required reviewer and deployment from `main` only. The integration cannot do this; the owner must.
+2. P2 configuration: add the new v1 `GSIS_SECRET` to that environment.
+3. R1: check the repository secrets, or have Codex remove the provider lines.
+4. Staging: a separate owner decision.
