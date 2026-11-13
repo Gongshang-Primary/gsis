@@ -2323,7 +2323,11 @@ async function board(ctx, input) {
         r.end_period,
       ]),
     );
-  if (input.since === revision) return { date, revision, unchanged: true };
+  const deviceExpiry = ctx.principal.deviceScope
+    ? { validUntil: ctx.principal.validUntil }
+    : {};
+  if (input.since === revision)
+    return { date, revision, unchanged: true, ...deviceExpiry };
   const timing = await one(
       ctx.env.DB,
       "SELECT value_json FROM lord_settings WHERE school_id=? AND setting_key='periodTimings'",
@@ -2384,6 +2388,7 @@ async function board(ctx, input) {
   return {
     date,
     revision,
+    ...deviceExpiry,
     generatedAt: new Date(ctx.now ?? Date.now()).toISOString(),
     bookings,
   };

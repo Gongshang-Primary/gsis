@@ -16,7 +16,7 @@ The source baseline is `27fa498657965169b9d971a9caabc33c8b19bc69`; the controlli
 | `<owner>/worker.mjs` | Bundled Core, Contacts, Deploy, Roster, Calendar, Venues, Layout or LORD owner implementation |
 | `<owner>/wrangler.json` | Isolated Worker identity, own DB/R2 bindings, explicit cross-owner/named capability bindings, scheduler definition and non-secret school settings |
 | `<owner>/migrations/0001_owner.sql` | Shared receipt/admission/outbox schema plus that owner's versioned schema; source migrations remain under `v1/migrations/` |
-| `GSiS-v1-local-build.tar.gz` | GitHub build artifact containing the generated `product/` tree, named by the workflow's exact source SHA |
+| `GSiS-v1-local-build.tar.gz` | GitHub build artifact containing the generated `product/` tree and `evidence/` results/screenshots, named by the workflow's exact source SHA |
 | Exact-commit repository source archive | Source, tests, specifications present at that commit, build scripts, dependency locks and notices; obtain from GitHub at `manifest.sourceCommit`, not a moving branch |
 
 The topology has eight domain databases, eight private artifact buckets and one gateway in addition to the eight domain Workers. The allocator is a replaceable pure module included with Roster; it does not introduce another authoritative database. Runtime compatibility is pinned to `2026-08-06`, matching the locked local Workers test runtime. The v1 deployment tool dependency is separately locked in `v1/package-lock.json`. Source/vendor licences and attribution remain with the repository and copied assets; no third-party skill repository is included.

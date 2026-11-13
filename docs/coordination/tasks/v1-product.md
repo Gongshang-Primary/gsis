@@ -1,6 +1,6 @@
 # v1-product: complete isolated accelerated product
 
-- Status: implemented in isolated worktree; final committed-head verification and independent review pending. Owner implementation instruction 13 November 2026: “build product fully”.
+- Status: implemented in isolated worktree; exact-head verification outcomes are maintained in the PR and its evidence package. Independent Claude review remains pending. Owner implementation instruction 13 November 2026: “build product fully”.
 - Owner/model: Codex; coordinator ChatGPT (v1); independent exact-head reviewer Claude.
 - Branch: codex/v1-product
 - PR: https://github.com/helper-gsps/gsis/pull/139 (draft until final verification; exact head and outcomes recorded there)

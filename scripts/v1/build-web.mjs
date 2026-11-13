@@ -64,6 +64,45 @@ function updateDeploy(source){
  source+=`\nwindow.addEventListener('gsis:clear-protected-state',()=>{stopLive();sessionEpoch++;clearInterval(pollTimer);clearInterval(leaseTimer);clearTimeout(queueTimer);token='';state={versions:[]};current='';snapshotCache=null;acceptedSnapshot=null;staffCatalog=new Map();roleCatalogue=[];cellQueue=[];queueFlight=null;draftBase=null;editing=null;unsavedDraft=false;busy=false;acquiring=false;versionCreateAttempt=null;versionNoteDrafts.clear();exclusionEdits.clear();if(inlineDraftEditor){inlineDraftEditor.open=false;inlineDraftEditor.remove();inlineDraftEditor=null;}el('content').replaceChildren();el('nav').replaceChildren();controls();});`;
  return source;
 }
+function updateStarlord(source){
+ source=replaceOnce(source,"  const CACHE_KEY = 'starlord_board_last_good_v1_3';",`  let CACHE_KEY = null, boardRevision = null, boardDate = '', cachedCandidate = null, accessExpiryTimer = null;
+  async function initialiseSignageScope(){
+    localStorage.removeItem('starlord_board_last_good_v1_3');
+    const token=sessionStorage.getItem('gsis-signage-device');
+    const session=token?null:await window.GSISV1.getSession();
+    const scope=token?'device:'+token:session?'account:'+session.schoolId+':'+session.user.accountId:null;
+    if(!scope)return;
+    const hash=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(scope))),b=>b.toString(16).padStart(2,'0')).join('');
+    CACHE_KEY='starlord_board_v1:'+hash;
+    try{const value=JSON.parse(localStorage.getItem(CACHE_KEY)||'null');if(value&&Array.isArray(value.rows)&&value.date===isoDate(new Date())&&typeof value.revision==='string'){cachedCandidate=value;boardRevision=value.revision;boardDate=value.date;}}catch{localStorage.removeItem(CACHE_KEY);}
+  }
+  function clearSignageScope(){
+    loadGeneration++;activeController?.abort();if(refreshTimer)clearTimeout(refreshTimer);refreshTimer=null;stopStripScroll();
+    clearTimeout(accessExpiryTimer);accessExpiryTimer=null;
+    window.GSISV1SignagePhotos?.clear();boardData=[];cachedCandidate=null;boardRevision=null;boardDate='';lastSuccessfulAt=0;lastSuccessfulDate='';fetchInFlight=false;
+    if(CACHE_KEY)localStorage.removeItem(CACHE_KEY);localStorage.removeItem('starlord_board_last_good_v1_3');
+    elements.pastStrip.replaceChildren();elements.activeGrid.replaceChildren();
+  }
+  window.addEventListener('gsis:clear-protected-state',clearSignageScope);
+  window.addEventListener('gsis:signage-access-ended',()=>{clearSignageScope();setFeedStatus('Display access expired or was revoked. Enter a current device token.',true);});`,'STARLORD device-bound private cache');
+ source=replaceOnce(source,"  function start() {\n    restoreLastGood();","  async function start() {\n    await initialiseSignageScope(); // A fresh server decision precedes any persisted display.\n",'STARLORD verifies scope before cached display');
+ source=replaceOnce(source,"localStorage.setItem(CACHE_KEY, JSON.stringify({ savedAt: Date.now(), date: payload.date || isoDate(new Date()), rows }));","if(CACHE_KEY)localStorage.setItem(CACHE_KEY, JSON.stringify({ savedAt: Date.now(), date: payload.date || isoDate(new Date()), revision:boardRevision, rows }));",'STARLORD records scoped revision');
+ source=replaceOnce(source,"${forceRefresh ? '&forceRefresh=1' : ''}","${forceRefresh ? '&forceRefresh=1' : ''}${boardRevision&&boardDate===requestedDate?'&since='+encodeURIComponent(boardRevision):''}",'STARLORD validates current authority and date before cache reuse');
+ source=replaceOnce(source,"const error=new Error('The booking feed is unavailable.');","const error=new Error('The booking feed is unavailable.');error.signageAccessDenied=response.status===401||response.status===403;",'STARLORD distinguishes revoked access from outage');
+ source=replaceOnce(source,"      const rows = normalisePayload(payload);",`      if(payload.date!==requestedDate||(payload.unchanged===true&&(boardDate!==requestedDate||boardRevision!==payload.revision))){clearSignageScope();setFeedStatus('Display date or revision could not be verified. Refresh this display.',true);return;}
+      if(Number.isFinite(payload.validUntil)){
+        clearTimeout(accessExpiryTimer);
+        const expire=()=>{const remaining=payload.validUntil-Date.now();if(remaining<=0)window.dispatchEvent(new CustomEvent('gsis:signage-access-ended'));else accessExpiryTimer=setTimeout(expire,Math.min(remaining,2147483647));};
+        if(payload.validUntil<=Date.now()){expire();return;}
+        expire();
+      }
+      const rows = payload.unchanged===true?(cachedCandidate?.rows||boardData):normalisePayload(payload);boardRevision=payload.revision||null;boardDate=requestedDate;cachedCandidate=null;`,'STARLORD cached rows require validated date/revision and bounded access');
+ source=replaceOnce(source,"      console.error(error);","      if(error.signageAccessDenied){clearSignageScope();setFeedStatus('Display access expired or was revoked. Enter a current device token.',true);return;}\n      console.error(error);",'STARLORD revocation clears private rows');
+ source=replaceOnce(source,'data-booking-card>','data-booking-card data-gsis-booking="${escapeHtml(row.bookingId)}">','STARLORD photo target identity');
+ source=replaceOnce(source,"    rebuildStripScroll();\n  }\n\n  function normaliseMovementState","    rebuildStripScroll();\n    window.GSISV1SignagePhotos?.update(rows);\n  }\n\n  function normaliseMovementState",'STARLORD private photo projection');
+ source=replaceOnce(source,"  start();","  start().catch(()=>{clearSignageScope();setFeedStatus('Display access could not be verified.',true);});",'STARLORD initialization failure stays private');
+ return source;
+}
 function transform(module,rel,text){
  for(const [host,id]of Object.entries(productionHosts))text=text.replaceAll('https://'+host+'/', '/'+id+'/').replaceAll('https://'+host, '/'+id+'/');
  for(const id of ['contacts','deploy','roster','calendar','layout','venues','lord','overlord','starlord'])text=text.replaceAll('https://'+id+'.gsps.edu.sg/', '/'+id+'/').replaceAll('https://'+id+'.gsps.edu.sg','/'+id+'/');
@@ -76,10 +115,11 @@ function transform(module,rel,text){
   if(module.id==='layout'&&rel==='index.html')text=text.replace('</body>','<script type="module" src="/v1/shared/layout-editor.js"></script></body>');
   if(module.id==='deploy'&&rel==='index.html')text=text.replace('</body>','<script type="module" src="/v1/shared/deploy-publication.js"></script></body>');
   if(module.id==='lord'&&rel==='index.html')text=text.replace('</body>','<script type="module" src="/v1/shared/lord-user.js"></script></body>');
-  if(module.id==='starlord'&&rel==='index.html')text=text.replace('</body>','<script type="module" src="/v1/shared/signage.js"></script></body>');
+  if(module.id==='starlord'&&rel==='index.html')text=replaceOnce(text,'<script src="assets/app.js','<script src="/v1/shared/starlord-photos.js"></script><script src="assets/app.js','STARLORD photo adapter before source renderer').replace('</body>','<script type="module" src="/v1/shared/signage.js"></script></body>');
   if(module.id==='overlord'&&rel==='index.html')text=replaceOnce(text,'<script src="assets/app.js','<script src="/v1/shared/lord-admin.js"></script><script src="assets/app.js','OVERLORD exact viewed revision adapter');
  }
  if(rel.endsWith('.js')&&!rel.includes('vendor/')&&!/\.min\.js$/.test(rel)){
+  if(module.id==='starlord'&&rel==='assets/app.js')text=updateStarlord(text);
   if(module.id==='lord'&&rel==='assets/app.js'){
    text=text.replaceAll('<strong>Bookings cannot be edited.</strong> If any detail is wrong, cancel the booking and make a new booking.','<strong>Bookings can be revised before collection.</strong> Use Edit my bookings to revise a saved booking. You can also cancel and make a new booking.');
    text+=`\nwindow.addEventListener('gsis:clear-protected-state',()=>{state.referenceGeneration++;resetStateKeepTeacher(false);state.auth.session=null;state.reference=null;state.identity.teacher='';main.replaceChildren();});`;

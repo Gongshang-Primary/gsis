@@ -109,18 +109,48 @@ function sessionEvidence(s, a) {
   };
 }
 async function readAccount(env, token, now) {
-  const s = await one(
+  // Session, identity linkage and effective grants share one D1 snapshot.
+  // Each T1A provider call keeps its existing deadline and re-reads this snapshot.
+  const row = await one(
     env.DB,
-    "SELECT * FROM core_sessions WHERE school_id=? AND token_hash=?",
-    [env.SCHOOL_ID, await digest(token)],
+    `SELECT s.*,
+      a.account_id AS linked_account_id,a.issuer AS account_issuer,
+      a.subject AS account_subject,a.email AS account_email,a.staff_id,
+      a.revision AS account_revision,a.suspended,a.pending_change,
+      a.created_at AS account_created_at,
+      (SELECT json_group_array(json_object(
+        'school_id',g.school_id,'account_id',g.account_id,
+        'capability',g.capability,'valid_from',g.valid_from,
+        'valid_until',g.valid_until,'revision',g.revision))
+       FROM core_grants g WHERE g.school_id=s.school_id
+         AND g.account_id=s.account_id AND g.valid_from<=?
+         AND (g.valid_until IS NULL OR g.valid_until>?)) AS grants_json
+     FROM core_sessions s
+     LEFT JOIN core_accounts a ON a.school_id=s.school_id AND a.account_id=s.account_id
+     WHERE s.school_id=? AND s.token_hash=?`,
+    [now, now, env.SCHOOL_ID, await digest(token)],
   );
-  fail(s, "SESSION_INVALID", 401, "Sign in to continue.");
-  const a = await one(
-    env.DB,
-    "SELECT * FROM core_accounts WHERE school_id=? AND account_id=?",
-    [env.SCHOOL_ID, s.account_id],
+  fail(row, "SESSION_INVALID", 401, "Sign in to continue.");
+  fail(
+    row.linked_account_id,
+    "IDENTITY_INVALID",
+    401,
+    "Account linkage is unavailable.",
   );
-  fail(a, "IDENTITY_INVALID", 401, "Account linkage is unavailable.");
+  const s = row,
+    a = {
+      school_id: row.school_id,
+      account_id: row.linked_account_id,
+      issuer: row.account_issuer,
+      subject: row.account_subject,
+      email: row.account_email,
+      staff_id: row.staff_id,
+      revision: row.account_revision,
+      suspended: row.suspended,
+      pending_change: row.pending_change,
+      created_at: row.account_created_at,
+    },
+    grants = JSON.parse(row.grants_json);
   const validation = createSessionPolicy({ clock: () => now }).validateSession(
     sessionEvidence(s, a),
     {
@@ -143,11 +173,6 @@ async function readAccount(env, token, now) {
     "AUTHORITY_CHANGED",
     409,
     "An account change is pending.",
-  );
-  const grants = await query(
-    env.DB,
-    "SELECT * FROM core_grants WHERE school_id=? AND account_id=? AND valid_from<=? AND (valid_until IS NULL OR valid_until>?)",
-    [env.SCHOOL_ID, a.account_id, now, now],
   );
   return { s, a, grants };
 }
