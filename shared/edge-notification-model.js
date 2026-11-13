@@ -87,7 +87,7 @@ function rosterNotificationEligible_(s,j,now,fresh,index,allowed){
  if(j.data.templateKey==='smc_attention'&&j.data.audience!=='duty-smc')return 'SMC duty wording requires a current duty recipient.';
  if(j.data.audience==='duty-smc'){const row=s.smcDutyRoster.find(r=>r.date===j.date);if(!GSISRosterOperations.dutyEligible(person)||!(fresh.rosterSMCIds||[]).includes(j.recipientId)||!row?.staffIds.includes(j.recipientId)||!GSISRosterOperations.dutyWindow(row,j.date,now))return 'Recipient is no longer on relief duty for this time window.';}
  if(j.data.audience==='urgent-smc'&&!(fresh.rosterUrgentSMCIds||[]).includes(j.recipientId))return 'Recipient is no longer eligible for urgent staff messages.';
- if(!person.active&&!s.adhoc.some(a=>a.staffId===j.recipientId&&a.date===j.date&&!a.deletedAt))return 'Recipient is inactive and is not engaged for the selected date.';
+ if(person.active!==true)return 'Recipient is inactive in Contacts.';
  j.mobile=GSISRosterOperations.mobile(person.mobile);j.name=person.name;j.external=person.active!==true;
  if(!/^\d{8,15}$/.test(j.mobile))return 'Recipient mobile number is missing or invalid. Contact the teacher directly.';
  // Explicit Notify actions and proven emergency-absence events bypass quiet hours.

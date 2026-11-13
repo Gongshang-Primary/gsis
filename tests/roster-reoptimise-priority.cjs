@@ -4,7 +4,7 @@ const fixture=require('./roster701-fixture.cjs'),A=require('../shared/roster-all
 function setup(){
  const f=fixture();Object.assign(f.ctx,{minute:360,now:Date.parse(f.date+'T06:00:00+08:00'),iso:f.date+'T06:00:00+08:00'});
  f.state.accountingYears['2026']={verified:true};f.state.systemConfig.consecutiveSubjectRules=[];
- Object.assign(f.people[1],{employment:'SRE',active:false});f.teachers[1].R=null;
+ Object.assign(f.people[1],{employment:'SRE',active:true});f.teachers[1].R=null;
  f.ctx.days[f.date].deployTeachingEvidence={verified:true,rows:[{id:'bob',periods:0,verified:true}]};
  return f;
 }
@@ -14,10 +14,10 @@ const activate=(f,periods=[2,3])=>command(f,'saveAdhoc',{staffId:'bob',periods})
 const demand=(f,period)=>({id:'d'+period,staffId:'alice',date:f.date,period,subject:'EL',className:'4A'});
 test('a fully covered draft adopts newly activated daily SRE up to the daily limit; fill-only does not',()=>{
  for(const cap of [1,2]){
-  const f=setup();f.state.systemConfig.adhocReliefMaxPeriods=cap;
+  const f=setup();f.people[1].active=false;f.state.systemConfig.adhocReliefMaxPeriods=cap;
   command(f,'saveAbsence',{staffId:'alice',typeId:'mc',periods:[2,3]});run(f);
   const before=structuredClone(A.effectiveAssignments(f.state));assert.equal(before.length,2);assert(!before.some(a=>a.staffId==='bob'));
-  activate(f);assert.deepEqual(A.effectiveAssignments(f.state),before,'activation never starts allocation');
+  f.people[1].active=true;activate(f);assert.deepEqual(A.effectiveAssignments(f.state),before,'activation never starts allocation');
   run(f,'fill-only');assert.deepEqual(A.effectiveAssignments(f.state),before);
   const result=run(f),rows=A.effectiveAssignments(f.state);assert.equal(rows.length,2);assert.equal(rows.filter(a=>a.staffId==='bob').length,cap);
   assert.equal(result.run.priority1.before,0);assert.equal(result.run.priority1.after,cap);assert.equal(result.run.reason,'priority-1 use improved');

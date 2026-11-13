@@ -63,11 +63,11 @@ test('a free selected day never replaces verified published Deploy evidence',()=
  quota.rows[0].teachingVerified=true;assert.equal(A.sreBasis(f.people[1],A.deploymentTeachingEvidence(quota,f.date)),'daily');
  delete quota.teachingEvidenceVersion;assert.equal(A.sreBasis(f.people[1],A.deploymentTeachingEvidence(quota,f.date)),'unknown');
 });
-test('inactive daily SREs require date activation and retain absence, period and peer protections',()=>{
+test('daily SREs require active Contacts and date activation; absence, period and peer protections remain',()=>{
  const f=setup();f.people[1].active=false;f.day.teachers=f.day.teachers.filter(t=>t.staffId!=='bob');
  assert(!A.eligibility(A.teacherContext(f.state,f.ctx,f.date).get('bob'),2).autoEligible);
  f.state.adhoc.push({id:'day-activation',date:f.date,staffId:'bob',periods:[0,2]});
- let t=A.teacherContext(f.state,f.ctx,f.date).get('bob');assert(A.eligibility(t,2).autoEligible);assert(!A.eligibility(t,3).autoEligible);assert(!A.eligibility(t,0).autoEligible);
+ assert(!A.eligibility(A.teacherContext(f.state,f.ctx,f.date).get('bob'),2).autoEligible,'dated activation cannot override inactive Contacts');f.people[1].active=true;let t=A.teacherContext(f.state,f.ctx,f.date).get('bob');assert(A.eligibility(t,2).autoEligible);assert(!A.eligibility(t,3).autoEligible);assert(!A.eligibility(t,0).autoEligible);
  f.state.absences.push({id:'absence',staffId:'bob',date:f.date,periods:[2]});t=A.teacherContext(f.state,f.ctx,f.date).get('bob');assert(!A.eligibility(t,2).autoEligible);
  f.state.absences=[];f.state.requests.push({id:'peer',recipientId:'bob',date:f.date,status:'pending',periods:[2],demandIds:['d2'],expiresAt:f.ctx.now+60000});
  assert(!A.eligibility(A.teacherContext(f.state,f.ctx,f.date).get('bob'),2).autoEligible);

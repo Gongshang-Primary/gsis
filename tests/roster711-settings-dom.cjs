@@ -27,7 +27,7 @@ const assert=require('node:assert/strict'),fs=require('node:fs'),{JSDOM}=require
  [...w.document.querySelectorAll('[data-no-relief-exclusions] [data-rule-chips] [data-remove-rule]')].find(b=>b.textContent.includes('PD*')).click();
  assert.equal(q('[data-no-relief-exclusions] [data-subject="PD"]').checked,true,'removing wildcard restores the saved exact selection');assert.equal(q('[data-no-relief-exclusions] [data-subject="PD (ART)"]').checked,false);assert.match(q('[data-no-relief-exclusions] [data-exact-rule-chips]').textContent,/Subject: PD/);assert.match(q('[data-no-relief-exclusions] [data-rule-preview]').textContent,/automatic relief \(2\)/);assert.equal(f.calls.length,beforeRemove,'rule removal remains local');q('[data-config-cancel]').click();
  // Bridge controls use real Contacts IDs and round-trip the complete configuration view.
- assert.deepEqual([...q('[data-bridge-form] [name="staffId"]').options].slice(1).map(o=>[o.value,o.textContent]),Array.from(f.ctx.people,p=>[p.id,p.name]));
+ assert.deepEqual([...q('[data-bridge-form] [name="staffId"]').options].slice(1).map(o=>[o.value,o.textContent]),Array.from(f.ctx.people.filter(p=>p.active===true),p=>[p.id,p.name]));
  q('#baseline-timetable-name').focus();assert.deepEqual([...w.document.querySelectorAll('[data-bridge-picker] [role=option]')].map(o=>o.textContent),['External Alice','External Bob','External Dora','Alice Teacher']);
  assert.match(q('[data-bridge-edit="External Dora"]').closest('tr').textContent,/Dora Free/);
  assert.match(q('[data-bridge-edit="Legacy contact"]').closest('tr').textContent,/Missing contact.*Needs review/);

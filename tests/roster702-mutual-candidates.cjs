@@ -6,7 +6,7 @@ ctx.minute=360;
 const actor={...ctx,user:{...ctx.user,smc:false,admin:false}};
 teachers.find(t=>t.staffId==='bob').cells[2]=['MA','3B','C2-01',''];
 teachers.find(t=>t.staffId==='dora').R=0;
-people.push({id:'external',name:'External relief',active:false,mobile:'89876543'});
+people.push({id:'external',name:'External relief',active:true,mobile:'89876543'});
 O.apply(state,ctx,{operation:'saveAdhoc',date,staffId:'external',periods:[2]});
 const absenceId=O.apply(state,actor,{operation:'saveAbsence',date,staffId:'alice',typeId:'mc',periods:[2,3]}).savedId;
 const ds=O.demand(ctx,state,date).filter(d=>d.absenceId===absenceId),ids=ds.map(d=>d.id);

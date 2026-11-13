@@ -25,9 +25,9 @@ function fixture() {
     { id: 'b', name: 'Teacher B', active: true, mobile: '82345678', employment: '' },
     { id: 'c', name: 'Teacher C', active: true, mobile: '83456789', employment: '' },
     { id: 'd', name: 'Teacher D', active: true, mobile: '84567890', employment: '' },
-    { id: 'dup', name: 'External duplicate D', active: false, mobile: '+65 8456 7890', employment: 'SRE' },
+    { id: 'dup', name: 'External duplicate D', active: true, mobile: '+65 8456 7890', employment: 'SRE' },
     { id: 'unknown', name: 'Unverified timetable', active: true, mobile: '', employment: 'FAJT' },
-    { id: 'external', name: 'External', active: false, mobile: '', employment: 'SRE' }
+    { id: 'external', name: 'External', active: true, mobile: '', employment: 'SRE' }
   ];
   const teachers = [a, b, c, d].map((cells, i) => ({ staffId: 'abcd'[i], cells, R: 4 }));
   const periods = Array.from({ length: 18 }, (_, period) => ({ period, startMinutes: 420 + 30 * period, endMinutes: 450 + 30 * period }));
