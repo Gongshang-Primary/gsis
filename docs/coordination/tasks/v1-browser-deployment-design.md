@@ -1,6 +1,6 @@
 # v1-browser-deployment-design: browser-only deployment approval
 
-- Status: claimed; documentation/design only.
+- Status: design prepared for exact-head review; documentation only.
 - Owner/model: Codex; coordinator ChatGPT for v1; independent reviewer Claude.
 - Last updated (Asia/Singapore): 14 November 2026.
 - Branch: codex/v1-browser-deployment-design
@@ -19,3 +19,11 @@ Pstack Architect, How and Why skills read from cloud package skill://plugins_6a8
 ## Handoff
 
 Publish the proposed design through one documentation PR. P1 stays open until an alternative is explicitly accepted and implemented with evidence. F5 OPEN; official T1B-01/T1B-02 and unperformed runtime UAT Not tested. No merge/deployment authorised or performed.
+
+## Design evidence
+
+Recommendation: private owner-only release repository with explicit browser dispatch, isolated credentials, separate unprivileged build and trusted deployment, immutable candidate binding and blocked recovery after unknown outcomes. Existing main-only rule is verified; required reviewer absent in observed API; secret/branch-protection metadata inaccessible. Owner screenshot confirms secret name only. No policy replacement is treated as accepted.
+
+Q01 scope/claim and overlap checked; Q02-Q05 design and negative scenarios documented; Q06 documentation/build/CI results recorded in PR, hosted tests Not tested; Q07 Claude review pending; Q08 no deployment. Implementation needs a separate scope decision. The claim landed alone at c2697bb28f39b062f7722cdd34590cf532024584; this branch adds only the proposal and task update.
+
+Verification before publication: `TZ=Asia/Singapore npm run build` passed; generated tracked files unchanged. Two-file scope, relative links and `git diff --check` passed. No new application tests for prose. Full Node/LORD regression is delegated to existing exact-head CI, with actual results in the PR; no local full-suite pass claimed.
