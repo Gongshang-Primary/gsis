@@ -35,7 +35,7 @@ jobs:
         run: node scripts/v1/verify-build.mjs
       - name: Package isolated artifacts
         run: tar -C deliverables/v1 -czf deliverables/GSiS-v1-local-build.tar.gz product evidence
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: gsis-v1-${{ github.event.pull_request.head.sha || github.sha }}
           path: deliverables/GSiS-v1-local-build.tar.gz

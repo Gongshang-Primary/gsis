@@ -92,3 +92,11 @@ Thirty actual separate browser contexts rendered all 200 staff. Warm useful UI p
 ## Release status
 
 Local product implementation is prepared for review, not production-approved. Claude exact-head review, completed final full-suite CI and any unresolved final verification failures remain gates. Hosted installation/restore, real Google sign-in, provider delivery, school-data migration, physical equipment workflows and installed-aSc import acceptance have not been performed. The next owner release decision follows that evidence; no skill, internal review or green build authorizes merge/deployment.
+
+## Review follow-up
+
+Claude's [review and owner P2 decision on main at `66e922f`](https://github.com/helper-gsps/gsis/blob/66e922f34307fd1f29f36f19d2f993c1114d99b4/docs/coordination/review/pr139-claude-review.md) approve isolated, undeployed code at `98cd5d8093c29af0c3f44919cdb73e47a8b49186`, with the review's stated coverage limits. The 43-program local/CI pass, full 1,138 Node + 40 LORD CI pass, nine dry-runs and 330-file artifact hash match remain attached to that exact head in PR139.
+
+The follow-up pins the upload action to the same commit used by that successful build and updates only the operator/release/task documentation for protected `main`-only deployment, a v1-specific environment secret, provider credentials absent until cutover, and removal of bootstrap identity settings after initial enrollment. It changes no application or database logic. Its own exact-head checks and Claude review status are recorded separately in the PR; the earlier approval is not transferred automatically.
+
+Read-only GitHub inspection found no `gsis-v1-owner-approved` environment. Repository-secret metadata returned HTTP403, so credentials inherited from that scope are unverified. No environment, secret, Worker setting or live bootstrap record was changed. P1 remains a pre-merge operator gate, P2 configuration remains outstanding, and staging still needs a separate owner decision. F5 remains OPEN; official T1B-01/T1B-02 and unperformed runtime UAT remain Not tested.
