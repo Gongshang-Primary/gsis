@@ -1,6 +1,6 @@
 # roster-statistics-next-in-line: "Cumulative percentage of relief done R%" table (changelog)
 
-- Status: approved (#47 at 4b66444, stacked on #46); merge held by owner
+- Status: merged (#47 at 4b66444 as 49be897)
 - Owner/model: Codex
 - Branch: codex/roster-statistics-r-percent
 - Depends on: roster-relief-count-investigation (same count definition; build after or together)

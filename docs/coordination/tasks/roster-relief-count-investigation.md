@@ -1,6 +1,6 @@
 # roster-relief-count-investigation: completed relief shows 0 for a teacher who did relief
 
-- Status: approved (#46 at 72f1406); merge held by owner
+- Status: merged (#46 at 72f1406 as 2215b2e)
 - Owner/model: Codex
 - Reviewer/model: Claude
 - Branch: codex/roster-relief-count

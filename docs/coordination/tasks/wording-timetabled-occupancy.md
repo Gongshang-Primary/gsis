@@ -1,6 +1,6 @@
 # wording-timetabled-occupancy: "individual (timetabled) workload" → "individual (timetabled) occupancy" (changelog)
 
-- Status: approved (#48 at 98283d6); merge held by owner
+- Status: merged (#48 at 98283d6 as b7d4142)
 - Owner/model: Codex
 - Branch: codex/wording-timetabled-occupancy
 - Reviewer/model: Claude

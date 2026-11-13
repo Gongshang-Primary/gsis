@@ -1,6 +1,6 @@
 # roster-inactive-teacher: inactive Contacts staff unavailable in Roster
 
-- Status: implemented and integrated with current main; exact-head full Node/LORD verification pending.
+- Status: merged (#38 at d23672c as 05ff0f1)
 - Owner/model: Codex.
 - Reviewer/model: Claude, exact final verified head.
 - Last updated (Asia/Singapore): 1 November 2026.

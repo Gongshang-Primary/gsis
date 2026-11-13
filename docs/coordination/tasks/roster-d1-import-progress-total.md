@@ -1,6 +1,6 @@
 # roster-d1-import-progress-total: truthful preparation totals
 
-- Status: locally implemented and focused-verified; fresh review and remote full CI pending
+- Status: merged (#42 at c5a5975 as 2597740)
 - Owner/model: Codex
 - Reviewer/model: fresh whole-branch review, then Claude exact published head
 - Last updated (Asia/Singapore): 1 November 2026 12:00, compatibility correction after parent review

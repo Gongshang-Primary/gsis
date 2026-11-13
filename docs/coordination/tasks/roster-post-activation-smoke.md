@@ -1,6 +1,6 @@
 # roster-post-activation-smoke: D1 acceptance at t+0 and t+20
 
-Status: rebased for fresh validation, 13 November 2026
+- Status: merged (#58 at addcaaa as 92e0bcb)
 Model: Codex
 Reviewer: Muse at exact final head. Owner merges.
 Branch: codex/roster-post-activation-smoke
