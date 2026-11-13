@@ -1,10 +1,14 @@
 
+
 # Pending: inactive staff excluded from new relief and delivery, 13 November 2026
 
 Model: Codex. Inactive Contacts staff are excluded from new relief allocation, ad hoc selection, peer eligibility and final WhatsApp/email delivery. Inactive teachers' saved duties and history stay, marked for review with an ` (inactive)` label; no automatic removal or refill. The allocator preserves manual, peer, published, protected and started duties. Daily employment settings can remove a retained ineligible recipient. See docs/coordination/tasks/roster-inactive-teacher.md.
 ## Unreleased: timetabled occupancy wording
 
 Deploy and Roster use the approved individual occupancy and relief quota wording in calculations, statistics, help, tooltips and Excel headers. Current configured budgets, formulas, policy names and data fields are unchanged.
+## PR #58 refresh, 6 November 2026
+
+Refresh the test-only D1 activation acceptance harness on current main. Verify current cron authority resolution, disabled allocation-cycle gating and no hidden job failures at t+20.
 
 
 # Pending: D1 Drive backup progress and cache-loss recovery, 12 November 2026
