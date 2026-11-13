@@ -372,11 +372,13 @@ function rosterEdgeExportCheckpoint_(req){
  return {...rosterEdgeExportReplyV2_(recovered.checkpoint,recovered.ref),completed:true};
 }
 function rosterEdgeExportReplyV2_(checkpoint,ref){
+ // Count completed inventory items independently of time/byte-bounded calls.
+ const workDone=1+checkpoint.jobIndex+(['finalize','ready'].includes(checkpoint.stage)?1:0)+(checkpoint.stage==='ready'?1:0);
  const uploaded=checkpoint.parts.length,part=checkpoint.work?.header?.partMetadata[checkpoint.work.next],pending=checkpoint.batch?Math.max(0,checkpoint.batch.total-checkpoint.batch.next):0;
  const remaining=checkpoint.stage==='ready'?0:checkpoint.budgetVersion===1?(pending?pending*2-(checkpoint.work?1:0):0)+Math.max(0,checkpoint.jobs-checkpoint.jobIndex-(pending&&checkpoint.stage==='objects'?1:0))*4+(checkpoint.stage==='objects'?5:1):(checkpoint.work?Math.ceil((checkpoint.work.parts-checkpoint.work.next)/2):0)+Math.max(0,checkpoint.jobs-checkpoint.jobIndex)+(checkpoint.stage==='records'||checkpoint.stage==='objects'?2:1);
  const nextStep=part?{phase:'Freeze parts',bytes:part.bytes,records:part.records,partId:part.id}:{phase:checkpoint.stage==='finalize'?'Manifest':'Prepare source',bytes:checkpoint.sourceBytes??null,records:null};
  const checkpointInputDigest=rosterEdgeExportHash_(JSON.stringify({sessionId:checkpoint.sessionId,ordinal:checkpoint.ordinal,checkpoint:checkpoint.previous||null}));
- const value={adminVerified:true,sessionId:checkpoint.sessionId,requestId:checkpoint.requestId,sourceDigest:checkpoint.sourceDigest,preparation:{ordinal:checkpoint.ordinal+1,checkpoint:ref},checkpointInputDigest,step:checkpoint.ordinal+1,phase:checkpoint.lastStep,nextStep,stepSize:checkpoint.stepSize||null,done:checkpoint.ordinal+1,total:checkpoint.ordinal+1+remaining,elapsedMs:checkpoint.elapsedMs||checkpoint.timing?.elapsedMs||0,stepElapsedMs:checkpoint.timing?.elapsedMs||0,preparedParts:uploaded};
+ const value={adminVerified:true,sessionId:checkpoint.sessionId,requestId:checkpoint.requestId,sourceDigest:checkpoint.sourceDigest,preparation:{ordinal:checkpoint.ordinal+1,checkpoint:ref},checkpointInputDigest,step:checkpoint.ordinal+1,phase:checkpoint.lastStep,nextStep,stepSize:checkpoint.stepSize||null,done:checkpoint.ordinal+1,total:checkpoint.ordinal+1+remaining,progressUnit:'work-items',workDone,workTotal:checkpoint.jobs+3,elapsedMs:checkpoint.elapsedMs||checkpoint.timing?.elapsedMs||0,stepElapsedMs:checkpoint.timing?.elapsedMs||0,preparedParts:uploaded};
  return checkpoint.stage==='ready'?{...value,manifest:checkpoint.manifest,manifestDigest:checkpoint.manifestDigest}:{...value,preparing:true,retryAfterMs:2000};
 }
 function rosterEdgeExportReadCapturedAudit_(envelope,date,fileId){
