@@ -32,7 +32,7 @@ const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('n
   assert.equal(await page.locator('details.calculation-detail').getAttribute('open'),null);await page.locator('.calculation-detail summary').click();assert.notEqual(await page.locator('details.calculation-detail').getAttribute('open'),null);
   assert.equal(await page.locator('.calculation-steps>li').count(),5);assert.equal(await page.locator('[data-teacher-picker],select[name=staffId]').count(),0);
   const explanation=await page.locator('.personal-calculations').textContent();assert.match(explanation,/Your offload factor is/);assert.match(explanation,/saved SIUE preparation and marking allowance/);assert.match(explanation,/KPs do not receive an additional preference/);assert(!explanation.includes('Across Singapore'));
-  value=workedExample();await page.locator('#refresh').click();await page.getByText('Your weekly workload estimate, Wi, is 83.85 periods.').waitFor();assert.match(await page.locator('.calculation-steps').textContent(),/46.11 periods/);assert.match(await page.locator('.calculation-steps').textContent(),/29.13.*84 eligible full time teachers/);assert.match(await page.locator('.calculation-greeting').textContent(),/relief quota R = 0/);
+  value=workedExample();await page.locator('#refresh').click();await page.getByText('Your weekly individual occupancy (timetabled plus allowances), Wi, is 83.85 periods.').waitFor();assert.match(await page.locator('.calculation-steps').textContent(),/46.11 periods/);assert.match(await page.locator('.calculation-steps').textContent(),/29.13.*84 eligible full time teachers/);assert.match(await page.locator('.calculation-greeting').textContent(),/relief quota R = 0/);
   fs.mkdirSync('verification',{recursive:true});await page.screenshot({path:'verification/717-calculations-desktop.png',fullPage:true});
   await page.setViewportSize({width:390,height:844});
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true,'mobile has no page overflow');
@@ -47,3 +47,4 @@ const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('n
   assert.deepEqual(errors,[]);console.log('PASS 716 Calculations browser: all-role learning tile after My Relief Duties, retired header, lazy load, actual personal figures, expandable explanation, desktop/mobile, unavailable data, escaping, retry, navigation and logout stale-read isolation.');
  }finally{await browser.close();}
 })().catch(e=>{console.error(e);process.exitCode=1;});
+
