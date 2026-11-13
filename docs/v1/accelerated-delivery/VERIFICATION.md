@@ -1,6 +1,6 @@
 # Product verification evidence
 
-This record distinguishes local engineering evidence from school acceptance and production operation. Exact tested commits, final command outcomes and CI URLs are attached to the implementation PR; the task/PR points here without a self-referential commit hash. No deployment, live-data access or real provider send was performed.
+This record distinguishes local engineering evidence from school acceptance and production operation. Exact tested commits, final command outcomes and CI URLs are attached to [PR139](https://github.com/helper-gsps/gsis/pull/139); the task/PR points here without a self-referential commit hash. No deployment, live-data access or real provider send was performed.
 
 ## Source and authority
 
@@ -83,7 +83,7 @@ Local evidence files are generated under `deliverables/v1/evidence/`: `performan
 
 Observed development run: 200 staff, 40 classes, P0–P16, 50 relief demands, 3,650 annual duty rows and 30 authenticated simultaneous sessions. Warm list p95≈360ms, committed write p95≈908ms with zero errors; annual ledger read≈134ms. Standard engine≈424ms;150-demand high-absence fixture≈441ms with a bounded useful result, including explicit unresolved demands. A bounded result is not proof no better allocation exists.
 
-Thirty actual separate browser contexts rendered all 200 staff. Warm useful UI p95≈1.21s and warm directory request p95≈353ms; cold useful UI p95≈7.35s and cold request p95≈818ms. The simultaneous cold first-screen result **misses the proposed 3-second budget**. It must be compared with isolated first-screen and representative school-device/network results before performance acceptance; it is not relabelled as a pass. Zero API/page errors and no Apps Script requests were observed in that run.
+Thirty actual separate browser contexts rendered all 200 staff. Warm useful UI p95≈1.21s and warm directory request p95≈353ms; cold useful UI p95≈7.35s and cold request p95≈818ms. The simultaneous cold first-screen result **misses the proposed 3-second budget**. It must be compared with isolated first-screen and representative school-device/network results before performance acceptance; it is not relabelled as a pass. Zero API/page errors and no Apps Script requests were observed in that run. A later shared-host run measured warm request p95 1,161ms, above the 1,000ms target; its evidence is retained in `browser/load-contention-run.log`. The final isolated measurements are recorded with the PR head, without erasing either miss.
 
 ## Release status
 

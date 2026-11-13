@@ -1,9 +1,184 @@
-const url=new URL(location.href),token=new URLSearchParams(url.hash.slice(1)).get('token')||url.searchParams.get('token'),status=document.querySelector('#status'),details=document.querySelector('#details'),form=document.querySelector('#response'),retry=document.querySelector('#retry');
-if(url.searchParams.has('token')){url.searchParams.delete('token');url.hash=new URLSearchParams({token:token||''});history.replaceState(null,'',url.pathname+url.search+url.hash);}
-const element=(tag,text)=>{const node=document.createElement(tag);if(text!==undefined)node.textContent=String(text);return node;};
-let view=null,storageKey=null,pending=null;
-async function request(body){const response=await fetch('/api/roster/external',{method:body?'POST':'GET',credentials:'omit',cache:'no-store',headers:body?{'Content-Type':'application/json'}:{'X-GSiS-External-Token':token},...(body?{body:JSON.stringify({...body,token})}:{})}),envelope=await response.json();if(!response.ok||envelope.ok===false)throw Object.assign(Error(envelope.error?.message||envelope.error||'The response could not be confirmed.'),{code:envelope.error?.code||envelope.code});return envelope.data??envelope;}
-function describe(value,host=details){if(Array.isArray(value)){for(const row of value){const section=element('section');section.className='gsis-panel';describe(row,section);host.append(section);}return;}if(value&&typeof value==='object'){const list=element('dl');for(const [key,item]of Object.entries(value)){if(['id','staffId','snapshotIds','sourceRevision','token','decisionId'].includes(key)||item===null||item===undefined)continue;list.append(element('dt',key.replace(/([A-Z])/g,' $1')));const cell=element('dd');if(typeof item==='object')describe(item,cell);else cell.textContent=String(item);list.append(cell);}host.append(list);return;}host.append(element('p',value??''));}
-async function submit(){if(!pending)return;form.inert=true;retry.disabled=true;status.textContent='Checking the original response…';try{const result=await request(pending);if(result.state!=='committed'&&result.receipt?.state!=='committed'&&result.result?.state!=='committed')throw Error('The outcome is not confirmed. Retry uses the same operation.');sessionStorage.removeItem(storageKey);pending=null;form.hidden=true;retry.hidden=true;status.textContent='Your response is confirmed.';}catch(error){status.textContent=error.message;retry.hidden=false;}finally{form.inert=!!pending;retry.disabled=false;}}
-form.onsubmit=event=>{event.preventDefault();if(!view)return;const data=new FormData(form);if(view.purpose==='mutual'){const decision=data.get('decision'),reason=String(data.get('reason')||'').trim();if(!['approve','reject'].includes(decision)||decision==='reject'&&!reason){status.textContent='Choose a decision and give a reason when rejecting.';return;}pending={operationId:crypto.randomUUID(),decision,reason};}else{const notice=view.projection?.timetableNotice;pending={operationId:crypto.randomUUID(),...(notice?.id?{timetableNoticeId:notice.id}:{}),snapshotIds:notice?.snapshotIds||view.projection?.pendingNotices?.flatMap(n=>n.snapshotIds||[n.snapshotId].filter(Boolean))||[]};}sessionStorage.setItem(storageKey,JSON.stringify(pending));void submit();};retry.onclick=()=>void submit();
-try{if(!token||token.length>256)throw Error('Open the complete private link from your school message.');storageKey='gsis-roster-external-'+Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(token))),b=>b.toString(16).padStart(2,'0')).join('');pending=JSON.parse(sessionStorage.getItem(storageKey)||'null');if(pending){retry.hidden=false;status.textContent='A previous response is unconfirmed. Check or retry that original response before making a new choice.';}view=await request();status.textContent=(pending?'Original response retained. ':'')+(view.purpose==='mutual'?'Review the proposed exchange.':'Review your published duties.')+' This link expires '+new Date(view.expiresAt).toLocaleString('en-SG',{timeZone:'Asia/Singapore'})+'.';details.replaceChildren();describe(view.purpose==='mutual'?view.request:view.projection);if(!pending){form.hidden=false;document.querySelector('#decisionLabel').hidden=view.purpose!=='mutual';document.querySelector('#reasonLabel').hidden=view.purpose!=='mutual';document.querySelector('#submit').textContent=view.purpose==='mutual'?'Confirm decision':'Acknowledge duties';}}catch(error){status.textContent=error.message+(pending?' Your original response can still be checked.':'');retry.hidden=!pending;}
+const url = new URL(location.href),
+  token =
+    new URLSearchParams(url.hash.slice(1)).get("token") ||
+    url.searchParams.get("token"),
+  status = document.querySelector("#status"),
+  details = document.querySelector("#details"),
+  form = document.querySelector("#response"),
+  retry = document.querySelector("#retry");
+if (url.searchParams.has("token")) {
+  url.searchParams.delete("token");
+  url.hash = new URLSearchParams({ token: token || "" });
+  history.replaceState(null, "", url.pathname + url.search + url.hash);
+}
+const element = (tag, text) => {
+  const node = document.createElement(tag);
+  if (text !== undefined) node.textContent = String(text);
+  return node;
+};
+let view = null,
+  storageKey = null,
+  pending = null;
+async function request(body) {
+  const response = await fetch("/api/roster/external", {
+      method: body ? "POST" : "GET",
+      credentials: "omit",
+      cache: "no-store",
+      headers: body
+        ? { "Content-Type": "application/json" }
+        : { "X-GSiS-External-Token": token },
+      ...(body ? { body: JSON.stringify({ ...body, token }) } : {}),
+    }),
+    envelope = await response.json();
+  if (!response.ok || envelope.ok === false)
+    throw Object.assign(
+      Error(
+        envelope.error?.message ||
+          envelope.error ||
+          "The response could not be confirmed.",
+      ),
+      { code: envelope.error?.code || envelope.code },
+    );
+  return envelope.data ?? envelope;
+}
+function describe(value, host = details) {
+  if (Array.isArray(value)) {
+    for (const row of value) {
+      const section = element("section");
+      section.className = "gsis-panel";
+      describe(row, section);
+      host.append(section);
+    }
+    return;
+  }
+  if (value && typeof value === "object") {
+    const list = element("dl");
+    for (const [key, item] of Object.entries(value)) {
+      if (
+        [
+          "id",
+          "staffId",
+          "snapshotIds",
+          "sourceRevision",
+          "token",
+          "decisionId",
+        ].includes(key) ||
+        item === null ||
+        item === undefined
+      )
+        continue;
+      list.append(element("dt", key.replace(/([A-Z])/g, " $1")));
+      const cell = element("dd");
+      if (typeof item === "object") describe(item, cell);
+      else cell.textContent = String(item);
+      list.append(cell);
+    }
+    host.append(list);
+    return;
+  }
+  host.append(element("p", value ?? ""));
+}
+async function submit() {
+  if (!pending) return;
+  form.inert = true;
+  retry.disabled = true;
+  status.textContent = "Checking the original response…";
+  try {
+    const result = await request(pending);
+    if (
+      result.state !== "committed" &&
+      result.receipt?.state !== "committed" &&
+      result.result?.state !== "committed"
+    )
+      throw Error(
+        "The outcome is not confirmed. Retry uses the same operation.",
+      );
+    sessionStorage.removeItem(storageKey);
+    pending = null;
+    form.hidden = true;
+    retry.hidden = true;
+    status.textContent = "Your response is confirmed.";
+  } catch (error) {
+    status.textContent = error.message;
+    retry.hidden = false;
+  } finally {
+    form.inert = !!pending;
+    retry.disabled = false;
+  }
+}
+form.onsubmit = (event) => {
+  event.preventDefault();
+  if (!view) return;
+  const data = new FormData(form);
+  if (view.purpose === "mutual") {
+    const decision = data.get("decision"),
+      reason = String(data.get("reason") || "").trim();
+    if (
+      !["approve", "reject"].includes(decision) ||
+      (decision === "reject" && !reason)
+    ) {
+      status.textContent =
+        "Choose a decision and give a reason when rejecting.";
+      return;
+    }
+    pending = { operationId: crypto.randomUUID(), decision, reason };
+  } else {
+    const notice = view.projection?.timetableNotice;
+    pending = {
+      operationId: crypto.randomUUID(),
+      ...(notice?.id ? { timetableNoticeId: notice.id } : {}),
+      snapshotIds:
+        notice?.snapshotIds ||
+        view.projection?.pendingNotices?.flatMap(
+          (n) => n.snapshotIds || [n.snapshotId].filter(Boolean),
+        ) ||
+        [],
+    };
+  }
+  sessionStorage.setItem(storageKey, JSON.stringify(pending));
+  void submit();
+};
+retry.onclick = () => void submit();
+try {
+  if (!token || token.length > 256)
+    throw Error("Open the complete private link from your school message.");
+  storageKey =
+    "gsis-roster-external-" +
+    Array.from(
+      new Uint8Array(
+        await crypto.subtle.digest("SHA-256", new TextEncoder().encode(token)),
+      ),
+      (b) => b.toString(16).padStart(2, "0"),
+    ).join("");
+  pending = JSON.parse(sessionStorage.getItem(storageKey) || "null");
+  if (pending) {
+    retry.hidden = false;
+    status.textContent =
+      "A previous response is unconfirmed. Check or retry that original response before making a new choice.";
+  }
+  view = await request();
+  status.textContent =
+    (pending ? "Original response retained. " : "") +
+    (view.purpose === "mutual"
+      ? "Review the proposed exchange."
+      : "Review your published duties.") +
+    " This link expires " +
+    new Date(view.expiresAt).toLocaleString("en-SG", {
+      timeZone: "Asia/Singapore",
+    }) +
+    ".";
+  details.replaceChildren();
+  describe(view.purpose === "mutual" ? view.request : view.projection);
+  if (!pending) {
+    form.hidden = false;
+    document.querySelector("#decisionLabel").hidden = view.purpose !== "mutual";
+    document.querySelector("#reasonLabel").hidden = view.purpose !== "mutual";
+    document.querySelector("#submit").textContent =
+      view.purpose === "mutual" ? "Confirm decision" : "Acknowledge duties";
+  }
+} catch (error) {
+  status.textContent =
+    error.message +
+    (pending ? " Your original response can still be checked." : "");
+  retry.hidden = !pending;
+}
