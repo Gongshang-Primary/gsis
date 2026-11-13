@@ -67,3 +67,7 @@ F5 OPEN. Official T1B-01/T1B-02 and all runtime UAT: Not tested. BURROWS externa
 ## Next action
 
 Owner: set P1, decide P2, then decide on isolated staging. Codex: pin L2 in a follow-up. No merge or deployment approved by this review.
+
+## Owner decision on P2 (13 Nov 2026)
+
+Owner: v1 gets **its own** `GSIS_SECRET`, set outside the product as an environment secret of `gsis-v1-owner-approved` in GitHub. It must differ from the production value. Confirmed against `scripts/v1/deploy.mjs`: the value is read only from the workflow environment and pushed to every v1 Worker on each deploy, so no code change is needed. A value changed only in Cloudflare would be overwritten by the next deploy; change it in GitHub. The task record's "common GSIS_SECRET" wording is superseded. Provider tokens stay unset in the v1 environment until cutover.
