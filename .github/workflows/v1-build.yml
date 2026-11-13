@@ -1,0 +1,42 @@
+name: Isolated v1 product
+on:
+  pull_request:
+    paths:
+      ["v1/**", "scripts/v1/**", "tests/v1-product*", ".github/workflows/v1-*"]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: gsis-v1-product-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  product:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      TZ: Asia/Singapore
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "24"
+          cache: npm
+      - run: npm ci
+      - run: npm ci --prefix v1
+      - run: npx playwright install --with-deps chromium
+      - run: npm run build
+      - name: Production build remains unchanged
+        run: git diff --exit-code
+      - run: node scripts/v1/test.mjs
+      - run: node scripts/v1/build.mjs
+      - name: Validate all generated Worker configurations without uploading
+        run: node scripts/v1/verify-build.mjs
+      - name: Package isolated artifacts
+        run: tar -C deliverables/v1 -czf deliverables/GSiS-v1-local-build.tar.gz product evidence
+      - uses: actions/upload-artifact@v4
+        with:
+          name: gsis-v1-${{ github.event.pull_request.head.sha || github.sha }}
+          path: deliverables/GSiS-v1-local-build.tar.gz
+          retention-days: 14

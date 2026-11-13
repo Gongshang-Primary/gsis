@@ -1,0 +1,11 @@
+[
+  {"id":"contacts","name":"Contacts","source":"contacts-update/public","service":"contacts","description":"Staff directory, profiles and accepted staff facts"},
+  {"id":"deploy","name":"Deploy","source":"public","service":"deploy","description":"Planning versions, teaching assignments and publication"},
+  {"id":"roster","name":"Roster","source":"roster-update/public","service":"roster","description":"Absences, relief, timetables and duties"},
+  {"id":"calendar","name":"Calendar","source":"calendar-update/public","service":"calendar","description":"School events, weekly views and publication"},
+  {"id":"layout","name":"Layout","source":"layout-update/public","service":"layout","description":"Campus, teaching groups and local annotations"},
+  {"id":"venues","name":"Venues","source":"venues-viewport/public","service":"venues","description":"Room availability and reservations"},
+  {"id":"lord","name":"LORD","source":"lord-suite/Source/lord","service":"lord","description":"Equipment booking, collection and return"},
+  {"id":"overlord","name":"OVERLORD","source":"lord-suite/Source/overlord","service":"lord","description":"Equipment administration and recovery"},
+  {"id":"starlord","name":"STARLORD","source":"lord-suite/Source/starlord","service":"lord","description":"Restricted equipment signage"}
+]
