@@ -73,6 +73,9 @@ Model: Muse. The Teacher field in the Add teacher tile dialog (and Edit teacher 
 # Pending: LORD return and collection as one long scrolling page, 6 November 2026
 
 Model: Muse. Return and collection trolley cards render open in a single scrolling list with no collapsible sections and no one-open-at-a-time binding. The return page no longer has the per-trolley "I am physically returning" checkbox or the two placement declaration checkboxes; quantity and photo per trolley still gate submission, partial returns remain barred by the backend, and both placement declarations are still sent as true with every trolley, covered by the single submit confirmation. Source and template copies kept byte-identical; return and collection browser tests updated. No deployment or live action. See [task](docs/coordination/tasks/lord-return-collection-scroll.md).
+## Unreleased: restore import health visibility
+
+System Health now shows retained Roster import job outcomes and recent failures alongside the current Drive and Venues diagnostics.
 
 # Pending: reliable Deploy to Contacts publication sync, 6 November 2026
 
