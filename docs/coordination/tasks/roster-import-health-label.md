@@ -1,6 +1,6 @@
 # roster-import-health-label: restore the import job in System Health
 
-- Status: claimed
+- Status: approved (#60 at 5dc0f5c); merge held by owner
 - Owner/model: Codex
 - Reviewer/model: Claude, exact final PR head
 - Last updated (Asia/Singapore): 2 November 2026, 23:12 SGT
