@@ -1,6 +1,6 @@
 # v1-asc-skills: publish consolidated aSc reference
 
-Status: claimed
+Status: review preparation
 Model: Codex
 Coordinator: ChatGPT v1
 Reviewer: Claude, exact-head review pending
@@ -24,4 +24,6 @@ Existing project-specific skill text is already tracked in docs/asc-skill.md; th
 Content/link/scope checks apply. Builds, full suites, CI, independent review and installed-aSc UAT are not claimed.
 Q01-Q05: documentation evidence recorded; Q06: content verification pending, runtime checks not run; Q07: review pending; Q08: deployment not applicable.
 No additional engineering skill package needed for copying approved prose.
-Next: publish document on this branch and open documentation PR. Owner decides merge.
+Main claim update was rejected by automatic approval review as a default-branch mutation. Claim was published on the dedicated branch before the reference. Main remains unchanged.
+Local document read successfully; content comparison against prepared reference differs only by final newline. The reference has only absolute public-source links, so there are no relative links to resolve. No product files changed.
+Next: Claude reviews the PR exact head. Owner decides merge. Build/full suites and exact-head CI remain pending, not passed.

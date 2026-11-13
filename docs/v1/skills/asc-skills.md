@@ -1,0 +1,453 @@
+# aSc skills for GSiS Deploy
+
+Consolidated reference, 13 November 2026, Singapore time.
+
+## Scope and evidence
+
+This file exports all content of the available `export-asc-timetables` skill and adds a current repository comparison and a digest of the supplied gist, including its linked comment. It is a reference deliverable, not a code change, installed skill update, release or import certification.
+
+Repository inspected: [helper-gsps/gsis at f5a238527eb5661ffb4c5c889c05baf3cca4287d](https://github.com/helper-gsps/gsis/tree/f5a238527eb5661ffb4c5c889c05baf3cca4287d). Search resolved the v0.9 source to this commit; all file reads below were pinned to it. This is source evidence, not proof of what is deployed.
+
+The installed skill and repository `docs/asc-skill.md` were byte-for-byte equal as returned by the tools. Their complete 23 October reference is preserved below. Its opening claim that no Deploy feature exists, its “future” design wording and its queued implementation instruction are historical. The inspected repository now contains an exporter and UI. Use this current-status supplement for implementation status, and the preserved reference for its mapping and acceptance contract.
+
+Evidence classes:
+
+| Label | Meaning |
+| --- | --- |
+| Current source | Read from the pinned repository; not executed in this task |
+| Historical reference | Claims retained from the existing skill; school XML/XLS samples were not supplied or reanalysed here |
+| Vendor checked | Public division and same-start documentation rechecked for this digest |
+| Community example | Author-specific workflow; not a vendor compatibility guarantee |
+| Follow-up | Inference or proposed verification, not implemented support |
+
+## Current exporter: verified source behaviour
+
+| Area | Current source behaviour |
+| --- | --- |
+| Entry points | `GSISAscExport.defaults`, `fillBells`, `validateSettings`, `preview`, `buildAscExport`, `validXmlText`, `identity` |
+| Actual call contract | `buildAscExport(snapshot, settings, {basicOnly})`; mappings and profile live inside settings |
+| Export route | Pure local transformation of a copied snapshot; UI reparses XML before download; no scheduled cards |
+| Profiles | `reference-2012` emits `periodspercard`; `current-catalogue` emits `durationperiods` |
+| Status | UI labels output Draft format; provenance always sets `applicationTested:false` |
+| Defaults | Five weekdays, Odd/Even, 17 half-hour periods from P0 at 07:00; one whole-year term |
+| Supported structure limits | One to seven days, one or two weeks, 1–48 continuous periods beginning at 0 or 1 |
+| Namespace and identity | Namespace defaults to deployment ID; type-prefixed reversible UTF-16 hex tokens form entity IDs |
+| Co-teaching | Class/TG events key on kind, target and subject; teacher IDs are deduplicated and emitted together |
+| Form demand | FT expands to Assembly, FTGP and FTT; repeated same-event assignments consolidate |
+| TG demand | Uses venue-group scope and periods helpers; creates fragments under each contributing class |
+| Staff-only demand | PLT membership creates PD demand of 2 weekly periods; non-teaching activities create separate events per teacher; duties create one-period events per recorded day |
+| Aliases | Explicit PE to PHE and Science to Sci handling; not a general language crosswalk |
+| Rooms | Missing rooms warn; conflicting rooms among co-teachers block |
+| Block plan | Explicit event override first; otherwise weekly ws/wd/wt plan; enabled fortnight mode requires an explicit event mapping |
+| Week selection | Blocks support all, odd or even; no floating Any-week choice |
+| Partial export | Basic-only mode retains whole-class groups and removes lessons and TG fragments; still blocks source/settings errors |
+| Template mode | Existing template with omitted structure is explicitly blocked pending a verified external-ID/structure profile |
+| Cross-subject divisions | Reusing a class-local division tag for more than one subject always blocks in current code |
+| Local UI state | Drafts keyed by account and deployment; snapshot frozen before export; local draft provenance retained |
+| Settings persistence | Uses setAscExportSettings through the surgical edit queue; export itself does not save |
+| Access | UI checks Admin/KP; existing settings test checks a Teacher role is refused |
+| XML safety | Explicit column schemas, escaped attributes, invalid-character checks, UTF-8 declaration and browser reparse |
+| Table options | Emits canadd,canupdate; these are not proof of deletion or overwrite semantics |
+
+Read sources: [shared/asc-export.js](https://github.com/helper-gsps/gsis/blob/f5a238527eb5661ffb4c5c889c05baf3cca4287d/shared/asc-export.js), [public/asc-export-ui.js](https://github.com/helper-gsps/gsis/blob/f5a238527eb5661ffb4c5c889c05baf3cca4287d/public/asc-export-ui.js), [docs/asc-skill.md](https://github.com/helper-gsps/gsis/blob/f5a238527eb5661ffb4c5c889c05baf3cca4287d/docs/asc-skill.md).
+
+## Supplied URL: focused digest
+
+[Timetabling with aSc and ManageBac, including FMVigo’s 10 May 2022 comment](https://gist.github.com/brainysmurf/8a5289de680a5272956e819ff1ebf794?permalink_comment_id=4162433) was already source S8 in the skill.
+
+The article converts scheduled aSc XML into ManageBac CSV. It demonstrates ID joins, virtual subject identities, combined cohorts and load checks. These are useful modelling examples, not a Deploy XML writer.
+
+The linked comment proposes one aSc class for an entire year, with divisions representing its constituent classes or teaching groups. It also suggests different subjects can occupy complementary groups.
+
+Do not copy its scripts directly. They discard additional teachers in one branch, pair class/group lists by position, omit unsupported multi-ID combinations and leave stale spreadsheet rows. The CSV stage embeds school-specific programme, year and naming assumptions.
+
+For GSiS, preserve every co-teacher, resolve each group through its class reference, reject unexplained loss and keep names separate from identities. Treat virtual subjects as explicit mappings. Never strip punctuation to manufacture stable IDs.
+
+This digest adds concrete cautions to an already-known source; it does not establish a new API or import profile.
+
+## Division rules: vendor clarification
+
+The vendor describes a division as a partition of a class. Groups within that division can run together. Groups in different divisions are not generally compatible, even if an operator knows some pupils do not overlap. A division is not itself a universal exact-start constraint.
+
+The vendor also advises reusing a partition where the pupil split is the same across subjects, and avoiding empty groups. Therefore “one subject per division” is a conservative GSiS implementation guard, not a universal aSc requirement.
+
+Sources: [Divisions](https://help.edupage.org/?lang_id=1&p=u1/u3/u55/u75/t465), [Groups have to start at the same time](https://help.edupage.org/?lang_id=1&id=t279). Exact-start relationships remain aSc configuration; the vendor distinguishes them from ordinary compatible grouping.
+
+A further vendor example offers combined intersection groups for overlapping partitions, or seminars with pupil records. This is a research route only. GSiS’s existing no-pupil-record export contract rules out silently adopting the latter. [Combining lessons of two divisions](https://www.help.edupage.org/?lang_id=13&p=lang_id%3D1&p=u1%2Fu3%2Fu55%2Fu75%2Ft239).
+
+## What to retain, investigate or reject
+
+| Priority | Finding | Required treatment |
+| --- | --- | --- |
+| 1 | Full application acceptance remains unproven | Import into a copy, inspect demand/groups, generate, repeat import, then round-trip identities before describing the export as compatible |
+| 1 | Cross-subject partition support is absent | Current validator counts subjects per division and always blocks mixed cases. There is no verified-partition override in settings. Add such support only through an explicit partition contract and tests |
+| 1 | Whole-year aggregation changes identity semantics | Preserve GSiS class refs by default. If a future destination requires year-level classes, add a separate reversible crosswalk and test class reports, home rooms, groups and reimports |
+| 1 | Fortnight totals do not define week placement | Preserve cycle demand; require explicit all/odd/even block choices. Do not silently split evenly or choose singles |
+| 1 | Existing-template preservation is not implemented | Keep the blocker until external IDs, structure references and omission semantics have been tested |
+| 2 | Names may represent display or scheduling concepts | Keep source subject ID, destination subject ID, label and partition separate; do not merge by equal display names |
+| 2 | Source assumptions may change in v1 | Recheck PD’s fixed 2 periods, duties’ 1-period events and per-teacher non-teaching activities against current domain records |
+| 2 | Duty days are used in event identity, not fixed cards | Current XML is unscheduled. A label containing Monday does not force a Monday placement |
+| 2 | Namespace default follows deployment ID | Confirm timetable lineage across copied revisions; a changed namespace can create new destination identities |
+| 2 | Room list and cohort list semantics differ | Candidate rooms are alternatives. Joined cohorts share demand. Preserve these relationships separately |
+| 2 | Partial export can look deceptively complete | Clearly report no lesson demand. Never use its successful XML download as evidence of full deployment transfer |
+| 3 | Gist’s spreadsheet pipeline is unnecessary here | Keep the conversion local. Do not add Apps Script, ManageBac or credentials to the Deploy export path |
+
+These are source observations and follow-up recommendations. No production incident, failed import or new application support is claimed.
+
+## Evidence from existing tests
+
+The following test files were read, not run:
+
+| Test | Assertions observed |
+| --- | --- |
+| [asc0810-export.cjs](https://github.com/helper-gsps/gsis/blob/f5a238527eb5661ffb4c5c889c05baf3cca4287d/tests/asc0810-export.cjs) | XML parsing, co-teaching, TG mapping blockers, deterministic output, rename-stable lesson IDs, bell edits without load change, unsupported template mode, basic-only export and invalid XML controls |
+| [asc0810-demand.cjs](https://github.com/helper-gsps/gsis/blob/f5a238527eb5661ffb4c5c889c05baf3cca4287d/tests/asc0810-demand.cjs) | FT deduplication, PLT ownership, separate staff activities, aliases, odd/even arithmetic, unique IDs, declared columns, foreign keys and room conflicts |
+| [asc0810-settings.cjs](https://github.com/helper-gsps/gsis/blob/f5a238527eb5661ffb4c5c889c05baf3cca4287d/tests/asc0810-settings.cjs) | Role refusal, scoped settings updates, independent-field merge, same-field conflict, idempotent retry and unchanged quota projection |
+
+Search also located `tests/asc0810-ui.cjs` and `tests/asc0810-browser.cjs`. Their excerpts show local-export/UI fixtures, but they were not fully reviewed or executed here. No CI status or test pass is asserted.
+
+## Recommended implementation handoff
+
+1. Read the current repository and preserve the local export boundary.
+2. Reuse the existing exporter and UI as the behaviour baseline.
+3. Port settings ownership and permissions to the current backend contract.
+4. Resolve only missing partitions, block mappings and destination profile details.
+5. Test exact demand, identity stability and no silent record loss.
+6. Complete the installed-aSc acceptance sequence preserved below.
+
+## Complete existing skill reference
+
+The following is the complete shared skill body, with its front matter removed solely to keep this a single Markdown document. It preserves historical sample evidence, source URLs, mapping rules, UI requirements and acceptance gates. The current-status supplement above supersedes historical implementation-status statements. Historical vendor-catalog claims beyond the division pages were not freshly revalidated in this task.
+
+# GSiS Deploy to aSc Timetables XML
+
+Prepare deployment inputs for aSc to schedule. Keep GSiS as the source for the selected deployment; let aSc own timetable placement and its solver constraints. Use a local XML download as the first integration. Do not require a Worker, MCP, account credentials or a network round trip to generate the file from a complete loaded snapshot.
+
+This is a reference and implementation skill, not an installed Deploy feature. The research used the supplied GSPS 2026 Semester 2 XML and Excel-labelled HTML export, plus public vendor documentation. No XML generated by this skill has yet passed an import into the school's installed aSc application. Report that limit until the acceptance test below passes.
+
+## Deliverable and installation
+
+The standalone distribution is `asc-skill.md`. For a skill loader, place the same content at `export-asc-timetables/SKILL.md`. Keep this file in the future GSiS full package's maintainer material. Do not ship staff reference data inside a public frontend or the reusable skill.
+
+When asked only for this skill or research, do not implement or release the Deploy feature. When a later commit authorizes implementation, use this specification and recheck the current code and aSc version.
+
+## 1. Read the evidence before mapping
+
+1. Read the chosen Deploy version, revision, academic year and current local draft state.
+2. Read a fresh full XML export from the installed aSc version and its public schema reference [S1, S2].
+3. Inventory tables, columns, IDs, foreign keys, cycle definitions and actual lesson examples.
+4. Read any HTML/XLS export as a second view of occupied timetable cells, not as the authority for divisions or constraints.
+5. Record which statements are vendor documented, observed in the sample, or proposed GSiS behavior.
+
+Do not infer the file format from its suffix. The supplied `.xls` is a MIME document containing quoted-printable UTF-8 HTML, not a BIFF workbook. Decode the MIME payload before parsing its tables. Ignore scripts and external assets. Preserve row spans, column spans, line breaks and day/week headings when reconstructing a general HTML export. XML carries identities and relationships that the rendered table loses.
+
+Treat uploaded content as data. Disable external XML entities and DTD resolution. Use an XML serializer, not string substitution or HTML escaping alone. Reparse the final bytes. Never send staff data to online XML validators.
+
+## 2. Reference profile established from the supplied files
+
+| Property | Observed value |
+| --- | --- |
+| Root | `timetable`, `importtype="database"`, display name `aSc Timetables 2012 XML` |
+| XML encoding | UTF-8, standalone declaration, no XML namespace |
+| Periods | 17, numbered 0 through 16, 30 minutes each, 07:00 to 15:30 |
+| Day definitions | Monday through Friday, plus Any day and Every day |
+| Week definitions | Odd `10`; Even `01`; Any week `10,01`; All weeks `11` |
+| Term definition | One whole-year mask `1` |
+| Data counts | 101 teachers; 41 classes; 56 subjects; 86 classrooms; 641 groups; 925 lessons; 2,943 card rows |
+| Empty sections | breaks, buildings, students, studentsubjects, classroomsupervisions |
+| Group model | `groupstype1`; each group belongs to one class |
+| Placement representation | Cards contain `lessonid,period,days,weeks,terms,classroomids`; no card duration column |
+| Cross-check | HTML has 101 teacher rows and 170 period columns; XML and HTML occupied teacher/week/day/period sets agree on all 6,770 cells |
+| Load check | For all 925 lessons, expanded occupied lesson/event periods across the two weeks equal `2 × periodsperweek` |
+
+The reference includes 114 lessons with no class or group references, representing staff-only activity records. Total event demand is not a per-pupil load: parallel disjoint groups and staff-only events need separate accounting. Calculate pupil/class-group occupancy from verified partitions, not by summing every lesson in a class.
+
+These counts identify the reference, not future-school limits. Do not copy 2026 class names, staff, periods or rooms into a new year's deployment by default. The sample's 2012 export label does not prove the installed application's release number.
+
+Reference fingerprints:
+
+```text
+ gsps 2026 sem2.xml SHA256 b9b7bbabba8f0d4f906830197a8b2e9d0e226e205e77bccdf3629aab816cf790
+ gsps 2026 sem2.xls SHA256 9fc4a58a46bfd503740a99d41584d011fd12f46e651f5c4afbc82f39fff373a0
+```
+
+The physical Classroom Layout PDF is optional evidence for room names and locations. It does not establish current deployment, class membership, capacity or aSc constraints. Use the selected Deploy venue records as the export source.
+
+## 3. Vocabulary and mapping contract
+
+The format is XML data interchange, not a programming language. It models related tables. Singular child elements are rows; XML attributes hold values; each table's `columns` attribute declares its fields. Exact spelling and casing matter. IDs connect tables; names are display text.
+
+| aSc concept | Meaning | GSiS mapping and guard |
+| --- | --- | --- |
+| `teachers/teacher` | Staff who teach or occupy a timetable activity | Use selected-version teacher IDs and names; include every referenced teacher, regardless of relief eligibility. Do not export contact details by default. |
+| `subjects/subject` | Timetable activity or subject | Map actual Deploy subject identity to aSc identity through an explicit crosswalk. |
+| `classes/class` | Pupil cohort, such as 3A | Use immutable class `ref`, display name, short name and explicit level. A class is not a room. |
+| `classrooms/classroom` | Venue resource | Use stable room ID and selected-version room label. A blank venue means unresolved/unassigned, not a new room. |
+| `groups/group` | Part of one class, or its entire-class group | Expand a TG across its actual contributing classes. One group ID per TG/class relationship. |
+| Division | Alternative, non-overlapping groups within one class | Use an explicit partition map. Group names alone are insufficient. |
+| `lessons/lesson` | Teaching demand with teacher(s), pupil scope, subject, block length and load | Consolidate only assignments that are explicitly the same teaching event. |
+| `cards/card` | Timetable placements of lesson demand | Omit in the default deployment export. Deploy does not know the final day and period. |
+| `daysdefs`, `weeksdefs`, `termsdefs` | Calendar masks and alternative masks | Use the intended school cycle, independent of calendar dates and year labels. |
+| `timeoff` | Resource availability grid | Export only explicit timetable availability with a verified mapping. |
+| Card relationships / solver rules | Constraints used while generating the timetable | Treat as a separate capability. Do not assume the default XML contains all rules. |
+
+Prefer `lessons` for explicit block and group mapping. The simpler `classsubjects` table does not model divisions; `groupsubjects` aggregates different block lengths. Do not flatten TGs into `classsubjects` or lose a verified block split through aggregation [S2].
+
+Do not confuse `classes.teacherid` with all teachers teaching that class. It is a singular class-teacher field. Use `lessons.teacherids` for confirmed co-teaching. A comma-separated room list on a lesson means candidate rooms from which the generator chooses; it does not reserve all rooms at once [S2].
+
+### GSiS source locations inspected at v0.8.9c
+
+Recheck these when integrating a later release:
+
+| Source | Relevant behavior |
+| --- | --- |
+| `public/app.js`: `v()`, `assignmentClass`, `loadValue`, `fortnightPage` | Selected version; assignment resolution; FT components; weekly/fortnight block counts |
+| `shared/venue-groups.js`: `scope`, `periods`, `forms`, `room` | TG class references, multiple levels, actual weekly override, venue associations |
+| `shared/workload.js`: `subjectType`, `subjectIdentity`, `rate` | Class/TG/both mode, existing aliases, subject loads |
+| `shared/pal.js` | FT changes can add PAL assignments; existing PAL allocations remain independent |
+| Selected version data | `teachers`, `classes`, `venues`, `groups`, `assignments`, `loads`, `fortnight` |
+
+Prefer `assignment.targetRef` and class `ref` over a mutable class name. Use the existing class resolver for legacy assignments and reject ambiguous matches. Resolve TG `classRefs`, `levels`, `levelWide`, `sources`, `anchorRef` and `associationSchema` with the existing scope helper. A venue anchor is not proof that a TG contains only pupils from that class.
+
+Use `GSISVenueGroups.periods(version, group)` for a TG's actual load. Multiple levels do not multiply the load. If a TG has its own weekly load, validate its block split against that load, not blindly against the level default.
+
+Include all timetable activities recorded in Deploy, including Assembly, FTGP, FTT, PD and other recorded timetable duties. Expand FT into its actual components once. Use actual activity demand and staffing, not workload scores. Do not convert R, Wi, offload rates, committee membership or HR membership into new lessons. Export a recorded staff-only activity without invented class/group references.
+
+## 4. Stable IDs and repeat imports
+
+Use an explicit GSiS ID namespace, for example:
+
+```xml
+<timetable importtype="database"
+ options="idprefix:GSiS,groupstype1,decimalseparatordot"
+ displayname="GSiS deployment">
+</timetable>
+```
+
+The example is a root declaration only, not a complete timetable.
+
+The sample instead uses `export:idprefix:%CHRID,import:idprefix:%TEMPID`. Do not copy that pair into the GSiS integration. It does not retain GSiS IDs during import. Vendor documentation distinguishes persistent external IDs from temporary/internal IDs [S2, S3].
+
+1. Choose stable external IDs from immutable GSiS identities, with separate entity prefixes.
+2. Restrict generated IDs to letters, digits, underscore and hyphen; resolve collisions deterministically.
+3. Use a stored namespace for the timetable lineage. Keep it stable across revisions and class renames.
+4. Give TG fragments and block-specific lesson rows stable identities too.
+5. Keep teacher identity, teacher assignment and lesson identity distinct. A reassignment should update the intended lesson, not silently duplicate demand.
+6. Store a crosswalk for existing aSc entities; do not claim an old `%CHRID` is a permanent external ID.
+7. During the first import into an existing timetable, review the matching dialog on a copy.
+8. Import the same export twice and check that no objects or lessons duplicate.
+
+Names, array positions, current timestamps and random IDs regenerated on each download are not identity keys. A class rename must not break group or lesson links. A copied school year needs an explicit lineage choice; do not merge it into the previous year's active timetable accidentally.
+
+For the initial import profile, use normal synchronization dialogs and no forced overwrite flags. `canadd`, `canremove` and `canupdate` describe the external table's export capabilities; they are not a general permission to import changes. `silent` suppresses review, and `primarydb`/`primarytt` influence default synchronization direction. Do not add these options casually [S2].
+
+Do not assume omission from an XML file deletes aSc data, or that every field has identical blank-versus-omitted behavior. Verify deletions, clearing rooms and missing rows in a copied timetable before supporting update mode.
+
+## 5. Teaching groups and divisions
+
+Use `groupstype1`. The public schema marks `groupstype2` as discontinued. It also warns that school-management TGs and aSc groups often have different meanings [S2].
+
+For a TG `3HCL1` containing pupils from classes 3A and 3B:
+
+1. Create or map one partial group under 3A and another under 3B.
+2. Give each fragment a unique ID and `entireclass="0"`.
+3. Put both group IDs and both class IDs on the joined lesson.
+4. Count the joined lesson's load once, not once per contributing class.
+5. Assign each fragment to the verified division for its own class.
+
+Apply the school's confirmed mapping contract:
+
+1. Treat every TG class association as definite: each mapped class contributes pupils.
+2. Treat TG membership within the same subject as mutually exclusive for each pupil. Do not require full class coverage; TGs may cover only some pupils.
+3. Keep pupil records outside aSc. Do not require or generate student identities, counts, membership lists or student-choice tables for this export.
+4. Expand each TG into class-local fragments using its explicit class mapping. Keep different subject families separate; do not infer an entire-level MTL partition or merge CL, ML, TL, HMTL and intervention groups from names alone.
+5. Reuse verified class-local division mappings when available. Groups in one division must be disjoint; different divisions may overlap. Do not invent residual groups or additional lessons to claim full coverage. Confirm incomplete-coverage representation in the installed aSc version.
+6. Let aSc handle temporal decisions. Do not infer compulsory synchronization from a shared source class or a TG series label. The observed parallel 3CLx slots are a timetable result, not an export rule. Add no Run together control for this integration.
+
+Do not put every TG into one division, create a separate fake class for each TG, or mark a partial TG as the entire class to make import succeed. Where a fragment's entire-class status is unknown, use the documented blank value when the tested profile supports it; never infer full coverage from a single mapped TG [S2].
+
+Use `(class identity, partition identity)` as the division mapping key. `divisiontag` forms divisions during import; it is not a persistent global division ID. The documented `ascttdivision` export field can help with a configured export. Numeric tags in the reference are local evidence, not a school-wide taxonomy [S2].
+
+In the supplied XML, an HMTL lesson joins CL1 fragments from six P3 classes. Its local `divisiontag` values differ between classes. This proves that equal TG names do not require equal numeric division tags across the school.
+
+MTL, CL, ML, TL, HCL and other GSiS families require an explicit subject/group crosswalk. The reference sometimes represents a language through the group while using `MTL` or `HMTL` as the subject. Do not globally collapse all language subjects or infer their pupil partitions from their names.
+
+An entire-class lesson must use the class's entire-class group. Create exactly one such group per exported class in the normalized model. Actual complementary fragments can share a division. Creating imaginary empty fragments can produce unexpected pupil gaps [S4].
+
+Divisions permit compatible groups to run together; they do not express every exact-start or synchronization requirement [S4, S5]. For the current GSiS integration, configure such temporal constraints inside aSc. Preserve a template through the normal import workflow and verify it on a copy; do not manufacture constraint XML.
+
+If GSiS has TG class associations but no partition information, export verified basic entities and report the missing mapping. Do not describe a partial export as a complete deployment. Ask the user for the partition plan or reuse a verified matching aSc template.
+
+## 6. Period loads, blocks and the odd/even cycle
+
+Treat `periodsperweek` as a weekly-average load for the supplied two-week profile. Treat `periodspercard` as consecutive block length in this legacy profile. The current public field catalog prefers `durationperiods`; it marks `periodspercard` as deprecated. Choose one tested compatibility profile. Do not emit both with conflicting values [S2].
+
+Use this accounting invariant for the observed profile:
+
+```text
+weekly average = occupied lesson/event periods in the two-week cycle / 2
+unique event demand = sum of lesson weekly averages, once per teaching event
+teacher load = each teacher's actual share of those events
+```
+
+Examples:
+
+| Intended demand | Legacy lesson encoding |
+| --- | --- |
+| Two double blocks every week | Block length 2; weekly average 4; All weeks `11` |
+| One double block only in Odd week | Block length 2; weekly average 1; Odd `10` |
+| One triple block every week | Block length 3; weekly average 3; All weeks `11` |
+| Ten periods in a fortnight | Aggregate weekly average 5; block split and week pattern still required |
+
+A weekly average of 5 does not prove a 5+5 distribution. Confirm whether blocks must repeat each week, are fixed to Odd/Even, or may float between weeks. A mask list `10,01` offers alternatives; `11` includes both weeks. Similarly, Any day is `10000,01000,00100,00010,00001`; Every day is `11111`.
+
+GSiS `fortnight[JSON.stringify([level, subject])]` stores:
+
+| Fields | Meaning |
+| --- | --- |
+| `enabled === false` | Weekly repeat mode; stored fortnight counts are inactive |
+| `wt`, `wd`, `ws` | Counts of weekly triple, double and single blocks |
+| `enabled === true` | Fortnight planning mode |
+| `ft`, `fd`, `fs` | Counts of fortnight triple, double and single blocks |
+| `remarks` | Human notes, not executable constraints |
+
+Validate `3*wt + 2*wd + ws == weeklyLoad` in weekly mode. Validate `3*ft + 2*fd + fs == 2*weeklyLoad` in fortnight mode. Do not add the two views together. Split demand into separate lesson rows for different block lengths and week patterns. Use rational/integer cycle counts to avoid rounding drift. A half-period weekly average may mean one whole period per fortnight; it does not mean half a teaching slot.
+
+For a verified weekly split, a row for block length L and count N has weekly average `L*N`. For a fixed Odd-only or Even-only block count N, it has weekly average `L*N/2`. A floating-week import still requires an aSc acceptance test; none of the 925 reference lessons uses the available Any week definition.
+
+Treat multiple teachers assigned to the same class or TG for the same subject as always co-teaching, including Form components and PAL. Consolidate the same teaching demand into one lesson per block/week variant with all teacher IDs. Count its periods once for the pupil group and fully for each assigned teacher. Do not multiply lesson demand by teacher count or infer alternating shares. Block conflicting loads, pupil scopes or room assignments for review; do not merge unrelated events. The singular class-teacher metadata field is separate: omit it or use an explicit primary class-teacher mapping, without dropping co-teachers from lessons.
+
+Missing splits and inconsistent totals remain blocking questions for a complete lesson export. Never quietly choose all singles. GSiS FT is an aggregate of Assembly, FTGP and FTT; map those components deliberately instead of adding a second Form load on top.
+
+The Roster rule for one relief teacher across a PAL block is not, by itself, proof of the baseline block schedule. Reuse an explicit Deploy block plan; report any mismatch between it and the Roster rule.
+
+## 7. Cards and constraints
+
+Default to an unscheduled export: basic entities, verified groups and lesson demand; no placement cards. Let aSc generate the timetable. Do not convert an existing baseline's placements into constraints on a future deployment without explicit instruction.
+
+When handling a placed reference timetable, inspect the card columns before expanding duration. In the supplied file, a double appears as two card rows and a triple as three. Multiplying each card row by `periodspercard` would double/triple count. The public schema says a card export without `durationperiods` can expand double lessons into repeated rows [S2]. The 925-lesson accounting check above validates this interpretation for the supplied file.
+
+| Requirement | Export treatment |
+| --- | --- |
+| Fixed teacher, pupil group, subject | Lesson references |
+| Block of two/three consecutive periods | Validated lesson duration and load |
+| Candidate teaching rooms | Lesson `classroomids`; do not infer room sharing capacity |
+| Class home room | Class `classroomids`, separate from subject-specific room candidates |
+| Resource availability, same start, same day, spread across days, room transitions, maximum consecutive lessons | Configure in aSc or its existing template; outside the current Deploy export page |
+| R quota, SMC manual protection, relief preferences, absent-teacher exclusions | Keep in GSiS; not baseline scheduling rules by default |
+
+The supplied XML has no general solver-rule section. The current schema lists specialized `coursegroups` constraints such as `samestudents` and `sameperiod`; this is not evidence that all aSc card relationships can be exported. Do not invent a `<rules>` schema or unsupported attributes.
+
+For documented `timeoff`, each comma-separated day contains one character per period starting at period zero: `0` forbids, `1` permits, `?` marks a question position, and `.` is unspecified. Do not flatten different Odd/Even availability into this simple grid without a verified multi-week mechanism [S2].
+
+A blank room must remain unassigned. The reference contains blank lesson room lists. Show an unresolved-room warning; test import behavior rather than copying a stale home room or choosing the first venue. Do not use relief eligibility to remove a teacher who still has baseline assignments.
+
+## 8. Future Deploy export design
+
+Implement a pure transformation with this logical contract:
+
+```text
+buildAscExport(snapshot, mapping, compatibilityProfile)
+  -> {xml, entityCounts, weeklyAndCycleTotals, warnings, blockers, provenance}
+```
+
+Use a normalized intermediate model for entities, class-local groups, divisions and teaching events. Index by stable ID once. Build references with maps, not repeated whole-array searches. Serialize in deterministic order. For larger exports, yield processing or use a browser Web Worker so the UI stays responsive; do not add a server service solely for XML serialization.
+
+Add an `ASC Export` page in Deploy navigation immediately before Audit. Put the `Export aSc XML` action on this page. Show the selected version, revision and whether local unsaved changes are included. Freeze a local snapshot at click time. Existing save-in-flight state must not produce a file assembled from mixed revisions. Do not force a save or publish to download a clearly labelled local draft.
+
+Offer a concise preview of counts, total demand and unresolved mappings. Keep a basic-data-only export available when lesson mapping is incomplete, with its limited scope explicit. Never silently skip assigned lessons. For a full export, block download on dangling IDs, invalid partitions or incompatible load splits. Missing optional room assignment is a warning when the target profile supports it.
+
+Produce UTF-8 `.xml` with MIME type `application/xml`. Use a filename identifying school, year and deployment version. Keep export provenance outside unrecognized XML attributes, for example in an XML comment and the UI report. Store no email, phone, staff birth date, private links or credentials unless an explicitly requested import field requires them.
+
+Do not silently write mapping changes while downloading. Persist new mapping/configuration through the existing versioned, surgical save path. Provide a preview before changing stored mappings. Preserve concurrent edits and current page focus.
+
+### ASC Export page settings
+
+Explain the destination choice: a new timetable needs a timetable structure; an existing aSc template may already contain bells, cycle definitions and solver settings. Offer both modes on the page instead of making a single workflow assumption. Reuse the selected version's source data and permissions. Keep export configuration separate from live Deploy loads, Roster timetables and school-wide scheduling settings.
+
+| User setting | Export contract |
+| --- | --- |
+| Destination | New timetable or existing template. Record the installed aSc version and chosen tested XML profile. For an existing template, default to retaining its structure, with an explicit reviewed option to include structure. |
+| School name and export label | Use `globals/global.name` for school name. Use academic year, deployment version and revision as file/report provenance; do not mistake the year label for a calendar or cycle mask. |
+| School days | Choose day count, order, full names and short names using `daysdefs`; generate masks consistently. Default from the selected school profile. Do not emit both `days` and `daysdefs`. |
+| Week cycle | Choose one-week or two-week cycle and names such as Odd/Even using `weeksdefs`. Preserve the source load basis. Block an incompatible cycle change until its demand mapping is explicit. |
+| Period grid | Set period count, continuous numbering starting at 0 or 1, full labels and short labels using `periods`. Preserve P0 when present. |
+| Bell times and duration | Edit each period's start and end using `period.starttime` and `period.endtime`. Offer a uniform-duration fill helper with first start time and gap minutes, then allow individual row edits. Duration is derived from start/end, not an invented XML duration attribute. Permit unequal period lengths when validated. |
+| Term definitions | Default to one whole-year term. Offer explicit term names and masks through `termsdefs` only with a tested profile and compatible lesson mapping. These are timetable terms, not automatic public-holiday or date-range scheduling. |
+| Subject and group mapping | Review Deploy-to-aSc codes, actual TG class mappings and class-local divisions. Read existing verified mappings first. Flag unresolved mappings; do not require pupil lists. |
+| Lesson demand | Show all recorded activities, co-teachers, source period totals and existing block plans. Use Deploy's demand unchanged; configure any verified missing block mapping explicitly. Let aSc choose actual slots and temporal constraints. |
+
+For existing-template mode, include only structure tables and references supported by the selected import profile. When retaining structure, omit structure changes and resolve lesson cycle references against the verified destination mapping. Block a mask/period mismatch. Do not promise that omission preserves every setting without application testing. A standalone new-timetable export must include its required definitions.
+
+Validate positive period length, valid clock strings, continuous unique period numbers, unique day/week identities, non-overlapping chronological bells, and consistent mask widths. Allow explicit gaps between periods. Do not infer a break activity or a resource-availability restriction from a gap. Store numbers and times without timezone conversion: school bell times are local clock values.
+
+Changing 30-minute periods to 40-minute periods changes exported bells, not the number of periods assigned in Deploy. Show period counts and bell duration. For a uniform grid, also show the implied teaching minutes and warn when they differ from the source. For unequal bells with unplaced lessons, show duration ranges rather than claiming exact teaching minutes. Never rescale lesson loads automatically. Block incompatible load/cycle conversions and revalidate any linked masks and definitions after a structural edit.
+
+Keep different bells by day/class, custom breaks, resource time-off and solver-rule editors outside this initial page. The public schema marks `dayperiods` deprecated and `custombells` export-only [S2]; do not offer these as supported import settings. Manage them in aSc. Room alternatives remain resource choices; they do not authorize simultaneous room sharing.
+
+Provide Preview, Save export settings, Reset to selected profile, and Export XML. Use the existing surgical versioned save path for persistent configuration; keep unsaved settings local and labelled. Retain focus and edits across navigation; report conflicts without discarding the draft. Export from one frozen combination of source snapshot and export settings. Keep preview and serialization local. Show validation beside the affected field and keep the rest of the page usable.
+
+## 9. Validation and acceptance gates
+
+### Automated checks
+
+1. Parse the XML with a secure parser; reject malformed content and invalid XML characters.
+2. Check every emitted attribute against the chosen table's `columns` declaration and tested profile.
+3. Check ID uniqueness, legal ID characters and every foreign-key reference.
+4. Check each group belongs to its stated class and each lesson's class/group references agree.
+5. Check divisions from the partition map; never assume names prove disjointness.
+6. Reconcile unique teaching demand, individual teacher shares and week/cycle totals with Deploy.
+7. Check block counts and mask widths; preserve period zero.
+8. Test confirmed co-teaching, joined classes, partial-coverage TGs, cross-level TGs, empty venues and inactive referenced teachers.
+9. Test class rename, teacher reassignment, subject aliases, Unicode and XML special characters.
+10. Check deterministic repeated export, no state mutation, and no network call in the conversion.
+11. For placed reference imports, compare semantic teacher/class/room occupancy, not raw card-row counts.
+12. Test new/existing-template modes, omitted structure, P0, edited/unequal bells, gaps, mask regeneration and rejected incompatible cycles. Confirm clock edits do not rescale demand or alter live school data.
+13. Label checks as structural, semantic or application-import checks. XML parse success is not aSc acceptance.
+
+### aSc acceptance, using a copy
+
+1. Record the installed aSc version and use a new test timetable or a copy of the existing one.
+2. Import a small fixture through File → Import → aSc Timetables XML [S1].
+3. Inspect teachers, classes, rooms, group divisions and lesson demand before generation.
+4. Verify a whole class, a cross-class TG, co-teaching, PAL triple, Odd-only double and blank venue.
+5. Import the same file again and check no duplicates; then test rename and reassignment.
+6. Generate a small timetable and check group clashes, room choices and block length.
+7. Export XML back from aSc using a configured GSiS ID prefix; compare semantic data and retained identities.
+8. Test clearing/removing data separately on the copy before enabling update mode.
+9. Run the full-school fixture and reconcile counts and loads; record every unsupported constraint.
+
+An export limit can hide data during round-trip tests. The vendor has separate guidance for the default XML export's 10-card/lesson limit [S6]. Confirm the school's license/export setup; do not work around licensing.
+
+## 10. Questions to resolve at implementation time
+
+Ask only for information not already present in the selected deployment, confirmed school contract and saved export settings.
+
+1. Record the installed aSc version during the application acceptance test. Let the ASC Export page capture new/existing-template choice and structural settings.
+2. Resolve only unmapped class-local divisions and uncertain cross-subject overlaps. Do not ask for student rosters, assume full coverage, or repeat the confirmed within-subject exclusivity question.
+3. Resolve subject crosswalks only when the Deploy code and destination subject identity differ.
+4. Resolve only missing or inconsistent block plans and load overrides. Let aSc handle timetable positions and temporal constraints.
+
+Treat multiple assigned teachers as co-teachers and include all recorded Deploy timetable activities; these are confirmed requirements, not open interview questions. Record remaining compatibility gaps in the export report. Keep the page queued until an explicit GSiS implementation/commit instruction under the user's changelog workflow.
+
+## 11. Research routes and sources
+
+Research checked 23 October 2026, Singapore time. Recheck versions before implementation. The following are public sources; no school credentials are needed for the XML route.
+
+| Ref | Source | Use and limit |
+| --- | --- | --- |
+| S1 | [aSc: Import from XML](https://help.edupage.org/?lang_id=1&p=u1/u3/u64/t690) | Official import route; installed `template/Import Samples/XML/import_basicdata.xml`; table/column declarations; links S2. |
+| S2 | [aSc Timetables API field catalog](https://docs.google.com/spreadsheets/d/1qd_3JZZLNf3uT6dFOJulj5TcAKTckQydd5qgBSR1wDE/edit) | Public vendor-linked specification. All five sheets inspected: Tables and columns, Types, Database options, Table options, Id prefix. This title does not establish a hosted REST write API. |
+| S3 | [aSc: Export to XML](https://help.edupage.org/?lang_id=1&p=u1/u3/u64/t699) | Default/configured export and external ID persistence. Default output is not a full lossless timetable backup. |
+| S4 | [aSc: Divisions](https://help.edupage.org/?lang_id=1&p=u1/u3/u55/u75/t465) | Pupil grouping and compatibility; explains why arbitrary divisions cause scheduling errors. |
+| S5 | [aSc: Groups start at the same time](https://help.edupage.org/?lang_id=1&id=t279) | Distinguishes division compatibility from explicit relationships. |
+| S6 | [aSc: Export limited to 10 cards/lessons](https://help.edupage.org/?lang_id=1&p=u1/u3/u64/t713) | Licensing/export configuration check for acceptance tests. |
+| S7 | [classroomtechtools/asc2mb](https://github.com/classroomtechtools/asc2mb) | Public user project converting aSc XML to ManageBac CSV. Useful parser/normalization precedent; reverse direction, not a GSiS-to-aSc writer. |
+| S8 | [Timetabling with aSc and ManageBac](https://gist.github.com/brainysmurf/8a5289de680a5272956e819ff1ebf794) | Author's practical group/subject mapping and Apps Script workflow. Its school-specific terminology is not the vendor schema. |
+| S9 | [Thanitkul/classroom-timetable](https://github.com/Thanitkul/classroom-timetable) | XML to room PDF/Excel; useful reporting precedent, not import validation. |
+| S10 | [EdupageAPI/edupage-api](https://github.com/EdupageAPI/edupage-api) | Community account client using EduPage endpoints and HTML parsing. Not proof of a supported aSc deployment writer. |
+| S11 | [mrtineu/edupage-mcp](https://github.com/mrtineu/edupage-mcp) | README inspected: read-only account/timetable tools. Does not solve deployment XML export. |
+| S12 | [oliverhruby/edupage-mcp](https://github.com/oliverhruby/edupage-mcp) | README inspected: broader account tools and some writes; expressly unofficial endpoints. No documented Deploy-to-aSc XML generation/import tool found. |
+
+Use S1–S6 plus the actual school XML for compatibility decisions. Use community code as examples only after checking its license and tests. Do not install MCP servers, request school credentials or disable authentication for this export task. No verified public end-to-end REST API or MCP for creating the school's aSc deployment was established in this research. If automated server-side import later becomes a requirement, obtain the current vendor integration contract before designing around it.
+
