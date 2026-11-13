@@ -1,0 +1,18 @@
+import assert from 'node:assert/strict';
+import {createRequire} from 'node:module';
+import {setup} from './helpers/relief-accounting-d1.mjs';
+const require=createRequire(import.meta.url),A=require('../shared/roster-allocation.js'),O=require('../shared/roster-operations.js'),{workedExample}=require('./roster717-calculations.cjs');
+const today='2026-11-01',row=(id,extra={})=>({id,staffId:'plain',date:'2026-10-29',period:3,status:'published',rCost:1,...extra});
+const state={accountingYears:{'2026':{verified:true,mode:'zero-start',at:'2026-10-18T00:00:00+08:00'}},entitlements:[{id:'quota-week',staffId:'plain',year:'2026',week:'2026-10-26',quota:4}],assignments:[row('published'),row('draft',{status:'draft'}),row('completed',{status:'completed'}),row('not-done'),row('transferred'),row('future',{date:'2026-11-02'}),row('zero-cost',{combination:true}),row('other',{staffId:'hod'})],importedRelief:[row('imported-before-tracking',{date:'2026-10-12',origin:'imported',status:'completed',rCost:2}),row('published')],reliefCorrections:[{assignmentId:'not-done',sequence:1,actual:{completionStatus:'not-completed'}},{assignmentId:'transferred',sequence:2,actual:{staffId:'hod',completionStatus:'completed'}}]};
+const originalNow=Date.now,originalFetch=globalThis.fetch;Date.now=()=>Date.parse(today+'T12:00:00+08:00');
+let f;
+try{
+ f=await setup({state});globalThis.fetch=()=>assert.fail('D1 calculations must not read Google');f.google.setDate(today);
+ const before=JSON.stringify((await f.store.load()).state),edge=await f.send({operation:'calculations'}),google=f.google.read(),annual=A.annual(f.google.state,{today,minute:720,days:{}},'plain');
+ assert.equal(edge.completion.completed,4,'past published and completed duties plus imported history count without SMC confirmation');assert.equal(edge.completion.completed,annual.completed);assert.deepEqual(edge.completion,google.completion);assert.equal(annual.committed,2,'draft and future reservations remain separate from work done');assert.equal(JSON.stringify((await f.store.load()).state),before,'calculation is read-only');
+ const mapping={nameBridges:[{timetableName:'Legacy name',staffId:'plain'}]},match=O.matchTimetableNames(mapping,f.google.contacts.rosterPeople,[{name:'Legacy name'}]);assert.equal(match[0].person.id,'plain','explicit name bridge uses the Contacts identity before assignment');assert(!A.accounted(f.google.state).some(a=>a.id==='not-done'));assert.equal(workedExample().calculation.R,0,'owner-shaped Wi 83.8475 gives zero by the published formula');
+ await assert.rejects(f.send({operation:'calculations',staffId:'hod'}),e=>e.status===400);
+ const openingState={...structuredClone(state),freshStart:{effectiveDate:'2026-10-28',fairnessMode:'opening-balances',openingBalancesConfirmedAt:'2026-10-28T00:00:00Z'},openingBalances:[{staffId:'plain',year:'2026',asOfDate:'2026-10-27',cumulativeDone:7,cumulativeQuota:0,version:1}]};
+ const opening=await setup({state:openingState});try{opening.google.setDate(today);const edgeOpening=await opening.send({operation:'calculations'}),googleOpening=opening.google.read();assert.equal(edgeOpening.completion.completed,9,'opening balance plus two retained completed duties, without re-counting pre-cutoff history');assert.equal(edgeOpening.completion.entitlement,0);assert.deepEqual(edgeOpening.completion,googleOpening.completion);assert.equal(edgeOpening.completion.from,'2026-10-28');}finally{opening.db.sql.close();}
+ console.log('PASS real D1 calculations: canonical published completion, drafts/future separated, correction/import/dedup parity, identity bridge, zero-start and formula-zero hypotheses');
+}finally{Date.now=originalNow;globalThis.fetch=originalFetch;f?.db.sql.close();}
