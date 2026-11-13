@@ -36,3 +36,10 @@ function rosterStatisticsRead_(req,c,p){
  const result={schema:1,key,bytes,encoding,checkedAt:ctx.iso,revision:state.revision,today:ctx.today,data:encoding==='gzip-base64-v1'?Utilities.base64Encode(Utilities.gzip(blob).getBytes()):json};
  rosterStatisticsCache_(key+':'+encoding,result);return result;
 }
+
+// Current-year fairness is independent of the activity report's date filters.
+function rosterStatisticsRPercent_(req,c){
+ const user=rosterOperationsAuthority_(c,req.identity);if(!user.smc&&!user.admin)error_(403,'Statistics is available to SMC and Admin only.');
+ const today=rosterToday_(),now=Date.now(),sg=new Date(now+28800000),ctx={user,people:rosterOperationsPeople_(c),today,minute:sg.getUTCHours()*60+sg.getUTCMinutes(),now,iso:new Date(now).toISOString()};
+ return GSISRosterStatistics.fairness(rosterOperationsState_(true),ctx,rosterOperationsQuota_([today]));
+}
