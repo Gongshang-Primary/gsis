@@ -60,3 +60,15 @@ Owner instruction: “go 1”, referring to removal of seven provider-secret wor
 - Owner accepts the eight publication-audit data categories as Official (Closed), harmless if publicly disclosed. This is disclosure acceptance, not a new open-source licence or credential disclosure authorisation.
 - Skills: Cloudflare skill used for connected-account/resource capability inspection only. Existing engineering policies applied proportionately; no third-party skill vendored.
 - Checks planned: workflow secret allowlist; upstream Outfit licence and embedded-font copyright comparison; canonical build/no tracked drift; product build with notice preservation; focused deployment test; full Node/LORD and exact-head CI. Runtime UAT remains Not tested; F5 OPEN.
+
+Licence source: https://raw.githubusercontent.com/google/fonts/29e94d990c84a54f83644e7c43f42dfc9e1a4ac7/ofl/outfit/OFL.txt. Both bundled Outfit fonts embed the matching 2021 Outfit Project Authors copyright and SIL OFL 1.1 designation. The complete notice is added beside the fonts and copied by the existing v1 asset build. Existing KaTeX licence remains present.
+
+### Preparation verification
+
+- `TZ=Asia/Singapore npm run build`: passed; tracked changes remained limited to this follow-up allowlist, with no generated production drift.
+- `TZ=Asia/Singapore node tests/v1-product-deployment.mjs`: passed actual-identity preflight, substituted production ID, duplicate stores and unreadable-resource negatives using synthetic providers.
+- `TZ=Asia/Singapore node scripts/v1/build.mjs`: passed. Byte comparison confirms the complete Outfit OFL survives at `web/assets/contacts/signature-assets/OFL.txt`. Licence SHA-256: `c676351bf8576b9aba743cd5eaa8c0e7ee0d51f805d720447b4df4ddb6a2e416`.
+- Workflow secret-reference assertion: exactly `CLOUDFLARE_API_TOKEN` and `GSIS_SECRET`; no seven provider references remain. `git diff --check`: passed.
+- Full Node/LORD suite, all product programs and Worker dry-runs: exact-head CI pending; no earlier head's pass is attributed to this update. Claude updated-head review pending. Repository/PR evidence identifies the resulting SHA to avoid a self-referential task commit.
+- Q01/Q02/Q03: bounded claimed scope and provider-inheritance fix checked; Q04/Q05: no transaction/concurrency/resource behaviour changed; Q06/Q07: focused/build checks pass, complete CI and independent review pending; Q08: no deployment/live verification, runtime UAT Not tested and F5 OPEN.
+- Rollback before deployment: revert this follow-up; doing so restores inherited-provider-secret risk. Font notice addition changes no executable code. Historical release downloads are not rewritten; rebuilt packages carry the notice.
