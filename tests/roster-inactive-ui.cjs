@@ -18,7 +18,7 @@ async function setup({ordinary=false,inactiveOwn=false,realPeople=false}={}){
    if(failCreation){failCreation=false;throw Object.assign(Error('Save confirmation lost'),{status:503});}
    return {saved:true,person:clone(created),revision:f.state.revision};
   }
-  if(p.operation==='saveAdhoc')throw Error('Inactive contact must not be activated');
+  if(p.operation==='saveAdhoc'){if(created&&!f.people.some(x=>x.id===created.id))f.people.push(created);f.O.apply(f.state,f.ctx,p);}
   const view=f.O.view(f.state,f.ctx,p);if(!realPeople)view.people=clone(f.people);return clone(view);
  }};
  vm.runInContext(source.replace('return {pages,render,unmount,','return {__test:{notifyTeachers,person},pages,render,unmount,'),dom.getInternalVMContext());
@@ -46,17 +46,17 @@ async function setup({ordinary=false,inactiveOwn=false,realPeople=false}={}){
   }finally{h.close();}
  }
  {
-  const h=await setup();try{
+  const h=await setup({realPeople:true});try{
    h.f.state.adhoc.push({id:'old-engagement',staffId:'ext',date:h.f.date,periods:[2],employment:'SRE'});
    await h.w.RosterOpsUI.render('Manage Ad-hoc relief',h.ctx);
-   assert.match(h.q('.ops-record-table').textContent,/External Known \(SRE\) \(inactive\)/,'retained engagement history keeps its identity and inactive label');
-   assert.equal(h.q('[data-edit-adhoc=old-engagement]').disabled,true,'inactive retained engagement cannot be selected for editing');
+   assert.match(h.q('.ops-record-table').textContent,/External Known \(SRE\) \(ad hoc\)/,'retained engagement history keeps its identity and inactive label');
+   assert.equal(h.q('[data-edit-adhoc=old-engagement]').disabled,false,'dated activation remains editable');
    h.q('[data-teacher-toggle]').click();
-   assert(!h.q('[role=listbox]').textContent.includes('External Known'),'inactive contacts are absent from the ad hoc picker');
+   assert(h.q('[role=listbox]').textContent.includes('External Known'),'inactive contacts can be selected for explicit dated activation');
    assert(h.q('[role=listbox]').textContent.includes('Bob'),'active contacts remain selectable');
    h.q('[data-add-contact]').click();h.input('[name=name]','External Known');h.input('[name=mobile]','95678901');
    assert.equal(h.q('[data-reuse-contact=ext]'),null,'duplicate recognition cannot bypass Contacts inactivity');
-   assert.match(h.q('[data-duplicate-matches]').textContent,/activate.*Contacts/i);
+   assert.match(h.q('[data-duplicate-matches]').textContent,/select.*existing contact/i);
    assert.equal(h.q('[data-create-contact]').disabled,true,'the existing identity cannot be duplicated');
    assert.equal(h.q('[data-duplicate-matches] a').href,'https://contacts.gsps.edu.sg/','activation opens the existing Contacts app');
    h.q('[data-close-dialog]').click();h.f.people.find(p=>p.id==='ext').active=true;h.w.RosterOpsUI.resetPreloads();
@@ -70,8 +70,8 @@ async function setup({ordinary=false,inactiveOwn=false,realPeople=false}={}){
    h.q('dialog form').dispatchEvent(new h.w.Event('submit',{bubbles:true,cancelable:true}));await h.wait(()=>h.q('[data-create-contact]')?.textContent==='Retry the same request');
    h.q('dialog form').dispatchEvent(new h.w.Event('submit',{bubbles:true,cancelable:true}));await h.wait(()=>!h.q('dialog'));
    const calls=h.calls.filter(p=>p.operation==='contactCreate');assert.equal(calls.length,2);assert.equal(calls[0].requestId,calls[1].requestId,'uncertain creation retains its request identity');
-   assert(!h.calls.some(p=>p.operation==='saveAdhoc'),'new inactive contacts wait for Contacts activation');
-   assert.match(h.q('main').textContent,/activate.*Contacts/i);
+   assert(h.calls.some(p=>p.operation==='saveAdhoc'),'new inactive contacts receive explicit dated activation');
+   assert(h.f.state.adhoc.some(a=>a.staffId==='fresh'),'activation is retained');
   }finally{h.close();}
  }
  {
@@ -107,5 +107,5 @@ async function setup({ordinary=false,inactiveOwn=false,realPeople=false}={}){
    assert.equal(h.q('[data-recipient=inactive]').disabled,true,'read-only former recipient history is retained');
   }finally{h.close();}
  }
- console.log('PASS inactive Roster UI: stale self-report denied, active-only ad hoc choices, retained duplicate identity, same-request creation recovery, no inactive activation, notification filtering and history labels.');
+ console.log('PASS inactive Roster UI: stale self-report denied, dated ad hoc choices, retained duplicate identity, same-request creation recovery, explicit dated activation, notification filtering and history labels.');
 })().catch(error=>{console.error(error);process.exitCode=1;});

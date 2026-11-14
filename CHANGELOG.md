@@ -1,3 +1,7 @@
+# Pending hotfix: activated ad hoc relief eligibility, 14 November 2026
+
+Model: Codex. Restore active-or-dated-ad-hoc eligibility after #38: manual/automatic relief, shared cover, daily reports and duty WhatsApp include activated inactive Contacts within their dates/periods. Truly inactive staff remain blocked. Dated labels read “ad hoc”; Contacts status and allocation rules are unchanged. See `docs/coordination/tasks/roster-adhoc-inactive-regression.md` and `DEPLOY_STEPS.md`. Not deployed.
+
 # Stapler teacher-row write-across, 14 November 2026
 
 Model: Codex. In the Stapler planner teacher view, each teacher row has Subject / Venue / Group fields with a "→" button that mass-writes one value across the whole row (all periods for that teacher), mirroring the class-row fields. Only existing lesson tiles change unless "In empty cells, create tiles" is chosen, in which case empty cells gain a tile for that teacher with the picked classes. Recess is never filled. Changes stay local until Save to online; one Undo restores the previous values and removes created tiles. See docs/coordination/tasks/stapler-teacher-row-write-across.md.
