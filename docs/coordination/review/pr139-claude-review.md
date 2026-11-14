@@ -98,3 +98,36 @@ The docs rightly note that repository-level secrets with the same names would st
 2. P2 configuration: add the new v1 `GSIS_SECRET` to that environment.
 3. R1: check the repository secrets, or have Codex remove the provider lines.
 4. Staging: a separate owner decision.
+
+## Re-review at `686af2fc803d9d035020d364705dbfae0b3be32f` (14 Nov 2026)
+
+**Verdict: approve** (advisory). Application code unchanged since my 43/43 run at 98cd5d8. **Before merge: G1 and G2 below** (GitHub settings, owner only).
+
+Changes since 957d5f0: three commits, four files.
+
+1. **R1 resolved.** `v1-deploy.yml` now references exactly two secrets, `CLOUDFLARE_API_TOKEN` and `GSIS_SECRET`; all seven provider references are gone, so same-named repository secrets cannot reach the job. YAML parses.
+2. **Outfit font licence added** at `contacts-update/public/signature-assets/OFL.txt`. SHA-256 `c676351b…a2e416` matches the pinned upstream Google Fonts file byte for byte. This sits in a production frontend path outside the v1 lane; it is licence text only, adds a missing attribution for fonts already shipped, and I accept it. Note: `git diff --check` flags one trailing space in that file. It is upstream's verbatim text and must stay, but the task record's "`git diff --check`: passed" is inaccurate.
+3. **Empty stores provisioned** (owner said "create"): eight D1 databases and eight private R2 buckets named `gsis-v1-gsps-*` in Cloudflare account `803fa957…`, zero tables, public access off. Recorded only; I did not verify in Cloudflare.
+4. OPERATIONS step 4 updated to match R1. Merge-tree against origin/main clean.
+
+Not rerun by me: product suite and full CI (owner reports all CI green at this head).
+
+### New facts that change P1
+
+The task record states the repository is **public**, and that environment `gsis-v1-owner-approved` now has required reviewers `helper-gsps` and `songwee`, self-review allowed, branch `main` only, with administrator bypass still allowed. On public repositories GitHub enforces required reviewers, so the browser-controller design in PR #140 is no longer needed for P1. P1 closes when G1 and G2 are done.
+
+### G1 (high, before merge): remove `helper-gsps` as a deployment reviewer
+
+All models act as `helper-gsps`. If that account can approve the deployment job, a model holding a token for it could approve its own deploy, and the gate means nothing. Keep only the owner's personal account (`songwee`) as required reviewer. Self-review may stay allowed for that account.
+
+### G2 (high, before merge): turn off administrator bypass
+
+"Allow administrators to bypass configured protection rules" must be off for `gsis-v1-owner-approved`. Otherwise any admin-level identity skips the reviewer.
+
+### G3 (medium, owner awareness): staging shares the production Cloudflare account
+
+The stores were created in the connected account. Cloudflare API tokens cannot be limited to chosen D1 databases or Workers; Workers and D1 permissions cover the whole account. So the v1 `CLOUDFLARE_API_TOKEN` can technically reach production `gsis-jobs` and production Workers. The deploy script refuses non-`gsis-v1-` names and checks real identities, which stops mistakes, but a modified workflow would not be stopped by the token. G1 and G2 are therefore the real protection. A separate Cloudflare account for staging (my PR #140 S1) would remove this exposure; owner's choice.
+
+### Public repository note
+
+Being public, every record here is world-readable, including Cloudflare account and D1 IDs, Drive folder IDs in `HANDOVER_REVIEWER.md`, and staff role structure. These are identifiers, not credentials, and the owner accepted the publication audit categories as harmless. Keep secrets, staff personal data and tokens out of all commits, as now.
