@@ -308,7 +308,7 @@ async function health() {
 }
 $("refreshHealth").onclick = health;
 function openSection(id) {
-  const ids = ["accounts", "health", "evidence", "services"];
+  const ids = ["accounts", "health", "evidence", "services", "storage"];
   if (!ids.includes(id)) id = "accounts";
   for (const section of ids) $(section).hidden = section !== id;
   for (const button of document.querySelectorAll("[data-section]"))

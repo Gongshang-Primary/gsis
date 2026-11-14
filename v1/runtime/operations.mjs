@@ -1,3 +1,4 @@
+import {storageInventory,storagePreview,confirmStoragePrune,finishStoragePrune} from "./storage.mjs";
 import { ApiError, identifier } from "./errors.mjs";
 import { query, one, prepareOperation, commitOperation } from "./store.mjs";
 import { admit, resolveAdmission } from "./security.mjs";
@@ -5,6 +6,9 @@ import { backupOwner } from "./backup.mjs";
 import { outboxHealth } from "./jobs.mjs";
 import { driveBackupHealth } from "./drive-backup-jobs.mjs";
 export function systemPolicy(method, path) {
+  if (method === "GET" && path === "/system/storage") return {action:"core.admin",write:false,resourceId:"storage"};
+  if (method === "POST" && ["/system/storage/preview","/system/storage/confirm","/system/storage/finish"].includes(path))
+    return {action:"core.admin",write:path!=="/system/storage/preview",resourceId:"storage"};
   if (
     method === "GET" &&
     [
@@ -21,6 +25,10 @@ export function systemPolicy(method, path) {
 export async function systemHandle(ctx) {
   const { env, body, principal, now, path } = ctx,
     schoolId = principal.schoolId;
+  if (path === "/system/storage") return storageInventory(ctx);
+  if (path === "/system/storage/preview") return storagePreview(ctx);
+  if (path === "/system/storage/confirm") return confirmStoragePrune(ctx);
+  if (path === "/system/storage/finish") return finishStoragePrune(ctx);
   if (path === "/system/health") {
     const pending = await query(
       env.DB,
