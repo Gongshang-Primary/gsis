@@ -307,15 +307,18 @@ async function health() {
   );
 }
 $("refreshHealth").onclick = health;
-document.querySelectorAll("[data-section]").forEach((button) => {
-  button.onclick = () => {
-    for (const id of ["accounts", "health", "evidence", "services"])
-      $(id).hidden = id !== button.dataset.section;
-    if (button.dataset.section === "health") void health();
-    if (button.dataset.section === "services")
-      void services().catch((e) => status(e.message, true));
-  };
-});
+function openSection(id) {
+  const ids = ["accounts", "health", "evidence", "services"];
+  if (!ids.includes(id)) id = "accounts";
+  for (const section of ids) $(section).hidden = section !== id;
+  for (const button of document.querySelectorAll("[data-section]"))
+    button.setAttribute("aria-current",button.dataset.section === id ? "page" : "false");
+  history.replaceState(null,"","#"+id);
+  window.dispatchEvent(new Event("gsis:navigation"));
+  if (id === "health") void health().catch(e=>status(e.message,true));
+  if (id === "services") void services().catch(e=>status(e.message,true));
+}
+document.querySelectorAll("[data-section]").forEach(button=>button.onclick=()=>openSection(button.dataset.section));
 $("evidenceForm").onsubmit = async (event) => {
   event.preventDefault();
   $("evidenceResult").textContent = "Recovering…";
@@ -333,14 +336,14 @@ try {
   const session = await api.getSession();
   if (!session) {
     location.replace("/?next=/admin/");
-  } else if (!session.capabilities.includes("core.admin"))
-    status("Administration requires current Admin access.", true);
+  } else if (session.impersonating || !session.capabilities.includes("core.admin"))
+    status("Global Admin Toolbox requires current Global Admin access.", true);
   else {
     $("adminContent").hidden = false;
     status("Current Core permissions govern every action.");
     await loadAccounts();
-    if (location.hash === "#health")
-      document.querySelector("[data-section=health]").click();
+    openSection(location.hash.slice(1));
+    window.addEventListener("hashchange",()=>openSection(location.hash.slice(1)));
   }
 } catch (error) {
   status(error.message, true);

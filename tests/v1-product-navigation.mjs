@@ -22,13 +22,13 @@ try {
   return route.fulfill({body:'',contentType:'text/plain'});
  });
  await page.goto('https://gsis.example.invalid/');
- await page.waitForFunction(()=>document.querySelectorAll('.module').length===9);
- assert.deepEqual(await page.locator('.module h2').allTextContents(),['Roster','Contacts','Calendar','Venues','Layout','Deploy','LORD','STARLORD','OVERLORD']);
+ await page.waitForFunction(()=>document.querySelectorAll('.module').length===10);
+ assert.deepEqual(await page.locator('.module h2').allTextContents(),['Roster','Contacts','Calendar','Venues','Layout','Deploy','LORD','STARLORD','OVERLORD','Global Admin Toolbox']);
  const boxes=await page.locator('.module').evaluateAll(nodes=>nodes.map(n=>({x:n.offsetLeft,y:n.offsetTop,w:n.offsetWidth,h:n.offsetHeight})));
  assert.equal(new Set(boxes.map(b=>b.x)).size,3);
- assert.equal(new Set(boxes.map(b=>b.y)).size,3);
+ assert.equal(new Set(boxes.map(b=>b.y)).size,4);
  assert(boxes.every(b=>Math.abs(b.w-b.h)<=1),'desktop equal square tiles');
- assert.equal(await page.locator('.module-icon').count(),9);
+ assert.equal(await page.locator('.module-icon').count(),10);
  assert.equal(await page.locator('.module-icon img[src="/calendar/gsps-calendar-logo.png"]').count(),1);
  await page.waitForFunction(()=>[...document.querySelectorAll('.module-icon img')].every(i=>i.complete&&i.naturalWidth>0));
  const iconBounds=await page.locator('.module-icon').evaluateAll(nodes=>nodes.map(n=>({box:n.getBoundingClientRect().height,image:n.firstElementChild.getBoundingClientRect().height})));assert(iconBounds.every(x=>x.image<=x.box+1),'all reused icons fit their equal square icon bounds');
