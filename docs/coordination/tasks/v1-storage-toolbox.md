@@ -9,3 +9,13 @@
 - Verification: actual isolated D1/R2, permissions, stale preview, retained reference, partial delete/restart, duplicate operation, tampering and bounds; canonical build/local migration upgrade, product and full exact-head CI. F5 OPEN; runtime UAT and T1B-01/T1B-02 Not tested.
 
 Scope clarification during actual-service testing: include `scripts/v1/dev.mjs`. The local multi-Worker launcher applies only `0001_owner.sql`, unlike deployment's sorted additive migrations. Consequently the actual service correctly returned 503 for a missing new cleanup journal. Load all generated migration files in the existing local schema setup; do not fold additive migrations into the deployed initial schema. This is a Codex-owned harness correction necessary for the authorised storage implementation, not a production change.
+
+## Implementation and verification
+
+Q01–Q05 Pass for bounded scratch cleanup: Core-admin server policy, owner/school scoping, 100-item preview batches, exact digest, pending-writer guard, immutable backup reference exclusion, retained two-phase journal and separate R2 finish. R2 listing is paginated; D1 expired count saturates at 1001 (displayed as 1001+). No valid-backup retention, evidence deletion or notification activation. See `docs/v1/accelerated-delivery/STORAGE_TOOLBOX.md`.
+
+Q06 focused Pass: `TZ=Asia/Singapore GSIS_BROWSER_EXECUTABLE=/usr/bin/chromium node tests/v1-product-storage-toolbox.mjs`: actual D1/R2, full 100-row atomic batch, stale preview, unchanged valid previews, protected backup files, manifest change, partial deletion/process restart/receipt replay, all eight owner inventory endpoints, real Core permission denial, browser typed confirmation. `TZ=Asia/Singapore npm run build`: pass/no generated drift. `TZ=Asia/Singapore node scripts/v1/verify-migration-upgrade.mjs`: pass; real local Wrangler applies all additive filenames once. Full product and Node/LORD exact-head CI pending at commit; results in PR.
+
+Failures retained: D1 PRAGMA size probe was rejected by the real runtime, replaced with supported size_after metadata (free pages explicitly unavailable); the actual-service test exposed the local launcher missing additive migrations, fixed in scoped dev.mjs; synthetic backup receipt fixture needed admission, corrected without weakening production checks; permission negative initially omitted required operationId and returned 400, corrected to exercise actual 403 authorization.
+
+Q07 pending Claude exact-head review. Q08 no live migration/deletion/deployment authorised. F5 OPEN; T1B-01/T1B-02/runtime UAT Not tested. Rollback retains additive journal, particularly pending cleanup plans; no initial schema rewrite.
