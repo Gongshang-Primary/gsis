@@ -110,6 +110,12 @@ function updateStarlord(source){
  source=replaceOnce(source,"  start();","  start().catch(()=>{clearSignageScope();setFeedStatus('Display access could not be verified.',true);});",'STARLORD initialization failure stays private');
  return source;
 }
+function updateRosterCapacity(source){
+ const ast=parse(source,{ecmaVersion:'latest',sourceType:'script'}),matches=[];
+ function walk(node){if(!node||typeof node!=='object')return;if(node.type==='FunctionDeclaration'&&node.id?.name==='healthSummary')matches.push(node);for(const value of Object.values(node))if(Array.isArray(value))value.forEach(walk);else if(value&&typeof value==='object')walk(value);}
+ walk(ast);if(matches.length!==1)throw Error('Roster health renderer baseline changed');
+ const node=matches[0];return source.slice(0,node.start)+'function healthSummary(s,h){return window.GSISV1RosterCapacity.render(s,h);}' +source.slice(node.end);
+}
 function transform(module,rel,text){
  for(const [host,id]of Object.entries(productionHosts))text=text.replaceAll('https://'+host+'/', '/'+id+'/').replaceAll('https://'+host, '/'+id+'/');
  for(const id of ['contacts','deploy','roster','calendar','layout','venues','lord','overlord','starlord'])text=text.replaceAll('https://'+id+'.gsps.edu.sg/', '/'+id+'/').replaceAll('https://'+id+'.gsps.edu.sg','/'+id+'/');
@@ -119,7 +125,7 @@ function transform(module,rel,text){
   text=text.replaceAll('v0.9.9p','v1').replaceAll('Dropdown choices are managed in Deploy.','Dropdown choices and accepted staff facts are managed in Contacts.').replaceAll('Admin access is managed in the backend sheet. Admins can assign or remove SMC access here.','Application access is managed in Core. Accepted SMC, EO and School Leader records are managed separately in Contacts.');
   if(module.id==='contacts'&&rel==='index.html')text=text.replace('</head>','<link rel="stylesheet" href="/v1/shared/contacts-ui.css"><script defer src="/v1/shared/contacts-ui.js"></script></head>');
   if(module.id==='deploy'&&rel==='index.html')text=text.replace('</head>','<script defer src="/v1/shared/deploy-ui.js"></script><script defer src="/v1/shared/deploy-ui-tables.js"></script></head>');
-  if(module.id==='roster'&&rel==='index.html')text=text.replace('</head>','<link rel="stylesheet" href="/v1/shared/roster-stapler-resize.css"><script defer src="/v1/shared/roster-stapler-resize.js"></script><script defer src="/v1/shared/roster-table-ui.js"></script></head>');
+  if(module.id==='roster'&&rel==='index.html')text=text.replace('</head>','<link rel="stylesheet" href="/v1/shared/roster-capacity.css"><script src="/v1/shared/roster-capacity.js"></script><link rel="stylesheet" href="/v1/shared/roster-stapler-resize.css"><script defer src="/v1/shared/roster-stapler-resize.js"></script><script defer src="/v1/shared/roster-table-ui.js"></script></head>');
   if(module.id==='calendar'&&rel==='index.html')text=text.replace('</head>','<link rel="stylesheet" href="/v1/shared/calendar-ui.css"><script type="module" src="/v1/shared/calendar-ui.js"></script></head>');
   if(module.id==='contacts'&&rel==='index.html')text=text.replace('</body>','<script type="module" src="/v1/shared/contacts-authority.js"></script><script type="module" src="/v1/shared/contacts-catalogues.js"></script></body>');
   if(module.id==='roster'&&rel==='index.html')text=text.replaceAll('/roster/system-health.html','/admin/#health').replace('</body>','<script type="module" src="/v1/shared/roster-import.js"></script><script type="module" src="/v1/shared/roster-policy-ledger.js"></script><script type="module" src="/v1/shared/roster-continuity.js"></script></body>');
@@ -170,6 +176,7 @@ function transform(module,rel,text){
    text=text.replaceAll('Annual R utilisation is first by default; same subject is last by default.','Layer settings below use daily capacity first by default.');
    text=text.replaceAll('<h4>Business preferences</h4>','<h4>Allocation layers</h4><p>Use Allocation layers and duties done below for the current per-layer limits, subject continuity and preference order. These settings replace the older annual-utilisation preferences.</p>');
   }
+  if(module.id==='roster'&&rel==='roster-operations-ui.js')text=updateRosterCapacity(text);
   if(module.id==='deploy'&&rel==='app.js')text=updateDeploy(text);
   if(module.id==='deploy'&&rel==='teaching-rules.js'){
    text=replaceOnce(text,"if(Array.isArray(catalogue)){p['EO Appt Level']=rule?String(rule.level||''):'';out.groups=rule?memberships(rule.role,rule.level,rule.groups):[];}","out.groups=(live&&live.groups||t.groups||[]).slice();out.authority=live&&live.authority||t.authority||{};",'Accepted Contacts facts remain authoritative');

@@ -6,11 +6,16 @@ on:
         description: "Enter DEPLOY ISOLATED V1 after exact-head review and owner approval"
         required: true
         type: string
+      upload_provider_credentials:
+        description: "Upload existing provider credentials from this protected environment (does not activate integrations)"
+        required: true
+        type: boolean
+        default: false
 permissions:
   contents: read
 jobs:
   deploy:
-    if: inputs.confirmation == 'DEPLOY ISOLATED V1'
+    if: github.ref == 'refs/heads/main' && inputs.confirmation == 'DEPLOY ISOLATED V1'
     environment: gsis-v1-owner-approved
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -34,4 +39,12 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           GSIS_SECRET: ${{ secrets.GSIS_SECRET }}
+          GSIS_UPLOAD_PROVIDER_CREDENTIALS: ${{ inputs.upload_provider_credentials }}
+          WHATSAPP_ACCESS_TOKEN: ${{ inputs.upload_provider_credentials && secrets.WHATSAPP_ACCESS_TOKEN || '' }}
+          WHATSAPP_APP_SECRET: ${{ inputs.upload_provider_credentials && secrets.WHATSAPP_APP_SECRET || '' }}
+          WHATSAPP_VERIFY_TOKEN: ${{ inputs.upload_provider_credentials && secrets.WHATSAPP_VERIFY_TOKEN || '' }}
+          TELEGRAM_BOT_TOKEN: ${{ inputs.upload_provider_credentials && secrets.TELEGRAM_BOT_TOKEN || '' }}
+          TELEGRAM_WEBHOOK_SECRET: ${{ inputs.upload_provider_credentials && secrets.TELEGRAM_WEBHOOK_SECRET || '' }}
+          GOOGLE_SERVICE_ACCOUNT: ${{ inputs.upload_provider_credentials && secrets.GOOGLE_SERVICE_ACCOUNT || '' }}
+          EMAIL_API_TOKEN: ${{ inputs.upload_provider_credentials && secrets.EMAIL_API_TOKEN || '' }}
         run: node scripts/v1/deploy.mjs
