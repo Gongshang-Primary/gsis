@@ -1,3 +1,4 @@
+import { acquireContactsPins, releaseContactsPins } from "../../runtime/source-pin-batch.mjs";
 import {
   signatureSettings,
   saveSignatureSettings,
@@ -817,6 +818,8 @@ export async function handle(ctx) {
       });
       return projection(env, body, p, now);
     }
+    if (path === "/internal/pins/acquire-batch") return acquireContactsPins(env, body, now);
+    if (path === "/internal/pins/release-batch") return releaseContactsPins(env, body, now);
     if (path === "/internal/pins/acquire") {
       if (body.scope?.startsWith("catalogue:"))
         return acquireSourcePin(

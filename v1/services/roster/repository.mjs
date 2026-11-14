@@ -231,7 +231,7 @@ export async function loadState(
     before: flatten(state),
   };
 }
-export async function recordChanges(schoolId, before, state, records) {
+export async function recordChanges(schoolId, before, state, records, { maxWrites = 1500 } = {}) {
   const next = flatten(state),
     known = new Map(records.map((r) => [r.collection + "|" + r.record_id, r])),
     guards = [],
@@ -271,7 +271,7 @@ export async function recordChanges(schoolId, before, state, records) {
         args: [schoolId, row.collection, row.id],
       });
     }
-  requireValue(writes.length <= 1500, "WRITE_BOUNDS", 413);
+  requireValue(writes.length <= maxWrites, "WRITE_BOUNDS", 413);
   return { guards, writes };
 }
 export async function scopeRevision(db, schoolId, scope) {

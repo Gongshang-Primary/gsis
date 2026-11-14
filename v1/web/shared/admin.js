@@ -206,6 +206,11 @@ async function health() {
       try {
         const result = await api.request(domain, "/system/health");
         content.textContent = JSON.stringify(result, null, 2);
+        const drive = document.createElement("p");
+        drive.textContent = "Google Drive backups: " + (result.driveBackup?.state || "unavailable") +
+          ". Daily freshness checks begin at 23:50 Singapore time; unchanged older files remain current. " +
+          "Drive history is deleted manually. Automatic Cloudflare pruning is off.";
+        section.append(drive);
         const note = document.createElement("p");
         note.textContent =
           "A verified backup covers this owner’s database and artifacts. Backups across different owners are not an atomic school-wide snapshot.";

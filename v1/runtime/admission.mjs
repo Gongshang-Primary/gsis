@@ -168,16 +168,14 @@ export async function queueSourceChange(
 }
 export async function requestSourceCancellations(env, pins) {
   const outcomes = await Promise.allSettled(
-    pins
-      .slice(0, 16)
-      .map((pin) =>
-        serviceCall(env, pin.destination, "/internal/operation-abort", {
-          schoolId: env.SCHOOL_ID,
-          owner: env.SERVICE_NAME,
-          pinId: pin.pin_id,
-          operationId: pin.operation_id,
-        }),
-      ),
+    pins.slice(0, 16).map((pin) =>
+      serviceCall(env, pin.destination, "/internal/operation-abort", {
+        schoolId: env.SCHOOL_ID,
+        owner: env.SERVICE_NAME,
+        pinId: pin.pin_id,
+        operationId: pin.operation_id,
+      }),
+    ),
   );
   return {
     attempted: outcomes.length,
@@ -393,6 +391,225 @@ export async function releaseSourcePin(env, { schoolId, pinId }, now) {
   ).run();
   return { pinId, state: "released", resolvedAt: now };
 }
+// Batch transport is limited to Contacts staff pins; every existing source
+// scope and deterministic pin identity remains authoritative.
+async function admitContactsBatch(env, db, op, principal, ordered, now) {
+  const staff = ordered.filter(
+    (d) => d.owner === "contacts" && d.scope.startsWith("staff:"),
+  );
+  if (staff.length > 512) throw new ApiError("PIN_BATCH_BOUNDS", 413);
+  if (
+    staff.some(
+      (d) =>
+        !/^staff:[A-Za-z0-9][A-Za-z0-9._:@/-]{0,127}$/.test(d.scope) ||
+        !/^\d{1,16}$/.test(String(d.revision)) ||
+        !Number.isSafeInteger(Number(d.revision)) ||
+        Number(d.revision) < 1,
+    )
+  )
+    throw new ApiError("DEPENDENCY_INVALID", 503);
+  let validUntil = Math.min(
+    principal.validUntil,
+    op.validUntil ?? principal.validUntil,
+    ...ordered.map((d) => d.validUntil ?? principal.validUntil),
+  );
+  if (!Number.isSafeInteger(validUntil) || validUntil <= now)
+    throw new ApiError("AUTHORITY_CHANGED", 409);
+  const binding = {
+    schoolId: op.schoolId,
+    destination: env.SERVICE_NAME,
+    operationId: op.operationId,
+    digest: op.digest,
+    fence: op.fence,
+    decisionId: principal.decisionId,
+  };
+  const pins = await Promise.all(
+    ordered.map(async (d) => ({
+      owner: d.owner,
+      scope: d.scope,
+      revision: String(d.revision),
+      pinId: await digest([
+        op.schoolId,
+        env.SERVICE_NAME,
+        op.operationId,
+        op.fence,
+        d.owner,
+        d.scope,
+      ]),
+      validUntil,
+      state: "planned",
+      ...(d.owner === "contacts" && d.scope.startsWith("staff:")
+        ? { batchVersion: 1, binding }
+        : {}),
+    })),
+  );
+  // The entire membership is immutable and durable before the first RPC. An
+  // overlapping attempt cannot replace it with a shorter acquisition prefix.
+  const inserted = await statement(
+    db,
+    "INSERT OR IGNORE INTO product_admissions(school_id,operation_id,fence,digest,decision_id,valid_until,pins_json,state) SELECT ?,?,?,?,?,?,?,'acquiring' WHERE EXISTS(SELECT 1 FROM product_operations WHERE school_id=? AND operation_id=? AND fence=? AND digest=? AND state='prepared')",
+    [
+      op.schoolId,
+      op.operationId,
+      op.fence,
+      op.digest,
+      principal.decisionId,
+      validUntil,
+      JSON.stringify(pins),
+      op.schoolId,
+      op.operationId,
+      op.fence,
+      op.digest,
+    ],
+  ).run();
+  if (inserted.meta.changes !== 1)
+    throw new ApiError(
+      "OPERATION_CONFLICT",
+      409,
+      "Another acquisition owns this operation.",
+    );
+  try {
+    let contactDone = false;
+    for (let i = 0; i < pins.length; i++) {
+      const pin = pins[i];
+      if (pin.batchVersion === 1 && contactDone) continue;
+      const members =
+        pin.batchVersion === 1
+          ? pins.filter((p) => p.batchVersion === 1)
+          : [pin];
+      for (const member of members) member.state = "uncertain";
+      // Planned members cannot be dispatched after a terminal fence. Preserve
+      // their identities, but do not release never-attempted legacy RPCs.
+      const dispatched = await statement(
+        db,
+        "UPDATE product_admissions SET pins_json=? WHERE school_id=? AND operation_id=? AND fence=? AND digest=? AND state='acquiring' AND EXISTS(SELECT 1 FROM product_operations WHERE school_id=? AND operation_id=? AND fence=? AND state='prepared')",
+        [
+          JSON.stringify(pins),
+          op.schoolId,
+          op.operationId,
+          op.fence,
+          op.digest,
+          op.schoolId,
+          op.operationId,
+          op.fence,
+        ],
+      ).run();
+      if (dispatched.meta.changes !== 1)
+        throw new ApiError("OPERATION_ABORTED", 409);
+      if (pin.batchVersion === 1) {
+        const reply = await serviceCall(
+          env,
+          "contacts",
+          "/internal/pins/acquire-batch",
+          {
+            ...binding,
+            pins: members.map((p) => ({
+              pinId: p.pinId,
+              scope: p.scope,
+              revision: p.revision,
+              validUntil: p.validUntil,
+            })),
+          },
+        );
+        if (!Array.isArray(reply.pins) || reply.pins.length !== members.length)
+          throw new ApiError("PIN_RESPONSE_INVALID", 503);
+        const returned = new Map();
+        for (const value of reply.pins) {
+          if (!value || returned.has(value.pinId))
+            throw new ApiError("PIN_RESPONSE_INVALID", 503);
+          returned.set(value.pinId, value);
+        }
+        for (const member of members) {
+          const value = returned.get(member.pinId);
+          if (
+            !value ||
+            value.owner !== "contacts" ||
+            value.scope !== member.scope ||
+            String(value.revision) !== member.revision ||
+            !Number.isSafeInteger(value.validUntil) ||
+            value.validUntil <= now ||
+            value.validUntil > member.validUntil
+          )
+            throw new ApiError("PIN_RESPONSE_INVALID", 503);
+          validUntil = Math.min(validUntil, value.validUntil);
+          member.validUntil = value.validUntil;
+          member.state = "held";
+        }
+        contactDone = true;
+      } else {
+        const value = await serviceCall(
+          env,
+          pin.owner,
+          "/internal/pins/acquire",
+          {
+            ...binding,
+            scope: pin.scope,
+            pinId: pin.pinId,
+            revision: pin.revision,
+            validUntil,
+          },
+        );
+        if (
+          !value ||
+          value.owner !== pin.owner ||
+          value.pinId !== pin.pinId ||
+          value.scope !== pin.scope ||
+          String(value.revision) !== pin.revision ||
+          !Number.isSafeInteger(value.validUntil) ||
+          value.validUntil <= now ||
+          value.validUntil > validUntil
+        )
+          throw new ApiError("PIN_RESPONSE_INVALID", 503);
+        validUntil = Math.min(validUntil, value.validUntil);
+        pin.validUntil = value.validUntil;
+        pin.state = "held";
+      }
+      const currentAfter = await operationStatus(
+        db,
+        op.schoolId,
+        op.operationId,
+      );
+      if (currentAfter?.state !== "prepared" || currentAfter.fence !== op.fence)
+        throw new ApiError("OPERATION_ABORTED", 409);
+    }
+    if (validUntil <= now) throw new ApiError("AUTHORITY_CHANGED", 409);
+    const ready = await statement(
+      db,
+      "UPDATE product_admissions SET state='ready',pins_json=?,valid_until=? WHERE school_id=? AND operation_id=? AND fence=? AND digest=? AND state='acquiring' AND EXISTS(SELECT 1 FROM product_operations WHERE school_id=? AND operation_id=? AND fence=? AND state='prepared')",
+      [
+        JSON.stringify(pins),
+        validUntil,
+        op.schoolId,
+        op.operationId,
+        op.fence,
+        op.digest,
+        op.schoolId,
+        op.operationId,
+        op.fence,
+      ],
+    ).run();
+    if (ready.meta.changes !== 1) throw new ApiError("OPERATION_ABORTED", 409);
+    return {
+      kind: "protected",
+      decisionId: principal.decisionId,
+      validUntil,
+      pins,
+      fence: op.fence,
+      digest: op.digest,
+    };
+  } catch (error) {
+    await abortOperation(db, op, "ADMISSION_FAILED", now);
+    await resolveAdmission(
+      env,
+      db,
+      op,
+      { decisionId: principal.decisionId, pins },
+      null,
+      now,
+    );
+    throw error;
+  }
+}
 export async function admit(
   env,
   db,
@@ -494,6 +711,12 @@ export async function admit(
       503,
       "Core authority admission is missing.",
     );
+  if (
+    ordered.filter(
+      (d) => d.owner === "contacts" && d.scope.startsWith("staff:"),
+    ).length > 1
+  )
+    return admitContactsBatch(env, db, op, principal, ordered, now);
   let validUntil = Math.min(
       principal.validUntil,
       op.validUntil ?? principal.validUntil,
@@ -640,7 +863,50 @@ export async function resolveAdmission(
     /* The immutable destination receipt remains available for later reconciliation. */
   }
   const unresolved = [];
-  for (const p of pins) {
+  const attempted = pins.filter((p) => p.state !== "planned");
+  const batched = attempted.filter(
+    (p) => p.owner === "contacts" && p.batchVersion === 1,
+  );
+  if (batched.length) {
+    try {
+      const binding = batched[0].binding;
+      if (
+        !binding ||
+        batched.some(
+          (p) => JSON.stringify(p.binding) !== JSON.stringify(binding),
+        )
+      )
+        throw new ApiError("PIN_CONFLICT", 409);
+      const r = await serviceCall(
+        env,
+        "contacts",
+        "/internal/pins/release-batch",
+        {
+          ...binding,
+          pins: batched.map((p) => ({
+            pinId: p.pinId,
+            scope: p.scope,
+            revision: p.revision,
+            validUntil: p.validUntil,
+          })),
+        },
+      );
+      const expected = new Set(batched.map((p) => p.pinId));
+      if (
+        r.state !== "released" ||
+        !Array.isArray(r.pins) ||
+        r.pins.length !== batched.length ||
+        r.pins.some(
+          (p) => p.state !== "released" || !expected.delete(p.pinId),
+        ) ||
+        expected.size
+      )
+        unresolved.push(...batched);
+    } catch {
+      unresolved.push(...batched);
+    }
+  }
+  for (const p of attempted.filter((p) => !batched.includes(p))) {
     try {
       const r = await serviceCall(env, p.owner, "/internal/pins/release", {
         schoolId: op.schoolId,

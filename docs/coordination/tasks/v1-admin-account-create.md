@@ -21,3 +21,7 @@ Added Add account with required school email and Google subject, optional perman
 - `git diff --check`: passed. Exact four-file allowlist maintained; no backend, schema or production source changes.
 - Q01–Q05: bounded scope, existing identity/authority/write contracts preserved; meaningful recovery test passed. Q06: local build/new test pass; full suite and product CI pending. Q07: Claude exact-head review pending. Q08: not deployed; runtime UAT remains Not tested, F5 OPEN.
 - Limitation: this form requires a verified Google subject. It does not implement email invitation or automatic enrolment. Bootstrap cleanup is a separate deployment/configuration action, not performed by this UI patch. Rollback is reverting these UI/test changes; already committed account grants would remain and require normal audited administration.
+
+## Owner change queue continuation
+
+The four-file scope and counts above describe the original item-1 head `34dafbcd257615df79975c778508156c21c07469`. Its product/full-suite CI passed. The owner subsequently ended the recording-only hold with “work and build. clear changelog item by item.” PR145 and this branch now follow the separate [claimed fourteen-item queue](v1-changelog-20261114.md), including its recorded scope refinements. The [change log](../../v1/accelerated-delivery/CHANGELOG_2026-11-14.md) maps each requirement to implementation and evidence. The consolidated exact head needs fresh CI and Claude review; this historical four-file claim is not a restriction on the later authorised queue or proof that its checks passed.

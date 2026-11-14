@@ -13,6 +13,7 @@ const scopes = [
 ];
 const panel = document.createElement("details");
 panel.className = "gsis-panel";
+panel.dataset.panelId = "deploy-publication";
 panel.innerHTML =
   '<summary>Canonical Excel and publication receipts</summary><p>Save changes a draft. Publish makes the selected saved revision active. Contacts proposals and recipient deliveries have independent outcomes.</p><div class="gsis-formrow"><label>Table scope<select data-scope></select></label><button data-export>Export All · importable</button><label>Import Export All workbook<input type="file" data-import accept=".xlsx"></label></div><p data-status role="status"></p><div data-preview></div><form data-receipt class="gsis-formrow"><label>Publication operation ID<input data-operation required></label><button>Check original receipt</button></form><div data-result></div>';
 for (const scope of scopes) {
@@ -23,6 +24,11 @@ for (const scope of scopes) {
 document.body.append(panel);
 const status = panel.querySelector("[data-status]"),
   previewHost = panel.querySelector("[data-preview]");
+let importDialog = null,
+  importStatus = null,
+  importReadEpoch = 0,
+  validationEpoch = 0,
+  protectedEpoch = 0;
 let pendingPreview = null,
   workbook = null,
   matchStaff = [],
@@ -36,6 +42,7 @@ function version() {
 }
 function message(text, error = false) {
   status.textContent = text;
+  if (importStatus) importStatus.textContent = text;
   status.classList.toggle("gsis-error", error);
 }
 function showReceipt(result, host = panel.querySelector("[data-result]")) {
@@ -68,6 +75,7 @@ function showReceipt(result, host = panel.querySelector("[data-result]")) {
   host.append(info);
 }
 panel.querySelector("[data-export]").onclick = async () => {
+  const epoch = protectedEpoch;
   try {
     message("Preparing canonical workbook…");
     const data = await api.request("deploy", "/export", {
@@ -77,8 +85,11 @@ panel.querySelector("[data-export]").onclick = async () => {
         scope: panel.querySelector("[data-scope]").value,
       },
     });
+    const bytes = await encodeWorkbook(data);
+    if (epoch !== protectedEpoch)
+      throw Error("Session changed. Export cancelled.");
     download(
-      await encodeWorkbook(data),
+      bytes,
       "GSiS-" +
         data.metadata["Table Scope"] +
         "-" +
@@ -90,6 +101,7 @@ panel.querySelector("[data-export]").onclick = async () => {
     );
   } catch (error) {
     message(error.message, true);
+    return { error };
   }
 };
 panel.querySelector("[data-receipt]").onsubmit = async (event) => {
@@ -236,12 +248,15 @@ function renderWorkbook() {
   }
 }
 async function validateWorkbook() {
+  const epoch = ++validationEpoch;
   try {
     message("Validating current scope, references and base revision…");
-    pendingPreview = await api.request("deploy", "/imports/preview", {
+    const result = await api.request("deploy", "/imports/preview", {
       method: "POST",
       body: { versionId: version(), workbook },
     });
+    if (epoch !== validationEpoch) return;
+    pendingPreview = result;
     applyOperation = crypto.randomUUID();
     applyRequest = null;
     applyLease = null;
@@ -252,6 +267,7 @@ async function validateWorkbook() {
         : "Review the replacement diff. No draft data has changed.",
     );
   } catch (error) {
+    if (epoch !== validationEpoch) return;
     pendingPreview = null;
     message(error.message, true);
   }
@@ -322,13 +338,44 @@ async function applyWorkbook() {
     input.disabled = !!applyRequest;
   }
 }
+function showImportDialog() {
+  if (!importDialog) {
+    importDialog = document.createElement("dialog");
+    importDialog.className = "gsis-import-preview";
+    importDialog.setAttribute("aria-label", "Import Deploy workbook");
+    const title = document.createElement("h2");
+    title.textContent = "Import Deploy workbook";
+    importStatus = document.createElement("p");
+    importStatus.setAttribute("role", "status");
+    const reimport = document.createElement("button");
+    reimport.textContent = "Reimport workbook";
+    reimport.onclick = () => panel.querySelector("[data-import]").click();
+    const close = document.createElement("button");
+    close.textContent = "Close";
+    close.onclick = () => importDialog.close();
+    importDialog.append(title, importStatus, reimport, close, previewHost);
+    document.body.append(importDialog);
+  }
+  if (!importDialog.open) importDialog.showModal();
+}
 panel.querySelector("[data-import]").onchange = async (event) => {
   const file = event.target.files[0];
   if (!file) return;
+  if (applyRequest) {
+    message("Resolve the original import before replacing its workbook.", true);
+    return;
+  }
+  showImportDialog();
+  const epoch = ++importReadEpoch;
+  ++validationEpoch;
+  pendingPreview = null;
+  workbook = null;
+  previewHost.replaceChildren();
   try {
     message("Reading workbook…");
-    workbook = await decodeWorkbook(await file.arrayBuffer());
-    if (["Membership", "HR Terms"].includes(workbook.metadata["Table Scope"]))
+    const candidate = await decodeWorkbook(await file.arrayBuffer());
+    if (epoch !== importReadEpoch) return;
+    if (["Membership", "HR Terms"].includes(candidate.metadata["Table Scope"]))
       throw Error(
         "This catalogue is reference-only in Deploy. Manage it in Contacts.",
       );
@@ -336,12 +383,14 @@ panel.querySelector("[data-import]").onchange = async (event) => {
       method: "POST",
       body: { versionId: version() },
     });
+    if (epoch !== importReadEpoch) return;
+    workbook = candidate;
     matchStaff = snapshot.staffCatalog || snapshot.current?.teachers || [];
     pendingPreview = null;
     renderWorkbook();
     await validateWorkbook();
   } catch (error) {
-    message(error.message, true);
+    if (epoch === importReadEpoch) message(error.message, true);
   }
 };
 window.GSISV1Publication = {
@@ -470,3 +519,66 @@ window.GSISV1Publication = {
     dialog.addEventListener("close", () => dialog.remove(), { once: true });
   },
 };
+
+// The shared toolbar delegates canonical operations to this existing owner flow.
+const scopeForTable = () =>
+  ({
+    "IP Deploy": "IP",
+    "Classes & TGs": "TG",
+    Classes: "IP",
+    "Dept Settings": "Dept",
+    Dept: "Dept",
+    Teachers: "Teachers",
+    "Level Exclusions": "Exclusions",
+    Membership: "Membership",
+    Offload: "Offload",
+    "HR Terms": "HR Terms",
+    "Span of Control": "Span of Control",
+  })[document.getElementById("content")?.dataset.view];
+function openCanonical(kind) {
+  const scope = scopeForTable();
+  if (!scope)
+    throw Error("This view does not have a canonical workbook contract.");
+  panel.querySelector("[data-scope]").value = scope;
+  panel.open = true;
+  if (kind === "export")
+    return panel
+      .querySelector("[data-export]")
+      .onclick()
+      .then((result) => {
+        if (result?.error) throw result.error;
+      });
+  panel.querySelector("[data-import]").click();
+}
+function registerTables() {
+  window.GSISCoreTables?.register(
+    '#content[data-view="IP Deploy"] table,#content[data-view="Classes & TGs"] table,#content[data-view="Classes"] table,#content[data-view="Dept Settings"] table,#content[data-view="Dept"] table,#content[data-view="Teachers"] table,#content[data-view="Level Exclusions"] table,#content[data-view="Membership"] table,#content[data-view="Offload"] table,#content[data-view="HR Terms"] table,#content[data-view="Span of Control"] table',
+    {
+      exportAll: () => openCanonical("export"),
+      importAll: () => openCanonical("import"),
+    },
+  );
+  window.GSISCoreTables?.register(
+    '#content[data-view="Membership"] table,#content[data-view="HR Terms"] table',
+    { exportAll: () => openCanonical("export") },
+  );
+}
+registerTables();
+window.addEventListener("load", registerTables);
+
+window.addEventListener("gsis:clear-protected-state", () => {
+  ++importReadEpoch;
+  ++validationEpoch;
+  ++protectedEpoch;
+  workbook = null;
+  pendingPreview = null;
+  matchStaff = [];
+  applyOperation = null;
+  applyRequest = null;
+  applyLease = null;
+  previewHost.replaceChildren();
+  panel.append(previewHost);
+  importDialog?.remove();
+  importDialog = null;
+  importStatus = null;
+});

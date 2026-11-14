@@ -4,7 +4,11 @@ import { handle, notificationIntent } from "../v1/services/lord/service.mjs";
 import { closeOverdueSessions } from "../v1/services/lord/jobs.mjs";
 import { one, query } from "../v1/runtime/store.mjs";
 const h = await createDatabase("lord"),
-  now = Date.now(),
+  // Keep the controlled 18:01 clock ahead of D1's real-time lease floor, at every time of day.
+  now = Date.parse(
+    new Date(Date.now() + 32 * 3600000).toISOString().slice(0, 10) +
+      "T09:00:00+08:00",
+  ),
   school = "synthetic-school",
   validUntil = now + 3 * 86400000;
 const core = {

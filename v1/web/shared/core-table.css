@@ -1,0 +1,106 @@
+/* Shared v1 tables: controls stay beside their table; no implicit write adapter. */
+.gsis-core-tools {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex-wrap: wrap;
+  margin: 7px 0;
+  font-size: 12px;
+}
+.gsis-core-tools details {
+  position: relative;
+}
+.gsis-core-tools details > div {
+  position: absolute;
+  z-index: 35;
+  background: white;
+  border: 1px solid #b8c9d8;
+  padding: 8px;
+  min-width: 190px;
+  box-shadow: 0 3px 12px #10203022;
+}
+.gsis-core-tools details label {
+  display: flex;
+  gap: 7px;
+  padding: 3px;
+}
+.gsis-core-tools select,
+.gsis-core-tools button {
+  font-size: 12px;
+  min-height: 28px;
+}
+.gsis-core-tools [role="status"] {
+  color: #52677c;
+}
+.gsis-core-filter th {
+  background: #edf3f7 !important;
+  padding: 3px !important;
+}
+.gsis-core-filter input {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 7ch;
+  max-width: 25ch;
+  font-size: 12px !important;
+  min-height: 26px !important;
+}
+.gsis-core-sort {
+  padding: 0 4px !important;
+  min-height: 20px !important;
+  font-size: 11px !important;
+  border: 0;
+  background: transparent;
+  color: inherit;
+}
+.gsis-core-scroll {
+  max-width: 100%;
+  overflow: auto;
+  position: relative;
+}
+.gsis-core-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 4;
+}
+.gsis-core-filter th {
+  top: var(--gsis-header-height, 28px) !important;
+}
+.gsis-core-table [data-core-resize] {
+  position: absolute;
+  right: 0;
+  top: 0;
+  width: 8px;
+  height: 100%;
+  cursor: col-resize;
+  touch-action: none;
+}
+.gsis-core-table thead th {
+  padding-right: 12px;
+}
+.gsis-core-table td:first-child,
+.gsis-core-table th:first-child {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  background: #edf3f7;
+}
+.gsis-core-table thead th:first-child {
+  z-index: 6;
+}
+.gsis-core-import[disabled] {
+  cursor: not-allowed;
+}
+.gsis-import-preview {
+  width: min(94vw, 1300px);
+  max-height: 90vh;
+  overflow: auto;
+}
+.gsis-import-preview::backdrop {
+  backdrop-filter: blur(3px);
+  background: #13233377;
+}
+.gsis-import-invalid {
+  outline: 2px solid #b42337;
+  outline-offset: -2px;
+  background: #fff0f0;
+}

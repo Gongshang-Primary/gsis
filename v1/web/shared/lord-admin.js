@@ -268,205 +268,19 @@
     await load();
   }
   window.GSISV1LordBackground = { open: openBackground };
-  const panel = document.createElement("details");
+  const settingsStyle = document.createElement("style");
+  settingsStyle.textContent =
+    "#systemSettingsModal .settings-card{width:min(1320px,100%)} #systemSettingsModal input[type=checkbox]{width:18px;height:18px;min-height:18px;padding:0} #systemSettingsModal .gsis-core-tools select{width:auto;min-height:30px} #systemSettingsModal .gsis-core-tools{align-items:center;gap:8px}.gsis-lord-import{border:1px solid #b8c8d4;border-radius:12px;padding:22px;color:#17324a;font:14px system-ui}.gsis-lord-import table{border-collapse:collapse;width:100%;margin:16px 0}.gsis-lord-import th,.gsis-lord-import td{padding:9px 8px;text-align:left;border-bottom:1px solid #d7e0e8}.gsis-lord-import th{background:#edf3f7}.gsis-lord-import button{font:inherit;margin-right:8px;padding:7px 12px;border:1px solid #b8c8d4;border-radius:5px}";
+  document.head.append(settingsStyle);
+  const panel = document.createElement("section");
   panel.className = "gsis-panel";
+  panel.dataset.gsisPanelKind = "lord-setup";
   panel.innerHTML =
-    '<summary>LORD setup and inventory</summary><p role="status" data-status></p><button data-refresh>Refresh Contacts references</button><form data-resource><h2>Resource inventory</h2><label>Resource<select name="existing"><option value="">New resource</option></select></label><label>Permanent resource ID<input name="resourceId" required pattern="[A-Za-z0-9][A-Za-z0-9._-]*"></label><label>Name<input name="name" required maxlength="160"></label><label>Device type<input name="type" required maxlength="80"></label><label>Capacity<input name="capacity" type="number" min="1" max="200" value="1" required></label><label>Preparation periods<input name="bufferPeriods" type="number" min="0" max="4" value="1" required></label><label><input name="exclusive" type="checkbox" checked> Reserve the whole resource</label><label><input name="active" type="checkbox" checked> Active</label><label><input name="stylusOption" type="checkbox"> Styluses available</label><label><input name="headphoneOption" type="checkbox"> Headphones available</label><button>Save resource</button></form><form data-periods><h2>Period timings</h2><p>Use an ordered JSON array such as [{"code":"1","start":"07:30","end":"08:00"}].</p><textarea name="periods" rows="5" required></textarea><button>Save period timings</button></form>';
-
-  for (const [key, title, hint] of [
-    [
-      "referenceLists",
-      "Class and subject reference lists",
-      "JSON object with classes and subjects arrays.",
-    ],
-    [
-      "notificationTemplates",
-      "Approved WhatsApp templates",
-      "JSON object keyed by created, changed, cancelled, collection-reminder, overdue, administrative-close or reminder. Each entry has name, language and optional parameters (teacher, resource, quantity, date, startPeriod, endPeriod, classOrActivity, subject, bookingId). No credentials.",
-    ],
-  ]) {
-    const extra = document.createElement("form");
-    extra.dataset.setting = key;
-    const heading = document.createElement("h2");
-    heading.textContent = title;
-    const note = document.createElement("p");
-    note.textContent = hint;
-    const area = document.createElement("textarea");
-    area.name = "value";
-    area.rows = 6;
-    area.required = true;
-    const button = document.createElement("button");
-    button.textContent = "Save " + title.toLowerCase();
-    extra.append(heading, note, area, button);
-    panel.append(extra);
-  }
-  installIncidentLinks(panel);
-  document.body.append(panel);
-  window.GSISV1LordSettings = {
-    open() {
-      panel.open = true;
-      panel.scrollIntoView({ behavior: "smooth", block: "start" });
-    },
-  };
-  const status = panel.querySelector("[data-status]"),
-    form = panel.querySelector("[data-resource]"),
-    timings = panel.querySelector("[data-periods]");
-  let resources = [],
-    periodRevision = 0,
-    resourcePending = null,
-    periodPending = null,
-    refreshPending = null;
-  const extraRevisions = new Map(),
-    extraPending = new Map();
-  async function load() {
-    const [ref, settings] = await Promise.all([
-      api.request("lord", "/resources?includeInactive=1"),
-      api.request("lord", "/settings"),
-    ]);
-    resources = ref.resources || [];
-    form.elements.existing.replaceChildren(
-      new Option("New resource", ""),
-      ...resources.map((r) => new Option(r.name, r.id)),
-    );
-    const period = settings.settings.find(
-      (s) => s.setting_key === "periodTimings",
-    );
-    for (const form of panel.querySelectorAll("form[data-setting]")) {
-      const record = settings.settings.find(
-        (s) => s.setting_key === form.dataset.setting,
-      );
-      extraRevisions.set(form.dataset.setting, record?.revision || 0);
-      form.elements.value.value = JSON.stringify(
-        record
-          ? JSON.parse(record.value_json)
-          : form.dataset.setting === "referenceLists"
-            ? { classes: [], subjects: [] }
-            : {},
-        null,
-        2,
-      );
-    }
-    periodRevision = period?.revision || 0;
-    timings.elements.periods.value = JSON.stringify(
-      period ? JSON.parse(period.value_json).periods : [],
-      null,
-      2,
-    );
-    status.textContent = ref.setupRequired?.length
-      ? "Setup required: " + ref.setupRequired.join(", ")
-      : "References and inventory are ready.";
-  }
-  form.elements.existing.onchange = () => {
-    resourcePending = null;
-    const r = resources.find((r) => r.id === form.elements.existing.value);
-    for (const key of [
-      "resourceId",
-      "name",
-      "type",
-      "capacity",
-      "bufferPeriods",
-    ])
-      form.elements[key].value = r
-        ? key === "resourceId"
-          ? r.id
-          : r[key]
-        : ({ capacity: 1, bufferPeriods: 1 }[key] ?? "");
-    form.elements.resourceId.readOnly = !!r;
-    for (const key of [
-      "exclusive",
-      "active",
-      "stylusOption",
-      "headphoneOption",
-    ])
-      form.elements[key].checked = r
-        ? key === "active" || key === "exclusive"
-          ? r[key] !== false
-          : r[key] === true
-        : key === "active" || key === "exclusive";
-  };
-  form.onsubmit = async (event) => {
-    event.preventDefault();
-    try {
-      const values = new FormData(form),
-        old = resources.find((r) => r.id === values.get("existing"));
-      resourcePending ??= {
-        operationId: crypto.randomUUID(),
-        revision: old?.revision || 0,
-        resourceId: values.get("resourceId"),
-        name: values.get("name"),
-        type: values.get("type"),
-        capacity: Number(values.get("capacity")),
-        bufferPeriods: Number(values.get("bufferPeriods")),
-        exclusive: values.has("exclusive"),
-        active: values.has("active"),
-        metadata: {
-          stylusOption: values.has("stylusOption"),
-          headphoneOption: values.has("headphoneOption"),
-        },
-      };
-      committed(
-        await api.request("lord", "/resources", {
-          method: "POST",
-          body: resourcePending,
-        }),
-      );
-      resourcePending = null;
-      await load();
-      status.textContent = "Resource saved.";
-    } catch (error) {
-      if (invalidInput(error)) resourcePending = null;
-      status.textContent = error.message;
-    }
-  };
-  timings.onsubmit = async (event) => {
-    event.preventDefault();
-    try {
-      periodPending ??= {
-        operationId: crypto.randomUUID(),
-        key: "periodTimings",
-        revision: periodRevision,
-        value: { periods: JSON.parse(timings.elements.periods.value) },
-      };
-      committed(
-        await api.request("lord", "/settings", {
-          method: "POST",
-          body: periodPending,
-        }),
-      );
-      periodPending = null;
-      await load();
-      status.textContent = "Period timings saved.";
-    } catch (error) {
-      if (invalidInput(error)) periodPending = null;
-      status.textContent = error.message;
-    }
-  };
-  for (const form of panel.querySelectorAll("form[data-setting]"))
-    form.onsubmit = async (event) => {
-      event.preventDefault();
-      const key = form.dataset.setting;
-      try {
-        if (!extraPending.has(key))
-          extraPending.set(key, {
-            operationId: crypto.randomUUID(),
-            key,
-            revision: extraRevisions.get(key) || 0,
-            value: JSON.parse(form.elements.value.value),
-          });
-        committed(
-          await api.request("lord", "/settings", {
-            method: "POST",
-            body: extraPending.get(key),
-          }),
-        );
-        extraPending.delete(key);
-        await load();
-        status.textContent = "Settings saved.";
-      } catch (error) {
-        if (invalidInput(error)) extraPending.delete(key);
-        status.textContent = error.message;
-      }
-    };
+    '<h2>LORD settings</h2><p><a href="/admin/">Manage application access</a></p><p>Telegram uses the existing bot and backend-managed token. Credentials never appear in these tables or downloads. Saving reference data does not enable messaging.</p><button data-background type="button">Background work and notification status</button><button data-refresh type="button">Refresh Contacts staff references</button><p role="status" data-status></p><div data-reference-tables></div>';
+  panel.querySelector("[data-background]").onclick = openBackground;
+  const state = panel.querySelector("[data-status]");
+  let refreshPending = null,
+    tables = null;
   panel.querySelector("[data-refresh]").onclick = async () => {
     try {
       refreshPending ??= { operationId: crypto.randomUUID() };
@@ -477,23 +291,94 @@
         }),
       );
       refreshPending = null;
-      await load();
+      await tables?.load();
+      state.textContent = "Contacts references refreshed.";
     } catch (error) {
-      status.textContent = error.message;
+      state.textContent = error.message;
     }
   };
-  api
-    .getSession()
-    .then((session) => {
-      if (
-        !session?.capabilities.some((c) => ["admin", "lord.admin"].includes(c))
-      ) {
-        panel.remove();
-        return;
+  installIncidentLinks(panel);
+  const templates = document.createElement("form");
+  templates.innerHTML =
+    '<h3>Approved WhatsApp templates</h3><p>Template names, language and approved parameters only. Provider tokens stay in backend secret storage.</p><label>Template definitions<textarea name="definitions" rows="5" required></textarea></label><button>Save approved templates</button><p role="status"></p>';
+  panel.append(templates);
+  let templatesRevision = 0,
+    templatesPending = null;
+  async function loadTemplates() {
+    const data = await api.request("lord", "/settings"),
+      record = data.settings.find(
+        (s) => s.setting_key === "notificationTemplates",
+      );
+    templatesRevision = record?.revision || 0;
+    templates.elements.definitions.value = record
+      ? JSON.stringify(JSON.parse(record.value_json), null, 2)
+      : "{}";
+  }
+  templates.onsubmit = async (event) => {
+    event.preventDefault();
+    try {
+      templatesPending ??= {
+        operationId: crypto.randomUUID(),
+        key: "notificationTemplates",
+        revision: templatesRevision,
+        value: JSON.parse(templates.elements.definitions.value),
+      };
+      committed(
+        await api.request("lord", "/settings", {
+          method: "POST",
+          body: templatesPending,
+        }),
+      );
+      templatesPending = null;
+      await loadTemplates();
+      templates.querySelector("[role=status]").textContent =
+        "Approved templates saved. Sending remains governed by backend configuration.";
+    } catch (error) {
+      if (invalidInput(error)) templatesPending = null;
+      templates.querySelector("[role=status]").textContent = error.message;
+    }
+  };
+  panel.hidden = true;
+  document.body.append(panel);
+  window.GSISV1LordSettings = {
+    async open() {
+      try {
+        const session = await api.getSession();
+        if (
+          !session?.capabilities.some((c) =>
+            ["admin", "lord.admin"].includes(c),
+          )
+        )
+          throw Error("LORD administrator access is required.");
+        let modal = document.getElementById("systemSettingsModal");
+        if (modal) {
+          modal.showModal?.();
+          return;
+        }
+        modal = document.createElement("dialog");
+        modal.id = "systemSettingsModal";
+        modal.className = "modal-backdrop";
+        modal.innerHTML =
+          '<section class="editor-card settings-card"><div class="editor-heading"><h2>System settings</h2><button type="button" data-close aria-label="Close settings">×</button></div><div id="settingsBody" data-gsis-panel-host="lord-settings"></div></section>';
+        modal.querySelector("[data-close]").onclick = () => modal.close();
+        modal.onclose = () => {
+          panel.hidden = true;
+          document.body.append(panel);
+          modal.remove();
+        };
+        document.body.append(modal);
+        panel.hidden = false;
+        modal.querySelector("#settingsBody").append(panel);
+        modal.showModal();
+        tables ??= window.GSISV1LordReferenceTables.install(
+          panel.querySelector("[data-reference-tables]"),
+          api,
+        );
+        await loadTemplates();
+        window.GSISCoreTables?.refresh();
+      } catch (error) {
+        alert(error.message);
       }
-      return load();
-    })
-    .catch((error) => {
-      status.textContent = error.message;
-    });
+    },
+  };
 })();
