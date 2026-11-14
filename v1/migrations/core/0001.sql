@@ -1,0 +1,17 @@
+CREATE TABLE IF NOT EXISTS core_accounts(school_id TEXT NOT NULL,account_id TEXT NOT NULL,issuer TEXT NOT NULL,subject TEXT NOT NULL,email TEXT NOT NULL,staff_id TEXT,revision INTEGER NOT NULL DEFAULT 1,suspended INTEGER NOT NULL DEFAULT 0 CHECK(suspended IN(0,1)),pending_change INTEGER NOT NULL DEFAULT 0,created_at INTEGER NOT NULL,PRIMARY KEY(school_id,account_id),UNIQUE(school_id,issuer,subject));
+CREATE INDEX IF NOT EXISTS core_accounts_staff ON core_accounts(school_id,staff_id);
+CREATE TABLE IF NOT EXISTS core_grants(school_id TEXT NOT NULL,account_id TEXT NOT NULL,capability TEXT NOT NULL,valid_from INTEGER NOT NULL,valid_until INTEGER,revision INTEGER NOT NULL DEFAULT 1,PRIMARY KEY(school_id,account_id,capability));
+CREATE TABLE IF NOT EXISTS core_sessions(school_id TEXT NOT NULL,session_id TEXT NOT NULL,token_hash TEXT NOT NULL UNIQUE,account_id TEXT NOT NULL,authenticated_at INTEGER NOT NULL,expires_at INTEGER NOT NULL,csrf_token TEXT NOT NULL,revoked INTEGER NOT NULL DEFAULT 0,revision INTEGER NOT NULL DEFAULT 1,PRIMARY KEY(school_id,session_id));
+CREATE INDEX IF NOT EXISTS core_sessions_account ON core_sessions(school_id,account_id);
+CREATE TABLE IF NOT EXISTS core_nonces(challenge_id TEXT PRIMARY KEY,nonce_hash TEXT NOT NULL,expires_at INTEGER NOT NULL,used INTEGER NOT NULL DEFAULT 0);
+CREATE TABLE IF NOT EXISTS core_jwks(id TEXT PRIMARY KEY CHECK(id='google'),body TEXT NOT NULL,expires_at INTEGER NOT NULL);
+CREATE TABLE IF NOT EXISTS core_evidence(school_id TEXT NOT NULL,decision_id TEXT NOT NULL,event_json TEXT NOT NULL,evidence_json TEXT NOT NULL,principal_json TEXT NOT NULL,descriptor_json TEXT NOT NULL,intent_digest TEXT,created_at INTEGER NOT NULL,valid_until INTEGER NOT NULL,receipt_json TEXT NOT NULL DEFAULT '{"schemaVersion":1,"state":"recorded"}',PRIMARY KEY(school_id,decision_id));
+CREATE INDEX IF NOT EXISTS core_evidence_created ON core_evidence(school_id,created_at);
+CREATE TABLE IF NOT EXISTS core_bootstrap(school_id TEXT PRIMARY KEY,account_id TEXT NOT NULL,created_at INTEGER NOT NULL);
+CREATE TABLE IF NOT EXISTS source_pins(school_id TEXT NOT NULL,scope TEXT NOT NULL,pin_id TEXT NOT NULL,destination TEXT NOT NULL,operation_id TEXT NOT NULL,digest TEXT NOT NULL,fence INTEGER NOT NULL,revision TEXT NOT NULL,valid_until INTEGER NOT NULL,decision_id TEXT NOT NULL,state TEXT NOT NULL CHECK(state IN('held','released')),created_at INTEGER NOT NULL,PRIMARY KEY(school_id,pin_id));
+CREATE INDEX IF NOT EXISTS source_pins_scope ON source_pins(school_id,scope,state);
+CREATE TABLE IF NOT EXISTS source_changes(school_id TEXT NOT NULL,scope TEXT NOT NULL,operation_id TEXT NOT NULL,created_at INTEGER NOT NULL,state TEXT NOT NULL DEFAULT 'pending',PRIMARY KEY(school_id,scope,operation_id));
+CREATE TABLE IF NOT EXISTS source_assertions(id TEXT PRIMARY KEY,ok INTEGER NOT NULL CHECK(ok=1));
+CREATE TABLE IF NOT EXISTS core_service_grants(school_id TEXT NOT NULL,service TEXT NOT NULL,capability TEXT NOT NULL,enabled INTEGER NOT NULL CHECK(enabled IN(0,1)),revision INTEGER NOT NULL,valid_from INTEGER NOT NULL,valid_until INTEGER,granted_by TEXT NOT NULL,PRIMARY KEY(school_id,service,capability));
+
+CREATE TABLE IF NOT EXISTS core_destination_receipts(school_id TEXT NOT NULL,decision_id TEXT NOT NULL,destination TEXT NOT NULL,operation_id TEXT NOT NULL,digest TEXT NOT NULL,receipt_json TEXT NOT NULL,recorded_at INTEGER NOT NULL,PRIMARY KEY(school_id,decision_id,destination,operation_id));

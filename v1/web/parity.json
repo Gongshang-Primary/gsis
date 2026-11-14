@@ -1,0 +1,1351 @@
+{
+  "schemaVersion": 1,
+  "note": "Per-operation source and implementation inventory. Adapted means the source control uses the explicit v1 transport; it is not a claim of completed browser or provider parity. Isolated Worker/browser evidence is named below. Official runtime UAT and provider integration remain Not tested.",
+  "modules": [
+    {
+      "module": "contacts",
+      "source": "contacts-update/public",
+      "route": "/contacts/",
+      "service": "contacts",
+      "sourceBaseline": "27fa498657965169b9d971a9caabc33c8b19bc69",
+      "frontend": "source DOM/CSS retained with explicit v1 transport and policy overlays",
+      "operations": [
+        {
+          "operation": "bootstrap",
+          "frontendStatus": "adapted",
+          "runtimeIntegration": "Passed isolated browser initial screen",
+          "evidence": "tests/v1-product-web-browser.mjs"
+        },
+        {
+          "operation": "data",
+          "frontendStatus": "adapted",
+          "runtimeIntegration": "Not tested"
+        },
+        {
+          "operation": "deployment",
+          "frontendStatus": "adapted",
+          "runtimeIntegration": "Not tested"
+        },
+        {
+          "operation": "kp",
+          "frontendStatus": "replaced",
+          "runtimeIntegration": "Not tested",
+          "replacement": "Core accounts and access"
+        },
+        {
+          "operation": "recalculate-data",
+          "frontendStatus": "adapted",
+          "runtimeIntegration": "Not tested"
+        },
+        {
+          "operation": "recover-save",
+          "frontendStatus": "adapted",
+          "runtimeIntegration": "Not tested"
+        },
+        {
+          "operation": "recovery-status",
+          "frontendStatus": "adapted",
+          "runtimeIntegration": "Not tested"
+        },
+        {
+          "operation": "save-data",
+          "frontendStatus": "adapted",
+          "runtimeIntegration": "Not tested"
+        },
+        {
+          "operation": "save-diy",
+          "frontendStatus": "adapted",
+          "runtimeIntegration": "Not tested"
+        },
+        {
+          "operation": "save-receipt",
+          "frontendStatus": "adapted",
+          "runtimeIntegration": "Not tested"
+        },
+        {
+          "operation": "save-signature-settings",
+          "frontendStatus": "adapted",
+          "runtimeIntegration": "Not tested"
+        },
+        {
+          "operation": "session",
+          "frontendStatus": "adapted",
+          "runtimeIntegration": "Passed isolated browser initial screen",
+          "evidence": "tests/v1-product-web-browser.mjs"
+        }
+      ],
+      "routes": [
+        "/api/",
+        "/api/config",
+        "/api/logout",
+        "/api/session"
+      ],
+      "providerIntegration": "Not tested",
+      "visualParity": "Source DOM/CSS preserved; initial desktop/narrow screenshots captured. Complete interaction-by-interaction visual comparison: Not tested",
+      "initialScreenEvidence": "tests/v1-product-web-browser.mjs: actual isolated services, desktop and narrow screenshots, no page errors or broken assets",
+      "routesNote": "Historical source route inventory below. Build namespaces module routes, maps authentication to Core, omits legacy bridge/rehearsal pages and uses the documented native replacements.",
+      "nativeOperations": [
+        {
+          "path": "/staff/:id/accept",
+          "frontendStatus": "implemented",
+          "description": "Explicit accepted authority and readiness panel",
+          "runtimeIntegration": "Passed isolated browser",
+          "evidence": "tests/v1-product-web-browser.mjs"
+        },
+        {
+          "path": "/catalogues",
+          "frontendStatus": "implemented",
+          "description": "Controlled catalogue CRUD and staff classifications",
+          "runtimeIntegration": "Not tested in browser",
+          "evidence": null
+        },
+        {
+          "path": "/contributions",
+          "frontendStatus": "implemented",
+          "description": "Owner contribution/conflict review",
+          "runtimeIntegration": "Not tested in browser",
+          "evidence": null
+        },
+        {
+          "path": "/readiness",
+          "frontendStatus": "implemented",
+          "description": "Single owner scan plus explicit cutover epoch recheck",
+          "runtimeIntegration": "Not tested in browser",
+          "evidence": null
+        }
+      ]
+    },
+    {
+      "module": "deploy",
+      "source": "public",
+      "route": "/deploy/",
+      "service": "deploy",
+      "sourceBaseline": "27fa498657965169b9d971a9caabc33c8b19bc69",
+      "frontend": "source DOM/CSS retained with explicit v1 transport and policy overlays",
+      "operations": [
+        {
+          "operation": "acceptContacts",
+          "frontendStatus": "adapted",
+          "runtimeIntegration": "Not tested"
+        },
+        {
+          "operation": "acknowledgeNotices",
+          "frontendStatus": "adapted",
+          "runtimeIntegration": "Not tested"
+        },
+        {
+          "operation": "addLevel",
+          "frontendStatus": "adapted",
+          "runtimeIntegration": "Not tested"
+        },
+        {
+          "operation": "addSubject",
+          "frontendStatus": "adapted",
+          "runtimeIntegration": "Not tested"
+        },
+        {
+          "operation": "addTeacher",
+          "frontendStatus": "adapted",
+          "runtimeIntegration": "Not tested"
+        },
+        {
+          "operation": "auditPage",
+          "frontendStatus": "adapted",
+          "runtimeIntegration": "Not tested"
+        },
+        {
+          "operation": "bootstrap",
+          "frontendStatus": "adapted",
+          "runtimeIntegration": "Passed isolated browser initial screen",
+          "evidence": "tests/v1-product-web-browser.mjs"
+        },
+        {
+          "operation": "change",
+          "frontendStatus": "adapted",
+          "runtimeIntegration": "Not tested"
+        },
+        {
+          "operation": "clearVenueAssignments",
+          "frontendStatus": "adapted",
+          "runtimeIntegration": "Not tested"
+        },
+        {
+          "operation": "consolidateCCEEL",
+          "frontendStatus": "adapted",
+          "runtimeIntegration": "Not tested"
+        },
+        {
+          "operation": "convertLegacySubject",
+          "frontendStatus": "adapted",
+          "runtimeIntegration": "Not tested"
+        },
+        {
+          "operation": "create",
+          "frontendStatus": "adapted",
+          "runtimeIntegration": "Not tested"
+        },
+        {
+          "operation": "delete",
+          "frontendStatus": "adapted",
+          "runtimeIntegration": "Not tested"
+        },
+        {
+          "operation": "deleteClass",
+          "frontendStatus": "adapted",
+          "runtimeIntegration": "Not tested"
+        },
+        {
+          "operation": "deleteClassNameSet",
+          "frontendStatus": "adapted",
+          "runtimeIntegration": "Not tested"
+        },
+        {
+          "operation": "delta",
+          "frontendStatus": "adapted",
+          "runtimeIntegration": "Not tested"
+        },
+        {
+          "operation": "initReporting",
+          "frontendStatus": "adapted",
+          "runtimeIntegration": "Not tested"
+        },
+        {
+          "operation": "lease",
+          "frontendStatus": "adapted",
+          "runtimeIntegration": "Not tested"
+        },
+        {
+          "operation": "metadata",
+          "frontendStatus": "adapted",
+          "runtimeIntegration": "Not tested"
+        },
+        {
+          "operation": "patchPlanning",
+          "frontendStatus": "adapted",
+          "runtimeIntegration": "Not tested"
+        },
+        {
+          "operation": "publish",
+          "frontendStatus": "replaced",
+          "runtimeIntegration": "Not tested",
+          "replacement": "Native exact-revision publication review and receipt"
+        },
+        {
+          "operation": "publishReview",
+          "frontendStatus": "adapted",
+          "runtimeIntegration": "Not tested"
+        },
+        {
+          "operation": "purge",
+          "frontendStatus": "adapted",
+          "runtimeIntegration": "Not tested"
+        },
+        {
+          "operation": "receipt",
+          "frontendStatus": "adapted",
+          "runtimeIntegration": "Not tested"
+        },
+        {
+          "operation": "refreshVenueRegistry",
+          "frontendStatus": "adapted",
+          "runtimeIntegration": "Not tested"
+        },
+        {
+          "operation": "removeTeacher",
+          "frontendStatus": "adapted",
+          "runtimeIntegration": "Not tested"
+        },
+        {
+          "operation": "removeTeacherProfile",
+          "frontendStatus": "adapted",
+          "runtimeIntegration": "Not tested"
+        },
+        {
+          "operation": "renameClasses",
+          "frontendStatus": "adapted",
+          "runtimeIntegration": "Not tested"
+        },
+        {
+          "operation": "retryContactsSync",
+          "frontendStatus": "adapted",
+          "runtimeIntegration": "Not tested"
+        },
+        {
+          "operation": "saveDraft",
+          "frontendStatus": "adapted",
+          "runtimeIntegration": "Not tested"
+        },
+        {
+          "operation": "saveVersionNote",
+          "frontendStatus": "adapted",
+          "runtimeIntegration": "Not tested"
+        },
+        {
+          "operation": "setAscExportSettings",
+          "frontendStatus": "adapted",
+          "runtimeIntegration": "Not tested"
+        },
+        {
+          "operation": "setClassAbility",
+          "frontendStatus": "adapted",
+          "runtimeIntegration": "Not tested"
+        },
+        {
+          "operation": "setDuties",
+          "frontendStatus": "adapted",
+          "runtimeIntegration": "Not tested"
+        },
+        {
+          "operation": "setExclusionCell",
+          "frontendStatus": "adapted",
+          "runtimeIntegration": "Not tested"
+        },
+        {
+          "operation": "setFortnight",
+          "frontendStatus": "adapted",
+          "runtimeIntegration": "Not tested"
+        },
+        {
+          "operation": "setLoad",
+          "frontendStatus": "adapted",
+          "runtimeIntegration": "Not tested"
+        },
+        {
+          "operation": "setMasterOptions",
+          "frontendStatus": "replaced",
+          "runtimeIntegration": "Not tested",
+          "replacement": "Contacts controlled catalogues; Deploy reference only"
+        },
+        {
+          "operation": "setMembership",
+          "frontendStatus": "replaced",
+          "runtimeIntegration": "Not tested",
+          "replacement": "Contacts controlled catalogues; Deploy reference only"
+        },
+        {
+          "operation": "setOffload",
+          "frontendStatus": "adapted",
+          "runtimeIntegration": "Not tested"
+        },
+        {
+          "operation": "setOrganisation",
+          "frontendStatus": "adapted",
+          "runtimeIntegration": "Not tested"
+        },
+        {
+          "operation": "setPAL",
+          "frontendStatus": "adapted",
+          "runtimeIntegration": "Not tested"
+        },
+        {
+          "operation": "setReliefSettings",
+          "frontendStatus": "adapted",
+          "runtimeIntegration": "Not tested"
+        },
+        {
+          "operation": "setReportingOfficer",
+          "frontendStatus": "adapted",
+          "runtimeIntegration": "Not tested"
+        },
+        {
+          "operation": "setSubjectType",
+          "frontendStatus": "adapted",
+          "runtimeIntegration": "Not tested"
+        },
+        {
+          "operation": "setTeacherField",
+          "frontendStatus": "adapted",
+          "runtimeIntegration": "Not tested"
+        },
+        {
+          "operation": "setTeacherNote",
+          "frontendStatus": "adapted",
+          "runtimeIntegration": "Not tested"
+        },
+        {
+          "operation": "setWorkload",
+          "frontendStatus": "adapted",
+          "runtimeIntegration": "Not tested"
+        },
+        {
+          "operation": "sync",
+          "frontendStatus": "adapted",
+          "runtimeIntegration": "Not tested"
+        },
+        {
+          "operation": "upsertClassNameSet",
+          "frontendStatus": "adapted",
+          "runtimeIntegration": "Not tested"
+        },
+        {
+          "operation": "upsertTeacherProfile",
+          "frontendStatus": "adapted",
+          "runtimeIntegration": "Not tested"
+        },
+        {
+          "operation": "versionNote",
+          "frontendStatus": "adapted",
+          "runtimeIntegration": "Not tested"
+        }
+      ],
+      "routes": [
+        "/api/",
+        "/api/campus-map",
+        "/api/commands",
+        "/api/config",
+        "/api/layout-reference",
+        "/api/logout",
+        "/api/session"
+      ],
+      "providerIntegration": "Not tested",
+      "visualParity": "Source DOM/CSS preserved; initial desktop/narrow screenshots captured. Complete interaction-by-interaction visual comparison: Not tested",
+      "initialScreenEvidence": "tests/v1-product-web-browser.mjs: actual isolated services, desktop and narrow screenshots, no page errors or broken assets",
+      "routesNote": "Historical source route inventory below. Build namespaces module routes, maps authentication to Core, omits legacy bridge/rehearsal pages and uses the documented native replacements.",
+      "nativeOperations": [
+        {
+          "path": "/change operation=create",
+          "frontendStatus": "implemented",
+          "description": "Existing Create initial baseline control",
+          "runtimeIntegration": "Passed isolated browser",
+          "evidence": "tests/v1-product-web-browser.mjs"
+        },
+        {
+          "path": "/imports/preview and /imports/apply",
+          "frontendStatus": "implemented",
+          "description": "Canonical XLSX review and replacement",
+          "runtimeIntegration": "Not tested in browser",
+          "evidence": null
+        },
+        {
+          "path": "/publishReview and /publish",
+          "frontendStatus": "implemented",
+          "description": "Reviewed publication and stable original receipt",
+          "runtimeIntegration": "Not tested in browser",
+          "evidence": null
+        }
+      ],
+      "createdScreenEvidence": {
+        "files": [
+          "deploy-populated-ip-tg-desktop.png",
+          "deploy-populated-ip-tg-narrow.png"
+        ],
+        "test": "tests/v1-product-web-browser.mjs",
+        "fixture": "Browser-created version; two synthetic classes, EL/Math loads and one TG committed through real owner contracts before the existing IP grid was captured."
+      }
+    },
+    {
+      "module": "roster",
+      "source": "roster-update/public",
+      "route": "/roster/",
+      "service": "roster",
+      "sourceBaseline": "27fa498657965169b9d971a9caabc33c8b19bc69",
+      "frontend": "source DOM/CSS retained with explicit v1 transport and policy overlays",
+      "operations": [
+        {
+          "operation": "acknowledge",
+          "frontendStatus": "adapted",
+          "runtimeIntegration": "Not tested"
+        },
+        {
+          "operation": "acknowledgementStatus",
+          "frontendStatus": "adapted",
+          "runtimeIntegration": "Not tested"
+        },
+        {
+          "operation": "acquireStaplerLock",
+          "frontendStatus": "adapted",
+          "runtimeIntegration": "Not tested"
+        },
+        {
+          "operation": "allocationVersion",
+          "frontendStatus": "adapted",
+          "runtimeIntegration": "Not tested"
+        },
+        {
+          "operation": "archiveItems",
+          "frontendStatus": "adapted",
+          "runtimeIntegration": "Not tested"
+        },
+        {
+          "operation": "archivedItem",
+          "frontendStatus": "adapted",
+          "runtimeIntegration": "Not tested"
+        },
+        {
+          "operation": "availability",
+          "frontendStatus": "adapted",
+          "runtimeIntegration": "Not tested"
+        },
+        {
+          "operation": "calculations",
+          "frontendStatus": "adapted",
+          "runtimeIntegration": "Not tested"
+        },
+        {
+          "operation": "cancelAllocationRun",
+          "frontendStatus": "adapted",
+          "runtimeIntegration": "Not tested"
+        },
+        {
+          "operation": "candidates",
+          "frontendStatus": "adapted",
+          "runtimeIntegration": "Not tested"
+        },
+        {
+          "operation": "contactCreate",
+          "frontendStatus": "adapted",
+          "runtimeIntegration": "Not tested"
+        },
+        {
+          "operation": "currentDuty",
+          "frontendStatus": "adapted",
+          "runtimeIntegration": "Not tested"
+        },
+        {
+          "operation": "dailyTimetable",
+          "frontendStatus": "adapted",
+          "runtimeIntegration": "Not tested"
+        },
+        {
+          "operation": "deliveryReview",
+          "frontendStatus": "adapted",
+          "runtimeIntegration": "Not tested"
+        },
+        {
+          "operation": "dutyRoster",
+          "frontendStatus": "adapted",
+          "runtimeIntegration": "Not tested"
+        },
+        {
+          "operation": "externalLink",
+          "frontendStatus": "adapted",
+          "runtimeIntegration": "Not tested"
+        },
+        {
+          "operation": "history",
+          "frontendStatus": "adapted",
+          "runtimeIntegration": "Not tested"
+        },
+        {
+          "operation": "inboxAssign",
+          "frontendStatus": "adapted",
+          "runtimeIntegration": "Not tested"
+        },
+        {
+          "operation": "inboxList",
+          "frontendStatus": "adapted",
+          "runtimeIntegration": "Not tested"
+        },
+        {
+          "operation": "inboxReply",
+          "frontendStatus": "adapted",
+          "runtimeIntegration": "Not tested"
+        },
+        {
+          "operation": "inboxSetHandled",
+          "frontendStatus": "adapted",
+          "runtimeIntegration": "Not tested"
+        },
+        {
+          "operation": "inboxTemplates",
+          "frontendStatus": "adapted",
+          "runtimeIntegration": "Not tested"
+        },
+        {
+          "operation": "inboxThread",
+          "frontendStatus": "adapted",
+          "runtimeIntegration": "Not tested"
+        },
+        {
+          "operation": "logout",
+          "frontendStatus": "adapted",
+          "runtimeIntegration": "Not tested"
+        },
+        {
+          "operation": "nextSchoolDay",
+          "frontendStatus": "adapted",
+          "runtimeIntegration": "Not tested"
+        },
+        {
+          "operation": "notifyDaily",
+          "frontendStatus": "adapted",
+          "runtimeIntegration": "Not tested"
+        },
+        {
+          "operation": "openingBalances",
+          "frontendStatus": "adapted",
+          "runtimeIntegration": "Not tested"
+        },
+        {
+          "operation": "operations",
+          "frontendStatus": "adapted",
+          "runtimeIntegration": "Not tested"
+        },
+        {
+          "operation": "peerMailReview",
+          "frontendStatus": "adapted",
+          "runtimeIntegration": "Not tested"
+        },
+        {
+          "operation": "plan",
+          "frontendStatus": "adapted",
+          "runtimeIntegration": "Not tested"
+        },
+        {
+          "operation": "previewRestoreStapler",
+          "frontendStatus": "adapted",
+          "runtimeIntegration": "Not tested"
+        },
+        {
+          "operation": "previewStaplerMigration",
+          "frontendStatus": "adapted",
+          "runtimeIntegration": "Not tested"
+        },
+        {
+          "operation": "previewTimetableReconcile",
+          "frontendStatus": "adapted",
+          "runtimeIntegration": "Not tested"
+        },
+        {
+          "operation": "profile",
+          "frontendStatus": "adapted",
+          "runtimeIntegration": "Passed isolated browser initial screen",
+          "evidence": "tests/v1-product-web-browser.mjs"
+        },
+        {
+          "operation": "quiet-mode",
+          "frontendStatus": "adapted",
+          "runtimeIntegration": "Not tested"
+        },
+        {
+          "operation": "read",
+          "frontendStatus": "adapted",
+          "runtimeIntegration": "Not tested"
+        },
+        {
+          "operation": "receiptStatus",
+          "frontendStatus": "adapted",
+          "runtimeIntegration": "Not tested"
+        },
+        {
+          "operation": "recordRecoveryCheckpoint",
+          "frontendStatus": "adapted",
+          "runtimeIntegration": "Not tested"
+        },
+        {
+          "operation": "recoverVenuesSync",
+          "frontendStatus": "adapted",
+          "runtimeIntegration": "Not tested"
+        },
+        {
+          "operation": "releaseStaplerLock",
+          "frontendStatus": "adapted",
+          "runtimeIntegration": "Not tested"
+        },
+        {
+          "operation": "reliefBatch",
+          "frontendStatus": "adapted",
+          "runtimeIntegration": "Not tested"
+        },
+        {
+          "operation": "requestMutual",
+          "frontendStatus": "adapted",
+          "runtimeIntegration": "Not tested"
+        },
+        {
+          "operation": "resolveAbsenceIntake",
+          "frontendStatus": "adapted",
+          "runtimeIntegration": "Not tested"
+        },
+        {
+          "operation": "respond",
+          "frontendStatus": "adapted",
+          "runtimeIntegration": "Not tested"
+        },
+        {
+          "operation": "retryAbsenceIntake",
+          "frontendStatus": "adapted",
+          "runtimeIntegration": "Not tested"
+        },
+        {
+          "operation": "retryBackgroundJob",
+          "frontendStatus": "adapted",
+          "runtimeIntegration": "Not tested"
+        },
+        {
+          "operation": "reviewPeerMail",
+          "frontendStatus": "adapted",
+          "runtimeIntegration": "Not tested"
+        },
+        {
+          "operation": "save",
+          "frontendStatus": "adapted",
+          "runtimeIntegration": "Not tested"
+        },
+        {
+          "operation": "saveAbsence",
+          "frontendStatus": "adapted",
+          "runtimeIntegration": "Not tested"
+        },
+        {
+          "operation": "saveOpeningBalances",
+          "frontendStatus": "adapted",
+          "runtimeIntegration": "Not tested"
+        },
+        {
+          "operation": "session",
+          "frontendStatus": "adapted",
+          "runtimeIntegration": "Not tested"
+        },
+        {
+          "operation": "setDutySMC",
+          "frontendStatus": "adapted",
+          "runtimeIntegration": "Not tested"
+        },
+        {
+          "operation": "stapler",
+          "frontendStatus": "adapted",
+          "runtimeIntegration": "Not tested"
+        },
+        {
+          "operation": "staplerDates",
+          "frontendStatus": "adapted",
+          "runtimeIntegration": "Not tested"
+        },
+        {
+          "operation": "statistics",
+          "frontendStatus": "adapted",
+          "runtimeIntegration": "Not tested"
+        },
+        {
+          "operation": "statisticsCalendar",
+          "frontendStatus": "adapted",
+          "runtimeIntegration": "Not tested"
+        },
+        {
+          "operation": "statisticsRPercent",
+          "frontendStatus": "replaced",
+          "runtimeIntegration": "Not tested",
+          "replacement": "Per-layer allocation policy and duties ledger"
+        },
+        {
+          "operation": "timetableBatch",
+          "frontendStatus": "adapted",
+          "runtimeIntegration": "Not tested"
+        },
+        {
+          "operation": "timetableDay",
+          "frontendStatus": "adapted",
+          "runtimeIntegration": "Not tested"
+        },
+        {
+          "operation": "timetablePreparationCheck",
+          "frontendStatus": "replaced",
+          "runtimeIntegration": "Not tested",
+          "replacement": "Rehearsal-only screen omitted from the runtime build"
+        },
+        {
+          "operation": "timetablePreparationManifest",
+          "frontendStatus": "replaced",
+          "runtimeIntegration": "Not tested",
+          "replacement": "Rehearsal-only screen omitted from the runtime build"
+        },
+        {
+          "operation": "timetablePreparationPart",
+          "frontendStatus": "replaced",
+          "runtimeIntegration": "Not tested",
+          "replacement": "Rehearsal-only screen omitted from the runtime build"
+        },
+        {
+          "operation": "view",
+          "frontendStatus": "adapted",
+          "runtimeIntegration": "Not tested"
+        }
+      ],
+      "routes": [
+        "/api/",
+        "/api/backup-ledger",
+        "/api/config",
+        "/api/edge/archive",
+        "/api/external",
+        "/api/operations",
+        "/api/system-health",
+        "/api/whatsapp/media/",
+        "/api/whatsapp/reports/"
+      ],
+      "providerIntegration": "Not tested",
+      "visualParity": "Source DOM/CSS preserved; initial desktop/narrow screenshots captured. Complete interaction-by-interaction visual comparison: Not tested",
+      "initialScreenEvidence": "tests/v1-product-web-browser.mjs: actual isolated services, desktop and narrow screenshots, no page errors or broken assets",
+      "routesNote": "Historical source route inventory below. Build namespaces module routes, maps authentication to Core, omits legacy bridge/rehearsal pages and uses the documented native replacements.",
+      "nativeOperations": [
+        {
+          "path": "/layers",
+          "frontendStatus": "implemented",
+          "description": "Per-layer allocation controls",
+          "runtimeIntegration": "Not tested in browser",
+          "evidence": null
+        },
+        {
+          "path": "/duties and /duties/export",
+          "frontendStatus": "implemented",
+          "description": "Inclusive YTD/year/custom own or managed duties",
+          "runtimeIntegration": "Passed isolated browser",
+          "evidence": "tests/v1-product-web-workflows.mjs"
+        },
+        {
+          "path": "/exports and /offline/preview and /offline/confirm",
+          "frontendStatus": "implemented",
+          "description": "Verified continuity downloads and separately confirmed draft return",
+          "runtimeIntegration": "Not tested in browser",
+          "evidence": null
+        },
+        {
+          "path": "/external",
+          "frontendStatus": "implemented",
+          "description": "Opaque recipient-scoped mutual/duties link; invalid-link denial verified",
+          "runtimeIntegration": "Passed isolated browser",
+          "evidence": "tests/v1-product-web-workflows.mjs"
+        }
+      ]
+    },
+    {
+      "module": "calendar",
+      "source": "calendar-update/public",
+      "route": "/calendar/",
+      "service": "calendar",
+      "sourceBaseline": "27fa498657965169b9d971a9caabc33c8b19bc69",
+      "frontend": "source DOM/CSS retained with explicit v1 transport and policy overlays",
+      "operations": [
+        {
+          "operation": "calendarPreflight",
+          "frontendStatus": "adapted",
+          "runtimeIntegration": "Not tested"
+        },
+        {
+          "operation": "calendarSyncStatus",
+          "frontendStatus": "adapted",
+          "runtimeIntegration": "Not tested"
+        },
+        {
+          "operation": "calendarWipeBatch",
+          "frontendStatus": "adapted",
+          "runtimeIntegration": "Not tested"
+        },
+        {
+          "operation": "calendarWipePreview",
+          "frontendStatus": "adapted",
+          "runtimeIntegration": "Not tested"
+        },
+        {
+          "operation": "deleteColourRule",
+          "frontendStatus": "adapted",
+          "runtimeIntegration": "Not tested"
+        },
+        {
+          "operation": "deleteTag",
+          "frontendStatus": "adapted",
+          "runtimeIntegration": "Not tested"
+        },
+        {
+          "operation": "generateYearStructure",
+          "frontendStatus": "adapted",
+          "runtimeIntegration": "Not tested"
+        },
+        {
+          "operation": "mutationReceipts",
+          "frontendStatus": "adapted",
+          "runtimeIntegration": "Not tested"
+        },
+        {
+          "operation": "publishVersion",
+          "frontendStatus": "adapted",
+          "runtimeIntegration": "Not tested"
+        },
+        {
+          "operation": "pullBirthdays",
+          "frontendStatus": "adapted",
+          "runtimeIntegration": "Not tested"
+        },
+        {
+          "operation": "relocateEvent",
+          "frontendStatus": "adapted",
+          "runtimeIntegration": "Not tested"
+        },
+        {
+          "operation": "reorderColourRules",
+          "frontendStatus": "adapted",
+          "runtimeIntegration": "Not tested"
+        },
+        {
+          "operation": "saveColourRule",
+          "frontendStatus": "adapted",
+          "runtimeIntegration": "Not tested"
+        },
+        {
+          "operation": "saveEvent",
+          "frontendStatus": "adapted",
+          "runtimeIntegration": "Passed isolated browser event creation",
+          "evidence": "tests/v1-product-web-workflows.mjs"
+        },
+        {
+          "operation": "saveParentSide",
+          "frontendStatus": "adapted",
+          "runtimeIntegration": "Not tested"
+        },
+        {
+          "operation": "saveTag",
+          "frontendStatus": "adapted",
+          "runtimeIntegration": "Not tested"
+        },
+        {
+          "operation": "saveUrls",
+          "frontendStatus": "adapted",
+          "runtimeIntegration": "Not tested"
+        },
+        {
+          "operation": "saveUser",
+          "frontendStatus": "adapted",
+          "runtimeIntegration": "Not tested"
+        },
+        {
+          "operation": "saveYear",
+          "frontendStatus": "adapted",
+          "runtimeIntegration": "Not tested"
+        },
+        {
+          "operation": "startCalendarWipe",
+          "frontendStatus": "adapted",
+          "runtimeIntegration": "Not tested"
+        },
+        {
+          "operation": "syncYearBatch",
+          "frontendStatus": "adapted",
+          "runtimeIntegration": "Not tested"
+        }
+      ],
+      "routes": [
+        "/api",
+        "/api/bootstrap",
+        "/api/calendar-changes",
+        "/api/calendar-changes/delta",
+        "/api/calendar-jobs",
+        "/api/client-config"
+      ],
+      "providerIntegration": "Not tested",
+      "visualParity": "Source DOM/CSS preserved; initial desktop/narrow screenshots captured. Complete interaction-by-interaction visual comparison: Not tested",
+      "initialScreenEvidence": "tests/v1-product-web-browser.mjs: actual isolated services, desktop and narrow screenshots, no page errors or broken assets",
+      "routesNote": "Historical source route inventory below. Build namespaces module routes, maps authentication to Core, omits legacy bridge/rehearsal pages and uses the documented native replacements.",
+      "nativeOperations": [],
+      "createdScreenEvidence": {
+        "files": [
+          "calendar-after-event-create.png"
+        ],
+        "test": "tests/v1-product-web-workflows.mjs",
+        "fixture": "Event created through the existing modal and verified in the actual owner store."
+      }
+    },
+    {
+      "module": "layout",
+      "source": "layout-update/public",
+      "route": "/layout/",
+      "service": "layout",
+      "sourceBaseline": "27fa498657965169b9d971a9caabc33c8b19bc69",
+      "frontend": "source DOM/CSS retained with explicit v1 transport and policy overlays",
+      "operations": [],
+      "routes": [
+        "/api/config",
+        "/api/logout",
+        "/api/profile",
+        "/api/public/campus",
+        "/api/session"
+      ],
+      "providerIntegration": "Not tested",
+      "visualParity": "Source DOM/CSS preserved; initial desktop/narrow screenshots captured. Complete interaction-by-interaction visual comparison: Not tested",
+      "initialScreenEvidence": "tests/v1-product-web-browser.mjs: actual isolated services, desktop and narrow screenshots, no page errors or broken assets",
+      "routesNote": "Historical source route inventory below. Build namespaces module routes, maps authentication to Core, omits legacy bridge/rehearsal pages and uses the documented native replacements.",
+      "nativeOperations": [
+        {
+          "path": "/owned-data",
+          "frontendStatus": "implemented",
+          "description": "Owner-field editor",
+          "runtimeIntegration": "Passed isolated browser",
+          "evidence": "tests/v1-product-web-browser.mjs"
+        },
+        {
+          "path": "/export and /import-preview and /import-apply",
+          "frontendStatus": "implemented",
+          "description": "Canonical Layout workbook",
+          "runtimeIntegration": "Passed isolated browser",
+          "evidence": "tests/v1-product-web-browser.mjs"
+        }
+      ],
+      "createdScreenEvidence": {
+        "files": [
+          "layout-after-owned-edit-and-import.png"
+        ],
+        "test": "tests/v1-product-web-browser.mjs",
+        "fixture": "Actual owner-field edit and canonical XLSX preview/apply; persisted programme and pupil count verified."
+      }
+    },
+    {
+      "module": "venues",
+      "source": "venues-viewport/public",
+      "route": "/venues/",
+      "service": "venues",
+      "sourceBaseline": "27fa498657965169b9d971a9caabc33c8b19bc69",
+      "frontend": "source DOM/CSS retained with explicit v1 transport and policy overlays",
+      "operations": [
+        {
+          "operation": "admin",
+          "frontendStatus": "adapted",
+          "runtimeIntegration": "Not tested"
+        },
+        {
+          "operation": "amend",
+          "frontendStatus": "adapted",
+          "runtimeIntegration": "Not tested"
+        },
+        {
+          "operation": "book",
+          "frontendStatus": "adapted",
+          "runtimeIntegration": "Not tested"
+        },
+        {
+          "operation": "bookings",
+          "frontendStatus": "adapted",
+          "runtimeIntegration": "Not tested"
+        },
+        {
+          "operation": "bootstrap",
+          "frontendStatus": "adapted",
+          "runtimeIntegration": "Passed isolated browser initial screen",
+          "evidence": "tests/v1-product-web-browser.mjs"
+        },
+        {
+          "operation": "cancel",
+          "frontendStatus": "adapted",
+          "runtimeIntegration": "Not tested"
+        },
+        {
+          "operation": "decide",
+          "frontendStatus": "adapted",
+          "runtimeIntegration": "Not tested"
+        },
+        {
+          "operation": "decideTransfer",
+          "frontendStatus": "adapted",
+          "runtimeIntegration": "Not tested"
+        },
+        {
+          "operation": "notificationDecision",
+          "frontendStatus": "adapted",
+          "runtimeIntegration": "Not tested"
+        },
+        {
+          "operation": "piece",
+          "frontendStatus": "adapted",
+          "runtimeIntegration": "Not tested"
+        },
+        {
+          "operation": "requestTransfer",
+          "frontendStatus": "adapted",
+          "runtimeIntegration": "Not tested"
+        },
+        {
+          "operation": "respond",
+          "frontendStatus": "adapted",
+          "runtimeIntegration": "Not tested"
+        },
+        {
+          "operation": "saveClosure",
+          "frontendStatus": "adapted",
+          "runtimeIntegration": "Not tested"
+        },
+        {
+          "operation": "saveGrant",
+          "frontendStatus": "adapted",
+          "runtimeIntegration": "Not tested"
+        },
+        {
+          "operation": "saveRoomMetadata",
+          "frontendStatus": "adapted",
+          "runtimeIntegration": "Not tested"
+        },
+        {
+          "operation": "saveRoomOwners",
+          "frontendStatus": "adapted",
+          "runtimeIntegration": "Not tested"
+        },
+        {
+          "operation": "saveVenue",
+          "frontendStatus": "adapted",
+          "runtimeIntegration": "Not tested"
+        },
+        {
+          "operation": "sync",
+          "frontendStatus": "adapted",
+          "runtimeIntegration": "Not tested"
+        }
+      ],
+      "routes": [
+        "/api",
+        "/api/",
+        "/api/config",
+        "/api/logout",
+        "/api/session"
+      ],
+      "providerIntegration": "Not tested",
+      "visualParity": "Source DOM/CSS preserved; initial desktop/narrow screenshots captured. Complete interaction-by-interaction visual comparison: Not tested",
+      "initialScreenEvidence": "tests/v1-product-web-browser.mjs: actual isolated services, desktop and narrow screenshots, no page errors or broken assets",
+      "routesNote": "Historical source route inventory below. Build namespaces module routes, maps authentication to Core, omits legacy bridge/rehearsal pages and uses the documented native replacements.",
+      "nativeOperations": []
+    },
+    {
+      "module": "lord",
+      "source": "lord-suite/Source/lord",
+      "route": "/lord/",
+      "service": "lord",
+      "sourceBaseline": "27fa498657965169b9d971a9caabc33c8b19bc69",
+      "frontend": "source DOM/CSS retained with explicit v1 transport and policy overlays",
+      "operations": [
+        {
+          "operation": "bookingCancel",
+          "frontendStatus": "adapted",
+          "runtimeIntegration": "Not tested"
+        },
+        {
+          "operation": "bookingCreateBatch",
+          "frontendStatus": "adapted",
+          "runtimeIntegration": "Not tested"
+        },
+        {
+          "operation": "bookingRespond",
+          "frontendStatus": "adapted",
+          "runtimeIntegration": "Not tested"
+        },
+        {
+          "operation": "bookingUpdate",
+          "frontendStatus": "replaced",
+          "runtimeIntegration": "Passed isolated browser; changed class and quantity persisted",
+          "replacement": "Native own-booking editor for current BOOKED records; exact viewed revision and stable request across retries.",
+          "evidence": "tests/v1-product-web-lord.mjs"
+        },
+        {
+          "operation": "loan",
+          "frontendStatus": "adapted",
+          "runtimeIntegration": "Not tested"
+        },
+        {
+          "operation": "notificationPreferences",
+          "frontendStatus": "adapted",
+          "runtimeIntegration": "Not tested"
+        },
+        {
+          "operation": "return",
+          "frontendStatus": "adapted",
+          "runtimeIntegration": "Not tested"
+        }
+      ],
+      "routes": [
+        "/api/auth/config",
+        "/api/auth/google",
+        "/api/auth/identity",
+        "/api/auth/logout",
+        "/api/auth/relief",
+        "/api/auth/session",
+        "/api/reference",
+        "/api/transaction"
+      ],
+      "providerIntegration": "Not tested",
+      "visualParity": "Source DOM/CSS preserved; initial desktop/narrow screenshots captured. Complete interaction-by-interaction visual comparison: Not tested",
+      "initialScreenEvidence": "tests/v1-product-web-browser.mjs: actual isolated services, desktop and narrow screenshots, no page errors or broken assets",
+      "routesNote": "Historical source route inventory below. Build namespaces module routes, maps authentication to Core, omits legacy bridge/rehearsal pages and uses the documented native replacements.",
+      "nativeOperations": [
+        {
+          "path": "/bookings/get and /bookings/update",
+          "frontendStatus": "implemented",
+          "description": "Own uncollected booking editor with viewed revision and retained receipt identity.",
+          "runtimeIntegration": "Passed isolated browser",
+          "evidence": "tests/v1-product-web-lord.mjs"
+        },
+        {
+          "path": "/incidents/respond-context and /incidents/respond",
+          "frontendStatus": "implemented",
+          "description": "Authenticated recipient response from an Admin-issued scoped link. Token stays in fragment, request header or POST body; login continuation preserves fragment.",
+          "runtimeIntegration": "Passed isolated browser; response persisted and request URLs checked",
+          "evidence": "tests/v1-product-web-lord.mjs"
+        }
+      ],
+      "createdScreenEvidence": {
+        "files": [
+          "lord-after-own-booking-edit.png",
+          "lord-after-scoped-incident-response.png"
+        ],
+        "test": "tests/v1-product-web-lord.mjs",
+        "fixture": "Actual linked borrower, booking edit, missing-photo declaration and scoped incident response in isolated owner stores."
+      }
+    },
+    {
+      "module": "overlord",
+      "source": "lord-suite/Source/overlord",
+      "route": "/overlord/",
+      "service": "lord",
+      "sourceBaseline": "27fa498657965169b9d971a9caabc33c8b19bc69",
+      "frontend": "source DOM/CSS retained with explicit v1 transport and policy overlays",
+      "operations": [
+        {
+          "operation": "adminGrant",
+          "frontendStatus": "replaced",
+          "runtimeIntegration": "Not tested",
+          "replacement": "Core accounts and access"
+        },
+        {
+          "operation": "backgroundack",
+          "frontendStatus": "replaced",
+          "runtimeIntegration": "Not tested",
+          "replacement": "Native owner background reconciliation"
+        },
+        {
+          "operation": "backgroundapply",
+          "frontendStatus": "replaced",
+          "runtimeIntegration": "Not tested",
+          "replacement": "Native retry of confirmed failed owner jobs"
+        },
+        {
+          "operation": "backgroundpreview",
+          "frontendStatus": "replaced",
+          "runtimeIntegration": "Not tested",
+          "replacement": "Native owner background status"
+        },
+        {
+          "operation": "bookingCancel",
+          "frontendStatus": "adapted",
+          "runtimeIntegration": "Not tested"
+        },
+        {
+          "operation": "bookingCreate",
+          "frontendStatus": "adapted",
+          "runtimeIntegration": "Not tested"
+        },
+        {
+          "operation": "bookingUpdate",
+          "frontendStatus": "adapted",
+          "runtimeIntegration": "Not tested"
+        },
+        {
+          "operation": "incidentResolve",
+          "frontendStatus": "adapted",
+          "runtimeIntegration": "Not tested"
+        },
+        {
+          "operation": "reignClose",
+          "frontendStatus": "adapted",
+          "runtimeIntegration": "Not tested"
+        },
+        {
+          "operation": "suiteRefresh",
+          "frontendStatus": "adapted",
+          "runtimeIntegration": "Not tested"
+        }
+      ],
+      "routes": [
+        "/api/auth/config",
+        "/api/auth/google",
+        "/api/auth/session",
+        "/api/dashboard",
+        "/api/reference",
+        "/api/transaction"
+      ],
+      "providerIntegration": "Not tested",
+      "visualParity": "Source DOM/CSS preserved; initial desktop/narrow screenshots captured. Complete interaction-by-interaction visual comparison: Not tested",
+      "initialScreenEvidence": "tests/v1-product-web-browser.mjs: actual isolated services, desktop and narrow screenshots, no page errors or broken assets",
+      "routesNote": "Historical source route inventory below. Build namespaces module routes, maps authentication to Core, omits legacy bridge/rehearsal pages and uses the documented native replacements.",
+      "nativeOperations": [
+        {
+          "path": "/resources and /settings",
+          "frontendStatus": "implemented",
+          "description": "Inventory, timings, reference lists and approved templates",
+          "runtimeIntegration": "Resource creation passed isolated browser; other settings not tested in browser",
+          "evidence": "tests/v1-product-web-workflows.mjs"
+        },
+        {
+          "path": "/background and /background/retry",
+          "frontendStatus": "implemented",
+          "description": "Confirmed failed job retry; unknown outcome requires reconciliation",
+          "runtimeIntegration": "Not tested in browser",
+          "evidence": null
+        },
+        {
+          "path": "/incidents/list and /links",
+          "frontendStatus": "implemented",
+          "description": "Admin reviews an unresolved incident revision and creates its recipient-scoped response link; link token stays in fragment.",
+          "runtimeIntegration": "Passed isolated browser through actual issued link",
+          "evidence": "tests/v1-product-web-lord.mjs"
+        }
+      ],
+      "createdScreenEvidence": {
+        "files": [
+          "lord-after-resource-create.png",
+          "overlord-created-scoped-response-link.png"
+        ],
+        "test": "tests/v1-product-web-workflows.mjs and tests/v1-product-web-lord.mjs",
+        "fixture": "Actual resource creation and Admin-issued recipient-scoped incident link."
+      }
+    },
+    {
+      "module": "starlord",
+      "source": "lord-suite/Source/starlord",
+      "route": "/starlord/",
+      "service": "lord",
+      "sourceBaseline": "27fa498657965169b9d971a9caabc33c8b19bc69",
+      "frontend": "source DOM/CSS retained with explicit v1 transport and policy overlays",
+      "operations": [],
+      "routes": [
+        "/api/board"
+      ],
+      "providerIntegration": "Not tested",
+      "visualParity": "Source DOM/CSS preserved; initial desktop/narrow screenshots captured. Complete interaction-by-interaction visual comparison: Not tested",
+      "initialScreenEvidence": "tests/v1-product-web-browser.mjs: actual isolated services, desktop and narrow screenshots, no page errors or broken assets",
+      "routesNote": "Historical source route inventory below. Build namespaces module routes, maps authentication to Core, omits legacy bridge/rehearsal pages and uses the documented native replacements.",
+      "nativeOperations": [
+        {
+          "path": "/links and /board",
+          "frontendStatus": "implemented",
+          "description": "Restricted device token and Admin signage preview",
+          "runtimeIntegration": "Not tested in browser",
+          "evidence": null
+        }
+      ]
+    }
+  ],
+  "evidence": {
+    "focused": "tests/v1-product-web.mjs",
+    "nineScreens": "tests/v1-product-web-browser.mjs",
+    "adminAndBoundaries": "tests/v1-product-web-workflows.mjs",
+    "thirtyBrowserLoad": "tests/v1-product-web-load.mjs",
+    "loadArtifact": "deliverables/v1/evidence/browser-load-30.json",
+    "officialRuntimeUAT": "Not tested",
+    "sourceBaseline": "27fa498657965169b9d971a9caabc33c8b19bc69",
+    "lordUserWorkflows": "tests/v1-product-web-lord.mjs",
+    "screenshots": "deliverables/v1/evidence/browser/"
+  },
+  "coreAdministration": [
+    {
+      "path": "/system/health and /system/backup",
+      "frontendStatus": "implemented",
+      "runtimeIntegration": "Passed isolated browser Contacts owner backup, verified manifest and parts",
+      "evidence": "tests/v1-product-web-workflows.mjs"
+    },
+    {
+      "path": "/admin/service-grants",
+      "frontendStatus": "implemented",
+      "runtimeIntegration": "Passed isolated browser explicit Roster allocation grant",
+      "evidence": "tests/v1-product-web-workflows.mjs"
+    },
+    {
+      "path": "/admin/accounts and /evidence/:id",
+      "frontendStatus": "implemented",
+      "runtimeIntegration": "Not tested in browser"
+    }
+  ]
+}

@@ -1,0 +1,286 @@
+import { encodeWorkbook, decodeWorkbook, download } from "./workbooks.mjs";
+const api = window.GSISV1;
+const panel = document.createElement("details");
+panel.className = "gsis-panel";
+panel.innerHTML =
+  '<summary>Layout-owned data</summary><p>Local teacher labels, pupil evidence, programmes and notes belong to Layout. They do not change Deploy teaching assignments or Venues room records.</p><div class="gsis-formrow"><label>Year<input data-year type="number" min="2000" max="2100"></label><label>Table<select data-table><option value="groups">Teaching groups</option><option value="venues">Venue annotations</option><option value="classes">Class annotations</option><option value="allocations">Local allocations</option><option value="pupilBreakdown">Pupil evidence</option></select></label><button data-load>Load</button><button data-export>Export All</button><label>Import canonical workbook<input data-import type="file" accept=".xlsx"></label></div><p data-status role="status"></p><div class="gsis-scroll" data-rows></div><div data-preview></div>';
+document.body.append(panel);
+panel.querySelector("[data-year]").value =
+  new URLSearchParams(location.search).get("year") || new Date().getFullYear();
+let snapshot = null,
+  preview = null,
+  operationId = null,
+  importRequest = null;
+const setup = document.createElement("details");
+setup.innerHTML =
+  '<summary>Initial source setup</summary><p>Use a validated Layout snapshot only for a year with no existing snapshot. Published Deploy adoption remains the assignment source.</p><label>Source snapshot JSON<input data-initial-source type="file" accept=".json,application/json"></label><div data-initial-preview></div>';
+panel.append(setup);
+setup.querySelector("[data-initial-source]").onchange = async (event) => {
+  const host = setup.querySelector("[data-initial-preview]");
+  host.replaceChildren();
+  try {
+    const file = event.target.files[0];
+    if (!file) return;
+    if (file.size > 8 * 1024 * 1024)
+      throw Error("Choose a source snapshot smaller than 8 MiB.");
+    const source = JSON.parse(await file.text());
+    if (source.year !== year())
+      throw Error("The source year differs from the selected year.");
+    const preview = document.createElement("p");
+    preview.textContent = [
+      "venues",
+      "classes",
+      "groups",
+      "allocations",
+      "pupilBreakdown",
+    ]
+      .map(
+        (key) =>
+          key +
+          ": " +
+          (Array.isArray(source[key]) ? source[key].length : "invalid"),
+      )
+      .join(" · ");
+    const confirm = document.createElement("button");
+    confirm.textContent = "Confirm initial source import";
+    const body = {
+      operationId: crypto.randomUUID(),
+      year: year(),
+      revision: 0,
+      snapshot: source,
+    };
+    confirm.onclick = async () => {
+      confirm.disabled = true;
+      try {
+        const result = await api.request("layout", "/snapshot/import", {
+          method: "POST",
+          body,
+        });
+        if (
+          result.receipt?.state !== "committed" &&
+          result.state !== "committed"
+        )
+          throw Error(
+            "Initial import is not yet confirmed. Retry the same operation.",
+          );
+        host.replaceChildren();
+        await load();
+        message(
+          "Initial Layout source committed. Refresh the campus view to display it.",
+        );
+      } catch (error) {
+        message(error.message, true);
+        confirm.disabled = false;
+      }
+    };
+    host.append(preview, confirm);
+  } catch (error) {
+    message(error.message, true);
+  }
+};
+const editable = {
+  groups: [
+    "teacherLabels",
+    "pupilCount",
+    "pupilCountText",
+    "programmes",
+    "active",
+    "notes",
+  ],
+  venues: ["active"],
+  classes: ["active"],
+  allocations: ["active"],
+  pupilBreakdown: [],
+};
+const message = (value, error = false) => {
+  const e = panel.querySelector("[data-status]");
+  e.textContent = value;
+  e.classList.toggle("gsis-error", error);
+};
+const year = () => Number(panel.querySelector("[data-year]").value);
+function render() {
+  const host = panel.querySelector("[data-rows]");
+  host.replaceChildren();
+  if (!snapshot) return;
+  const tableName = panel.querySelector("[data-table]").value,
+    rows = snapshot.rows?.[tableName] || [],
+    columns = [...new Set(rows.flatMap(Object.keys))];
+  const table = document.createElement("table"),
+    head = document.createElement("tr");
+  for (const field of columns) {
+    const th = document.createElement("th");
+    th.textContent = field;
+    head.append(th);
+  }
+  const action = document.createElement("th");
+  action.textContent = "Save";
+  head.append(action);
+  table.append(head);
+  for (const row of rows) {
+    const tr = document.createElement("tr"),
+      inputs = new Map();
+    for (const field of columns) {
+      const td = document.createElement("td");
+      if (
+        (
+          snapshot.editableFields?.[tableName] ||
+          editable[tableName] ||
+          []
+        ).includes(field)
+      ) {
+        const input = document.createElement("input");
+        input.value = row[field] ?? "";
+        input.setAttribute(
+          "aria-label",
+          (row.id || row.code || row.unitNumber || "record") + " " + field,
+        );
+        td.append(input);
+        inputs.set(field, input);
+      } else
+        td.textContent =
+          typeof row[field] === "object"
+            ? JSON.stringify(row[field])
+            : String(row[field] ?? "");
+      tr.append(td);
+    }
+    const td = document.createElement("td"),
+      save = document.createElement("button");
+    save.textContent = "Save";
+    let request = null;
+    save.onclick = async () => {
+      save.disabled = true;
+      try {
+        const changes = Object.fromEntries(
+          [...inputs]
+            .filter(
+              ([field, input]) => String(row[field] ?? "") !== input.value,
+            )
+            .map(([field, input]) => [
+              field,
+              field === "pupilCount"
+                ? input.value === ""
+                  ? null
+                  : Number(input.value)
+                : input.value,
+            ]),
+        );
+        request ??= {
+          operationId: crypto.randomUUID(),
+          revision: snapshot.revision,
+          year: year(),
+          table: tableName,
+          id: row.id || row.code || row.unitNumber,
+          changes,
+        };
+        const result = await api.request("layout", "/owned-data", {
+          method: "POST",
+          body: request,
+        });
+        if (
+          result.receipt?.state !== "committed" &&
+          result.state !== "committed" &&
+          result.saved !== true
+        )
+          throw Error(
+            "The save is not confirmed. Check the original operation before retrying.",
+          );
+        message(
+          "Local Layout data saved. Published assignments are unchanged.",
+        );
+        await load();
+      } catch (error) {
+        message(
+          error.message + " Your edit and original request are retained.",
+          true,
+        );
+        save.textContent = "Retry same save";
+      } finally {
+        save.disabled = false;
+      }
+    };
+    td.append(save);
+    tr.append(td);
+    table.append(tr);
+  }
+  host.append(table);
+}
+async function load() {
+  snapshot = await api.request("layout", "/owned-data?year=" + year());
+  render();
+  message("Layout " + year() + " revision " + snapshot.revision);
+}
+panel.querySelector("[data-load]").onclick = () =>
+  load().catch((e) => message(e.message, true));
+panel.querySelector("[data-table]").onchange = render;
+panel.querySelector("[data-export]").onclick = async () => {
+  try {
+    const data = await api.request("layout", "/export?year=" + year());
+    download(await encodeWorkbook(data), "GSiS-Layout-" + year() + ".xlsx");
+    message("Canonical Layout workbook ready.");
+  } catch (e) {
+    message(e.message, true);
+  }
+};
+panel.querySelector("[data-import]").onchange = async (event) => {
+  try {
+    const file = event.target.files[0];
+    if (!file) return;
+    const parsed = await decodeWorkbook(await file.arrayBuffer());
+    const workbook = { ...parsed.metadata, sheets: parsed.sheets };
+    preview = await api.request("layout", "/import-preview", {
+      method: "POST",
+      body: {
+        year: year(),
+        revision: snapshot?.revision ?? workbook.revision,
+        workbook,
+      },
+    });
+    operationId = crypto.randomUUID();
+    importRequest = {
+      operationId,
+      year: year(),
+      revision: preview.baseRevision ?? snapshot?.revision ?? workbook.revision,
+      previewId: preview.previewId,
+    };
+    const host = panel.querySelector("[data-preview]");
+    host.replaceChildren();
+    const details = document.createElement("pre");
+    details.className = "gsis-code";
+    details.textContent = JSON.stringify(preview.diff || preview, null, 2);
+    const confirm = document.createElement("button");
+    confirm.textContent = "Confirm Layout import";
+    confirm.disabled = !!preview.errors?.length;
+    confirm.onclick = async () => {
+      confirm.disabled = true;
+      try {
+        const result = await api.request("layout", "/import-apply", {
+          method: "POST",
+          body: importRequest,
+        });
+        if (
+          result.receipt?.state !== "committed" &&
+          result.state !== "committed" &&
+          result.saved !== true
+        )
+          throw Error("The import outcome is not confirmed.");
+        message("Layout import committed.");
+        host.replaceChildren();
+        await load();
+      } catch (e) {
+        message(e.message + " The original operation is retained.", true);
+        confirm.disabled = false;
+      }
+    };
+    host.append(details, confirm);
+  } catch (e) {
+    message(e.message, true);
+  }
+};
+try {
+  const session = await api.getSession();
+  if (!session || !(api.capable("layout.edit") || api.capable("layout.admin")))
+    panel.hidden = true;
+  else await load();
+} catch (error) {
+  message(error.message, true);
+}

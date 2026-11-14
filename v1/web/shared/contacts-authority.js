@@ -1,0 +1,276 @@
+const api = window.GSISV1;
+const panel = document.createElement("details");
+panel.className = "gsis-panel";
+panel.innerHTML =
+  '<summary>Accepted authority records and readiness</summary><p>SMC, EO and School Leader are explicit accepted records. A blank value is missing evidence. Job names and teaching duties do not grant authority.</p><div class="gsis-formrow"><label>Staff member<select data-staff><option value="">Select a staff member…</option></select></label><button data-refresh>Refresh records</button><button data-readiness>Check active-staff readiness</button></div><p data-status role="status"></p><div data-records></div><form data-accept hidden><div class="gsis-formrow"><label>Record<select data-field><option value="smc">SMC</option><option value="eo">EO</option><option value="schoolLeader">School Leader</option></select></label><label>Accepted value<select data-value required><option value="">Choose yes or no…</option><option value="true">Yes</option><option value="false">No</option></select></label><label>Effective from<input data-from type="datetime-local" required></label><label>Effective until, if any<input data-until type="datetime-local"></label><button class="primary">Accept record</button></div><p>Verification source: the owner’s own review. Admins and Contacts Power Users may act independently. Nobody may accept their own SMC, EO or School Leader record.</p></form><div data-readiness-result></div>';
+document.body.append(panel);
+const select = panel.querySelector("[data-staff]"),
+  status = panel.querySelector("[data-status]"),
+  records = panel.querySelector("[data-records]"),
+  form = panel.querySelector("[data-accept]");
+let staff = null,
+  session = null,
+  operationId = null,
+  request = null,
+  scan = null;
+const msg = (text, error = false) => {
+  status.textContent = text;
+  status.classList.toggle("gsis-error", error);
+};
+const label = { smc: "SMC", eo: "EO", schoolLeader: "School Leader" };
+function acceptedRecord(field) {
+  const raw =
+    staff?.authority?.[field] ??
+    staff?.fields?.["authority." + field] ??
+    staff?.fields?.[field] ??
+    staff?.[field];
+  return Array.isArray(raw)
+    ? raw.find(
+        (r) =>
+          r.status === "accepted" &&
+          (!r.validFrom || Date.parse(r.validFrom) <= Date.now()) &&
+          (!r.validUntil || Date.parse(r.validUntil) > Date.now()),
+      )
+    : raw;
+}
+function render() {
+  records.replaceChildren();
+  if (!staff) {
+    form.hidden = true;
+    return;
+  }
+  const table = document.createElement("table"),
+    head = document.createElement("thead");
+  head.innerHTML =
+    "<tr><th>Record</th><th>Accepted value</th><th>State</th><th>Effective interval</th><th>Revision</th></tr>";
+  table.append(head);
+  const body = document.createElement("tbody");
+  for (const field of Object.keys(label)) {
+    const record = acceptedRecord(field),
+      row = document.createElement("tr");
+    for (const value of [
+      label[field],
+      typeof record?.value === "boolean"
+        ? record.value
+          ? "Yes"
+          : "No"
+        : "Missing",
+      record?.status || record?.state || "Missing",
+      record
+        ? [
+            record.validFrom || record.effectiveFrom || "Not supplied",
+            record.validUntil || record.effectiveTo || "No end",
+          ].join(" — ")
+        : "",
+      record?.revision ?? "",
+    ]) {
+      const cell = document.createElement("td");
+      cell.textContent = String(value);
+      row.append(cell);
+    }
+    body.append(row);
+  }
+  table.append(body);
+  records.append(table);
+  const own =
+    !!session?.user.staffId &&
+    session.user.staffId === (staff.staffId || staff.id);
+  form.hidden =
+    own ||
+    session?.impersonating ||
+    !(api.capable("contacts.manage") || api.capable("contacts.accept"));
+  if (own)
+    msg(
+      "Your own records are visible. Another authorised person must accept them.",
+    );
+  panel.querySelector("[data-from]").value = new Date(
+    Date.now() - new Date().getTimezoneOffset() * 60000,
+  )
+    .toISOString()
+    .slice(0, 16);
+}
+async function load() {
+  if (!select.value) return;
+  staff = await api.request(
+    "contacts",
+    "/staff/" + encodeURIComponent(select.value),
+  );
+  operationId = null;
+  request = null;
+  render();
+}
+async function staffList() {
+  const result = await api.request("contacts", "/staff");
+  select.replaceChildren(new Option("Select a staff member…", ""));
+  for (const person of result.rows || []) {
+    if (
+      !api.capable("contacts.manage") &&
+      (person.staffId || person.id) !== session.user.staffId
+    )
+      continue;
+    const option = new Option(
+      (person.basicName ||
+        person.ttbName ||
+        person.name ||
+        person.staffId ||
+        person.id) +
+        " · " +
+        (person.staffId || person.id),
+      person.staffId || person.id,
+    );
+    select.append(option);
+  }
+}
+select.onchange = () => load().catch((error) => msg(error.message, true));
+panel.querySelector("[data-refresh]").onclick = () =>
+  load().catch((error) => msg(error.message, true));
+form.onsubmit = async (event) => {
+  event.preventDefault();
+  const button = event.submitter,
+    field = panel.querySelector("[data-field]").value,
+    record = acceptedRecord(field),
+    from = panel.querySelector("[data-from]").value,
+    until = panel.querySelector("[data-until]").value;
+  if (!staff) return;
+  button.disabled = true;
+  operationId ??= crypto.randomUUID();
+  request ??= {
+    staffId: staff.staffId || staff.id,
+    body: {
+      operationId,
+      revision: record?.revision ?? 0,
+      field,
+      value: panel.querySelector("[data-value]").value === "true",
+      validFrom: new Date(from).getTime(),
+      validUntil: until ? new Date(until).getTime() : null,
+      ownerReviewReference: "owner-review",
+    },
+  };
+  select.disabled = true;
+  panel.querySelector("[data-refresh]").disabled = true;
+  form
+    .querySelectorAll("input,select")
+    .forEach((node) => (node.disabled = true));
+  try {
+    const result = await api.request(
+      "contacts",
+      "/staff/" + encodeURIComponent(request.staffId) + "/accept",
+      { method: "POST", body: request.body },
+    );
+    if (result.state === "pending" || result.receipt?.state === "pending") {
+      msg(
+        "Acceptance is pending. Check this operation before changing its intent.",
+      );
+    } else if (
+      result.state === "committed" ||
+      result.receipt?.state === "committed" ||
+      result.saved === true
+    ) {
+      msg("Accepted record committed with its audit.");
+      operationId = null;
+      request = null;
+      await load();
+    } else
+      msg(
+        "The outcome is not confirmed. Retain operation " +
+          operationId +
+          " for recovery.",
+        true,
+      );
+  } catch (error) {
+    msg(error.message + " Original operation: " + operationId, true);
+  } finally {
+    button.disabled = false;
+    button.textContent = request
+      ? "Retry original acceptance"
+      : "Accept record";
+    select.disabled = !!request;
+    panel.querySelector("[data-refresh]").disabled = !!request;
+    form
+      .querySelectorAll("input,select")
+      .forEach((node) => (node.disabled = !!request));
+  }
+};
+panel.querySelector("[data-readiness]").onclick = async () => {
+  const host = panel.querySelector("[data-readiness-result]");
+  host.replaceChildren();
+  try {
+    scan = await api.request("contacts", "/readiness");
+    const heading = document.createElement("h3");
+    heading.textContent =
+      scan.ready || scan.state === "ready"
+        ? "Readiness scan complete — cutover recheck required"
+        : "Readiness is blocked";
+    host.append(heading);
+    const metadata = document.createElement("p");
+    metadata.textContent =
+      "Epoch " +
+      scan.epoch +
+      " · evaluated " +
+      (scan.evaluatedAt || scan.asOf || "unknown");
+    host.append(metadata);
+    const rows = scan.issues || scan.missing || scan.blockers || [];
+    const table = document.createElement("table");
+    for (const person of rows) {
+      const tr = document.createElement("tr");
+      for (const value of [
+        person.staffId || person.id,
+        person.name || person.basicName,
+        (person.missing || person.missingFields || []).join(", ") ||
+          [person.field, person.reason].filter(Boolean).join(": ") ||
+          "Missing required records",
+      ]) {
+        const td = document.createElement("td");
+        td.textContent = value;
+        tr.append(td);
+      }
+      table.append(tr);
+    }
+    host.append(table);
+    if (Array.isArray(scan.inactive) && scan.inactive.length) {
+      const note = document.createElement("p");
+      note.textContent =
+        scan.inactive.length +
+        " inactive staff are informational and do not block.";
+      host.append(note);
+    }
+    if (scan.ready || scan.state === "ready") {
+      const check = document.createElement("button");
+      check.textContent = "Recheck cutover epoch";
+      check.onclick = async () => {
+        try {
+          const result = await api.request("contacts", "/readiness/check", {
+            method: "POST",
+            body: { operationId: crypto.randomUUID(), report: scan },
+          });
+          msg(
+            result.ready || result.state === "ready"
+              ? "Current readiness evidence rechecked. Production cutover still requires owner release approval."
+              : "Readiness changed. Run a fresh scan.",
+            !(result.ready || result.state === "ready"),
+          );
+        } catch (error) {
+          msg(error.message, true);
+        }
+      };
+      host.append(check);
+    }
+  } catch (error) {
+    msg(error.message, true);
+  }
+};
+try {
+  session = await api.getSession();
+  panel.querySelector("[data-readiness]").hidden =
+    !api.capable("contacts.manage");
+  if (
+    session &&
+    (api.capable("contacts.manage") ||
+      api.capable("contacts.read") ||
+      api.capable("contacts.accept"))
+  )
+    await staffList();
+  else panel.hidden = true;
+} catch (error) {
+  msg(error.message, true);
+}
