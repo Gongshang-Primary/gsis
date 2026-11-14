@@ -53,3 +53,7 @@ Drive history is owner-managed deletion; nothing purges old daily files. Persona
 ## Status that does not change
 
 Not deployed. Google backup activation and live UAT pending. F5 OPEN. Official T1B-01/T1B-02 and runtime UAT: Not tested.
+
+## Owner disposition (14 Nov 2026)
+
+D1 closed: owner manages Drive folder sharing ("im confident of managing the drive sharing"). D2 retention remains an open owner choice. L1 sent to Codex.
