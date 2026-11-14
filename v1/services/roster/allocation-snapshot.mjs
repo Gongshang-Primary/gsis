@@ -3,6 +3,7 @@ import Operations from "../../../shared/roster-operations.js";
 import { defaultPolicy } from "../../allocator/index.mjs";
 import { requireValue } from "../../runtime/errors.mjs";
 import { query, one, canonical, digest } from "../../runtime/store.mjs";
+import { hasDatedReliefActivation } from "./eligibility.mjs";
 
 function monday(date) {
   const d = new Date(date + "T12:00:00Z"),
@@ -128,7 +129,7 @@ export async function allocationSnapshot(ctx, loaded, c, date, revision, runId) 
     return {
       staffId: p.id,
       active: p.longTermActive ?? p.active,
-      dateActive: !!adHoc && p.adhocEligible === true,
+      dateActive: hasDatedReliefActivation(p, adHoc ? [adHoc] : [], date),
       eo: p.eo,
       employment: p.employment,
       employmentTags: p.employmentTags,
