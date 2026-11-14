@@ -1,11 +1,11 @@
 # roster-adhoc-inactive-regression: Activated ad hoc relief teachers are blocked as "inactive" (HOTFIX)
 
-- Status: proposed (URGENT HOTFIX; needed before Mon 16 Nov 07:00 SGT)
+- Status: claimed (Model: Codex, 14 November 2026; urgent hotfix)
 - Owner/model: Codex
 - Reviewer/model: Muse (owner may name Claude for speed)
 - Last updated (Asia/Singapore): 2026-11-14 ~23:30
 - Branch: codex/roster-adhoc-inactive-regression
-- Base SHA: current main (889669a or later). Lane R: this jumps the queue.
+- Base SHA: 8abd29d (current main at claim). Lane R: this jumps the queue.
 - User-authorised scope: owner, 14 Nov ("urgent bug fix. dig deep to investigate. planning for 16 nov relief. we have many adhoc relief. but cannot manually assign them (do not turn up in search), auto also cannot. urgent.")
 
 ## Diagnosis (Claude, read-only D1 + code, 14 Nov)
