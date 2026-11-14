@@ -72,3 +72,24 @@ Licence source: https://raw.githubusercontent.com/google/fonts/29e94d990c84a54f8
 - Full Node/LORD suite, all product programs and Worker dry-runs: exact-head CI pending; no earlier head's pass is attributed to this update. Claude updated-head review pending. Repository/PR evidence identifies the resulting SHA to avoid a self-referential task commit.
 - Q01/Q02/Q03: bounded claimed scope and provider-inheritance fix checked; Q04/Q05: no transaction/concurrency/resource behaviour changed; Q06/Q07: focused/build checks pass, complete CI and independent review pending; Q08: no deployment/live verification, runtime UAT Not tested and F5 OPEN.
 - Rollback before deployment: revert this follow-up; doing so restores inherited-provider-secret risk. Font notice addition changes no executable code. Historical release downloads are not rewritten; rebuilt packages carry the notice.
+
+## Owner-authorised empty-store provisioning, 14 November 2026
+
+Owner explicitly answered “create” to eight empty D1 databases and eight private R2 buckets in the connected account, with no deployment, migration, data import or paid-plan upgrade. This supersedes the earlier provisioning exclusion only for these sixteen stores. No other infrastructure operation is authorised.
+
+Created 14 November 2026, 14:17–14:18 Asia/Singapore, in Cloudflare account `803fa9573f2829233f03e0c0290803d9`. Resource prefix: `gsis-v1-gsps`. D1 and R2 creation responses report APAC. Locations are placement, not a Singapore-only residency guarantee.
+
+| Owner | Database and private bucket name | D1 database ID |
+| --- | --- | --- |
+| core | `gsis-v1-gsps-core` | `9052f79c-c08d-4750-9cc8-921aca085d75` |
+| contacts | `gsis-v1-gsps-contacts` | `00229fd6-0b9e-4971-af9e-e2ce1a9850f8` |
+| deploy | `gsis-v1-gsps-deploy` | `4e3e15fa-21d9-420c-b2b1-92947b58b059` |
+| roster | `gsis-v1-gsps-roster` | `ece88c5d-7352-4604-9b3c-57afbe6ca2d9` |
+| calendar | `gsis-v1-gsps-calendar` | `2a22aaf7-2512-4f58-86a8-ed9f5266db60` |
+| lord | `gsis-v1-gsps-lord` | `26d05ebd-0e68-49a4-8319-57bb977574db` |
+| venues | `gsis-v1-gsps-venues` | `a43aaed5-55d3-4b36-a958-3d80f1c053bd` |
+| layout | `gsis-v1-gsps-layout` | `10b8a260-8197-413e-8d92-9f7c221cc740` |
+
+Verification: re-listed all eight D1 databases (zero tables each); read each bucket's managed-domain and custom-domain settings (all eight `enabled:false`, all custom-domain lists empty). No SQL, migrations, object uploads, Workers deployment, routes, credentials, provider integrations or plan changes performed. Existing resources were not modified. Store provisioning is not a product deployment or runtime UAT. F5 OPEN; T1B-01/T1B-02 and unperformed runtime UAT remain Not tested.
+
+The eight UUIDs above populate `GSIS_V1_SCHOOL_CONFIG.databases`; the names populate `buckets`. This inventory is not a complete deploy-ready school configuration: approved HTTPS origin, Google OAuth client/domain and verified bootstrap identity remain required. Do not dispatch the deployment yet. Resource removal would require a separate owner instruction and confirmation that the stores remain unused; none was deleted.
