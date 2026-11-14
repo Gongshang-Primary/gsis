@@ -57,3 +57,11 @@ Not deployed. Google backup activation and live UAT pending. F5 OPEN. Official T
 ## Owner disposition (14 Nov 2026)
 
 D1 closed: owner manages Drive folder sharing ("im confident of managing the drive sharing"). D2 retention remains an open owner choice. L1 sent to Codex.
+
+## Re-review at `f1efe8a687cb640dae8731fe674acb72b33e7f9b` (14 Nov 2026)
+
+**Verdict: approve** (advisory). L1 resolved.
+
+One commit since ec68e98, two files: `v1/migrations/lord/0002_reign_archive.sql` renamed to `0003_reign_archive.sql` with 100% identical content, and one comment line in `scripts/v1/verify-migration-upgrade.mjs`. No remaining reference to the old name anywhere at this head. LORD migrations now run 0001, 0002-drive-backup, 0003_reign_archive. Merge-tree against origin/main clean.
+
+Not rerun by me: product suite, build and migration upgrade (no executable change; Codex reports all passed at this head). Owner rechecks CI at this head before merge.
