@@ -6853,14 +6853,15 @@ var GSISRosterStapler=(()=>{
   const tile={id:newId(plan,'extra'),kind:'lesson',teacherId:text(value.teacherId,200),classIds:classes.slice(),period:Number.isInteger(value.period)?value.period:null,location:Number.isInteger(value.period)?'grid':'pit',subject:text(value.subject||''),venue:text(value.venue||''),group:text(value.group||''),baselineId:null};tile.source=source(tile);plan.tiles.push(tile);return tile;
  }
  function bulkCreateTiles(next,previous,command,values){
-  const row=command.classId!==undefined,byClass=row||command.view==='class';
+  const row=command.classId!==undefined,teacherRow=!row&&command.teacherId!==undefined&&command.view==='teacher',byClass=row||command.view==='class';
   if(!row&&!['teacher','class'].includes(command.view))fail('Choose a teacher or class view for filling empty cells.',400);
   if(byClass&&!next.teachers.some(t=>t.staffId===command.teacherId))fail('Choose a valid teacher before creating tiles.',400);
-  const rows=row?[command.classId]:byClass?previous.classes.map(c=>c.id):previous.teachers.map(t=>t.staffId),periods=row?(Array.isArray(command.periods)?command.periods:previous.periods.map(p=>p.period)):command.periods;
+  const rows=row?[command.classId]:teacherRow?[command.teacherId]:byClass?previous.classes.map(c=>c.id):previous.teachers.map(t=>t.staffId),periods=row||teacherRow?(Array.isArray(command.periods)?command.periods:previous.periods.map(p=>p.period)):command.periods;
   const original=active(previous);
   for(const id of rows)for(const n of [...new Set(periods)]){
    period(next,n);
    if(original.some(t=>(byClass?t.classIds.includes(id):t.teacherId===id)&&span(previous,t).includes(n)))continue;
+   if(teacherRow&&original.some(t=>t.kind==='recess'&&t.classIds.some(id=>(values.classIds||[]).includes(id))&&span(previous,t).includes(n)))continue;
    const tile=addLessonTile(next,{teacherId:byClass?command.teacherId:id,period:n,subject:values.subject||'',venue:values.venue||'',group:values.group||''},byClass?[id]:values.classIds||[]);
    for(const other of active(next))if(other.id!==tile.id&&overlaps(next,tile,other)){
     if(other.teacherId===tile.teacherId)fail('Teacher already has a lesson at P'+n+'. No changes were applied.');
@@ -7026,9 +7027,15 @@ var GSISRosterStapler=(()=>{
    const same=next.mats.find(m=>m.target===target&&m.targetId===targetId&&m.fromPeriod===from.period&&m.toPeriod===to.period);if(same)same.reason=reason;else next.mats.push({id:newId(next,'mat'),target,targetId,fromPeriod:from.period,toPeriod:to.period,reason});
   }else if(type==='removeMat'){next.mats=next.mats.filter(m=>m.id!==command.matId);
   }else if(type==='bulkEdit'){
-   const column=command.classId===undefined,patch=command.patch||{};
+   const teacherRow=command.classId===undefined&&command.teacherId!==undefined&&(command.view==='teacher'||command.periods===undefined),column=command.classId===undefined&&!teacherRow,patch=command.patch||{};
    if(command.createTiles!==undefined&&typeof command.createTiles!=='boolean')fail('Choose whether to create tiles.',400);
-   if(column){
+   if(teacherRow){
+    if(!next.teachers.some(t=>t.staffId===command.teacherId))fail('Choose a teacher.');
+    if(Object.keys(patch).some(key=>!['subject','venue','group'].includes(key)))fail('Only Subject, Venue and Group can be changed together.',400);
+    if(Array.isArray(command.periods))command.periods.forEach(id=>period(next,id));
+    for(const t of next.tiles.filter(t=>t.kind==='lesson'&&t.teacherId===command.teacherId&&(!Array.isArray(command.periods)||command.periods.includes(t.period))))for(const [key,value] of Object.entries(patch))t[key]=text(value);
+    if(command.createTiles){const classIds=selectedClasses(next,command.classIds||[],command.customClasses);if(classIds.some(id=>!next.classes.some(c=>c.id===id)))fail('Choose valid classes.',400);bulkCreateTiles(next,plan,command,{...patch,classIds});}
+   }else if(column){
     if(!Array.isArray(command.periods)||!command.periods.length)fail('Choose a valid timetable period.',400);
     command.periods.forEach(id=>period(next,id));
     if(Object.keys(patch).some(key=>!['subject','venue','group','classIds'].includes(key)))fail('Only Subject, Venue, Group and Class can be changed by period.',400);
