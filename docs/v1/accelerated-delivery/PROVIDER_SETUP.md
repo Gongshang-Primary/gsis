@@ -1,6 +1,6 @@
 # Browser-only provider credential setup
 
-Preserve the existing WhatsApp provider credentials and Telegram bot. No token rotation is required for migration. `GSIS_SECRET` remains the common GSiS backend secret; provider-issued credentials and provider webhook verification remain separate. This guide and wiring do not activate any sender, scheduler, webhook, Google backup or live integration.
+Preserve the existing WhatsApp provider credentials and Telegram bot. No token rotation is required for migration. GSiS v1 uses its own separate `GSIS_SECRET`, already configured for v1 and distinct from the v0.9 secret (owner decision, 13 November 2026). This value is shared across the v1 backend services; provider-issued credentials and provider webhook verification remain separate. This guide and wiring do not activate any sender, scheduler, webhook, Google backup or live integration.
 
 ## Where to enter values
 
@@ -8,7 +8,7 @@ In GitHub, open **helper-gsps/gsis → Settings → Environments → gsis-v1-own
 
 | Environment secret | Value / use |
 | --- | --- |
-| `GSIS_SECRET` | Existing v1 backend secret; retain it. |
+| `GSIS_SECRET` | Existing separate v1 backend secret; retain the value already configured for v1. |
 | `CLOUDFLARE_API_TOKEN` | Existing scoped Cloudflare deployment token; retain it. |
 | `WHATSAPP_ACCESS_TOKEN` | Existing WhatsApp access token, unchanged. Used by Roster, LORD and Venues senders. |
 | `WHATSAPP_APP_SECRET` | Existing Meta app secret, used by Roster's ingress to verify provider signatures. It is not the access token. |
@@ -31,7 +31,7 @@ Nonsecret settings belong under **Environment variables → GSIS_V1_SCHOOL_CONFI
 
 After the implementation PR is reviewed/merged and the owner separately authorises deployment, use **Actions → Owner-triggered isolated v1 deployment → Run workflow**, select **main**, enter the existing deployment confirmation, and select **Upload existing provider credentials** only when provisioning those bindings is approved. The new option defaults **off**. The protected environment approval still applies. All of this runs in GitHub; no Wrangler installation is needed on a school machine.
 
-Secrets are passed only to the deployment step and transferred to encrypted Worker secret bindings through Wrangler stdin. They are not embedded in Worker JavaScript, web assets, school configuration, downloadable packages or command arguments. Provider secrets are restricted to the consuming owners; the web Worker receives only the existing GSiS backend secret, never provider credentials. Validate secret formats before any migration/deployment side effect.
+Secrets are passed only to the deployment step and transferred to encrypted Worker secret bindings through Wrangler stdin. They are not embedded in Worker JavaScript, web assets, school configuration, downloadable packages or command arguments. Provider secrets are restricted to the consuming owners; the web Worker receives only the existing separate v1 `GSIS_SECRET`, never provider credentials. Validate secret formats before any migration/deployment side effect.
 
 Selecting the option does not register a webhook or change ownership. The existing initial-deployment validator still rejects `senderOwner`, `schedulerOwner` or `webhookOwner` set to `v1`. Sender/scheduler/webhook cutover requires a separate approved procedure and tests, including recipient consent, current templates, provider signature/header checks and uncertain-delivery recovery. Do not change those JSON fields to bypass that gate. OVERLORD's Telegram monitor needs the existing scheduled-monitor and sender gates as well as a destination and token.
 
