@@ -61,3 +61,14 @@ Legacy capacity warnings are replaced by v1 layered health; new warnings queue o
 ## Merge order
 
 #145 → #146 → #151; #145 → #147 → #148; #145 → #149; #145 → #150; #152 after C-1 is fixed. Resolve L-1 conflicts and recheck CI at each final head.
+
+## Re-review (14 Nov 2026)
+
+| PR | New head | Verdict |
+|---|---|---|
+| #152 | `af9771456b0de9a809b7463530adbd23f0020777` | **Approve**. C-1 resolved. |
+| #149 | `c500998bc6beec22f5242d8a5a535358576a5989` | **Approve**. Wording note resolved. |
+
+- #152: one documentation file. The owner instructions now list `WHATSAPP_ACCESS_TOKEN`, `WHATSAPP_APP_SECRET`, `WHATSAPP_VERIFY_TOKEN`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_WEBHOOK_SECRET`, `GOOGLE_SERVICE_ACCOUNT`, `EMAIL_API_TOKEN`, plus the v1 `GSIS_SECRET` and `CLOUDFLARE_API_TOKEN`. I compared this list mechanically with every `secrets.*` reference in #149's `v1-deploy.yml` at `c500998`: identical, nine of nine. Also records the stacked-claim rule and the N-1 staging latency check. Merge-tree with main: clean.
+- #149: only `PROVIDER_SETUP.md` changed (3 lines): states v1 uses its own separate `GSIS_SECRET`, distinct from v0.9 (owner decision 13 Nov). No workflow or script change since `ed6ecb5`, so my test results there still apply. The add/add task-record conflict (L-1) remains, deferred until #145 merges, as agreed.
+- `git diff --check` clean on both. CI at both new heads not seen by me (Codex reports running).
