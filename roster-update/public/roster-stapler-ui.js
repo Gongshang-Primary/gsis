@@ -35,7 +35,7 @@
  function blockAccess(message){
   const s=current;if(!s||!live(s)||s.mode!=='planner')return;
   s.accessBlocked=message;dateListCache=null;persistDraft(s);closeDialog();
-  s.ctx.container.querySelectorAll('[data-save],[data-confirm],[data-import],[data-review-relief],[data-suspend],[data-add-teacher],[data-add-class],[data-add-card],[data-reset-recess],[data-edit-selected],[data-pit-selected],[data-undo],[data-redo],[data-class-fields] input,[data-class-fields] button,[data-period-apply]').forEach(el=>el.disabled=true);
+  s.ctx.container.querySelectorAll('[data-save],[data-confirm],[data-import],[data-review-relief],[data-suspend],[data-add-teacher],[data-add-class],[data-add-card],[data-reset-recess],[data-edit-selected],[data-pit-selected],[data-undo],[data-redo],[data-class-fields] input,[data-class-fields] button,[data-teacher-fields] input,[data-teacher-fields] button,[data-period-apply]').forEach(el=>el.disabled=true);
   tell(s,message,true);
  }
  async function checkAccess(fresh){
@@ -220,6 +220,9 @@
  function classFields(s,row){
   return '<div class="planner-class-fields" data-class-fields="'+esc(row.id)+'">'+[['subject','Subject',200],['venue','Venue',500],['group','Group',300]].map(([field,label,max])=>'<form class="planner-class-field" data-class-field-form="'+field+'"><input name="class-'+field+'" placeholder="'+label+'" aria-label="'+label+' for '+esc(row.name)+'" maxlength="'+max+'"'+(!editable(s)?' disabled':'')+'><button type="submit" aria-label="Apply '+label+' to all '+esc(row.name)+' lesson tiles" title="Apply '+label+' to all '+esc(row.name)+' lesson tiles"'+(!editable(s)?' disabled':'')+'>→</button></form>').join('')+'</div>';
  }
+ function teacherFields(s,row){
+  return '<div class="planner-class-fields" data-teacher-fields="'+esc(row.staffId)+'">'+[['subject','Subject',200],['venue','Venue',500],['group','Group',300]].map(([field,label,max])=>'<form class="planner-class-field" data-teacher-field-form="'+field+'"><input name="teacher-'+field+'" placeholder="'+label+'" aria-label="'+label+' for '+esc(row.name)+'" maxlength="'+max+'"'+(!editable(s)?' disabled':'')+'><button type="submit" aria-label="Apply '+label+' to all '+esc(row.name)+' lesson tiles" title="Apply '+label+' to all '+esc(row.name)+' lesson tiles"'+(!editable(s)?' disabled':'')+'>→</button></form>').join('')+'</div>';
+ }
  function comparisonGhosts(s){
   if(!s.showComparison||s.nativeImport)return [];
   const tiles=s.data.comparisonTiles;if(!Array.isArray(tiles))return s.data.comparisonGhosts||[];
@@ -237,7 +240,7 @@
   for(const group of groups)group.visibleRows=rows.filter(row=>group.classIds.includes(idOf(row)));
   const cells=new Map(),oldCells=new Map(),continuingCells=new Map(),matCells=new Map(),put=(map,key,item)=>{if(!map.has(key))map.set(key,[]);map.get(key).push(item);},ids=t=>type==='teacher'?[t.teacherId]:t.classIds;for(const t of tiles)for(const id of ids(t)){put(cells,id+'|'+t.period,t);if(t.kind==='recess')for(const n of model().tilePeriods(s.plan,t))if(n!==t.period)put(continuingCells,id+'|'+n,t);}for(const t of ghosts)for(const id of ids(t))put(oldCells,id+'|'+t.period,t);for(const m of s.plan.mats||[])if(m.target===type)for(const p of periods)if(periodNumber(p)>=m.fromPeriod&&periodNumber(p)<=m.toPeriod)put(matCells,m.targetId+'|'+periodNumber(p),m);
   const head='<tr><th class="planner-name"><input type="search" data-filter="'+type+'" aria-label="Find a '+type+'" placeholder="Find a '+type+'…" value="'+esc(s.filters[type])+'"></th>'+periods.map(p=>periodHeader(s,p,type)).join('')+'</tr>';
-  return '<table class="planner-grid"><thead>'+ (type==='teacher'?head:'<tr><th class="planner-name"><input type="search" data-filter="class" aria-label="Find a class" placeholder="Find a class…" value="'+esc(s.filters.class)+'"></th>'+periods.map(()=>'<th aria-hidden="true"></th>').join('')+'</tr>')+'</thead><tbody>'+rows.map(row=>{const id=idOf(row);return '<tr data-row-name="'+esc(String(row.name||row.timetableName||'').normalize('NFKC').toLowerCase())+'"'+(!String(row.name||row.timetableName||'').normalize('NFKC').toLowerCase().includes(query)?' hidden':'')+'><th class="planner-name" scope="row"><span>'+esc(row.name||row.timetableName)+'</span>'+(type==='class'&&row.adhoc&&s.data.canEdit?'<button class="planner-class-edit" data-edit-class="'+esc(id)+'" aria-label="Rename or delete '+esc(row.name)+'">✎</button>':'')+(type==='class'&&s.data.canEdit?classFields(s,row):'')+'</th>'+periods.map(p=>{
+  return '<table class="planner-grid"><thead>'+ (type==='teacher'?head:'<tr><th class="planner-name"><input type="search" data-filter="class" aria-label="Find a class" placeholder="Find a class…" value="'+esc(s.filters.class)+'"></th>'+periods.map(()=>'<th aria-hidden="true"></th>').join('')+'</tr>')+'</thead><tbody>'+rows.map(row=>{const id=idOf(row);return '<tr data-row-name="'+esc(String(row.name||row.timetableName||'').normalize('NFKC').toLowerCase())+'"'+(!String(row.name||row.timetableName||'').normalize('NFKC').toLowerCase().includes(query)?' hidden':'')+'><th class="planner-name" scope="row"><span>'+esc(row.name||row.timetableName)+'</span>'+(type==='class'&&row.adhoc&&s.data.canEdit?'<button class="planner-class-edit" data-edit-class="'+esc(id)+'" aria-label="Rename or delete '+esc(row.name)+'">✎</button>':'')+(type==='class'&&s.data.canEdit?classFields(s,row):type==='teacher'&&s.data.canEdit?teacherFields(s,row):'')+'</th>'+periods.map(p=>{
    const n=periodNumber(p),group=groupByClass.get(id);
    if(group?.periods.includes(n)){
     if(group.visibleRows[0].id!==id||n!==group.period)return '';
@@ -267,6 +270,7 @@
   s.teacherNames=new Map([...(s.data.people||[]).map(p=>[p.id,p.name]),...people(s).map(p=>[p.staffId,p.name])]);s.classNames=new Map(s.plan.classes.map(c=>[c.id,c.name]));
   const root=s.ctx.container,focused=document.activeElement,field=focused?.dataset?.filter,pos=focused?.selectionStart,scrolls={};
   const classValues=new Map([...root.querySelectorAll('[data-class-fields]')].map(group=>[group.dataset.classFields,Object.fromEntries([...group.querySelectorAll('input')].map(input=>[input.name,input.value]))]));
+  const teacherValues=new Map([...root.querySelectorAll('[data-teacher-fields]')].map(group=>[group.dataset.teacherFields,Object.fromEntries([...group.querySelectorAll('input')].map(input=>[input.name,input.value]))]));
   root.querySelectorAll('[data-scroll]').forEach(el=>scrolls[el.dataset.scroll]={left:el.scrollLeft,top:el.scrollTop});
   for(const type of only?[only]:['teacher','class'])root.querySelector('[data-scroll="'+type+'"]').innerHTML=matrix(s,type);
   if(!only)drawPit(s);markAbsences(s);
@@ -276,6 +280,7 @@
   root.querySelectorAll('[data-period-apply]').forEach(button=>button.onclick=()=>applyPeriod(s,Number(button.dataset.periodApply),button.dataset.periodView));
   root.querySelectorAll('[data-edit-class]').forEach(b=>b.onclick=()=>editClass(s,b.dataset.editClass));
   root.querySelectorAll('[data-class-fields]').forEach(group=>{const values=classValues.get(group.dataset.classFields)||{};group.querySelectorAll('form').forEach(form=>{const field=form.dataset.classFieldForm,input=form.querySelector('input');input.value=values[input.name]||'';form.onsubmit=e=>{e.preventDefault();applyClassField(s,group.dataset.classFields,field,input);};});});
+  root.querySelectorAll('[data-teacher-fields]').forEach(group=>{const values=teacherValues.get(group.dataset.teacherFields)||{};group.querySelectorAll('form').forEach(form=>{const field=form.dataset.teacherFieldForm,input=form.querySelector('input');input.value=values[input.name]||'';form.onsubmit=e=>{e.preventDefault();applyTeacherField(s,group.dataset.teacherFields,field,input);};});});
  }
  function drawPit(s){if(!live(s)||!s.plan)return;const q=s.filters.pit.toLowerCase(),pit=s.plan.tiles.filter(t=>t.location==='pit'&&[name(s,t.teacherId),t.subject,t.venue,t.group,...t.classIds.map(id=>className(s,id))].join(' ').toLowerCase().includes(q));s.ctx.container.querySelector('[data-pit-cards]').innerHTML=pit.map(t=>tileHtml(s,t)).join('')||'<p class="hint">Drop a card here to leave it unplaced.</p>';}
  function views(s){const root=s.ctx.container;for(const key of ['teacher','class','pit']){root.querySelector('[data-pane="'+key+'"]').hidden=!s.views[key];root.querySelector('[data-view="'+key+'"]').setAttribute('aria-pressed',String(s.views[key]));}root.querySelector('.planner-workspace').classList.toggle('no-pit',!s.views.pit);root.querySelector('.planner-workspace').classList.toggle('pit-only',!s.views.teacher&&!s.views.class);root.querySelector('.planner-left').hidden=!s.views.teacher&&!s.views.class;root.querySelector('.planner-divider').hidden=!s.views.teacher||!s.views.class;root.querySelector('[data-hidden-views]').hidden=Object.values(s.views).some(Boolean);root.querySelector('.planner-left').classList.toggle('single-view',!s.views.teacher||!s.views.class);}
@@ -457,7 +462,7 @@
   return '<fieldset><legend>Apply to</legend><label><input type="radio" name="bulkMode" value="existing" checked> Only write values to cells with tiles</label><label><input type="radio" name="bulkMode" value="create"> In empty cells, create tiles to fill whole '+axis+'</label></fieldset>'+(needsTeacher?'<div data-bulk-teacher hidden><div data-bulk-teacher-picker></div><input type="hidden" name="teacherId" value=""><p class="hint">Choose the teacher for newly created lesson tiles.</p></div>':'');
  }
  function bindBulkChoice(s,form,needsTeacher){
-  const section=form.querySelector('[data-bulk-teacher]'),update=()=>{if(section)section.hidden=form.elements.bulkMode.value!=='create';};form.querySelectorAll('[name=bulkMode]').forEach(input=>input.onchange=update);update();
+  const section=form.querySelector('[data-bulk-teacher],[data-bulk-class]'),update=()=>{if(section)section.hidden=form.elements.bulkMode.value!=='create';};form.querySelectorAll('[name=bulkMode]').forEach(input=>input.onchange=update);update();
   if(needsTeacher&&window.RosterOpsUI?.teacherPicker)window.RosterOpsUI.teacherPicker(form.querySelector('[data-bulk-teacher-picker]'),people(s).map(p=>({id:p.staffId,name:p.name,timetableName:p.timetableName})),'',id=>{form.elements.teacherId.value=id;},'Teacher');
  }
  function applyBulk(s,el,input,tiles){
@@ -489,6 +494,13 @@
   if(!value){tell(s,'Enter '+label+' before applying it to '+className(s,id)+'.');input.focus();return;}
   const el=dialog(s,'Apply '+label+' to '+className(s,id),'<form><p>'+esc(label)+': '+esc(value)+'</p>'+bulkChoice('row',true)+'<p class="hint">Recess is never filled. Changes stay local until Save to online.</p><button type="submit" class="primary">Apply to row</button></form>'),form=el.querySelector('form');bindBulkChoice(s,form,true);
   form.onsubmit=e=>{e.preventDefault();if(!editable(s)||!form.reportValidity())return;applyBulk(s,el,{type:'bulkEdit',classId:id,patch:{[field]:value},createTiles:form.elements.bulkMode.value==='create',teacherId:form.elements.teacherId.value},s.plan.tiles.filter(t=>t.kind==='lesson'&&t.classIds.includes(id)));};
+ }
+ function applyTeacherField(s,staffId,field,input){
+  if(!editable(s))return;
+  const label={subject:'Subject',venue:'Venue',group:'Group'}[field],value=input.value.trim(),teacher=name(s,staffId);
+  if(!value){tell(s,'Enter '+label+' before applying it to '+teacher+'.');input.focus();return;}
+  const el=dialog(s,'Apply '+label+' to '+teacher,'<form><p>'+esc(label)+': '+esc(value)+'</p>'+bulkChoice('row',false)+'<div data-bulk-class hidden>'+classPicker(s,[])+'</div><p class="hint">Recess is never filled. Changes stay local until Save to online.</p><button type="submit" class="primary">Apply to row</button></form>'),form=el.querySelector('form');bindFields(s,el,{classIds:[]});bindBulkChoice(s,form,false);
+  form.onsubmit=e=>{e.preventDefault();if(!editable(s)||!form.reportValidity())return;applyBulk(s,el,{type:'bulkEdit',teacherId:staffId,view:'teacher',patch:{[field]:value},createTiles:form.elements.bulkMode.value==='create',classIds:[...form.querySelectorAll('[name=classIds]:checked')].map(c=>c.value),customClasses:customClasses(form)},s.plan.tiles.filter(t=>t.kind==='lesson'&&t.teacherId===staffId));};
  }
  function suspend(s){
   if(!editable(s))return;const options=s.plan.periods.map(p=>'<option value="'+periodNumber(p)+'">'+esc(periodLabel(p))+'</option>').join(''),baselineTeachers=new Set((s.plan.baseline?.tiles||[]).map(t=>t.teacherId));
