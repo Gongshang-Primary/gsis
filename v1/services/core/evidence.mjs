@@ -10,9 +10,10 @@ export async function sealDecisionEvidence(event,evidence,principal,binding) {
 }
 export async function verifyDecisionEvidence({schoolId,decisionId,event,evidence,principal,binding,readHistorical,now=Date.now()}) {
   const check=(value,code='EVIDENCE_INTEGRITY_FAILED')=>requireValue(value,code,409);
-  check(event.schoolId===schoolId&&evidence.schoolId===schoolId&&principal.schoolId===schoolId&&event.eventId===decisionId&&evidence.decisionId===decisionId&&principal.decisionId===decisionId,'EVIDENCE_SCOPE_MISMATCH');
+  check(event.schoolId===schoolId&&principal.schoolId===schoolId&&(evidence.schoolId===undefined||evidence.schoolId===schoolId)&&event.eventId===decisionId&&evidence.decisionId===decisionId&&principal.decisionId===decisionId,'EVIDENCE_SCOPE_MISMATCH');
   if(evidence.schemaVersion===1)return {state:'incomplete',issues:['LEGACY_UNSEALED_EVIDENCE','FINAL_EVALUATION_TIME_UNVERIFIED'],currentAuthority:false};
   check(evidence.schemaVersion===2);
+  check(evidence.schoolId===schoolId,'EVIDENCE_SCOPE_MISMATCH');
   const {integrityDigest,...captured}=evidence;
   check(integrityDigest===await digest({event,evidence:captured,principal,binding}));
   const d=evidence.decision;
