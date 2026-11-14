@@ -1,3 +1,4 @@
+import {secretBindings} from "./provider-secrets.mjs";
 import { verifyResources } from "./verify-resources.mjs";
 import { readFile, writeFile } from "node:fs/promises";
 import { spawnSync } from "node:child_process";
@@ -33,6 +34,7 @@ const ownerConfigs = await Promise.all(
     JSON.parse(await readFile(join(base, d, "wrangler.json"), "utf8")),
   ),
 );
+const secretsByOwner = Object.fromEntries([...domains, "web"].map(owner => [owner, secretBindings(owner, process.env)]));
 await verifyResources(ownerConfigs, process.env);
 for (const d of domains) {
   const config = join(base, d, "wrangler.json"),
@@ -63,23 +65,7 @@ for (const d of domains) {
 for (const d of [...domains, "web"]) {
   const config = join(base, d, "wrangler.json");
   run(["deploy", "--config", config]);
-  const secrets = { GSIS_SECRET: process.env.GSIS_SECRET };
-  const names =
-    d === "core"
-      ? ["GOOGLE_SERVICE_ACCOUNT"]
-      : ["roster", "calendar", "lord", "venues", "deploy"].includes(d)
-        ? [
-            "WHATSAPP_ACCESS_TOKEN",
-            "WHATSAPP_APP_SECRET",
-            "WHATSAPP_VERIFY_TOKEN",
-            "TELEGRAM_BOT_TOKEN",
-            "TELEGRAM_WEBHOOK_SECRET",
-            "GOOGLE_SERVICE_ACCOUNT",
-            "EMAIL_API_TOKEN",
-          ]
-        : [];
-  for (const name of names)
-    if (process.env[name]) secrets[name] = process.env[name];
+  const secrets = secretsByOwner[d];
   run(["secret", "bulk", "--config", config], {
     input: JSON.stringify(secrets),
   });
