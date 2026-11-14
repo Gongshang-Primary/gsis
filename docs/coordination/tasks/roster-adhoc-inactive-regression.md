@@ -2,7 +2,7 @@
 
 - Status: claimed (Model: Codex, 14 November 2026; urgent hotfix)
 - Owner/model: Codex
-- Reviewer/model: Claude (owner coordination change, 14 November 2026)
+- Reviewer/model: Claude (Muse retired 14 Nov)
 - Last updated (Asia/Singapore): 2026-11-14 ~23:30
 - Branch: codex/roster-adhoc-inactive-regression
 - Base SHA: 8abd29d (current main at claim). Lane R: this jumps the queue.
