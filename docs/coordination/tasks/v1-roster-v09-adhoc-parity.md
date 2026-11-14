@@ -6,7 +6,7 @@
 - Branch: codex/v1-roster-v09-adhoc-parity
 - Base: main a6c08379a6acc5911f2c37821d7da434f7d36ad2, including PR153 merge 7c9315124344e204819538697f1369edcc5ace31 and the separate frontend-inventory claim.
 - User-authorised scope: "read v0.9 repo. capture all updates done today. ensure that the updates are also integrated into v1 where applicable". Integrate the reviewed PR153 behaviour through v1-owned adapters; no merge, deployment, live data or messaging authority is inferred.
-- Exact file allowlist: `v1/services/roster/eligibility.mjs`; `v1/services/roster/context.mjs`; `v1/services/roster/allocation-snapshot.mjs`; `v1/services/roster/service.mjs`; `tests/v1-product-roster-adhoc-parity.mjs`; `tests/v1-product-roster-adhoc-delivery.mjs`; `tests/v1-product-roster-adhoc-browser.mjs`; `docs/v1/product/ROSTER_V09_PARITY.md`; this task record.
+- Exact file allowlist: `v1/services/roster/eligibility.mjs`; `v1/services/roster/context.mjs`; `v1/services/roster/allocation-snapshot.mjs`; `v1/services/roster/service.mjs`; `tests/v1-product-roster-adhoc-parity.mjs`; `tests/v1-product-roster-adhoc-delivery.mjs`; `tests/v1-product-roster-adhoc-browser.mjs`; `tests/v1-product-roster-service.mjs`; `docs/v1/product/ROSTER_V09_PARITY.md`; this task record.
 - Current head/PR: claim first; exact tested head and PR evidence recorded at handoff.
 
 ## Source contract and boundaries
@@ -33,3 +33,7 @@ Out of scope: shared/v0.9 sources, generated legacy bundles, release assembly, r
 Pstack blast-radius (`skill://plugins_6a85a87df50c8191bd7f010bb7b17794/blast-radius/SKILL.md`) used to trace source status through adapters, allocator snapshots, browsers and final dispatch. No new dependency or copied skill code.
 
 F5 remains OPEN; official T1B-01/T1B-02, live provider delivery, hosted recovery and unperformed runtime UAT remain Not tested. Owner controls later merge/deployment. Claim-only publication precedes implementation.
+
+## Claim refinement before the existing-test edit
+
+The existing service regression at `tests/v1-product-roster-service.mjs` expects directory `active=true` after dated activation, although Contacts remains inactive. Add only this test path to the implementation allowlist to replace that obsolete assertion with truthful `active=false` and explicit dated-period evidence. This is routine verification within the owner-authorised v0.9 integration, not a permission-policy expansion. No production path is added.
