@@ -1,3 +1,7 @@
+# Stapler teacher-row write-across, 14 November 2026
+
+Model: Codex. In the Stapler planner teacher view, each teacher row has Subject / Venue / Group fields with a "→" button that mass-writes one value across the whole row (all periods for that teacher), mirroring the class-row fields. Only existing lesson tiles change unless "In empty cells, create tiles" is chosen, in which case empty cells gain a tile for that teacher with the picked classes. Recess is never filled. Changes stay local until Save to online; one Undo restores the previous values and removes created tiles. See docs/coordination/tasks/stapler-teacher-row-write-across.md.
+
 
 
 # Pending: inactive staff excluded from new relief and delivery, 13 November 2026

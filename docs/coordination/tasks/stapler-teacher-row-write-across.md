@@ -5,7 +5,7 @@
 - Reviewer/model: Muse
 - Last updated (Asia/Singapore): 2026-11-14
 - Branch: codex/stapler-teacher-row-write-across
-- Base SHA: 47a6cefbbd92cdb0dad3e1138d640eba7234a28b (verify it is current main before branching)
+- Base SHA: 3c2202c (verified current main before branching)
 - Current head SHA (or PR head; avoid self-referential commit hashes):
 - PR:
 - Owner request (14 Nov, screenshot of the live Stapler planner): the class rows have Subject / Venue / Group fields with a "→" button that mass-writes one value across the whole row. Build the same write-across fields for the teacher's row too.
@@ -67,3 +67,11 @@ Not deployed unless supported by explicit environment/version/time evidence. Sta
 ## Handoff
 - Remaining work: implement, verify per the acceptance checks, open a draft PR naming Muse at the exact head.
 - Do not change live data, settings, or release branches.
+
+## Implementation, 14 November 2026
+
+Model: Codex. Teacher rows now use the existing local bulk-apply and Undo flow with Subject, Venue and Group fields. Creation uses the row teacher, optional existing/custom classes, occupied-cell skipping and atomic conflict rejection; selected-class recess spans are skipped. Existing class-row and period controls retain their behavior. The actual branch base is the task publication commit 3c2202c.
+
+Verification so far: canonical build passed; the new domain regression fails on the original main model and passes on the implementation. New Chromium coverage passes for fields, empty/matching outcomes, class selection, Undo, redraw retention and read-only access. All four existing mass-apply model/browser programs passed. The parity guard passes for 273 entries without catalog changes. Full local suite is running; final results and exact head will be recorded in the PR after full CI is green. Chromium path: /usr/bin/chromium. Test data is synthetic. No live or release-branch actions.
+
+Remaining gates: full local suite, final-head no-diff canonical build, all five exact-head CI jobs, draft PR and Muse review. Owner merges and deploys in a release after w. No review or deployment claimed.
