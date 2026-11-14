@@ -35,6 +35,12 @@ async function loadAccounts() {
     button.textContent = "Edit";
     button.onclick = () => {
       editing = account;
+      $("suspended").disabled = false;
+      $("accountHeading").textContent = "Edit account";
+      $("newIdentity").hidden = true;
+      $("newEmail").required = $("newSubject").required = false;
+      $("explicitCapabilities").hidden = false;
+      $("accountStatus").textContent = "";
       operationId = crypto.randomUUID();
       accountRequest = null;
       $("accountId").textContent = account.accountId;
@@ -59,6 +65,24 @@ async function loadAccounts() {
     $("accountRows").append(row);
   }
 }
+$("addAccount").onclick = () => {
+  editing = { accountId: crypto.randomUUID(), creating: true };
+  operationId = crypto.randomUUID();
+  accountRequest = null;
+  $("accountHeading").textContent = "Add account";
+  $("accountId").textContent = editing.accountId;
+  $("newIdentity").hidden = false;
+  $("newEmail").required = $("newSubject").required = true;
+  $("newEmail").value = $("newSubject").value = "";
+  $("newAdmin").checked = false;
+  $("explicitCapabilities").hidden = true;
+  $("staffId").value = $("capabilities").value = $("reason").value = "";
+  $("suspended").value = "false";
+  $("suspended").disabled = true;
+  $("accountStatus").textContent = "";
+  $("accountForm").hidden = false;
+  $("newEmail").focus();
+};
 $("refreshAccounts").onclick = () =>
   loadAccounts().catch((e) => status(e.message, true));
 $("cancelAccount").onclick = () => {
@@ -75,10 +99,14 @@ $("accountForm").onsubmit = async (event) => {
       method: "POST",
       body: (accountRequest ??= {
         operationId,
-        revision: editing.revision,
+        ...(editing.creating
+          ? { subject: $("newSubject").value.trim(), email: $("newEmail").value.trim() }
+          : { revision: editing.revision }),
         accountId: editing.accountId,
         staffId: $("staffId").value.trim() || null,
-        capabilities: $("capabilities")
+        capabilities: editing.creating
+          ? ($("newAdmin").checked ? ["admin"] : [])
+          : $("capabilities")
           .value.split(/\n/)
           .map((x) => x.trim())
           .filter(Boolean),
@@ -96,6 +124,9 @@ $("accountForm").onsubmit = async (event) => {
       accountRequest = null;
       $("accountStatus").textContent = "Account change confirmed.";
       await loadAccounts();
+      editing = null;
+      $("accountForm").hidden = true;
+      status("Account change confirmed.");
     } else throw Error("The account change outcome is not confirmed.");
   } catch (error) {
     $("accountStatus").textContent =
