@@ -13,7 +13,7 @@ export async function verifyMigrationUpgrade() {
   try {
     await buildProduct({ output: out });
     // Exercise the actual deployment CLI locally: simulate an already-installed
-    // LORD database, then apply both additive migrations with the same 0002 prefix.
+    // LORD database, then apply the 0002 Drive backup and 0003 REIGN migrations.
     const config = join(out, "lord/wrangler.json"),
       folder = join(out, "lord/migrations");
     const additions = (await readdir(folder)).filter(
