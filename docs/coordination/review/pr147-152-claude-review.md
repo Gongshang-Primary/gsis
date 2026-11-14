@@ -72,3 +72,23 @@ Legacy capacity warnings are replaced by v1 layered health; new warnings queue o
 - #152: one documentation file. The owner instructions now list `WHATSAPP_ACCESS_TOKEN`, `WHATSAPP_APP_SECRET`, `WHATSAPP_VERIFY_TOKEN`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_WEBHOOK_SECRET`, `GOOGLE_SERVICE_ACCOUNT`, `EMAIL_API_TOKEN`, plus the v1 `GSIS_SECRET` and `CLOUDFLARE_API_TOKEN`. I compared this list mechanically with every `secrets.*` reference in #149's `v1-deploy.yml` at `c500998`: identical, nine of nine. Also records the stacked-claim rule and the N-1 staging latency check. Merge-tree with main: clean.
 - #149: only `PROVIDER_SETUP.md` changed (3 lines): states v1 uses its own separate `GSIS_SECRET`, distinct from v0.9 (owner decision 13 Nov). No workflow or script change since `ed6ecb5`, so my test results there still apply. The add/add task-record conflict (L-1) remains, deferred until #145 merges, as agreed.
 - `git diff --check` clean on both. CI at both new heads not seen by me (Codex reports running).
+
+## Recheck after #145 and #150 merged (14 Nov 2026)
+
+Main: #145 merged as `7d7abad` at the reviewed head `f1efe8a`; #150 merged as `1d38279` at the reviewed head `75e4b56`. `git show --remerge-diff` shows both merges are clean (no hand edits).
+
+| PR | New head | Reviewed head | Verdict |
+|---|---|---|---|
+| #146 | `b84f8dbd7c0eb169a5caadcbb63badfc451e1aac` | `692ea36` | **Approve** |
+| #147 | `a80a3dea8bd01bf5d8b0aa4217016552d09746e8` | `70a2102` | **Approve** |
+| #149 | `9734215eca7ee8551fe29401ba274fcedb18f305` | `c500998` | **Approve** |
+| #152 | `8c0b72d472dd581df755bf9f19d58da26eea1455` | `af97714` | **Approve** |
+
+Method, per PR:
+1. No new non-merge commits beyond the reviewed head except those already on main.
+2. Exactly one new merge commit. `--remerge-diff` shows the only manual change is the L-1 task-record conflict (#146, #147, #149); #152's merge is clean.
+3. The resolved task record is byte-identical to the reviewed branch version.
+4. Every other file the PR changes relative to main is the same set, with identical content, as at the reviewed head.
+5. Merge-tree against current main: clean for all four.
+
+No new code to test; my earlier focused results stand. Fresh CI at these heads not seen by me (Codex reports running). Remaining: #148 after #147 merges; #151 after #146 merges; each needs the same main sync and recheck.
