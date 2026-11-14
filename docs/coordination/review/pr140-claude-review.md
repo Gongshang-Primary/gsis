@@ -50,3 +50,7 @@ The source-read token expires and needs renewal; every controller change needs a
 ## Next action
 
 Owner chooses: (a) the two-stage path in S1, or (b) build the controller now before any staging. No implementation, setting change, merge or deployment is approved by this review.
+
+## Outcome (14 Nov 2026)
+
+Closed unmerged by the owner. The repository is public, so GitHub enforces environment required reviewers; P1 is handled by `gsis-v1-owner-approved` settings instead (see the PR #139 review, "Owner decisions on G1 and G2"). The design remains in PR history if production later needs a stronger gate.

@@ -131,3 +131,10 @@ The stores were created in the connected account. Cloudflare API tokens cannot b
 ### Public repository note
 
 Being public, every record here is world-readable, including Cloudflare account and D1 IDs, Drive folder IDs in `HANDOVER_REVIEWER.md`, and staff role structure. These are identifiers, not credentials, and the owner accepted the publication audit categories as harmless. Keep secrets, staff personal data and tokens out of all commits, as now.
+
+## Owner decisions on G1 and G2 (14 Nov 2026)
+
+- G2 closed: owner reports administrator bypass is **off** for `gsis-v1-owner-approved` (owner statement; not verified by me).
+- G1 closed by owner decision: owner keeps `helper-gsps` as a required reviewer with self-review allowed ("wish to allow helper-gsps self review"). Residual risk accepted by the owner and recorded once: models act through the `helper-gsps` identity, so if a model holds a user-level token for it, it could approve its own deployment. Current evidence suggests the models use app integration tokens (Codex's environment write returned "Resource not accessible by integration"), which normally cannot approve deployments, but this was not tested.
+- With these settings, P1 is closed for the owner's purposes: required reviewer, `main` only, no administrator bypass, two secrets only.
+- PR #140 (browser deployment controller design) closed by the owner as no longer needed.
