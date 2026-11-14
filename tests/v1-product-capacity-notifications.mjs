@@ -1,0 +1,35 @@
+import assert from 'node:assert/strict';
+import fixture from './roster701-fixture.cjs';
+import {capacityText,outlookText,queueCapacityWarnings,replaceLegacyWarnings,refreshCapacityMessage,capacityTemplateData} from '../v1/services/roster/capacity-notifications.mjs';
+import {createDatabase} from './v1-product/helpers.mjs';
+const f=fixture(),{state,ctx:c,date}=f;
+c.now=Date.parse(date+'T06:35:00+08:00');c.iso=new Date(c.now).toISOString();c.minute=395;
+c.notificationsConfigured=true;c.dutySources={[date]:{available:true,staffIds:['alice']}};state.smcDutyRoster=[{date,staffIds:['alice']}];
+const h={verified:true,date,periods:[{period:2,green:['bob']},{period:3,green:[]} ]};
+queueCapacityWarnings(state,c,h);
+assert.equal(state.outbox.length,2);assert(state.outbox.every(j=>j.recipientId==='alice'&&j.data.capacityEngine==='v1'));
+queueCapacityWarnings(state,c,h);assert.equal(state.outbox.length,2,'same episode does not repeat');
+const before=structuredClone(state),next=structuredClone(state);
+next.outbox.push({id:'legacy',kind:'capacity_warning'});next.smcAlerts.push({id:'legacy',key:'capacity:wrong'});next.healthWarningState.wrong={seen:[0]};
+replaceLegacyWarnings(before,next);assert.deepEqual(next,state,'remove only new legacy warnings, preserve earlier jobs and episode state');
+queueCapacityWarnings(next,c,{...h,verified:false});assert.deepEqual(next,state,'unknown does not create false critical warning');
+const quiet=fixture();quiet.ctx.now=Date.parse(date+'T23:00:00+08:00');quiet.ctx.dutySources=c.dutySources;quiet.state.smcDutyRoster=state.smcDutyRoster;queueCapacityWarnings(quiet.state,quiet.ctx,h);assert.equal(quiet.state.outbox.length,0);
+assert.match(capacityText(h),/not additive R/);assert.match(capacityText({verified:false}),/not verified/);
+const text=outlookText({days:[{date,state:'projected',unresolved:[{}]},{date:'2026-10-15',state:'not-verified'}]});assert.match(text,/Consider external ad hoc/);assert.match(text,/2026-10-15: not verified/);
+const mapped=capacityTemplateData({PUBLIC_ORIGIN:'https://synthetic.test'},state.outbox[0],{name:'Alice'});
+for(const k of ['duty_smc_name','duty_date','capacity_details','relief_health_summary','roster_plan_url'])assert(mapped[k],k);
+const db=await createDatabase('roster');
+try{
+ c.publication={publicationId:'pub',publicationSequence:1,calculationVersion:'v1',rows:c.people.map(p=>({staffId:p.id,quality:'verified',budget:1,Wi:0,factor:1}))};
+ c.people=c.people.map(p=>({...p,staffId:p.id,eo:true,employment:'Full-time',employmentTags:[],adhocEligible:false,role:'Teacher'}));
+ c.dependencies=[];c.effectiveCaps={};c.calendarByDate={[date]:{schoolDay:true,available:true}};
+ const loaded={state,accountingRevisions:{}},context={env:{DB:db.db},principal:{schoolId:'s'},now:c.now};
+ const stale=structuredClone(state.outbox.find(j=>j.data.remaining===0));
+ assert.equal(await refreshCapacityMessage(context,loaded,c,stale,0),false,'recovered capacity cancels stale critical warning');
+ const unknown={...c,days:{}};assert.equal(await refreshCapacityMessage(context,loaded,unknown,stale,0),false,'unknown is not a sendable critical alert');
+ const report={kind:'smc_report',date,data:{scheduledSummary:{},summary:'legacy optimistic numbers'}};
+ await refreshCapacityMessage(context,loaded,c,report,0);
+ assert.match(report.data.summary,/Known-demand outlook/);assert.match(report.data.summary,/not verified/);assert(!report.data.summary.includes('legacy'));
+ assert.deepEqual(state.assignments,[],'delivery forecast does not allocate');
+}finally{await db.close();}
+console.log('PASS v1 capacity warnings: duty-only, episode dedup, quiet hours, no false unknown capacity, template aliases, actual D1 delivery refresh and stale cancellation; no sends');
