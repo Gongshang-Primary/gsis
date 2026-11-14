@@ -1,6 +1,6 @@
 # v1-v09-frontend-parity-20261114: Capture 14 November v0.9 updates and preserve v1 release labels
 
-- Status: claimed
+- Status: implementation complete; exact-head CI and Claude review pending
 - Owner/model: Codex; v1 coordinator ChatGPT; independent reviewer Claude
 - Last updated (Asia/Singapore): 15 November 2026
 - Branch: codex/v1-v09-frontend-parity-20261114
@@ -33,3 +33,13 @@ Pstack blast-radius applied from `skill://plugins_6a85a87df50c8191bd7f010bb7b177
 ## Handoff
 
 Claim-only publication precedes implementation. No live operation is authorised by this record. Runtime UAT is Not tested; independent Claude review and owner merge/release decisions remain separate.
+
+## Implementation evidence
+
+The builder now reads `package.json.gsisBuildLabel` and replaces only current application chrome text with v1. Original HTML text-node offsets preserve asset query stamps, attributes, scripts, comments and historical/about content; the existing jsdom development dependency is reused. No production source or dependency changes. The inventory records all identified source changes and separate Roster adaptation at claim c3b4aa2aa99e0ae4f29203dcd07d359c7d666de4.
+
+Red proof: the new actual-build test failed before the fix because Roster chrome contained `v0.9.9x`, not v1. Green focused checks, all with `TZ=Asia/Singapore` and browser executable `/usr/bin/chromium`: `node tests/v1-product-v09-frontend-parity.mjs`; `node tests/v1-product-stapler-resize.mjs`; `node tests/v1-product-web-browser.mjs`; `node tests/stapler-teacher-row-write-across-browser.cjs`. The new test covers all nine real source viewports, a future `0.9.9zz` label in memory, unchanged source files/cache stamps/scripts/history and Landmark historical text. One fixture assertion was corrected to inspect Venues' separate adjacent footer spans rather than assume whitespace between them; no production assertion was weakened.
+
+Canonical `TZ=Asia/Singapore npm run build` passed with no tracked generated drift. Existing runner discovery includes the new test (1,169 programs). `git diff --check`, exact four-path scope and all ten inventory relative links pass. Focused checks tested the code tree committed by this PR; full product/Node/LORD exact-head CI remains pending until its recorded runs finish. No school runtime UAT was performed.
+
+Q01/Q02: published claim, exact sources and independent-domain disposition recorded. Q03–Q05: build-time presentation only, no authority/persistence/concurrency change or new dependency; original source/URLs and historical text preserved. Q06: focused and canonical evidence above, exact-head full CI pending. Q07: Claude exact-head review pending. Q08: no merge/deployment or activation included; rollback is the builder/test change only. F5 remains OPEN.

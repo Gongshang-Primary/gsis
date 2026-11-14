@@ -6,13 +6,37 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createHash } from 'node:crypto';
 import { parse } from 'acorn';
+import { JSDOM } from 'jsdom';
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'../..');
 const modules=JSON.parse(await readFile(path.join(root,'v1/web/modules.json'),'utf8'));
+const {gsisBuildLabel}=JSON.parse(await readFile(path.join(root,'package.json'),'utf8'));
 const defaultOutput=path.join(root,'deliverables/v1/web');
 const omitted=/^(?:_worker\.js|_routes\.json|edge-.*|timetable-preparation\..*|timetable-review\..*|system-health\..*)$/;
 const forbidden=/https?:\/\/(?:script\.google\.com|script\.googleusercontent\.com)(?:\/|\b)/i;
 const productionHosts={ 'gsps-gsis.pages.dev':'contacts','gsps-deploy.pages.dev':'deploy','gsps-layout.pages.dev':'layout','gsps-roster.pages.dev':'roster','gsps-calendar.pages.dev':'calendar','gsps-venues.pages.dev':'venues','gsps-lord.pages.dev':'lord','gsps-overlord.pages.dev':'overlord','gsps-starlord.pages.dev':'starlord'};
 const textExtensions=new Set(['.js','.mjs','.html','.css','.json','.svg','.txt','.md']);
+export function normaliseReleaseChrome(source, sourceLabel) {
+ if(typeof sourceLabel !== 'string' || !/^\d+\.\d+\.\d+[a-z]*$/i.test(sourceLabel)) throw Error('Invalid source build label');
+ if(!source.includes('v'+sourceLabel)) return source;
+ // Locate current application chrome, then patch only its original text bytes.
+ // Serializing the DOM would also rewrite unrelated markup, scripts and URLs.
+ const dom=new JSDOM(source,{includeNodeLocations:true});
+ try {
+  const {document,NodeFilter}=dom.window,edits=[];
+  const token=new RegExp('(?<![\\w.-])v'+sourceLabel.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'(?![\\w.-])','g');
+  const walker=document.createTreeWalker(document,NodeFilter.SHOW_TEXT);
+  for(let node=walker.nextNode();node;node=walker.nextNode()) {
+   const parent=node.parentElement;
+   if(!parent?.closest('title,header,.suite-release,.release-label,.release-version,.app-footer') || parent.closest('script,style,template')) continue;
+   const location=dom.nodeLocation(node);
+   if(!location) continue;
+   const old=source.slice(location.startOffset,location.endOffset),value=old.replace(token,'v1');
+   if(value!==old) edits.push([location.startOffset,location.endOffset,value]);
+  }
+  for(const [start,end,value] of edits.sort((a,b)=>b[0]-a[0])) source=source.slice(0,start)+value+source.slice(end);
+  return source;
+ } finally { dom.window.close(); }
+}
 function replaceOnce(source,from,to,label){if(!source.includes(from))throw Error('Visual baseline changed: '+label);return source.replace(from,to);}
 function replaceFetch(source,filename){
  let ast;try{ast=parse(source,{ecmaVersion:'latest',sourceType:'module',allowReturnOutsideFunction:true});}catch(error){throw Error('Cannot parse browser source '+filename+': '+error.message);}
@@ -122,7 +146,7 @@ function transform(module,rel,text){
  if(rel.endsWith('.html')){
   text=text.replace(/\b(src|href|action)=(['"])\/(?!\/|api\/)([^'"]*)\2/g,(_m,key,q,value)=>`${key}=${q}/${module.id}/${value}${q}`);
   text=text.replace('</head>',`<meta name="gsis-module" content="${module.id}"><link rel="stylesheet" href="/v1/shared/suite.css"><script src="/v1/shared/client.js"></script><script defer src="/v1/shared/module-shell.js"></script><link rel="stylesheet" href="/v1/shared/core-table.css"><script type="module" src="/v1/shared/core-table.js"></script></head>`);
-  text=text.replaceAll('v0.9.9p','v1').replaceAll('Dropdown choices are managed in Deploy.','Dropdown choices and accepted staff facts are managed in Contacts.').replaceAll('Admin access is managed in the backend sheet. Admins can assign or remove SMC access here.','Application access is managed in Core. Accepted SMC, EO and School Leader records are managed separately in Contacts.');
+  text=normaliseReleaseChrome(text,gsisBuildLabel).replaceAll('Dropdown choices are managed in Deploy.','Dropdown choices and accepted staff facts are managed in Contacts.').replaceAll('Admin access is managed in the backend sheet. Admins can assign or remove SMC access here.','Application access is managed in Core. Accepted SMC, EO and School Leader records are managed separately in Contacts.');
   if(module.id==='contacts'&&rel==='index.html')text=text.replace('</head>','<link rel="stylesheet" href="/v1/shared/contacts-ui.css"><script defer src="/v1/shared/contacts-ui.js"></script></head>');
   if(module.id==='deploy'&&rel==='index.html')text=text.replace('</head>','<script defer src="/v1/shared/deploy-ui.js"></script><script defer src="/v1/shared/deploy-ui-tables.js"></script></head>');
   if(module.id==='roster'&&rel==='index.html')text=text.replace('</head>','<link rel="stylesheet" href="/v1/shared/roster-capacity.css"><script src="/v1/shared/roster-capacity.js"></script><link rel="stylesheet" href="/v1/shared/roster-stapler-resize.css"><script defer src="/v1/shared/roster-stapler-resize.js"></script><script defer src="/v1/shared/roster-table-ui.js"></script></head>');
