@@ -1,6 +1,7 @@
 import {updateCapacityWarnings,refreshCapacityMessage,refreshNewSummaries,capacityTemplateData} from "./capacity-notifications.mjs";
 import { forecastCapacity, layeredHealth } from "./capacity.mjs";
 import { allocationSnapshot } from "./allocation-snapshot.mjs";
+import { hasDatedReliefActivation, isReliefNotificationKind } from "./eligibility.mjs";
 import { compactOpeningSave } from './opening-save.mjs';
 import Stapler from "../../../shared/roster-stapler.js";
 import {
@@ -2646,6 +2647,39 @@ async function assertJobLease(env, job, now) {
     409,
   );
 }
+// Use current owner records after notificationCurrent resolves superseded source
+// references. A correction can withdraw a duty without granting a new period.
+function notificationReliefPeriods(state, payload) {
+  const data = payload.data || {}, recipientId = payload.recipientId || payload.staffId;
+  let periods;
+  if (payload.kind === "mutual_request") {
+    const request = state.requests.find(r => r.id === payload.requestId && r.date === payload.date && r.recipientId === recipientId);
+    if (!request?.lessons?.length) return null;
+    periods = request.lessons.map(lesson => lesson.period);
+  } else if (payload.kind === "mutual_override") {
+    if (!data.peerRequestIds?.length) return null;
+    const requests = data.peerRequestIds.map(id => state.requests.find(r => r.id === id && r.date === payload.date && r.staffId === recipientId && !r.retiredAt));
+    if (requests.some(r => !r?.lessons?.length || r.lessons.some(l => !Number.isInteger(l.period)))) return null;
+    return []; // An override reports a changed prior arrangement, not new relief.
+  } else if (payload.kind === "stapler_timetable") {
+    const publication = data.communicationSnapshot || state.dailyPublicationStates[payload.date];
+    const row = publication?.date === payload.date
+      ? publication.teachers?.find(r => r.staffId === recipientId)
+      : state.staplerPlans.find(r => r.date === payload.date)?.timetableNotices?.[recipientId];
+    if (!row?.rows?.length || row.rows.some(r => !["relief", "stapler", "restored", "absence"].includes(r.kind) || !Number.isInteger(r.period))) return null;
+    periods = row.rows.filter(r => r.kind === "relief" || r.kind === "stapler").map(r => r.period);
+  } else {
+    // Nonpersonal instructions keep their historical snapshotIds; the shared
+    // validator identifies the publication supplying the actual message here.
+    const snapshotIds = payload.kind === "conditional_relief_instruction" && !data.personal
+      ? [data.checkedPublicationId] : data.snapshotIds;
+    if (!snapshotIds?.length) return null;
+    const snapshots = snapshotIds.map(id => state.publicationSnapshots.find(v => v.id === id && v.date === payload.date && v.staffId === recipientId));
+    if (snapshots.some(v => !v || !Number.isInteger(v.period))) return null;
+    periods = snapshots.filter(v => v.kind !== "cancelled").map(v => v.period);
+  }
+  return periods.every(p => Number.isInteger(p) && p >= 0 && p < 40) ? [...new Set(periods)] : null;
+}
 export async function dispatchRosterJob(job, env, now = Date.now()) {
   const payload = job.payload,
     schoolId = job.school_id;
@@ -2800,18 +2834,11 @@ export async function dispatchRosterJob(job, env, now = Date.now()) {
   const person = (refs.people || refs.staff || []).find(
     (p) => (p.staffId || p.id) === (payload.recipientId || payload.staffId),
   );
-  const recipientDate = payload.date || localDate(now),
-    datedRecipient =
-      person &&
-      (person.eo === true || person.adhocEligible === true) &&
-      (await one(
-        env.DB,
-        "SELECT 1 AS ok FROM roster_records WHERE school_id=? AND collection='adhoc' AND staff_id=? AND service_date=? AND json_extract(payload_json,'$.data.deletedAt') IS NULL",
-        [schoolId, person.staffId || person.id, recipientDate],
-      ));
+  const reliefNotification = job.type === "roster-notification" &&
+    isReliefNotificationKind(payload.kind) && !payload.data?.audience;
   if (
     !person ||
-    (person.active !== true && !datedRecipient) ||
+    (person.active !== true && !(reliefNotification && (person.eo === true || person.adhocEligible === true))) ||
     person.notificationConsent === false
   )
     return { state: "cancelled", code: "RECIPIENT_NO_LONGER_ELIGIBLE" };
@@ -2829,8 +2856,21 @@ export async function dispatchRosterJob(job, env, now = Date.now()) {
     const currentRecipient = c.people.find(
       (p) => p.id === (payload.recipientId || payload.staffId),
     );
-    if (!currentRecipient?.active)
+    if (!currentRecipient || currentRecipient.notificationConsent === false ||
+      (currentRecipient.active !== true && !reliefNotification))
       return { state: "cancelled", code: "RECIPIENT_NO_LONGER_ELIGIBLE" };
+    let currentActivations = [];
+    if (currentRecipient.active !== true) {
+      // Contacts/calendar IO can outlast an activation edit. Read the owning D1
+      // again before sending; this is not atomic with Contacts or the provider.
+      const rows = await query(env.DB,
+        "SELECT payload_json FROM roster_records WHERE school_id=? AND collection='adhoc' AND staff_id=? AND service_date=? LIMIT 10001",
+        [schoolId, currentRecipient.staffId || currentRecipient.id, payload.date]);
+      requireValue(rows.length <= 10000 && rows.reduce((n, row) => n + row.payload_json.length, 0) <= 8388608, "ROSTER_RECORD_BOUNDS", 413);
+      currentActivations = rows.map(row => JSON.parse(row.payload_json).data);
+      if (!hasDatedReliefActivation(currentRecipient, currentActivations, payload.date))
+        return { state: "cancelled", code: "RECIPIENT_NO_LONGER_ELIGIBLE" };
+    }
     if (
       (payload.data?.audience === "duty-smc" ||
         ["smc_report", "smc_alert", "lse_notice", "urgent_forward"].includes(
@@ -2848,6 +2888,11 @@ export async function dispatchRosterJob(job, env, now = Date.now()) {
       return { state: "cancelled", code: "SPONSOR_NO_LONGER_SMC" };
     if (Operations.notificationCurrent(loaded.state, payload, now))
       return { state: "cancelled", code: "NOTIFICATION_OBSOLETE" };
+    if (currentRecipient.active !== true) {
+      const periods = notificationReliefPeriods(loaded.state, payload);
+      if (periods === null || !periods.every(period => hasDatedReliefActivation(currentRecipient, currentActivations, payload.date, period)))
+        return { state: "cancelled", code: "RECIPIENT_NO_LONGER_ELIGIBLE" };
+    }
     if(capacityMessage&&!await refreshCapacityMessage(ctx,loaded,c,payload,await scopeRevision(env.DB,schoolId,'day:'+payload.date)))
       return {state:'cancelled',code:'CAPACITY_WARNING_OBSOLETE_OR_UNVERIFIED'};
     let link = null;

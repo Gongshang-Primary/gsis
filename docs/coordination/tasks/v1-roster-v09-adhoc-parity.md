@@ -1,13 +1,13 @@
 # v1-roster-v09-adhoc-parity: Integrate reviewed dated ad hoc relief behaviour into v1
 
-- Status: claimed
+- Status: implementation complete; exact-head CI and Claude review pending
 - Owner/model: Codex; v1 coordinator ChatGPT; independent reviewer Claude
 - Last updated (Asia/Singapore): 15 November 2026
 - Branch: codex/v1-roster-v09-adhoc-parity
 - Base: main a6c08379a6acc5911f2c37821d7da434f7d36ad2, including PR153 merge 7c9315124344e204819538697f1369edcc5ace31 and the separate frontend-inventory claim.
 - User-authorised scope: "read v0.9 repo. capture all updates done today. ensure that the updates are also integrated into v1 where applicable". Integrate the reviewed PR153 behaviour through v1-owned adapters; no merge, deployment, live data or messaging authority is inferred.
 - Exact file allowlist: `v1/services/roster/eligibility.mjs`; `v1/services/roster/context.mjs`; `v1/services/roster/allocation-snapshot.mjs`; `v1/services/roster/service.mjs`; `tests/v1-product-roster-adhoc-parity.mjs`; `tests/v1-product-roster-adhoc-delivery.mjs`; `tests/v1-product-roster-adhoc-browser.mjs`; `tests/v1-product-roster-service.mjs`; `docs/v1/product/ROSTER_V09_PARITY.md`; this task record.
-- Current head/PR: claim first; exact tested head and PR evidence recorded at handoff.
+- Current head/PR: claim c3b4aa2aa99e0ae4f29203dcd07d359c7d666de4 and refinement 8335c133d425d99704ca6b74303c165200407d9f were published to main before the corresponding edits and incorporated into this branch. Exact tested head and CI are recorded in the implementation PR.
 
 ## Source contract and boundaries
 
@@ -37,3 +37,29 @@ F5 remains OPEN; official T1B-01/T1B-02, live provider delivery, hosted recovery
 ## Claim refinement before the existing-test edit
 
 The existing service regression at `tests/v1-product-roster-service.mjs` expects directory `active=true` after dated activation, although Contacts remains inactive. Add only this test path to the implementation allowlist to replace that obsolete assertion with truthful `active=false` and explicit dated-period evidence. This is routine verification within the owner-authorised v0.9 integration, not a permission-policy expansion. No production path is added.
+
+## Implementation and evidence
+
+The actual Contacts `active` fact is now preserved for all ranges and prospective activations. A small pure predicate binds accepted EO/explicit eligibility to permanent Staff ID, date and valid selected periods; allocator snapshots and final relief dispatch reuse it. The six existing relief kinds alone may use this route. Final dispatch rechecks current Contacts consent/qualification and rereads the owning D1 activation after service IO. Periods come from the current referenced owner publication/request/timetable; cancellation-only notices do not assign a new period. No Core/Contacts, shared domain, provider integration, schema, migration, dependency or configuration file changed. See [contract and limits](../../v1/product/ROSTER_V09_PARITY.md).
+
+Red evidence: the new context test first failed on the existing `active=true` promotion. The delivery test first failed because a recipient's consent could be revoked between Contacts reads and still be sent a message. Both reproduced against the actual adapter/service with local owner D1/R2 and synthetic projections/providers. An existing service assertion explicitly required the fabricated active status; the refined claim permits replacing it with `active=false` and checks of the actual saved activation's allowed/denied periods. No test is skipped.
+
+Focused commands below passed with `TZ=Asia/Singapore`; browser execution uses `GSIS_BROWSER_EXECUTABLE=/usr/bin/chromium`:
+
+- `node tests/v1-product-roster-adhoc-parity.mjs` — actual context, reports/labels, manual/automatic relief, shared cover, retained duties, current/weekly capacity and negative identity/date/period/qualification cases.
+- `node tests/v1-product-roster-adhoc-delivery.mjs` — synthetic sends through actual dispatch, six kinds, fresh evidence, durable private links and one local owner restart; real provider delivery is Not tested.
+- `node tests/v1-product-roster-adhoc-browser.mjs` — built UI with local owner reads, allowed P2 and denied P3/next-day/deleted activation.
+- `node tests/v1-product-roster-service.mjs` — all 14 existing service acceptance groups pass after the explicit obsolete-assertion correction.
+- `node tests/v1-product-roster-accounting.mjs` — all ten accounting/source-race groups pass.
+- `node tests/v1-product-roster-capacity.mjs` and `node tests/v1-product-capacity-notifications.mjs` — pass, including final D1 refresh and stale cancellation.
+- `node tests/roster-adhoc-inactive-regression.cjs` and `node tests/roster-adhoc-inactive-parity.cjs` — pass against inherited source and local legacy adapters; no production operation.
+- `npm run build` — pass with no tracked generated drift.
+- `node tests/run.cjs --list` — all three new programs discovered (1,171 programs on this branch; the separate frontend PR adds one more).
+
+One root browser invocation used the wrong environment variable and failed before Chromium launch because no cached Playwright browser existed. Rerunning with the repository's `GSIS_BROWSER_EXECUTABLE=/usr/bin/chromium` passed (6.5 seconds). This was an environment setup failure, not a hidden pass. An optional baseline browser load-hook probe stalled and was stopped; it supplies no red evidence. The actual context/service reproductions above do.
+
+Internal working-tree review and the independent local parity rerun found no blocker in the helper/context/snapshot. This is not Claude approval. Full required product and Node/LORD exact-head CI is pending until the PR run links report results; no prior head's result is substituted.
+
+Q01/Q02 Pass: owner-authorised integration, claim/refinement, source review and exact domain/field ownership. Q03/Q04 Pass for bounded local evidence: current identity/consent/activation and retained active-only gates, period/source checks, restart/revocation tests; check-to-send interval remains explicit. Q05 Pass: no new dependency, bounded date/staff activation lookup (10,000 rows/8 MiB), existing owner/service boundaries. Q06 focused/canonical Pass, full CI Pending. Q07 Claude exact-head review Pending. Q08 deployment Not applicable; live provider/hosted recovery/runtime UAT Not tested. F5 OPEN and official T1B-01/T1B-02 Not tested.
+
+Internal review also reproduced a conditional-instruction source mismatch in the first patch: current duty P3 was sent while only original duty P2 was activated. The final code checks `notificationCurrent`'s resolved `checkedPublicationId` for non-personal instructions; personal instructions use its rewritten eligible snapshot IDs. Added negative and positive controls prove current P3 is denied with P2-only activation and allowed with P3-only activation. The original probe now cancels with zero synthetic provider calls. This finding is resolved in the submitted code; Claude has not yet reviewed it.

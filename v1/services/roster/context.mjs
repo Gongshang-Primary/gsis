@@ -85,18 +85,9 @@ export async function context(ctx, loaded, range, { needsQuota = false } = {}) {
     id: p.staffId || p.id,
     name: p.name || p.basicName || p.staffId,
     longTermActive: p.active === true,
-    active:
-      p.active === true ||
-      (range.from === range.to &&
-        (p.adhocEligible === true || p.eo === true) &&
-        (loaded.state.adhoc.some(
-          (a) =>
-            a.staffId === (p.staffId || p.id) &&
-            a.date === range.from &&
-            !a.deletedAt,
-        ) ||
-          (ctx.body.operation === "saveAdhoc" &&
-            ctx.body.staffId === (p.staffId || p.id)))),
+    // Dated relief availability stays in Roster's activation records. It must
+    // not promote Contacts employment status, including during saveAdhoc.
+    active: p.active === true,
     eo: p.eo === true,
     mobile: p.mobile || "",
     email: p.email || "",
