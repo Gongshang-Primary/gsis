@@ -1,0 +1,8 @@
+# V1 capacity warnings and weekly SMC outlook
+
+- Status: claimed, 14 November 2026 Singapore. Codex implements, ChatGPT coordinates, Claude reviews exact head.
+- Main observed bf485af; implementation base PR146 692ea365522cd90c4961b7e6fb43072848253677. Branch codex/v1-capacity-notifications. Same builder owns PR146; this follow-up uses its unchanged allocator projection. No shared v0.9 Roster sources touched.
+- Owner authorisation: build remaining queue, including early SMC capacity warnings and remaining-week outlook. No live provider sends, scheduler activation, credentials, merge or deployment.
+- Exact scope: v1/services/roster/service.mjs; v1/services/roster/capacity-notifications.mjs; tests/v1-product-capacity-notifications.mjs; tests/v1-product-roster-service.mjs; docs/v1/product/RELIEF_CAPACITY.md; this task.
+- Adapt only v1 notification generation to current layered capacity. Preserve legacy mutation/reconciliation semantics; replace newly generated legacy capacity warnings after the operation and restore their warning episode state before generating current warnings. Keep current duty-SMC targeting, quiet hours, episode dedup, leases and uncertain-delivery handling. Scheduled morning/evening reports include bounded remaining-week outlook with known-demand and nonadditive-opportunity caveats. Delivery recomputes capacity using current evidence; unavailable is never zero/healthy. Map existing approved template parameter names; do not claim current Meta approval is verified.
+- Tests: current rule exclusions, projected unknown days, warning dedup/quiet hours, aliases and no blank capacity fields, stale warning cancellation/current report refresh; unchanged real service integration and product/Node/LORD CI. F5 OPEN, runtime UAT Not tested.
