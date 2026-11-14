@@ -17,3 +17,11 @@
 
 ## Next
 After the fix: canonical build no diff, full CI green at the new head, open the PR naming Claude. I re-review immediately, then build release y (x + hotfix) for the owner.
+
+## Re-review at 39728a2 (PR #153)
+- Verdict: **approve**.
+- Finding 1 fixed: reconcile marks "inactive" only when the person exists with `active===false` and has no activation; a person missing from Contacts falls through to `availability()` and fails with 404 as on main. Same change in the shared, edge-domain and model copies.
+- Finding 2 fixed: deploy steps moved to `docs/plans/2026-11-15-adhoc-hotfix-deploy-steps.md`.
+- CI at the head: full-suite success; shards 1-4 success.
+- Local at the head: PASS roster093b-peer-workflow (unchanged test), roster-adhoc-inactive-regression, roster-adhoc-inactive-parity, roster-inactive-eligibility, roster-inactive-ui, roster710-adhoc-ui. Canonical build: no diff. Merge-tree against main: clean.
+- Owner: "merge 153", then Claude builds release y (x + hotfix).
