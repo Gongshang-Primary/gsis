@@ -1,6 +1,6 @@
 # stapler-teacher-row-write-across: In Stapler, build the Subject / Venue / Group write-across fields for the teacher's row too
 
-- Status: claimed (Codex, 14 November 2026)
+- Status: merged (#142 at dbd9fb4 as ff96392)
 - Owner/model: Codex
 - Reviewer/model: Muse
 - Last updated (Asia/Singapore): 2026-11-14
