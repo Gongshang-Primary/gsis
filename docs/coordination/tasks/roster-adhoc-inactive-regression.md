@@ -1,11 +1,11 @@
 # roster-adhoc-inactive-regression: Activated ad hoc relief teachers are blocked as "inactive" (HOTFIX)
 
-- Status: proposed (URGENT HOTFIX; needed before Mon 16 Nov 07:00 SGT)
+- Status: claimed (Model: Codex, 14 November 2026; urgent hotfix)
 - Owner/model: Codex
 - Reviewer/model: Claude (Muse retired 14 Nov)
 - Last updated (Asia/Singapore): 2026-11-14 ~23:30
 - Branch: codex/roster-adhoc-inactive-regression
-- Base SHA: current main (889669a or later). Lane R: this jumps the queue.
+- Base SHA: 8abd29d (current main at claim). Lane R: this jumps the queue.
 - User-authorised scope: owner, 14 Nov ("urgent bug fix. dig deep to investigate. planning for 16 nov relief. we have many adhoc relief. but cannot manually assign them (do not turn up in search), auto also cannot. urgent.")
 
 ## Diagnosis (Claude, read-only D1 + code, 14 Nov)
@@ -54,3 +54,29 @@ In Contacts, set **Active = Y** for the ad hoc teachers needed on 16 Nov (Chai, 
 ## Verification
 
 ## Review
+
+## Implementation handoff — Model: Codex
+
+The root cause is the active-only gate introduced by #38, not missing activation records. One alias-aware `reliefActive` predicate now accepts active Contacts or a non-deleted activation on the requested date/period. Contacts creation remains `Active:N`; activation is the existing explicit SMC action. Quotas, employment restrictions, priority rules and protection of saved work are unchanged.
+
+### #38 gate audit
+
+| Gate/caller | Ad hoc exception and disposition |
+|---|---|
+| Allocation `activeReliefCandidate`, `eligibility`, `opportunities`, `ranked`, `optimise`, manual model/ranks | Yes: dated membership and period availability; serialized period eligibility also reaches browser ranking. Existing priority 1 and employment constraints retained. |
+| `candidates`, `availabilityView`, `runOptimisation` | Yes: date eligibility. Replanning can remove an unprotected automatic proposal outside a changed activation window; saved/protected work keeps existing rules. |
+| `manualApply` (assign/combine), `peerProposalChoice`, `mutualChoice` | Yes: date and every selected period, with existing class/category/conflict checks. |
+| Shared-lesson `sharedPresentIds`, reconcile inactive flag, replacement of automatic shared cover | Yes: date/period. Clear only the obsolete inactive workload warning when eligibility returns; retain other review reasons. |
+| `queue`, daily notify view/queue/submit, Google and edge final WhatsApp eligibility | Yes for relief publication/reminder/instructions, daily timetable and mutual request/override kinds. Fresh Contacts plus dated activation checked again before send. Existing personal instruction recovery retained. Non-relief admin/SMC/contact messages still require active Contacts and their roles. |
+| Daily employment `externalTeachers` | Restore inactive Contacts with a non-deleted activation on the report date; report recipients remain active-only. |
+| `staffName`, view people, public duty, export, UI person label | Dated ad hoc label for activated inactive people; otherwise retain inactive label. No Contacts mutation. |
+| Manage ad hoc picker/edit/save, contact-create completion | Explicit SMC activation must accept inactive Contacts; preserve category exclusions, duplicate detection and same-request retry. |
+| Report Absence form/view/save, absence directory (Google and edge) | No: absence reporting is not relief eligibility. Keep active-only new reports and retained history. |
+| Name bridge view/save; employment report settings/addresses and final email gate | No: dated relief eligibility does not grant directory mapping or report-recipient authority. |
+| General inbound WhatsApp menu identity; admin/SMC membership; main-pool/opening-balance selection | No: retain identity/role and accounting boundaries. Ad hoc priority uses its existing separate path. |
+
+### Verification and release gates
+
+The new regression fails against base `8abd29d` at “activated inactive teacher appears in candidates”. The fixed test exercises candidates, assignment, auto priority, report, stale-warning cleanup, alias/deletion, publication followed by explicit Notify, shared cover and both final-send gates. Google/D1 adapter parity also runs with inactive dated relief fixtures. #38 tests that encoded the regression now assert dated eligibility and still assert rejection without activation; no assertions are disabled.
+
+Canonical generated files and the D1 parity references are refreshed. Full local and exact-head CI results are recorded in the PR before review; no review or deployment is claimed here. Claude reviews the exact PR head. Hotfix assembly and owner verification/rollback are in `docs/plans/2026-11-15-adhoc-hotfix-deploy-steps.md`; Claude builds the release, the owner merges/deploys. No live reads, settings changes or provider sends were performed.
