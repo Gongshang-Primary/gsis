@@ -503,7 +503,7 @@ var GSISRosterOperations=(()=>{
    if(dd&&a.timetableId!==dd.id&&!readyStaplerPlan((s.staplerPlans||[]).find(row=>row.date===a.date),s.audit)&&a.origin!=='recess'&&!a.recessActivationId&&!lessonStillExists(a,dd))reason='Lesson no longer in the timetable';
    else if(!a.sharedLessonKey&&a.origin!=='recess'&&!a.recessActivationId&&(!absence||absence.deletedAt||!absence.reliefRequired||!absencePeriods(ctx,absence).includes(a.period)))reason='Absence or lesson no longer requires cover.';
    else if(!a.noRelief&&!a.remove&&s.absences.some(x=>!x.deletedAt&&x.date===a.date&&samePerson(ctx,x.staffId,a.staffId)&&absencePeriods(ctx,x).includes(a.period)))reason='Covering colleague reported absent.';
-   else if(!a.noRelief&&!a.remove&&!reliefActive(s,ctx,ctx.people.find(p=>p.id===a.staffId),a.date,a.period))reason='Teacher is inactive in Contacts.';
+   else if(!a.noRelief&&!a.remove&&ctx.people.find(p=>p.id===a.staffId)?.active===false&&!reliefActive(s,ctx,ctx.people.find(p=>p.id===a.staffId),a.date,a.period))reason='Teacher is inactive in Contacts.';
    else if(dd&&a.timetableId!==dd.id&&a.origin!=='recess'&&!a.recessActivationId&&!readyStaplerPlan((s.staplerPlans||[]).find(row=>row.date===a.date),s.audit)){
     // A baseline swap does not withdraw cover for a lesson that still exists.
     // Conflicts introduced by that swap are visible for a human decision.
