@@ -1,7 +1,7 @@
 # Reviewer handover: Muse reviews, Codex builds (from 6 Nov 2026)
 
 Owner instruction (6 Nov): "make plans for Muse to take over as reviewer and codex to continue coding grunt as your tokens run out".
-**Coordinator: Muse** (owner 13 Nov: "return coordinator to muse"). Muse coordinates and reviews Codex PRs; Codex reviews Muse PRs; Claude reviews only when the owner names Claude for a task. This file is the rulebook. Owner merges and deploys, always.
+**Superseded 14 Nov:** owner "take over coordinator ship from muse for v0.9 lanes. retire muse completely". Claude coordinates v0.9 and reviews every Codex PR; Muse is retired. The checklist (§2), merge (§3) and release (§4) procedures below still apply, with Claude as reviewer and release builder. Earlier text kept as history: Coordinator: Muse (owner 13 Nov). Muse coordinates and reviews Codex PRs; Codex reviews Muse PRs; Claude reviews only when the owner names Claude for a task. This file is the rulebook. Owner merges and deploys, always.
 
 ## 1. Roles
 | Role | Who | Notes |

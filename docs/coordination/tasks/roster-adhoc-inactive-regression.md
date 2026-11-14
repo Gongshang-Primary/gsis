@@ -2,7 +2,7 @@
 
 - Status: proposed (URGENT HOTFIX; needed before Mon 16 Nov 07:00 SGT)
 - Owner/model: Codex
-- Reviewer/model: Muse (owner may name Claude for speed)
+- Reviewer/model: Claude (Muse retired 14 Nov)
 - Last updated (Asia/Singapore): 2026-11-14 ~23:30
 - Branch: codex/roster-adhoc-inactive-regression
 - Base SHA: current main (889669a or later). Lane R: this jumps the queue.
