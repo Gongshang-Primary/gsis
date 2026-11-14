@@ -1,3 +1,4 @@
+import {updateCapacityWarnings,refreshCapacityMessage,refreshNewSummaries,capacityTemplateData} from "./capacity-notifications.mjs";
 import { forecastCapacity, layeredHealth } from "./capacity.mjs";
 import { allocationSnapshot } from "./allocation-snapshot.mjs";
 import { compactOpeningSave } from './opening-save.mjs';
@@ -1745,6 +1746,7 @@ async function operations(ctx) {
   } catch (e) {
     throw safeLegacyError(e);
   }
+  await updateCapacityWarnings(ctx, loaded, next, c, range.dates, revision);
   const quotaPlan = await captureObservedQuotas(ctx, loaded, next, c),
     change = await recordChanges(schoolId, loaded.before, next, loaded.records,
       opName === "saveOpeningBalances" ? { maxWrites: 6000 } : undefined),
@@ -2145,6 +2147,7 @@ async function allocationRun(ctx, loaded, c, range, scope, revision, op) {
     engineVersion: proposal.engineVersion,
     unresolved: proposal.unresolved.length,
   });
+  await updateCapacityWarnings(ctx,loaded,next,c,[date],revision);
   const change = await recordChanges(
       schoolId,
       loaded.before,
@@ -2199,6 +2202,7 @@ async function allocationRun(ctx, loaded, c, range, scope, revision, op) {
     guards: [...change.guards, ...(c.localGuards || [])],
     writes: change.writes,
     result,
+    outbox: next.outbox.filter(j=>!loaded.state.outbox.some(old=>old.id===j.id)).map(j=>({id:j.id,type:'roster-notification',payload:j,dueAt:j.dueAt||ctx.now})),
     audit: {
       runId: op.operationId,
       inputDigest: snapshot.inputDigest,
@@ -2465,7 +2469,7 @@ async function scheduledCommunication(ctx, slot) {
       slot.date,
       now,
     ),
-    range = requestedDates({ from: slot.today, to: slot.date }, now),
+    range = requestedDates({ from: slot.today, to: Allocation.addDays(Allocation.monday(slot.date), 6) }, now),
     scope = "day:" + slot.date,
     revision = await scopeRevision(env.DB, schoolId, scope),
     loaded = await loadState(env.DB, schoolId, range),
@@ -2476,8 +2480,10 @@ async function scheduledCommunication(ctx, slot) {
       next,
       { ...c, service: true, skipScheduledAllocation: true },
       body.tick,
-    ),
-    op = await prepared(local, "roster.scheduled-notifications", body),
+    );
+  await updateCapacityWarnings(local, loaded, next, c, range.dates, revision);
+  await refreshNewSummaries(local, loaded, next, c, revision);
+  const op = await prepared(local, "roster.scheduled-notifications", body),
     quotaPlan = await captureObservedQuotas(local, loaded, next, c),
     change = await recordChanges(schoolId, loaded.before, next, loaded.records),
     sc = scopeChange(schoolId, scope, revision);
@@ -2810,7 +2816,8 @@ export async function dispatchRosterJob(job, env, now = Date.now()) {
   )
     return { state: "cancelled", code: "RECIPIENT_NO_LONGER_ELIGIBLE" };
   if (job.type === "roster-notification") {
-    const range = { from: payload.date, to: payload.date },
+    const capacityMessage = payload.kind==='capacity_warning'||payload.kind==='smc_report'&&!!payload.data?.scheduledSummary;
+    const range = requestedDates({from:payload.date,to:capacityMessage?Allocation.addDays(Allocation.monday(payload.date),6):payload.date},now),
       loaded = await loadState(env.DB, schoolId, range),
       ctx = {
         env,
@@ -2818,7 +2825,7 @@ export async function dispatchRosterJob(job, env, now = Date.now()) {
         now,
         body: { date: payload.date, operation: "dailyNotify" },
       },
-      c = await context(ctx, loaded, { ...range, dates: [payload.date] });
+      c = await context(ctx, loaded, range, {needsQuota:capacityMessage});
     const currentRecipient = c.people.find(
       (p) => p.id === (payload.recipientId || payload.staffId),
     );
@@ -2841,6 +2848,8 @@ export async function dispatchRosterJob(job, env, now = Date.now()) {
       return { state: "cancelled", code: "SPONSOR_NO_LONGER_SMC" };
     if (Operations.notificationCurrent(loaded.state, payload, now))
       return { state: "cancelled", code: "NOTIFICATION_OBSOLETE" };
+    if(capacityMessage&&!await refreshCapacityMessage(ctx,loaded,c,payload,await scopeRevision(env.DB,schoolId,'day:'+payload.date)))
+      return {state:'cancelled',code:'CAPACITY_WARNING_OBSOLETE_OR_UNVERIFIED'};
     let link = null;
     if (
       payload.kind === "mutual_request" ||
@@ -2861,7 +2870,7 @@ export async function dispatchRosterJob(job, env, now = Date.now()) {
       provider: "whatsapp",
       to: currentRecipient.mobile,
       template: templateFor(env, payload.data?.templateKey || payload.kind, {
-        ...(payload.data || {}),
+        ...(capacityMessage?capacityTemplateData(env,payload,currentRecipient):(payload.data || {})),
         link,
       }),
       idempotencyKey: job.job_id,
