@@ -62,6 +62,9 @@ export function capacityTemplateData(env,payload,recipient){
 
 export async function refreshNewSummaries(ctx,loaded,next,c,revision){
   const before=new Set(loaded.state.outbox.map(j=>j.id)),cache=new Map();
-  for(const j of next.outbox)if(!before.has(j.id)&&j.kind==='smc_report'&&j.data?.scheduledSummary)
+  for(const j of next.outbox)if(!before.has(j.id)&&j.kind==='smc_report'&&j.data?.scheduledSummary){
     await refreshCapacityMessage(ctx,{...loaded,state:next},c,j,revision,cache);
+    const alert=next.smcAlerts.find(a=>j.key===a.key+':'+j.recipientId);
+    if(alert)alert.summary=j.data.summary;
+  }
 }

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import fixture from './roster701-fixture.cjs';
-import {capacityText,outlookText,queueCapacityWarnings,replaceLegacyWarnings,refreshCapacityMessage,capacityTemplateData} from '../v1/services/roster/capacity-notifications.mjs';
+import {capacityText,outlookText,queueCapacityWarnings,replaceLegacyWarnings,refreshCapacityMessage,refreshNewSummaries,capacityTemplateData} from '../v1/services/roster/capacity-notifications.mjs';
 import {createDatabase} from './v1-product/helpers.mjs';
 const f=fixture(),{state,ctx:c,date}=f;
 c.now=Date.parse(date+'T06:35:00+08:00');c.iso=new Date(c.now).toISOString();c.minute=395;
@@ -30,6 +30,11 @@ try{
  const report={kind:'smc_report',date,data:{scheduledSummary:{},summary:'legacy optimistic numbers'}};
  await refreshCapacityMessage(context,loaded,c,report,0);
  assert.match(report.data.summary,/Known-demand outlook/);assert.match(report.data.summary,/not verified/);assert(!report.data.summary.includes('legacy'));
+ const reportState=structuredClone(state);
+ reportState.outbox.push({...report,id:'new-report',key:'report:slot:alice',recipientId:'alice'});
+ reportState.smcAlerts.push({id:'report-alert',key:'report:slot',summary:'legacy report'});
+ await refreshNewSummaries(context,loaded,reportState,c,0);
+ assert.equal(reportState.smcAlerts.at(-1).summary,reportState.outbox.at(-1).data.summary,'in-app alert and queued provider summary use the same projection');
  assert.deepEqual(state.assignments,[],'delivery forecast does not allocate');
 }finally{await db.close();}
 console.log('PASS v1 capacity warnings: duty-only, episode dedup, quiet hours, no false unknown capacity, template aliases, actual D1 delivery refresh and stale cancellation; no sends');
