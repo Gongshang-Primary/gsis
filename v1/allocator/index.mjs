@@ -424,6 +424,38 @@ function eligibility(p, unit, assignments, s, policy, layer) {
     reasons.push("employment-cap");
   return { reasons, state, remaining };
 }
+/** Per-period reserve choices, not additive quota or a promise of whole-lesson cover.
+ * Known demand/continuity feasibility is evaluated separately by runEngine.
+ * This deliberately shares the allocator's eligibility and quota functions.
+ */
+export function inspectCapacity(input, rawPolicy, periods) {
+  const s = validateSnapshot(input), policy = validatePolicy(rawPolicy);
+  if (!Array.isArray(periods) || periods.length > 40 ||
+      periods.some(p => !integer(p, 0, 39)) || new Set(periods).size !== periods.length)
+    fail("Invalid capacity periods.");
+  const staff = s.staff.map(person => ({person, layer: policy.layers.find(l => l.id === resolveLayer(person, policy))}));
+  const balances = staff.filter(x => x.layer && (x.person.active === true || x.person.dateActive === true && x.person.dailyAdhoc === true && x.person.adhocEligible === true) && (x.person.eo === true || x.person.dailyAdhoc === true && x.person.hasBaseline === false && x.person.adhocEligible === true)).map(({person, layer}) => {
+    const state = stateFor(person, s.assignments, policy);
+    return {staffId: person.staffId, remainingR: quotaRemaining(person, state), layer: layer.id,
+      verified: quotaRemaining(person, state) !== null &&
+        !(person.employmentCapRequired && !Number.isFinite(person.actualWeeklyCap)) &&
+        !(person.actualWeeklyCap != null && !Number.isFinite(person.actualWeeklyOccupied))};
+  });
+  return {engineVersion: ENGINE_VERSION, policyVersion: policy.version, balances,
+    verified: balances.every(x => x.verified),
+    periods: periods.map(period => {
+      const green = [], exclusions = {};
+      for (const {person, layer} of staff) {
+        if (!layer) continue;
+        const check = eligibility(person, [{period}], s.assignments, s, policy, layer);
+        if (!check.reasons.length) green.push(person.staffId);
+        else for (const reason of check.reasons) exclusions[reason] = (exclusions[reason] || 0) + 1;
+      }
+      return {period, green, exclusions};
+    }),
+    note: "Each green entry is a choice for one period. Choices share R and daily limits; whole-lesson continuity and simultaneous demand are checked by the forecast."};
+}
+
 function unitsFor(demands, layer, assignments) {
   const units = [],
     seen = new Set();
