@@ -183,6 +183,10 @@ try {
     [allowed.decisionId],
   );
   const chain = JSON.parse(evidence.evidence_json);
+  assert.equal(chain.schemaVersion, 2);
+  assert.equal(chain.decision.evaluatedAt, chain.evaluatedAt);
+  assert.equal(JSON.parse(evidence.event_json).evaluatedAt, chain.decision.evaluatedAt);
+  assert.equal(JSON.parse(evidence.event_json).requestId, chain.decision.requestId);
   assert.equal(chain.contacts.kind, "observed");
   assert.equal(chain.contacts.snapshot.staffId, "teacher-a");
   assert.equal(chain.contacts.snapshot.fields.schoolLeader[0].value, false);
@@ -770,6 +774,24 @@ try {
       restoredCore.db,
       "SELECT * FROM core_destination_receipts",
     );
+    // Exercise the same administrative recovery API against independently restored owners.
+    const originalCore = ce.DB, originalContacts = pe.DB;
+    try {
+      ce.DB = restoredCore.db; pe.DB = restoredContacts.db;
+      const inspector = await authorize(admin, "core", "core.admin", {}, false);
+      const recover = () => core({env:ce, principal:inspector, path:"/evidence/"+allowed.decisionId, method:"GET", body:{}, now:Date.now()});
+      const verified = await recover();
+      assert.equal(verified.verification.state, "verified");
+      assert.equal(verified.verification.currentAuthority, false);
+      assert.deepEqual(verified.evidence.contacts.observation, chain.contacts.observation);
+      assert.deepEqual(verified.evidence.contacts.snapshot, chain.contacts.snapshot);
+      await statement(ce.DB, "UPDATE core_evidence SET event_json=? WHERE decision_id=?", [JSON.stringify({...verified.event, requestId:"tampered"}), allowed.decisionId]).run();
+      await assert.rejects(recover, e=>e.code==="EVIDENCE_INTEGRITY_FAILED");
+      await statement(ce.DB, "UPDATE core_evidence SET event_json=? WHERE decision_id=?", [JSON.stringify(verified.event), allowed.decisionId]).run();
+      await statement(pe.DB, "DELETE FROM contacts_snapshots WHERE school_id=? AND snapshot_id=?", [base.SCHOOL_ID, recovered.contacts.snapshot.snapshotId]).run();
+      await assert.rejects(recover, e=>e.code==="EVIDENCE_CONTENT_UNAVAILABLE");
+      console.log("PASS F5 actual recovery API after separate-owner restore; historical observation exact; tamper and missing content reject");
+    } finally { ce.DB=originalCore; pe.DB=originalContacts; }
     assert(links.length >= 5);
     assert(
       links.every((l) =>
