@@ -92,3 +92,16 @@ Method, per PR:
 5. Merge-tree against current main: clean for all four.
 
 No new code to test; my earlier focused results stand. Fresh CI at these heads not seen by me (Codex reports running). Remaining: #148 after #147 merges; #151 after #146 merges; each needs the same main sync and recheck.
+
+## Recheck of #148 and #151 after parents merged (14 Nov 2026)
+
+Main at `ac15953`: #146, #147, #149 and #152 merged.
+
+| PR | New head | Reviewed head | Verdict |
+|---|---|---|---|
+| #148 | `c87acf8e016b75b2706e65b79bbedf6bd1dd28aa` | `a950b8b` | **Approve** |
+| #151 | `1b6affcfa99efcdad9972a488264bd0e8fbea0f8` | `8e653b1` | **Approve** |
+
+- #148: one merge commit; `--remerge-diff` shows only the task-record conflict, resolved to the reviewed branch version byte for byte. Own files identical to the reviewed head. Merge-tree with main clean.
+- #151: one clean merge commit, no hand edits; task record identical to the reviewed version. It was synced before #147 merged, so a plain diff against main lists #147's files. I checked the actual three-way merge result (`git merge-tree` with current main): all eight #147 files come from main unchanged, and #151's four own files are byte-identical to the reviewed head. Merge-tree clean.
+- Note: #151's CI ran on a base without #147. The two touch unrelated areas (Roster service vs Admin UI), so risk is low, but the owner should check main's CI after merging #151, or ask Codex to sync once more if a pre-merge run is preferred.
