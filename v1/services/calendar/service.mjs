@@ -1,4 +1,5 @@
 import defaults from "./defaults.mjs";
+import { tableWorkbook, previewTableImport, applyTableImport } from "./table-import.mjs";
 import {
   acquireSourcePin,
   releaseSourcePin,
@@ -37,6 +38,8 @@ const READS = new Set([
   "syncYearBatch",
   "calendarWipeBatch",
   "mutationReceipts",
+  "tableWorkbook",
+  "tableImportPreview",
 ]);
 const WRITES = new Set([
   "saveEvent",
@@ -62,6 +65,7 @@ const WRITES = new Set([
   "savePdf",
   "saveDayNote",
   "pullBirthdays",
+  "tableImportApply",
 ]);
 const EVENT_FIELDS = [
   "Year",
@@ -644,7 +648,7 @@ async function syncIntents(
   }
   return out;
 }
-async function metadataMutation(ctx, op, action, p) {
+async function metadataPlan(ctx, op, action, p, observed = {}) {
   const s = ctx.principal.schoolId,
     db = ctx.env.DB;
   let [kind, key] = META[action],
@@ -658,7 +662,7 @@ async function metadataMutation(ctx, op, action, p) {
     recordId = recordId.replace(/^\[|\]$/g, "").toLowerCase();
   }
   id(recordId);
-  const row = await one(
+  const row = Object.hasOwn(observed, 'row') ? observed.row : await one(
     db,
     "SELECT * FROM calendar_metadata WHERE school_id=? AND kind=? AND record_id=?",
     [s, kind, recordId],
@@ -738,11 +742,17 @@ async function metadataMutation(ctx, op, action, p) {
       sql: "SELECT NOT EXISTS(SELECT 1 FROM calendar_dispatch_locks l JOIN calendar_events e ON e.school_id=l.school_id AND e.event_id=l.event_id WHERE l.school_id=? AND json_extract(e.data_json,'$.LaneID')=?) AS ok",
       args: [s, recordId],
     });
-    const years = await query(
+    const years = observed.years || await query(
       db,
       "SELECT year FROM calendar_years WHERE school_id=? AND released=1 AND status<>'ARCHIVED' LIMIT 202",
       [s],
     );
+    // The sync jobs and metadata write must cover the same complete released
+    // year set. A release/archive between planning and commit invalidates both.
+    guards.push({
+      sql: "SELECT json_group_array(year)=? AS ok FROM (SELECT year FROM calendar_years WHERE school_id=? AND released=1 AND status<>'ARCHIVED' ORDER BY year)",
+      args: [canonical(years.map(row => row.year).sort((a,b) => a-b)), s],
+    });
     for (const y of years)
       outbox.push({
         id: `calendar-lane:${op.operationId}:${y.year}`,
@@ -756,21 +766,20 @@ async function metadataMutation(ctx, op, action, p) {
         },
       });
   }
-  return finish(
-    ctx,
-    op,
-    guards,
-    [write],
-    {
-      ...value,
-      _revision: revision,
-      deleted,
+  return {
+    guards, writes: [write],
+    result: {
+      ...value, _revision: revision, deleted,
       metadataRevision: deleted ? "missing" : await digest(value),
       _metadataRevision: deleted ? "missing" : await digest(value),
-    },
-    outbox,
-  );
+    }, outbox,
+  };
 }
+async function metadataMutation(ctx, op, action, p) {
+  const plan = await metadataPlan(ctx, op, action, p);
+  return finish(ctx, op, plan.guards, plan.writes, plan.result, plan.outbox);
+}
+
 async function bootstrap(ctx, p) {
   const db = ctx.env.DB,
     s = ctx.principal.schoolId;
@@ -2180,6 +2189,8 @@ export async function handle(ctx) {
       liveVerification: "Not tested",
     };
   }
+  if (action === "tableWorkbook") return tableWorkbook(ctx, p);
+  if (action === "tableImportPreview") return previewTableImport(ctx, p);
   if (action === "calendarWipePreview") return externalWipePreview(ctx, p);
   if (action === "calendarWipeBatch") return externalWipeStatus(ctx, p);
   if (action === "archiveYearsPreview") return preview(ctx, "archive", p);
@@ -2198,6 +2209,7 @@ export async function handle(ctx) {
     )
   )
     return eventMutation(ctx, op, action, p);
+  if (action === "tableImportApply") return applyTableImport(ctx, op, p, { metadataPlan, finish });
   if (META[action]) return metadataMutation(ctx, op, action, p);
   if (action === "saveYear") return saveYear(ctx, op, p);
   if (action === "publishVersion") return publishYear(ctx, op, p);

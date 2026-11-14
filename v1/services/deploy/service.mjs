@@ -162,7 +162,7 @@ function flatten(doc) {
   }
   return out;
 }
-function inflate(rows) {
+export function inflate(rows) {
   const d = defaults(),
     orders = {};
   for (const scope of rootRows) d[scope] = [];
@@ -325,48 +325,69 @@ const scopeGuard = (school, version, revision) => ({
   sql: "SELECT EXISTS(SELECT 1 FROM deploy_versions WHERE school_id=? AND id=? AND revision=? AND deleted=0) AS ok",
   args: [school, version, revision],
 });
-function changesFor(school, version, beforeRows, next) {
-  const old = new Map(beforeRows.map((r) => [`${r.scope}\0${r.row_id}`, r])),
+export function changesFor(school, version, beforeRows, next) {
+  const old = new Map(
+      beforeRows.map((row) => [`${row.scope}\0${row.row_id}`, row]),
+    ),
     fresh = flatten(next),
-    writes = [],
-    guards = [];
+    delta = [];
   for (const key of new Set([...old.keys(), ...fresh.keys()])) {
     const prior = old.get(key),
       value = fresh.get(key);
     if (prior?.value === value) continue;
     const [scope, row] = key.split("\0");
-    guards.push(
-      prior
-        ? {
-            sql: "SELECT EXISTS(SELECT 1 FROM deploy_rows WHERE school_id=? AND version_id=? AND scope=? AND row_id=? AND revision=?) AS ok",
-            args: [school, version, scope, row, prior.revision],
-          }
-        : {
-            sql: "SELECT NOT EXISTS(SELECT 1 FROM deploy_rows WHERE school_id=? AND version_id=? AND scope=? AND row_id=?) AS ok",
-            args: [school, version, scope, row],
-          },
-    );
-    writes.push(
-      value === undefined
-        ? {
-            sql: "DELETE FROM deploy_rows WHERE school_id=? AND version_id=? AND scope=? AND row_id=?",
-            args: [school, version, scope, row],
-          }
-        : {
-            sql: "INSERT INTO deploy_rows(school_id,version_id,scope,row_id,revision,value) VALUES(?,?,?,?,?,?) ON CONFLICT(school_id,version_id,scope,row_id) DO UPDATE SET revision=excluded.revision,value=excluded.value",
-            args: [
-              school,
-              version,
-              scope,
-              row,
-              (prior?.revision || 0) + 1,
-              value,
-            ],
-          },
-    );
+    delta.push({
+      scope,
+      row,
+      expected: prior ? prior.revision : null,
+      revision: (prior?.revision || 0) + 1,
+      deleted: value === undefined,
+      body: value ?? null,
+    });
   }
-  return { writes, guards };
+  if (!delta.length) return { writes: [], guards: [], changedRows: 0 };
+  const payload = JSON.stringify(delta);
+  check(
+    delta.length <= 8192 &&
+      new TextEncoder().encode(payload).byteLength <= 1024 * 1024,
+    "The atomic planning change exceeds the supported 8192 rows or 1 MiB delta. Reduce the change; no planning rows were saved.",
+    "EDIT_BOUNDS",
+    413,
+  );
+  // Compare every changed row against the exact loaded revision (or absence).
+  // Unrelated rows do not participate; the caller separately retains its version and lease guards.
+  const guards = [
+      {
+        sql: `SELECT NOT EXISTS(
+      SELECT 1 FROM json_each(?) delta
+      LEFT JOIN deploy_rows current ON current.school_id=? AND current.version_id=?
+        AND current.scope=json_extract(delta.value,'$.scope') AND current.row_id=json_extract(delta.value,'$.row')
+      WHERE (json_extract(delta.value,'$.expected') IS NULL AND current.row_id IS NOT NULL)
+        OR (json_extract(delta.value,'$.expected') IS NOT NULL AND (current.row_id IS NULL OR current.revision<>json_extract(delta.value,'$.expected')))
+    ) AS ok`,
+        args: [payload, school, version],
+      },
+    ],
+    writes = [];
+  if (delta.some((row) => row.deleted))
+    writes.push({
+      sql: `DELETE FROM deploy_rows WHERE school_id=? AND version_id=? AND EXISTS(
+      SELECT 1 FROM json_each(?) delta WHERE json_extract(delta.value,'$.deleted')=1
+        AND deploy_rows.scope=json_extract(delta.value,'$.scope') AND deploy_rows.row_id=json_extract(delta.value,'$.row')
+    )`,
+      args: [school, version, payload],
+    });
+  if (delta.some((row) => !row.deleted))
+    writes.push({
+      sql: `INSERT INTO deploy_rows(school_id,version_id,scope,row_id,revision,value)
+      SELECT ?,?,json_extract(delta.value,'$.scope'),json_extract(delta.value,'$.row'),json_extract(delta.value,'$.revision'),json_extract(delta.value,'$.body')
+      FROM json_each(?) delta WHERE json_extract(delta.value,'$.deleted')=0
+      ON CONFLICT(school_id,version_id,scope,row_id) DO UPDATE SET revision=excluded.revision,value=excluded.value`,
+      args: [school, version, payload],
+    });
+  return { writes, guards, changedRows: delta.length };
 }
+
 async function contacts(ctx) {
   return serviceCall(ctx.env, "contacts", "/internal/projection", {
     purpose: "deploy",
@@ -543,12 +564,21 @@ async function create(ctx) {
     to: doc.to || "",
     notes: doc.notes || "",
   });
+  let delta;
+  try {
+    delta = changesFor(school, versionId, [], doc);
+  } catch (error) {
+    if (error.code !== "EDIT_BOUNDS") throw error;
+    const outcome = await abortOperation(ctx.env.DB, op, error.code, ctx.now);
+    if (outcome?.state === "committed") return outcome.result;
+    throw error;
+  }
   const writes = [
     {
       sql: "INSERT INTO deploy_versions(school_id,id,name,revision,metadata,created_at) VALUES(?,?,?,0,?,?)",
       args: [school, versionId, doc.name, metadata, ctx.now],
     },
-    ...changesFor(school, versionId, [], doc).writes,
+    ...delta.writes,
   ];
   return finish(
     ctx,
@@ -769,7 +799,15 @@ async function save(
       );
   }
   validateDocument(next);
-  const delta = changesFor(school, b.versionId, loaded.rows, next);
+  let delta;
+  try {
+    delta = changesFor(school, b.versionId, loaded.rows, next);
+  } catch (error) {
+    if (error.code !== "EDIT_BOUNDS") throw error;
+    const outcome = await abortOperation(ctx.env.DB, op, error.code, ctx.now);
+    if (outcome?.state === "committed") return outcome.result;
+    throw error;
+  }
   const guards = [...delta.guards, leaseGuard(ctx, scope)];
   const expected = b.revision ?? b.expectedRevision;
   if (expected !== undefined)
@@ -810,14 +848,14 @@ async function save(
       saved: true,
       versionId: b.versionId,
       requestId: b.requestId || op.operationId,
-      changedRows: delta.writes.length,
+      changedRows: delta.changedRows,
     },
     {
       dependencies: extraDependencies,
       audit: {
         versionId: b.versionId,
         scope,
-        changedRows: delta.writes.length,
+        changedRows: delta.changedRows,
         previewId: preview?.id || null,
       },
     },
@@ -1833,8 +1871,21 @@ export async function handle(ctx) {
       if (op.receipt) return op.receipt.result;
       const loaded = await loadVersion(ctx.env.DB, school, b.versionId),
         ref = await contacts(ctx),
-        next = mergeContacts(loaded.doc, ref),
+        next = mergeContacts(loaded.doc, ref);
+      let delta;
+      try {
         delta = changesFor(school, b.versionId, loaded.rows, next);
+      } catch (error) {
+        if (error.code !== "EDIT_BOUNDS") throw error;
+        const outcome = await abortOperation(
+          ctx.env.DB,
+          op,
+          error.code,
+          ctx.now,
+        );
+        if (outcome?.state === "committed") return outcome.result;
+        throw error;
+      }
       return finish(
         ctx,
         op,

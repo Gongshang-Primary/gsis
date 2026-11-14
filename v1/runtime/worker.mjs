@@ -9,6 +9,7 @@ import { digest, operationStatus, abortOperation, one } from "./store.mjs";
 import { secretEquals, verifyWebhook } from "./providers.mjs";
 import { systemPolicy, systemHandle } from "./operations.mjs";
 import { outboxHealth } from "./jobs.mjs";
+import { runDriveBackups } from "./drive-backup-jobs.mjs";
 const DOMAINS = [
   "core",
   "contacts",
@@ -295,6 +296,14 @@ export function domainWorker(service, module) {
       }
     },
     async scheduled(event, bindings, execution) {
+      // Backups have their own explicit cutover switch, separate from messaging.
+      // Catch-up rotates bounded owner datasets; daily verification is due at
+      // 23:50 SGT and is completed by these resumable runs.
+      const backupEnv = { ...bindings, SERVICE_NAME: service };
+      if (bindings.DRIVE_BACKUP_ENABLED === "true") {
+        const task = runDriveBackups(backupEnv, Date.now()).catch(() => undefined);
+        if (execution?.waitUntil) execution.waitUntil(task); else await task;
+      }
       if (bindings.SCHEDULER_OWNER !== "v1") return;
       if (module.scheduled)
         await module.scheduled({

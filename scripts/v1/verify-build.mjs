@@ -26,3 +26,9 @@ for (const domain of [...domains, "web"]) {
   );
   if (result.status !== 0) process.exit(result.status || 1);
 }
+
+// Verify an upgrade of an existing database using local D1 only.
+const { verifyMigrationUpgrade } = await import(
+  "./verify-migration-upgrade.mjs"
+);
+await verifyMigrationUpgrade();

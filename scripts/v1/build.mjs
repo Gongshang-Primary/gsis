@@ -5,6 +5,7 @@ import {
   mkdir,
   readdir,
   copyFile,
+  rm,
 } from "node:fs/promises";
 import { resolve, join } from "node:path";
 import { createHash } from "node:crypto";
@@ -69,6 +70,9 @@ export async function buildProduct({
     "LORD_MONITOR_TELEGRAM_CHAT_ID",
     "VENUES_WHATSAPP_TEMPLATE",
     "PHONE_COUNTRY_CODE",
+    "DRIVE_BACKUP_ENABLED",
+    "DRIVE_BACKUP_ROOT_ID",
+    "DRIVE_BACKUP_FOLDERS_JSON",
   ];
   for (const key of Object.keys(config.settings ?? {}))
     if (!allowedSettings.includes(key))
@@ -231,16 +235,18 @@ export async function buildProduct({
         },
       ];
       wrangler.triggers = { crons: ["* * * * *"] };
-      await mkdir(join(folder, "migrations"), { recursive: true });
-      let sql = await readFile(join(root, "v1/migrations/common.sql"), "utf8");
-      for (const f of (
-        await readdir(join(root, "v1/migrations", domain))
-      ).sort())
-        if (f.endsWith(".sql"))
-          sql +=
-            "\n" +
-            (await readFile(join(root, "v1/migrations", domain, f), "utf8"));
-      await writeFile(join(folder, "migrations/0001_owner.sql"), sql);
+      // Preserve the already-deployed initial migration; later migrations are
+      // separate files so Wrangler can apply them to existing installations.
+      const migrationFolder = join(folder, "migrations");
+      await rm(migrationFolder, { recursive: true, force: true });
+      await mkdir(migrationFolder, { recursive: true });
+      const files = (await readdir(join(root, "v1/migrations", domain))).filter(f => f.endsWith(".sql")).sort();
+      const initialName = domain === "roster" ? "001_roster.sql" : "0001.sql";
+      const initial = await readFile(join(root, "v1/migrations/common.sql"), "utf8") +
+        "\n" + await readFile(join(root, "v1/migrations", domain, initialName), "utf8");
+      await writeFile(join(migrationFolder, "0001_owner.sql"), initial);
+      for (const file of files.filter(f => f !== initialName))
+        await copyFile(join(root, "v1/migrations", domain, file), join(migrationFolder, file));
     }
     await writeFile(
       join(folder, "wrangler.json"),
