@@ -42,16 +42,24 @@ D2 Drive retention remains an owner choice; no automatic deletion was built. Dri
 
 Use **GitHub → helper-gsps/gsis → Settings → Environments → gsis-v1-owner-approved → Environment secrets**. Do not put credentials in Git files, frontend fields, screenshots or chat. Existing tokens need not rotate for migration.
 
-- `WA_ACCESS_TOKEN`: WhatsApp provider token.
-- `WA_APP_SECRET`, `WA_VERIFY_TOKEN`: existing WhatsApp webhook verification secrets when ingress is separately approved.
-- `TG_BOT_TOKEN`: existing Telegram token; a separate bot-ID secret is not needed because its numeric prefix identifies the bot.
-- Keep `GSIS_SECRET` and `CLOUDFLARE_API_TOKEN` as already configured.
+- `WHATSAPP_ACCESS_TOKEN`: existing WhatsApp access token, unchanged; used by Roster, LORD and Venues senders.
+- `WHATSAPP_APP_SECRET`: existing Meta app secret for Roster ingress signature verification; not the access token.
+- `WHATSAPP_VERIFY_TOKEN`: existing webhook subscription verification token, if independently configured. The runtime fallback is unchanged; this does not register or switch a webhook.
+- `TELEGRAM_BOT_TOKEN`: complete existing `numericBotID:secret` token for LORD/OVERLORD monitoring; no separate bot-ID secret is needed.
+- `TELEGRAM_WEBHOOK_SECRET`: existing webhook header secret only when receiving Telegram updates through Roster ingress; outbound LORD monitoring alone does not require it.
+- `GOOGLE_SERVICE_ACCOUNT`: optional existing service-account JSON for a separately approved Google integration; consumed by all eight owner backup adapters without activating Drive backups.
+- `EMAIL_API_TOKEN`: optional existing email provider token for Roster, LORD or Venues.
+- Keep the separate v1 `GSIS_SECRET` and existing `CLOUDFLARE_API_TOKEN` as already configured; do not substitute a v0.9 backend secret.
 
-Nonsecret `GSIS_V1_SCHOOL_CONFIG.settings` values include `WHATSAPP_PHONE_NUMBER_ID`, approved `WHATSAPP_TEMPLATES_JSON` (exact names/languages/parameter order) and `LORD_MONITOR_TELEGRAM_CHAT_ID` (destination chat, not bot ID). Optional Drive/email credentials and exact owner routing are in the [provider setup guide](https://github.com/helper-gsps/gsis/blob/ed6ecb5bdde4acc2a1d54cf3253526fce69980d3/docs/v1/accelerated-delivery/PROVIDER_SETUP.md). Upload is a default-off, separately chosen protected workflow option. No token was read, changed or uploaded in this queue; no scheduler, sender, webhook or Drive backup was activated.
+Nonsecret `GSIS_V1_SCHOOL_CONFIG.settings` values include `WHATSAPP_PHONE_NUMBER_ID`, approved `WHATSAPP_TEMPLATES_JSON` (exact names/languages/parameter order) and `LORD_MONITOR_TELEGRAM_CHAT_ID` (destination chat, not bot ID). Optional Drive/email credentials and exact owner routing are in the [provider setup guide](https://github.com/helper-gsps/gsis/blob/c500998bc6beec22f5242d8a5a535358576a5989/docs/v1/accelerated-delivery/PROVIDER_SETUP.md). Upload is a default-off, separately chosen protected workflow option. No token was read, changed or uploaded in this queue; no scheduler, sender, webhook or Drive backup was activated.
 
 ## Remaining gates and next decision
 
 After Claude reviews each exact head and CI is green, the owner decides which groups may merge. 145 must precede its children; 147 precedes 148; 146 precedes 151. Reconcile claim-record conflicts against then-current main and obtain review of changed heads. Claude specifically identified the mechanical task-record add/add conflict in 146; do not resolve it by merging an unapproved base. The documentation handoff has no release side effects.
+
+For future stacked work, merge main's exact claim commit into the implementation branch immediately after claiming, before adding evidence. For the existing #147, #148, #149 and #151 branches, wait until the parent has merged; then merge current main, resolve the task-record add/add conflict by keeping the branch's version, and publish the new head for review and CI. This does not authorise merging a parent PR.
+
+Staging check N-1 from [Claude's review](https://github.com/helper-gsps/gsis/blob/2a192ce8db66044309f3ad121c8945b5c67bea59/docs/coordination/review/pr147-152-claude-review.md): measure end-to-end Roster save latency with the capacity-warning checks enabled, including calls that build up to seven allocation snapshots. Record representative single-day and multi-day save timings (p50/p95), workload size and source-service call counts; compare with the baseline before accepting staging performance. **Not tested**; local correctness tests are not staging latency evidence.
 
 **F5 remains OPEN**: the new recovery verifies captured allow decisions, actual observations and immutable Contacts history. It does not close rejected-decision capture, live durable recovery, destination-commit verification or retention policy. See [recovery evidence and closure requirements](https://github.com/helper-gsps/gsis/blob/75e4b5695c58e8618f387fe90013232a7e9ffc34/docs/v1/core/F5_RECOVERY_VERIFICATION.md).
 
