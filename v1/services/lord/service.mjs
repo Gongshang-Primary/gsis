@@ -1,5 +1,14 @@
 import { ApiError } from "../../runtime/errors.mjs";
 import {
+  wrappedReport,
+  prepareReignArchive,
+  exportReignArchive,
+  previewReignCleanup,
+  commitReignCleanup,
+  finishReignCleanup,
+  reignArchiveList,
+} from "./reign.mjs";
+import {
   canonical,
   digest,
   query,
@@ -38,8 +47,13 @@ import {
 
 const adminActions = new Set([
   "resource-save",
+  "resources-save",
   "resource-delete",
   "reignclose",
+  "reign-archive-prepare",
+  "reign-archive-export",
+  "reign-cleanup",
+  "reign-cleanup-finish",
   "reference-refresh",
   "settings-save",
   "incident-resolve",
@@ -80,6 +94,8 @@ const borrowActions = new Set([
 const adminReads = new Set([
   "dashboard",
   "reignpreview",
+  "reign-archives",
+  "reign-cleanup-preview",
   "complianceincidents",
   "backgroundwork",
   "adminsettings",
@@ -113,6 +129,8 @@ function actionOf(method, path, body) {
     "/incidents/respond-context": "incident-response-context",
     "/reign/preview": "reignpreview",
     "/reign/archive": "archive-download",
+    "/reign/archives": "reign-archives",
+    "/reign/cleanup/preview": "reign-cleanup-preview",
     "/background": "backgroundwork",
     "/settings": "adminsettings",
     "/export": "export",
@@ -121,6 +139,7 @@ function actionOf(method, path, body) {
   };
   const post = {
     "/resources": "resource-save",
+    "/resources/batch": "resources-save",
     "/resources/delete": "resource-delete",
     "/bookings": "bookingcreate",
     "/bookings/batch": "bookingcreatebatch",
@@ -136,6 +155,10 @@ function actionOf(method, path, body) {
     "/links": "link-create",
     "/links/revoke": "link-revoke",
     "/reign/close": "reignclose",
+    "/reign/archive/prepare": "reign-archive-prepare",
+    "/reign/archive/export": "reign-archive-export",
+    "/reign/cleanup": "reign-cleanup",
+    "/reign/cleanup/finish": "reign-cleanup-finish",
     "/reference/refresh": "reference-refresh",
     "/settings": "settings-save",
     "/background/retry": "background-retry",
@@ -440,7 +463,7 @@ async function reference(ctx) {
   const trolleys = resources.map((r) => ({
     id: r.resource_id,
     name: r.name,
-    group: r.resource_id,
+    group: JSON.parse(r.metadata_json).cart || r.resource_id,
     deviceType: r.type,
     defaultQuantity: r.capacity,
     stylusOption: JSON.parse(r.metadata_json).stylusOption === true,
@@ -518,11 +541,32 @@ async function resourceSave(ctx, input) {
             [school, row.resourceId],
           ),
     ];
+    if (row.metadata.cart) {
+      const siblings = await query(
+        ctx.env.DB,
+        "SELECT type FROM lord_resources WHERE school_id=? AND resource_id<>? AND json_extract(metadata_json,'$.cart')=?",
+        [school, row.resourceId, row.metadata.cart],
+      );
+      if (siblings.some((r) => r.type !== row.type))
+        fail(
+          "INVALID_INPUT",
+          "All trolleys in a cart/group must use the same device type.",
+        );
+      guards.push(
+        guard(
+          "SELECT NOT EXISTS(SELECT 1 FROM lord_resources WHERE school_id=? AND resource_id<>? AND json_extract(metadata_json,'$.cart')=? AND type<>?) AS ok",
+          [school, row.resourceId, row.metadata.cart, row.type],
+        ),
+      );
+    }
     // Inventory reductions/deactivation wait until all reserved resources are returned/cancelled.
     if (
       old &&
       (row.capacity < old.capacity ||
+        row.bufferPeriods > old.buffer_periods ||
         !row.active ||
+        row.type !== old.type ||
+        row.metadata.cart !== (JSON.parse(old.metadata_json).cart || "") ||
         row.exclusive !== Boolean(old.exclusive))
     )
       guards.push(
@@ -551,6 +595,94 @@ async function resourceSave(ctx, input) {
         ),
       ],
       result: { resourceId: row.resourceId, revision: revision + 1 },
+    };
+  });
+}
+async function resourcesSave(ctx, input) {
+  return mutate(ctx, "resources-save", async () => {
+    if (
+      !Array.isArray(input.resources) ||
+      input.resources.length < 1 ||
+      input.resources.length > 200
+    )
+      fail("INVALID_INPUT", "Save between one and 200 resource rows together.");
+    const school = ctx.principal.schoolId;
+    const rows = input.resources.map((value) => ({
+      ...resourceInput(value),
+      revision: requireRevision(value.revision),
+    }));
+    if (new Set(rows.map((r) => r.resourceId)).size !== rows.length)
+      fail("INVALID_INPUT", "Resource IDs must be unique.");
+    const existing = await query(
+      ctx.env.DB,
+      "SELECT * FROM lord_resources WHERE school_id=? LIMIT 2001",
+      [school],
+    );
+    if (existing.length > 2000)
+      fail("RESULT_BOUNDS", "Inventory exceeds the supported edit bound.", 422);
+    for (const row of rows) {
+      const old = existing.find((r) => r.resource_id === row.resourceId);
+      if ((old?.revision || 0) !== row.revision)
+        fail(
+          "REVISION_CONFLICT",
+          "Inventory changed. Reload before saving.",
+          409,
+        );
+    }
+    const merged = [
+      ...existing
+        .filter((r) => !rows.some((v) => v.resourceId === r.resource_id))
+        .map((r) => ({
+          type: r.type,
+          cart: JSON.parse(r.metadata_json).cart || "",
+        })),
+      ...rows.map((r) => ({ type: r.type, cart: r.metadata.cart })),
+    ];
+    const groups = new Map();
+    for (const row of merged)
+      if (row.cart) {
+        if (groups.has(row.cart) && groups.get(row.cart) !== row.type)
+          fail(
+            "INVALID_INPUT",
+            "All trolleys in a cart/group must use the same device type.",
+          );
+        groups.set(row.cart, row.type);
+      }
+    const payload = canonical(
+      rows.map((r) => ({
+        ...r,
+        active: r.active ? 1 : 0,
+        exclusive: r.exclusive ? 1 : 0,
+      })),
+    );
+    return {
+      guards: [
+        guard(
+          "SELECT NOT EXISTS(SELECT 1 FROM json_each(?) x LEFT JOIN lord_resources r ON r.school_id=? AND r.resource_id=json_extract(x.value,'$.resourceId') WHERE COALESCE(r.revision,0)<>json_extract(x.value,'$.revision')) AS ok",
+          [payload, school],
+        ),
+        guard(
+          "SELECT NOT EXISTS(SELECT 1 FROM json_each(?) x JOIN lord_resources r ON r.school_id=? AND r.resource_id=json_extract(x.value,'$.resourceId') JOIN lord_booking_items i ON i.school_id=r.school_id AND i.resource_id=r.resource_id JOIN lord_bookings b USING(school_id,booking_id) WHERE b.status IN ('BOOKED','COLLECTED') AND (json_extract(x.value,'$.capacity')<r.capacity OR json_extract(x.value,'$.bufferPeriods')>r.buffer_periods OR json_extract(x.value,'$.active')=0 OR json_extract(x.value,'$.exclusive')<>r.exclusive OR json_extract(x.value,'$.type')<>r.type OR json_extract(x.value,'$.metadata.cart')<>COALESCE(json_extract(r.metadata_json,'$.cart'),''))) AS ok",
+          [payload, school],
+        ),
+        guard(
+          "WITH merged AS (SELECT type,COALESCE(json_extract(metadata_json,'$.cart'),'') AS cart FROM lord_resources WHERE school_id=? AND resource_id NOT IN (SELECT json_extract(value,'$.resourceId') FROM json_each(?)) UNION ALL SELECT json_extract(value,'$.type'),json_extract(value,'$.metadata.cart') FROM json_each(?)) SELECT NOT EXISTS(SELECT cart FROM merged WHERE cart<>'' GROUP BY cart HAVING COUNT(DISTINCT type)>1) AS ok",
+          [school, payload, payload],
+        ),
+      ],
+      writes: [
+        write(
+          "INSERT INTO lord_resources(school_id,resource_id,name,type,capacity,active,exclusive,buffer_periods,revision,metadata_json) SELECT ?,json_extract(value,'$.resourceId'),json_extract(value,'$.name'),json_extract(value,'$.type'),json_extract(value,'$.capacity'),json_extract(value,'$.active'),json_extract(value,'$.exclusive'),json_extract(value,'$.bufferPeriods'),json_extract(value,'$.revision')+1,json_extract(value,'$.metadata') FROM json_each(?) WHERE 1 ON CONFLICT(school_id,resource_id) DO UPDATE SET name=excluded.name,type=excluded.type,capacity=excluded.capacity,active=excluded.active,exclusive=excluded.exclusive,buffer_periods=excluded.buffer_periods,revision=excluded.revision,metadata_json=excluded.metadata_json",
+          [school, payload],
+        ),
+      ],
+      result: {
+        resources: rows.map((r) => ({
+          resourceId: r.resourceId,
+          revision: r.revision + 1,
+        })),
+        atomic: true,
+      },
     };
   });
 }
@@ -591,6 +723,17 @@ async function saveBookings(ctx, input, update = false) {
         writes = [],
         outbox = [],
         resources = new Map();
+      const timings = await one(
+        db,
+        "SELECT revision FROM lord_settings WHERE school_id=? AND setting_key='periodTimings'",
+        [p.schoolId],
+      );
+      guards.push(
+        guard(
+          "SELECT COALESCE((SELECT revision FROM lord_settings WHERE school_id=? AND setting_key='periodTimings'),0)=? AS ok",
+          [p.schoolId, timings?.revision || 0],
+        ),
+      );
       for (const b of planned) {
         const ref = await one(
           db,
@@ -2057,13 +2200,7 @@ async function reignClose(ctx, input) {
         .replaceAll(">", "&gt;");
     for (const [format, mime, content] of [
       ["md", "text/markdown", markdown],
-      [
-        "html",
-        "text/html",
-        '<!doctype html><meta charset="utf-8"><title>LORD period report</title><pre>' +
-          escape(markdown) +
-          "</pre>",
-      ],
+      ["html", "text/html", wrappedReport(archive)],
     ]) {
       const fileSha = await digest(content),
         fileKey = `${school}/lord/archives/${preview.periodId}/${fileSha}.${format}`;
@@ -2189,8 +2326,19 @@ async function settingsSave(ctx, input) {
     )
       fail("INVALID_INPUT", "Invalid settings value.");
     validateSettings(key, input.value);
+    const timetableGuards =
+      key === "periodTimings" &&
+      (!old || canonical(JSON.parse(old.value_json)) !== canonical(input.value))
+        ? [
+            guard(
+              "SELECT NOT EXISTS(SELECT 1 FROM lord_bookings WHERE school_id=? AND status IN ('BOOKED','COLLECTED')) AS ok",
+              [ctx.principal.schoolId],
+            ),
+          ]
+        : [];
     return {
       guards: [
+        ...timetableGuards,
         guard(
           "SELECT COALESCE((SELECT revision FROM lord_settings WHERE school_id=? AND setting_key=?),0)=? AS ok",
           [ctx.principal.schoolId, key, revision],
@@ -2891,7 +3039,15 @@ function validateSettings(key, value) {
       if (
         !Array.isArray(value[k]) ||
         value[k].length > 2000 ||
-        value[k].some((s) => typeof s !== "string" || s.length > 200)
+        value[k].some(
+          (s) =>
+            typeof s !== "string" ||
+            !s.trim() ||
+            s !== s.trim() ||
+            s.length > 200,
+        ) ||
+        new Set(value[k].map((s) => String(s).toLocaleLowerCase())).size !==
+          value[k].length
       )
         fail("INVALID_INPUT", "Invalid reference lists.");
   }
@@ -3052,6 +3208,8 @@ export async function handle(ctx) {
       return board(ctx, input);
     case "resource-save":
       return resourceSave(ctx, input);
+    case "resources-save":
+      return resourcesSave(ctx, input);
     case "resource-delete":
       return resourceSave(ctx, {
         ...input,
@@ -3128,6 +3286,18 @@ export async function handle(ctx) {
       return archiveDownload(ctx, input);
     case "reignpreview":
       return reignPreview(ctx);
+    case "reign-archives":
+      return reignArchiveList(ctx);
+    case "reign-archive-prepare":
+      return prepareReignArchive(ctx, input, mutate);
+    case "reign-archive-export":
+      return exportReignArchive(ctx, input, mutate);
+    case "reign-cleanup-preview":
+      return previewReignCleanup(ctx, input);
+    case "reign-cleanup":
+      return commitReignCleanup(ctx, input, mutate);
+    case "reign-cleanup-finish":
+      return finishReignCleanup(ctx, input, mutate);
     case "reignclose":
       return reignClose(ctx, input);
     case "settings-save":

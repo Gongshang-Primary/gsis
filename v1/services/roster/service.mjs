@@ -1,3 +1,7 @@
+import {updateCapacityWarnings,refreshCapacityMessage,refreshNewSummaries,capacityTemplateData} from "./capacity-notifications.mjs";
+import { forecastCapacity, layeredHealth } from "./capacity.mjs";
+import { allocationSnapshot } from "./allocation-snapshot.mjs";
+import { compactOpeningSave } from './opening-save.mjs';
 import Stapler from "../../../shared/roster-stapler.js";
 import {
   exportDrive,
@@ -78,6 +82,7 @@ const ownReads = new Set([
   "directory",
 ]);
 const reads = new Set([
+  "capacityForecast",
   ...Operations.READS,
   ...ownReads,
   "allocationVersion",
@@ -476,6 +481,7 @@ async function bootstrap(ctx) {
     selected: publicBaseline(selected.entry),
     selection: selected.selection,
     types: loaded.state.types,
+    historyCoverage: Operations.historyCoverage(loaded.state),
     people: c.people.map((p) => ({
       id: p.id,
       name: p.name,
@@ -1590,7 +1596,7 @@ async function captureObservedQuotas(ctx, loaded, next, c) {
         supplied ?? null,
         r.cumulativeDone,
         await digest({ source: "owner-entered-opening", row: r }),
-        ctx.body.operationId,
+        ctx.body.operationId || ctx.body.requestId,
       ],
     });
   }
@@ -1603,14 +1609,14 @@ async function operations(ctx) {
     body = ctx.body,
     opName = operation(body, ctx.path),
     readonly = reads.has(opName) || opName === "read",
-    range = requestedDates(body, ctx.now),
+    range = requestedDates(opName === "capacityForecast" ? {...body, from: body.date || localDate(ctx.now), to: Allocation.addDays(Allocation.monday(body.date || localDate(ctx.now)), 6)} : body, ctx.now),
     ids = [
       body.id,
       body.absenceId,
       ...(body.ids || []),
       ...(body.absenceIds || []),
     ].filter(Boolean),
-    scope = adminWrites.has(opName) ? "config" : "day:" + range.from,
+    scope = (adminWrites.has(opName) || opName === "openingBalances") ? "config" : "day:" + range.from,
     revision = await scopeRevision(ctx.env.DB, schoolId, scope),
     configRevision = await scopeRevision(ctx.env.DB, schoolId, "config"),
     loaded = await loadState(ctx.env.DB, schoolId, range, { recordIds: ids });
@@ -1678,6 +1684,15 @@ async function operations(ctx) {
           workloadOperations.has(opName) &&
           !(opName === "requestMutual" && body.proposalOnly),
       });
+  if (opName === "capacityForecast") {
+    requireValue(ctx.principal.capabilities.some(x => ["admin", "roster.write", "roster.allocate"].includes(x)), "CAPABILITY_DENIED", 403);
+    requireValue(range.from >= localDate(ctx.now), "FORECAST_PAST_DATE", 400);
+    const forecast = await forecastCapacity(ctx, loaded, c, range.dates, revision);
+    requireValue(await scopeRevision(ctx.env.DB, schoolId, "config") === configRevision, "FORECAST_CHANGED", 409);
+    for (const guard of c.localGuards || []) requireValue((await one(ctx.env.DB, guard.sql, guard.args))?.ok === 1, "FORECAST_CHANGED", 409);
+    requireValue(await scopeRevision(ctx.env.DB, schoolId, scope) === revision, "FORECAST_CHANGED", 409);
+    return {...forecast, revision, sourceDependencies: c.dependencies};
+  }
   if (opName === "directory")
     return {
       people: c.people.map((p) => ({
@@ -1703,11 +1718,9 @@ async function operations(ctx) {
   }
   if (readonly) {
     try {
-      return {
-        ...Operations.read(loaded.state, c, { ...body, operation: opName }),
-        revision,
-        calendarByDate: c.calendarByDate,
-      };
+      const result = Operations.read(loaded.state, c, { ...body, operation: opName });
+      if (result.health) result.health = await layeredHealth(ctx, loaded, c, range.from, revision, result.health);
+      return {...result, revision, calendarByDate: c.calendarByDate};
     } catch (e) {
       throw safeLegacyError(e);
     }
@@ -1733,8 +1746,10 @@ async function operations(ctx) {
   } catch (e) {
     throw safeLegacyError(e);
   }
+  await updateCapacityWarnings(ctx, loaded, next, c, range.dates, revision);
   const quotaPlan = await captureObservedQuotas(ctx, loaded, next, c),
-    change = await recordChanges(schoolId, loaded.before, next, loaded.records),
+    change = await recordChanges(schoolId, loaded.before, next, loaded.records,
+      opName === "saveOpeningBalances" ? { maxWrites: 6000 } : undefined),
     sc = scopeChange(schoolId, scope, revision);
   accountingChanges(schoolId, loaded, change, {
     forceWeeks: quotaPlan.writes.length ? [weekOf(range.from)] : [],
@@ -1832,7 +1847,7 @@ async function operations(ctx) {
     notificationsQueued: outbox.filter((j) => j.type === "roster-notification")
       .length,
   };
-  return commit(ctx, op, {
+  const plan = {
     dependencies: c.dependencies,
     guards: [...change.guards, ...(c.localGuards || [])],
     writes: change.writes,
@@ -1843,7 +1858,8 @@ async function operations(ctx) {
       savedIds: result?.savedIds || [],
     },
     outbox,
-  });
+  };
+  return commit(ctx, op, opName === "saveOpeningBalances" ? compactOpeningSave(schoolId, plan) : plan);
 }
 async function preparePublication(ctx, op, state, c, date, revision) {
   const schoolId = ctx.principal.schoolId,
@@ -2036,255 +2052,10 @@ async function preparePublication(ctx, op, state, c, date, revision) {
     ],
   };
 }
-function monday(date) {
-  const d = new Date(date + "T12:00:00Z"),
-    offset = (d.getUTCDay() + 6) % 7;
-  return new Date(Date.parse(date) - offset * 86400000)
-    .toISOString()
-    .slice(0, 10);
-}
-function lessonIdentity(d, day) {
-  const teacher = day.teachers?.find(
-      (t) => t.staffId === (d.absentId || d.staffId),
-    ),
-    cell = teacher?.cells[d.period];
-  let start = d.period;
-  if (cell)
-    while (
-      start > 0 &&
-      JSON.stringify(teacher.cells[start - 1]) === JSON.stringify(cell)
-    )
-      start--;
-  return [
-    day.id,
-    d.absentId || d.staffId || d.absenceId,
-    d.className || "",
-    d.groupName || "",
-    d.subject,
-    start,
-  ].join(":");
-}
 async function allocationRun(ctx, loaded, c, range, scope, revision, op) {
-  const schoolId = ctx.principal.schoolId,
-    date = range.from,
-    day = c.days[date];
-  requireValue(
-    day?.verified && day.schoolDay && day.id,
-    "TIMETABLE_UNVERIFIED",
-    409,
-  );
-  requireValue(
-    c.publication?.publicationId &&
-      Number.isSafeInteger(c.publication.publicationSequence),
-    "WORKLOAD_UNVERIFIED",
-    503,
-  );
-  const week = monday(date),
-    rows = c.publication.rows || [],
-    byStaff = new Map(rows.map((r) => [r.staffId, r])),
-    captured = await query(
-      ctx.env.DB,
-      "SELECT * FROM roster_weekly WHERE school_id=? AND week=?",
-      [schoolId, week],
-    ),
-    capturedMap = new Map(captured.map((r) => [r.staff_id, r]));
-  const used = new Map(),
-    usedOccupied = new Map(),
-    physicalSlots = new Map(),
-    unknownPhysical = new Set();
-  for (const a of Allocation.accounted(loaded.state, c)) {
-    if (monday(a.date) !== week || a.date === date) continue;
-    used.set(a.staffId, (used.get(a.staffId) || 0) + Allocation.cost(a));
-    if (!Number.isInteger(a.period)) {
-      unknownPhysical.add(a.staffId);
-      continue;
-    }
-    const key = a.staffId + "|" + a.date + "|" + a.period,
-      occupied =
-        a.occupiedPeriods ??
-        a.additionalOccupied ??
-        (a.combination || a.repurposedDuty ? 0 : 1),
-      previous = physicalSlots.get(key) || 0;
-    physicalSlots.set(key, Math.max(previous, occupied));
-    usedOccupied.set(
-      a.staffId,
-      (usedOccupied.get(a.staffId) || 0) + Math.max(0, occupied - previous),
-    );
-  }
-  const weeklyWrites = [],
-    weeklyGuards = [];
-  const staff = c.people.map((p) => {
-    const teaching = day.teachers.find((t) => t.staffId === p.id),
-      adHoc = loaded.state.adhoc.find(
-        (a) => a.staffId === p.id && a.date === date && !a.deletedAt,
-      ),
-      row = byStaff.get(p.id),
-      previous = capturedMap.get(p.id),
-      quality = row?.quality === "verified" ? "verified" : "unavailable";
-    const q =
-        quality === "verified" &&
-        Number.isFinite(row.budget) &&
-        Number.isFinite(row.weightedWi ?? row.Wi) &&
-        Number.isFinite(row.factor)
-          ? Math.max(
-              0,
-              Math.floor(
-                row.factor * (row.budget - (row.weightedWi ?? row.Wi)),
-              ),
-            )
-          : null,
-      quota = previous ? (previous.excluded ? 0 : previous.quota) : q;
-    if (!previous && q !== null && teaching && p.active && p.eo) {
-      weeklyGuards.push({
-        sql: "SELECT NOT EXISTS(SELECT 1 FROM roster_weekly WHERE school_id=? AND staff_id=? AND week=?) AS ok",
-        args: [schoolId, p.id, week],
-      });
-      weeklyWrites.push({
-        sql: "INSERT INTO roster_weekly(school_id,staff_id,week,publication_id,publication_sequence,calculation_version,quota,captured_at,evidence_json) VALUES(?,?,?,?,?,?,?,?,?)",
-        args: [
-          schoolId,
-          p.id,
-          week,
-          c.publication.publicationId,
-          c.publication.publicationSequence,
-          c.publication.calculationVersion,
-          q,
-          ctx.now,
-          canonical({
-            source: "initial-verified-capture",
-            row,
-            contactsRevision: c.publication.contactsRevision || null,
-          }),
-        ],
-      });
-    }
-    return {
-      staffId: p.id,
-      active: p.longTermActive ?? p.active,
-      dateActive: !!adHoc && p.adhocEligible === true,
-      eo: p.eo,
-      employment: p.employment,
-      employmentTags: p.employmentTags,
-      employmentCapRequired:
-        p.employment.split(",").includes("UT") || row?.periodCap != null,
-      appointments: p.appointments || [p.role].filter(Boolean),
-      dailyAdhoc: !!adHoc,
-      adhocEligible: p.adhocEligible,
-      hasBaseline: !!teaching,
-      available: adHoc?.periods || day.periods.map((p) => p.period),
-      occupied: (teaching?.cells || []).flatMap((cell, period) =>
-        cell.some((x) => String(x).trim())
-          ? [{ period, subject: cell[0], occupied: true }]
-          : [],
-      ),
-      weekly: {
-        quality:
-          quality === "verified" && quota !== null ? "verified" : "unavailable",
-        remaining:
-          quota === null ? null : Math.max(0, quota - (used.get(p.id) || 0)),
-        publicationId: previous?.publication_id || c.publication.publicationId,
-      },
-      subjects: p.subjects || [],
-      levels: p.levels || [],
-      actualWeeklyCap: row?.periodCap ?? null,
-      actualWeeklyOccupied:
-        row?.periodCap == null
-          ? null
-          : !unknownPhysical.has(p.id) &&
-              c.effectiveCaps?.[p.id + "|" + week]?.capVerified === true
-            ? c.effectiveCaps[p.id + "|" + week].capWorkload +
-              (usedOccupied.get(p.id) || 0)
-            : null,
-      rotation: 0,
-    };
-  });
-  const demands = Operations.demand(c, loaded.state, date).map((d) => ({
-    ...d,
-    lessonId: lessonIdentity(d, day),
-    classId: d.classId || d.className || null,
-    groupId: d.groupId || d.groupName || null,
-    venueId: d.venueId || d.venue || null,
-  }));
-  const policyRow = await one(
-      ctx.env.DB,
-      "SELECT payload_json,revision FROM roster_records WHERE school_id=? AND collection='layerPolicy' AND record_id='scalar'",
-      [schoolId],
-    ),
-    policyValue = policyRow
-      ? { ...defaultPolicy(), ...JSON.parse(policyRow.payload_json).data }
-      : defaultPolicy(),
-    policyRevision = policyRow?.revision || 0;
-  policyValue.noReliefSubjects =
-    loaded.state.systemConfig.noReliefSubjects || policyValue.noReliefSubjects;
-  policyValue.consecutiveBreakSubjects =
-    loaded.state.systemConfig.consecutiveCountExclusions;
-  policyValue.employmentRestrictedPeriods = Object.fromEntries(
-    (loaded.state.systemConfig.employmentPeriodRestrictions || []).map((x) => [
-      x.employment,
-      x.periods,
-    ]),
-  );
-  const snapshot = {
-    schemaVersion: 1,
-    schoolId,
-    runId: op.operationId,
-    date,
-    timeZone: "Asia/Singapore",
-    observedAt: ctx.now,
-    revisions: {
-      day: revision,
-      config: policyRevision,
-      publication: c.publication.publicationSequence,
-      accounting: loaded.accountingRevisions,
-    },
-    employmentCapEvidence: c.effectiveCaps,
-    sourceDependencies: c.dependencies.map((d) => ({
-      owner: d.owner,
-      scope: d.scope,
-      revision: d.revision,
-    })),
-    staff,
-    demands,
-    assignments: Allocation.effectiveAssignments(loaded.state)
-      .filter((a) => a.date === date && !a.noRelief && !a.remove)
-      .map((a) => ({
-        ...a,
-        lessonId:
-          demands.find((d) => d.id === a.demandId)?.lessonId ||
-          a.lessonId ||
-          a.demandId,
-        charge: a.rCost ?? 1,
-        blockLength:
-          policyValue.layers.find((l) => l.id === a.layer)?.continuity[
-            String(a.subject).toUpperCase()
-          ] || 1,
-      })),
-    absences: loaded.state.absences
-      .filter((a) => a.date === date && !a.deletedAt)
-      .map((a) => ({
-        staffId: a.staffId,
-        periods: Allocation.absencePeriods(a, day),
-      })),
-    peerReservations: loaded.state.requests
-      .filter((r) => r.date === date && r.status === "pending")
-      .map((r) => ({
-        staffId: r.recipientId,
-        periods: r.periods || [],
-        status: "pending",
-      })),
-    manualNoCover: loaded.state.assignments
-      .filter((a) => a.date === date && a.noRelief)
-      .map((a) => a.demandId),
-    startedPeriods: day.periods
-      .filter(
-        (p) =>
-          Date.parse(date + "T00:00:00+08:00") + p.startMinutes * 60000 <=
-          ctx.now,
-      )
-      .map((p) => p.period),
-    inputDigest: "pending",
-  };
-  snapshot.inputDigest = await digest({ ...snapshot, inputDigest: null });
+  const schoolId = ctx.principal.schoolId, date = range.from;
+  const { snapshot, policyValue, policyRevision, weeklyWrites, weeklyGuards, day, demands, week } =
+    await allocationSnapshot(ctx, loaded, c, date, revision, op.operationId);
   const run = await one(
     ctx.env.DB,
     "SELECT * FROM roster_runs WHERE school_id=? AND run_id=?",
@@ -2376,6 +2147,7 @@ async function allocationRun(ctx, loaded, c, range, scope, revision, op) {
     engineVersion: proposal.engineVersion,
     unresolved: proposal.unresolved.length,
   });
+  await updateCapacityWarnings(ctx,loaded,next,c,[date],revision);
   const change = await recordChanges(
       schoolId,
       loaded.before,
@@ -2430,6 +2202,7 @@ async function allocationRun(ctx, loaded, c, range, scope, revision, op) {
     guards: [...change.guards, ...(c.localGuards || [])],
     writes: change.writes,
     result,
+    outbox: next.outbox.filter(j=>!loaded.state.outbox.some(old=>old.id===j.id)).map(j=>({id:j.id,type:'roster-notification',payload:j,dueAt:j.dueAt||ctx.now})),
     audit: {
       runId: op.operationId,
       inputDigest: snapshot.inputDigest,
@@ -2696,7 +2469,7 @@ async function scheduledCommunication(ctx, slot) {
       slot.date,
       now,
     ),
-    range = requestedDates({ from: slot.today, to: slot.date }, now),
+    range = requestedDates({ from: slot.today, to: Allocation.addDays(Allocation.monday(slot.date), 6) }, now),
     scope = "day:" + slot.date,
     revision = await scopeRevision(env.DB, schoolId, scope),
     loaded = await loadState(env.DB, schoolId, range),
@@ -2707,8 +2480,10 @@ async function scheduledCommunication(ctx, slot) {
       next,
       { ...c, service: true, skipScheduledAllocation: true },
       body.tick,
-    ),
-    op = await prepared(local, "roster.scheduled-notifications", body),
+    );
+  await updateCapacityWarnings(local, loaded, next, c, range.dates, revision);
+  await refreshNewSummaries(local, loaded, next, c, revision);
+  const op = await prepared(local, "roster.scheduled-notifications", body),
     quotaPlan = await captureObservedQuotas(local, loaded, next, c),
     change = await recordChanges(schoolId, loaded.before, next, loaded.records),
     sc = scopeChange(schoolId, scope, revision);
@@ -3041,7 +2816,8 @@ export async function dispatchRosterJob(job, env, now = Date.now()) {
   )
     return { state: "cancelled", code: "RECIPIENT_NO_LONGER_ELIGIBLE" };
   if (job.type === "roster-notification") {
-    const range = { from: payload.date, to: payload.date },
+    const capacityMessage = payload.kind==='capacity_warning'||payload.kind==='smc_report'&&!!payload.data?.scheduledSummary;
+    const range = requestedDates({from:payload.date,to:capacityMessage?Allocation.addDays(Allocation.monday(payload.date),6):payload.date},now),
       loaded = await loadState(env.DB, schoolId, range),
       ctx = {
         env,
@@ -3049,7 +2825,7 @@ export async function dispatchRosterJob(job, env, now = Date.now()) {
         now,
         body: { date: payload.date, operation: "dailyNotify" },
       },
-      c = await context(ctx, loaded, { ...range, dates: [payload.date] });
+      c = await context(ctx, loaded, range, {needsQuota:capacityMessage});
     const currentRecipient = c.people.find(
       (p) => p.id === (payload.recipientId || payload.staffId),
     );
@@ -3072,6 +2848,8 @@ export async function dispatchRosterJob(job, env, now = Date.now()) {
       return { state: "cancelled", code: "SPONSOR_NO_LONGER_SMC" };
     if (Operations.notificationCurrent(loaded.state, payload, now))
       return { state: "cancelled", code: "NOTIFICATION_OBSOLETE" };
+    if(capacityMessage&&!await refreshCapacityMessage(ctx,loaded,c,payload,await scopeRevision(env.DB,schoolId,'day:'+payload.date)))
+      return {state:'cancelled',code:'CAPACITY_WARNING_OBSOLETE_OR_UNVERIFIED'};
     let link = null;
     if (
       payload.kind === "mutual_request" ||
@@ -3092,7 +2870,7 @@ export async function dispatchRosterJob(job, env, now = Date.now()) {
       provider: "whatsapp",
       to: currentRecipient.mobile,
       template: templateFor(env, payload.data?.templateKey || payload.kind, {
-        ...(payload.data || {}),
+        ...(capacityMessage?capacityTemplateData(env,payload,currentRecipient):(payload.data || {})),
         link,
       }),
       idempotencyKey: job.job_id,

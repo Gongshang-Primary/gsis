@@ -1,5 +1,11 @@
 # F5 — durable decision evidence recovery design
 
+## 14 November implementation update
+
+The historical design below records the earlier library-only evidence gap. The isolated product at PR145 `f1efe8a687cb640dae8731fe674acb72b33e7f9b` already persists Core evidence and Contacts immutable snapshots. The owner subsequently authorised the remaining build including F5. This follow-up captures the actual final T1A allow decision and validates recovery through existing owner stores, with no new database or audit-projector fields. See [recovery verification](F5_RECOVERY_VERIFICATION.md) for the implemented boundary and remaining closure gates. **F5 remains OPEN.**
+
+## Historical design (13 November; authorisation wording is historical)
+
 Model: Codex. 13 November 2026 SGT. **F5 OPEN. Design only; no evidence writer, store, audit change or durable recovery demonstrated.** Source queue at `110bf5838b4a9c95735d503f42587dd0d1f34a40` (unmerged PR132); owner's later instruction approves D design/publication only. Contracts inspected at source main `e996dfdb3a69bee76355ba60500468679d0963de`. Package A changes a denial reason, not this evidence gap. ChatGPT coordinates; Claude independently reviews the exact documentation head.
 
 ## Findings from actual contracts

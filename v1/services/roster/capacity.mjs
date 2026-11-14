@@ -1,3 +1,5 @@
+import { allocationSnapshot } from "./allocation-snapshot.mjs";
+import { inspectCapacity, runEngine } from "../../allocator/index.mjs";
 import Operations from "../../../shared/roster-operations.js";
 import Allocation from "../../../shared/roster-allocation.js";
 import Stapler from "../../../shared/roster-stapler.js";
@@ -233,4 +235,65 @@ export async function effectiveWeeklyCaps(
       };
     }
   return { byKey, dependencies, sourceDays };
+}
+
+/** Read-only projection. Each day's simulated new duties enter one scratch week;
+ * existing future commitments already loaded by the repository remain fixed.
+ */
+export async function forecastCapacity(ctx, loaded, c, dates, revision) {
+  requireValue(Array.isArray(dates) && dates.length > 0 && dates.length <= 7 &&
+    dates.every(d => Allocation.monday(d) === Allocation.monday(dates[0])), "FORECAST_RANGE_BOUNDS", 400);
+  const scratch = structuredClone(loaded), days = [];
+  let incomplete = false;
+  for (const date of [...dates].sort()) {
+    const day = c.days[date];
+    if (c.calendarByDate?.[date]?.schoolDay === false) {
+      days.push({date, state: "not-school-day"}); continue;
+    }
+    try {
+      const {snapshot, policyValue} = await allocationSnapshot(ctx, scratch, c, date, revision, "forecast:" + date);
+      const reserve = inspectCapacity(snapshot, policyValue, day.periods.map(p => p.period));
+      if (!reserve.verified || incomplete) {
+        incomplete = true;
+        days.push({date, state: "not-verified", reason: "Required capacity evidence is unavailable, including earlier days in this forecast."});
+        continue;
+      }
+      const proposal = runEngine(snapshot, policyValue, {mode: "fill-only", maxComparisons: 10000});
+      const unresolved = proposal.unresolved.map(x => ({...x, ...snapshot.demands.find(d => d.id === x.demandId)}));
+      days.push({date, state: "projected", observedAt: ctx.now, revisions: snapshot.revisions,
+        inputDigest: snapshot.inputDigest, reserve, planned: proposal.assignments.length,
+        retained: proposal.retained.length, unresolved, search: proposal.search});
+      for (const a of proposal.assignments) scratch.state.assignments.push({...a, date, rCost: a.charge ?? 1});
+    } catch (error) {
+      if (!["TIMETABLE_UNVERIFIED", "WORKLOAD_UNVERIFIED", "ALLOCATION_INPUT_INVALID"].includes(error.code)) throw error;
+      incomplete = true;
+      days.push({date, state: "not-verified", reason: error.code});
+    }
+  }
+  return {schemaVersion: 1, observedAt: ctx.now, from: dates[0], to: dates.at(-1),
+    state: incomplete ? "incomplete" : "projected", days, optimalityProven: false,
+    note: "Known demand only. Saved duties remain fixed. Projected duties do not change assignments or R. Uncovered means no valid cover found in this bounded projection."};
+}
+export async function layeredHealth(ctx, loaded, c, date, revision, previous) {
+  try {
+    const {snapshot, policyValue, day} = await allocationSnapshot(ctx, loaded, c, date, revision, "health:" + date);
+    const periods = day.periods.map(p => p.period), current = inspectCapacity(snapshot, policyValue, periods),
+      baseline = inspectCapacity({...snapshot, assignments: []}, policyValue, periods);
+    const potential = baseline.periods.reduce((n,p) => n+p.green.length,0), remaining = current.periods.reduce((n,p) => n+p.green.length,0);
+    return {...previous, engineVersion: current.engineVersion, policyVersion: current.policyVersion,
+      observedAt: ctx.now, incomplete: !current.verified, verified: current.verified,
+      reason: current.verified ? "" : "Current quota or employment-cap evidence is not verified.",
+      potential, remaining, consumed: Math.max(0,potential-remaining),
+      percentage: current.verified && potential ? 100*remaining/potential : null,
+      critical: current.verified && remaining === 0, balances: current.balances, note: current.note,
+      periods: current.periods.map(p => ({...day.periods.find(x => x.period === p.period), ...p,
+        potential: baseline.periods.find(x => x.period === p.period).green.length,
+        potentialStaffIds: baseline.periods.find(x => x.period === p.period).green,
+        red: (previous?.periods.find(x => x.period === p.period)?.red || []),
+        warning: p.green.length <= 2 ? (p.green.length === 0 ? "critical" : p.green.length === 1 ? "very-low" : "low") : null}))};
+  } catch (error) {
+    if (!["TIMETABLE_UNVERIFIED", "WORKLOAD_UNVERIFIED", "ALLOCATION_INPUT_INVALID"].includes(error.code)) throw error;
+    return {...previous, verified: false, incomplete: true, percentage: null, critical: false,
+      reason: error.code, periods: (previous?.periods || []).map(p => ({...p, green: [], potentialStaffIds: []}))};
+  }
 }

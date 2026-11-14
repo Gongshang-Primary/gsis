@@ -2,7 +2,7 @@ const api = window.GSISV1,
   panel = document.createElement("details");
 panel.className = "gsis-panel";
 panel.innerHTML =
-  '<summary>Signage access</summary><p data-state></p><form data-use><label>Restricted device token<input name="token" type="password" pattern="[a-f0-9]{64}" required autocomplete="off"></label><button>Use in this tab</button><button type="button" data-clear>Forget device token</button></form><form data-create hidden><h2>Create a restricted display session</h2><label>Device ID<input name="deviceId" required maxlength="80" pattern="[A-Za-z0-9][A-Za-z0-9._-]*"></label><label>Days valid<input name="days" type="number" value="7" min="1" max="30" required></label><fieldset data-resources><legend>Resources shown on this display (none selected means all resources)</legend></fieldset><label><input type="checkbox" name="photos">Allow current collection photographs for these resources</label><button>Create device token</button><output data-token></output></form>';
+  '<summary>Signage access</summary><p data-state></p><form data-use><p>Using a device token signs this browser out of its staff account before opening the restricted display.</p><label>Restricted device token<input name="token" type="password" pattern="[a-f0-9]{64}" required autocomplete="off"></label><button>Use in this tab</button><button type="button" data-clear>Forget device token</button></form><form data-create hidden><h2>Create a restricted display session</h2><label>Device ID<input name="deviceId" required maxlength="80" pattern="[A-Za-z0-9][A-Za-z0-9._-]*"></label><label>Days valid<input name="days" type="number" value="7" min="1" max="30" required></label><fieldset data-resources><legend>Resources shown on this display (none selected means all resources)</legend></fieldset><label><input type="checkbox" name="photos">Allow current collection photographs for these resources</label><button>Create device token</button><output data-token></output></form>';
 document.body.append(panel);
 const state = panel.querySelector("[data-state]");
 state.textContent = sessionStorage.getItem("gsis-signage-device")
@@ -11,12 +11,14 @@ state.textContent = sessionStorage.getItem("gsis-signage-device")
 panel.querySelector("[data-use]").onsubmit = async (event) => {
   event.preventDefault();
   const token = new FormData(event.currentTarget).get("token");
-  await api.clearProtectedState();
-  sessionStorage.setItem(
-    "gsis-signage-device",
-    token,
-  );
-  location.reload();
+  try {
+    // An unattended display must not keep the configuring Admin's staff session.
+    await api.logout();
+    sessionStorage.setItem("gsis-signage-device", token);
+    location.assign("/starlord/");
+  } catch (error) {
+    state.textContent = error.message;
+  }
 };
 panel.querySelector("[data-clear]").onclick = async () => {
   await api.clearProtectedState();

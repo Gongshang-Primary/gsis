@@ -35,6 +35,12 @@ async function loadAccounts() {
     button.textContent = "Edit";
     button.onclick = () => {
       editing = account;
+      $("suspended").disabled = false;
+      $("accountHeading").textContent = "Edit account";
+      $("newIdentity").hidden = true;
+      $("newEmail").required = $("newSubject").required = false;
+      $("explicitCapabilities").hidden = false;
+      $("accountStatus").textContent = "";
       operationId = crypto.randomUUID();
       accountRequest = null;
       $("accountId").textContent = account.accountId;
@@ -59,6 +65,24 @@ async function loadAccounts() {
     $("accountRows").append(row);
   }
 }
+$("addAccount").onclick = () => {
+  editing = { accountId: crypto.randomUUID(), creating: true };
+  operationId = crypto.randomUUID();
+  accountRequest = null;
+  $("accountHeading").textContent = "Add account";
+  $("accountId").textContent = editing.accountId;
+  $("newIdentity").hidden = false;
+  $("newEmail").required = $("newSubject").required = true;
+  $("newEmail").value = $("newSubject").value = "";
+  $("newAdmin").checked = false;
+  $("explicitCapabilities").hidden = true;
+  $("staffId").value = $("capabilities").value = $("reason").value = "";
+  $("suspended").value = "false";
+  $("suspended").disabled = true;
+  $("accountStatus").textContent = "";
+  $("accountForm").hidden = false;
+  $("newEmail").focus();
+};
 $("refreshAccounts").onclick = () =>
   loadAccounts().catch((e) => status(e.message, true));
 $("cancelAccount").onclick = () => {
@@ -75,10 +99,14 @@ $("accountForm").onsubmit = async (event) => {
       method: "POST",
       body: (accountRequest ??= {
         operationId,
-        revision: editing.revision,
+        ...(editing.creating
+          ? { subject: $("newSubject").value.trim(), email: $("newEmail").value.trim() }
+          : { revision: editing.revision }),
         accountId: editing.accountId,
         staffId: $("staffId").value.trim() || null,
-        capabilities: $("capabilities")
+        capabilities: editing.creating
+          ? ($("newAdmin").checked ? ["admin"] : [])
+          : $("capabilities")
           .value.split(/\n/)
           .map((x) => x.trim())
           .filter(Boolean),
@@ -96,6 +124,9 @@ $("accountForm").onsubmit = async (event) => {
       accountRequest = null;
       $("accountStatus").textContent = "Account change confirmed.";
       await loadAccounts();
+      editing = null;
+      $("accountForm").hidden = true;
+      status("Account change confirmed.");
     } else throw Error("The account change outcome is not confirmed.");
   } catch (error) {
     $("accountStatus").textContent =
@@ -175,6 +206,11 @@ async function health() {
       try {
         const result = await api.request(domain, "/system/health");
         content.textContent = JSON.stringify(result, null, 2);
+        const drive = document.createElement("p");
+        drive.textContent = "Google Drive backups: " + (result.driveBackup?.state || "unavailable") +
+          ". Daily freshness checks begin at 23:50 Singapore time; unchanged older files remain current. " +
+          "Drive history is deleted manually. Automatic Cloudflare pruning is off.";
+        section.append(drive);
         const note = document.createElement("p");
         note.textContent =
           "A verified backup covers this owner’s database and artifacts. Backups across different owners are not an atomic school-wide snapshot.";
@@ -271,15 +307,18 @@ async function health() {
   );
 }
 $("refreshHealth").onclick = health;
-document.querySelectorAll("[data-section]").forEach((button) => {
-  button.onclick = () => {
-    for (const id of ["accounts", "health", "evidence", "services"])
-      $(id).hidden = id !== button.dataset.section;
-    if (button.dataset.section === "health") void health();
-    if (button.dataset.section === "services")
-      void services().catch((e) => status(e.message, true));
-  };
-});
+function openSection(id) {
+  const ids = ["accounts", "health", "evidence", "services", "storage"];
+  if (!ids.includes(id)) id = "accounts";
+  for (const section of ids) $(section).hidden = section !== id;
+  for (const button of document.querySelectorAll("[data-section]"))
+    button.setAttribute("aria-current",button.dataset.section === id ? "page" : "false");
+  history.replaceState(null,"","#"+id);
+  window.dispatchEvent(new Event("gsis:navigation"));
+  if (id === "health") void health().catch(e=>status(e.message,true));
+  if (id === "services") void services().catch(e=>status(e.message,true));
+}
+document.querySelectorAll("[data-section]").forEach(button=>button.onclick=()=>openSection(button.dataset.section));
 $("evidenceForm").onsubmit = async (event) => {
   event.preventDefault();
   $("evidenceResult").textContent = "Recovering…";
@@ -297,14 +336,14 @@ try {
   const session = await api.getSession();
   if (!session) {
     location.replace("/?next=/admin/");
-  } else if (!session.capabilities.includes("core.admin"))
-    status("Administration requires current Admin access.", true);
+  } else if (session.impersonating || !session.capabilities.includes("core.admin"))
+    status("Global Admin Toolbox requires current Global Admin access.", true);
   else {
     $("adminContent").hidden = false;
     status("Current Core permissions govern every action.");
     await loadAccounts();
-    if (location.hash === "#health")
-      document.querySelector("[data-section=health]").click();
+    openSection(location.hash.slice(1));
+    window.addEventListener("hashchange",()=>openSection(location.hash.slice(1)));
   }
 } catch (error) {
   status(error.message, true);

@@ -208,7 +208,9 @@ export async function startProduct({
     for (const d of domains) {
       progress(d + " database opening");
       const db = database(d);
-      await migrate(db, [join(output, d, "migrations/0001_owner.sql")]);
+      const folder = join(output, d, "migrations");
+      const files = (await readdir(folder)).filter(name => name.endsWith(".sql")).sort();
+      await migrate(db, files.map(name => join(folder, name)));
       progress(d + " schema ready");
     }
   return {

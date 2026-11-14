@@ -19,11 +19,12 @@
     $("status").textContent = "Choose an application.";
     $("identity").textContent = session.user.email;
     $("impersonation").hidden = !session.impersonating;
-    $("adminLink").hidden = !session.capabilities.includes("core.admin");
     const response = await fetch("/v1/modules.json");
     if (!response.ok)
       throw Error("Application list could not load. Reload to retry.");
     const modules = await response.json();
+    if (!session.impersonating && session.capabilities.includes("core.admin"))
+      modules.push({id:"admin",name:"Global Admin Toolbox",description:"Accounts, system health, backups and recovery."});
     $("modules").replaceChildren();
     for (const module of modules) {
       const link = document.createElement("a");
@@ -33,7 +34,37 @@
       title.textContent = module.name;
       const detail = document.createElement("p");
       detail.textContent = module.description;
-      link.append(title, detail);
+      const icon = document.createElement("span");
+      icon.className = "module-icon";
+      icon.setAttribute("aria-hidden", "true");
+      if (module.icon) {
+        const image = document.createElement("img");
+        image.src = module.icon;
+        image.alt = "";
+        icon.append(image);
+      } else {
+        const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+        svg.setAttribute("viewBox", "0 0 48 48");
+        svg.setAttribute("fill", "none");
+        svg.setAttribute("stroke", "currentColor");
+        svg.setAttribute("stroke-width", "2.5");
+        svg.setAttribute("stroke-linecap", "round");
+        svg.setAttribute("stroke-linejoin", "round");
+        const path = document.createElementNS(svg.namespaceURI, "path");
+        const paths = {
+          admin: "M7 15h34v25H7ZM17 15V8h14v7M7 25h34M20 22h8v7h-8Z",
+          venues: "M10 40V8h28v32M10 16h28M17 40V23h14v17M26 30h1",
+          layout: "m7 12 11-5 12 5 11-5v29l-11 5-12-5-11 5ZM18 7v29M30 12v29",
+          deploy: "M7 9h34v30H7ZM7 18h34M18 18v21M29 18v21M7 28h34",
+          lord: "M7 9h34v24H7ZM17 40h14M24 33v7M16 20h16m-5-5 5 5-5 5",
+          starlord: "M6 8h36v27H6ZM16 41h16M24 35v6m0-22 3 6 7 1-5 5 1 7-6-3-6 3 1-7-5-5 7-1Z",
+          overlord: "M10 7h28v34H10ZM17 15h3m5 0h7M17 24h3m5 0h7M17 33h3m5 0h7",
+        };
+        path.setAttribute("d", paths[module.id] || paths.deploy);
+        svg.append(path);
+        icon.append(svg);
+      }
+      link.append(icon, title, detail);
       $("modules").append(link);
     }
     const target = safeNext(next);

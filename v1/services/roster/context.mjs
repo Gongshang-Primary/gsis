@@ -7,6 +7,7 @@ import { serviceCall } from "../../runtime/security.mjs";
 import { requireValue } from "../../runtime/errors.mjs";
 import { localDate, readArtifact, scopeRevision } from "./repository.mjs";
 export const workloadOperations = new Set([
+  "capacityForecast",
   "assign",
   "combine",
   "undo",
