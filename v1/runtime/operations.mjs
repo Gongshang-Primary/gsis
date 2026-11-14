@@ -3,6 +3,7 @@ import { query, one, prepareOperation, commitOperation } from "./store.mjs";
 import { admit, resolveAdmission } from "./security.mjs";
 import { backupOwner } from "./backup.mjs";
 import { outboxHealth } from "./jobs.mjs";
+import { driveBackupHealth } from "./drive-backup-jobs.mjs";
 export function systemPolicy(method, path) {
   if (
     method === "GET" &&
@@ -63,6 +64,7 @@ export async function systemHandle(ctx) {
         telegram: !!env.TELEGRAM_BOT_TOKEN,
         email: !!(env.EMAIL_API_TOKEN && env.EMAIL_FROM),
       },
+      driveBackup: await driveBackupHealth(env, now),
       automaticEvidenceDeletion: false,
     };
   }

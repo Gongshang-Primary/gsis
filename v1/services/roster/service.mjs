@@ -1,3 +1,4 @@
+import { compactOpeningSave } from './opening-save.mjs';
 import Stapler from "../../../shared/roster-stapler.js";
 import {
   exportDrive,
@@ -476,6 +477,7 @@ async function bootstrap(ctx) {
     selected: publicBaseline(selected.entry),
     selection: selected.selection,
     types: loaded.state.types,
+    historyCoverage: Operations.historyCoverage(loaded.state),
     people: c.people.map((p) => ({
       id: p.id,
       name: p.name,
@@ -1590,7 +1592,7 @@ async function captureObservedQuotas(ctx, loaded, next, c) {
         supplied ?? null,
         r.cumulativeDone,
         await digest({ source: "owner-entered-opening", row: r }),
-        ctx.body.operationId,
+        ctx.body.operationId || ctx.body.requestId,
       ],
     });
   }
@@ -1610,7 +1612,7 @@ async function operations(ctx) {
       ...(body.ids || []),
       ...(body.absenceIds || []),
     ].filter(Boolean),
-    scope = adminWrites.has(opName) ? "config" : "day:" + range.from,
+    scope = (adminWrites.has(opName) || opName === "openingBalances") ? "config" : "day:" + range.from,
     revision = await scopeRevision(ctx.env.DB, schoolId, scope),
     configRevision = await scopeRevision(ctx.env.DB, schoolId, "config"),
     loaded = await loadState(ctx.env.DB, schoolId, range, { recordIds: ids });
@@ -1734,7 +1736,8 @@ async function operations(ctx) {
     throw safeLegacyError(e);
   }
   const quotaPlan = await captureObservedQuotas(ctx, loaded, next, c),
-    change = await recordChanges(schoolId, loaded.before, next, loaded.records),
+    change = await recordChanges(schoolId, loaded.before, next, loaded.records,
+      opName === "saveOpeningBalances" ? { maxWrites: 6000 } : undefined),
     sc = scopeChange(schoolId, scope, revision);
   accountingChanges(schoolId, loaded, change, {
     forceWeeks: quotaPlan.writes.length ? [weekOf(range.from)] : [],
@@ -1832,7 +1835,7 @@ async function operations(ctx) {
     notificationsQueued: outbox.filter((j) => j.type === "roster-notification")
       .length,
   };
-  return commit(ctx, op, {
+  const plan = {
     dependencies: c.dependencies,
     guards: [...change.guards, ...(c.localGuards || [])],
     writes: change.writes,
@@ -1843,7 +1846,8 @@ async function operations(ctx) {
       savedIds: result?.savedIds || [],
     },
     outbox,
-  });
+  };
+  return commit(ctx, op, opName === "saveOpeningBalances" ? compactOpeningSave(schoolId, plan) : plan);
 }
 async function preparePublication(ctx, op, state, c, date, revision) {
   const schoolId = ctx.principal.schoolId,

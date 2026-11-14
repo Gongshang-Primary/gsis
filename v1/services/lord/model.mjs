@@ -76,6 +76,7 @@ export function resourceInput(input) {
     exclusive: input.exclusive !== false,
     bufferPeriods: integer(input.bufferPeriods ?? 1, 0, 4, "buffer"),
     metadata: {
+      cart: text(input.metadata?.cart || "", "cart/group", 160),
       stylusOption: input.metadata?.stylusOption === true,
       headphoneOption: input.metadata?.headphoneOption === true,
     },

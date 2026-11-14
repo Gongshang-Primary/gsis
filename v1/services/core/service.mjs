@@ -1,3 +1,4 @@
+import {sealDecisionEvidence,recoverDecisionEvidence} from "./evidence.mjs";
 import { authorizeContribution } from "./contributions.mjs";
 import { ApiError } from "../../runtime/errors.mjs";
 import {
@@ -304,7 +305,8 @@ export async function authorizeCore(env, input, now = Date.now()) {
     ])
       caps.add(x);
   let observation = null,
-    authority = null;
+    authority = null,
+    authorityDecision = null;
   const derived =
     !targetAdmin &&
     [
@@ -539,6 +541,7 @@ export async function authorizeCore(env, input, now = Date.now()) {
       decision.outcome === "unavailable" ? 503 : decision.retryable ? 409 : 403,
       "Current Deploy authority was not confirmed.",
     );
+    authorityDecision = decision;
     decisionId = decision.decisionId;
     coreRevision = decision.coreRevision;
     if (authority) {
@@ -591,7 +594,7 @@ export async function authorizeCore(env, input, now = Date.now()) {
         schemaVersion: 1,
         kind: "privileged-decision",
         eventId: decisionId,
-        requestId: d.requestId ?? decisionId,
+        requestId: authorityDecision?.requestId ?? d.requestId ?? decisionId,
         schoolId: env.SCHOOL_ID,
         action: d.action,
         outcome: "allow",
@@ -601,7 +604,7 @@ export async function authorizeCore(env, input, now = Date.now()) {
         policyVersion: "deploy-capabilities/1",
         coreRevision,
         contactsRevision: authority?.snapshot.revision,
-        evaluatedAt: now,
+        evaluatedAt: authorityDecision?.evaluatedAt ?? now,
       })
     : {
         schemaVersion: 2,
@@ -611,10 +614,11 @@ export async function authorizeCore(env, input, now = Date.now()) {
         actorAccountId: a.account_id,
         action: d.action,
         outcome: "allow",
-        evaluatedAt: now,
+        evaluatedAt: authorityDecision?.evaluatedAt ?? now,
       };
   const evidence = {
-    schemaVersion: 1,
+    schemaVersion: 2,
+    decision: authorityDecision,
     schoolId: env.SCHOOL_ID,
     decisionId,
     actor: {
@@ -627,7 +631,7 @@ export async function authorizeCore(env, input, now = Date.now()) {
       staffId: target.staff_id,
       linkageRevision: `link-${target.revision}`,
     },
-    evaluatedAt: now,
+    evaluatedAt: authorityDecision?.evaluatedAt ?? now,
     core: {
       revision: coreRevision,
       account: accountEvidence(a, grants),
@@ -656,7 +660,7 @@ export async function authorizeCore(env, input, now = Date.now()) {
       env.SCHOOL_ID,
       decisionId,
       canonical(event),
-      canonical(evidence),
+      canonical(await sealDecisionEvidence(event, evidence, principal, d)),
       canonical(principal),
       canonical(d),
       d.bodyDigest ?? null,
@@ -1609,25 +1613,7 @@ export async function handle(ctx) {
       ? path.split("/")[2]
       : new URL(request.url).searchParams.get("decisionId");
     fail(validId(id));
-    const r = await one(
-      env.DB,
-      "SELECT event_json,evidence_json,descriptor_json,receipt_json FROM core_evidence WHERE school_id=? AND decision_id=?",
-      [env.SCHOOL_ID, id],
-    );
-    fail(r, "NOT_FOUND", 404, "Decision was not found.");
-    return {
-      event: JSON.parse(r.event_json),
-      evidence: JSON.parse(r.evidence_json),
-      binding: JSON.parse(r.descriptor_json),
-      receipt: { ...JSON.parse(r.receipt_json), decisionId: id },
-      destinations: (
-        await query(
-          env.DB,
-          "SELECT destination,operation_id AS operationId,digest,receipt_json FROM core_destination_receipts WHERE school_id=? AND decision_id=?",
-          [env.SCHOOL_ID, id],
-        )
-      ).map((x) => ({ ...x, receipt: JSON.parse(x.receipt_json) })),
-    };
+    return recoverDecisionEvidence(ctx, id);
   }
   if (path === "/admin/service-grants" && method === "GET")
     return {
