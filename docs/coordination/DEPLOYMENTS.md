@@ -2,6 +2,16 @@
 
 What is live, when it changed and how to roll back. Record every production deployment and every live setting change. "Reported" means stated by the owner; "verified" means checked by a model with the evidence named.
 
+## 14 Nov 2026, approximately 14:52 SGT: isolated v1 prototype deployed and routed
+
+Owner explicitly authorised merge, deployment and hostname attachment; then approved the GitHub environment job in browser. Model: Codex. Reviewed PR139 head `686af2fc803d9d035020d364705dbfae0b3be32f`; deployed merge SHA `f1a5d32fdca3154ebb30d5c4fd8f6a9501185d03`. [Successful deployment run](https://github.com/helper-gsps/gsis/actions/runs/43568056552).
+
+- Live prototype: https://gsis.gsps.edu.sg, gateway `gsis-v1-gsps-web`; eight owner Workers and isolated D1/R2 stores use prefix `gsis-v1-gsps`. Existing v0.9 routes/resources unchanged.
+- Verified all nine Worker settings: exact deployed SHA, correct origin, scheduler disabled, sender/webhook owners v0.9, only GSIS_SECRET secret name. No provider credentials installed.
+- HTTP checks: home and Contacts/Deploy/Roster/Calendar/Layout/Venues/LORD/OVERLORD/STARLORD pages 200; public Core sign-in configuration 200/configured; unauthenticated session 401. Initial urllib checks gave 403, later curl checks passed; cause not established. These checks do not prove authenticated browser journeys.
+- Pending: owner first Admin sign-in, durable grant confirmation, remove bootstrap settings from GitHub source and all Workers through approved configuration deployment. No staff-data import. F5 OPEN; official T1B-01/T1B-02 and unperformed runtime UAT Not tested.
+- Rollback: if the prototype must be withdrawn, detach only this v1 hostname after owner instruction. Do not delete databases, buckets, grants or receipts, and do not redirect v0.9 traffic. Code rollback does not reverse D1 migrations or subsequent accepted writes. No temporary authority or messaging switch was enabled.
+
 ## 31 Oct 2026 14:06 SGT: v0.9.9d (main 5c202c0), reported by owner
 
 Bundle `deploy/2026-10-31-v0.9.9d`. Same six components. Adds resumable D1 import preparation (PR #32) and immutable allocation audit versions.
