@@ -1,6 +1,6 @@
 # Lanes and job coordination (three models)
 
-Owner and release decision: Song Wee. Coordinator: **Muse** (owner 13 Nov: "return coordinator to muse"). Previously Claude (owner directive 31 Oct 2026). Claude reviews only when the owner names Claude for a task.
+Owner and release decision: Song Wee. Coordinator for v0.9 lanes: **Claude** (owner 14 Nov: "take over coordinator ship from muse for v0.9 lanes. retire muse completely"). Muse is **retired**: no new tasks, reviews, releases or commits. History: Claude 31 Oct, Muse 13-14 Nov, Claude again from 14 Nov. v1 lanes are unchanged (ChatGPT coordinates; Claude reviews named v1 tasks). Previously: Claude reviews only when the owner names Claude for a task.
 
 The coordinator assigns each job to a lane and a model, keeps this file and the queue current, writes each model's prompt for the owner to paste, and reviews every PR at its exact head. The owner merges and deploys. The coordinator does not merge without the owner's word.
 
@@ -8,7 +8,7 @@ The coordinator assigns each job to a lane and a model, keeps this file and the 
 | Model | Role | Branch prefix | Commit/PR label |
 |---|---|---|---|
 | Codex | Builder, Roster core and D1 path | `codex/<task-id>` | `Model: Codex` |
-| Muse | Builder, pilot (owner directive 3 Nov 2026) | `muse/<task-id>` | `Model: Muse` |
+| Muse | **Retired 14 Nov 2026** (owner). Was builder, pilot, then reviewer/coordinator. Branches `muse/*` and records kept as history. | `muse/<task-id>` (history) | `Model: Muse` (history) |
 | Claude | Coordinator, architect, reviewer; small fixes | `claude/<task-id>` | `Model: Claude` |
 
 All three share one GitHub identity, so the label is the only attribution.
@@ -21,7 +21,7 @@ All three share one GitHub identity, so the label is the only attribution.
 | **C: Contacts** | `contacts-update/public/`, `backend/Contacts_*.gs`, `Contacts_Code.gs` | Codex (Muse after pilot) | Independent of Roster bundles except the Contacts API used by Roster; API changes need coordinator sign-off. |
 | **K: Calendar** | `calendar-update/public/`, `calendar-backend/`, `calendar-job-worker/` | Codex (Muse after pilot) | Independent. |
 | **L: LORD suite UI** | `lord-suite/Source/` (frontends) | Codex (Muse after pilot) | LORD backend and queued writes stay with Codex until designed (D1-first rule). |
-| **Y: Layout and Venues** | `layout-update/public/`, `venues-viewport/public/` | Layout: Codex. **Venues: Muse** (owner 6 Nov: "let muse handle entirely"; `tasks/venues-muse-ownership.md`) | Independent. Roster-side Venues sync code stays lane R: changes need Claude's OK. |
+| **Y: Layout and Venues** | `layout-update/public/`, `venues-viewport/public/` | Layout: Codex. **Venues: Codex** (from 14 Nov; was Muse, retired) | Independent. Roster-side Venues sync code stays lane R: changes need Claude's OK. |
 | **T: Docs and tests only** | `docs/`, `tests/` without product code | Any | Coordinator approves. |
 
 Any job that touches files in two lanes belongs to the stricter lane (R before D before the rest). Release assembly (`scripts/build-release.py`, `package.json`, `release-installation-manifest.json`) is coordinator-owned.
@@ -46,6 +46,8 @@ Kept for the record. Gemini/Jules no longer receives jobs; its branches no longe
 - After the pilot the coordinator reports quality (correctness, rule-following, test discipline) and the owner decides whether lanes K, L and Y open to Gemini.
 
 ## Current assignments (update on every change)
+**Muse retired (owner 14 Nov).** Claude coordinates v0.9: assigns tasks, writes prompts, reviews every Codex PR at its exact head, builds releases. Codex is the only v0.9 builder. Muse's unfinished work moves to Codex (reassign only when the owner prioritises it): `overlord-dismiss-past-unknowns` (lane L), `calendar-deploy-version-check` (lane K), `roster-consecutive-after-gap` (lane R), `edge-queue-google-authority` (remaining phases), Venues ownership, draft PR #103 (LORD return assertions). Muse's release PRs #110, #113, #117, #122, #126, #135, #141, #143 are records; the owner closes them when convenient. Deployed: v0.9.9x (bundle `deploy/2026-11-14-v0.9.9x`).
+**Codex, lane R HOTFIX (owner 14 Nov, before Mon 16 Nov), reviewer Claude:** `tasks/roster-adhoc-inactive-regression.md`: #38 blocks activated ad hoc relief teachers (inactive in Contacts by design) from search, manual assign, auto-allocate and WhatsApp. Jumps the queue.
 **Done 13 Nov (merged #127, #130; awaiting deploy). Owner exception ended; Muse reviews again.** Was: Codex, lane R URGENT (owner 12 Nov), reviewer Claude: 1) `tasks/roster-d1-full-backup-fix.md` (no full D1 backup has ever verified), then 2) `tasks/roster-d1-employment-mail-dispatch.md` (Daily Employment Update not sent since 6 Nov). Owner exception: Claude reviews; Muse does not review these two; all other Codex tasks keep Muse as reviewer.
 **Codex, lane R URGENT (owner 11 Nov):** `tasks/roster-relief-instructions-info-only.md`: relief instructions are info only, never block a report, always reach the relief teacher (Roster duty details + WhatsApp). Muse reviews. Supersedes `roster-intake-instruction-edit` and `roster-intake-instruction-orphan-close`.
 **PR plan while Claude is away:** `plans/2026-11-handover-pr-plan.md` (Codex C1-C13, Muse M1-M4, owner decisions).

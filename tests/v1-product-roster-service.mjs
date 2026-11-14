@@ -17,6 +17,7 @@ import {
 import { issueLink } from "../v1/services/roster/external.mjs";
 import { loadState } from "../v1/services/roster/repository.mjs";
 import { writeArtifact } from "../v1/services/roster/repository.mjs";
+import { hasDatedReliefActivation } from "../v1/services/roster/eligibility.mjs";
 const h = await createDatabase("roster"),
   schoolId = "school";
 let dayStamp = Date.now() + 7 * 86400000;
@@ -844,7 +845,11 @@ try {
     const same = await handle(
       ctx("/operations", { operation: "directory", date }),
     );
-    assert.equal(same.people.find((p) => p.id === "bob").active, true);
+    assert.equal(same.people.find((p) => p.id === "bob").active, false);
+    const saved = await loadState(env.DB, schoolId, { from: date, to: date });
+    assert(hasDatedReliefActivation(bob, saved.state.adhoc, date, 3));
+    assert(hasDatedReliefActivation(bob, saved.state.adhoc, date, 4));
+    assert.equal(hasDatedReliefActivation(bob, saved.state.adhoc, date, 2), false);
     const tomorrow = new Date(Date.parse(date) + 86400000)
       .toISOString()
       .slice(0, 10);
@@ -852,6 +857,7 @@ try {
       ctx("/operations", { operation: "directory", date: tomorrow }),
     );
     assert.equal(later.people.find((p) => p.id === "bob").active, false);
+    assert.equal(hasDatedReliefActivation(bob, saved.state.adhoc, tomorrow, 3), false);
     bob.active = true;
   });
   console.log(`${count} Roster service acceptance groups passed`);
