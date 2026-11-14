@@ -266,6 +266,14 @@ try {
       1,
     );
   });
+  await test("capacity forecast is an SMC read and does not capture or mutate owner records", async () => {
+    const rows = await query(env.DB,"SELECT * FROM roster_records ORDER BY collection,record_id");
+    const result = await handle(ctx("/operations",{operation:"capacityForecast",date}));
+    assert.equal(result.schemaVersion,1);assert(result.days.length<=7);assert.equal(result.optimalityProven,false);
+    assert.deepEqual(await query(env.DB,"SELECT * FROM roster_records ORDER BY collection,record_id"),rows);
+    await assert.rejects(()=>handle(ctx("/operations",{operation:"capacityForecast",date},{...principal,capabilities:["roster.own"]})),e=>e.status===403);
+    await assert.rejects(()=>handle({...ctx("/operations",{operation:"capacityForecast",date}),now:now+86400000}),e=>e.code==="FORECAST_PAST_DATE");
+  });
   await test("service denies foreign schools, impersonation and wrong action before any mutation", async () => {
     const body = {
       operation: "saveAbsence",

@@ -25,4 +25,12 @@ At PR145 ec68e987, health routes through shared legacy Operations.read while all
 
 ## Skills and status
 
-Pstack architect/how applied for source tracing and single-owner boundaries. Reuse the actual engine and snapshot builder; reject a second independent eligibility implementation. No new dependency planned. Implementation not yet started; no tests or release claims for this task. Exact PR head/evidence will be recorded at handoff.
+Pstack architect/how applied for source tracing and single-owner boundaries. Reuse the actual engine and snapshot builder; reject a second independent eligibility implementation. No new dependency planned. Implementation in progress. To keep the owner’s small-PR rule, warning scheduling/fingerprint work is separated into the next claim; this first PR covers the shared snapshot, read-only forecast and visualisation. No notification completion is claimed. Exact PR head/evidence will be recorded at handoff.
+
+## Implementation evidence (exact head recorded by PR)
+
+Q01–Q05: Pass for this narrowed read/visualisation item. Scope is the above allowlist; policy and snapshot ownership remain with existing domains. Same allocator eligibility, bounded seven-date/10,000-comparison projection, no persistence from forecast, local revision rechecks; cross-service as-of interval remains explicit. No dependency or schema change.
+
+Q06: Focused pass: `TZ=Asia/Singapore node tests/v1-product-roster-capacity.mjs`; `... node tests/v1-product-roster-accounting.mjs` (10 groups); `... node tests/v1-product-roster-service.mjs` (14 groups); browser test `... GSIS_BROWSER_EXECUTABLE=/usr/bin/chromium node tests/v1-product-roster-capacity-browser.mjs`. Canonical `TZ=Asia/Singapore npm run build` passes with no tracked generated drift. Runner `node scripts/v1/test.mjs --list` discovers both new tests. Full product and Node/LORD runs and exact-head CI are pending at commit time; results will be recorded in PR, not inferred. Two initial synthetic fixture failures (undefined canonical fields; cloning a function-bearing context) were corrected in the test fixture; no production assertions weakened.
+
+Q07: Pending independent Claude exact-head review. This PR is based on PR145's L1 head, not main, to keep the diff bounded. Q08: Not applicable to deployment; no merge/deploy authorised. Runtime UAT Not tested. F5 OPEN; T1B-01/T1B-02 Not tested. Roll back this PR without database migration; notification follow-up is still pending.
