@@ -19,11 +19,12 @@
     $("status").textContent = "Choose an application.";
     $("identity").textContent = session.user.email;
     $("impersonation").hidden = !session.impersonating;
-    $("adminLink").hidden = !session.capabilities.includes("core.admin");
     const response = await fetch("/v1/modules.json");
     if (!response.ok)
       throw Error("Application list could not load. Reload to retry.");
     const modules = await response.json();
+    if (!session.impersonating && session.capabilities.includes("core.admin"))
+      modules.push({id:"admin",name:"Global Admin Toolbox",description:"Accounts, system health, backups and recovery."});
     $("modules").replaceChildren();
     for (const module of modules) {
       const link = document.createElement("a");
@@ -51,6 +52,7 @@
         svg.setAttribute("stroke-linejoin", "round");
         const path = document.createElementNS(svg.namespaceURI, "path");
         const paths = {
+          admin: "M7 15h34v25H7ZM17 15V8h14v7M7 25h34M20 22h8v7h-8Z",
           venues: "M10 40V8h28v32M10 16h28M17 40V23h14v17M26 30h1",
           layout: "m7 12 11-5 12 5 11-5v29l-11 5-12-5-11 5ZM18 7v29M30 12v29",
           deploy: "M7 9h34v30H7ZM7 18h34M18 18v21M29 18v21M7 28h34",

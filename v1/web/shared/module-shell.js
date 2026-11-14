@@ -16,7 +16,7 @@
     span.setAttribute("aria-hidden", "true");
     return span;
   };
-  const names = {contacts:"Contacts",deploy:"Deploy",roster:"Roster",calendar:"Calendar",layout:"Layout",venues:"Venues",lord:"LORD",overlord:"OVERLORD",starlord:"STARLORD",admin:"Administration"};
+  const names = {contacts:"Contacts",deploy:"Deploy",roster:"Roster",calendar:"Calendar",layout:"Layout",venues:"Venues",lord:"LORD",overlord:"OVERLORD",starlord:"STARLORD",admin:"Global Admin Toolbox"};
   const appHome = document.createElement("a");
   appHome.textContent = names[suite.module] || suite.module;
   appHome.href = "/" + suite.module + "/";
@@ -46,6 +46,7 @@
     }
   };
   function sectionName() {
+    if(suite.module === "admin") return document.querySelector('[data-section][aria-current="page"]')?.textContent.trim() || "";
     if(suite.module === "venues") return document.querySelector('.main-nav [aria-current="page"]')?.textContent.trim() || "";
     if(suite.module === "lord") return document.querySelector("#main > .card h2")?.textContent.trim() || "";
     if(suite.module === "deploy") return document.getElementById("content")?.dataset.view || document.querySelector("#settingsSubnav .selected, #nav .selected")?.textContent.trim() || "";
