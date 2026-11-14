@@ -154,12 +154,13 @@ try {
     .getByRole("button", { name: "Settings", exact: true })
     .click();
   const access = managerPage
-    .locator("details")
+    .locator("#systemSettingsModal[open] #settingsBody details[open]")
     .filter({
       has: managerPage.locator("summary").filter({ hasText: "Signage access" }),
     });
-  if ((await access.getAttribute("open")) === null)
-    await access.locator("summary").click();
+  // Settings mounts and opens this panel asynchronously. Wait for that final
+  // host rather than toggling a disclosure that may still be parked and closed.
+  await access.waitFor({ state: "visible" });
   const create = access.locator("[data-create]");
   await create.locator("[name=deviceId]").fill("synthetic-display");
   assert.equal(
@@ -214,12 +215,11 @@ try {
     await page.goto(origin + "/overlord/");
     await page.getByRole("button", { name: "Settings", exact: true }).click();
     const settings = page
-      .locator("#settingsBody details")
+      .locator("#systemSettingsModal[open] #settingsBody details[open]")
       .filter({
         has: page.locator("summary").filter({ hasText: "Signage access" }),
       });
-    if ((await settings.getAttribute("open")) === null)
-      await settings.locator("summary").click();
+    await settings.waitFor({ state: "visible" });
     await settings.locator("[data-use] [name=token]").fill(value);
     await Promise.all([
       page.waitForURL((url) => url.pathname === "/starlord/"),

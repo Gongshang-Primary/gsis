@@ -72,5 +72,40 @@ try {
  await deploy.waitForFunction(()=>!document.querySelector('details').open);
  assert.equal(await deploy.locator('#versionDraft').isVisible(),false,'native disclosure remains user-controlled');
  await deploy.close();
- console.log('PASS home 3x3 square/order/icons; compact native breadcrumbs; permission-hidden panel placement; native navigation guard; panel drafts survive renderer replacement');
+ // Settings may await authentication before its host exists. The parked
+ // disclosure is closed, then opens on mounting; clicking based on its earlier
+ // state would close it again. Wait for the final host instead.
+ const overlord=await browser.newPage();
+ await overlord.setContent(`<button id="settings">Settings</button><details class="gsis-panel"><summary>Signage access</summary><form data-create><input name="deviceId"></form></details>`);
+ await overlord.evaluate(()=>{
+  window.GSISV1={module:'overlord',capable:()=>true,getSession:async()=>({user:{email:'test@example.invalid',accountId:'test'},schoolId:'school'})};
+  const ready=new Promise(resolve=>window.releaseSettings=resolve);
+  document.getElementById('settings').onclick=async()=>{
+   window.settingsRequested=true;
+   await ready;
+   const modal=document.createElement('dialog');modal.id='systemSettingsModal';
+   modal.innerHTML='<h2>System settings</h2><div id="settingsBody"></div>';
+   document.body.append(modal);modal.showModal();
+  };
+ });
+ await overlord.addScriptTag({content:shell});
+ await overlord.waitForFunction(()=>document.querySelector('[data-gsis-panel-parking] details'));
+ await overlord.getByRole('button',{name:'Settings',exact:true}).click();
+ await overlord.waitForFunction(()=>window.settingsRequested);
+ assert.equal(await overlord.locator('details').getAttribute('open'),null,'panel remains closed while the Settings host is deferred');
+ assert.equal(await overlord.locator('[name=deviceId]').isVisible(),false);
+ await overlord.evaluate(()=>window.releaseSettings());
+ const mounted=overlord.locator('#systemSettingsModal[open] #settingsBody details[open]');
+ await mounted.waitFor({state:'visible'});
+ await mounted.locator('[name=deviceId]').fill('delayed-display');
+ assert.equal(await mounted.locator('[name=deviceId]').inputValue(),'delayed-display');
+ // Once mounted, ordinary collapse and expand remain under user control.
+ await overlord.locator('#settingsBody summary').click();
+ await overlord.waitForFunction(()=>!document.querySelector('#settingsBody details').open);
+ assert.equal(await overlord.locator('[name=deviceId]').isVisible(),false);
+ await overlord.locator('#settingsBody summary').click();
+ await mounted.waitFor({state:'visible'});
+ assert.equal(await mounted.locator('[name=deviceId]').inputValue(),'delayed-display');
+ await overlord.close();
+ console.log('PASS home 3x3 square/order/icons; compact native breadcrumbs; permission-hidden panel placement; native navigation guard; panel drafts survive renderer replacement; delayed Settings mount and user-controlled disclosure');
 } finally {await browser.close();}
