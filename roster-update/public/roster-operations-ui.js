@@ -506,7 +506,6 @@ var RosterOpsUI = (() => {
    });
   }catch(error){if(current())el.querySelector('[data-dialog-message]').textContent=failureText(error);}
  }
- function intakeReplaceable(s,entry){return s.ctx.profile?.user?.accessVerified===true&&!!entry?.command?.absenceClashToken&&entry.intakeState==='needsReview'&&!entry.absenceApplied;}
  async function reviewIntake(s,entry){
   if(!entry||!isLive(s)||!intakeManageable(s)&&!intakeReplaceable(s,entry))return;
   const el=dialog(s,'Review received absence report','<p role="status">Checking the original report against saved absence entries…</p>');
@@ -514,14 +513,7 @@ var RosterOpsUI = (() => {
    const value=await s.ctx.api('operations',{operation:'read',view:'intakeReview',intakeRequestId:entry.requestId},'POST',undefined,{background:true});if(!isLive(s)||!el.isConnected)return;
    if(value?.readOnly!==true||value.requestId!==entry.requestId||!Array.isArray(value.teachers)||!value.requested)throw Error('The review is unavailable. Close this window and try Review report again.');
    const requested=[intakeCoverageText(value.requested),value.requested.typeLabel,value.requested.reasonDetail,value.requested.reliefRequired?'Relief required':'No relief'].filter(Boolean).join(' · '),rows=value.teachers.map(teacher=>'<section><h4>'+esc(teacher.name)+'</h4><p><strong>Dates with no saved entry:</strong> '+(teacher.missingDates.length?teacher.missingDates.map(date=>esc(dateText(date))).join('; '):'None. Check the coverage and settings of every existing entry below.')+'</p><div class="ops-record-scroll"><table class="ops-record-table"><thead><tr><th scope="col">Requested date</th><th scope="col">Current saved entries</th></tr></thead><tbody>'+teacher.dates.map(day=>'<tr><th scope="row">'+esc(dateText(day.date))+'</th><td>'+(day.savedEntries.length?day.savedEntries.map(saved=>'<p>'+esc([intakeCoverageText(saved),saved.typeLabel,saved.reasonDetail,saved.reliefRequired?'Relief required':'No relief'].join(' · '))+'</p>').join(''):'No saved entry')+'</td></tr>').join('')+'</tbody></table></div></section>').join('');
-   if(value.resolutionOptions?.includes('replace')){
-    el.querySelector('[data-dialog-body]').innerHTML='<p><strong>Your new report:</strong> '+esc(requested)+'</p>'+rows+'<p>The saved absence changed while this report was waiting. Replace the listed overlapping reports with your new report? Their history will be kept.</p><button type="button" data-replace-current>Replace current absence</button> <button type="button" data-keep-current>Keep current absence; cancel new report</button>';
-    for(const [selector,resolution] of [['[data-replace-current]','replace'],['[data-keep-current]','keep']])el.querySelector(selector).onclick=()=>{
-     if(!isLive(s)||s.busy||pendingFor(s))return;
-     const task={owner:s.owner,source:s,sourceDialog:el,page:s.page,date:s.date,rangeTo:s.rangeTo,tab:s.tab,ownReplacement:true,payload:{operation:'resolveAbsenceIntake',date:s.date,requestId:crypto.randomUUID(),intakeRequestId:entry.requestId,resolution,overlapToken:value.overlapToken,replacementToken:value.replacementToken,confirm:true,reason:resolution==='replace'?'Reporter acknowledged replacement of the current absence.':'Reporter kept the current absence.'},route:'operations'};trackPending(task);void sendPending(s,false,task);
-    };return;
-   }
-   if(value.resolutionOptions?.includes('merge')){
+   if(value.resolutionOptions?.includes('replace')){replacementIntakeDialog(s,entry,el,value,requested,rows);return;} if(value.resolutionOptions?.includes('merge')){
     el.querySelector('[data-dialog-body]').innerHTML='<div data-intake-review><p><strong>Original request:</strong> '+esc(requested)+'</p><p>'+esc(value.message||'Compare the original report with the saved absences below.')+'</p>'+rows+'<p>Merge keeps existing coverage, adds missing periods and dates, and uses the report’s absence type, reason and relief setting. Existing relief assignments stay unchanged. Submitted instructions and colleague proposals remain subject to their own checks.</p><p>Keep existing closes this report without adding its missing absence or sending its proposals. Edit existing opens Manage reported absences; return here and retry the retained report after saving.</p><form data-resolve-overlap><label>Reason for this decision<textarea name="reason" required maxlength="1000" rows="3"></textarea></label><label><input type="checkbox" name="confirm" required> I checked every requested teacher and date.</label><button type="submit" name="resolution" value="merge">Merge into existing</button> <button type="submit" name="resolution" value="keep">Keep existing; close report</button> <button type="button" data-edit-overlap>Edit existing then retry</button></form></div>';
     el.querySelector('[data-edit-overlap]').onclick=()=>{closeDialog();s.ctx.go('Manage reported absences',entry.dates?.[0]||s.date);};
     el.querySelector('form').onsubmit=event=>{event.preventDefault();if(!isLive(s)||!intakeManageable(s)||s.busy||pendingFor(s))return;const form=event.target,resolution=event.submitter?.value,reason=form.elements.reason.value.trim();if(!['merge','keep'].includes(resolution)||!reason||!form.elements.confirm.checked||!form.reportValidity())return;const task={owner:s.owner,source:s,sourceDialog:el,page:s.page,date:s.date,rangeTo:s.rangeTo,tab:s.tab,payload:{operation:'resolveAbsenceIntake',date:s.date,requestId:crypto.randomUUID(),intakeRequestId:entry.requestId,resolution,overlapToken:value.overlapToken,confirm:true,reason},route:'operations'};trackPending(task);void sendPending(s,false,task);};
@@ -1852,6 +1844,14 @@ var RosterOpsUI = (() => {
    }catch(error){if(isLive(s)&&el.isConnected){status.textContent=error.message||'The archived copy could not load.';const retry=document.createElement('button');retry.type='button';retry.dataset.retryArchiveItem='';retry.textContent='Retry';retry.onclick=load;status.append(' ',retry);}}
   }
   void load();
+ }
+ function intakeReplaceable(s,entry){return s.ctx.profile?.user?.accessVerified===true&&!!entry?.command?.absenceClashToken&&entry.intakeState==='needsReview'&&!entry.absenceApplied;}
+ function replacementIntakeDialog(s,entry,el,value,requested,rows){
+    el.querySelector('[data-dialog-body]').innerHTML='<p><strong>Your new report:</strong> '+esc(requested)+'</p>'+rows+'<p>The saved absence changed while this report was waiting. Replace the listed overlapping reports with your new report? Their history will be kept.</p><button type="button" data-replace-current>Replace current absence</button> <button type="button" data-keep-current>Keep current absence; cancel new report</button>';
+    for(const [selector,resolution] of [['[data-replace-current]','replace'],['[data-keep-current]','keep']])el.querySelector(selector).onclick=()=>{
+     if(!isLive(s)||s.busy||pendingFor(s))return;
+     const task={owner:s.owner,source:s,sourceDialog:el,page:s.page,date:s.date,rangeTo:s.rangeTo,tab:s.tab,ownReplacement:true,payload:{operation:'resolveAbsenceIntake',date:s.date,requestId:crypto.randomUUID(),intakeRequestId:entry.requestId,resolution,overlapToken:value.overlapToken,replacementToken:value.replacementToken,confirm:true,reason:resolution==='replace'?'Reporter acknowledged replacement of the current absence.':'Reporter kept the current absence.'},route:'operations'};trackPending(task);void sendPending(s,false,task);
+    };
  }
  return {pages,render,unmount,isDirty,needsLeaveWarning,flushPending,canRefreshLocal,dateText,range,teacherPicker,teacherMultiPicker,preload,seedReport,resetPreloads,invalidateDates,referencesChanged,refreshCurrent,persistentWarning,healthSummary,progress:{show:showProgress,hide:hideProgress}};
 })();

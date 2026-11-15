@@ -35,3 +35,7 @@ Targeted D1 adapter, SQLite intake/receipt and report-form regression tests pass
 Build the v0.9 hotfix first, then mirror the behavior in a separate v1 PR. Owner merges and deploys. Claude review is waived for this v0.9 hotfix; the separate v1 mirror follows v1 review rules.
 
 Owner clarification, 16 Nov: D1 Worker and frontend only; no Google Apps Script fallback changes. The implementation uses a D1-specific adapter and leaves shared Google domain code unchanged.
+
+## CI follow-up
+
+Run 43775109909 at 26fa4e3 passed three regression shards; shard 3 failed only because `v1-product-operation-probe.mjs` pins the existing shared frontend dispatch call by line. The new replacement-dialog code is extracted into a helper after the dispatch section, retaining that existing call-site location. No v1 files, allowlists or assertions are changed. A new exact-head full CI run is required.

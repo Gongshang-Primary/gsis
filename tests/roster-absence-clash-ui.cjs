@@ -12,12 +12,13 @@ async function setup(){
  const ctx={profile:f.profile,today:()=>f.ctx.today,container:$('#content'),cachedTimetable:()=>({modelId:'baseline',model:{even:week,odd:week}}),status:()=>{},api:async(route,p)=>{
   calls.push(structuredClone(p));
   if(p.operation==='read'&&p.view==='absenceClash')return previewAbsenceClash(f.state,f.ctx,p);
+  if(p.operation==='read'&&p.view==='intakeReview'){const entry=journal.get(p.intakeRequestId),preview=previewAbsenceClash(f.state,f.ctx,entry.command);return {...receipt(entry),readOnly:true,requested:entry.command,teachers:[{name:'Alice',missingDates:[],dates:[{date:f.ctx.today,savedEntries:f.state.absences.filter(a=>!a.deletedAt)}]}],resolutionOptions:['replace','keep'],replacementToken:preview.token,overlapToken:'a'.repeat(64)};}
   if(p.operation==='read'&&p.view==='intake')return {revision:'intake-1',entries:[...journal.values()].map(entry=>structuredClone(entry)),pendingCaptureCount:journal.size,peerReviewCount:0};
   if(['saveAbsence','requestMutual'].includes(p.operation)&&p.intake===true){
-   const entry={requestId:p.requestId,command:structuredClone(p),dates:[p.date],acceptedAt:f.ctx.iso,intakeState:'pending',absenceApplied:false,savedIds:[],peerState:p.operation==='requestMutual'||p.ownArrangementsByStaffDate?'pending':'none',mutualRequestIds:[],reasonCode:''};const applied=applyAbsenceClash(f.state,{...f.ctx,attendanceOnly:true},p);Object.assign(entry,{savedIds:applied.savedIds,intakeState:'applied',absenceApplied:true});journal.set(p.requestId,entry);
+   const entry={requestId:p.requestId,command:structuredClone(p),dates:[p.date],acceptedAt:f.ctx.iso,intakeState:'pending',absenceApplied:false,savedIds:[],peerState:p.operation==='requestMutual'||p.ownArrangementsByStaffDate?'pending':'none',mutualRequestIds:[],reasonCode:''};if(control.park){entry.intakeState='needsReview';}else{const applied=applyAbsenceClash(f.state,{...f.ctx,attendanceOnly:true},p);Object.assign(entry,{savedIds:applied.savedIds,intakeState:'applied',absenceApplied:true});}journal.set(p.requestId,entry);
    if(control.dropResponse){control.dropResponse=false;throw Object.assign(Error('Response was lost'),{status:503});}return receipt(entry);
   }
-  if(p.operation==='resolveAbsenceIntake'){const entry=journal.get(p.intakeRequestId);Object.assign(entry,{intakeState:'withdrawn',resolution:{action:'withdraw',reason:p.reason,at:f.ctx.iso,actorName:'Alice Teacher'}});if(control.dropResolution){control.dropResolution=false;throw Object.assign(Error('Resolution response lost'),{status:503});}return receipt(entry);}
+  if(p.operation==='resolveAbsenceIntake'){const entry=journal.get(p.intakeRequestId);if(p.resolution==='replace'){const applied=applyAbsenceClash(f.state,{...f.ctx,attendanceOnly:true},{...entry.command,absenceClashToken:p.replacementToken,confirmAbsenceReplacement:true});Object.assign(entry,{intakeState:'applied',absenceApplied:true,savedIds:applied.savedIds,resolution:{action:'replace'}});return receipt(entry);}Object.assign(entry,{intakeState:'withdrawn',resolution:{action:'withdraw',reason:p.reason,at:f.ctx.iso,actorName:'Alice Teacher'}});if(control.dropResolution){control.dropResolution=false;throw Object.assign(Error('Resolution response lost'),{status:503});}return receipt(entry);}
   if(p.operation==='receiptStatus'&&p.command.intake===true){const entry=journal.get(p.command.requestId);return entry?receipt(entry):{accepted:false,requestId:p.command.requestId};}
   if(control.failRead&&p.operation==='read')throw Object.assign(Error('Records unavailable'),{status:503});
   const response=await w.fetch('/'+route,{body:JSON.stringify(p)}),result=await response.json();if(!response.ok)throw Object.assign(Error(result.error),{status:response.status});return {...structuredClone(result.data),absenceClashSupported:true};
@@ -41,5 +42,14 @@ async function setup(){
    }else{await t.wait(()=>t.journal.size===1&&!state.busy);assert.equal(prompts.length,0,'disjoint report saves without a prompt');assert.equal(t.f.state.absences.filter(a=>!a.deletedAt).length,2);}
   }finally{t.w.RosterOpsUI.unmount();t.w.close();}
  }
+ const t=await setup();try{
+  t.w.GSISRosterOperations.apply(t.f.state,t.f.ctx,{operation:'saveAbsence',staffId:'alice',date:t.f.ctx.today,typeId:'mc',periods:[2],reliefRequired:true});
+  t.w.confirm=()=>true;t.control.park=true;const state=await t.w.RosterOpsUI.render('Report Absence',t.ctx);t.preview();t.$('[data-save-instructions]').click();
+  await t.wait(()=>t.$('[data-replace-current]')&&!state.busy);
+  assert.equal(t.f.state.absences.filter(a=>!a.deletedAt).length,1,'queued review has not replaced the old absence');
+  t.$('[data-replace-current]').click();await t.wait(()=>[...t.journal.values()][0].absenceApplied&&!state.busy);
+  assert.equal(t.f.state.absences.filter(a=>!a.deletedAt).length,1);assert(t.f.state.absences.some(a=>a.deletedAt));
+  assert.equal(t.calls.filter(p=>p.operation==='resolveAbsenceIntake').length,1);
+ }finally{t.w.RosterOpsUI.unmount();t.w.close();}
  console.log('PASS real report form: disjoint save, overlap acknowledgement/cancel, replacement and lost-acknowledgement receipt retry');
 })().catch(error=>{console.error(error);process.exitCode=1;});
