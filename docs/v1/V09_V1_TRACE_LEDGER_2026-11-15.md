@@ -150,7 +150,7 @@ Status words: **Absent** means no handler string found at `77e30ee`. **Blocked**
 
 ## 6. Ledger B: validation that is too strict
 
-**Proposed rule for the owner to confirm.** Be strict on who and when. Be lenient on what.
+**Rule accepted by the owner on 15 November 2026** (recorded in `docs/coordination/OWNER_DIRECTIVES.md`). Be strict on who and when. Be lenient on what.
 
 1. **Keep strict (reject):** session, school, capability, revision compare and swap, idempotent operation identity, accepted SMC, EO and School Leader authority, payload size bounds.
 2. **Make lenient (accept, store, flag):** values outside a catalogue, missing optional facts, duplicate display names, multi value cells, unknown capacity, label spelling. This is the v0.9 rule (Section 2, rule 3).
@@ -233,12 +233,12 @@ Do the steps in order. Do not start a step until the one before has hosted proof
 
 ## 11. Owner decisions needed
 
-1. Confirm the validation rule in Section 6.
+1. Validation rule in Section 6: **accepted, 15 November 2026.** Codex may plan B02 to B09 and B15 as one bounded job under the normal claim workflow.
 2. B08: may relief allocation run before a verified Deploy publication exists, with numbers marked "estimated"?
 3. A03 to A06: which Roster panels may be retired in v1?
 4. Ledger C: which look changes are accepted?
 5. H08: migrate application access grants to Core, or grant afresh?
-6. Section 9 item 4: who coordinates v1?
+6. Section 9 item 4: settled. The 12 November directive appoints ChatGPT as v1 coordinator. `CLAUDE.md` needs a one line correction for v1.
 7. Supply the three missing Revision 49 files, or declare them superseded.
 
 ## 12. What this ledger does not prove
