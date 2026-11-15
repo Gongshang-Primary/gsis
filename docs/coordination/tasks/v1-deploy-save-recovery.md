@@ -10,7 +10,7 @@
 - Accepted initial claim: `5260b40c06f6a25652530c6a63db35048ec0a619`; combined preimplementation local base `44aa8519ac549b62cca2d35971d05d561cc085e2` preserves both selected chains. Implementation head/PR pending.
 - User scope: continue the supplied frontend UAT bug queue one bounded group at a time. Historical permissions in source documents do not authorise new live operations. The v1 coordinator initially defined nine paths. The scoped test-compatibility supplement below adds a tenth before that path is edited; no production-code scope is added.
 
-## Exact ten-path scope (coordinator supplement below)
+## Exact eleven-path scope (coordinator test supplements below)
 
 1. `v1/services/deploy/service.mjs`
 2. `v1/web/shared/client.js`
@@ -22,6 +22,7 @@
 8. `v1/web/shared/lord-user.js`
 9. `tests/v1-product-lord-cart-groups-browser.mjs`
 10. `tests/v1-product-deploy-fortnight-browser.mjs`
+11. `tests/v1-product-web.mjs`
 
 Deploy owns saved documents, operation outcomes and withdrawal. Core remains the owner of current authorization and durable original decision evidence. The shared client owns bounded in-page request retention; the builder changes only v1 adaptations of the reused Deploy and LORD UIs. LORD retains all cart, reservation, custody and outcome ownership; no LORD service/model change belongs here. The same preparation-to-pending boundary includes new LORD cart submissions and its owned editor. A two-line local fieldset/legend wrapping repair and narrow-browser assertion are included for the observed 390px owned-editor overflow. No v0.9 source, Core/shared-runtime implementation, schema, migration, dependency, provider, configuration, secret, generated output or live-data change. No new descriptor marker is expected. No merge or deployment.
 
@@ -67,7 +68,7 @@ This small local preparation extension and the Deploy outcome repair share the r
 6. Test shared cleanup across endpoint changes and same-ID collisions across domains/accounts/schools; preserve Contacts recovery. Repeated terminal operations release bounded pending capacity, while unresolved entries remain protected and receipt checks still work at capacity.
 7. Test old receipt after newer save without revision-cache regression; reload with minimal reference, no full payload persistence/reconstruction; existing class-draft compatibility; storage failure and account/version changes during asynchronous recovery.
 8. Define the actual ordinary-save UI surface in the handoff: queued cells/classes, direct edit and version-note callers must either be covered or named as outside the bounded fix. No general completion claim based only on the queue.
-9. Using `TZ=Asia/Singapore`, run focused service and built-browser tests, unchanged parent Deploy/Core/Contacts regressions, canonical build/no tracked drift, runner discovery, product suite, full Node/LORD and exact-head CI. Record actual commands, exact head, failures, counts, omissions and the ten-path inventory.
+9. Using `TZ=Asia/Singapore`, run focused service and built-browser tests, unchanged parent Deploy/Core/Contacts regressions, canonical build/no tracked drift, runner discovery, product suite, full Node/LORD and exact-head CI. Record actual commands, exact head, failures, counts, omissions and the eleven-path inventory.
 10. Claude reviews the exact head without editing the branch. Synthetic evidence does not establish the original hosted operation's outcome or runtime UAT.
 
 ## Verification, review and release state
@@ -88,3 +89,9 @@ Actual parent regression `tests/v1-product-deploy-fortnight-browser.mjs` now fai
 
 The v1 coordinator authorises one additional test path, number10 above, to adapt that existing fake to the new verified-recovery contract. Retain all six behavior assertions, raw-input/blur/queue semantics and uncertainty checks. Do not add a production compatibility fallback, skip tests or treat an unverified HTTP result as terminal merely to satisfy the old fake. No other file or business scope expands. Record this claim-only supplement on main with expected-head protection, immediately incorporate it into the implementation branch, and only then edit the tenth path. Claude reviews the exact resulting implementation head.
 
+
+## Coordinator platform-fixture supplement — 15 November 2026, 12:40 SGT
+
+The unchanged `TZ=Asia/Singapore node tests/v1-product-web.mjs` regression fails before its assertions because its JSDOM fixture has no WebCrypto SubtleCrypto (`TypeError` at `crypto.subtle.digest`); evidence `/tmp/gsis-br01-web-regression.log`. Real HTTPS browser tests already exercise the required digest operation. The coordinator adds only the existing test path11 above to provide Node's real WebCrypto and text encoders in that fixture, retain its18 existing cases and add bounded shared-client compatibility negatives where needed. Do not add an application crypto fallback or weaken receipt hashes.
+
+This test also verifies preservation of existing owner response contracts where shared pending cleanup changes: a direct successful preparation/create/import result must not leak a slot; unknown/partial/mismatched evidence still cannot settle another request. Production changes stay in the already claimed client path and must be grounded in actual owner finish/receipt contracts. No provider, dependency, schema, authority or new module feature is added. Publish this claim-only supplement and incorporate it before editing path11. The earlier ten-path supplement and its failure evidence remain history.
