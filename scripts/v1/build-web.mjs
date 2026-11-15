@@ -44,6 +44,185 @@ function replaceFetch(source,filename){
  function visit(node){if(!node||typeof node!=='object')return;if(node.type==='LogicalExpression'&&node.right?.type==='Identifier'&&node.right.name==='fetch')edits.push([node.right.start,node.right.end,'window.GSISV1.fetch']);if(node.type==='CallExpression'&&node.callee?.type==='Identifier'&&node.callee.name==='fetch')edits.push([node.callee.start,node.callee.end,'window.GSISV1.fetch']);for(const [key,value]of Object.entries(node)){if(key==='start'||key==='end')continue;if(Array.isArray(value))value.forEach(visit);else if(value&&typeof value==='object')visit(value);}}
  visit(ast);for(const [start,end,value]of edits.sort((a,b)=>b[0]-a[0]))source=source.slice(0,start)+value+source.slice(end);return source;
 }
+// Keep the v1 save lifecycle tied to the original durable operation. The legacy
+// frontend is copied unchanged; only its built v1 functions are replaced.
+function updateContactsRecovery(source) {
+ const helpers = [
+  function contactAttemptContext(attempt, credential, authAttempt) {
+   return !!token && token === credential && loginAttempt === authAttempt && state?.user.email === attempt.owner;
+  },
+  function contactAttemptOutcome(result, attempt) {
+   const receipt = result?.receipt || result;
+   if (receipt?.operationId === attempt.requestId) {
+    if (receipt.state === 'committed') return 'committed';
+    if (receipt.state === 'terminal-not-committed') return 'aborted';
+   }
+   return result?.state === 'prepared' ? 'prepared' : 'unknown';
+  },
+  async function settleContactAttempt(attempt, result, credential, authAttempt) {
+   if (!contactAttemptContext(attempt, credential, authAttempt) || dataRequest !== attempt) return null;
+   const outcome = contactAttemptOutcome(result, attempt);
+   if (outcome === 'aborted') {
+    dataRequest = null;
+    resetContactRecovery();
+    const reason = result.receipt?.reason || result.reason;
+    return 'Not saved' + (reason ? ' (' + reason + ')' : '') + '. Your unsaved draft is retained. Review it and save as a new operation.';
+   }
+   if (outcome !== 'committed') return null;
+   dataEdits.clear();
+   newContactIds.clear();
+   dataRequest = null;
+   resetContactRecovery();
+   try {
+    const next = await api('data');
+    if (!contactAttemptContext(attempt, credential, authAttempt)) return null;
+    contactData = sortContactData(next);
+    applyContactSavedRows(contactData.rows);
+    renderContacts();
+    notice('Contacts saved');
+    return 'Saved';
+   } catch {
+    if (!contactAttemptContext(attempt, credential, authAttempt)) return null;
+    contactData = null;
+    return 'Saved · reload the display. Your save is confirmed.';
+   }
+  },
+ ];
+ const replacements = [
+  async function confirmContactSave(attempt, {digest, credential = token, diagnostics = {}} = {}) {
+   const budget = 12000, deadline = Date.now() + 27000, authAttempt = loginAttempt;
+   let latest = null;
+   for (const delay of [0, 1000, 2500]) {
+    if (Date.now() + delay + budget > deadline || !contactAttemptContext(attempt, credential, authAttempt)) break;
+    if (delay) await new Promise(resolve => setTimeout(resolve, delay));
+    if (!contactAttemptContext(attempt, credential, authAttempt)) break;
+    const controller = new AbortController(), timer = setTimeout(() => controller.abort(), budget);
+    try {
+     const result = await api('save-receipt', {requestId: attempt.requestId, ...(digest ? {digest} : {})}, controller.signal);
+     if (!contactAttemptContext(attempt, credential, authAttempt)) return null;
+     latest = result;
+     if (['committed', 'aborted'].includes(contactAttemptOutcome(result, attempt))) return result;
+    } catch (error) {
+     diagnostics.confirmationError = friendlyFailure(error);
+     if (error.status === 401 || error.status === 403) break;
+    } finally { clearTimeout(timer); }
+   }
+   return latest;
+  },
+  async function showContactRecovery() {
+   const attempt = dataRequest;
+   if (!attempt || attempt.owner !== state?.user.email || !contactDataEditable() || !token) { resetContactRecovery(); return; }
+   if (recoveryBusy || dataSaving) return;
+   $('contactRecovery').hidden = false;
+   $('contactRecovery').open = true;
+   $('recoveryRequests').replaceChildren();
+   $('recoveryStatus').textContent = 'Original save ' + attempt.requestId + ' is unconfirmed. Check again reads its receipt. Stop original save can stop a recorded pending save; your draft stays retained until its outcome is known.';
+   $('refreshRecovery').disabled = false;
+   const button = document.createElement('button');
+   button.type = 'button';
+   button.dataset.contactsRecoverAttempt = '';
+   button.textContent = 'Stop original save';
+   button.onclick = () => recoverInterruptedContact(attempt, button);
+   $('recoveryRequests').append(button);
+  },
+  async function recoverInterruptedContact(attempt, button, stop = true) {
+   if (recoveryBusy || dataSaving || dataRequest !== attempt || !contactDataEditable() || attempt.owner !== state?.user.email) return;
+   const credential = token, authAttempt = loginAttempt;
+   recoveryBusy = true;
+   dataSaving = true;
+   button.disabled = true;
+   $('refreshRecovery').disabled = true;
+   renderData();
+   $('dataGrid').inert = true;
+   $('recoveryStatus').textContent = 'Checking original save ' + attempt.requestId + '…';
+   let message = '';
+   try {
+    let result = await api('save-receipt', {requestId: attempt.requestId});
+    if (!contactAttemptContext(attempt, credential, authAttempt) || dataRequest !== attempt) return;
+    if (stop && contactAttemptOutcome(result, attempt) === 'prepared') {
+     result = await api('recover-save', {requestId: attempt.requestId});
+     if (!contactAttemptContext(attempt, credential, authAttempt) || dataRequest !== attempt) return;
+    }
+    message = await settleContactAttempt(attempt, result, credential, authAttempt) || 'The original save is still unconfirmed. Your draft and save ID are retained.';
+   } catch (error) {
+    if (!contactAttemptContext(attempt, credential, authAttempt) || dataRequest !== attempt) return;
+    const diagnostics = {};
+    const result = await confirmContactSave(attempt, {credential, diagnostics});
+    if (!contactAttemptContext(attempt, credential, authAttempt)) return;
+    message = await settleContactAttempt(attempt, result, credential, authAttempt) || friendlyFailure(error) + ' The original save is still unconfirmed. Your draft and save ID are retained.';
+   } finally {
+    if (contactAttemptContext(attempt, credential, authAttempt)) {
+     recoveryBusy = false;
+     dataSaving = false;
+     renderData();
+     $('dataStatus').textContent = message || 'The original save is unconfirmed.';
+     $('dataGrid').inert = false;
+     syncContactDataControls();
+     if (dataRequest === attempt) {
+      await showContactRecovery();
+      if (contactAttemptContext(attempt, credential, authAttempt) && dataRequest === attempt) $('recoveryStatus').textContent = message + ' Operation: ' + attempt.requestId;
+     }
+    }
+   }
+  },
+ ];
+ const save = async function saveContactsGrid() {
+  if (!contactDataEditable() || dataLoading || dataSaving || recoveryBusy || (!dataEdits.size && !newContactIds.size && !dataRequest)) return;
+  if (!dataRequest && dataEdits.size + newContactIds.size * 17 > 300) { notice('Save up to 300 changed cells at a time.'); return; }
+  const retry = !!dataRequest;
+  dataRequest ||= contactSaveAttempt();
+  const attempt = dataRequest, credential = token, authAttempt = loginAttempt;
+  if (attempt.owner !== state.user.email) { notice('Use the same account to confirm this save.'); return; }
+  dataSaving = true;
+  renderData();
+  $('dataGrid').inert = true;
+  $('dataStatus').textContent = 'Saving…';
+  let message = '';
+  try {
+   let result;
+   if (retry) {
+    result = await api('save-receipt', {requestId: attempt.requestId});
+    if (!contactAttemptContext(attempt, credential, authAttempt) || dataRequest !== attempt) return;
+   }
+   const outcome = contactAttemptOutcome(result, attempt);
+   if (!retry || outcome === 'unknown') {
+    result = await api('save-data', JSON.parse(attempt.payload));
+    if (!contactAttemptContext(attempt, credential, authAttempt) || dataRequest !== attempt) return;
+   }
+   if (!['committed', 'aborted'].includes(contactAttemptOutcome(result, attempt))) result = await confirmContactSave(attempt, {credential});
+   message = await settleContactAttempt(attempt, result, credential, authAttempt) || 'The original save is still unconfirmed. Draft locked; Retry Save changes uses the same save ID.';
+  } catch (error) {
+   if (!contactAttemptContext(attempt, credential, authAttempt) || dataRequest !== attempt) return;
+   const diagnostics = {};
+   $('dataStatus').textContent = 'Checking whether your save completed…';
+   const result = await confirmContactSave(attempt, {credential, diagnostics});
+   if (!contactAttemptContext(attempt, credential, authAttempt)) return;
+   message = await settleContactAttempt(attempt, result, credential, authAttempt) || friendlyFailure(error) + (diagnostics.confirmationError ? ' Confirmation: ' + diagnostics.confirmationError : '') + ' Draft locked. Retry Save changes uses the same save ID.';
+  } finally {
+   if (contactAttemptContext(attempt, credential, authAttempt)) {
+    dataSaving = false;
+    renderData();
+    $('dataStatus').textContent = message || 'The original save is unconfirmed.';
+    syncContactDataControls();
+    $('dataGrid').inert = false;
+    if (dataRequest === attempt) await showContactRecovery();
+    queueMicrotask(refreshCatalogueData);
+   }
+  }
+ };
+ const ast = parse(source, {ecmaVersion: 'latest', sourceType: 'module'}), edits = [];
+ for (const replacement of replacements) {
+  const node = ast.body.find(item => item.type === 'FunctionDeclaration' && item.id?.name === replacement.name);
+  if (!node) throw Error('Visual baseline changed: Contacts ' + replacement.name);
+  edits.push([node.start, node.end, replacement.toString()]);
+ }
+ const handler = ast.body.find(node => node.type === 'ExpressionStatement' && source.slice(node.start, node.end).startsWith("$('saveData').onclick="));
+ if (!handler) throw Error('Visual baseline changed: Contacts save handler');
+ edits.push([handler.start, handler.end, save.toString() + "\n$('saveData').onclick=saveContactsGrid;"]);
+ for (const [start, end, value] of edits.sort((a, b) => b[0] - a[0])) source = source.slice(0, start) + value + source.slice(end);
+ source = replaceOnce(source, "$('refreshRecovery').onclick=()=>showContactRecovery();", "$('refreshRecovery').onclick=()=>{if(dataRequest)void recoverInterruptedContact(dataRequest,$('refreshRecovery'),false);};", 'Contacts recovery check preserves a prepared save');
+ return source + '\n' + helpers.map(fn => fn.toString()).join('\n');
+}
 function updateContacts(source){
  // EO and authority are accepted records. A display appointment must never create them.
  source=replaceOnce(source,"if(eo)eo.value=rule?.level||'';","if(eo)eo.value=r.values[eoIndex]??'';",'Contacts role-to-EO inference');
@@ -53,9 +232,9 @@ function updateContacts(source){
  // Application grants are managed by Core, separate from accepted staff records.
  source=replaceOnce(source,"$('addRole').onclick=()=>openRole();","$('addRole').onclick=()=>location.assign('/admin/');",'Contacts Core admin link');
  source=replaceOnce(source,"if(b)openRole(b.dataset.roleEmail);","if(b)location.assign('/admin/');",'Contacts Core access row');
- source=replaceOnce(source,"  if(!result.saved)throw Error('Recovery is unconfirmed. Retry this same recovery.');","  if(result.state==='aborted'){if(dataRequest?.requestId===entry.requestId)dataRequest=null;recoveryBusy=false;resetContactRecovery();renderData();syncContactDataControls();notice(result.message||'The original operation is fenced. Review the preserved draft and save it as a new operation.');return;}if(!result.saved)throw Error('Recovery is unconfirmed. Retry this same recovery.');",'Contacts confirmed abort unlocks the retained draft');
+ source=updateContactsRecovery(source);
  source=source.replaceAll('Complete this saved change','Inspect or recover this save').replaceAll('Completing the original save…','Checking durable recovery…');
- source+=`\nwindow.addEventListener('gsis:clear-protected-state',()=>{loginAttempt++;loginAbort?.abort();clearContactsPersonalState();token='';state=null;visible=[];dataSaving=false;dataRequest=null;$('contactRows').replaceChildren();$('accessRows').replaceChildren();$('app').classList.add('hidden');});`;
+ source+=`\nwindow.addEventListener('gsis:clear-protected-state',()=>{loginAttempt++;loginAbort?.abort();clearContactsPersonalState();token='';state=null;visible=[];dataSaving=false;dataRequest=null;recoveryBusy=false;resetContactRecovery();$('dataGrid').inert=false;$('contactRows').replaceChildren();$('accessRows').replaceChildren();$('app').classList.add('hidden');});`;
  return source;
 }
 function updateDeploy(source){
