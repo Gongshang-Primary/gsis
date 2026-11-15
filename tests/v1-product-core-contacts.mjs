@@ -13,6 +13,7 @@ import {
   prepareOperation,
   commitOperation,
   operationStatus,
+  canonical,
 } from "../v1/runtime/store.mjs";
 import {
   admit,
@@ -22,6 +23,13 @@ import {
 import { backupOwner, restoreOwner } from "../v1/runtime/backup.mjs";
 import { processContribution } from "../v1/services/contacts/contributions.mjs";
 import { authorizeRosterSchedule } from "../v1/services/core/scheduler.mjs";
+import {
+  staffRecord,
+  effectiveField,
+  makeSnapshots,
+} from "../v1/services/contacts/store.mjs";
+import { replaceField } from "../v1/services/contacts/intervals.mjs";
+import { deriveDisplay } from "../v1/services/contacts/catalogues.mjs";
 const c = await createDatabase("core"),
   p = await createDatabase("contacts");
 let now = Date.now();
@@ -133,6 +141,57 @@ async function call(user, path, body, action = "contacts.manage") {
     now: Date.now(),
   });
 }
+// Historical storage fixture only: current public writes deliberately cannot
+// create catalogue references. This creates exact old evidence in isolated D1.
+async function legacyDefinition(catalogue) {
+  await statement(
+    pe.DB,
+    "INSERT INTO contacts_catalogues(school_id,catalogue_id,revision,body) VALUES(?,?,?,?)",
+    [
+      base.SCHOOL_ID,
+      catalogue.catalogueId,
+      Number(catalogue.revision),
+      canonical(catalogue),
+    ],
+  ).run();
+}
+async function legacyFields(staffId, values) {
+  const { staff, fields } = await staffRecord(pe.DB, base.SCHOOL_ID, staffId),
+    at = Date.now(),
+    context = {
+      schoolId: base.SCHOOL_ID,
+      staffId,
+      actorId: "historical-fixture",
+      operationId: "historical-fixture-" + ++serial,
+      now: at,
+    },
+    writes = [];
+  for (const [field, value] of Object.entries(values)) {
+    const next = replaceField(fields[field], field, value, context, at, null);
+    fields[field] = next.row;
+    writes.push(...next.writes);
+  }
+  writes.push(...(await deriveDisplay(pe.DB, base.SCHOOL_ID, fields, context)));
+  const revision = staff.revision + 1;
+  writes.push(
+    ...(await makeSnapshots(pe.DB, base.SCHOOL_ID, staffId, revision, fields)),
+  );
+  writes.push({
+    sql: "UPDATE contacts_staff SET revision=?,ttb_name=? WHERE school_id=? AND staff_id=?",
+    args: [
+      revision,
+      effectiveField(fields.ttbName, at),
+      base.SCHOOL_ID,
+      staffId,
+    ],
+  });
+  writes.push({
+    sql: "UPDATE contacts_epoch SET revision=revision+1 WHERE school_id=?",
+    args: [base.SCHOOL_ID],
+  });
+  await pe.DB.batch(writes.map((w) => statement(pe.DB, w.sql, w.args)));
+}
+
 try {
   const admin = await seedAccount("admin-a", "staff-admin"),
     pu = await seedAccount("power-user", "staff-pu", ["contacts.powerUser"]);
@@ -185,8 +244,14 @@ try {
   const chain = JSON.parse(evidence.evidence_json);
   assert.equal(chain.schemaVersion, 2);
   assert.equal(chain.decision.evaluatedAt, chain.evaluatedAt);
-  assert.equal(JSON.parse(evidence.event_json).evaluatedAt, chain.decision.evaluatedAt);
-  assert.equal(JSON.parse(evidence.event_json).requestId, chain.decision.requestId);
+  assert.equal(
+    JSON.parse(evidence.event_json).evaluatedAt,
+    chain.decision.evaluatedAt,
+  );
+  assert.equal(
+    JSON.parse(evidence.event_json).requestId,
+    chain.decision.requestId,
+  );
   assert.equal(chain.contacts.kind, "observed");
   assert.equal(chain.contacts.snapshot.staffId, "teacher-a");
   assert.equal(chain.contacts.snapshot.fields.schoolLeader[0].value, false);
@@ -372,7 +437,7 @@ try {
     "PASS Contacts grid atomic multi-row save, stale-cell whole-batch refusal, idempotent receipt and self-only DIY",
   );
 
-  // Catalogue display lifecycle is atomic with new immutable references.
+  // Retained historical definitions remain pinned; ordinary writes no longer manage catalogues.
   const tags = {
     catalogueId: "employment-tags",
     revision: "1",
@@ -398,14 +463,12 @@ try {
       },
     ],
   };
-  await call(pu, "/catalogues", { revision: 0, catalogue: tags });
-  await call(pu, "/staff/teacher-a/update", {
-    changes: {
-      employmentTags: [
-        { catalogueId: tags.catalogueId, revision: "1", code: "BT" },
-        { catalogueId: tags.catalogueId, revision: "1", code: "hidden" },
-      ],
-    },
+  await legacyDefinition(tags);
+  await legacyFields("teacher-a", {
+    employmentTags: [
+      { catalogueId: tags.catalogueId, revision: "1", code: "BT" },
+      { catalogueId: tags.catalogueId, revision: "1", code: "hidden" },
+    ],
   });
   assert.equal(
     (
@@ -420,17 +483,34 @@ try {
     "SELECT body FROM contacts_snapshots WHERE staff_id=? AND profile='display' ORDER BY sequence DESC LIMIT 1",
     ["teacher-a"],
   );
-  await call(pu, "/catalogues", {
-    revision: 1,
-    catalogue: {
-      ...tags,
-      revision: "2",
-      entries: tags.entries.map((e) =>
-        e.code === "BT"
-          ? { ...e, label: "Beginning Teacher", active: false }
-          : e,
-      ),
-    },
+  const retiredTags = {
+    ...tags,
+    revision: "2",
+    entries: tags.entries.map((e) =>
+      e.code === "BT" ? { ...e, label: "Beginning Teacher", active: false } : e,
+    ),
+  };
+  await legacyDefinition(retiredTags);
+  // A new immutable catalogue revision cannot rewrite a pinned old record.
+  assert.equal(
+    (
+      await one(pe.DB, "SELECT ttb_name FROM contacts_staff WHERE staff_id=?", [
+        "teacher-a",
+      ])
+    ).ttb_name,
+    "Synthetic Renamed (BT)",
+  );
+  assert.equal(
+    JSON.parse(priorDisplay.body).fields.ttbName[0].value,
+    "Synthetic Renamed (BT)",
+  );
+  const oldHistory = await query(
+    pe.DB,
+    "SELECT record_json FROM contacts_history WHERE staff_id=? AND field='employmentTags' ORDER BY revision",
+    ["teacher-a"],
+  );
+  await call(pu, "/staff/teacher-a/update", {
+    changes: { employmentTags: ["BT", "4/5"] },
   });
   assert.equal(
     (
@@ -438,11 +518,17 @@ try {
         "teacher-a",
       ])
     ).ttb_name,
-    "Synthetic Renamed (Beginning Teacher)",
+    "Synthetic Renamed (BT) (4/5)",
   );
-  assert.equal(
-    JSON.parse(priorDisplay.body).fields.ttbName[0].value,
-    "Synthetic Renamed (BT)",
+  assert.deepEqual(
+    (
+      await query(
+        pe.DB,
+        "SELECT record_json FROM contacts_history WHERE staff_id=? AND field='employmentTags' ORDER BY revision",
+        ["teacher-a"],
+      )
+    ).slice(0, oldHistory.length),
+    oldHistory,
   );
   await assert.rejects(
     () =>
@@ -453,7 +539,7 @@ try {
           ],
         },
       }),
-    (e) => e.code === "TAG_RETIRED",
+    (e) => e.code === "INVALID_DIRECT_FIELD",
   );
   // A future accepted replacement retains the current interval; no read increments content.
   const future = Date.now() + 86400000,
@@ -506,7 +592,7 @@ try {
     ).validUntil <= future,
   );
   console.log(
-    "PASS catalogues retire assignments without changing history; future acceptance preserves preceding interval and unchanged read identity",
+    "PASS pinned legacy definitions and direct replacements preserve history; future acceptance preserves preceding interval and unchanged read identity",
   );
   // Immutable publication proof is injected here; Core and Contacts stores/authorization are real D1.
   const publishPrincipal = await authorize(admin, "deploy", "deploy.publish", {
@@ -616,54 +702,8 @@ try {
   console.log(
     "PASS independent contribution field application and stale-field conflict with current Core authority; publication proof is synthetic",
   );
-  const subjectDefinitions = {
-    catalogueId: "subject-tags",
-    revision: "1",
-    kind: "operational-tag",
-    entries: [
-      {
-        code: "MTL",
-        label: "MTL",
-        active: true,
-        definitionRevision: "mtl-1",
-        category: "subjectTags",
-        ttbVisible: true,
-        order: 0,
-      },
-    ],
-  };
-  const roleDefinitions = {
-    catalogueId: "roles",
-    revision: "1",
-    kind: "membership-role",
-    entries: [
-      {
-        code: "MTL",
-        label: "Mother Tongue Teacher",
-        active: true,
-        definitionRevision: "mtl-role-1",
-        flags: Object.fromEntries(
-          [
-            "sl",
-            "sc",
-            "smc",
-            "kp",
-            "tl",
-            "sdt",
-            "cmt",
-            "sat",
-            "support",
-            "mk",
-          ].map((k) => [k, false]),
-        ),
-        eoAppointment: null,
-      },
-    ],
-  };
-  await call(pu, "/catalogues", { revision: 0, catalogue: subjectDefinitions });
-  await call(pu, "/catalogues", { revision: 0, catalogue: roleDefinitions });
   await call(pu, "/staff/inactive-a/update", {
-    changes: { role: { catalogueId: "roles", revision: "1", code: "MTL" } },
+    changes: { role: "MTL" },
     validFrom: future,
   });
   const beforeRole = await contacts({
@@ -680,8 +720,12 @@ try {
       principal: manager,
       now: future + 1,
     });
-  assert.deepEqual(beforeRole.fields.subjectTags.value, []);
-  assert.equal(afterRole.fields.subjectTags.value[0].code, "MTL");
+  assert.notEqual(
+    beforeRole.fields.subjectTags?.effective,
+    true,
+    "A future derived subject must not become current evidence",
+  );
+  assert.equal(afterRole.fields.subjectTags.value[0], "MTL");
   assert.equal(afterRole.ttbName, "Contribution Applied (MTL)");
   console.log(
     "PASS future role-implied structured subject tag and display activate only in their accepted interval",
@@ -746,6 +790,42 @@ try {
       expectedSchoolId: base.SCHOOL_ID,
       expectedOwner: "contacts",
     });
+    // Restore proves both direct schema2 and immutable historical schema1
+    // storage survive an actual owner backup into fresh isolated databases.
+    for (const table of [
+      "contacts_fields",
+      "contacts_history",
+      "contacts_catalogues",
+      "contacts_snapshots",
+    ]) {
+      const before = await query(
+          pe.DB,
+          `SELECT * FROM ${table} ORDER BY rowid`,
+        ),
+        after = await query(
+          restoredContacts.db,
+          `SELECT * FROM ${table} ORDER BY rowid`,
+        );
+      assert.deepEqual(
+        after,
+        before,
+        table + " restores exact mixed-version bytes",
+      );
+    }
+    const restoredStaffSnapshots = await query(
+      restoredContacts.db,
+      "SELECT body FROM contacts_snapshots WHERE profile='staff'",
+    );
+    assert(
+      restoredStaffSnapshots.some(
+        (row) => JSON.parse(row.body).schemaVersion === 1,
+      ),
+    );
+    assert(
+      restoredStaffSnapshots.some(
+        (row) => JSON.parse(row.body).schemaVersion === 2,
+      ),
+    );
     const recovered = JSON.parse(
       (
         await one(
@@ -775,23 +855,65 @@ try {
       "SELECT * FROM core_destination_receipts",
     );
     // Exercise the same administrative recovery API against independently restored owners.
-    const originalCore = ce.DB, originalContacts = pe.DB;
+    const originalCore = ce.DB,
+      originalContacts = pe.DB;
     try {
-      ce.DB = restoredCore.db; pe.DB = restoredContacts.db;
+      ce.DB = restoredCore.db;
+      pe.DB = restoredContacts.db;
       const inspector = await authorize(admin, "core", "core.admin", {}, false);
-      const recover = () => core({env:ce, principal:inspector, path:"/evidence/"+allowed.decisionId, method:"GET", body:{}, now:Date.now()});
+      const recover = () =>
+        core({
+          env: ce,
+          principal: inspector,
+          path: "/evidence/" + allowed.decisionId,
+          method: "GET",
+          body: {},
+          now: Date.now(),
+        });
       const verified = await recover();
       assert.equal(verified.verification.state, "verified");
       assert.equal(verified.verification.currentAuthority, false);
-      assert.deepEqual(verified.evidence.contacts.observation, chain.contacts.observation);
-      assert.deepEqual(verified.evidence.contacts.snapshot, chain.contacts.snapshot);
-      await statement(ce.DB, "UPDATE core_evidence SET event_json=? WHERE decision_id=?", [JSON.stringify({...verified.event, requestId:"tampered"}), allowed.decisionId]).run();
-      await assert.rejects(recover, e=>e.code==="EVIDENCE_INTEGRITY_FAILED");
-      await statement(ce.DB, "UPDATE core_evidence SET event_json=? WHERE decision_id=?", [JSON.stringify(verified.event), allowed.decisionId]).run();
-      await statement(pe.DB, "DELETE FROM contacts_snapshots WHERE school_id=? AND snapshot_id=?", [base.SCHOOL_ID, recovered.contacts.snapshot.snapshotId]).run();
-      await assert.rejects(recover, e=>e.code==="EVIDENCE_CONTENT_UNAVAILABLE");
-      console.log("PASS F5 actual recovery API after separate-owner restore; historical observation exact; tamper and missing content reject");
-    } finally { ce.DB=originalCore; pe.DB=originalContacts; }
+      assert.deepEqual(
+        verified.evidence.contacts.observation,
+        chain.contacts.observation,
+      );
+      assert.deepEqual(
+        verified.evidence.contacts.snapshot,
+        chain.contacts.snapshot,
+      );
+      await statement(
+        ce.DB,
+        "UPDATE core_evidence SET event_json=? WHERE decision_id=?",
+        [
+          JSON.stringify({ ...verified.event, requestId: "tampered" }),
+          allowed.decisionId,
+        ],
+      ).run();
+      await assert.rejects(
+        recover,
+        (e) => e.code === "EVIDENCE_INTEGRITY_FAILED",
+      );
+      await statement(
+        ce.DB,
+        "UPDATE core_evidence SET event_json=? WHERE decision_id=?",
+        [JSON.stringify(verified.event), allowed.decisionId],
+      ).run();
+      await statement(
+        pe.DB,
+        "DELETE FROM contacts_snapshots WHERE school_id=? AND snapshot_id=?",
+        [base.SCHOOL_ID, recovered.contacts.snapshot.snapshotId],
+      ).run();
+      await assert.rejects(
+        recover,
+        (e) => e.code === "EVIDENCE_CONTENT_UNAVAILABLE",
+      );
+      console.log(
+        "PASS F5 actual recovery API after separate-owner restore; historical observation exact; tamper and missing content reject",
+      );
+    } finally {
+      ce.DB = originalCore;
+      pe.DB = originalContacts;
+    }
     assert(links.length >= 5);
     assert(
       links.every((l) =>

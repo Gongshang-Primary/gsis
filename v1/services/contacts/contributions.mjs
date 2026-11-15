@@ -15,7 +15,7 @@ import {
   admit,
   resolveAdmission,
 } from "../../runtime/admission.mjs";
-import { validateValue } from "./store.mjs";
+import { validateValue, record } from "./store.mjs";
 const fail = (v, code = "INVALID_INPUT", status = 400) => {
   if (!v)
     throw new ApiError(code, status, "Review this Contacts contribution.");
@@ -96,22 +96,44 @@ export async function processContribution(job, env) {
 export async function listContributions(ctx) {
   const rows = await query(
     ctx.env.DB,
-    "SELECT * FROM contacts_contributions WHERE school_id=? ORDER BY created_at DESC LIMIT 512",
+    "SELECT c.*,f.field AS current_field,f.revision AS current_revision,f.state AS current_state,f.value_json AS current_value_json,f.valid_from AS current_valid_from,f.valid_until AS current_valid_until,f.revoked AS current_revoked FROM contacts_contributions c LEFT JOIN contacts_fields f ON f.school_id=c.school_id AND f.staff_id=c.staff_id AND f.field=c.field WHERE c.school_id=? ORDER BY c.created_at DESC LIMIT 512",
     [ctx.env.SCHOOL_ID],
   );
   return {
-    rows: await Promise.all(
-      rows.map(async (r) => ({
-        ...r,
+    rows: rows.map((r) => {
+      const current = r.current_field
+        ? {
+            ...record({
+              field: r.current_field,
+              revision: r.current_revision,
+              state: r.current_state,
+              value_json: r.current_value_json,
+              valid_from: r.current_valid_from,
+              valid_until: r.current_valid_until,
+              revoked: r.current_revoked,
+            }),
+            revision: r.current_revision,
+          }
+        : null;
+      const {
+        current_field,
+        current_revision,
+        current_state,
+        current_value_json,
+        current_valid_from,
+        current_valid_until,
+        current_revoked,
+        ...proposal
+      } = r;
+      return {
+        ...proposal,
         value: JSON.parse(r.value_json),
-        current: await one(
-          ctx.env.DB,
-          "SELECT revision,state,value_json FROM contacts_fields WHERE school_id=? AND staff_id=? AND field=?",
-          [ctx.env.SCHOOL_ID, r.staff_id, r.field],
-        ),
+        current: current
+          ? { ...current, value_json: canonical(current.value ?? null) }
+          : null,
         outcome: r.outcome_json ? JSON.parse(r.outcome_json) : null,
-      })),
-    ),
+      };
+    }),
   };
 }
 export async function resolveContribution(ctx) {
@@ -185,7 +207,7 @@ export async function resolveContribution(ctx) {
             : JSON.parse(row.value_json),
       },
       fieldRevisions: { [row.field]: body.revision },
-      validFrom: body.validFrom ?? now,
+      ...(body.validFrom !== undefined ? { validFrom: body.validFrom } : {}),
       contributionId: row.contribution_id,
     },
   });

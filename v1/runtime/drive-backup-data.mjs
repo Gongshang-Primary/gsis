@@ -9,6 +9,7 @@ import { workbook as layoutWorkbook } from "../services/layout/service.mjs";
 import { publicStaff } from "../services/contacts/store.mjs";
 import {
   CONTACT_GRID_FIELDS,
+  CONTACT_GRID_SCHEMA,
   gridValues,
 } from "../services/contacts/grid-projection.mjs";
 import { readArtifact } from "../services/roster/repository.mjs";
@@ -529,7 +530,7 @@ async function contactsWorkbook(env, now) {
     importable: true,
     book: {
       metadata: {
-        Schema: "gsis.contacts.grid.v1",
+        Schema: CONTACT_GRID_SCHEMA.workbookSchema,
         "School ID": env.SCHOOL_ID,
         Revision: sourceDigest,
         "Import semantics":

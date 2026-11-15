@@ -58,7 +58,12 @@ try{
  await page.goto(origin+'/contacts/');await page.locator('.navbar [data-page=admin]').click();
  await page.locator('#admin [data-staff]').waitFor({state:'visible'});await page.locator('#admin [data-staff]').selectOption('browser-teacher');
  await page.locator('#admin [data-accept]').waitFor({state:'visible'});await page.locator('.navbar [data-page=data]').click();
- await page.locator('#data details.gsis-panel').filter({hasText:'Staff classifications and controlled catalogues'}).waitFor({state:'visible'});
+ await page.locator('#data [data-person="browser-teacher"][aria-label="Role"]').waitFor({state:'visible'});
+ await page.locator('#data [data-contacts-contributions] > summary').click();
+ await page.locator('#data [data-load-contributions]').waitFor({state:'visible'});
+ assert.equal(await page.locator('#data [data-contributions]').count(),1,'The contribution inbox belongs to the direct editor');
+ assert.equal(await page.locator('script[src*="contacts-catalogues.js"]').count(),0,'The removed catalogue editor is not loaded');
+ assert.equal(await page.getByText('Staff classifications and controlled catalogues',{exact:true}).count(),0);
  assert.equal(await page.evaluate(()=>GSISV1.capable('core.admin')),false,'Contacts manager does not become Core Admin');
  const teacher=await suite.seedAccount('browser-readonly-teacher',{capabilities:['contacts.read']});
  await context.addCookies([{name:'__Host-gsis_session',value:teacher.token,domain:'gsis.example.invalid',path:'/',secure:true,httpOnly:true,sameSite:'Lax'}]);

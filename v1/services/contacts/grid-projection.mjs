@@ -1,3 +1,4 @@
+import { DIRECT_FIELD_DEFINITIONS } from "../../contacts/direct-fields.mjs";
 // Contacts-owned presentation only. Callers must apply publicStaff privacy first.
 export const CONTACT_FIELD_MAP = Object.freeze({
   "TTb Name": "ttbName",
@@ -17,6 +18,14 @@ export const CONTACT_FIELD_MAP = Object.freeze({
   "Subject Modifier": "subjectTags",
   Active: "employmentActive",
   "MK Modifier": "mkTags",
+  "School Section": "schoolSection",
+  "Personnel Category": "personnelCategory",
+  "Employment Arrangement": "employmentArrangement",
+  "Employment Status": "employmentStatus",
+  Memberships: "memberships",
+  "General Aliases": "aliases",
+  "Name Suffix": "nameSuffix",
+  "Profile Completion": "profileState",
 });
 // This public order intentionally differs from the legacy writer's field map.
 export const CONTACT_GRID_FIELDS = Object.freeze([
@@ -37,16 +46,60 @@ export const CONTACT_GRID_FIELDS = Object.freeze([
   "GSPS Alias (@gsps.edu.sg)",
   "iCON Alias (@moe.edu.sg)",
   "CES Alias (@schools.gov.sg)",
+  "School Section",
+  "Personnel Category",
+  "Employment Arrangement",
+  "Employment Status",
+  "Memberships",
+  "General Aliases",
+  "Name Suffix",
+  "Profile Completion",
 ]);
-const editable = new Set([
-  "Basic Name",
-  "Statutory Name",
-  "Mobile No",
-  "Active",
-  "GSPS Alias (@gsps.edu.sg)",
-  "iCON Alias (@moe.edu.sg)",
-  "CES Alias (@schools.gov.sg)",
-]);
+export const CONTACT_GRID_SCHEMA = Object.freeze({
+  schemaVersion: 2,
+  workbookSchema: "gsis.contacts.grid.v2",
+  fields: CONTACT_GRID_FIELDS.map((label) => {
+    const key = CONTACT_FIELD_MAP[label],
+      direct = DIRECT_FIELD_DEFINITIONS[key];
+    const type =
+      direct?.type ??
+      (key === "aliases"
+        ? "string[]"
+        : key === "employmentActive"
+          ? "boolean"
+          : "string");
+    return Object.freeze({
+      key,
+      label,
+      type,
+      editable: key !== "ttbName",
+      selfEditable: ["statutoryName", "mobile"].includes(key),
+      nullable: !["basicName", "ttbName", "profileState"].includes(key),
+      maxLength:
+        {
+          basicName: 160,
+          ttbName: 4096,
+          statutoryName: 160,
+          mobile: 24,
+          email: 320,
+          iconEmail: 320,
+          cesEmail: 320,
+          aliases: 160,
+          nameSuffix: 40,
+        }[key] ?? 4096,
+      ...(direct ?? {}),
+      ...(type === "string[]"
+        ? { separator: "\n", maxItems: key === "aliases" ? 16 : 32 }
+        : {}),
+      ...(key === "employmentActive" ? { choices: ["Y", "N"] } : {}),
+      ...(key === "profileState"
+        ? { choices: ["provisional", "complete"] }
+        : {}),
+      ...(key === "nameSuffix" ? { maxLength: 40 } : {}),
+    });
+  }),
+  writeLimits: Object.freeze({ mutations: 64, staff: 16, additionCost: 1 }),
+});
 export function contactAliasDomains({ schoolDomain } = {}) {
   return {
     gsps: schoolDomain ?? "",
@@ -63,7 +116,7 @@ function effective(person, name) {
     : null;
 }
 function codes(value) {
-  if (Array.isArray(value)) return value.map(codes).join(", ");
+  if (Array.isArray(value)) return value.map(codes).join("\n");
   if (value && typeof value === "object")
     return typeof value.code === "string" ? value.code : "";
   return value === null || value === undefined ? "" : String(value);
@@ -106,6 +159,14 @@ function values(person, options) {
     "GSPS Alias (@gsps.edu.sg)": alias(field("email"), domains.gsps),
     "iCON Alias (@moe.edu.sg)": alias(field("iconEmail"), domains.icon),
     "CES Alias (@schools.gov.sg)": alias(field("cesEmail"), domains.ces),
+    "School Section": codes(field("schoolSection")),
+    "Personnel Category": codes(field("personnelCategory")),
+    "Employment Arrangement": codes(field("employmentArrangement")),
+    "Employment Status": codes(field("employmentStatus")),
+    Memberships: codes(field("memberships")),
+    "General Aliases": codes(field("aliases")),
+    "Name Suffix": codes(field("nameSuffix")),
+    "Profile Completion": codes(field("profileState") ?? person.profileState),
   };
 }
 export function gridValues(person, options) {
@@ -118,7 +179,24 @@ export function projectGridRow(person, options) {
     staffId: person.staffId ?? person.id,
     revision: person.revision,
     values: gridValues(person, options),
-    computed: CONTACT_GRID_FIELDS.map((field) => !editable.has(field)),
+    computed: CONTACT_GRID_SCHEMA.fields.map((field) => !field.editable),
+    presentation: person.presentation ?? {},
+    fieldStatus: Object.fromEntries(
+      Object.entries(person.fields ?? {}).map(([key, row]) => [
+        key,
+        {
+          state: row.state,
+          effective: row.effective === true,
+          validFrom: row.validFrom ?? null,
+          validUntil: row.validUntil ?? null,
+        },
+      ]),
+    ),
+    formalRole: person.formalRole ?? "",
+    signatureSource: person.signatureSource ?? {
+      available: false,
+      reason: "SOURCE_UNRESOLVED",
+    },
   };
 }
 export function projectGridPerson(person, options) {
@@ -135,6 +213,11 @@ export function projectGridPerson(person, options) {
     mobile: cells["Mobile No"],
     ext: cells.EXT,
     role: cells.Role,
+    formalRole: person.formalRole ?? "",
+    signatureSource: person.signatureSource ?? {
+      available: false,
+      reason: "SOURCE_UNRESOLVED",
+    },
     appointmentLevel: cells["EO Appt Level"],
     appointmentStatus: cells["Appointment Status"],
     active: cells.Active,

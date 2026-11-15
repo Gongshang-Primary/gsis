@@ -1,5 +1,6 @@
 /** Contacts contract v1: no storage, transport or production dependencies. */
 import { copy, freeze, id, instant, object } from '../core/contracts.mjs';
+import { isDirectField, validateDirectRecord } from './direct-fields.mjs';
 export { copy, freeze, id, instant };
 export const LIMITS = freeze({ bytes: 262144, fields: 64, references: 128, entries: 256,
   records: 8, groups: 32, streams: 128, identities: 8192, depth: 16 });
@@ -81,7 +82,8 @@ export function fieldVector(fields, names) {
   return Object.fromEntries(names.map(name => [name,fields[name].map(r => r.state === 'accepted'
     ? {state:r.state,revision:r.revision} : {state:r.state})]));
 }
-export function validateFields(fields, profile) {
+export function validateFields(fields, profile, {schemaVersion=1} = {}) {
+  check(schemaVersion===1 || schemaVersion===2 && profile==='staff');
   const names=fieldNames(profile); exact(fields,names); check(names.length <= LIMITS.fields,'LIMIT_EXCEEDED');
   let references=0;
   for (const name of names) {
@@ -92,8 +94,10 @@ export function validateFields(fields, profile) {
       if (r.state !== 'accepted') {
         exact(r,['state']); check(['missing','pending','rejected','superseded'].includes(r.state)); continue;
       }
-      exact(r,['state','revision','value','validFrom','validUntil','revoked']);
+      const direct=schemaVersion===2 && isDirectField(name) && r.valueSchema===2;
+      exact(r,['state','revision','value','validFrom','validUntil','revoked'],direct?['valueSchema','legacy']:[]);
       check(id(r.revision) && instant(r.validFrom) && (r.validUntil === null || instant(r.validUntil) && r.validUntil>r.validFrom) && typeof r.revoked==='boolean');
+      if(direct) { try { validateDirectRecord(name,r); } catch { check(false); } continue; }
       const type=FIELDS[name];
       if(type==='boolean') check(typeof r.value==='boolean');
       else if(type==='profile') check(['provisional','complete'].includes(r.value));

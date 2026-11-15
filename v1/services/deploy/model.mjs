@@ -100,47 +100,14 @@ export function authority(principal, permission) {
   );
 }
 export function catalogueDisplay(catalogues) {
-  const categories = {
-    employmentArrangement: "Employment Modifier",
-    employmentTags: "Employment Modifier",
-    subjectTags: "Subject Modifier",
-    mkTags: "MK Modifier",
-    eoAppointmentLevel: "EO Appt Level",
-    appointmentStatus: "Appointment Status",
-    schoolSection: "School Section",
-    personnelCategory: "Personnel Category",
-    employmentStatus: "Employment Status",
-  };
-  const hrTerms = {},
-    membership = [];
+  // Historical definitions are descriptive only; never recreate role-level permissions.
+  const hrTerms = {};
   for (const catalogue of catalogues)
     for (const entry of catalogue.entries || []) {
-      if (!entry.active) continue;
-      if (catalogue.kind === "membership-role") {
-        membership.push([
-          entry.code,
-          entry.label,
-          ...[
-            "sl",
-            "sc",
-            "smc",
-            "kp",
-            "tl",
-            "sdt",
-            "cmt",
-            "sat",
-            "support",
-            "mk",
-          ].map((k) => (entry.flags[k] ? "1" : "")),
-          entry.eoAppointment?.code || "",
-        ]);
-        (hrTerms.Role ??= []).push(entry.code);
-      } else if (categories[entry.category])
-        (hrTerms[categories[entry.category]] ??= []).push(entry.code);
+      if (entry.active)
+        (hrTerms[entry.category || "Role"] ??= []).push(entry.code);
     }
-  for (const key of Object.keys(hrTerms))
-    hrTerms[key] = [...new Set(hrTerms[key])];
-  return { hrTerms, membership };
+  return { hrTerms, membership: [] };
 }
 export function mergeContacts(doc, projection) {
   check(
@@ -263,9 +230,34 @@ export function mergeContacts(doc, projection) {
         : { state: "eligible", reasons: [] };
     return teacher;
   });
-  const display = projection.catalogues
-    ? catalogueDisplay(projection.catalogues)
-    : null;
+  const hrTerms = {},
+    contactsMemberships = [],
+    contactsFacts = [];
+  for (const person of people) {
+    contactsMemberships.push([
+      person.id,
+      person.ttbName,
+      person.profile.Role || "",
+      person.groups.join("\n"),
+    ]);
+    for (const [field, value] of Object.entries(person.profile)) {
+      if (["Basic Name", "TTb Name", "Active"].includes(field) || !value)
+        continue;
+      const values = [
+        "Employment Modifier",
+        "Subject Modifier",
+        "MK Modifier",
+      ].includes(field)
+        ? value.split(";")
+        : [value];
+      hrTerms[field] ??= [];
+      for (const item of values)
+        if (item) {
+          if (!hrTerms[field].includes(item)) hrTerms[field].push(item);
+          contactsFacts.push([person.id, person.ttbName, field, item]);
+        }
+    }
+  }
   const map = new Map(people.map((p) => [p.id, p]));
   const oldIds = new Set(doc.teachers.map((t) => t.id));
   return {
@@ -287,8 +279,10 @@ export function mergeContacts(doc, projection) {
       ...people.filter((p) => !oldIds.has(p.id)),
     ],
     catalogues: projection.catalogues || doc.catalogues || [],
-    membership: display?.membership || projection.membership || doc.membership,
-    hrTerms: display?.hrTerms || projection.hrTerms || doc.hrTerms,
+    membership: [],
+    contactsMemberships,
+    hrTerms,
+    contactsFacts,
   };
 }
 // This canonicalization is private to comparison/import; reading never rewrites history.

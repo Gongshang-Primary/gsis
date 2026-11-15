@@ -10,12 +10,13 @@ import {
   recalculate,
 } from "./settings.mjs";
 import { listContributions, resolveContribution } from "./contributions.mjs";
-import { replaceField, validateMkeIntervals } from "./intervals.mjs";
+import { validateMkeIntervals } from "./intervals.mjs";
 import {
-  saveCatalogue,
   deriveDisplay,
   validateAssignments,
-  currentCatalogues,
+  pinnedDefinitions,
+  resolvedField,
+  writeOrdinaryField,
 } from "./catalogues.mjs";
 import {
   birthdayIntents,
@@ -31,9 +32,10 @@ export function readAuthorityProjection(env, input, now = Date.now()) {
     now,
   );
 }
-import { saveGrid, gridReceipt } from "./grid.mjs";
+import { saveGrid, gridReceipt, validateOrdinaryValue } from "./grid.mjs";
 import {
   CONTACT_GRID_FIELDS,
+  CONTACT_GRID_SCHEMA,
   contactAliasDomains,
   projectGridRow,
   projectGridPerson,
@@ -77,7 +79,11 @@ import {
   makeSnapshots,
   currentSnapshot,
 } from "./store.mjs";
-import { validateCatalogues } from "../../contacts/catalogues.mjs";
+import {
+  isDirectField,
+  normalizeDirectValue,
+} from "../../contacts/direct-fields.mjs";
+import { decorateContacts } from "./formal-role-display.mjs";
 const validId = (v) =>
   typeof v === "string" && /^[A-Za-z0-9][A-Za-z0-9._:@/-]{0,127}$/.test(v);
 const fail = (
@@ -109,7 +115,6 @@ export function policy(method, path, body = {}) {
     [
       "/readiness",
       "/audit",
-      "/catalogues",
       "/health",
       "/contributions",
       "/recovery-status",
@@ -144,7 +149,6 @@ export function policy(method, path, body = {}) {
       [
         "/save-data",
         "/readiness/check",
-        "/catalogues",
         "/contributions",
         "/contributions/resolve",
         "/save-signature-settings",
@@ -430,6 +434,58 @@ async function projection(env, body, principal, now, internal = false) {
   const rows = (await allRows(env, now)).filter(
     (r) => !body.staffIds || body.staffIds.includes(r.staff.staff_id),
   );
+  const projectionDefinitions =
+    body.purpose === "deploy"
+      ? await pinnedDefinitions(
+          env.DB,
+          env.SCHOOL_ID,
+          rows.map((r) =>
+            Object.fromEntries(
+              DEPLOY_FIELDS.filter((k) => r.fields[k]).map((k) => [
+                k,
+                r.fields[k],
+              ]),
+            ),
+          ),
+        )
+      : [];
+  if (body.purpose === "deploy") {
+    const checked = new Map();
+    for (const row of rows)
+      for (const field of DEPLOY_FIELDS) {
+        const chosen = choose(records(row.fields[field]), now);
+        if (
+          chosen.state !== "effective" ||
+          ![
+            "role",
+            "eoAppointmentLevel",
+            "appointmentStatus",
+            "schoolSection",
+            "employmentArrangement",
+            "employmentTags",
+            "subjectTags",
+            "mkTags",
+            "memberships",
+          ].includes(field)
+        )
+          continue;
+        const value = chosen.record;
+        if (value.valueSchema === 2) continue;
+        const key = canonical([field, value]);
+        if (!checked.has(key)) {
+          try {
+            await resolvedField(field, value, projectionDefinitions);
+            checked.set(key, true);
+          } catch {
+            throw new ApiError(
+              "CONTACTS_EVIDENCE_UNAVAILABLE",
+              503,
+              "The pinned Contacts classification evidence is unavailable.",
+            );
+          }
+        }
+      }
+  }
   const staff = rows.map((r) => {
     const { fields: _fieldRecords, ...p } = publicStaff(r, now);
     const value = (name) => effectiveField(r.fields[name], now);
@@ -440,6 +496,7 @@ async function projection(env, body, principal, now, internal = false) {
       schoolLeader: value("schoolLeader"),
       employment: value("employmentArrangement"),
       role: value("role"),
+      appointmentLevel: value("eoAppointmentLevel"),
       employmentTags: value("employmentTags"),
       subjectTags: value("subjectTags"),
       groups: value("memberships"),
@@ -452,6 +509,12 @@ async function projection(env, body, principal, now, internal = false) {
         Object.entries(r.fields).map(([k, v]) => [k, v.revision]),
       ),
     };
+    if (body.purpose === "roster") {
+      const section = sectionCode(value("schoolSection"));
+      // Roster's existing operational adapter uses MK for both kindergarten staff sections.
+      x.schoolSection = ["MK", "MKE"].includes(section) ? "MK" : section;
+      x.profile.section = x.schoolSection;
+    }
     if (
       body.purpose === "roster" &&
       (principal.capabilities.includes("admin") ||
@@ -520,23 +583,31 @@ async function projection(env, body, principal, now, internal = false) {
         [env.SCHOOL_ID],
       )
     )?.revision ?? 0;
-  const catalogues =
-    body.purpose === "deploy"
-      ? await currentCatalogues(env.DB, env.SCHOOL_ID)
-      : [];
+  const catalogues = projectionDefinitions.map((r) => r.catalogue);
   const dependencies = rows.map((r) => ({
     owner: "contacts",
     scope: `staff:${r.staff.staff_id}`,
     revision: String(r.staff.revision),
     validUntil: null,
   }));
-  for (const c of catalogues)
-    dependencies.push({
-      owner: "contacts",
-      scope: `catalogue:${c.catalogueId}`,
-      revision: c.revision,
-      validUntil: null,
-    });
+  if (catalogues.length) {
+    // Exact pinned definitions determine content; the current head guards concurrent legacy writers.
+    const heads = await query(
+      env.DB,
+      "SELECT catalogue_id,MAX(revision) revision FROM contacts_catalogues WHERE school_id=? AND catalogue_id IN(SELECT value FROM json_each(?)) GROUP BY catalogue_id",
+      [
+        env.SCHOOL_ID,
+        canonical([...new Set(catalogues.map((c) => c.catalogueId))]),
+      ],
+    );
+    for (const head of heads)
+      dependencies.push({
+        owner: "contacts",
+        scope: `catalogue:${head.catalogue_id}`,
+        revision: String(head.revision),
+        validUntil: null,
+      });
+  }
   const transition = rows.flatMap((r) =>
     Object.entries(r.fields)
       .filter(
@@ -556,6 +627,7 @@ async function projection(env, body, principal, now, internal = false) {
     staff,
     people: staff,
     catalogues,
+    ...(body.purpose === "deploy" ? { roleCatalogue: [] } : {}),
     smcIds: staff.filter((s) => s.smc === true).map((s) => s.staffId),
     revision: `contacts-${epoch}`,
     sequence: epoch,
@@ -796,31 +868,32 @@ export async function handle(ctx) {
       const tagChanges = {};
       if (body.tags) {
         fail(Array.isArray(body.tags) && body.tags.length <= 16);
-        const catalogues = await currentCatalogues(env.DB, env.SCHOOL_ID);
-        for (const code of body.tags) {
-          fail(typeof code === "string");
-          const found = catalogues.flatMap((c) =>
-            c.kind === "operational-tag"
-              ? c.entries
-                  .filter((e) => e.active && e.code === code)
-                  .map((e) => ({
-                    field: e.category,
-                    ref: {
-                      catalogueId: c.catalogueId,
-                      revision: c.revision,
-                      code: e.code,
-                    },
-                  }))
-              : [],
-          );
+        const employment = new Set([
+            "BT",
+            "UT",
+            "SRE",
+            "FAJT",
+            "4/5",
+            "Full-time",
+          ]),
+          subjects = new Set(["MTL", "PE", "Art", "Music"]);
+        // v0.9 Contacts requiredSubject_ and shared workload employment-tag rules.
+        for (const tag of body.tags) {
+          const field = employment.has(tag)
+            ? "employmentTags"
+            : subjects.has(tag)
+              ? "subjectTags"
+              : null;
           fail(
-            found.length === 1,
-            "CATALOGUE_SELECTION_REQUIRED",
+            field,
+            "CONTACTS_FIELD_REVIEW_REQUIRED",
             409,
-            "Unknown tags require Contacts review before assignment.",
+            "Choose the explicit Contacts field for this registration tag.",
           );
-          (tagChanges[found[0].field] ??= []).push(found[0].ref);
+          (tagChanges[field] ??= []).push(tag);
         }
+        for (const [field, tags] of Object.entries(tagChanges))
+          tagChanges[field] = normalizeDirectValue(field, tags);
       }
       const operationId = `provisional-${await digest([proof.descriptor.service, body.operationId])}`,
         intent = {
@@ -1120,12 +1193,19 @@ export async function handle(ctx) {
     return saveGrid(ctx);
   if (path === "/diy") {
     const options = { schoolDomain: env.HOSTED_DOMAIN },
-      person = publicStaff(
+      personRaw = publicStaff(
         await staffRecord(env.DB, env.SCHOOL_ID, principal.staffId),
         now,
         { privateFields: true },
+      ),
+      [person] = await decorateContacts(
+        env.DB,
+        env.SCHOOL_ID,
+        [personRaw],
+        now,
       );
     return {
+      gridSchema: CONTACT_GRID_SCHEMA,
       fields: CONTACT_GRID_FIELDS,
       rows: [projectGridRow(person, options)],
       aliasDomains: contactAliasDomains(options),
@@ -1138,13 +1218,14 @@ export async function handle(ctx) {
     ["/bootstrap", "/data", "/deployment", "/staff"].includes(path) &&
     method === "GET"
   ) {
-    const rows = (await allRows(env, now)).map((r) =>
+    const rawRows = (await allRows(env, now)).map((r) =>
       publicStaff(r, now, {
         privateFields:
           canManage(principal) || r.staff.staff_id === principal.staffId,
         directory: true,
       }),
     );
+    const rows = await decorateContacts(env.DB, env.SCHOOL_ID, rawRows, now);
     const revision =
       (
         await one(
@@ -1179,15 +1260,19 @@ export async function handle(ctx) {
       signatureSettings: await signatureSettings(env),
       catalogueRevision: revision,
       revision,
+      gridSchema: CONTACT_GRID_SCHEMA,
       fields: CONTACT_GRID_FIELDS,
       lists: { Active: ["Y", "N"] },
     };
   }
   if (method === "GET" && /^\/staff\/[^/]+$/.test(path)) {
     const id = decodeURIComponent(path.split("/")[2]);
-    return publicStaff(await staffRecord(env.DB, env.SCHOOL_ID, id), now, {
-      privateFields: canManage(principal) || principal.staffId === id,
-    });
+    const person = publicStaff(
+      await staffRecord(env.DB, env.SCHOOL_ID, id),
+      now,
+      { privateFields: canManage(principal) || principal.staffId === id },
+    );
+    return (await decorateContacts(env.DB, env.SCHOOL_ID, [person], now))[0];
   }
   if (path === "/readiness" && method === "GET") return readiness(env, now);
   if (path === "/readiness/check") {
@@ -1236,17 +1321,6 @@ export async function handle(ctx) {
     );
     return { rows };
   }
-  if (path === "/catalogues" && method === "GET") {
-    return {
-      rows: (
-        await query(
-          env.DB,
-          "SELECT c.* FROM contacts_catalogues c JOIN(SELECT catalogue_id,MAX(revision) revision FROM contacts_catalogues WHERE school_id=? GROUP BY catalogue_id) h ON c.catalogue_id=h.catalogue_id AND c.revision=h.revision WHERE c.school_id=?",
-          [env.SCHOOL_ID, env.SCHOOL_ID],
-        )
-      ).map((r) => JSON.parse(r.body)),
-    };
-  }
   if (path === "/health")
     return {
       schemaVersion: 1,
@@ -1267,7 +1341,6 @@ export async function handle(ctx) {
         )
       ).n,
     };
-  if (path === "/catalogues" && method === "POST") return saveCatalogue(ctx);
   const create = path === "/staff/create",
     self = path === "/save-diy",
     match = path.match(/^\/staff\/([^/]+)\/(update|accept|propose)$/);
@@ -1300,28 +1373,68 @@ export async function handle(ctx) {
         "CAPABILITY_DENIED",
         403,
       );
+    const action = principal.capabilities.includes("contacts.mobile")
+      ? "contacts.mobile"
+      : principal.capabilities.includes("contacts.contribute")
+        ? "contacts.contribute"
+        : principal.capabilities.includes("contacts.provisional")
+          ? "contacts.provisional"
+          : self
+            ? "contacts.self"
+            : "contacts.manage";
+    const prepare = () =>
+      prepareOperation(env.DB, {
+        schoolId: env.SCHOOL_ID,
+        actorId: principal.actorId,
+        operationId: body.operationId,
+        action,
+        intent: body,
+        now,
+        validUntil: principal.validUntil,
+        authorization: principal,
+      });
+    let op;
+    fail(validId(body.operationId));
+    if (await operationStatus(env.DB, env.SCHOOL_ID, body.operationId)) {
+      op = await prepare();
+      if (op.receipt) return op.receipt;
+    }
     const accepted = match?.[2] === "accept",
       propose = match?.[2] === "propose";
+    if (create)
+      fail(
+        body.ttbName === undefined &&
+          !AUTHORITY.some((f) => Object.hasOwn(body, f)),
+        "AUTHORITY_OR_DERIVED_FIELD",
+        400,
+      );
     const changes = create
       ? {
           basicName: body.basicName,
-          ttbName: body.ttbName ?? body.basicName,
-          ...(body.mobile ? { mobile: body.mobile } : {}),
           ...Object.fromEntries(
-            ["nameSuffix", "employmentTags", "subjectTags", "mkTags"]
-              .filter((k) => body[k] !== undefined)
-              .map((k) => [k, body[k]]),
+            DATA_FIELDS.filter(
+              (k) =>
+                !["basicName", "ttbName", ...AUTHORITY].includes(k) &&
+                body[k] !== undefined,
+            ).map((k) => [k, body[k]]),
           ),
+          ...(body.changes ?? {}),
         }
       : accepted || propose
         ? { [body.field]: body.value }
-        : body.changes;
+        : { ...body.changes };
+    fail(
+      !Object.hasOwn(changes, "ttbName"),
+      "DERIVED_FIELD",
+      400,
+      "TTb Name is derived from ordinary staff fields.",
+    );
     fail(
       changes &&
         typeof changes === "object" &&
         !Array.isArray(changes) &&
         Object.keys(changes).length >= 1 &&
-        Object.keys(changes).length <= 8,
+        Object.keys(changes).length <= 25,
     );
     if (self)
       fail(
@@ -1367,8 +1480,9 @@ export async function handle(ctx) {
         "Record the owner review reference.",
       );
     }
-    for (const [field, value] of Object.entries(changes))
-      validateValue(field, value);
+    for (const [field, value] of Object.entries(changes)) {
+      changes[field] = validateOrdinaryValue(env, field, value);
+    }
     const from = body.validFrom ?? now,
       until = body.validUntil ?? null;
     fail(
@@ -1376,25 +1490,7 @@ export async function handle(ctx) {
         from >= 0 &&
         (until === null || (Number.isSafeInteger(until) && until > from)),
     );
-    const action = principal.capabilities.includes("contacts.mobile")
-        ? "contacts.mobile"
-        : principal.capabilities.includes("contacts.contribute")
-          ? "contacts.contribute"
-          : principal.capabilities.includes("contacts.provisional")
-            ? "contacts.provisional"
-            : self
-              ? "contacts.self"
-              : "contacts.manage",
-      op = await prepareOperation(env.DB, {
-        schoolId: env.SCHOOL_ID,
-        actorId: principal.actorId,
-        operationId: body.operationId,
-        action,
-        intent: body,
-        now,
-        validUntil: principal.validUntil,
-        authorization: principal,
-      });
+    op ??= await prepare();
     if (op.receipt) return op.receipt;
     const admission = await admit(env, env.DB, op, principal, [], now);
     if (propose) {
@@ -1514,7 +1610,7 @@ export async function handle(ctx) {
             [env.SCHOOL_ID, staffId, field, expectedField],
           ),
         );
-        const change = replaceField(
+        const change = writeOrdinaryField(
             old,
             field,
             value,
@@ -1573,7 +1669,7 @@ export async function handle(ctx) {
       // Structural dependent-group check includes future records, so future MKE+SMC cannot be pre-authorised.
       const section = sectionCode(
         nextFields.schoolSection
-          ? JSON.parse(nextFields.schoolSection.value_json)
+          ? effectiveField(nextFields.schoolSection, now)
           : current.staff.section,
       );
       const smc = nextFields.smc && JSON.parse(nextFields.smc.value_json);
@@ -1583,6 +1679,24 @@ export async function handle(ctx) {
         name =
           effectiveField(nextFields.basicName, now) ?? current.staff.basic_name,
         ttb = effectiveField(nextFields.ttbName, now) ?? current.staff.ttb_name;
+      if (create || ttb !== current.staff.ttb_name) {
+        fail(
+          !(await one(
+            env.DB,
+            "SELECT 1 found FROM contacts_staff WHERE school_id=? AND staff_id<>? AND lower(ttb_name)=lower(?)",
+            [env.SCHOOL_ID, staffId, ttb],
+          )),
+          "IDENTITY_SELECTION_REQUIRED",
+          409,
+          "Use a distinct name suffix or select the existing person.",
+        );
+        guards.push(
+          w(
+            "SELECT NOT EXISTS(SELECT 1 FROM contacts_staff WHERE school_id=? AND staff_id<>? AND lower(ttb_name)=lower(?)) AS ok",
+            [env.SCHOOL_ID, staffId, ttb],
+          ),
+        );
+      }
       guards.push(
         create
           ? w(
@@ -1597,7 +1711,7 @@ export async function handle(ctx) {
       if (create)
         writes.unshift(
           w(
-            "INSERT INTO contacts_staff(school_id,staff_id,basic_name,ttb_name,active,section,revision,authority_revision,created_at) VALUES(?,?,?,?,?,?,?,?,?)",
+            "INSERT INTO contacts_staff(school_id,staff_id,basic_name,ttb_name,active,section,revision,authority_revision,created_at,profile_state) VALUES(?,?,?,?,?,?,?,?,?,?)",
             [
               env.SCHOOL_ID,
               staffId,
@@ -1608,6 +1722,7 @@ export async function handle(ctx) {
               revision,
               accepted ? 1 : 0,
               now,
+              effectiveField(nextFields.profileState, now) ?? "provisional",
             ],
           ),
         );

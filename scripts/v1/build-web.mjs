@@ -7,6 +7,8 @@ import { fileURLToPath } from 'node:url';
 import { createHash } from 'node:crypto';
 import { parse } from 'acorn';
 import { JSDOM } from 'jsdom';
+import { CONTACT_GRID_SCHEMA } from '../../v1/services/contacts/grid-projection.mjs';
+import { previewTTb } from '../../v1/contacts/direct-fields.mjs';
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'../..');
 const modules=JSON.parse(await readFile(path.join(root,'v1/web/modules.json'),'utf8'));
 const {gsisBuildLabel}=JSON.parse(await readFile(path.join(root,'package.json'),'utf8'));
@@ -69,6 +71,7 @@ function updateContactsRecovery(source) {
     return 'Not saved' + (reason ? ' (' + reason + ')' : '') + '. Your unsaved draft is retained. Review it and save as a new operation.';
    }
    if (outcome !== 'committed') return null;
+   window.GSISContactsEditor.markSignatureStale();
    dataEdits.clear();
    newContactIds.clear();
    dataRequest = null;
@@ -168,7 +171,7 @@ function updateContactsRecovery(source) {
  ];
  const save = async function saveContactsGrid() {
   if (!contactDataEditable() || dataLoading || dataSaving || recoveryBusy || (!dataEdits.size && !newContactIds.size && !dataRequest)) return;
-  if (!dataRequest && dataEdits.size + newContactIds.size * 17 > 300) { notice('Save up to 300 changed cells at a time.'); return; }
+  if (!dataRequest) { try { window.GSISContactsEditor.validateDraft(); } catch(error) { notice(error.message); return; } }
   const retry = !!dataRequest;
   dataRequest ||= contactSaveAttempt();
   const attempt = dataRequest, credential = token, authAttempt = loginAttempt;
@@ -237,7 +240,7 @@ function updateContactsClassificationViews(source) {
    if(!valid())return outcome('unavailable','unavailable','The active Contacts account changed.');
    if(state!==before||pending())return outcome('deferred','deferred','Native Contacts changed while refreshing; its current draft is retained.');
    const fields=before.fields,id=record=>record?.staffId||record?.id,uniqueIds=records=>records.every(record=>typeof id(record)==='string'&&id(record)&&(!record.staffId||!record.id||record.staffId===record.id))&&new Set(records.map(id)).size===records.length;
-   if(!Array.isArray(fields)||fields.length!==17||new Set(fields).size!==fields.length||next.user?.email!==owner||!Array.isArray(next.people)||!uniqueIds(next.people)||!Array.isArray(next.rows)||!uniqueIds(next.rows)||!Array.isArray(next.fields)||next.fields.length!==fields.length||fields.some((field,index)=>next.fields[index]!==field)||!next.aliasDomains||!Number.isSafeInteger(next.revision)||next.rows.some(row=>!Number.isSafeInteger(row.revision)||!Array.isArray(row.values)||row.values.length!==fields.length||row.values.some(value=>typeof value!=='string')||!Array.isArray(row.computed)||row.computed.length!==fields.length||row.computed.some(value=>typeof value!=='boolean')))return outcome('unavailable','unavailable','Contacts returned an incomplete view.');
+   if(!Array.isArray(fields)||!window.GSISContactsEditor.validProjection(next)||new Set(fields).size!==fields.length||next.user?.email!==owner||!Array.isArray(next.people)||!uniqueIds(next.people)||!Array.isArray(next.rows)||!uniqueIds(next.rows)||!Array.isArray(next.fields)||next.fields.length!==fields.length||fields.some((field,index)=>next.fields[index]!==field)||!next.aliasDomains||!Number.isSafeInteger(next.revision)||next.rows.some(row=>!Number.isSafeInteger(row.revision)||!Array.isArray(row.values)||row.values.length!==fields.length||row.values.some(value=>typeof value!=='string')||!Array.isArray(row.computed)||row.computed.length!==fields.length||row.computed.some(value=>typeof value!=='boolean')))return outcome('unavailable','unavailable','Contacts returned an incomplete view.');
    const person=staffId?next.people.find(person=>(person.staffId||person.id)===staffId):null,row=staffId?next.rows.find(row=>(row.staffId||row.id)===staffId):null;
    if(staffId&&(!person||!row||person.revision!==row.revision||person.revision!==expectedRevision))return outcome('stale','stale','A newer or different staff view was read. Refresh the classifications to reconcile.',person?.revision??row?.revision??null);
    const dirtyGrid=contactData!==gridBefore||dataEdits.size||newContactIds.size,
@@ -252,12 +255,47 @@ function updateContactsClassificationViews(source) {
    return outcome('refreshed','refreshed',null,person?.revision??null);
   }catch(error){return outcome('unavailable','unavailable',valid()?error.message:'The active Contacts account changed.');}
  };
- return source+'\nlet classificationViewEpoch=0;\n'+refresh.toString()+"\nwindow.GSISV1ContactsViews=Object.freeze({refresh:refreshClassificationViews});\nwindow.addEventListener('gsis:clear-protected-state',()=>{classificationViewEpoch++;});\n";
+ return source+'\nlet classificationViewEpoch=0;\n'+refresh.toString()+"\nwindow.GSISV1ContactsViews=Object.freeze({refresh:refreshClassificationViews});\n";
+}
+
+function updateContactsDirectEditor(source) {
+ const delegates={renderStaffGrid:'return window.GSISContactsEditor.renderGrid(id,data,edits,onEdit,locked,append);',contactSaveAttempt:'return window.GSISContactsEditor.makeAttempt();',renderSignature:'return window.GSISContactsEditor.renderSignature();'};
+ const ast=parse(source,{ecmaVersion:'latest',sourceType:'module'}),edits=[];
+ for(const [name,body] of Object.entries(delegates)){
+  const declaration=ast.body.find(item=>item.type==='FunctionDeclaration'&&item.id?.name===name);
+  if(!declaration)throw Error('Visual baseline changed: Contacts direct '+name);
+  edits.push([declaration.body.start,declaration.body.end,'{'+body+'}']);
+ }
+ for(const [prefix,replacement] of [
+  ["$('addContactRow').onclick=","$('addContactRow').onclick=()=>window.GSISContactsEditor.addRow();"],
+  ["$('signatureDownload').onclick=","$('signatureDownload').onclick=()=>window.GSISContactsEditor.downloadSignature();"],
+ ]){
+  const node=ast.body.find(item=>item.type==='ExpressionStatement'&&source.slice(item.start,item.end).startsWith(prefix));
+  if(!node)throw Error('Visual baseline changed: Contacts direct '+prefix);
+  edits.push([node.start,node.end,replacement]);
+ }
+ for(const [start,end,value] of edits.sort((a,b)=>b[0]-a[0]))source=source.slice(0,start)+value+source.slice(end);
+ source=replaceOnce(source,"if(row.formalRole!==undefined)p.formalRole=row.formalRole;","if(row.formalRole!==undefined)p.formalRole=row.formalRole;if(row.signatureSource!==undefined)p.signatureSource=row.signatureSource;if(row.revision!==undefined)p.revision=row.revision;",'Contacts saved signature source');
+ source=replaceOnce(source,"state.signatureSettings=saved;signatureSettingsDraft=null;","state.signatureSettings=saved;window.GSISContactsEditor.invalidateSignature();signatureSettingsDraft=null;",'Contacts changed signature settings invalidate pending render');
+ source=replaceOnce(source,"p.monthOfBirth=get('Month of birth');","p.monthOfBirth=get('Month of birth');p.groups=get('Memberships').split('\\n').filter(Boolean);",'Contacts saved direct memberships');
+ const gridFields=/const gridFields=\[[^;]+\];/;
+ if(!gridFields.test(source))throw Error('Visual baseline changed: Contacts loading schema');
+ source=source.replace(gridFields,"const gridFields=state.gridSchema?.fields.map(field=>field.label)||[];");
+ source=replaceOnce(source,"const shown=contactData||{editable:false,fields:gridFields,rows:","const shown=contactData||{editable:false,gridSchema:state.gridSchema,fields:gridFields,rows:",'Contacts loading owner schema');
+ return source+`\nwindow.GSISContactsEditor.install({
+ get:()=>({state,data:contactData,edits:dataEdits,additions:newContactIds,editable:contactDataEditable(),locked:dataLoading||dataSaving||!!dataRequest||contactViewPending(),saving:dataSaving||recoveryBusy,attempt:dataRequest}),
+ capture:()=>{const credential=token,attempt=loginAttempt,owner=state?.user.email,epoch=window.GSISV1.saveStatus().contextEpoch;return()=>!!credential&&token===credential&&loginAttempt===attempt&&state?.user.email===owner&&window.GSISV1.saveStatus().contextEpoch===epoch;},
+ render:()=>renderData(),save:()=>saveContactsGrid(),notice,
+ invalidateSignature:()=>{signatureRenderEpoch++;signatureReady=null;},
+ signature:()=>({epoch:signatureRenderEpoch,ready:signatureReady}),setSignature:ready=>{signatureReady=ready;},
+ },${JSON.stringify(CONTACT_GRID_SCHEMA)},${previewTTb.toString()});
+ window.GSISContactsContributions?.mount().catch(()=>{});
+ const applySavedContactRows=applyContactSavedRows;
+ applyContactSavedRows=function(rows){applySavedContactRows(rows);window.GSISContactsEditor.acceptSignatureView();if($('signature').classList.contains('active'))void renderSignature();};
+ `;
 }
 
 function updateContacts(source){
- // EO and authority are accepted records. A display appointment must never create them.
- source=replaceOnce(source,"if(eo)eo.value=rule?.level||'';","if(eo)eo.value=r.values[eoIndex]??'';",'Contacts role-to-EO inference');
  source=replaceOnce(source,"p.emails[key]=value?(value.includes('@')?value:value+'@'+domain):'';","const aliasDomain=contactData.aliasDomains?.[key]||state.aliasDomains?.[key],prior=p.emails[key],sameAlias=typeof prior==='string'&&prior.split('@')[0]===value&&prior.split('@')[1]?.toLowerCase()===aliasDomain?.toLowerCase();p.emails[key]=value?(value.includes('@')||!aliasDomain?value:sameAlias?prior:value+'@'+aliasDomain):'';",'Contacts saved aliases retain the owning configured domain');
  source=source.replaceAll("state?.user.roles.includes('Admin')","(state?.user.roles.includes('Admin')||state?.user.roles.includes('ContactsPowerUser'))");
  source=source.replaceAll("state.user.roles.includes('Admin')","(state.user.roles.includes('Admin')||state.user.roles.includes('ContactsPowerUser'))");
@@ -267,8 +305,9 @@ function updateContacts(source){
  source=replaceOnce(source,"if(b)openRole(b.dataset.roleEmail);","if(b)location.assign('/admin/');",'Contacts Core access row');
  source=updateContactsRecovery(source);
  source=updateContactsClassificationViews(source);
+ source=updateContactsDirectEditor(source);
  source=source.replaceAll('Complete this saved change','Inspect or recover this save').replaceAll('Completing the original save…','Checking durable recovery…');
- source+=`\nwindow.addEventListener('gsis:clear-protected-state',()=>{loginAttempt++;loginAbort?.abort();clearContactsPersonalState();token='';state=null;visible=[];dataSaving=false;dataRequest=null;recoveryBusy=false;resetContactRecovery();$('dataGrid').inert=false;$('contactRows').replaceChildren();$('accessRows').replaceChildren();$('app').classList.add('hidden');});`;
+ source+=`\nwindow.GSISContactsEditor.onContextClear(()=>{classificationViewEpoch++;loginAttempt++;loginAbort?.abort();clearContactsPersonalState();token='';state=null;visible=[];dataSaving=false;dataRequest=null;recoveryBusy=false;resetContactRecovery();$('dataGrid').inert=false;$('contactRows').replaceChildren();$('accessRows').replaceChildren();$('identity').replaceChildren();$('app').classList.add('hidden');});`;
  return source;
 }
 // Fortnight inputs have their own raw draft; the existing queue still owns every
@@ -743,6 +782,27 @@ function updateDeployTeachingEligibility(source) {
  body=replaceOnce(body,'return {memberships:memberships,resolve:resolve,eligible:eligible,',legacyClassification+'return {memberships:memberships,resolve:resolve,classificationEligible:classificationEligible,eligible:eligible,','Separate catalogue classification from current teacher eligibility');
  return source.slice(0,engine.start)+body+source.slice(engine.end);
 }
+function updateDeployContactsReports(source){
+ source=replaceOnce(source,"if(doc.membership)roleCatalogue=doc.membership.map(r=>({role:r[0],level:r[12],groups:['SL','SC','SMC','KP','TL','SDT','CMT','SAT','Support','MK'].filter((k,i)=>r[i+2]==='1')}));",'', 'Contacts reports do not rebuild a role authority catalogue');
+ const ast=parse(source,{ecmaVersion:'latest',sourceType:'script'}),edits=[];
+ const offload=ast.body.find(node=>node.type==='FunctionDeclaration'&&node.id?.name==='offloadPage'),sort=ast.body.find(node=>node.type==='FunctionDeclaration'&&node.id?.name==='wireSort');
+ if(!offload||!sort)throw Error('Visual baseline changed: Contacts report consumers');
+ const offloadCode=source.slice(offload.start,offload.end),roleChoices='roleCatalogue.map(r=>r.role)';
+ if(offloadCode.split(roleChoices).length!==3)throw Error('Visual baseline changed: Offload descriptive role choices');
+ edits.push([offload.start,offload.end,offloadCode.replaceAll(roleChoices,'(hrTermLists().Role||[])')]);
+ edits.push([sort.start,sort.end,replaceOnce(source.slice(sort.start,sort.end),'table:not([data-no-sort])','table:not([data-no-sort]):not([data-contacts-reference])','Contacts reference reports use the shared table sorter')]);
+ for(const [name,key,fields] of [
+  ['membershipPage','contactsMemberships',['Staff ID','TTb Name','Role','Memberships']],
+  ['masterOptionsPage','contactsFacts',['Staff ID','TTb Name','Field','Value']],
+ ]){
+  const fn=ast.body.find(node=>node.type==='FunctionDeclaration'&&node.id?.name===name);
+  if(!fn)throw Error('Visual baseline changed: Contacts reference report '+name);
+  const body=`{const fields=${JSON.stringify(fields)},rows=Array.isArray(v().${key})?v().${key}:[];root.innerHTML='<p class="hint">Contacts reference. Edit staff facts in Contacts → Edit Info. These reports do not grant authority.</p>'+table(fields,rows.length?rows.map(row=>'<tr>'+fields.map((_,index)=>'<td style="white-space:pre-line">'+esc(row[index])+'</td>').join('')+'</tr>'):['<tr><td colspan="4">No Contacts facts are available.</td></tr>']);root.querySelector('table').setAttribute('data-contacts-reference','');}`;
+  edits.push([fn.body.start,fn.body.end,body]);
+ }
+ for(const [start,end,body] of edits.sort((a,b)=>b[0]-a[0]))source=source.slice(0,start)+body+source.slice(end);
+ return source;
+}
 function updateDeploy(source){
  source=replaceOnce(source,'return [...byId.values()].filter(t=>!t.active||eligibleTeacher(t));','return [...byId.values()].filter(t=>!t.active||eligibleTeacher(t)||t.orphan||(v().assignments||[]).some(a=>a.teacher===t.id)||Object.hasOwn(v().teacherNotes||{},t.id)||Object.hasOwn(v().teacherDrafts||{},t.id));','Teachers inventory retains historical references independently of new choices');
  source=replaceOnce(source,'.filter(value=>eligibleTeacher({role:value}))','.filter(value=>GSISTeachingRules.classificationEligible(value,roleCatalogue.length?roleCatalogue:undefined))','Offload catalogue labels preserve their legacy negative classification filter');
@@ -763,17 +823,12 @@ function updateDeploy(source){
  source=replaceOnce(source,"admin=()=>role.includes('Admin')","admin=()=>window.GSISV1.capable('admin')",'Deploy preview disables administrative mutation controls');
  source=replaceOnce(source,"function canClearVenueAssignments(){const d=v();return admin()&&d?.status==='planning'&&d.publication!=='Published'&&d.publishedRevision==null;}","function canClearVenueAssignments(){const d=v();return admin()&&d?.status==='draft'&&d.publication!=='Published'&&d.publishedRevision==null;}",'Deploy venue controls use the native v1 draft state');
  source=replaceOnce(source,"viewEpoch++;editing={versionId:current,key,clientId,baseline:JSON.stringify(v()),expectedRevision:snapshotCache?.revision,hash:null};return editing;","viewEpoch++;const grant=await api('lease',{versionId:current,scope:key,key,clientId,revision:snapshotCache?.revision,operationId:crypto.randomUUID()});editing={versionId:current,key,scope:key,clientId,token:grant.token,fence:grant.fence,leaseFence:grant.fence,baseline:JSON.stringify(v()),expectedRevision:grant.revision,revision:grant.revision};return editing;",'Deploy owner lease');
- source=replaceOnce(source,"function membershipPage(root){\n const readOnly=false;","function membershipPage(root){\n const readOnly=true;",'Membership reference only');
- source=source.replaceAll("This table defines this version’s roles, memberships and EO mappings. Publishing replaces Contacts’ mappings.","Reference from Contacts. Manage role, membership and EO catalogues in Contacts; Deploy publication does not change them.");
- source=source.replaceAll("(!admin()||fixed.includes(k)?'readonly':'')","('readonly')");
  source=source.replaceAll('if(kp()&&admin())','if(kp())');
  source=source.replaceAll('Purge entire log for this version','Archive audit display').replaceAll('Permanently purge this version’s audit log?','Archive this version’s audit display? Immutable audit and recovery evidence are retained.');
  source=replaceOnce(source,"const id=t?.id||'new-'+crypto.randomUUID(),p=t?plannerProfile(t)","let id=t?.id||'new-'+crypto.randomUUID();const registrationId=crypto.randomUUID(),p=t?plannerProfile(t)",'Contacts owns new Staff IDs');
  source=replaceOnce(source,"selectionEditor(t?'Edit teacher':'Add teacher',body,d=>{const profile=read(d);","selectionEditor(t?'Edit teacher':'Add teacher',body,async d=>{const profile=read(d);",'Asynchronous permanent Staff ID registration');
  source=replaceOnce(source,"queueCell({operation:'upsertTeacherProfile',teacher:id,profile,expected:v().teacherDrafts?.[id]||v().teachers.find(r=>r.id===id)?.profile||null})","if(!t&&id.startsWith('new-')){const registered=await window.GSISV1.request('deploy','/staff/register',{method:'POST',body:{operationId:registrationId,basicName:profile['Basic Name']}});if(registered.state!=='committed'||!(registered.result?.staffId||registered.staffId))throw Error('The permanent staff identity is not yet confirmed. Retry this same registration.');id=registered.result?.staffId||registered.staffId;}queueCell({operation:'upsertTeacherProfile',teacher:id,profile,expected:v().teacherDrafts?.[id]||v().teachers.find(r=>r.id===id)?.profile||null})",'Use confirmed Contacts Staff ID');
  source=source.replaceAll('data-version-action="publish" \'+(!admin()?\'disabled\':\'\')','data-version-action="publish" \'+(!window.GSISV1.capable(\'deploy.publish\')?\'disabled\':\'\')');
- source=source.replaceAll("Choices belong to this version. Publishing replaces Contacts’ choices; other versions keep their own. Existing staff values outside these choices are retained and flagged. Edit roles and EO mappings in Membership.","Reference from Contacts. These accepted catalogue choices are read-only in Deploy. Existing proposed staff values outside the choices remain visible for review.");
- source=source.replaceAll("Defines the levels available in Membership. Each teacher’s level follows their assigned role.","Explicit accepted EO appointment evidence from Contacts.");
  // PG01/PG02 govern version-owned Subject Type edits; legacy Admin-only UI is superseded.
  const subjectAst=parse(source,{ecmaVersion:'latest',sourceType:'script'}),subjectPage=subjectAst.body.find(node=>node.type==='FunctionDeclaration'&&node.id?.name==='subjectTypesPage');
  if(!subjectPage)throw Error('Visual baseline changed: Subject Type view');
@@ -784,6 +839,7 @@ function updateDeploy(source){
  const ast=parse(source,{ecmaVersion:'latest',sourceType:'script'}),publication=ast.body.find(node=>node.type==='FunctionDeclaration'&&node.id?.name==='reviewTeacherPublication');
  if(!publication)throw Error('Visual baseline changed: Deploy publication flow');
  source=source.slice(0,publication.start)+`async function reviewTeacherPublication(){if(queuedEdits().length||unsavedDraft||editing||busy){alert('Save or discard drafts before publishing.');return;}if(!window.GSISV1.capable('deploy.publish')){alert('Current Deploy publication access is required.');return;}await window.GSISV1Publication.open({versionId:current,revision:snapshotCache?.revision,name:v()?.name,onCommitted:()=>refresh(true)});}`+source.slice(publication.end);
+ source=updateDeployContactsReports(source);
  source+=`\nwindow.addEventListener('gsis:clear-protected-state',()=>{stopLive();sessionEpoch++;clearInterval(pollTimer);clearInterval(leaseTimer);clearTimeout(queueTimer);token='';state={versions:[]};current='';snapshotCache=null;acceptedSnapshot=null;staffCatalog=new Map();roleCatalogue=[];cellQueue=[];queueFlight=null;draftBase=null;editing=null;unsavedDraft=false;busy=false;acquiring=false;versionCreateAttempt=null;versionNoteDrafts.clear();exclusionEdits.clear();if(inlineDraftEditor){inlineDraftEditor.open=false;inlineDraftEditor.remove();inlineDraftEditor=null;}el('content').replaceChildren();el('nav').replaceChildren();controls();});`;
  return source;
 }
@@ -997,7 +1053,7 @@ function transform(module,rel,text){
   if(module.id==='deploy'&&rel==='index.html')text=text.replace('</head>','<script defer src="/v1/shared/deploy-ui.js"></script><script defer src="/v1/shared/deploy-ui-tables.js"></script></head>');
   if(module.id==='roster'&&rel==='index.html')text=text.replace('</head>','<link rel="stylesheet" href="/v1/shared/roster-capacity.css"><script src="/v1/shared/roster-capacity.js"></script><link rel="stylesheet" href="/v1/shared/roster-stapler-resize.css"><script defer src="/v1/shared/roster-stapler-resize.js"></script><script defer src="/v1/shared/roster-table-ui.js"></script></head>');
   if(module.id==='calendar'&&rel==='index.html')text=text.replace('</head>','<link rel="stylesheet" href="/v1/shared/calendar-ui.css"><script type="module" src="/v1/shared/calendar-ui.js"></script></head>');
-  if(module.id==='contacts'&&rel==='index.html')text=text.replace('</body>','<script type="module" src="/v1/shared/contacts-authority.js"></script><script type="module" src="/v1/shared/contacts-catalogues.js"></script></body>');
+  if(module.id==='contacts'&&rel==='index.html')text=text.replace('</body>','<script type="module" src="/v1/shared/contacts-authority.js"></script></body>');
   if(module.id==='roster'&&rel==='index.html')text=text.replaceAll('/roster/system-health.html','/admin/#health').replace('</body>','<script type="module" src="/v1/shared/roster-import.js"></script><script type="module" src="/v1/shared/roster-policy-ledger.js"></script><script type="module" src="/v1/shared/roster-continuity.js"></script></body>');
   if(module.id==='layout'&&rel==='index.html')text=text.replace('</body>','<script type="module" src="/v1/shared/layout-editor.js"></script></body>');
   if(module.id==='deploy'&&rel==='index.html')text=text.replace('</body>','<script type="module" src="/v1/shared/deploy-publication.js"></script></body>');
