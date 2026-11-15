@@ -1,0 +1,71 @@
+# v1-deploy-venue-source-fence-budget: B-D03 bounded Venues source-begin
+
+- Status: claimed for the next bounded implementation under the owner's continuing frontend UAT repair instruction. Incorporate the accepted claim before editing; no merge or deployment authorised.
+- Owner/model: Codex; coordinator ChatGPT for v1; independent exact-head reviewer Claude.
+- Last updated (Asia/Singapore): 15 November 2026, 13:31.
+- Branch: `codex/v1-deploy-venue-source-fence-budget`.
+- Selected frozen parent: [`f14543449882b47774dc2799298d8d0c1382dbb3`](https://github.com/helper-gsps/gsis/commit/f14543449882b47774dc2799298d8d0c1382dbb3), branch `codex/v1-deploy-venue-uses`. Parent PR #169 is open at this frozen head. Full CI `43680646355` is green: 1,184 Node programs and 40 LORD programs per shard. Focused 11/11 groups, canonical no-drift and unchanged regressions pass; isolated product/build CI and Claude review remain pending. Parent evidence is not child verification.
+- Pre-claim main: `68f0504f408a52b00d1d0cd625f21a3ea87c76f2`. Accepted claim / incorporated base / child PR / tested head: pending actual publication. Use expected-head non-force update; never infer acceptance.
+- Discovery: Run B [`9b6b9361a42de0e54153e7a0a63d719150ac2392`](https://github.com/helper-gsps/gsis/blob/9b6b9361a42de0e54153e7a0a63d719150ac2392/docs/v1/accelerated-delivery/UAT_RUN_B_2026-11-15.md), B-D03 and the 12:06–12:21 SGT continuation.
+- Authorisation: next bounded repair in the continuing owner-authorised UAT queue, selected by ChatGPT as v1 coordinator. Publish and re-read this Git claim and incorporate it into the frozen parent before edits. No live authority is granted.
+
+## Exact five-path scope
+
+1. `v1/services/venues/service.mjs` — only nonstaged `sourceBegin` preparation/read/guard/write batching, with narrow local helpers if useful; preserve staged dispatch and every other route.
+2. `tests/v1-product-venues-source-fence-budget.mjs` — new actual owning-D1 budget, guard, race and restart program.
+3. `tests/v1-product-deploy-venues.mjs` — extend the existing actual nine-Worker integration without weakening its current 11 groups or fixed sequence/count assertions.
+4. `docs/coordination/tasks/v1-deploy-venue-source-fence-budget.md` — this claim and actual evidence.
+5. `docs/v1/accelerated-delivery/DEPLOY_VENUE_SOURCE_FENCE_BUDGET_2026-11-15.md` — design, measured budgets, limitations and exact-head handoff.
+
+Venues alone owns canonical physical rooms, room revisions, conflict checks and its source-fence transaction. Deploy owns immutable source publications and its current pointer. No Core, generic admission/security/store runtime, Deploy service, Contacts, staged projection, schema, migration, frontend, build, dependency, provider or configuration path is included. No tracked generated output. No merge, deployment, live-data read/write, original hosted operation retry/abort, canonical-room seeding, authority acceptance or scheduler activation. Pause only an affected requirement if an actual test demonstrates a necessary scope expansion; obtain a refined claim before editing another path.
+
+## Refreshed start gates and serial handoff
+
+After opening PR #169, main, all branches, claims, review and discovery heads, CI and actual file inventories of all 29 open PRs were refreshed. Main remains `68f0504f408a52b00d1d0cd625f21a3ea87c76f2`; Run B remains `9b6b9361a42de0e54153e7a0a63d719150ac2392`; Claude review branch remains `58e22a7bf7ba4a49caa2caabe877605153b098db`. Only frozen same-builder PRs #160/#168/#169 overlap the existing integration test. No open PR changes the proposed Venues source path; no competing implementer was identified. Applicable root/v1, coordination and engineering instructions were read. Production coordination remains separate.
+
+The parent source is frozen and handed forward; do not edit its branch. Publish only this claim on the refreshed main using expected-head protection, re-read it, and immediately incorporate the accepted commit into the new branch before any implementation. Preserve all frozen parent fixes. Parent review/product CI remain separate gates; any later code change in a parent requires child revalidation. This is a serial same-builder handoff, not concurrent editing of the shared test.
+
+## Defect and evidence boundary
+
+At the selected parent, nonstaged Venues `sourceBegin` makes a separate room SELECT, revision guard and scope INSERT for each reference. `commitOperation` adds an assertion INSERT and cleanup DELETE for every guard. A reference-only successful call uses `4n + 9` owner SQL statements. The executed local synthetic budget probe succeeds at 10 references/49 statements; 11 references exceed a simulated 50-statement budget and leave the original local operation prepared with no fence. A 143-reference unrestricted run uses 581 statements and about 4.5 seconds with trivial proof adapters. The source RPC has a five-second deadline.
+
+This is a proved local scaling defect, not proof of the reported hosted exception or Cloudflare plan. The report's generic RPC message cannot identify quota, timeout or another transport/runtime failure. A 143-room register also does not establish 143 used publication references.
+
+Source-begin uses the existing explicit internal-system admission, after validation of the original source decision and durable projection. It does not acquire ordinary Core/Contacts source pins. The later Deploy source change/admission is reached only after the fence reply. Do not diagnose this as a held ordinary pin or remove any admission protection.
+
+Existing local evidence also shows a prepared source-begin survives an actual persisted-D1 restart, then finishes with the same ID/digest/fence when only the synthetic quota is removed and authority is still valid. Exact replay creates no second fence/audit. New implementation tests must prove this on the repaired path; the earlier probe is not a child test pass.
+
+## Contract to preserve
+
+- Keep `sourceProof` and its original school, actor, source domain/service/action, operation, full request digest, source digest, writer fence, preview and decision-lifetime checks. Keep the existing accepted source states and old-fence identity/replay behavior. A committed source with no original fence cannot retrospectively create one.
+- Keep `scopeRows` behavior and its contribution to `prepareOperation.intent` exactly: occupancy source, stable IDs, numeric/date parsing, safe integer timestamps, positive intervals of at most 24 hours, existing ordering/deduplication, retained `sourceId`, and optional supplied-scope comparison. Do not normalize away fields, change sort rules, add references to the stored intent, or change its digest/operation ID to simplify batching. Preserve local `fence:<digest>` ID and original decision/fence/time semantics.
+- Preserve the 1,000 raw reference and 10,000 raw occupancy limits. Validate every raw reference against the owning snapshot with existing strict revision semantics before harmless duplicate elimination. Identical references may yield one zero-range scope; contradictory revisions for the same ID must reject. Do not coerce string revisions into numeric equality, silently truncate inputs, infer room IDs, use labels as identity, or mutate the original proof/body.
+- Read the union of explicit referenced/scoped room IDs once with a bounded `json_each(?)` selection. Missing reference rooms and stale revisions retain their reference failure semantics; missing occupied rooms retain their existing venue failure semantics. The snapshot is preparation, not authority to commit later.
+- Use a constant number of set-based guards in the same owning-D1 transaction to recheck all captured room revisions and all booking/closure conflicts. Preserve `confirmed`, `pending` and `active` statuses, direct venue identity or the same nonempty `overlapGroup`, the existing strict half-open overlap inequalities, stored interval `buffer_ms`, and current room `bufferMinutes`. A room or overlap-group change after the snapshot must lose at commit.
+- Nonstaged source-begin presently has no separate opening-hours check. Preserve the existing interval/conflict contract and retain unchanged booking/opening-hours regressions; adding a new publication opening-hours policy is outside this repair.
+- Insert zero-range reference markers and actual scopes using bounded set-based INSERT…SELECT statements, preserving existing primary-key/INSERT OR IGNORE duplicate semantics. Keep fence header, complete scope set, operation receipt and audit in the original atomic D1 batch. No per-room transaction, partial sealed fence or asynchronous scope completion; no cross-D1 atomicity claim.
+- Keep result fields and meanings: a sealed `pending` Venues source fence is not a committed Deploy publication or delivered downstream update. Preserve unknown outcomes, original receipt recovery and source-completion behavior.
+
+## Resource target and implementation shape
+
+Reuse existing store helpers and schema. Prefer one bounded room snapshot, a small constant guard set and bulk scope writes over a new generic framework. The target for a normal successful nonstaged source-begin is at most 25 owning-Venues SQL statements, no more than 100 bound parameters per statement, a constant batch statement count, and less than 1 MiB of serialized SQL-bound JSON per request. Count every statement inside D1 batches and all single queries, not only API calls. Preserve the existing source-proof transport limit and reject oversized normalized material before SQL fanout. Do not raise the five-second deadline or rely on a higher quota.
+
+Use indexed room identity and direct/linked conflict predicates; inspect plans or measured query behavior to avoid an accidental room-by-interval Cartesian scan. The row count is bounded by the distinct source IDs. Record successful and failure/recovery counts separately, including attempted versus executed statements. A snapshot must be followed by atomic guards, not treated as an unchanging cache. These are targets to measure, not predeclared results.
+
+## Acceptance and required verification
+
+1. Capture a meaningful red on unchanged parent source with actual local D1 and a strict 50-statement counter. Exercise 1/10/11/41/143/1,000 references; fixture setup is outside the measured invocation. After repair all valid cases meet the measured normal-path target and retain one exact fence/receipt/audit. Include the 1,001-reference and oversized-byte rejection boundaries.
+2. Cover empty occupancy, at least one real occupancy, duplicate references/scopes, mismatched revisions, unknown/foreign-school rooms, invalid intervals and exact source/body identity. Test direct and linked-room bookings/closures, both buffers, active statuses and exact touching boundaries; retain unrelated opening-hours behavior.
+3. Pause after the snapshot, then change a room revision/overlap group/buffer or add a conflicting booking/closure. Commit guards must roll back the entire fence/scopes/audit set. Preserve the original operation evidence; no false committed receipt. Exercise concurrent identical attempts and same-ID/different-intent rejection.
+4. Restart after a failed pre-fence attempt, retry the exact original ID/digest/fence under valid original authority, and prove one committed local fence/audit and idempotent replay. Cover lost replies after fence commit and after publication commit. Expired authority is never extended; source abort and late writer cases must retain existing guarantees. Any newly exposed cancellation/tombstone gap is reported and scoped separately before dependent work changes.
+5. Extend the actual nine-Worker test with 143 physical rooms but only 41 used references, then 143 used references, through real Core/Contacts/Deploy/Venues. Prove immutable publication content, exactly one pointer advance per intended publication, original receipt binding, exact fence scope membership, source completion and process-restart recovery. Unused rooms must not become occupancy. Preserve all current fixed sequence/count assertions; append after their original scenarios or use an independent fixture. Do not rewrite old expected totals merely to make new cases pass.
+6. Keep each focused test program within the existing 45-second execution budget, including Worker startup and restart. Share fixtures sensibly and avoid one test runtime per room. Do not increase the runner timeout, skip original groups, substitute mocked authority for the actual integration, or claim a timeout as pass. If meaningful coverage cannot fit, report the measured cause and obtain a bounded scope decision.
+7. Run canonical build with no tracked drift, focused new/existing tests, unchanged Venues/source-projection and Deploy/Core/Contacts regressions, runner-discovery checks, full required Node/LORD/product suites and exact-head CI. All relevant commands use `TZ=Asia/Singapore`. Record exact commands/head/results, including failures and omissions. Claude reviews the final exact head; no approval inherited from the parent.
+
+## Explicit remaining limits and release boundary
+
+The staged Roster `beginStaged` path in `venues/projection.mjs` has separate per-room guards; this claim does not repair its scalability. Nonstaged `sourceComplete` retains per-occupancy work. This repair must not claim all 10,000-occupancy lifecycles meet the new budget. Keep their unchanged behavioral regressions and record future measured bounds, especially for B-R02.
+
+No migration or data rewrite is needed. Reverting restores the old query fanout and cannot repair a hosted pending operation. The original hosted operation remains subject to separately authorised receipt/recovery handling; do not replace it with a fresh publication. An owner-authorised post-deployment check is required to close hosted B-D03. F5 remains OPEN; official T1B-01/T1B-02 and unperformed hosted runtime UAT remain Not tested.
+
+Q01 remains pending actual claim/base/overlap publication. Q02–Q05 require implementation and its evidence; Q06–Q07 remain pending tests, exact-head CI and independent review. Q08 is not applicable to deployment in this task. No skill package was executed to draft this scope; repository boundary, failure-reproduction and recovery principles were applied directly.

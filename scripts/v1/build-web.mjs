@@ -6,19 +6,222 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createHash } from 'node:crypto';
 import { parse } from 'acorn';
+import { JSDOM } from 'jsdom';
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'../..');
 const modules=JSON.parse(await readFile(path.join(root,'v1/web/modules.json'),'utf8'));
+const {gsisBuildLabel}=JSON.parse(await readFile(path.join(root,'package.json'),'utf8'));
 const defaultOutput=path.join(root,'deliverables/v1/web');
 const omitted=/^(?:_worker\.js|_routes\.json|edge-.*|timetable-preparation\..*|timetable-review\..*|system-health\..*)$/;
 const forbidden=/https?:\/\/(?:script\.google\.com|script\.googleusercontent\.com)(?:\/|\b)/i;
 const productionHosts={ 'gsps-gsis.pages.dev':'contacts','gsps-deploy.pages.dev':'deploy','gsps-layout.pages.dev':'layout','gsps-roster.pages.dev':'roster','gsps-calendar.pages.dev':'calendar','gsps-venues.pages.dev':'venues','gsps-lord.pages.dev':'lord','gsps-overlord.pages.dev':'overlord','gsps-starlord.pages.dev':'starlord'};
 const textExtensions=new Set(['.js','.mjs','.html','.css','.json','.svg','.txt','.md']);
+export function normaliseReleaseChrome(source, sourceLabel) {
+ if(typeof sourceLabel !== 'string' || !/^\d+\.\d+\.\d+[a-z]*$/i.test(sourceLabel)) throw Error('Invalid source build label');
+ if(!source.includes('v'+sourceLabel)) return source;
+ // Locate current application chrome, then patch only its original text bytes.
+ // Serializing the DOM would also rewrite unrelated markup, scripts and URLs.
+ const dom=new JSDOM(source,{includeNodeLocations:true});
+ try {
+  const {document,NodeFilter}=dom.window,edits=[];
+  const token=new RegExp('(?<![\\w.-])v'+sourceLabel.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'(?![\\w.-])','g');
+  const walker=document.createTreeWalker(document,NodeFilter.SHOW_TEXT);
+  for(let node=walker.nextNode();node;node=walker.nextNode()) {
+   const parent=node.parentElement;
+   if(!parent?.closest('title,header,.suite-release,.release-label,.release-version,.app-footer') || parent.closest('script,style,template')) continue;
+   const location=dom.nodeLocation(node);
+   if(!location) continue;
+   const old=source.slice(location.startOffset,location.endOffset),value=old.replace(token,'v1');
+   if(value!==old) edits.push([location.startOffset,location.endOffset,value]);
+  }
+  for(const [start,end,value] of edits.sort((a,b)=>b[0]-a[0])) source=source.slice(0,start)+value+source.slice(end);
+  return source;
+ } finally { dom.window.close(); }
+}
 function replaceOnce(source,from,to,label){if(!source.includes(from))throw Error('Visual baseline changed: '+label);return source.replace(from,to);}
 function replaceFetch(source,filename){
  let ast;try{ast=parse(source,{ecmaVersion:'latest',sourceType:'module',allowReturnOutsideFunction:true});}catch(error){throw Error('Cannot parse browser source '+filename+': '+error.message);}
  const edits=[];
  function visit(node){if(!node||typeof node!=='object')return;if(node.type==='LogicalExpression'&&node.right?.type==='Identifier'&&node.right.name==='fetch')edits.push([node.right.start,node.right.end,'window.GSISV1.fetch']);if(node.type==='CallExpression'&&node.callee?.type==='Identifier'&&node.callee.name==='fetch')edits.push([node.callee.start,node.callee.end,'window.GSISV1.fetch']);for(const [key,value]of Object.entries(node)){if(key==='start'||key==='end')continue;if(Array.isArray(value))value.forEach(visit);else if(value&&typeof value==='object')visit(value);}}
  visit(ast);for(const [start,end,value]of edits.sort((a,b)=>b[0]-a[0]))source=source.slice(0,start)+value+source.slice(end);return source;
+}
+// Keep the v1 save lifecycle tied to the original durable operation. The legacy
+// frontend is copied unchanged; only its built v1 functions are replaced.
+function updateContactsRecovery(source) {
+ const helpers = [
+  function contactAttemptContext(attempt, credential, authAttempt) {
+   return !!token && token === credential && loginAttempt === authAttempt && state?.user.email === attempt.owner;
+  },
+  function contactAttemptOutcome(result, attempt) {
+   const receipt = result?.receipt || result;
+   if (receipt?.operationId === attempt.requestId) {
+    if (receipt.state === 'committed') return 'committed';
+    if (receipt.state === 'terminal-not-committed') return 'aborted';
+   }
+   return result?.state === 'prepared' ? 'prepared' : 'unknown';
+  },
+  async function settleContactAttempt(attempt, result, credential, authAttempt) {
+   if (!contactAttemptContext(attempt, credential, authAttempt) || dataRequest !== attempt) return null;
+   const outcome = contactAttemptOutcome(result, attempt);
+   if (outcome === 'aborted') {
+    dataRequest = null;
+    resetContactRecovery();
+    const reason = result.receipt?.reason || result.reason;
+    return 'Not saved' + (reason ? ' (' + reason + ')' : '') + '. Your unsaved draft is retained. Review it and save as a new operation.';
+   }
+   if (outcome !== 'committed') return null;
+   dataEdits.clear();
+   newContactIds.clear();
+   dataRequest = null;
+   resetContactRecovery();
+   try {
+    const next = await api('data');
+    if (!contactAttemptContext(attempt, credential, authAttempt)) return null;
+    contactData = sortContactData(next);
+    applyContactSavedRows(contactData.rows);
+    renderContacts();
+    notice('Contacts saved');
+    return 'Saved';
+   } catch {
+    if (!contactAttemptContext(attempt, credential, authAttempt)) return null;
+    contactData = null;
+    return 'Saved · reload the display. Your save is confirmed.';
+   }
+  },
+ ];
+ const replacements = [
+  async function confirmContactSave(attempt, {digest, credential = token, diagnostics = {}} = {}) {
+   const budget = 12000, deadline = Date.now() + 27000, authAttempt = loginAttempt;
+   let latest = null;
+   for (const delay of [0, 1000, 2500]) {
+    if (Date.now() + delay + budget > deadline || !contactAttemptContext(attempt, credential, authAttempt)) break;
+    if (delay) await new Promise(resolve => setTimeout(resolve, delay));
+    if (!contactAttemptContext(attempt, credential, authAttempt)) break;
+    const controller = new AbortController(), timer = setTimeout(() => controller.abort(), budget);
+    try {
+     const result = await api('save-receipt', {requestId: attempt.requestId, ...(digest ? {digest} : {})}, controller.signal);
+     if (!contactAttemptContext(attempt, credential, authAttempt)) return null;
+     latest = result;
+     if (['committed', 'aborted'].includes(contactAttemptOutcome(result, attempt))) return result;
+    } catch (error) {
+     diagnostics.confirmationError = friendlyFailure(error);
+     if (error.status === 401 || error.status === 403) break;
+    } finally { clearTimeout(timer); }
+   }
+   return latest;
+  },
+  async function showContactRecovery() {
+   const attempt = dataRequest;
+   if (!attempt || attempt.owner !== state?.user.email || !contactDataEditable() || !token) { resetContactRecovery(); return; }
+   if (recoveryBusy || dataSaving) return;
+   $('contactRecovery').hidden = false;
+   $('contactRecovery').open = true;
+   $('recoveryRequests').replaceChildren();
+   $('recoveryStatus').textContent = 'Original save ' + attempt.requestId + ' is unconfirmed. Check again reads its receipt. Stop original save can stop a recorded pending save; your draft stays retained until its outcome is known.';
+   $('refreshRecovery').disabled = false;
+   const button = document.createElement('button');
+   button.type = 'button';
+   button.dataset.contactsRecoverAttempt = '';
+   button.textContent = 'Stop original save';
+   button.onclick = () => recoverInterruptedContact(attempt, button);
+   $('recoveryRequests').append(button);
+  },
+  async function recoverInterruptedContact(attempt, button, stop = true) {
+   if (recoveryBusy || dataSaving || dataRequest !== attempt || !contactDataEditable() || attempt.owner !== state?.user.email) return;
+   const credential = token, authAttempt = loginAttempt;
+   recoveryBusy = true;
+   dataSaving = true;
+   button.disabled = true;
+   $('refreshRecovery').disabled = true;
+   renderData();
+   $('dataGrid').inert = true;
+   $('recoveryStatus').textContent = 'Checking original save ' + attempt.requestId + '…';
+   let message = '';
+   try {
+    let result = await api('save-receipt', {requestId: attempt.requestId});
+    if (!contactAttemptContext(attempt, credential, authAttempt) || dataRequest !== attempt) return;
+    if (stop && contactAttemptOutcome(result, attempt) === 'prepared') {
+     result = await api('recover-save', {requestId: attempt.requestId});
+     if (!contactAttemptContext(attempt, credential, authAttempt) || dataRequest !== attempt) return;
+    }
+    message = await settleContactAttempt(attempt, result, credential, authAttempt) || 'The original save is still unconfirmed. Your draft and save ID are retained.';
+   } catch (error) {
+    if (!contactAttemptContext(attempt, credential, authAttempt) || dataRequest !== attempt) return;
+    const diagnostics = {};
+    const result = await confirmContactSave(attempt, {credential, diagnostics});
+    if (!contactAttemptContext(attempt, credential, authAttempt)) return;
+    message = await settleContactAttempt(attempt, result, credential, authAttempt) || friendlyFailure(error) + ' The original save is still unconfirmed. Your draft and save ID are retained.';
+   } finally {
+    if (contactAttemptContext(attempt, credential, authAttempt)) {
+     recoveryBusy = false;
+     dataSaving = false;
+     renderData();
+     $('dataStatus').textContent = message || 'The original save is unconfirmed.';
+     $('dataGrid').inert = false;
+     syncContactDataControls();
+     if (dataRequest === attempt) {
+      await showContactRecovery();
+      if (contactAttemptContext(attempt, credential, authAttempt) && dataRequest === attempt) $('recoveryStatus').textContent = message + ' Operation: ' + attempt.requestId;
+     }
+    }
+   }
+  },
+ ];
+ const save = async function saveContactsGrid() {
+  if (!contactDataEditable() || dataLoading || dataSaving || recoveryBusy || (!dataEdits.size && !newContactIds.size && !dataRequest)) return;
+  if (!dataRequest && dataEdits.size + newContactIds.size * 17 > 300) { notice('Save up to 300 changed cells at a time.'); return; }
+  const retry = !!dataRequest;
+  dataRequest ||= contactSaveAttempt();
+  const attempt = dataRequest, credential = token, authAttempt = loginAttempt;
+  if (attempt.owner !== state.user.email) { notice('Use the same account to confirm this save.'); return; }
+  dataSaving = true;
+  renderData();
+  $('dataGrid').inert = true;
+  $('dataStatus').textContent = 'Saving…';
+  let message = '';
+  try {
+   let result;
+   if (retry) {
+    result = await api('save-receipt', {requestId: attempt.requestId});
+    if (!contactAttemptContext(attempt, credential, authAttempt) || dataRequest !== attempt) return;
+   }
+   const outcome = contactAttemptOutcome(result, attempt);
+   if (!retry || outcome === 'unknown') {
+    result = await api('save-data', JSON.parse(attempt.payload));
+    if (!contactAttemptContext(attempt, credential, authAttempt) || dataRequest !== attempt) return;
+   }
+   if (!['committed', 'aborted'].includes(contactAttemptOutcome(result, attempt))) result = await confirmContactSave(attempt, {credential});
+   message = await settleContactAttempt(attempt, result, credential, authAttempt) || 'The original save is still unconfirmed. Draft locked; Retry Save changes uses the same save ID.';
+  } catch (error) {
+   if (!contactAttemptContext(attempt, credential, authAttempt) || dataRequest !== attempt) return;
+   const diagnostics = {};
+   $('dataStatus').textContent = 'Checking whether your save completed…';
+   const result = await confirmContactSave(attempt, {credential, diagnostics});
+   if (!contactAttemptContext(attempt, credential, authAttempt)) return;
+   message = await settleContactAttempt(attempt, result, credential, authAttempt) || friendlyFailure(error) + (diagnostics.confirmationError ? ' Confirmation: ' + diagnostics.confirmationError : '') + ' Draft locked. Retry Save changes uses the same save ID.';
+  } finally {
+   if (contactAttemptContext(attempt, credential, authAttempt)) {
+    dataSaving = false;
+    renderData();
+    $('dataStatus').textContent = message || 'The original save is unconfirmed.';
+    syncContactDataControls();
+    $('dataGrid').inert = false;
+    if (dataRequest === attempt) await showContactRecovery();
+    queueMicrotask(refreshCatalogueData);
+   }
+  }
+ };
+ const ast = parse(source, {ecmaVersion: 'latest', sourceType: 'module'}), edits = [];
+ for (const replacement of replacements) {
+  const node = ast.body.find(item => item.type === 'FunctionDeclaration' && item.id?.name === replacement.name);
+  if (!node) throw Error('Visual baseline changed: Contacts ' + replacement.name);
+  edits.push([node.start, node.end, replacement.toString()]);
+ }
+ const handler = ast.body.find(node => node.type === 'ExpressionStatement' && source.slice(node.start, node.end).startsWith("$('saveData').onclick="));
+ if (!handler) throw Error('Visual baseline changed: Contacts save handler');
+ edits.push([handler.start, handler.end, save.toString() + "\n$('saveData').onclick=saveContactsGrid;"]);
+ for (const [start, end, value] of edits.sort((a, b) => b[0] - a[0])) source = source.slice(0, start) + value + source.slice(end);
+ source = replaceOnce(source, "$('refreshRecovery').onclick=()=>showContactRecovery();", "$('refreshRecovery').onclick=()=>{if(dataRequest)void recoverInterruptedContact(dataRequest,$('refreshRecovery'),false);};", 'Contacts recovery check preserves a prepared save');
+ return source + '\n' + helpers.map(fn => fn.toString()).join('\n');
 }
 function updateContacts(source){
  // EO and authority are accepted records. A display appointment must never create them.
@@ -29,9 +232,9 @@ function updateContacts(source){
  // Application grants are managed by Core, separate from accepted staff records.
  source=replaceOnce(source,"$('addRole').onclick=()=>openRole();","$('addRole').onclick=()=>location.assign('/admin/');",'Contacts Core admin link');
  source=replaceOnce(source,"if(b)openRole(b.dataset.roleEmail);","if(b)location.assign('/admin/');",'Contacts Core access row');
- source=replaceOnce(source,"  if(!result.saved)throw Error('Recovery is unconfirmed. Retry this same recovery.');","  if(result.state==='aborted'){if(dataRequest?.requestId===entry.requestId)dataRequest=null;recoveryBusy=false;resetContactRecovery();renderData();syncContactDataControls();notice(result.message||'The original operation is fenced. Review the preserved draft and save it as a new operation.');return;}if(!result.saved)throw Error('Recovery is unconfirmed. Retry this same recovery.');",'Contacts confirmed abort unlocks the retained draft');
+ source=updateContactsRecovery(source);
  source=source.replaceAll('Complete this saved change','Inspect or recover this save').replaceAll('Completing the original save…','Checking durable recovery…');
- source+=`\nwindow.addEventListener('gsis:clear-protected-state',()=>{loginAttempt++;loginAbort?.abort();clearContactsPersonalState();token='';state=null;visible=[];dataSaving=false;dataRequest=null;$('contactRows').replaceChildren();$('accessRows').replaceChildren();$('app').classList.add('hidden');});`;
+ source+=`\nwindow.addEventListener('gsis:clear-protected-state',()=>{loginAttempt++;loginAbort?.abort();clearContactsPersonalState();token='';state=null;visible=[];dataSaving=false;dataRequest=null;recoveryBusy=false;resetContactRecovery();$('dataGrid').inert=false;$('contactRows').replaceChildren();$('accessRows').replaceChildren();$('app').classList.add('hidden');});`;
  return source;
 }
 function updateDeploy(source){
@@ -46,6 +249,7 @@ function updateDeploy(source){
  source=replaceOnce(source,"async function change(operation,args={}){","async function change(operation,args={}){\n if(['setMembership','setMasterOptions','setHRTerms'].includes(operation))throw Error('This catalogue is owned by Contacts. Open Contacts to manage it.');",'Deploy catalogue ownership');
  source=replaceOnce(source,"kp=()=>role.includes('KP')||role.includes('Admin')","kp=()=>window.GSISV1.capable('deploy.edit')",'Deploy current edit capability');
  source=replaceOnce(source,"admin=()=>role.includes('Admin')","admin=()=>window.GSISV1.capable('admin')",'Deploy preview disables administrative mutation controls');
+ source=replaceOnce(source,"function canClearVenueAssignments(){const d=v();return admin()&&d?.status==='planning'&&d.publication!=='Published'&&d.publishedRevision==null;}","function canClearVenueAssignments(){const d=v();return admin()&&d?.status==='draft'&&d.publication!=='Published'&&d.publishedRevision==null;}",'Deploy venue controls use the native v1 draft state');
  source=replaceOnce(source,"viewEpoch++;editing={versionId:current,key,clientId,baseline:JSON.stringify(v()),expectedRevision:snapshotCache?.revision,hash:null};return editing;","viewEpoch++;const grant=await api('lease',{versionId:current,scope:key,key,clientId,revision:snapshotCache?.revision,operationId:crypto.randomUUID()});editing={versionId:current,key,scope:key,clientId,token:grant.token,fence:grant.fence,leaseFence:grant.fence,baseline:JSON.stringify(v()),expectedRevision:grant.revision,revision:grant.revision};return editing;",'Deploy owner lease');
  source=replaceOnce(source,"function membershipPage(root){\n const readOnly=false;","function membershipPage(root){\n const readOnly=true;",'Membership reference only');
  source=source.replaceAll("This table defines this version’s roles, memberships and EO mappings. Publishing replaces Contacts’ mappings.","Reference from Contacts. Manage role, membership and EO catalogues in Contacts; Deploy publication does not change them.");
@@ -122,7 +326,7 @@ function transform(module,rel,text){
  if(rel.endsWith('.html')){
   text=text.replace(/\b(src|href|action)=(['"])\/(?!\/|api\/)([^'"]*)\2/g,(_m,key,q,value)=>`${key}=${q}/${module.id}/${value}${q}`);
   text=text.replace('</head>',`<meta name="gsis-module" content="${module.id}"><link rel="stylesheet" href="/v1/shared/suite.css"><script src="/v1/shared/client.js"></script><script defer src="/v1/shared/module-shell.js"></script><link rel="stylesheet" href="/v1/shared/core-table.css"><script type="module" src="/v1/shared/core-table.js"></script></head>`);
-  text=text.replaceAll('v0.9.9p','v1').replaceAll('Dropdown choices are managed in Deploy.','Dropdown choices and accepted staff facts are managed in Contacts.').replaceAll('Admin access is managed in the backend sheet. Admins can assign or remove SMC access here.','Application access is managed in Core. Accepted SMC, EO and School Leader records are managed separately in Contacts.');
+  text=normaliseReleaseChrome(text,gsisBuildLabel).replaceAll('Dropdown choices are managed in Deploy.','Dropdown choices and accepted staff facts are managed in Contacts.').replaceAll('Admin access is managed in the backend sheet. Admins can assign or remove SMC access here.','Application access is managed in Core. Accepted SMC, EO and School Leader records are managed separately in Contacts.');
   if(module.id==='contacts'&&rel==='index.html')text=text.replace('</head>','<link rel="stylesheet" href="/v1/shared/contacts-ui.css"><script defer src="/v1/shared/contacts-ui.js"></script></head>');
   if(module.id==='deploy'&&rel==='index.html')text=text.replace('</head>','<script defer src="/v1/shared/deploy-ui.js"></script><script defer src="/v1/shared/deploy-ui-tables.js"></script></head>');
   if(module.id==='roster'&&rel==='index.html')text=text.replace('</head>','<link rel="stylesheet" href="/v1/shared/roster-capacity.css"><script src="/v1/shared/roster-capacity.js"></script><link rel="stylesheet" href="/v1/shared/roster-stapler-resize.css"><script defer src="/v1/shared/roster-stapler-resize.js"></script><script defer src="/v1/shared/roster-table-ui.js"></script></head>');

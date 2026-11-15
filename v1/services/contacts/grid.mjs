@@ -208,8 +208,9 @@ export async function saveGrid(ctx) {
   if (op.receipt)
     return {
       saved: op.receipt.state === "committed",
+      state: op.state,
       receipt: op.receipt,
-      mapping: op.receipt.result.mapping,
+      mapping: op.receipt.result?.mapping,
     };
   const byStaff = new Map();
   for (const change of body.changes) {
@@ -472,11 +473,14 @@ export async function gridReceipt(ctx) {
     "CAPABILITY_DENIED",
     403,
   );
+  if (body.digest !== undefined)
+    fail(body.digest === result.digest, "OPERATION_INTENT_CONFLICT", 409);
   return {
-    saved: result.state === "committed",
+    saved:
+      result.state === "committed" && result.receipt?.state === "committed",
     writing: result.state === "prepared",
     state: result.state,
     receipt: result.receipt,
-    mapping: result.receipt?.result.mapping,
+    mapping: result.receipt?.result?.mapping,
   };
 }
