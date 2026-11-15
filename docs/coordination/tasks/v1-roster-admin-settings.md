@@ -1,6 +1,6 @@
 # v1-roster-admin-settings: recover settings saves and durable absence-type order
 
-- Status: implemented; focused and unchanged local regressions/build/scope pass; child full exact-head CI and Claude review pending publication.
+- Status: merged through PR175; PR172, reviewed head `d3d76fc571fecbcd335ee9c5552ca869fd329a3a`, carrying merge `334731cdb1d4fc5d37d7bdf6de761d668c062994`. Not deployed. See the 16 November checkpoint below; older pending statements are historical.
 - Owner/model: Codex. Coordinator: ChatGPT for v1. Independent exact-head reviewer: Claude.
 - Branch: `codex/v1-roster-admin-settings`.
 - Owner authority: continue the frontend UAT repair queue, one related group per claim/PR, recursively refreshing Git discovery. This is a code repair task; no merge, deployment, live settings, Contacts writes, provider activation or migration.
@@ -125,3 +125,9 @@ Parent chronology: this claim was accepted while frozen navigation checks ran, b
 Q01 Pass. Q02–Q05 Pass locally for this bounded design, authority/privacy negatives, atomic ordering/receipt/restart and resource measurements; peer proof boundaries remain explicit. Q06 local checks Pass, full child exact-head CI Pending. Q07 publication/Claude review Pending. Q08 Not applicable to deployment. Repository engineering principles were applied; no optional skill execution or third-party copying is claimed by documentation preparation. No merge, deployment or live operation. F5 **OPEN**; official T1B-01/T1B-02 and unperformed runtime UAT **Not tested**.
 
 Final review clarification: rollback read compatibility does not imply write compatibility. The rollback restriction above preserves accepted type-order evidence; this correction changes documentation only, with no source/test edit or new execution claim.
+
+## Merge checkpoint — 16 November 2026 (Asia/Singapore)
+
+[PR172](https://github.com/helper-gsps/gsis/pull/172) at reviewed head `d3d76fc571fecbcd335ee9c5552ca869fd329a3a` is included in main by [merge `334731cdb1d4fc5d37d7bdf6de761d668c062994`](https://github.com/helper-gsps/gsis/commit/334731cdb1d4fc5d37d7bdf6de761d668c062994). [Claude's controlling review](https://github.com/helper-gsps/gsis/blob/afeba886cd97f365cfb530200bcf46309812cd1b/docs/coordination/review/v1-pr175-chain-claude-recheck.md) and green exact-head CI were checked before integration. The task claim is closed; prior implementation, test failures and pending checkpoints above remain dated history.
+
+The owner amended the sequence to merge PR175 once, preserving all eleven reviewed heads. This head is an ancestor of that carrying merge; it was not separately reimplemented or resolved by hand. The resulting product tree equals the tested tree outside two review documents. [The merge inventory](v1-merge-records-20261115.md#verified-merge-inventory) records the exact heads, carrying commits and verification. Not deployed; no new hosted UAT, migration or provider send. F5 remains **OPEN**; official T1B-01/T1B-02 and unperformed runtime UAT remain **Not tested**.

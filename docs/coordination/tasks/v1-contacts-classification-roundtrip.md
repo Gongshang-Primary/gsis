@@ -1,6 +1,6 @@
 # v1-contacts-classification-roundtrip: preserve classification intent and refresh native views
 
-- Status: implemented; final focused browser verification passes. All 26 unchanged regressions and final local gates pass; publication/full exact-head CI and Claude review remain pending. Updated 15 November 2026, 16:32 Asia/Singapore.
+- Status: merged through PR175; PR174, reviewed head `ba818831fc318ccd7c5d5f501aed9dce5d141457`, carrying merge `334731cdb1d4fc5d37d7bdf6de761d668c062994`. Not deployed. See the 16 November checkpoint below; older pending statements are historical.
 - Owner/model: Codex. Coordinator: ChatGPT v1. Independent exact-head reviewer: Claude.
 - Branch: `codex/v1-contacts-classification-roundtrip`.
 - Frozen parent: [`f7f9ea2b0a6c7667e128a0752ad2c6f3551b91dd`](https://github.com/helper-gsps/gsis/commit/f7f9ea2b0a6c7667e128a0752ad2c6f3551b91dd), complete tree `3d9dcaab630f0439c46ea60e71c6a595a1e96840`, branch `codex/v1-contacts-projection`. Its local implementation `709d0ae4b3ff78e12584dd26c266b98e93edf37f` has the identical complete tree. Parent source is frozen in draft [PR173](https://github.com/helper-gsps/gsis/pull/173). Its full Node/LORD CI passed on attempt2; product CI and Claude review remain pending at the current checkpoint below. Parent evidence never counts as this task's evidence.
@@ -124,3 +124,9 @@ This is a client/build fix, no stored schema conversion. Code-only rollback rest
 RUN-B-021 identity selection, RUN-B-024 signature/formal-role mapping, missing LT/Security/Music definitions, direct-authoring/schema transition B and live migration are excluded. Preserve explicit EO/SMC/School Leader acceptance, no self-acceptance, independent Admin/Contacts Power User action, MKE+SMC rejection, no notification and Core-owned grants. No business-policy question is currently demonstrated.
 
 Publish the task/handoff in Git at the actual implementation head, with PR/base/claim, inventory, commands/results, limitations and rollback. Claude reviews that exact head without editing it; subsequent source changes require updated-head review. No merge or deployment. F5 remains **OPEN**; official T1B-01/T1B-02 and unperformed runtime UAT remain **Not tested**. No readiness/completion claim until required evidence exists.
+
+## Merge checkpoint — 16 November 2026 (Asia/Singapore)
+
+[PR174](https://github.com/helper-gsps/gsis/pull/174) at reviewed head `ba818831fc318ccd7c5d5f501aed9dce5d141457` is included in main by [merge `334731cdb1d4fc5d37d7bdf6de761d668c062994`](https://github.com/helper-gsps/gsis/commit/334731cdb1d4fc5d37d7bdf6de761d668c062994). [Claude's controlling review](https://github.com/helper-gsps/gsis/blob/afeba886cd97f365cfb530200bcf46309812cd1b/docs/coordination/review/v1-pr175-chain-claude-recheck.md) and green exact-head CI were checked before integration. The task claim is closed; prior implementation, test failures and pending checkpoints above remain dated history.
+
+The owner amended the sequence to merge PR175 once, preserving all eleven reviewed heads. This head is an ancestor of that carrying merge; it was not separately reimplemented or resolved by hand. The resulting product tree equals the tested tree outside two review documents. [The merge inventory](v1-merge-records-20261115.md#verified-merge-inventory) records the exact heads, carrying commits and verification. Not deployed; no new hosted UAT, migration or provider send. F5 remains **OPEN**; official T1B-01/T1B-02 and unperformed runtime UAT remain **Not tested**.

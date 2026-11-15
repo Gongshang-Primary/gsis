@@ -1,6 +1,6 @@
 # v1-contacts-policy-update — owner B1 decision and C1 simplification
 
-- Status: claimed, documentation only; 13 November 2026 SGT.
+- Status: merged; PR136, reviewed head `8d62eda95bb1e38ecab0ae0eeabcc67991623d10`, carrying merge `59a1bd832743d3d53a064ea5c96e0aaec5c322a8`. Not deployed. See the 16 November checkpoint below; older pending statements are historical.
 - Owner/model: Codex; coordinator ChatGPT v1; reviewer Claude at exact head.
 - Branch: codex/v1-contacts-policy-update
 - Base: 02c237cf56cc1805675c0357646087e2c29fc724 (after authorised merges #133/#134).
@@ -29,3 +29,9 @@ Owner requested all applicable PRs be merged in logical order. Claude approved t
 Merged current main into this branch without changing application files. The only merge conflict was the OWNER_DIRECTIVES insertion: preserved both new 15 November rows and every main line, then retained the original 13 November B1 row verbatim. No owner policy was changed. Remaining edits are the readiness paragraph/status and this handoff, within the existing eight-document scope. Relative-link, scope and whitespace checks pass; no local application suites were run for prose. Fresh CI and Claude exact-head recheck are pending; the current exact head is recorded in PR136. Earlier no-merge task wording is historical; the current owner merge instruction applies once these gates pass. F5 OPEN; runtime UAT and official T1B-01/T1B-02 Not tested.
 
 Check detail: an initial staged whitespace check against the old branch also inspected unrelated files inherited from current main and reported their pre-existing whitespace. The relevant check compares the resulting tree with current main. For the frozen CRLF specification, `git -c core.whitespace=blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol diff --cached --check origin/main` recognises its preserved CRLF endings; that scoped check passes. No inherited application/licence/test whitespace was changed.
+
+## Merge checkpoint — 16 November 2026 (Asia/Singapore)
+
+[PR136](https://github.com/helper-gsps/gsis/pull/136) at reviewed head `8d62eda95bb1e38ecab0ae0eeabcc67991623d10` is included in main by [merge `59a1bd832743d3d53a064ea5c96e0aaec5c322a8`](https://github.com/helper-gsps/gsis/commit/59a1bd832743d3d53a064ea5c96e0aaec5c322a8). [Claude's controlling review](https://github.com/helper-gsps/gsis/blob/42873cd068c24c54d4738be5503942333bc1e9ae/docs/coordination/review/v1-pr163-136-137-179-claude-review.md) and green exact-head CI were checked before integration. The task claim is closed; prior implementation, test failures and pending checkpoints above remain dated history.
+
+[The merge inventory](v1-merge-records-20261115.md#verified-merge-inventory) records the exact heads, carrying commits and verification. Not deployed; no new hosted UAT, migration or provider send. F5 remains **OPEN**; official T1B-01/T1B-02 and unperformed runtime UAT remain **Not tested**.

@@ -1,6 +1,6 @@
 # v1-venues-subpath-navigation: B-V01b preserve Venues routing on reload
 
-- Status: implemented; local focused/regression/build evidence complete; child exact-head CI and Claude review pending publication.
+- Status: merged through PR175; PR171, reviewed head `eb63f820b3d9a78fdeec528bfe0c0d990bc17db0`, carrying merge `334731cdb1d4fc5d37d7bdf6de761d668c062994`. Not deployed. See the 16 November checkpoint below; older pending statements are historical.
 - Owner/model: Codex; coordinator ChatGPT for v1; independent exact-head reviewer Claude.
 - Updated: 15 November 2026, 14:12 Asia/Singapore.
 - Branch: `codex/v1-venues-subpath-navigation`.
@@ -96,3 +96,9 @@ This presentation repair changes future query navigation only. Rollback restores
 Q01 Pass: accepted/incorporated claim and overlap evidence. Q02–Q05 Pass for the bounded presentation change, unchanged ownership/history and actual permission/session negatives; no owner mutation or retry contract changes. Q06 local checks Pass, required full exact-head CI Pending. Q07 Pending publication/review. Q08 Not applicable to deployment. F5 remains **OPEN**. Official T1B-01/T1B-02 and unperformed runtime UAT remain **Not tested**. No live product was fetched or changed by this task. Next deployment remains v1.01 under separate authority.
 
 Skill record for documentation preparation: repository engineering/skill principles were applied; no external skill was executed or represented as installed. No third-party material was copied.
+
+## Merge checkpoint — 16 November 2026 (Asia/Singapore)
+
+[PR171](https://github.com/helper-gsps/gsis/pull/171) at reviewed head `eb63f820b3d9a78fdeec528bfe0c0d990bc17db0` is included in main by [merge `334731cdb1d4fc5d37d7bdf6de761d668c062994`](https://github.com/helper-gsps/gsis/commit/334731cdb1d4fc5d37d7bdf6de761d668c062994). [Claude's controlling review](https://github.com/helper-gsps/gsis/blob/afeba886cd97f365cfb530200bcf46309812cd1b/docs/coordination/review/v1-pr175-chain-claude-recheck.md) and green exact-head CI were checked before integration. The task claim is closed; prior implementation, test failures and pending checkpoints above remain dated history.
+
+The owner amended the sequence to merge PR175 once, preserving all eleven reviewed heads. This head is an ancestor of that carrying merge; it was not separately reimplemented or resolved by hand. The resulting product tree equals the tested tree outside two review documents. [The merge inventory](v1-merge-records-20261115.md#verified-merge-inventory) records the exact heads, carrying commits and verification. Not deployed; no new hosted UAT, migration or provider send. F5 remains **OPEN**; official T1B-01/T1B-02 and unperformed runtime UAT remain **Not tested**.
