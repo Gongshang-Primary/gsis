@@ -1,6 +1,6 @@
 # Shared save-status presentation contract
 
-Model: Codex. Coordinator: ChatGPT v1. Independent reviewer: Claude at the exact published head. Updated15 November2026,16:57 Asia/Singapore. **Implemented: final focused11/11, unchanged regressions22/22 and local gates pass. Full exact-head CI/Claude review pending.** This task changes status presentation only and authorises no merge, deployment, provider action or live-data operation.
+Model: Codex. Coordinator: ChatGPT v1. Independent reviewer: Claude at the exact published head. Updated15 November2026,17:15 Asia/Singapore. **Product implemented; initial full CI failed one existing browser assertion. The authorised test-only correction and amendment gates pass locally; new exact-head CI/Claude review remain pending.** This task changes status presentation only and authorises no merge, deployment, provider action or live-data operation.
 
 ## References and scope
 
@@ -9,8 +9,8 @@ Model: Codex. Coordinator: ChatGPT v1. Independent reviewer: Claude at the exact
 | Frozen classification parent | [`ba818831fc318ccd7c5d5f501aed9dce5d141457`](https://github.com/helper-gsps/gsis/commit/ba818831fc318ccd7c5d5f501aed9dce5d141457), tree `6ef5e38ee4026e1348fc9ca6b225410cd803595b` |
 | Accepted claim | Main [`24a8872b506393021824269be18660fa702f8e51`](https://github.com/helper-gsps/gsis/commit/24a8872b506393021824269be18660fa702f8e51) |
 | Pre-edit incorporation | Local `6a55e9f9b61656e1fbbe99811d40321302fe056c`; public [`b7c68ed007cc3a12f888c41efa5f7a2c4c4c613a`](https://github.com/helper-gsps/gsis/commit/b7c68ed007cc3a12f888c41efa5f7a2c4c4c613a); same tree `f42ab9597856c5c0e8f84ca63e0d821fd8ca5adb` |
-| Branch and allowlist | `codex/v1-global-save-status`; [accepted task](../../coordination/tasks/v1-global-save-status.md), exactly client, module shell, one new test, task and this contract |
-| Implementation head / PR / CI | Pending; the PR will identify its actual head/base. Incorporation is not a tested implementation result. |
+| Branch and allowlist | `codex/v1-global-save-status`; [accepted task](../../coordination/tasks/v1-global-save-status.md), six paths after the coordinator amendment: client, module shell, one new focused test, the existing Deploy recovery browser test, task and this contract |
+| Implementation head / PR / CI | Initial head `551801180444a414ca6bd647e9feaf572768ca9a` failed full CI; the eventual PR will identify the corrected head/base and new checks. |
 
 At the accepted-claim checkpoint, all33 actual open-PR inventories were unchanged; overlaps are frozen ancestors only. Main is the accepted claim above; Run B `4c2c5eef3389f5291c6152bfe4b1bb49a0ae0acd` and Claude review branch `58e22a7bf7ba4a49caa2caabe877605153b098db` are unchanged. This follow-up is tracked by task name, not an invented official UAT ID. The coordinator expressly permits this serial child after the classification source freeze while its CI/review continues. At that checkpoint classification's full1,191-program CI was running; its parent PR173 is ready for Claude after full1,190/LORD40 and product91 green. No parent result substitutes for child verification.
 
@@ -54,6 +54,8 @@ The inspected cleanup inventory came from every generic `pending.delete`/`pendin
 
 ## Verification ledger
 
+### Historical initial verification at5518011
+
 | Check | Actual status |
 | --- | --- |
 | Independent preparation probe | Two synthetic full-client/shell cases pass as described above. This is separate from the tracked red and real owner evidence. |
@@ -63,7 +65,7 @@ The inspected cleanup inventory came from every generic `pending.delete`/`pendin
 | Unchanged regression selection | **22/22 programs pass**, no timeouts, maximum27.045s. All files byte-identical to parent `ba81883`; three implementation/test hashes stayed fixed. `/tmp/gsis-global-save-status-regressions.log`, `-results.json`, `...-regression-files.json`. Exact selection below. |
 | Build/syntax/scope | Baseline and final `TZ=Asia/Singapore npm run build` pass18 components with no tracked generated drift. Final `/tmp/gsis-global-save-status-canonical-final.log`. `node --check` passes client, shell and focused test; `git diff --check`, frozen hashes and exact five-path inventory pass. |
 | Discovery | `TZ=Asia/Singapore node scripts/v1/test.mjs --list` finds93 product programs; `TZ=Asia/Singapore node tests/run.cjs --list` finds1,192 Node programs. Both include `v1-product-save-status.mjs`; `/tmp/gsis-global-save-status-{product,node}-list.json`. |
-| Full exact-head CI / Claude | Pending:1,192-program Node/LORD and93-program product suites plus independent exact-head review. Full local suites were not rerun. |
+| Full exact-head CI / Claude | Initial head5518011 failed full CI as recorded below. Corrected-head1,192-program Node/LORD and93-program product CI plus independent review remain pending. Full local suites were not rerun. |
 
 Ten focused groups exercise the actual full client/shell with synthetic sessions/transport and real hash functions: original terminal proof, multiple unknowns, normal in-flight/unsent work, wrong acknowledgements, every direct-result family, Deploy cached terminal history, LORD read-only receipt cleanup, denied/other text,401 restoration and delayed context changes. The eleventh group uses actual local nine-Worker Contacts owners and built Chromium with synthetic identities: two intentionally lost original responses (one committed, one aborted), exact original wire retry and original receipts, pending/count/banner2→1→0, one committed audit and zero aborted audit. Both are local engineering evidence; neither is hosted/runtime UAT.
 
@@ -90,9 +92,21 @@ v1-product-roster-admin-settings-browser.mjs
 v1-product-venues-navigation.mjs
 ```
 
-Q01–Q05 pass locally for the accepted scope, implemented contract and bounded security/recovery evidence. Q06 passes locally with full exact-head CI pending; Q07 Claude review remains pending. Q08 is not applicable because deployment is not authorised. No optional skill execution is claimed.
+Q01–Q05 pass locally for the implemented contract and authorised test correction. Q06 passes locally for the corrected test and amendment gates, while new full corrected-head CI remains pending and the initial failure stays recorded; Q07 Claude review remains pending. Q08 is not applicable because deployment is not authorised. No optional skill execution is claimed.
 
 Latest coordinator checkpoint: all34 actual PR inventories refreshed after classification [PR174](https://github.com/helper-gsps/gsis/pull/174); prior33 unchanged, only its frozen five paths added. Run B `ee052420628e3567038df5141c448bc366d0d9ba` adds separate RUN-B-025 (49 source IDs). Its reported baseline SERVICE_DENIED matches the Calendar-bound action addressed in PR172 by source comparison; no hosted fix is certified and no scope is added here. Parent checks remain separate from this child.
+
+### CI failure and authorised sixth path
+
+[Full CI43696959533](https://github.com/helper-gsps/gsis/actions/runs/43696959533) at `551801180444a414ca6bd647e9feaf572768ca9a` passed1,191/1,192 Node programs; `v1-product-deploy-save-recovery-browser.mjs` failed at `4 !== 5`. Shard2 did not run LORD; the other shards each passed40. No retry or PR was opened. The coordinator amended the task before test edits to include that existing browser program; product source, validators and timeouts remain unchanged. Failed log: `/tmp/gsis-global-save-ci-5518011/shard-2-attempt1.log`.
+
+A controlled real-Worker/Chromium probe held the original post-commit sync reply. At the inherited `!queueFlight` wait, the owner was revision1/value4 while the browser was revision0, refreshing/inert and without an applied snapshot. The test bypassed that disabled UI with a programmatic write, got a correct409 `REVISION_CONFLICT`, then discarded it as if it were a successful lost commit; the owner correctly retained4 and its receipt was terminal-not-committed. This reproduces a reachable fixture fault, not the exact uninstrumented CI interleaving. The probe's later cleanup timed out because its aborted draft remained; its exit1 is not a positive correction pass. Evidence: `/tmp/gsis-global-save-refresh-boundary-findings.md` and companion probe/log.
+
+The amended test adds a deterministic real-response barrier, waits for original settlement **and** current snapshot application/completed refresh, and asserts both lost-response fixtures are committed successes. All15 groups and original wire/lease/receipt/no-resend/durable-value assertions remain. This applies R07 to distinct operation/read completion boundaries; no product behavior was changed. The corrected program passed in15.643s before formatting and16.065s after formatting (`/tmp/gsis-global-save-refresh-test-final.log`); SHA256 `423b3d39b1a4352e69753ae25d16e2c1b4bd6151483488ac8a9e75d435a853f1`.
+
+The first correction launch (`/tmp/gsis-global-save-refresh-test-green1.log`) stopped because `/usr/bin/time` was absent; Node did not execute, so it is not a test failure. The successful timed runs used Bash timing.
+
+The earlier11 save-status groups and22 unchanged regression passes are historical evidence at5518011. One of the22 regression programs is now amended; the remaining21 are unchanged and were not rerun for this amendment. Final local amendment gates pass: canonical18/no tracked drift (`/tmp/gsis-global-save-status-canonical-correction.log`), four JavaScript syntax checks, whitespace, exact six total paths against pre-implementation `b7c68ed`, unchanged three original hashes and stable amended-test hash. Discovery remains93 product/1,192 Node. New full corrected-head Node/LORD/product CI is pending. Contacts B keeps its accepted claim/worktree, with source edits paused until this corrected parent is reverified.
 
 The four local documentation links resolve; external links/CI are not certified by this check. Reproduce it from the repository root:
 
@@ -113,4 +127,4 @@ PY
 
 This is an in-memory, current-context presentation correction. It adds no reload uncertainty persistence, automatic reconciliation, owner mutation, schema conversion, new queue or business-policy change. Clearing a banner is never evidence that a durable operation succeeded. Existing validators and unresolved cross-service recovery intervals remain unchanged.
 
-Code-only rollback restores the stale-banner behavior and does not undo operations, receipts or owner data. Independent source findings and live school record repair remain outside this five-path task. F5 stays **OPEN**; official T1B-01/T1B-02 and unperformed runtime UAT remain **Not tested**. Next: publish one bounded PR, record the actual implementation head/base and full CI, then obtain Claude exact-head review. No merge or deployment.
+Code-only rollback restores the stale-banner behavior and does not undo operations, receipts or owner data. Independent source findings and live school record repair remain outside this six-path amended task. F5 stays **OPEN**; official T1B-01/T1B-02 and unperformed runtime UAT remain **Not tested**. Next: publish one bounded PR, record the actual implementation head/base and full CI, then obtain Claude exact-head review. No merge or deployment.

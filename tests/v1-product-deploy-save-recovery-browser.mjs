@@ -43,7 +43,8 @@ try {
     },
   ]);
   const requests = [],
-    errors = [];
+    errors = [],
+    changeLosses = [];
   let foreignReceipt = null,
     contactReceipt = null;
   const contactsChanges = [
@@ -65,7 +66,8 @@ try {
     receiptOverride = null,
     holdReceipt = false,
     releaseReceipt = null,
-    prepareNext = false;
+    prepareNext = false,
+    syncBarrier = null;
   async function prepareInterrupted(body) {
     const core = await suite.mf.getWorker("gsis-core");
     const env = {
@@ -217,17 +219,33 @@ try {
         ? undefined
         : request.postDataBuffer(),
     });
+    const responseBody = Buffer.from(await response.arrayBuffer());
+    if (syncBarrier && url.pathname === "/api/deploy/sync") {
+      const barrier = syncBarrier;
+      syncBarrier = null;
+      barrier.reached(JSON.parse(responseBody).data);
+      await barrier.release;
+    }
     if (loseChange && url.pathname === "/api/deploy/change") {
       loseChange = false;
-      await response.arrayBuffer();
-      return route.abort();
+      const payload = JSON.parse(responseBody),
+        requestId = request.postDataJSON().operationId;
+      changeLosses.push({ status: response.status, payload, requestId });
+      // A lost-commit fixture must never hide an actual rejection as a commit.
+      if (
+        response.status === 200 &&
+        payload.ok === true &&
+        payload.data?.saved === true &&
+        payload.data.requestId === requestId
+      )
+        return route.abort();
     }
     const headers = Object.fromEntries(response.headers);
     delete headers["transfer-encoding"];
     await route.fulfill({
       status: response.status,
       headers,
-      body: Buffer.from(await response.arrayBuffer()),
+      body: responseBody,
     });
   });
   const page = await context.newPage();
@@ -264,6 +282,32 @@ try {
   const leases = () => requests.filter((r) => r.path.endsWith("/lease"));
   const check = () => page.locator('[data-deploy-recovery-action="check"]');
   const retry = () => page.locator('[data-deploy-recovery-action="retry"]');
+  const waitForSavedSnapshot = (id, science) =>
+    page.waitForFunction(
+      ({ id, science }) =>
+        !queueFlight &&
+        !refreshing &&
+        current === id &&
+        snapshotCache?.id === id &&
+        Number.isInteger(snapshotCache.revision) &&
+        snapshotCache.revision === v()?.revision &&
+        v()?.loads?.["1"]?.Science === science &&
+        !document.getElementById("content").inert,
+      { id, science },
+    );
+  function assertCommittedResponseLoss(index, requestId) {
+    assert.equal(changeLosses.length, index + 1);
+    const lost = changeLosses[index];
+    assert.equal(
+      lost.status,
+      200,
+      "the lost response was a real owner success",
+    );
+    assert.equal(lost.payload.ok, true);
+    assert.equal(lost.payload.data.saved, true);
+    assert.equal(lost.payload.data.requestId, requestId);
+    assert.equal(lost.requestId, requestId);
+  }
   await check().click();
   await page.waitForFunction(() => !queueFlight?.running);
   assert.equal(writes().length, 1, "check is read-only");
@@ -313,8 +357,46 @@ try {
     assert.deepEqual(writes().at(-1).body, original);
   }
   rejectChange = false;
+  let releaseSync, reportSync, syncTimeout;
+  const syncReached = new Promise((resolve) => (reportSync = resolve));
+  syncBarrier = {
+    reached: reportSync,
+    release: new Promise((resolve) => (releaseSync = resolve)),
+  };
   await retry().click();
   await page.waitForFunction(() => !queueFlight);
+  try {
+    const savedSnapshot = await Promise.race([
+      syncReached,
+      new Promise((_, reject) => {
+        syncTimeout = setTimeout(
+          () =>
+            reject(Error("Post-commit owner sync did not reach the barrier")),
+          5000,
+        );
+      }),
+    ]);
+    assert.equal(savedSnapshot.current.loads["1"].Science, 4);
+    const savedRevision = savedSnapshot.versions.find(
+      (entry) => entry.id === versionId,
+    ).revision;
+    const beforeRefresh = await page.evaluate(() => ({
+      refreshing,
+      snapshot: snapshotCache,
+      revision: v().revision,
+      inert: document.getElementById("content").inert,
+    }));
+    assert.equal(beforeRefresh.refreshing, true);
+    assert.equal(beforeRefresh.snapshot, null);
+    assert.equal(beforeRefresh.inert, true);
+    assert(beforeRefresh.revision < savedRevision);
+    releaseSync();
+    await waitForSavedSnapshot(versionId, 4);
+    assert.equal(await page.evaluate(() => v().revision), savedRevision);
+  } finally {
+    clearTimeout(syncTimeout);
+    releaseSync();
+  }
   assert.deepEqual(
     writes().at(-1).body,
     original,
@@ -359,6 +441,7 @@ try {
   assert.equal(await page.evaluate(() => !!queueFlight), true);
   const lostId = writes().at(-1).body.operationId,
     beforeCheck = writes().length;
+  assertCommittedResponseLoss(0, lostId);
   await check().click();
   await page.waitForFunction(() => !queueFlight);
   assert.equal(
@@ -381,6 +464,7 @@ try {
     ),
     false,
   );
+  await waitForSavedSnapshot(versionId, 5);
   console.log(
     "PASS real Worker/D1 committed save recovers after response loss without duplicate write.",
   );
@@ -445,6 +529,7 @@ try {
       versionNoteDrafts.get(id)?.attempt && !versionNoteDrafts.get(id)?.saving,
     other.versionId,
   );
+  assertCommittedResponseLoss(1, writes().at(-1).body.operationId);
   const grant = await suite.call(actor, "deploy", "/lease", {
     operationId: "later-note-lease",
     versionId: other.versionId,
@@ -504,6 +589,7 @@ try {
   rejectChange = false;
   await retry().click();
   await page.waitForFunction(() => !v1DirectSave);
+  await waitForSavedSnapshot(versionId, 5);
   assert.equal(
     (await suite.call(actor, "deploy", "/bootstrap", { versionId })).current
       .notes,
