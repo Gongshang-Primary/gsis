@@ -1,5 +1,7 @@
 # GSiS v1 accelerated implementation specification
 
+> Historical baseline prepared 13 November 2026. Current owner decisions in [OWNER_DIRECTIVES.md](../../coordination/OWNER_DIRECTIVES.md) and later merged v1 plans override superseded clauses in this record; this document does not itself authorise implementation or release.
+
 Version 1.1. Prepared 13 November 2026, Asia/Singapore. Updated with the owner's credential reuse decision.
 
 Repository https://github.com/helper-gsps/gsis

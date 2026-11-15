@@ -1,0 +1,109 @@
+/* Explicit identity selection for the existing timetable converter. Names are labels. */
+const api = window.GSISV1;
+const element = (tag, text) => {
+  const node = document.createElement(tag);
+  if (text !== undefined) node.textContent = text;
+  return node;
+};
+window.GSISV1RosterMapping = async function (model) {
+  const reference = await api.request("roster", "/reference"),
+    weeks = ["single", "odd", "even"].filter((k) => model[k]);
+  const names = [
+      ...new Set(weeks.flatMap((k) => model[k].blocks.map((b) => b.name))),
+    ],
+    venues = [
+      ...new Set(
+        weeks.flatMap((k) =>
+          model[k].blocks.flatMap((b) =>
+            b.cells.map((c) => c[2]).filter(Boolean),
+          ),
+        ),
+      ),
+    ];
+  return new Promise((resolve, reject) => {
+    const dialog = element("dialog"),
+      form = element("form"),
+      status = element("p");
+    dialog.className = "v1-panel";
+    form.append(
+      element("h2", "Confirm timetable identities"),
+      element(
+        "p",
+        "Choose the permanent Contacts Staff ID and Venue ID for every source label. This mapping does not change accepted staff facts.",
+      ),
+    );
+    const selections = { staffMapping: [], venueMapping: [] };
+    for (const [key, title, labels, rows, idField] of [
+      ["staffMapping", "Teachers", names, reference.staff || [], "staffId"],
+      ["venueMapping", "Venues", venues, reference.venues || [], "venueId"],
+    ]) {
+      form.append(element("h3", title));
+      const table = element("table");
+      for (const name of labels) {
+        const tr = element("tr"),
+          label = element("th", name),
+          cell = element("td"),
+          select = element("select");
+        select.required = true;
+        select.setAttribute("aria-label", title + ": " + name);
+        select.append(new Option("Choose the exact record…", ""));
+        for (const row of rows) {
+          const id = row[idField] ?? row.id;
+          select.append(
+            new Option(
+              (row.name || row.unit || id) +
+                " · " +
+                id +
+                (row.active === false ? " (inactive)" : ""),
+              id,
+            ),
+          );
+        }
+        cell.append(select);
+        tr.append(label, cell);
+        table.append(tr);
+        selections[key].push({ name, select });
+      }
+      form.append(table);
+    }
+    const controls = element("div"),
+      cancel = element("button", "Cancel"),
+      confirm = element("button", "Confirm identity mapping");
+    cancel.type = "button";
+    confirm.type = "submit";
+    cancel.onclick = () => {
+      dialog.close();
+      dialog.remove();
+      reject(Error("Import cancelled before any write."));
+    };
+    controls.append(cancel, confirm);
+    form.append(status, controls);
+    dialog.append(form);
+    document.body.append(dialog);
+    form.onsubmit = (event) => {
+      event.preventDefault();
+      const staffIds = selections.staffMapping.map((x) => x.select.value);
+      if (new Set(staffIds).size !== staffIds.length) {
+        status.textContent =
+          "Each source teacher must map to a different permanent Staff ID.";
+        return;
+      }
+      const result = Object.fromEntries(
+        Object.entries(selections).map(([key, rows]) => [
+          key,
+          Object.fromEntries(
+            rows.map(({ name, select }) => [name, select.value]),
+          ),
+        ]),
+      );
+      dialog.close();
+      dialog.remove();
+      resolve(result);
+    };
+    dialog.addEventListener("cancel", (event) => {
+      event.preventDefault();
+      cancel.click();
+    });
+    dialog.showModal();
+  });
+};

@@ -38,3 +38,11 @@ The initial claim was committed on this dedicated branch before document editing
 ## Owner amendment: credential reuse
 
 Specification version 1.1 records the explicit owner instruction to retain existing WhatsApp and Telegram tokens unchanged and use one common application secret named GSIS_SECRET. Rotation is not a migration prerequisite. Provider webhook requirements and current user permissions remain distinct. Coexistence uses one active sender/webhook owner. No token values were accessed and no live credential/provider configuration changed. Section 11.1 and acceptance case INT03 carry this requirement into the execution prompt. Updated content validation passed and frozen TV01-TV07 remain exact.
+
+## 15 November 2026 — Claude R-2 and merge preparation
+
+Claude approved head `b6cd8f5702fbea8fc4dc22c245de00b6dfdd2a22` as a historical record in `docs/coordination/review/v1-pr174-175-drafts-claude-review.md`, requiring an explicit supersession header. Added only that header to the specification: current OWNER_DIRECTIVES and later merged plans override the 13 November baseline. The remainder of the specification, including its original line endings, and the frozen Revision 49 source are byte-for-byte preserved.
+
+Merged main `c69d30c682e11f10421e42efa746edc9b8729777` cleanly into this branch. This refresh stays within the existing three-document scope. Link, whitespace, preservation and documentation-only scope checks pass. No local build/application suite was run for prose; fresh CI and Claude exact-head recheck remain pending. The owner now authorises applicable merges after their gates pass; deployment and live-data operations remain outside this task. F5 OPEN; official T1B-01/T1B-02 and unperformed runtime UAT Not tested. The exact refreshed head is recorded in PR137.
+
+Check detail: an initial staged whitespace check against the old branch also inspected unrelated files inherited from current main and reported their pre-existing whitespace. The relevant check compares the resulting tree with current main. For the frozen CRLF specification, `git -c core.whitespace=blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol diff --cached --check origin/main` recognises its preserved CRLF endings; that scoped check passes. No inherited application/licence/test whitespace was changed.

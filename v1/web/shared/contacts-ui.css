@@ -1,0 +1,26 @@
+/* The signature guide is document content, not a fixed-height data grid. */
+html.gsis-contacts-signature,
+html.gsis-contacts-signature body {
+  height: auto !important;
+  min-height: 100%;
+  overflow-y: auto !important;
+}
+html.gsis-contacts-signature #app {
+  height: auto !important;
+  min-height: 0;
+  overflow: visible !important;
+}
+html.gsis-contacts-signature #signature,
+html.gsis-contacts-signature #signatureSettings {
+  height: auto !important;
+  max-height: none !important;
+  overflow: visible !important;
+  min-height: 0;
+}
+html.gsis-contacts-signature .page.active {
+  flex: 0 0 auto !important;
+}
+html.gsis-contacts-signature .signature-guide,
+html.gsis-contacts-signature details {
+  max-height: none;
+}

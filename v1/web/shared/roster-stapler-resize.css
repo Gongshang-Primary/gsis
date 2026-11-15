@@ -1,0 +1,12 @@
+/* Keep the existing teacher/class divider. Add an independent width divider. */
+.v1-planner-resizable.planner-workspace{grid-template-columns:minmax(0,1fr) 12px var(--v1-pit-width,310px);gap:0}
+.v1-planner-pit-divider{cursor:ew-resize;touch-action:none;position:relative;background:#dce5ed;border:1px solid #c5d1da;border-radius:5px}
+.v1-planner-pit-divider::after{content:"";position:absolute;width:3px;height:44px;left:4px;top:calc(50% - 22px);background:#587e96;border-radius:3px}
+.v1-planner-card-list{position:relative;min-height:100px;min-width:0;flex:1;overflow:hidden}
+.v1-planner-card-list>.planner-pit-cards{height:100%;min-height:0;box-sizing:border-box;padding-bottom:19px}
+.v1-planner-pit-corner{position:absolute;bottom:0;right:0;width:22px;height:22px;cursor:nwse-resize;touch-action:none;background:linear-gradient(135deg,transparent 50%,#6c879a 51%,#6c879a 58%,transparent 59%,transparent 68%,#6c879a 69%,#6c879a 76%,transparent 77%)}
+.v1-planner-pit-divider:focus-visible,.v1-planner-pit-corner:focus-visible{outline:3px solid #c07c00;outline-offset:-3px}
+.v1-planner-resizable.no-pit,.v1-planner-resizable.pit-only{grid-template-columns:minmax(0,1fr)}
+.v1-planner-resizable.no-pit>.v1-planner-pit-divider,.v1-planner-resizable.pit-only>.v1-planner-pit-divider{display:none}
+.v1-planner-resizable .planner-actions{flex-shrink:0}
+@media(max-width:760px){.v1-planner-resizable>.v1-planner-pit-divider{display:none}.v1-planner-resizable .planner-pit{max-height:none;height:430px;flex:none}.v1-planner-card-list{max-height:240px}}

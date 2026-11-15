@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "schoolId": "synthetic-school",
+  "schoolName": "GSiS Local Verification",
+  "hostedDomain": "example.invalid",
+  "publicOrigin": "https://gsis.example.invalid",
+  "googleClientId": "",
+  "bootstrapSubject": "",
+  "bootstrapEmail": "",
+  "resourcePrefix": "gsis-v1",
+  "compatibilityDate": "2026-08-06",
+  "databases": {},
+  "buckets": {},
+  "senderOwner": "v0.9",
+  "schedulerOwner": "disabled",
+  "webhookOwner": "v0.9"
+}
