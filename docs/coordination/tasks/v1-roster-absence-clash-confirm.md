@@ -14,6 +14,8 @@ Read the root/v1 instructions, workflow, lanes, status, owner directives and v1 
 
 `git ls-remote --heads origin codex/roster-absence-clash-confirm` returned no remote branch at the inspection time. The owner says this v0.9 reference is still in progress. No final reviewed reference head is available or claimed. Fetch its published final head and exact review before treating it as completed reference; preserve the v0.9 branch unchanged. The owner requirements below remain authoritative while that reference is provisional.
 
+Subsequent refresh on 16 November: the reference was published at `26fa4e3b1cd025ed1007fbad82639fbc8e630d99`. Its task record says implemented with full verification/CI pending; it is therefore still provisional, not a completed reference. That v0.9 record reports a review waiver in its own session. This does not waive Claude's exact-head review for this v1 task or establish that the owner's final-reference gate has passed. Current PR181 remains open at its recorded head with green CI, awaiting Claude review.
+
 Current file ownership is **this task record only**. Release the overlap by merging/releasing PR181 through its own review/owner process, or obtain an explicit scope/ownership handoff. Then refresh main, actual PR files and claims before activating implementation scope. No draft PR is opened before the required checks/CI are green, as the owner specifically requested for this task.
 
 ## Required behavior
