@@ -68,7 +68,6 @@
   let lordUser = null;
   const panelKinds = {
     "Accepted authority records and readiness":"contacts-authority",
-    "Staff classifications and controlled catalogues":"contacts-catalogues",
     "Allocation layers and duties done":"roster-policy",
     "Relief duties done":"roster-policy",
     "Continuity exports and offline return":"roster-continuity",
@@ -82,7 +81,6 @@
     if(explicit) return explicit;
     const section=sectionName();
     if(kind === "contacts-authority") return document.getElementById(suite.capable("contacts.manage") || suite.capable("contacts.accept") ? "admin" : "diy");
-    if(kind === "contacts-catalogues") return document.getElementById("data");
     if(kind === "roster-policy" && /System Config|My Relief Duties/.test(section)) return document.querySelector('#content [data-settings-body]') || document.getElementById("content");
     if(kind === "roster-continuity" && section === "System Config") return document.querySelector('#content [data-settings-body]') || document.getElementById("content");
     if(kind === "deploy-publication" && section === "Versions") return document.getElementById("content");
