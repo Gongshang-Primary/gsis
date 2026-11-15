@@ -7,10 +7,10 @@
 - Refreshed main: `1db6b686b72a1bf54f0bc935982c2aed6cb4f560`. Use an expected-head non-force claim update.
 - Intended service parent: frozen `codex/v1-deploy-clear-authority`, `11370014ed8b8eb73b8f0f15ec30eff744f7b1f9`, including PR160 publication recovery at `ab24739203f3bcc03c5b7e6c96f8fa2144a84654`.
 - Builder/client parent: frozen LORD cart repair `af6065e30c667b453f72b27ffbdec742ceaac92f`, branch `codex/v1-lord-cart-groups`, containing ASC `5a2affa6a99ac4511644d0b3e01bcae827774dae`, Fortnight `38dabe6ad46a5f0fdf37baa92811ffca86206cf7`, Contacts recovery `175f34e55cc3152a60ef0a6865c3bcfb55ab27c5` and UAT019 `1f4121a6b54de6f9973934992fea395fdc3cab81`. Combine that exact tree with the frozen service parent above and immediately incorporate this accepted claim before implementation. Record resulting merge SHAs in the implementation handoff. LORD full verification is running; no parent source may change during this serial handoff.
-- Accepted claim commit, implementation head and PR: **Not created.** Record exact Git links when they exist.
-- User scope: continue the supplied frontend UAT bug queue one bounded group at a time. Historical permissions in source documents do not authorise new live operations. The v1 coordinator defines the nine-path related save-recovery group below; this supersedes the unpublished seven-path draft before implementation.
+- Accepted initial claim: `5260b40c06f6a25652530c6a63db35048ec0a619`; combined preimplementation local base `44aa8519ac549b62cca2d35971d05d561cc085e2` preserves both selected chains. Implementation head/PR pending.
+- User scope: continue the supplied frontend UAT bug queue one bounded group at a time. Historical permissions in source documents do not authorise new live operations. The v1 coordinator initially defined nine paths. The scoped test-compatibility supplement below adds a tenth before that path is edited; no production-code scope is added.
 
-## Exact nine-path scope
+## Exact ten-path scope (coordinator supplement below)
 
 1. `v1/services/deploy/service.mjs`
 2. `v1/web/shared/client.js`
@@ -21,6 +21,7 @@
 7. `docs/v1/accelerated-delivery/DEPLOY_SAVE_RECOVERY_FIX_2026-11-15.md`
 8. `v1/web/shared/lord-user.js`
 9. `tests/v1-product-lord-cart-groups-browser.mjs`
+10. `tests/v1-product-deploy-fortnight-browser.mjs`
 
 Deploy owns saved documents, operation outcomes and withdrawal. Core remains the owner of current authorization and durable original decision evidence. The shared client owns bounded in-page request retention; the builder changes only v1 adaptations of the reused Deploy and LORD UIs. LORD retains all cart, reservation, custody and outcome ownership; no LORD service/model change belongs here. The same preparation-to-pending boundary includes new LORD cart submissions and its owned editor. A two-line local fieldset/legend wrapping repair and narrow-browser assertion are included for the observed 390px owned-editor overflow. No v0.9 source, Core/shared-runtime implementation, schema, migration, dependency, provider, configuration, secret, generated output or live-data change. No new descriptor marker is expected. No merge or deployment.
 
@@ -66,7 +67,7 @@ This small local preparation extension and the Deploy outcome repair share the r
 6. Test shared cleanup across endpoint changes and same-ID collisions across domains/accounts/schools; preserve Contacts recovery. Repeated terminal operations release bounded pending capacity, while unresolved entries remain protected and receipt checks still work at capacity.
 7. Test old receipt after newer save without revision-cache regression; reload with minimal reference, no full payload persistence/reconstruction; existing class-draft compatibility; storage failure and account/version changes during asynchronous recovery.
 8. Define the actual ordinary-save UI surface in the handoff: queued cells/classes, direct edit and version-note callers must either be covered or named as outside the bounded fix. No general completion claim based only on the queue.
-9. Using `TZ=Asia/Singapore`, run focused service and built-browser tests, unchanged parent Deploy/Core/Contacts regressions, canonical build/no tracked drift, runner discovery, product suite, full Node/LORD and exact-head CI. Record actual commands, exact head, failures, counts, omissions and the nine-path inventory.
+9. Using `TZ=Asia/Singapore`, run focused service and built-browser tests, unchanged parent Deploy/Core/Contacts regressions, canonical build/no tracked drift, runner discovery, product suite, full Node/LORD and exact-head CI. Record actual commands, exact head, failures, counts, omissions and the ten-path inventory.
 10. Claude reviews the exact head without editing the branch. Synthetic evidence does not establish the original hosted operation's outcome or runtime UAT.
 
 ## Verification, review and release state
@@ -80,3 +81,10 @@ Rollback requires no schema/data rollback and cannot undo a committed save. It r
 ## Next action
 
 Publish this claim alone using the expected current main, re-read active claims, immediately incorporate it into the selected combined frozen parent, then implement and verify. Record exact merge/head/PR and tests in Git. Do not edit frozen predecessor branches. Claude reviews the exact new head; no merge/deployment or live operations are implied.
+
+## Coordinator scope supplement — 15 November 2026, 12:16 SGT
+
+Actual parent regression `tests/v1-product-deploy-fortnight-browser.mjs` now fails at `finishSave` because its synthetic GSISV1 only supplies capable/fetch and has no verified recovery/reference API or startup reconciliation response. Evidence: `/tmp/gsis-br01-parent-fortnight.log`; its first behavior group passes, then the incomplete fake times out. The new actual-client/native Deploy test already passes eight groups at this stage, but that does not waive the parent regression.
+
+The v1 coordinator authorises one additional test path, number10 above, to adapt that existing fake to the new verified-recovery contract. Retain all six behavior assertions, raw-input/blur/queue semantics and uncertainty checks. Do not add a production compatibility fallback, skip tests or treat an unverified HTTP result as terminal merely to satisfy the old fake. No other file or business scope expands. Record this claim-only supplement on main with expected-head protection, immediately incorporate it into the implementation branch, and only then edit the tenth path. Claude reviews the exact resulting implementation head.
+
