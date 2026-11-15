@@ -1,14 +1,22 @@
 # v1-operation-probe: built-browser operation coverage in existing CI
 
-- Status: implemented; local checks passed; exact-head CI and Claude review pending.
+- Status: rebased onto main; authorised N2 guard implemented. New-head checks, N1 timing and Claude recheck pending.
 - Owner/model: Codex. Coordinator: ChatGPT v1. Lane: tests/documentation only.
-- Reviewer/model: Claude, independent exact-head review; pending.
-- Last updated (Asia/Singapore): 15 November 2026, 21:06.
+- Reviewer/model: Claude; approved original `bf2067c`, new-head recheck pending.
+- Last updated (Asia/Singapore): 16 November 2026.
 - Branch: `codex/v1-operation-probe`.
-- Required product/review base: PR175, `codex/v1-global-save-status`, exact `77e30eece77cf2477384ecd4fdc901b828e47599`.
+- Historical product/review base: PR175, `codex/v1-global-save-status`, exact `77e30eece77cf2477384ecd4fdc901b828e47599`.
 - Refreshed main before claim: `d77408178f9e6adfb67914643add48a783e87f11`.
 - Current implementation head / PR: to be recorded by the PR, avoiding a self-referential hash.
 - User-authorised scope: Job2/T07 only, a test-only sibling beside PR176. No application, build, workflow, dependency, migration or generated-output changes.
+
+## Part C continuation — 16 November 2026
+
+PR175 landed through `334731cdb1d4fc5d37d7bdf6de761d668c062994`. Refreshed main is `fa6666b3f846dfc10bebfe47e5a10ed9a264b0ed`; its additional change is the unrelated bookkeeping claim. All current open-PR file inventories were checked: no overlap with these three paths. The owner authorises the actual rebase, Claude N2's exact fifteen runtime-site pins and N1 runtime monitoring in the same push. This continuation retains the existing accepted claim and exact three-file scope. No handler, runner, timeout, build or workflow change is authorised.
+
+The first rebase attempt onto `334731c` stopped on this task record and was aborted under the no-hand-resolution rule. The owner then explicitly approved retaining this file exactly from reviewed `bf2067c52bf7390b8651194022eb32791e8c086f` before adding this evidence. The rebase onto `fa6666b` replayed the implementation commit only; the duplicate claim-carry commit `77deaf312eeb02fad060192029156c721110c0c0` was skipped because its accepted claim already exists on main. The only conflict was this task's old claim status/provenance. Its resolution restored the exact reviewed blob, with no other conflict resolution. Rebased checkpoint `cd5c1b49841c13e1d8d0e0befbfc18a4495410dc`, tree `6056366384926d0dd4a242ad69d0ca01e07d9ab4`, preserves all three reviewed file blobs byte for byte before N1/N2 edits.
+
+Before test edits: retain all 29 reviewed missing-handler exceptions; pin each unresolved runtime site by exact file, line and kind with a reason, rejecting new, changed, duplicate and stale pins. Negative controls must include a newly parsed dynamic caller and replacement without a count increase. Keep the real built-browser/Worker/D1 exercise and all existing dispatch controls. Measure elapsed runtime against the unchanged 45-second runner limit. The necessary published-branch rewrite uses an exact old-head lease at `bf2067c`, as specifically authorised by the owner's rebase instruction; no other history is rewritten. New-head CI and Claude recheck remain required. The historical pinned-base narrative below records the original exception and is not the current base requirement.
 
 ## Owner clarification: sibling, not a deeper stack
 
@@ -89,3 +97,12 @@ Focused probe passed (399 calls, 29 expected missing bindings), including Chromi
 Development failures retained honestly: the first static evaluator followed unrelated graphics templates and was stopped; it now limits evaluation to API-bearing expressions and asserts finite bounds. An overly broad error phrase mistook a missing wipe receipt for a missing handler; the real-resource negative control prevents that regression. The first LORD invocation lacked its local Chromium environment variable and stopped at browser launch; rerunning the unchanged complete suite with `LORD_TEST_CHROMIUM` passed 40/40. No test, workflow, timeout, exclusion or product behavior was changed to suppress these failures.
 
 Q01 scope/claim and Q02 ownership: exact sibling base, three paths, zero overlap with176. Q03 security and Q04 recovery: real authenticated synthetic dispatch, retained security gates, missing-receipt distinction and no live effects. Q05 verification and Q06 maintainability: runner discovery, bounded AST extraction, per-entry reasons and stale-exception rejection; full exact-head CI still required. Q07 independent Claude review pending. Q08 release not applicable. Visible changes: none. All allowed product gaps remain open. F5 OPEN; official T1B-01/T1B-02 and hosted/runtime UAT **Not tested**.
+
+
+### Part C N1/N2 implementation and verification handoff
+
+N2 now compares the complete set of exact file/line/kind identities with fifteen individually reasoned pins. An added site, a replacement without a count increase, a stale pin, duplicate pin or missing reason fails. Negative controls obtain the new dynamic expression through the actual parser; the positive inventory still comes from actual built assets and the program retains all real Chromium, Worker and local-D1 dispatch checks. Pins include conservatively reported model/data expressions and do not certify every one as an HTTP call. All 29 previously approved missing-handler entries are unchanged.
+
+The worktree based on rebased `cd5c1b4` passed the canonical build (5.227s) and v1 build (3.290s) while this authorised test/documentation follow-up was in progress. Product inputs were unchanged and there was no generated drift; these are worktree checks, not clean final-head evidence. The final guard passes `TZ=Asia/Singapore node --check tests/v1-product-operation-probe.mjs` and `git diff --check`. Cached Prettier formatted only the test and JSON; no dependency was added. Focused real-path execution, discovery, N1 wall time and fresh full-suite/product CI at the published head remain pending, to be recorded in PR178 without a self-referential hash. The existing 45-second program limit is unchanged. A synthetic program pass does not close any missing-handler finding, F5 or hosted UAT.
+
+Reproducible focused command after a clean commit: `TZ=Asia/Singapore GSIS_BROWSER_EXECUTABLE=/usr/bin/chromium node tests/v1-product-operation-probe.mjs`. The unchanged product runner records each program's elapsed milliseconds and enforces 45 seconds; the focused wrapper uses that same bound and records the actual head/clean-tree state. Discovery commands remain `node scripts/v1/test.mjs --list` and `node tests/run.cjs --list`. Recheck exact scope with `git diff --name-only fa6666b3f846dfc10bebfe47e5a10ed9a264b0ed`; only the three claimed paths may differ. The owner-approved task conflict resolution is distinct from a conflict-free mechanical merge and must be described that way in the PR.

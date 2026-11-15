@@ -1,6 +1,6 @@
 {
   "source": "PR177 follow-up ledger Section 2 at 429367ed23bf4edf8d10cbb575226c84c228474c",
-  "review": "Candidate seed for Claude's exact-head review; allowances do not close the findings.",
+  "review": "Missing-handler entries approved by Claude at bf2067c52bf7390b8651194022eb32791e8c086f; runtime-site pins require the Part C exact-head recheck. Allowances do not close findings.",
   "entries": [
     {
       "domain": "calendar",
@@ -233,6 +233,99 @@
       "name": "",
       "ledger": "F11",
       "reason": "Delivery-report links use this absent route family; only the synthetic report ID is substituted."
+    }
+  ],
+  "dynamicSource": "Claude PR178 note N2; exact built-source expression locations at reviewed bf2067c52bf7390b8651194022eb32791e8c086f, preserved on rebased main.",
+  "dynamicCallSites": [
+    {
+      "file": "calendar/app.js",
+      "line": 6674,
+      "kind": "runtime action",
+      "reason": "Calendar job recovery forwards the retained job action and payload; their possible values depend on stored state."
+    },
+    {
+      "file": "calendar/app.js",
+      "line": 6684,
+      "kind": "runtime action",
+      "reason": "The retained Calendar proposal contains a runtime job action. This conservative expression report is not proof of a separate HTTP call."
+    },
+    {
+      "file": "calendar/app.js",
+      "line": 6811,
+      "kind": "runtime api argument",
+      "reason": "Calendar retry forwards a retained pending action and payload through rawApi; arbitrary stored retries are not statically enumerated."
+    },
+    {
+      "file": "calendar/app.js",
+      "line": 7074,
+      "kind": "runtime action",
+      "reason": "Calendar mutation-status reads include the pending action as payload evidence; its possible runtime values are unresolved."
+    },
+    {
+      "file": "roster/backup-ledger.js",
+      "line": 12,
+      "kind": "runtime operation",
+      "reason": "Backup-ledger retry reconstructs its operation from a failed request kind returned by the owner, rather than a finite local constant."
+    },
+    {
+      "file": "roster/roster-allocation.js",
+      "line": 287,
+      "kind": "runtime operation",
+      "reason": "Roster allocation audit records carry the caller-supplied operation. This reported data expression does not establish an HTTP route."
+    },
+    {
+      "file": "roster/roster-operations-model.js",
+      "line": 895,
+      "kind": "runtime operation",
+      "reason": "The Stapler restore result returns the runtime operation selector; the scanner conservatively reports this model response expression."
+    },
+    {
+      "file": "roster/roster-operations-model.js",
+      "line": 899,
+      "kind": "runtime operation",
+      "reason": "The Stapler rename result returns the runtime operation selector; this model response is unresolved, not a separately proven request."
+    },
+    {
+      "file": "roster/roster-operations-model.js",
+      "line": 914,
+      "kind": "runtime operation",
+      "reason": "The Stapler archive or move result returns the selected operation; the static scanner cannot enumerate this model response value."
+    },
+    {
+      "file": "roster/roster-operations-ui.js",
+      "line": 988,
+      "kind": "runtime api argument",
+      "reason": "Roster operations recovery dispatches a retained task route and payload whose contents depend on the original user request."
+    },
+    {
+      "file": "roster/roster-settings-ui.js",
+      "line": 70,
+      "kind": "runtime operation",
+      "reason": "Roster settings reconstruct pending-operation evidence after refresh; the selector comes from a retained request, not a local constant."
+    },
+    {
+      "file": "roster/roster.js",
+      "line": 22,
+      "kind": "runtime api argument",
+      "reason": "The timetable preload callback forwards its runtime route and input into the common Roster transport."
+    },
+    {
+      "file": "roster/roster.js",
+      "line": 198,
+      "kind": "runtime api argument",
+      "reason": "The absence-page preload callback forwards its runtime route and input into the common Roster transport."
+    },
+    {
+      "file": "roster/roster.js",
+      "line": 465,
+      "kind": "runtime operation",
+      "reason": "The Roster row action stores a user-selected operation in the pending update payload; its DOM-derived values are unresolved."
+    },
+    {
+      "file": "roster/roster.js",
+      "line": 575,
+      "kind": "runtime api argument",
+      "reason": "Roster original-operation retry forwards the retained request route and payload rather than a statically known route."
     }
   ]
 }

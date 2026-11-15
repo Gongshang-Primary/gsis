@@ -469,6 +469,46 @@ function verify(results, allowances) {
   assert.equal(failures.length, 0, failures.join("\n"));
 }
 
+function verifyDynamic(actual, pins) {
+  assert.ok(
+    Array.isArray(pins),
+    "Runtime call sites must be explicitly pinned.",
+  );
+  const siteKey = (site) => JSON.stringify([site.file, site.line, site.kind]);
+  const remaining = new Set();
+  for (const pin of pins) {
+    assert.ok(
+      domains.includes(fileDomain(pin.file)) &&
+        /^[a-z]+\/[A-Za-z0-9_./-]+\.(?:js|mjs|html)$/.test(pin.file) &&
+        Number.isSafeInteger(pin.line) &&
+        pin.line > 0 &&
+        /^runtime (?:api argument|operation|action|command)$/.test(pin.kind),
+      "Runtime pins must identify an exact source file, line and kind.",
+    );
+    assert.ok(
+      pin.reason?.trim().length > 20,
+      "Every runtime pin needs a reason.",
+    );
+    const key = siteKey(pin);
+    assert.ok(!remaining.has(key), `Duplicate runtime pin ${key}`);
+    remaining.add(key);
+  }
+  const failures = [];
+  for (const site of actual) {
+    const key = siteKey(site);
+    if (!remaining.delete(key))
+      failures.push(`Unpinned runtime call site ${key}`);
+  }
+  for (const key of remaining) failures.push(`Stale runtime pin ${key}`);
+  assert.equal(failures.length, 0, failures.join("\n"));
+}
+
+const allowlist = JSON.parse(
+  await readFile(
+    new URL("./v1-product/operation-probe-allowlist.json", import.meta.url),
+    "utf8",
+  ),
+);
 const suite = await productSuite({
   bindings: {
     SEND_OWNER: "disabled",
@@ -483,6 +523,51 @@ try {
   const actor = await suite.seedAccount("operation-probe-admin");
   const assets = join(suite.path, "product/web/assets");
   const discovered = await inventory(assets);
+  verifyDynamic(discovered.dynamic, allowlist.dynamicCallSites);
+  // Pin identities, not just a count: replacing one unsupported caller must
+  // fail even when the total is unchanged. These controls use the real parser.
+  const addedDynamic = analyse(
+    "calendar/synthetic-dynamic.js",
+    "api(runtimeSelectedAction)",
+  ).dynamic;
+  assert.equal(addedDynamic.length, 1);
+  assert.throws(
+    () =>
+      verifyDynamic(
+        [...discovered.dynamic, ...addedDynamic],
+        allowlist.dynamicCallSites,
+      ),
+    /Unpinned runtime call site/,
+  );
+  assert.throws(
+    () =>
+      verifyDynamic(
+        [...discovered.dynamic.slice(1), ...addedDynamic],
+        allowlist.dynamicCallSites,
+      ),
+    /Unpinned runtime call site/,
+  );
+  assert.throws(
+    () =>
+      verifyDynamic(discovered.dynamic.slice(1), allowlist.dynamicCallSites),
+    /Stale runtime pin/,
+  );
+  assert.throws(
+    () =>
+      verifyDynamic(discovered.dynamic, [
+        ...allowlist.dynamicCallSites,
+        allowlist.dynamicCallSites[0],
+      ]),
+    /Duplicate runtime pin/,
+  );
+  assert.throws(
+    () =>
+      verifyDynamic(discovered.dynamic, [
+        { ...allowlist.dynamicCallSites[0], reason: "" },
+        ...allowlist.dynamicCallSites.slice(1),
+      ]),
+    /Every runtime pin needs a reason/,
+  );
   const version = await suite.call(actor, "deploy", "/versions/create", {
     operationId: crypto.randomUUID(),
     name: "Synthetic probe",
@@ -743,12 +828,6 @@ try {
       process.env.GSIS_PROBE_REPORT,
       JSON.stringify(report, null, 2),
     );
-  const allowlist = JSON.parse(
-    await readFile(
-      new URL("./v1-product/operation-probe-allowlist.json", import.meta.url),
-      "utf8",
-    ),
-  );
   verify(results, allowlist.entries);
   console.log(
     JSON.stringify({
