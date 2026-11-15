@@ -1,11 +1,11 @@
 # v1-v09-frontend-parity-20261114: Capture 14 November v0.9 updates and preserve v1 release labels
 
-- Status: implementation complete; exact-head CI and Claude review pending
+- Status: merged as PR154 and deployed at `26bbccd229962700409bb6e9c80b1e9bec170d20`; Claude approved exact head `344141ac413eca2478518c92d7b3c17d671c17a4`; unperformed runtime UAT remains Not tested (closure evidence below)
 - Owner/model: Codex; v1 coordinator ChatGPT; independent reviewer Claude
 - Last updated (Asia/Singapore): 15 November 2026
 - Branch: codex/v1-v09-frontend-parity-20261114
 - Base SHA: 7c9315124344e204819538697f1369edcc5ace31
-- Current head/PR: claim first; exact implementation head and evidence will be recorded in the PR.
+- Current head/PR: [PR154](https://github.com/helper-gsps/gsis/pull/154), reviewed head `344141ac413eca2478518c92d7b3c17d671c17a4`, merged at `591fb3ed587239ae2de309c0a15eca782f838d74`.
 - User-authorised scope: "read v0.9 repo. capture all updates done today. ensure that the updates are also integrated into v1 where applicable". The source window is 14 November 2026 Singapore time, 2026-11-13T16:00:00Z through 2026-11-14T16:00:00Z. This authorises the bounded implementation and its tests/PR, not another deployment or provider activation.
 - Exact file scope: `scripts/v1/build-web.mjs`; `tests/v1-product-v09-frontend-parity.mjs`; `docs/v1/accelerated-delivery/V09_UPDATES_2026-11-14.md`; this task record.
 - Out of scope: legacy/shared code, release bundles and labels, package/dependency changes, Core/Contacts identity/authority, Roster behaviour fixes (separate claim), infrastructure/configuration/live data, provider/Drive activation, merge or deployment.
@@ -43,3 +43,9 @@ Red proof: the new actual-build test failed before the fix because Roster chrome
 Canonical `TZ=Asia/Singapore npm run build` passed with no tracked generated drift. Existing runner discovery includes the new test (1,169 programs). `git diff --check`, exact four-path scope and all ten inventory relative links pass. Focused checks tested the code tree committed by this PR; full product/Node/LORD exact-head CI remains pending until its recorded runs finish. No school runtime UAT was performed.
 
 Q01/Q02: published claim, exact sources and independent-domain disposition recorded. Q03–Q05: build-time presentation only, no authority/persistence/concurrency change or new dependency; original source/URLs and historical text preserved. Q06: focused and canonical evidence above, exact-head full CI pending. Q07: Claude exact-head review pending. Q08: no merge/deployment or activation included; rollback is the builder/test change only. F5 remains OPEN.
+
+## Merge closure, 15 November 2026
+
+The owner subsequently instructed “merge and deploy, i approve”, superseding this task's earlier no-merge/no-deploy limits for the reviewed release. [Claude approved the exact head](https://github.com/helper-gsps/gsis/blob/29915fbe6a33329bf7f9bf1a998aca9aaf33bd52/docs/coordination/review/pr154-155-claude-review.md) on main commit `29915fbe6a33329bf7f9bf1a998aca9aaf33bd52`. Codex merged PR154 without hand edits at [`591fb3ed587239ae2de309c0a15eca782f838d74`](https://github.com/helper-gsps/gsis/commit/591fb3ed587239ae2de309c0a15eca782f838d74), 15 November 06:40:49 SGT. Implementation ownership is closed; the historical pending statements above describe the earlier handoff.
+
+The combined main after PR155 is `26bbccd229962700409bb6e9c80b1e9bec170d20`. Its [full regression CI](https://github.com/helper-gsps/gsis/actions/runs/43649420498) passed 1,172/1,172 Node programs and 40/40 LORD checks per shard; [product CI](https://github.com/helper-gsps/gsis/actions/runs/43649422660) passed 73/73 programs, build/no drift, nine Worker dry runs and local migration-upgrade checks. Both passed on attempt 1 at that exact head. [Deployment run 43650254322](https://github.com/helper-gsps/gsis/actions/runs/43650254322) succeeded at 15 November 06:55:04 SGT after owner browser approval. All nine Worker settings report that exact deployed SHA with unchanged resource bindings, service graph and activation flags; all eight D1 checks reported no pending migrations. All 16 public HTTP checks and four Roster asset byte/hash comparisons passed at 06:57:18–06:57:22 SGT; authenticated runtime acceptance is not claimed. Release evidence is maintained in the [product task](v1-product.md#reviewed-v09-integration-15-november-2026) and [deployment log](../DEPLOYMENTS.md). No provider activation or live-data action is inferred. F5 remains **OPEN**; official T1B-01/T1B-02 and unperformed runtime UAT remain **Not tested**.

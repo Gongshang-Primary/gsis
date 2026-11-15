@@ -60,6 +60,8 @@ for (let i = 0; i < 22; i++)
     profile: { ...staff[0].profile, "Basic Name": "Extra " + i },
   });
 let failVenues = false;
+let venueCatalogue = null;
+let onCatalogueRead = null;
 const env = {
   SCHOOL_ID: school,
   SERVICE_NAME: "deploy",
@@ -103,8 +105,12 @@ const env = {
       }),
   },
   VENUES: {
-    fetch: async () => {
+    fetch: async (request) => {
       if (failVenues) throw Error("test dependency outage");
+      if (new URL(request.url).pathname === "/internal/catalogue") {
+        if (onCatalogueRead) await onCatalogueRead();
+        return Response.json({ ok: true, data: venueCatalogue });
+      }
       return Response.json({
         ok: true,
         data: { state: "committed", fenceId: "venue-fence-a" },
@@ -525,6 +531,166 @@ try {
     ),
     (e) => e.code === "OPERATION_ABORTED",
   );
+  // Refresh only changes canonical room metadata, even when the source is
+  // malformed or a saved planning row changes while the owner is being read.
+  const refreshPlan = await call("/versions/create", {
+    operationId: "create-venue-refresh",
+    name: "Synthetic venue refresh",
+  });
+  const refreshVersion = refreshPlan.versionId;
+  const originalRoom = {
+    id: "room-refresh",
+    name: "Previous name",
+    form: "1A",
+    forms: ["1A"],
+  };
+  const originalClass = {
+    ref: "class-refresh",
+    level: "1",
+    name: "A",
+    shortName: "A",
+    venueId: originalRoom.id,
+  };
+  for (const [scope, rowId, value] of [
+    ["venues", originalRoom.id, originalRoom],
+    ["classes", originalClass.ref, originalClass],
+  ])
+    await statement(
+      h.db,
+      "INSERT INTO deploy_rows(school_id,version_id,scope,row_id,revision,value) VALUES(?,?,?,?,1,?)",
+      [school, refreshVersion, scope, rowId, JSON.stringify(value)],
+    ).run();
+  const goodCatalogue = {
+    schemaVersion: 1,
+    schoolId: school,
+    revision: "catalogue-7",
+    asOf: now,
+    venues: [
+      {
+        id: originalRoom.id,
+        venueId: originalRoom.id,
+        name: "Canonical name",
+        unit: "A-01",
+        shortName: "A",
+        revision: 7,
+      },
+    ],
+  };
+  const refreshRequest = async (operationId, revision) => {
+    const l = await call("/lease", {
+      operationId: operationId + ".lease",
+      versionId: refreshVersion,
+      scope: "meta",
+      clientId: "client-a",
+    });
+    return {
+      operationId,
+      operation: "refreshVenueRegistry",
+      versionId: refreshVersion,
+      ...(revision !== undefined ? { revision } : {}),
+      scope: "meta",
+      clientId: "client-a",
+      leaseFence: l.fence,
+    };
+  };
+  let malformedIndex = 0;
+  for (const bad of [
+    { ...goodCatalogue, schemaVersion: 2 },
+    { ...goodCatalogue, schoolId: "other-school" },
+    { ...goodCatalogue, revision: null },
+    {
+      ...goodCatalogue,
+      venues: [goodCatalogue.venues[0], goodCatalogue.venues[0]],
+    },
+    {
+      ...goodCatalogue,
+      venues: [{ ...goodCatalogue.venues[0], revision: null }],
+    },
+    {
+      ...goodCatalogue,
+      venues: [{ ...goodCatalogue.venues[0], revision: "7" }],
+    },
+    { ...goodCatalogue, venues: [{ ...goodCatalogue.venues[0], revision: 0 }] },
+  ]) {
+    venueCatalogue = bad;
+    const input = await refreshRequest(
+      "malformed-catalogue-" + ++malformedIndex,
+      0,
+    );
+    await assert.rejects(
+      call("/change", input),
+      (error) => error.code === "SOURCE_INVALID",
+    );
+    const saved = await loadVersion(h.db, school, refreshVersion);
+    assert.equal(saved.version.revision, 0);
+    assert.deepEqual(saved.doc.venues, [originalRoom]);
+  }
+  failVenues = true;
+  await assert.rejects(
+    call("/change", await refreshRequest("refresh-source-outage", 0)),
+    (error) => error.code === "DEPENDENCY_UNAVAILABLE",
+  );
+  failVenues = false;
+  venueCatalogue = { ...goodCatalogue, venues: [] };
+  await assert.rejects(
+    call("/change", await refreshRequest("refresh-deleted-room", 0)),
+    (error) => error.code === "VENUE_REFERENCE_CHANGED",
+  );
+  assert.deepEqual(
+    (await loadVersion(h.db, school, refreshVersion)).doc.venues,
+    [originalRoom],
+  );
+
+  venueCatalogue = goodCatalogue;
+  onCatalogueRead = async () => {
+    onCatalogueRead = null;
+    await h.db.batch([
+      statement(
+        h.db,
+        "UPDATE deploy_rows SET value=?,revision=revision+1 WHERE school_id=? AND version_id=? AND scope='classes' AND row_id=?",
+        [
+          JSON.stringify({ ...originalClass, name: "Concurrent class name" }),
+          school,
+          refreshVersion,
+          originalClass.ref,
+        ],
+      ),
+      statement(
+        h.db,
+        "UPDATE deploy_versions SET revision=revision+1 WHERE school_id=? AND id=?",
+        [school, refreshVersion],
+      ),
+    ]);
+  };
+  // Even a caller without an explicit expected revision must not overwrite
+  // changes made after the refresh's initial saved-document read.
+  await assert.rejects(
+    call("/change", await refreshRequest("refresh-race")),
+    (error) => error.code === "REVISION_CONFLICT",
+  );
+  let refreshed = await loadVersion(h.db, school, refreshVersion);
+  assert.equal(refreshed.version.revision, 1);
+  assert.equal(refreshed.doc.classes[0].name, "Concurrent class name");
+  assert.deepEqual(refreshed.doc.venues, [originalRoom]);
+  const refreshInput = await refreshRequest("refresh-valid", 1);
+  const refreshResult = await call("/change", refreshInput);
+  assert.equal(refreshResult.workingRevision, 2);
+  refreshed = await loadVersion(h.db, school, refreshVersion);
+  assert.equal(refreshed.doc.venues[0].revision, 7);
+  assert.deepEqual(refreshed.doc.venues[0].forms, originalRoom.forms);
+  assert.equal(refreshed.doc.venues[0].form, originalRoom.form);
+  assert.equal(refreshed.doc.classes[0].name, "Concurrent class name");
+  failVenues = true;
+  assert.deepEqual(await call("/change", refreshInput), refreshResult);
+  failVenues = false;
+  assert.equal(
+    (await loadVersion(h.db, school, refreshVersion)).version.revision,
+    2,
+  );
+  console.log(
+    "PASS venue refresh validates source evidence, preserves local assignments, rejects stale saved revisions and replays its original receipt without rereading Venues.",
+  );
+
   const row = await one(
     h.db,
     "SELECT payload_key FROM deploy_publications WHERE school_id=? AND id=?",

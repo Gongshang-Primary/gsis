@@ -745,9 +745,28 @@ function expiredLeaseWrite(ctx, scope) {
     args: [ctx.now, ctx.principal.schoolId, ctx.body.versionId, scope],
   };
 }
+function venueClearGuard(school, versionId) {
+  return {
+    sql: `SELECT NOT EXISTS(
+      SELECT 1 FROM deploy_publications WHERE school_id=? AND version_id=?
+    ) AND NOT EXISTS(
+      SELECT 1 FROM deploy_prepared_publications p
+      LEFT JOIN product_operations o
+        ON o.school_id=p.school_id AND o.operation_id=p.operation_id
+      WHERE p.school_id=? AND json_extract(p.document,'$.id')=?
+        AND (o.state IS NULL OR o.state<>'aborted')
+    ) AS ok`,
+    args: [school, versionId, school, versionId],
+  };
+}
 async function save(
   ctx,
-  { document = null, preview = null, dependencies = [] } = {},
+  {
+    document = null,
+    preview = null,
+    dependencies = [],
+    baseRevision = null,
+  } = {},
 ) {
   const op = await prepare(ctx, "deploy.edit");
   if (op.receipt) return op.receipt.result;
@@ -755,6 +774,28 @@ async function save(
     school = ctx.principal.schoolId,
     loaded = await loadVersion(ctx.env.DB, school, b.versionId),
     scope = b.scope || b.key || "meta";
+  const clearing =
+    !document &&
+    b.operation !== "saveVersionNote" &&
+    (b.edits || [b]).some(
+      (edit) => edit?.operation === "clearVenueAssignments",
+    );
+  let clearGuard = null;
+  if (clearing) {
+    check(
+      can(ctx.principal, "admin"),
+      "Only Admin can clear venue assignments.",
+      "CAPABILITY_DENIED",
+      403,
+    );
+    clearGuard = venueClearGuard(school, b.versionId);
+    check(
+      (await one(ctx.env.DB, clearGuard.sql, clearGuard.args)).ok,
+      "Clear venue assignments requires an unpublished version with no publication in progress.",
+      "VENUE_CLEAR_NOT_ALLOWED",
+      409,
+    );
+  }
   let next = document;
   let extraDependencies = dependencies;
   if (
@@ -809,9 +850,20 @@ async function save(
     throw error;
   }
   const guards = [...delta.guards, leaseGuard(ctx, scope)];
+  if (clearGuard) {
+    // Recheck inside the same D1 commit: publication does not advance the
+    // working revision. If clear wins before preparation, its revision bump
+    // instead fences the publication's captured working snapshot.
+    guards.push(
+      clearGuard,
+      scopeGuard(school, b.versionId, loaded.version.revision),
+    );
+  }
   const expected = b.revision ?? b.expectedRevision;
   if (expected !== undefined)
     guards.push(scopeGuard(school, b.versionId, expected));
+  if (baseRevision !== null)
+    guards.push(scopeGuard(school, b.versionId, baseRevision));
   if (preview)
     guards.push(scopeGuard(school, b.versionId, preview.base_revision));
   // Scope-row CAS permits independent edits; imports/publications additionally bind the entire saved revision.
@@ -849,6 +901,7 @@ async function save(
       versionId: b.versionId,
       requestId: b.requestId || op.operationId,
       changedRows: delta.changedRows,
+      ...(baseRevision !== null ? { workingRevision: baseRevision + 1 } : {}),
     },
     {
       dependencies: extraDependencies,
@@ -961,24 +1014,90 @@ async function applyImport(ctx) {
     dependencies: ref.dependencies || [],
   });
 }
+function usedVenueIds(document) {
+  return [
+    ...new Set([
+      ...document.classes.map((c) => c.venueId).filter(Boolean),
+      ...document.groups.map((g) => g.venue).filter(Boolean),
+      ...document.venues
+        .filter((v) => v.form || v.forms?.length)
+        .map((v) => v.id),
+    ]),
+  ].sort();
+}
 function referenceVenues(document) {
-  const used = new Set([
-    ...document.classes.map((c) => c.venueId).filter(Boolean),
-    ...document.groups.map((g) => g.venue).filter(Boolean),
-    ...document.venues
-      .filter((v) => v.form || v.forms?.length)
-      .map((v) => v.id),
-  ]);
-  return [...used].sort().map((venueId) => {
+  return usedVenueIds(document).map((venueId) => {
     const venue = document.venues.find((v) => v.id === venueId);
     check(
-      venue && venue.revision !== undefined && venue.revision !== null,
+      venue && Number.isSafeInteger(venue.revision) && venue.revision > 0,
       "Refresh current venue metadata before publication.",
       "VENUE_REFERENCE_STALE",
       409,
     );
     return { venueId, revision: venue.revision };
   });
+}
+function refreshedVenues(document, catalogue, schoolId) {
+  check(
+    catalogue?.schemaVersion === 1 &&
+      catalogue.schoolId === schoolId &&
+      Array.isArray(catalogue.venues) &&
+      catalogue.venues.length <= 1000 &&
+      typeof catalogue.revision === "string" &&
+      catalogue.revision.length > 0 &&
+      Number.isSafeInteger(catalogue.asOf) &&
+      catalogue.asOf >= 0,
+    "The venue catalogue could not be verified. No planning data was changed.",
+    "SOURCE_INVALID",
+    503,
+  );
+  const previous = new Map(document.venues.map((v) => [v.id, v]));
+  const ids = new Set();
+  const venues = catalogue.venues.map((v) => {
+    const venueId = v?.id || v?.venueId;
+    check(
+      typeof venueId === "string" &&
+        /^[A-Za-z0-9][A-Za-z0-9_.:@/-]{0,127}$/.test(venueId) &&
+        (!v.id || !v.venueId || v.id === v.venueId) &&
+        !ids.has(venueId) &&
+        Number.isSafeInteger(v.revision) &&
+        v.revision > 0 &&
+        typeof v.name === "string" &&
+        v.name.trim().length > 0 &&
+        v.name.length <= 160 &&
+        (v.unit === undefined || typeof v.unit === "string") &&
+        (v.shortName === undefined || typeof v.shortName === "string"),
+      "The venue catalogue could not be verified. No planning data was changed.",
+      "SOURCE_INVALID",
+      503,
+    );
+    ids.add(venueId);
+    const prior = previous.get(venueId);
+    return {
+      id: venueId,
+      name: v.name.trim(),
+      unit: v.unit || "",
+      shortName: v.shortName || "",
+      revision: v.revision,
+      // Canonical metadata belongs to Venues. These assignments belong to this
+      // Deploy version and must not disappear during a metadata-only refresh.
+      ...(prior && Object.hasOwn(prior, "form") ? { form: prior.form } : {}),
+      ...(prior && Object.hasOwn(prior, "forms")
+        ? { forms: structuredClone(prior.forms) }
+        : {}),
+    };
+  });
+  check(
+    usedVenueIds(document).every((venueId) => ids.has(venueId)),
+    "A referenced venue is no longer in the current catalogue. Review its assignment before refreshing.",
+    "VENUE_REFERENCE_CHANGED",
+    409,
+  );
+  return {
+    ...document,
+    venues,
+    venueCatalogue: { revision: catalogue.revision, asOf: catalogue.asOf },
+  };
 }
 async function publicationById(ctx, publicationId) {
   const row = await one(
@@ -1072,6 +1191,7 @@ async function publish(ctx) {
     const ref = await contacts(ctx),
       document = mergeContacts(loaded.doc, ref),
       calculated = calculate(document, ref);
+    referenceVenues(document);
     validateDocument(document);
     check(
       Number.isInteger(document.year) &&
@@ -1521,6 +1641,7 @@ export async function handle(ctx) {
   }
   if (p === "/publishReview") {
     const { doc, version } = await loadVersion(ctx.env.DB, school, b.versionId);
+    referenceVenues(doc);
     const ref = await contacts(ctx),
       calculation = calculate(doc, ref);
     const pointer = await one(
@@ -1840,31 +1961,22 @@ export async function handle(ctx) {
       );
     }
     if (b.operation === "refreshVenueRegistry") {
+      // Replay is resolved before reading a mutable catalogue. The receipt
+      // describes the original saved refresh, even if Venues changed later.
+      const op = await prepare(ctx, "deploy.edit");
+      if (op.receipt) return op.receipt.result;
+      const loaded = await loadVersion(ctx.env.DB, school, b.versionId);
       const ref = await serviceCall(ctx.env, "venues", "/internal/catalogue", {
         schoolId: school,
         decisionId: ctx.principal.decisionId,
         purpose: "deploy",
       });
-      check(
-        Array.isArray(ref.venues),
-        "Venue catalogue unavailable.",
-        "SOURCE_UNAVAILABLE",
-        503,
-      );
-      const loaded = await loadVersion(ctx.env.DB, school, b.versionId),
-        next = {
-          ...loaded.doc,
-          venues: ref.venues.map((v) => ({
-            id: id(v.id || v.venueId),
-            name: text(v.name),
-            unit: v.unit || "",
-            shortName: v.shortName || "",
-            revision: v.revision,
-          })),
-          venueCatalogue: { revision: ref.revision || null, asOf: ref.asOf },
-        };
+      const next = refreshedVenues(loaded.doc, ref, school);
       validateDocument(next);
-      return save(ctx, { document: next });
+      return save(ctx, {
+        document: next,
+        baseRevision: loaded.version.revision,
+      });
     }
     if (b.operation === "acceptContacts") {
       const op = await prepare(ctx);
