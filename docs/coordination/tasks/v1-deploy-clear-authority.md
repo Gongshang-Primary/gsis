@@ -1,6 +1,6 @@
 # v1-deploy-clear-authority: preserve venue-clear source permissions
 
-- Status: claimed; implementation pending.
+- Status: implemented; focused verification passed; final exact-head full suites and Claude review pending.
 - Owner/model: Codex; coordinator ChatGPT (v1); independent reviewer Claude.
 - Last updated (Asia/Singapore): 15 November 2026, 10:17.
 - Branch: `codex/v1-deploy-clear-authority`.
@@ -44,6 +44,23 @@ Tests must exercise actual local Worker/D1 behavior:
 
 ## Quality and handoff
 
-Apply the already selected Pstack root-cause approach; no skill repository or dependency copied. Q01 claim/scope evidence pending accepted publication; Q02–Q06 implementation/verification pending; Q07 Claude exact-head review pending; Q08 no release action.
+Apply the already selected Pstack root-cause approach; no skill repository or dependency copied. Q01 claim/scope passed at accepted main af58de2b95e82c8b7ad35ae1e6c1a4c820744199; Q02–Q05 passed for the bounded owning-D1 guard and preserved capabilities; Q06 focused evidence below passed, full exact-head results pending; Q07 Claude exact-head review pending; Q08 no release action.
 
 No runtime or original live-data proof is claimed. F5 remains OPEN; official T1B-01/T1B-02 and unperformed runtime UAT remain Not tested. Rollback reintroduces the server permission gap but requires no schema/data rollback and does not undo saved operations. The next deployment label remains v1.01 under the separate version task.
+
+## Implementation and verification
+
+The service adds a clear-specific current Admin check and an owning-D1 guard against any historical publication or non-aborted prepared publication for the same school/version. It rechecks that guard and the full loaded version revision in the atomic save transaction. An absent preparation outcome remains blocking. Committed identical replay stays ahead of the new-state guard; ordinary edits retain the existing capability policy. No schema, runtime or model file changed.
+
+Actual Worker/D1 red reproduced both direct and mixed non-Admin clears returning 200 with nine/ten changed rows. After the correction, all twelve focused groups pass: both denials without partial writes, ordinary editor writes, Admin clear with identity preservation and committed replay, active/prior publication denial, prepared/orphaned/aborted outcomes, exact school/version scope, preview/foreign/revoked boundaries, stale expectations, and three real publication/clear interleavings. The race fixtures use independent valid lease scopes so the publication guard or full revision check itself determines the result.
+
+Commands completed using TZ=Asia/Singapore (browser checks also set GSIS_BROWSER_EXECUTABLE=/usr/bin/chromium):
+
+- `node tests/v1-product-deploy-clear-authority.mjs`: 12 groups passed; `/tmp/gsis-clear-authority-green3.log`.
+- Parent Deploy storage, venues, settings/table and other existing targeted tests passed; exact filenames are recorded in the PR command block. Parent `node tests/v1-product-deploy-venue-ui.mjs`: six built-browser groups passed.
+- `for f in tests/v1-core-*.mjs tests/v1-contacts-*.mjs; do node "$f" || exit; done`: 12 unchanged programs, 56 cases passed.
+- Canonical build, syntax, cached Prettier 3.6.2 and whitespace passed; no tracked generated drift. Both runners discover the new program: 76 product / 1,175 Node.
+
+Retained failures: the first regression command named nonexistent `tests/v1-product-deploy.mjs` and stopped before assertions; the corrected four-file command passed. Initial race fixtures passed Node Request objects across Miniflare bindings; the harness was corrected to use URL/options against real Worker bindings, without replacing Core authorization. No assertion, production guard or runner timeout was weakened. Root internal source inspection found no further blocker; it is not Claude approval.
+
+The implementation branch immediately merged accepted main claim into frozen PR160 before edits (local merge c603f10da62ac907631e6972970df48b298b0017). The merge includes existing main UAT019/Contacts claim records unchanged; those are ancestry, not new implementation edits. Full clean-head product, Node/LORD and product/build CI evidence and the published head belong in the PR. No original live request or hosted permission test was performed.

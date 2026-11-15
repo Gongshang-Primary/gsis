@@ -745,6 +745,20 @@ function expiredLeaseWrite(ctx, scope) {
     args: [ctx.now, ctx.principal.schoolId, ctx.body.versionId, scope],
   };
 }
+function venueClearGuard(school, versionId) {
+  return {
+    sql: `SELECT NOT EXISTS(
+      SELECT 1 FROM deploy_publications WHERE school_id=? AND version_id=?
+    ) AND NOT EXISTS(
+      SELECT 1 FROM deploy_prepared_publications p
+      LEFT JOIN product_operations o
+        ON o.school_id=p.school_id AND o.operation_id=p.operation_id
+      WHERE p.school_id=? AND json_extract(p.document,'$.id')=?
+        AND (o.state IS NULL OR o.state<>'aborted')
+    ) AS ok`,
+    args: [school, versionId, school, versionId],
+  };
+}
 async function save(
   ctx,
   {
@@ -760,6 +774,28 @@ async function save(
     school = ctx.principal.schoolId,
     loaded = await loadVersion(ctx.env.DB, school, b.versionId),
     scope = b.scope || b.key || "meta";
+  const clearing =
+    !document &&
+    b.operation !== "saveVersionNote" &&
+    (b.edits || [b]).some(
+      (edit) => edit?.operation === "clearVenueAssignments",
+    );
+  let clearGuard = null;
+  if (clearing) {
+    check(
+      can(ctx.principal, "admin"),
+      "Only Admin can clear venue assignments.",
+      "CAPABILITY_DENIED",
+      403,
+    );
+    clearGuard = venueClearGuard(school, b.versionId);
+    check(
+      (await one(ctx.env.DB, clearGuard.sql, clearGuard.args)).ok,
+      "Clear venue assignments requires an unpublished version with no publication in progress.",
+      "VENUE_CLEAR_NOT_ALLOWED",
+      409,
+    );
+  }
   let next = document;
   let extraDependencies = dependencies;
   if (
@@ -814,6 +850,15 @@ async function save(
     throw error;
   }
   const guards = [...delta.guards, leaseGuard(ctx, scope)];
+  if (clearGuard) {
+    // Recheck inside the same D1 commit: publication does not advance the
+    // working revision. If clear wins before preparation, its revision bump
+    // instead fences the publication's captured working snapshot.
+    guards.push(
+      clearGuard,
+      scopeGuard(school, b.versionId, loaded.version.revision),
+    );
+  }
   const expected = b.revision ?? b.expectedRevision;
   if (expected !== undefined)
     guards.push(scopeGuard(school, b.versionId, expected));
