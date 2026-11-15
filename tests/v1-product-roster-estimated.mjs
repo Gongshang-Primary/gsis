@@ -60,7 +60,9 @@ try {
   assert(pins.some(p => p.scope === "publication" && p.revision === "absent" && p.state === "released"));
   await deploy.prepare("INSERT INTO deploy_pointer VALUES(?,1,'synthetic-missing-publication','1')").bind(schoolId).run();
   const corrupt = await send(f.admin, { operation: "availability", date: s.date, complete: true });
-  assert.equal(corrupt.status, 503, "broken publication evidence cannot silently fall back to estimates");
+  assert.equal(corrupt.status, 404, "preserve the existing missing-publication denial; never fall back to estimates");
+  assert.equal(corrupt.body.error.code, "NOT_FOUND");
+  assert.equal(corrupt.body.data, undefined, "a denied publication read contains no estimated workload");
   await deploy.prepare("DELETE FROM deploy_pointer WHERE school_id=?").bind(schoolId).run();
   // Local Worker/process restart over the same synthetic persistent D1/R2.
   await f.stopWorkers();
