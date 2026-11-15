@@ -6,18 +6,19 @@ import {parse} from 'acorn';
 import {assert,cases} from './v1-contacts-contracts.mjs';
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 const source=['contracts','accepted-facts','catalogues','core-provider'].map(n=>`v1/contacts/${n}.mjs`);
+const currentSource=[...source,'v1/contacts/direct-fields.mjs'];
 const tests=['contracts','snapshots','catalogues','core-provider','races','recovery','isolation'].map(n=>`tests/v1-contacts-${n}.mjs`);
 const allowed=[...source,...tests,'docs/v1/contacts/T1B_CONTRACT.md','docs/coordination/tasks/v1-contacts-t1b.md','docs/coordination/LANES.md'];
 const git=(...args)=>execFileSync('git',args,{cwd:root,encoding:'utf8'}).trim();
 await cases([
   ['B12 static dependency boundary: library has no production imports or IO',async()=>{
-    for(const file of source) {
+    for(const file of currentSource) {
       const ast=parse(readFileSync(path.join(root,file),'utf8'),{ecmaVersion:'latest',sourceType:'module'});
       function visit(n) {
         if(!n||typeof n!=='object')return;
         if(n.type==='ImportDeclaration') {
           const resolved=path.posix.normalize(path.posix.join(path.posix.dirname(file),n.source.value));
-          assert([...source,'v1/core/contracts.mjs'].includes(resolved),`${file}: ${resolved}`);
+          assert([...currentSource,'v1/core/contracts.mjs'].includes(resolved),`${file}: ${resolved}`);
         }
         assert.notEqual(n.type,'ImportExpression');
         if(n.type==='Identifier')assert(!['fetch','WebSocket','XMLHttpRequest','D1Database','process','require','eval','Function'].includes(n.name),`${file}: ${n.name}`);

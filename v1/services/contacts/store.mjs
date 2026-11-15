@@ -10,6 +10,12 @@ import {
   choose,
 } from "../../contacts/contracts.mjs";
 import { validateCatalogues } from "../../contacts/catalogues.mjs";
+import {
+  isDirectField,
+  normalizeDirectValue,
+  encodeDirectValue,
+  decodeStoredValue,
+} from "../../contacts/direct-fields.mjs";
 const fail = (
   v,
   c = "INVALID_INPUT",
@@ -40,7 +46,7 @@ export function record(row) {
       ? {
           state: "accepted",
           revision: `${row.field}-${row.revision}`,
-          value: JSON.parse(row.value_json),
+          ...decodeStoredValue(row.field, JSON.parse(row.value_json)),
           validFrom: row.valid_from,
           validUntil: row.valid_until,
           revoked: !!row.revoked,
@@ -130,7 +136,23 @@ export function effectiveField(row, now) {
 }
 export function validateValue(field, value) {
   fail(DATA_FIELDS.includes(field));
-  if (FIELDS[field] === "boolean") fail(typeof value === "boolean");
+  if (
+    value === null &&
+    ![...AUTHORITY, "basicName", "ttbName", "profileState"].includes(field)
+  )
+    return;
+  if (isDirectField(field)) {
+    try {
+      normalizeDirectValue(field, value);
+    } catch (error) {
+      throw new ApiError(
+        "INVALID_DIRECT_FIELD",
+        400,
+        `${field}: ${error.message}`,
+        { field },
+      );
+    }
+  } else if (FIELDS[field] === "boolean") fail(typeof value === "boolean");
   else if (field === "profileState")
     fail(["provisional", "complete"].includes(value));
   else if (FIELDS[field] === "text")
@@ -154,7 +176,14 @@ export function validateValue(field, value) {
               /^[A-Za-z0-9][A-Za-z0-9._:@/-]{0,127}$/.test(v),
           ),
       );
-  } else if (field === "nameSuffix")
+  } else if (["statutoryName", "preferredName"].includes(field))
+    fail(
+      typeof value === "string" &&
+        value.trim().length > 0 &&
+        value.length <= 160 &&
+        !/[\x00-\x1f\x7f]/.test(value),
+    );
+  else if (field === "nameSuffix")
     fail(
       typeof value === "string" &&
         value.length <= 40 &&
@@ -168,20 +197,39 @@ export function validateValue(field, value) {
         /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value) &&
         value.length <= 320,
     );
-  else if (field === "birthday")
+  else if (field === "birthday") {
     fail(
       typeof value === "string" &&
         /^(?:[0-9]{4}-)?(?:0[1-9]|1[0-2])-(?:0[1-9]|[12][0-9]|3[01])$/.test(
           value,
         ),
     );
-  else if (field === "aliases")
+    const parts = value.split("-").map(Number),
+      day = parts.at(-1),
+      month = parts.at(-2),
+      year = parts.length === 3 ? parts[0] : 2000;
+    fail(
+      year >= 1 &&
+        new Date(
+          Date.UTC(year < 100 ? year + 400 : year, month, 0),
+        ).getUTCDate() >= day,
+    );
+  } else if (field === "aliases")
     fail(
       Array.isArray(value) &&
         value.length <= 16 &&
-        value.every((v) => typeof v === "string" && v.length <= 160),
+        value.every(
+          (v) =>
+            typeof v === "string" &&
+            v.trim().length > 0 &&
+            v.length <= 160 &&
+            !/[\x00-\x1f\x7f]/.test(v),
+        ),
     );
   else fail(typeof value === "string" && value.length <= 4096);
+}
+export function storageValue(field, value, legacy = null) {
+  return isDirectField(field) ? encodeDirectValue(field, value, legacy) : value;
 }
 export function sectionCode(value) {
   return typeof value === "object" && value ? value.code : value;
@@ -199,7 +247,14 @@ export async function makeSnapshots(
     const allValues = Object.fromEntries(
       fieldNames(profile).map((name) => [name, records(fields[name])]),
     );
-    validateFields(allValues, profile);
+    const schemaVersion =
+      profile === "staff" &&
+      Object.values(allValues).some((rows) =>
+        rows.some((r) => r.valueSchema === 2),
+      )
+        ? 2
+        : 1;
+    validateFields(allValues, profile, { schemaVersion });
     // Precompute immutable authority phases on a content mutation. Reads select a
     // stored phase; they never allocate revisions or mutate source content.
     const phases =
@@ -298,9 +353,18 @@ export async function makeSnapshots(
               catalogues.push(JSON.parse(row.body));
             }
           }
-      validateCatalogues(catalogues, values, [...refs.values()]);
+      validateCatalogues(
+        catalogues,
+        Object.fromEntries(
+          Object.entries(values).map(([name, rows]) => [
+            name,
+            rows.filter((r) => r.valueSchema !== 2),
+          ]),
+        ),
+        [...refs.values()],
+      );
       const snapshot = {
-        schemaVersion: 1,
+        schemaVersion,
         source: "contacts",
         schoolId,
         staffId,

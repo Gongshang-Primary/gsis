@@ -5,9 +5,9 @@ import { validateCatalogues } from './catalogues.mjs';
 
 async function validate(snapshot, q) {
   exact(snapshot,['schemaVersion','source','schoolId','staffId','profile','snapshotId','revision','sequence','fields','groups','dependencies','catalogueRefs','catalogues']);
-  check(snapshot.schemaVersion===1 && snapshot.source==='contacts' && snapshot.profile===q.profile && id(snapshot.snapshotId) && id(snapshot.revision) && instant(snapshot.sequence));
+  check((snapshot.schemaVersion===1 || snapshot.schemaVersion===2 && snapshot.profile==='staff') && snapshot.source==='contacts' && snapshot.profile===q.profile && id(snapshot.snapshotId) && id(snapshot.revision) && instant(snapshot.sequence));
   check(snapshot.schoolId===q.schoolId,'SCHOOL_MISMATCH'); check(snapshot.staffId===q.staffId,'STAFF_MISMATCH');
-  validateFields(snapshot.fields,q.profile);
+  validateFields(snapshot.fields,q.profile,{schemaVersion:snapshot.schemaVersion});
   exact(snapshot.groups,PROFILES[q.profile]);
   for(const name of PROFILES[q.profile]) {
     const g=snapshot.groups[name]; exact(g,['revision','vector']); check(id(g.revision));
@@ -22,7 +22,7 @@ async function validate(snapshot, q) {
     check(g.members.length>0 && g.members.every(n=>fieldNames(q.profile).includes(n)),'INCOMPLETE_EVIDENCE');
     check(await digest(g.vector)===await digest(fieldVector(snapshot.fields,g.members)));
   }
-  validateCatalogues(snapshot.catalogues,snapshot.fields,snapshot.catalogueRefs);
+  validateCatalogues(snapshot.catalogues,Object.fromEntries(Object.entries(snapshot.fields).map(([name,rows])=>[name,rows.filter(r=>r.valueSchema!==2)])),snapshot.catalogueRefs);
   return digest(snapshot);
 }
 function projection(snapshot, at) {
