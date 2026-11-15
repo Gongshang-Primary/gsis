@@ -520,7 +520,8 @@ export async function context(ctx, loaded, range, { needsQuota = false } = {}) {
     calendarByDate,
     projection,
     publication: payload,
-    workloadEvidence: !needsQuota ? null : payload?.workloadEvidence || { quality: "verified",
+    workloadEvidence: !needsQuota ? null : payload?.workloadEvidence || {
+      quality: payload?.rows?.every(row => row.quality === "verified") ? "verified" : "unavailable",
       sourceKind: "publication", sourceId: payload?.publicationId || null,
       sourceRevision: payload?.publicationSequence || null },
     effectiveCaps: capEvidence.byKey,

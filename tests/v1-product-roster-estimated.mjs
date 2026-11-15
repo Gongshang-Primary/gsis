@@ -51,7 +51,7 @@ try {
   const blocked = await send(f.admin, { operation: "publish", automatic: true, date: s.date,
     revision: run.revision, operationId: "synthetic-auto-publish" });
   assert.equal(blocked.status, 409, JSON.stringify(blocked.body));
-  assert.equal(blocked.body.error.code, "WORKLOAD_ESTIMATED_AUTOPUBLISH_BLOCKED");
+  assert.equal(blocked.body.error.code, "WORKLOAD_UNVERIFIED_AUTOPUBLISH_BLOCKED");
   assert.equal(await count("roster_publications"), 0);
   const deploy = await f.db("deploy");
   const pins = (await deploy.prepare("SELECT scope,revision,state FROM source_pins WHERE school_id=? AND operation_id=?")

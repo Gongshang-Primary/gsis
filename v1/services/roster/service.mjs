@@ -2074,9 +2074,9 @@ async function operations(ctx) {
       ? compactAdministrativeSave(schoolId, opName, plan) : plan);
 }
 function assertPublicationWorkload(ctx, c) {
-  requireValue(c.workloadEvidence?.quality !== "estimated" ||
+  requireValue(c.workloadEvidence?.quality === "verified" ||
     !(ctx.body.automatic === true || ctx.body.scheduleKey || ctx.principal.serviceIdentity === "roster"),
-    "WORKLOAD_ESTIMATED_AUTOPUBLISH_BLOCKED", 409);
+    "WORKLOAD_UNVERIFIED_AUTOPUBLISH_BLOCKED", 409);
 }
 async function preparePublication(ctx, op, state, c, date, revision) {
   assertPublicationWorkload(ctx, c);
@@ -2412,7 +2412,7 @@ async function allocationRun(ctx, loaded, c, range, scope, revision, op) {
     ...Operations.read(next, c, { operation: "allocation", date, compact: ctx.body.compact }),
     revision: revision + 1,
     workloadEvidence: c.workloadEvidence || null,
-    automaticPublicationAllowed: c.workloadEvidence?.quality !== "estimated",
+    automaticPublicationAllowed: c.workloadEvidence?.quality === "verified",
     runId: op.operationId,
     assigned: proposal.assignments.length,
     unresolved: proposal.unresolved,

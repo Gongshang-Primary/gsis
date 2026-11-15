@@ -48,7 +48,7 @@ const people = [
     groups: [],
   },
 ];
-let venueSealed = true;
+let venueSealed = true, workloadQuality = "verified";
 const reply = (data) => Response.json({ ok: true, data });
 const env = {
   SERVICE_NAME: "roster",
@@ -114,7 +114,7 @@ const env = {
         calculationVersion: "wi/1",
         rows: people.map((p) => ({
           staffId: p.staffId,
-          quality: "verified",
+          quality: workloadQuality,
           budget: 84,
           weightedWi: 30,
           factor: 5 / 7,
@@ -859,6 +859,18 @@ try {
     assert.equal(later.people.find((p) => p.id === "bob").active, false);
     assert.equal(hasDatedReliefActivation(bob, saved.state.adhoc, tomorrow, 3), false);
     bob.active = true;
+  });
+  await test("automatic publication requires verified rows, not just a publication identity", async () => {
+    workloadQuality = "unavailable";
+    const revision = (await one(env.DB,
+      "SELECT revision FROM roster_scopes WHERE school_id=? AND scope=?",
+      [schoolId, "day:" + date])).revision;
+    const input = { operation: "publish", automatic: true, date, revision,
+      operationId: "synthetic-unverified-automatic-publication" };
+    await prepare(input, "roster.publish");
+    await assert.rejects(handle(ctx("/operations", input)),
+      error => error.code === "WORKLOAD_UNVERIFIED_AUTOPUBLISH_BLOCKED");
+    workloadQuality = "verified";
   });
   console.log(`${count} Roster service acceptance groups passed`);
 } finally {
