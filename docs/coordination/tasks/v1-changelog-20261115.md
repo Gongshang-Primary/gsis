@@ -2,8 +2,8 @@
 
 - Status: documentation queue in [PR159](https://github.com/helper-gsps/gsis/pull/159); earlier ledger and Run B findings from PR162 incorporated. PR160/PR161 are independently published; their review/release gates remain separate.
 - Owner/model: Codex. Coordinator: ChatGPT (v1). Independent reviewer: Claude.
-- Last updated (Asia/Singapore): 15 November 2026, 11:58.
-- Branch: `codex/v1-changelog-20261115`; documentation head before this update `e16232d2d55ef3860d92821920b8ac3259031d15`. The PR body records the new exact head after commit.
+- Last updated (Asia/Singapore): 15 November 2026, 12:25.
+- Branch: `codex/v1-changelog-20261115`; documentation head before this update `10118f2d75f1bb35aaa9979fa03d17041c812020`. The PR body records the new exact head after commit.
 - Original source/base: `26bbccd229962700409bb6e9c80b1e9bec170d20`; current main at the 10:30 SGT refresh `57c9223b532d5bf6c84ef6b5ffdb79059a5e3cc1`. The earlier discovery base was `2c396391186a342a0c42c41d961aba30832baf54`; intervening main changes are claims, not these implementations.
 - Initial owner request: “deploy is unable to publish, changelog for bug fix”, with a mobile screenshot. Subsequent request: read the data-clone UAT ledger as bug-fix input and work through reported fixes one by one.
 
@@ -76,3 +76,9 @@ Coordinator evidence now marks [PR166](https://github.com/helper-gsps/gsis/pull/
 Validation: `TZ=Asia/Singapore python3 /tmp/validate-gsis-uat-docs.py` passes exact two-document scope, whitespace, 70 links (34 pinned source anchors, 28 external-reference URL forms), all 37 unique inventory IDs and absence of operation UUIDs. Source/commit targets are checked locally; external URL form checks do not verify network or current CI/PR status. Application suites were not rerun for this prose-only update. The helper remains outside the repository and the coordinator will include its rerunnable contents in PR159. Claude exact-head review is Pending. No application edits, live access, merge or deployment. F5 remains **OPEN**; official T1B-01/T1B-02 and unperformed runtime UAT remain **Not tested**.
 
 Subsequent serial handoff: LORD source is frozen at `af6065e30c667b453f72b27ffbdec742ceaac92f`; focused tests pass and full verification is running. B-R01 nine-path claim is accepted at main `5260b40c06f6a25652530c6a63db35048ec0a619`, combining both required frozen parent chains. No new completed full-suite or Claude approval is claimed here.
+
+## PR167 recursive discovery checkpoint
+
+Read Run B at `652987c227529ec61fa64319b6796160a5cebea1` after all27 actual open-PR inventories/refreshed refs. Added B-V01, bringing the normalized inventory to38. The handoff distinguishes missing initial Venues UI/null-capacity validation, subpath navigation, and PR160's remaining uses omission. Pure source probes establish these findings; no live migration, runtime UAT or new writes are attributed to this work. Parent branches stay frozen.
+
+PR167 is ready for Claude at `af6065e30c667b453f72b27ffbdec742ceaac92f`, full1179 Node/LORD and local/CI80-product verification green. B-R01 remains implementing; its necessary test-only scope supplement is on main at `2e62819640458b9b78438158d1785e570b88d346`. Existing document-head CI43674984404 passed; a new prose head needs its own CI/review. Updated validator checks38 IDs and all pinned links; exact result and tested head belong to the PR. No application suite/build rerun for this documentation-only checkpoint.
