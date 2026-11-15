@@ -1,30 +1,41 @@
 # v1 owner change log — 15 November 2026
 
-- Status: draft documentation queue; V1-20261115-01 implementation separately claimed at `bef1ac8c1d5e310a3468b92b72da38d59e49aeb1`.
+- Status: documentation queue in [PR159](https://github.com/helper-gsps/gsis/pull/159); supplied ledger incorporated. First implementation is independently published as PR160, awaiting Claude's exact-head review.
 - Owner/model: Codex. Coordinator: ChatGPT (v1). Independent reviewer: Claude.
-- Last updated (Asia/Singapore): 15 November 2026, 08:48.
-- Branch: `codex/v1-changelog-20261115`.
-- Base/source inspected: `26bbccd229962700409bb6e9c80b1e9bec170d20`.
-- Current documentation head and PR: use the draft PR for `codex/v1-changelog-20261115`; its body records the exact head without a self-referential hash here.
-- Owner request: “deploy is unable to publish, changelog for bug fix”, with a mobile screenshot showing a venue-metadata error and disabled publication retry.
+- Last updated (Asia/Singapore): 15 November 2026, 09:54.
+- Branch: `codex/v1-changelog-20261115`; documentation head before this update `eb4b4589e02aafa3cb775364ef7e9fea3eff83cc`. The PR body records the new exact head after commit.
+- Original source/base: `26bbccd229962700409bb6e9c80b1e9bec170d20`; current main at the coordinator's refresh `bef1ac8c1d5e310a3468b92b72da38d59e49aeb1`.
+- Initial owner request: “deploy is unable to publish, changelog for bug fix”, with a mobile screenshot. Subsequent request: read the data-clone UAT ledger as bug-fix input and work through reported fixes one by one.
 
 ## Exact documentation scope
 
 1. `docs/coordination/tasks/v1-changelog-20261115.md` (this claim and evidence).
-2. `docs/v1/accelerated-delivery/CHANGELOG_2026-11-15.md` (reported bug, source evidence and future acceptance criteria).
+2. `docs/v1/accelerated-delivery/CHANGELOG_2026-11-15.md` (reported bugs, chronological evidence, source diagnosis, ordered work and acceptance criteria).
 
-No application, test, generated, configuration or policy edits in this documentation task. No live receipt reads, publication retries, data writes, migration, merge or deployment. Owner subsequently said “read project chat data clone uat ledger, treat them as change log for bug fixes too. proceed to work on them one by one”; the first fix now has its own seven-path implementation claim and branch `codex/v1-deploy-venue-publication`. The separate project chat was inaccessible through current tools; owner asked for entries/Git handoff. Do not invent its findings. No screenshot or real operation identifier is committed.
+This existing claim remains documentation only. No application, test, generated, configuration or policy edits. No live receipt reads/retries, source or sink data access, migration, acceptance writes, provider activation, merge or deployment. Each implementation uses a separate bounded claim and PR; owner authorisation to fix reported bugs one by one does not turn the ledger's historical live-write permissions into new authority.
 
-## Start and ownership checks
+## Source provenance and current evidence
 
-Main refreshed at the base above. All 18 open PR file inventories checked: neither new path overlaps. In particular, PR144 deployment records, PR158 Contacts job and PR157 reviewer directive remain separate and unmerged. No existing 15 November v1 changelog/claim found on main or the refreshed PR inventory. This is a v1 documentation collection alongside those documents, not a concurrent implementation task. Root/current lane instructions retire Muse; the historical Muse wording in the v1 supplement does not reassign production responsibilities.
+The separate project conversation was initially inaccessible. The owner subsequently supplied `GSIS_FRONTEND_UAT_LEDGER.md`, dated 15 November 2026 Singapore time. Read and SHA-256 verified: `c4c0cb8786eced24b5ef3143c7d113369ddaf81dcba8728e27fb0a2a34c5a0f8`. All UAT001–UAT028 and ENV001–ENV004 are represented in source chronology. Raw staff data, school database/spreadsheet identifiers, operation references, screenshots and the raw attachment are not committed.
 
-Read applicable root/v1 instructions, workflow, lanes, status, owner directives, deployment records and engineering policies. Initial claim `8ec2315` landed on main through the workflow's claim-only exception and was re-read before editing the changelog. No skill execution is needed for this small documentation task; source inspection applies the existing explicit-error and recovery principles.
+Later reported migration of 161 active staff and 59 role definitions supersedes the early empty Contacts/catalogue observations. EO completeness, accepted personnel facts, Core identity links, LORD ownership/reference refresh and refreshed UI remain unverified. The ledger withdrew its broad clone-completion statement; this queue preserves that correction. Historical UAT013 data correction and other clone writes are recorded as reports, not repeated or treated as runtime acceptance. ENV failures are tooling evidence; UAT006/UAT025 export causes remain uncertain.
 
-## Verification and handoff
+Source diagnosis at implementation head `ab24739203f3bcc03c5b7e6c96f8fa2144a84654` identifies the UAT019 frontend draft-status mismatch, UAT004 aborted-receipt mapping dereference, LORD cart/trolley projection mismatch and distinct reminder/monitor timing gaps. UAT003/UAT026 overlap the separate direct-editing proposal PR158; UAT015 needs retesting after the reported catalogue migration. Missing accepted authority behind UAT016/UAT017/UAT028 must not be inferred from appointments or duties.
 
-Documentation checks passed: `git diff --check 26bbccd229962700409bb6e9c80b1e9bec170d20`; `TZ=Asia/Singapore python3` scope/link checker (complete rerunnable command in PR body) verified exactly the two allowed documents, all six links/source anchors and no operation UUID. Source statements were inspected against the pinned commit. Repeat these checks at the final documentation head and record it in the PR. Main CI has successful full/product runs 43649420498 / 43649422660; later full-suite run 43652367183 was cancelled. These are historical base results, not bug reproduction or new-head validation. No application build/tests or live UAT run for this report; application checks and exact-head CI are not claimed passed for the documentation branch.
+First fix: [PR160](https://github.com/helper-gsps/gsis/pull/160), branch `codex/v1-deploy-venue-publication`, exact head [`ab24739203f3bcc03c5b7e6c96f8fa2144a84654`](https://github.com/helper-gsps/gsis/commit/ab24739203f3bcc03c5b7e6c96f8fa2144a84654). Coordinator reports exact-head CI green for 75 product programs and 1,174 full Node programs; LORD checks pass 40/40. Focused source/UI reproduction, eight Worker/D1 groups, six built mobile-browser groups and canonical-build/no-drift evidence belong to that PR. Claude review is Pending; no merge/deployment or original live recovery is claimed.
 
-Q01 Pass: bounded documentation claim and overlap check. Q02–Q04 Pass for documentation: source-pinned report preserves domain ownership, publication uncertainty and the original operation identity; future runtime verification remains pending. Q05 Not applicable: no runtime resources/dependencies change; no skill executed. Q06 Pass for documentation checks only; unrun implementation/CI checks remain pending if this draft is proposed for merge. Q07 Pending: Claude review at the published exact head. Q08 Not applicable: no release action authorised. Rollback removes only the documentation entry; it cannot undo any live publication.
+Next sequential implementation order: UAT019 (claim `7b5f1eb2a9c12b9d27ffd9dab4de694f8885aefd`, branch `codex/v1-deploy-draft-status`), UAT004 recovery, then UAT014 save/navigation. LORD booking groups, five-minute reminders and overdue monitoring remain separate scopes. Contacts direct editing stays coordinated with PR158. The queue names closure evidence and domain owners; it does not silently absorb those implementations.
 
-Next: record separately verified fix progress and import the requested UAT ledger once supplied; Claude reviews exact heads. First implementation is independently claimed; later items remain unknown until the ledger is read. No merge/deployment approval is inferred. F5 remains OPEN. Official T1B-01/T1B-02 and unperformed runtime UAT remain Not tested.
+## Claim and overlap checks
+
+Initial claim `8ec2315` landed on main through the workflow's claim-only exception before the first changelog edit. Applicable root/v1 instructions, workflow, lanes, status, owner directives, deployments and engineering policies were read. The original refresh checked all 18 open PR file inventories. For this update, the coordinator refreshed main at `bef1ac8c1d5e310a3468b92b72da38d59e49aeb1` and checked all 20 actual open-PR file inventories: no competing change to these two paths. PR158's Contacts job and PR160's implementation remain separate. This update uses the existing PR159 claim, not another implementation allocation.
+
+Current lane instructions retire Muse; historical Muse wording in the v1 supplement does not reassign production responsibility. No skill execution was needed for this bounded documentation task. Read-only diagnosis applies existing explicit-error, ownership and recovery principles; third-party skill execution is not claimed.
+
+## Verification, review and rollback
+
+Historical initial-document validation passed whitespace, two-path scope, six links/source anchors and absence of an operation UUID. Those checks do not validate the new ledger update. This update verified the attachment digest and inspected source statements against the pinned implementation head. Final documentation validation passed: exact two-path scope, 25 links/source anchors, all 28 UAT and four ENV IDs appearing once as inventory rows, no operation UUIDs, and `git diff --check`. The complete rerunnable Python command is included in PR159. Claude's exact-head review remains Pending. No application build/test run is attributed to this documentation task; PR160's engineering evidence is recorded separately.
+
+Q01 Pass: existing bounded documentation claim and refreshed overlap check. Q02–Q04 Pass for source/provenance and acceptance design only: authority, historical reports, unknown receipts, later superseding evidence and readiness dependencies remain distinct. Q05 Not applicable: no runtime resource/dependency change or skill execution. Q06 Pass for documentation validation only; application suites were not rerun for this prose-only branch and no runtime UAT pass is implied. Q07 Pending: Claude review of the new published documentation head. Q08 Not applicable: no release action. Rollback removes this documentation update only; it does not undo data corrections, publications or receipts.
+
+Publish the two validated documentation files and record their exact head in PR159. No merge/deployment approval is inferred. F5 remains **OPEN**. Official T1B-01/T1B-02 and all unperformed runtime UAT remain **Not tested**.
