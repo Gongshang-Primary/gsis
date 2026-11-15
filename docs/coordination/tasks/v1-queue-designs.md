@@ -1,6 +1,6 @@
 # v1-queue-designs — Packages B–D and results index
 
-- Status: claimed; design/documentation only, owner-authorised 13 November 2026 SGT.
+- Status: merged (PR134, 02c237cf56cc1805675c0357646087e2c29fc724); historical claim: design/documentation only, owner-authorised 13 November 2026 SGT.
 - Model/owner: Codex; coordinator ChatGPT v1; independent exact-head reviewer Claude.
 - Branch: codex/v1-queue-designs
 - Base: f7014a1 (main after Package A claim); source implementation baseline e996dfdb3a69bee76355ba60500468679d0963de.
@@ -40,3 +40,7 @@ TZ=Asia/Singapore git diff --check f7014a1 HEAD
 Full build/regression checks are run for A, not claimed as local B–D implementation tests. No build input changed in this design branch. Final PR/head and exact-head CI results are GitHub handoff evidence; each new head requires Claude review. Reverting these five documents has no runtime/data effect. No merge authorised.
 
 Package A exact-head CI run 43313064264 completed successfully: all four shards and full-suite green at `0213160a7d45810849d5ed859818d09c55bdb4e2`. Results index updated. This does not establish B–D durable behaviour; documentation exact-head CI and Claude review remain separate. Publication PR134; final documentation head is available in that PR.
+
+## Claim closed — 13 November 2026 SGT
+
+Owner authorised merge; PR#134 merged as `02c237cf56cc1805675c0357646087e2c29fc724` after Claude exact-head approval and green four-shard/full-suite CI. Not deployed. Earlier pending-review/merge statements are historical. Follow-up policy/design task: v1-contacts-policy-update; no B–D implementation authorised.
