@@ -125,7 +125,7 @@ export async function loadState(
     );
   }
   let sql =
-    "SELECT * FROM roster_records WHERE school_id=? AND (service_date IS NULL OR service_date BETWEEN ? AND ?)";
+    "SELECT * FROM roster_records WHERE school_id=? AND (collection='types' OR service_date IS NULL OR service_date BETWEEN ? AND ?)";
   const args = [schoolId, range.from, range.to];
   if (recordIds.length) {
     sql =
@@ -152,9 +152,42 @@ export async function loadState(
   state.systemConfig.consecutiveCountExclusions = [
     { type: "exact", value: "BLK" },
   ];
-  const seen = new Set();
+  const seen = new Set(),
+    typeOrder = [];
   for (const row of records) {
-    const { kind, data } = JSON.parse(row.payload_json);
+    let payload;
+    try {
+      payload = JSON.parse(row.payload_json);
+    } catch (error) {
+      if (row.collection === "types")
+        throw new ApiError("TYPE_ORDER_INTEGRITY", 503);
+      throw error;
+    }
+    if (row.collection === "types")
+      requireValue(
+        payload && typeof payload === "object" && !Array.isArray(payload),
+        "TYPE_ORDER_INTEGRITY",
+        503,
+      );
+    const { kind, data } = payload;
+    if (row.collection === "types") {
+      requireValue(
+        kind === "array" &&
+          data?.id === row.record_id &&
+          typeof data.id === "string" &&
+          /^[a-zA-Z0-9_-]{1,60}$/.test(data.id) &&
+          row.service_date == null &&
+          row.staff_id == null &&
+          row.year == null,
+        "TYPE_ORDER_INTEGRITY",
+        503,
+      );
+      typeOrder.push({
+        data,
+        positioned: Object.hasOwn(payload, "position"),
+        position: payload.position,
+      });
+    }
     if (!seen.has(row.collection)) {
       state[row.collection] =
         kind === "array" ? [] : kind === "map" ? {} : data;
@@ -164,6 +197,25 @@ export async function loadState(
     else if (kind === "map") state[row.collection][row.record_id] = data;
     else state[row.collection] = data;
   }
+  requireValue(typeOrder.length <= 80, "TYPE_ORDER_INTEGRITY", 503);
+  if (typeOrder.some((row) => row.positioned)) {
+    requireValue(
+      typeOrder.every(
+        (row) =>
+          row.positioned &&
+          Number.isSafeInteger(row.position) &&
+          row.position >= 0 &&
+          row.position < typeOrder.length,
+      ) &&
+        new Set(typeOrder.map((row) => row.position)).size === typeOrder.length,
+      "TYPE_ORDER_INTEGRITY",
+      503,
+    );
+    state.types = typeOrder
+      .sort((a, b) => a.position - b.position)
+      .map((row) => row.data);
+  }
+  // Entirely unmarked legacy types retain the query's stable record-ID order.
   const jobs = await query(
     db,
     `SELECT * FROM product_outbox WHERE school_id=? AND type='roster-notification' AND json_extract(payload_json,'$.date') BETWEEN ? AND ? ORDER BY due_at LIMIT 1001`,
@@ -231,22 +283,112 @@ export async function loadState(
     before: flatten(state),
   };
 }
-export async function recordChanges(schoolId, before, state, records, { maxWrites = 1500 } = {}) {
-  const next = flatten(state),
+const administrativeSaves = new Set(["saveSystemConfig", "saveTypes"]);
+const recordPresent =
+  "SELECT EXISTS(SELECT 1 FROM roster_records WHERE school_id=? AND collection=? AND record_id=? AND revision=?) AS ok";
+const recordAbsent =
+  "SELECT NOT EXISTS(SELECT 1 FROM roster_records WHERE school_id=? AND collection=? AND record_id=?) AS ok";
+const recordDeleteRevision =
+  "SELECT revision=? AS ok FROM roster_records WHERE school_id=? AND collection=? AND record_id=?";
+const recordInsert =
+  "INSERT INTO roster_records(school_id,collection,record_id,service_date,staff_id,year,revision,payload_json) VALUES(?,?,?,?,?,?,?,?) ON CONFLICT(school_id,collection,record_id) DO UPDATE SET service_date=excluded.service_date,staff_id=excluded.staff_id,year=excluded.year,revision=excluded.revision,payload_json=excluded.payload_json";
+const recordDelete =
+  "DELETE FROM roster_records WHERE school_id=? AND collection=? AND record_id=?";
+export async function recordChanges(
+  schoolId,
+  before,
+  state,
+  records,
+  { maxWrites = 1500, administrativeSave } = {},
+) {
+  if (administrativeSave !== undefined)
+    requireValue(
+      administrativeSaves.has(administrativeSave),
+      "ADMIN_SAVE_OPERATION",
+      500,
+    );
+  const orderedTypes = administrativeSave === "saveTypes";
+  if (orderedTypes)
+    requireValue(
+      Array.isArray(state.types) &&
+        state.types.length > 0 &&
+        state.types.length <= 80 &&
+        state.types.every(
+          (row) =>
+            typeof row.id === "string" && /^[a-zA-Z0-9_-]{1,60}$/.test(row.id),
+        ) &&
+        new Set(state.types.map((row) => row.id)).size === state.types.length,
+      "TYPE_BOUNDS",
+      400,
+    );
+  if (administrativeSave)
+    requireValue(
+      records.every((row) => row.school_id === schoolId),
+      "SCHOOL_MISMATCH",
+      403,
+    );
+  const positions = orderedTypes
+      ? new Map(state.types.map((row, i) => [row.id, i]))
+      : null,
+    next = flatten(state),
     known = new Map(records.map((r) => [r.collection + "|" + r.record_id, r])),
     guards = [],
     writes = [];
   for (const [key, row] of next) {
-    const old = before.get(key);
-    if (old && canonical(old.data) === canonical(row.data)) continue;
-    const stored = known.get(key),
-      version = stored?.revision || 0;
-    guards.push({
-      sql: "SELECT COALESCE((SELECT revision FROM roster_records WHERE school_id=? AND collection=? AND record_id=?),0)=? AS ok",
-      args: [schoolId, row.collection, row.id, version],
-    });
+    const old = before.get(key),
+      stored = known.get(key),
+      storedPayload =
+        row.collection === "types" && administrativeSave && stored
+          ? JSON.parse(stored.payload_json)
+          : null,
+      position =
+        orderedTypes && row.collection === "types"
+          ? positions.get(row.id)
+          : storedPayload?.position,
+      positionChanged =
+        orderedTypes &&
+        row.collection === "types" &&
+        (!storedPayload ||
+          !Object.hasOwn(storedPayload, "position") ||
+          storedPayload.position !== position),
+      missingConfig =
+        administrativeSave === "saveSystemConfig" &&
+        row.collection === "systemConfig" &&
+        !stored;
+    // An explicit settings save must establish the complete validated map;
+    // loading a partially stored map does not retain its in-memory defaults.
+    if (
+      old &&
+      canonical(old.data) === canonical(row.data) &&
+      !positionChanged &&
+      !missingConfig
+    )
+      continue;
+    const version = stored?.revision || 0;
+    if (administrativeSave) {
+      requireValue(
+        !stored ||
+          (Number.isSafeInteger(stored.revision) &&
+            stored.revision >= 0 &&
+            stored.revision < Number.MAX_SAFE_INTEGER),
+        "RECORD_INTEGRITY",
+        503,
+      );
+      guards.push(
+        stored
+          ? {
+              sql: recordPresent,
+              args: [schoolId, row.collection, row.id, stored.revision],
+            }
+          : { sql: recordAbsent, args: [schoolId, row.collection, row.id] },
+      );
+    } else
+      guards.push({
+        sql: "SELECT COALESCE((SELECT revision FROM roster_records WHERE school_id=? AND collection=? AND record_id=?),0)=? AS ok",
+        args: [schoolId, row.collection, row.id, version],
+      });
     writes.push({
-      sql: "INSERT INTO roster_records(school_id,collection,record_id,service_date,staff_id,year,revision,payload_json) VALUES(?,?,?,?,?,?,?,?) ON CONFLICT(school_id,collection,record_id) DO UPDATE SET service_date=excluded.service_date,staff_id=excluded.staff_id,year=excluded.year,revision=excluded.revision,payload_json=excluded.payload_json",
+      sql: recordInsert,
       args: [
         schoolId,
         row.collection,
@@ -255,7 +397,15 @@ export async function recordChanges(schoolId, before, state, records, { maxWrite
         row.staffId,
         row.year,
         version + 1,
-        canonical({ kind: row.kind, data: row.data }),
+        canonical({
+          kind: row.kind,
+          data: row.data,
+          ...(row.collection === "types" &&
+          administrativeSave &&
+          position !== undefined
+            ? { position }
+            : {}),
+        }),
       ],
     });
   }
@@ -263,16 +413,141 @@ export async function recordChanges(schoolId, before, state, records, { maxWrite
     if (!next.has(key) && known.has(key)) {
       const stored = known.get(key);
       guards.push({
-        sql: "SELECT revision=? AS ok FROM roster_records WHERE school_id=? AND collection=? AND record_id=?",
+        sql: recordDeleteRevision,
         args: [stored.revision, schoolId, row.collection, row.id],
       });
       writes.push({
-        sql: "DELETE FROM roster_records WHERE school_id=? AND collection=? AND record_id=?",
+        sql: recordDelete,
         args: [schoolId, row.collection, row.id],
       });
     }
+  if (orderedTypes) {
+    const prior = records.filter((row) => row.collection === "types");
+    // Guard unchanged members too: positions describe the complete collection.
+    for (const row of prior) {
+      requireValue(
+        Number.isSafeInteger(row.revision) && row.revision >= 0,
+        "RECORD_INTEGRITY",
+        503,
+      );
+      guards.push({
+        sql: recordPresent,
+        args: [schoolId, "types", row.record_id, row.revision],
+      });
+    }
+    guards.push({
+      sql: "SELECT NOT EXISTS(SELECT 1 FROM roster_records WHERE school_id=? AND collection='types' AND record_id NOT IN(SELECT value FROM json_each(?))) AS ok",
+      args: [schoolId, canonical(prior.map((row) => row.record_id))],
+    });
+  }
   requireValue(writes.length <= maxWrites, "WRITE_BOUNDS", 413);
   return { guards, writes };
+}
+/** Only these two admin saves compact records, after accounting derived its guards. */
+export function compactAdministrativeSave(schoolId, operation, plan) {
+  requireValue(administrativeSaves.has(operation), "ADMIN_SAVE_OPERATION", 500);
+  const expected = [],
+    upserts = [],
+    deletes = [],
+    guards = [],
+    writes = [];
+  const scoped = (args, index = 0) =>
+    requireValue(args[index] === schoolId, "SCHOOL_MISMATCH", 403);
+  for (const guard of plan.guards) {
+    if (guard.sql === recordPresent) {
+      scoped(guard.args);
+      expected.push([...guard.args.slice(1), true]);
+    } else if (guard.sql === recordAbsent) {
+      scoped(guard.args);
+      expected.push([...guard.args.slice(1), null, false]);
+    } else if (guard.sql === recordDeleteRevision) {
+      scoped(guard.args, 1);
+      expected.push([guard.args[2], guard.args[3], guard.args[0], true]);
+    } else guards.push(guard);
+  }
+  for (const write of plan.writes) {
+    if (write.sql === recordInsert) {
+      scoped(write.args);
+      upserts.push(write.args.slice(1));
+    } else if (write.sql === recordDelete) {
+      scoped(write.args);
+      deletes.push(write.args.slice(1));
+    } else writes.push(write);
+  }
+  if (expected.length)
+    guards.push({
+      sql: "SELECT NOT EXISTS(SELECT 1 FROM json_each(?) x LEFT JOIN roster_records r ON r.school_id=? AND r.collection=json_extract(x.value,'$[0]') AND r.record_id=json_extract(x.value,'$[1]') WHERE (json_extract(x.value,'$[3]')=1 AND (r.record_id IS NULL OR r.revision<>json_extract(x.value,'$[2]'))) OR (json_extract(x.value,'$[3]')=0 AND r.record_id IS NOT NULL)) AS ok",
+      args: [
+        canonical([
+          ...new Map(expected.map((row) => [canonical(row), row])).values(),
+        ]),
+        schoolId,
+      ],
+    });
+  if (upserts.length)
+    writes.push({
+      sql: "INSERT INTO roster_records(school_id,collection,record_id,service_date,staff_id,year,revision,payload_json) SELECT ?,json_extract(value,'$[0]'),json_extract(value,'$[1]'),json_extract(value,'$[2]'),json_extract(value,'$[3]'),json_extract(value,'$[4]'),json_extract(value,'$[5]'),json_extract(value,'$[6]') FROM json_each(?) WHERE 1 ON CONFLICT(school_id,collection,record_id) DO UPDATE SET service_date=excluded.service_date,staff_id=excluded.staff_id,year=excluded.year,revision=excluded.revision,payload_json=excluded.payload_json",
+      args: [schoolId, canonical(upserts)],
+    });
+  if (deletes.length)
+    writes.push({
+      sql: "DELETE FROM roster_records WHERE school_id=? AND EXISTS(SELECT 1 FROM json_each(?) x WHERE json_extract(x.value,'$[0]')=roster_records.collection AND json_extract(x.value,'$[1]')=roster_records.record_id)",
+      args: [schoolId, canonical(deletes)],
+    });
+  const unique = [
+      ...new Map(guards.map((guard) => [canonical(guard), guard])).values(),
+    ],
+    ordinary = unique.filter((guard) => guard.deadlineAt === undefined),
+    timed = unique.filter((guard) => guard.deadlineAt !== undefined),
+    args = ordinary.flatMap((guard) => guard.args || []),
+    combined = ordinary.length
+      ? [
+          {
+            sql:
+              "SELECT " +
+              ordinary
+                .map(
+                  (guard) =>
+                    "COALESCE((SELECT ok FROM (" + guard.sql + ") LIMIT 1),0)",
+                )
+                .join(" AND ") +
+              " AS ok",
+            args,
+          },
+        ]
+      : [],
+    finalGuards = [...combined, ...timed],
+    outbox = plan.outbox || [],
+    encoder = new TextEncoder(),
+    byteLength = (value) => encoder.encode(value).length;
+  // Reserve space for fixed operation/admission guards and receipt metadata. Count
+  // every repeated bound value, not just distinct JSON or JavaScript characters.
+  const boundBytes =
+    [...finalGuards, ...writes].reduce(
+      (total, item) =>
+        total +
+        (item.args || []).reduce(
+          (sum, value) =>
+            sum + (typeof value === "string" ? byteLength(value) : 8),
+          0,
+        ),
+      0,
+    ) +
+    byteLength(canonical(plan.result)) +
+    byteLength(canonical(plan.audit || {})) +
+    outbox.reduce((sum, job) => sum + byteLength(canonical(job.payload)), 0);
+  requireValue(
+    args.length <= 98 &&
+      writes.every((write) => (write.args || []).length <= 99) &&
+      [...finalGuards, ...writes].every(
+        (item) => item.sql === undefined || byteLength(item.sql) < 100000,
+      ) &&
+      finalGuards.length * 2 + writes.length + outbox.length <= 20 &&
+      boundBytes <= 1024 * 1024 - 8192,
+    "ADMIN_SAVE_BOUNDS",
+    413,
+  );
+  return { ...plan, guards: finalGuards, writes };
 }
 export async function scopeRevision(db, schoolId, scope) {
   return (

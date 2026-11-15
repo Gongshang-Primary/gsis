@@ -2423,6 +2423,7 @@ export async function internal(ctx) {
         "roster.write",
         "roster.publish",
         "roster.allocate",
+        "roster.admin",
         "venues.read",
         "venues.book",
         "calendar.read",

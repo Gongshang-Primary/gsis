@@ -775,6 +775,47 @@ function updateRosterCapacity(source){
  walk(ast);if(matches.length!==1)throw Error('Roster health renderer baseline changed');
  const node=matches[0];return source.slice(0,node.start)+'function healthSummary(s,h){return window.GSISV1RosterCapacity.render(s,h);}' +source.slice(node.end);
 }
+// Native settings consume complete saved views. Check the original operation's
+// committed view before native cleanup; this is not a second receipt protocol.
+function updateRosterAdminSettings(source, settings) {
+ const confirmation = function rosterAdminSaveConfirmed(data, input) {
+  const object = value => !!value && typeof value === 'object' && !Array.isArray(value);
+  const equal = (left, right) => {
+   if (left === right) return true;
+   if (Array.isArray(left)) return Array.isArray(right) && left.length === right.length && left.every((value, index) => equal(value, right[index]));
+   if (!object(left) || !object(right)) return false;
+   const keys = Object.keys(left);
+   return keys.length === Object.keys(right).length && keys.every(key => Object.hasOwn(right, key) && equal(left[key], right[key]));
+  };
+  const receipt = data?.receipt, committed = receipt?.result, revision = input.revision + 1;
+  if (!Number.isSafeInteger(input.revision) || input.revision < 0 || !Number.isSafeInteger(revision) || !object(data) || !object(committed) || receipt.state !== 'committed' || receipt.operationId !== input.requestId || !Number.isSafeInteger(receipt.fence) || receipt.fence < 1 || !/^[a-f0-9]{64}$/.test(receipt.digest || '')) return false;
+  for (const view of [data, committed]) if (view.requestId !== input.requestId || view.revision !== revision || view.acceptedRevision !== revision || !Array.isArray(view.savedIds)) return false;
+  if (!equal(data.savedIds, committed.savedIds)) return false;
+  if (input.operation === 'saveTypes') {
+   const ids = input.types?.map(type => type.id);
+   for (const view of [data, committed]) if (view.date !== input.date || !Array.isArray(view.types) || !Array.isArray(view.periods) || !equal(view.types.map(type => type?.id), ids) || !view.types.every(type => object(type) && typeof type.id === 'string' && !!type.id && typeof type.label === 'string' && ['requiresDetail', 'allowSelectAll', 'todayOnly'].every(key => typeof type[key] === 'boolean') && (type.allowedPeriods === null || Array.isArray(type.allowedPeriods)) && ['afterMinutes', 'minStartMinutes'].every(key => type[key] === null || Number.isSafeInteger(type[key])))) return false;
+   return equal(data.types, committed.types) && equal(data.periods, committed.periods);
+  }
+  const arrays = ['periods', 'employmentTypes', 'subjects', 'consecutiveSubjects', 'teachingGroups', 'preferenceRules'];
+  const configArrays = ['allocationPreferences', 'consecutiveSubjectRules', 'consecutiveCountExclusions', 'noReliefSubjects', 'subjectFamilies', 'teachingGroupOverrides', 'reliefHealthPeriods', 'employmentPeriodRestrictions', 'sharedSubjectCoverSubjects'];
+  for (const view of [data, committed]) {
+   if (view.canEdit !== true || !view.savedIds.includes('systemConfig') || !object(view.config) || !arrays.every(key => Array.isArray(view[key])) || !(view.baseline === null || object(view.baseline)) || typeof view.schedulerAvailable !== 'boolean' || !(view.nameBridges === null || object(view.nameBridges))) return false;
+   const config = view.config;
+   if (!configArrays.every(key => Array.isArray(config[key])) || !object(config.allocationRuleEnabled) || !object(config.smcSummaryTimes) || !['morning', 'evening'].every(key => Array.isArray(config.smcSummaryTimes[key]))) return false;
+   if (!['googleBackupLagMinutes', 'maxDailyPeriods', 'maxConsecutivePeriods', 'maxDailyReliefPeriods', 'adhocReliefMaxPeriods'].every(key => Number.isSafeInteger(config[key])) || !['scheduledAllocationEnabled', 'allowAdvancePublishing', 'verboseLogging', 'sharedSubjectCoverEnabled'].every(key => typeof config[key] === 'boolean')) return false;
+   const backup = config.driveBackup, daily = config.driveDaily;
+   if (!object(backup) || typeof backup.enabled !== 'boolean' || !Number.isSafeInteger(backup.sizeAlertMiB) || !['homeBaseFolderId', 'folderId', 'continuitySheetId'].every(key => typeof backup[key] === 'string') || !object(daily) || typeof daily.enabled !== 'boolean' || !['folderId', 'auditFolderId'].every(key => typeof daily[key] === 'string')) return false;
+  }
+  return ['canEdit', 'config', ...arrays, 'baseline', 'schedulerAvailable', 'nameBridges'].every(key => equal(data[key], committed[key]));
+ };
+ const anchor = settings ? ' function reportSaveConfirmed(data,request){' : ' async function sendPending(s,checkReceipt=false,task=pendingFor(s)){';
+ source = replaceOnce(source, anchor, ' ' + confirmation.toString() + '\n' + anchor, 'Roster administrative complete-view confirmation');
+ if (settings) {
+  source = replaceOnce(source, "const data=await s.ctx.api('operations',request.input);", "const data=await s.ctx.api('operations',request.input);if(request.input.operation==='saveSystemConfig'&&!rosterAdminSaveConfirmed(data,request.input))throw Error('The saved system settings could not be confirmed. Retry the same request.');", 'Roster System Config confirmation before pending cleanup');
+  source = replaceOnce(source, "if(s.ctx.profile.user.admin&&validateWorkloadRules(s)&&validateSummaryTimes(s)&&validateSubjectBusiness(s)&&validateConsecutiveRules(s))save(s,'saveSystemConfig',d);", `if(!s.ctx.profile.user.admin)return;try{if(!validateSummaryTimes(s)||!validateSubjectBusiness(s))return;const payload=copy(d);for(const key of ['allocationRuleEnabled','allocationPreferences','maxDailyPeriods','maxConsecutivePeriods','maxDailyReliefPeriods','adhocReliefMaxPeriods','consecutiveSubjectRules']){if(Object.hasOwn(s.data.config,key))payload[key]=copy(s.data.config[key]);else delete payload[key];}save(s,'saveSystemConfig',payload);}catch(error){message(s,error.message||'Check the settings before saving.',true);}`, 'Roster editable settings validate without changing hidden compatibility fields');
+ } else source = replaceOnce(source, 'const result=await s.ctx.api(task.route,task.payload);', "const result=await s.ctx.api(task.route,task.payload);if(task.payload.operation==='saveTypes'&&!rosterAdminSaveConfirmed(result,task.payload))throw Error('The saved absence types could not be confirmed. Retry the same request.');", 'Roster absence-type confirmation before pending cleanup');
+ return source;
+}
 // Resolve only the two established legacy subject pairs. Keep exact source
 // identities and detect contradictory definitions before serializing v1 XML.
 function updateAscSubjectIdentity(source) {
@@ -946,11 +987,12 @@ function transform(module,rel,text){
   }
   if(module.id==='roster')text=text.replaceAll('href="/archive.html"','href="/roster/archive.html"');
   if(module.id==='roster'&&rel==='roster-settings-ui.js'){
-   for(const attr of ['data-workload-rules','data-consecutive-rules','data-consecutive-exclusions','data-preferences','data-default-preferences'])text=text.replaceAll(attr+' class=',attr+' hidden class=').replaceAll(attr+'>',attr+' hidden>');
+   for(const attr of ['data-workload-rules','data-consecutive-rules','data-preferences','data-default-preferences'])text=text.replaceAll(attr+' class=',attr+' hidden class=').replaceAll(attr+'>',attr+' hidden>');
    text=text.replaceAll('Annual R utilisation is first by default; same subject is last by default.','Layer settings below use daily capacity first by default.');
    text=text.replaceAll('<h4>Business preferences</h4>','<h4>Allocation layers</h4><p>Use Allocation layers and duties done below for the current per-layer limits, subject continuity and preference order. These settings replace the older annual-utilisation preferences.</p>');
+   text=updateRosterAdminSettings(text,true);
   }
-  if(module.id==='roster'&&rel==='roster-operations-ui.js')text=updateRosterCapacity(text);
+  if(module.id==='roster'&&rel==='roster-operations-ui.js')text=updateRosterAdminSettings(updateRosterCapacity(text),false);
   if(module.id==='deploy'&&rel==='app.js')text=updateDeploy(text);
   if(module.id==='deploy'&&rel==='app.js')text=updateAscSubjectIdentity(text);
   if(module.id==='deploy'&&rel==='teaching-rules.js'){
