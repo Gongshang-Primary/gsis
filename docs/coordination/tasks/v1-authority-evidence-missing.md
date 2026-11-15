@@ -1,6 +1,6 @@
 # v1-authority-evidence-missing — Package A
 
-- Status: claimed; implementation authorised by owner 13 November 2026 SGT.
+- Status: merged (PR133, 31886aca543305d4605261044a7cd8f13ea474d5); historical claim: implementation authorised by owner 13 November 2026 SGT.
 - Model/owner: Codex; coordinator ChatGPT v1; independent exact-head reviewer Claude.
 - Branch: codex/v1-authority-evidence-missing
 - Refreshed main/base: e996dfdb3a69bee76355ba60500468679d0963de
@@ -27,3 +27,7 @@ Commands: `TZ=Asia/Singapore AUTHORITY_MISSING_BASE_SHA=e996dfdb3a69bee76355ba60
 Environment failures retained: initial `npm ci` failed because default /home/agent/.npm cache could not be created; isolation/unchanged-regression attempt then lacked acorn and initial build failed. `npm ci --cache /tmp/gsis-a-npm-cache` installed the locked 86 packages; all focused/regression/build checks above were rerun successfully. No dependency/lockfile edits. Full suite and exact-head CI pending; browser installation is local test setup only.
 
 Q01–Q05: scope/trace, explicit failure/privacy, unchanged revisions/recovery limits, resource/dependency inspection pass. Q06: focused/build/discovery pass; full-suite/CI pending. Q07: Claude review pending. Q08: no release; all runtime UAT Not tested. F5 OPEN. Scope/readiness does not imply durable storage or implementation of B–D.
+
+## Claim closed — 13 November 2026 SGT
+
+Owner authorised merge; PR#133 merged as `31886aca543305d4605261044a7cd8f13ea474d5` after Claude exact-head approval and green four-shard/full-suite CI. Not deployed. Earlier pending-review/merge statements are historical. Follow-up policy/design task: v1-contacts-policy-update; no B–D implementation authorised.
