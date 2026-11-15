@@ -237,7 +237,146 @@ function updateContacts(source){
  source+=`\nwindow.addEventListener('gsis:clear-protected-state',()=>{loginAttempt++;loginAbort?.abort();clearContactsPersonalState();token='';state=null;visible=[];dataSaving=false;dataRequest=null;recoveryBusy=false;resetContactRecovery();$('dataGrid').inert=false;$('contactRows').replaceChildren();$('accessRows').replaceChildren();$('app').classList.add('hidden');});`;
  return source;
 }
+// Fortnight inputs have their own raw draft; the existing queue still owns every
+// staged edit and submitted operation. Other editors retain the legacy controls.
+function updateFortnightEditor(source) {
+ const helpers = [
+  function fortnightInputState(input) {
+   const field = input.dataset.splitField;
+   const expected = v()?.fortnight?.[input.dataset.splitRow]?.[field] ?? '';
+   input.setCustomValidity('');
+   const value = field === 'remarks' ? input.value : input.value === '' ? '' : Number(input.value);
+   const invalid = field === 'remarks'
+    ? value.length > 4000
+    : input.validity.badInput || value !== '' && (!Number.isInteger(value) || value < 0 || value > 200);
+   const message = invalid ? field === 'remarks'
+    ? 'Use up to 4000 characters for remarks.'
+    : 'Use a whole number of lesson blocks from 0 to 200, or leave it blank.' : '';
+   if (!input.disabled) input.setCustomValidity(message);
+   return {input, field, expected, value, invalid: !input.disabled && invalid,
+    dirty: !input.disabled && (invalid || value !== expected), message: input.disabled ? '' : message};
+  },
+  function fortnightDraftState() {
+   if (tab !== 'Fortnight Split') return [];
+   return [...el('content').querySelectorAll('[data-split-field]')].map(fortnightInputState);
+  },
+  function syncFortnightDraft() {
+   if (tab !== 'Fortnight Split') return;
+   unsavedDraft = fortnightDraftState().some(input => input.dirty);
+   drawQueueStatus();
+  },
+  function stageFortnightInput(input) {
+   const state = fortnightInputState(input);
+   if (state.invalid || queueFlight || !token || !kp()) { syncFortnightDraft(); return false; }
+   if (!state.dirty) { syncFortnightDraft(); return true; }
+   const row = input.dataset.splitRow;
+   const earlier = cellQueue.find(edit => edit.operation === 'setFortnight' && edit.row === row && edit.field === state.field);
+   if (earlier && state.value === earlier.expected) {
+    cellQueue = cellQueue.filter(edit => edit !== earlier);
+    viewEpoch++;
+    invalidatePendingProjection();
+    applyPendingProjection();
+   } else {
+    queueCell({operation: 'setFortnight', row, field: state.field, value: state.value, expected: state.expected});
+   }
+   syncFortnightDraft();
+   return !fortnightInputState(input).dirty;
+  },
+  function stageFortnightInputs() {
+   if (queueFlight || !token || !kp()) return false;
+   const states = fortnightDraftState();
+   const invalid = states.find(input => input.invalid);
+   if (invalid) { syncFortnightDraft(); invalid.input.reportValidity(); return false; }
+   for (const state of states) if (state.dirty) state.input.dispatchEvent(new Event('change', {bubbles: true}));
+   syncFortnightDraft();
+   return !unsavedDraft;
+  },
+  function wireFortnightEditor(root, update) {
+   root.querySelectorAll('[data-fortnight-toggle]').forEach(button => button.onclick = () => {
+    if (queueFlight || !token || !kp() || !stageFortnightInputs()) return;
+    queueCell({operation: 'setFortnight', row: button.dataset.fortnightToggle, field: 'enabled',
+     value: button.getAttribute('aria-checked') !== 'true', expected: v().fortnight[button.dataset.fortnightToggle]?.enabled ?? ''});
+    update(button.closest('tr'));
+    syncFortnightDraft();
+   });
+   root.querySelectorAll('[data-split-field]').forEach(input => {
+    input.oninput = syncFortnightDraft;
+    input.onchange = input.onblur = () => {
+     if (stageFortnightInput(input)) update(input.closest('tr'));
+    };
+   });
+  },
+  function drawQueueStatus() {
+   if (tab !== 'Fortnight Split') {
+    const bar = el('saveQueue');
+    if (bar) delete bar.dataset.fortnightEditor;
+    drawLegacyQueueStatus();
+    return;
+   }
+   persistClassDraft();
+   let bar = el('saveQueue');
+   if (!bar) { bar = document.createElement('div'); bar.id = 'saveQueue'; document.querySelector('.workspace-bar').append(bar); }
+   // Stable controls preserve the button receiving a click while input blur
+   // stages its edit. Replacing that button during blur loses the click.
+   if (!bar.dataset.fortnightEditor) {
+    bar.dataset.fortnightEditor = 'true';
+    bar.replaceChildren();
+    const status = document.createElement('span');
+    status.setAttribute('role', 'status');
+    const save = button('Save to online', () => {
+     if (!token || !kp()) return;
+     if (queueFlight) { pumpQueue(true); return; }
+     if (!stageFortnightInputs()) return;
+     document.activeElement?.blur();
+     pumpQueue(true);
+    });
+    save.dataset.fortnightSave = '';
+    const discard = button('Discard', () => {
+     if (queueFlight) return;
+     if (queuedEdits().length) { discardDrafts(); return; }
+     if (fortnightDraftState().some(input => input.dirty) && confirm('Discard unsaved Fortnight input?')) {
+      unsavedDraft = false;
+      render();
+     }
+    });
+    discard.dataset.fortnightDiscard = '';
+    const review = button('Review', resolveQueue);
+    review.dataset.fortnightReview = '';
+    bar.append(status, save, discard, review);
+   }
+   const count = queuedEdits().length;
+   const raw = fortnightDraftState();
+   const dirty = raw.some(input => input.dirty);
+   const invalid = raw.find(input => input.invalid);
+   const error = teacherInputError() || teacherNameError(v()) || classRenameError();
+   bar.hidden = !(kp() || admin()) && !count && !dirty;
+   bar.querySelector('[role="status"]').textContent = error || invalid?.message || classDraftStorageError || queueError ||
+    (count ? (queueFlight ? queueFlight.running ? 'Saving' : 'Save unconfirmed' : 'Unsaved') + ' · ' + count + ' change(s)' : dirty ? 'Unsaved input' : 'No unsaved changes');
+   const save = bar.querySelector('[data-fortnight-save]');
+   save.textContent = queueError ? 'Retry save' : 'Save to online';
+   save.disabled = !token || !kp() || !(count || dirty) || !!queueFlight?.running || !!error || !!invalid;
+   bar.querySelector('[data-fortnight-discard]').disabled = !(count || dirty) || !!queueFlight;
+   bar.querySelector('[data-fortnight-review]').hidden = !queueError;
+   if (count) el('status').textContent = queueError ? 'Save needs attention' : queueFlight ? 'Saving…' : 'Unsaved changes';
+  },
+ ];
+ const ast = parse(source, {ecmaVersion: 'latest', sourceType: 'script'});
+ const page = ast.body.find(node => node.type === 'FunctionDeclaration' && node.id?.name === 'fortnightPage');
+ const status = ast.body.find(node => node.type === 'FunctionDeclaration' && node.id?.name === 'drawQueueStatus');
+ if (!page || !status) throw Error('Fortnight editor baseline changed');
+ const body = source.slice(page.start, page.end);
+ const handlers = body.match(/ root\.querySelectorAll\('\[data-fortnight-toggle\]'\)\.forEach\([^\n]+\n root\.querySelectorAll\('\[data-split-field\]'\)\.forEach\([^\n]+/);
+ if (!handlers) throw Error('Fortnight input handlers baseline changed');
+ const edits = [
+  [page.start, page.end, body.replace(handlers[0], ' wireFortnightEditor(root, update);')],
+  [status.id.start, status.id.end, 'drawLegacyQueueStatus'],
+ ];
+ for (const [start, end, replacement] of edits.sort((a, b) => b[0] - a[0])) source = source.slice(0, start) + replacement + source.slice(end);
+ return source + '\n' + helpers.map(helper => helper.toString()).join('\n');
+}
+
 function updateDeploy(source){
+ source=updateFortnightEditor(source);
  // The server is authoritative; preventing a forbidden editor here is an extra UX boundary.
  source=replaceOnce(source,"function compact(p){const v=p.profile||{},role=v.Role||p.role||'';return {id:p.id,name:v['Basic Name']||p.basicName||p.name||p.id,role,active:v.Active!=null?v.Active==='Y':p.active===true||p.active==='Y',groups:p.groups||[],mk:!!(p.mk||v['MK Modifier']||(p.groups||[]).includes('MK')||/^MK(?:\\b|E)/i.test(role))};}","function compact(p){const v=p.profile||{},role=v.Role||p.role||'';return {id:p.id,name:v['Basic Name']||p.basicName||p.name||p.id,role,active:p.active===true||p.active==='Y',groups:p.groups||[],authority:p.authority||{},schoolSection:p.schoolSection,mk:String(p.schoolSection?.code||p.schoolSection||'').toLowerCase()==='mk'};}",'Reporting uses accepted section and authority');
  source=replaceOnce(source,"const row=compact({...p,profile:{...p.profile,...d.teacherDrafts?.[p.id]}});by.set(p.id,row);","const authoritySource=(people||[]).find(person=>person.id===p.id)||p;const row=compact({...p,active:authoritySource.active,authority:authoritySource.authority,schoolSection:authoritySource.schoolSection,profile:{...p.profile,...d.teacherDrafts?.[p.id]}});by.set(p.id,row);",'Reporting takes current Contacts authority ahead of embedded planning snapshot');

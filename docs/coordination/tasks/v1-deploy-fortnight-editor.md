@@ -1,6 +1,6 @@
 # v1-deploy-fortnight-editor: UAT014 input, save and navigation recovery
 
-- Status: claimed; implementation pending.
+- Status: implemented; focused verification passed; full exact-head suites/CI and Claude review pending.
 - Owner/model: Codex; v1 coordinator ChatGPT; independent exact-head reviewer Claude.
 - Updated (Asia/Singapore): 15 November 2026, 10:30.
 - Branch: `codex/v1-deploy-fortnight-editor`.
@@ -37,4 +37,19 @@ Use TZ=Asia/Singapore: red/green focused browser test, canonical build/no tracke
 
 ## Handoff
 
-Q01 scope/claim pending publication; Q02–Q06 pending evidence; Q07 Claude pending; Q08 no release. Apply the already selected root-cause approach, with no third-party repository copied. Rollback restores the input/navigation defect with no data/schema rollback. F5 remains OPEN. Official T1B-01/T1B-02 and unperformed runtime UAT remain Not tested. The next deployment label is v1.01 under the separate release-label task.
+Q01 claim accepted at57c9223b532d5bf6c84ef6b5ffdb79059a5e3cc1 and immediately merged before implementation (local8abe5ad0d7f6e4acbc6a4bfff92376cf19d2c978); Q02–Q05 pass for the bounded frontend adaptation; Q06 focused/build evidence below passed, exact-head full suites pending; Q07 Claude pending; Q08 no release. Apply the already selected root-cause approach, with no third-party repository copied. Rollback restores the input/navigation defect with no data/schema rollback. F5 remains OPEN. Official T1B-01/T1B-02 and unperformed runtime UAT remain Not tested. The next deployment label is v1.01 under the separate release-label task.
+
+## Implemented behavior and focused verification
+
+Only the v1 builder and one new built-browser test change runtime/test code. The helper compares raw fields to current projected values, stages valid edits through the existing queue, removes only a reversed staged field, and preserves other drafts. Fortnight save controls remain stable during blur so focused Save reaches its click handler. Invalid input stays visible; raw-only Discard is explicit. All other pages retain the legacy controls, and all parent builder content outside the new helper/call is byte-identical.
+
+Red: actual built browser 2→3→2→Tab retained dirty=true, `/tmp/gsis-fortnight-browser-red.log`. Green: six groups, 8.48 seconds, `/tmp/gsis-fortnight-browser-green-3.log`; independent rerun `/tmp/gsis-fortnight-browser-independent.log`. The test uses synthetic transport deliberately; it asserts UI/queue behavior, not owning-D1 recovery. An initial expectation that every tab transition is blocked during queueFlight was corrected to match the unchanged source: same-version tab navigation remains possible with inert content and immutable flight, while version and sign-out guards remain. No new global navigation policy or weakened save assertion was introduced.
+
+Passed with TZ=Asia/Singapore and GSIS_BROWSER_EXECUTABLE=/usr/bin/chromium:
+
+- `node tests/v1-product-deploy-fortnight-browser.mjs`: six groups, including numeric/remarks reversal, unrelated queued edits, focused/keyboard Save, invalid1.5/negative/201/badInput, explicit local Discard, uncertain flight identity and read-only restrictions.
+- `node tests/v1-product-deploy-draft-status.mjs`: six unchanged groups.
+- `node tests/v1-product-contacts-recovery-browser.mjs`: eight unchanged groups.
+- Canonical `npm run build`, whitespace and parent-content comparison passed, with no tracked generated drift. Runner discovery includes the new program:77 product/1,176 Node.
+
+Pre-commit formatting used cached Prettier3.6.2 only on the new test, followed by another passing six-group browser run. Unchanged Core/Contacts passed12programs/56cases. Logs: `/tmp/gsis-fortnight-formatted-final.log` and `/tmp/gsis-fortnight-contracts.log`. Full product and Node/LORD CI results and the exact published head belong in the PR. Logs are supplementary local evidence; no deployed or original live incident result is claimed. Independent Claude review remains pending.
