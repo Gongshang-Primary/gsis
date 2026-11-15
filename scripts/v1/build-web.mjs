@@ -459,6 +459,119 @@ function updateRosterCapacity(source){
  walk(ast);if(matches.length!==1)throw Error('Roster health renderer baseline changed');
  const node=matches[0];return source.slice(0,node.start)+'function healthSummary(s,h){return window.GSISV1RosterCapacity.render(s,h);}' +source.slice(node.end);
 }
+// Resolve only the two established legacy subject pairs. Keep exact source
+// identities and detect contradictory definitions before serializing v1 XML.
+function updateAscSubjectIdentity(source) {
+ const begin = '/* GSIS_ASC_EXPORT_BEGIN */', end = '/* GSIS_ASC_EXPORT_END */';
+ const start = source.indexOf(begin), finish = source.indexOf(end, start);
+ if (start < 0 || finish < start || source.indexOf(begin, start + begin.length) !== -1) throw Error('Embedded ASC asset baseline changed');
+ const before = source.slice(0, start), after = source.slice(finish);
+ source = source.slice(start, finish);
+ const helpers = [
+  function subjectAlternative(subject) {
+   if (subject === 'Science') return 'Sci';
+   if (subject === 'Sci') return 'Science';
+   if (subject === 'PE') return 'PHE';
+   if (subject === 'PHE') return 'PE';
+  },
+  function comparableSubjectValue(value) {
+   if (Array.isArray(value)) return value.map(comparableSubjectValue);
+   if (value && typeof value === 'object') return Object.fromEntries(Object.keys(value).sort().map(key => [key, comparableSubjectValue(value[key])]));
+   return value;
+  },
+  function splitSubjectValue(split) {
+   if (!split || typeof split !== 'object' || Array.isArray(split)) return split;
+   const enabled = split.enabled === true, keys = enabled ? ['fs', 'fd', 'ft'] : ['ws', 'wd', 'wt'];
+   return {enabled, counts: keys.map(key => split[key] === undefined || split[key] === '' ? 0 : split[key])};
+  },
+  function blockSubjectValue(blocks) {
+   const counts = new Map();
+   for (const block of blocks) {
+    const key = JSON.stringify([block.length, block.week]);
+    counts.set(key, (counts.get(key) || 0) + block.count);
+   }
+   return [...counts].sort(([left], [right]) => left < right ? -1 : left > right ? 1 : 0);
+  },
+  function mappingSubjectValue(mapping) {
+   return {code: mapping.code, name: mapping.name};
+  },
+  function subjectValue(values, exact, alternative, issues, field, label, compare = comparableSubjectValue) {
+   const hasExact = own(values, exact), hasAlternative = alternative !== undefined && own(values, alternative);
+   if (hasExact && hasAlternative && JSON.stringify(compare(values[exact])) !== JSON.stringify(compare(values[alternative]))) {
+    issues.push({field, message: label + ': conflicting definitions for ' + exact + ' and ' + alternative + '. Review the source subject keys.'});
+   }
+   return hasExact ? values[exact] : hasAlternative ? values[alternative] : undefined;
+  },
+  function sourceSubject(d, level, subject, issues, group, assigned = true) {
+   // An independent TG load keeps the existing export profile's identity;
+   // unused level defaults must not rename that teaching event. The legacy
+   // unassigned-only profile used its raw subject identity instead.
+   if (group && (group.weeklyPeriods !== undefined && group.weeklyPeriods !== null || vg().levels(group).length !== 1)) {
+    if (!assigned) return subject;
+    return subject === 'Science' ? 'Sci' : subject === 'PE' ? 'PHE' : subject;
+   }
+   const loads = d.loads?.[String(level)], alternative = subjectAlternative(subject);
+   subjectValue(loads, subject, alternative, issues, 'demand', 'P' + level + ' subject load');
+   return !own(loads, subject) && alternative !== undefined && own(loads, alternative) ? alternative : subject;
+  },
+  function sourceGroupLoad(d, group, subject) {
+   // The TG override, including zero or an invalid value, must never fall back.
+   if (group.weeklyPeriods !== undefined && group.weeklyPeriods !== null || vg().levels(group).length !== 1) return vg().periods(d, group);
+   return wl().rate(d, vg().levels(group)[0], subject);
+  },
+  function sourceMapping(settings, subject, issues) {
+   return subjectValue(settings.subjects, subject, subjectAlternative(subject), issues, 'subjects', 'Export subject mapping', mappingSubjectValue);
+  },
+  function sourceBlocks(d, event, settings, issues) {
+   const alternative = subjectAlternative(event.subject);
+   const splitKey = JSON.stringify([event.level, event.subject]);
+   const splitAlternative = alternative === undefined ? undefined : JSON.stringify([event.level, alternative]);
+   const split = subjectValue(d.fortnight, splitKey, splitAlternative, issues, 'blocks', event.label + ' source split', splitSubjectValue);
+   const blockAlternative = alternative === undefined ? undefined : JSON.stringify([event.kind, event.target, alternative]);
+   const explicit = subjectValue(settings.blocks, event.key, blockAlternative, issues, 'blocks', event.label + ' export blocks', blockSubjectValue);
+   if (explicit !== undefined) return explicit;
+   if (event.kind === 'duty') return [{length: 1, count: 1, week: 'all'}];
+   if (!split || split.enabled === true) return null;
+   const values = ['ws', 'wd', 'wt'].map(key => split[key]);
+   if (values.every(value => value === undefined || value === '')) return null;
+   if (values.some(value => value !== undefined && value !== '' && (!Number.isInteger(value) || value < 0))) return null;
+   return values.flatMap((value, index) => value ? [{length: index + 1, count: value, week: 'all'}] : []);
+  },
+ ];
+ const syntax = parse(source, {ecmaVersion: 'latest', sourceType: 'script'}), matches = [];
+ function walk(node) {
+  if (!node || typeof node !== 'object') return;
+  if (node.type === 'FunctionDeclaration' && node.id?.name === 'sourceBlocks') matches.push(node);
+  for (const value of Object.values(node)) if (Array.isArray(value)) value.forEach(walk); else if (value && typeof value === 'object') walk(value);
+ }
+ walk(syntax);
+ if (matches.length !== 1) throw Error('ASC source block resolver baseline changed');
+ const block = matches[0];
+ source = source.slice(0, block.start) + source.slice(block.end);
+ source = replaceOnce(source, " const alias=s=>s==='PE'?'PHE':s==='Science'?'Sci':s;", helpers.map(helper => helper.toString()).join('\n'), 'ASC source subject helpers');
+ source = replaceOnce(source,
+  "   const key=JSON.stringify([kind,target,subject]);let e=events.get(key);",
+  "   const key=JSON.stringify([kind,target,subject]);let e=events.get(key);\n   const alternative=subjectAlternative(subject);if(alternative!==undefined&&events.has(JSON.stringify([kind,target,alternative])))fail(label+': multiple source subject aliases describe the same teaching target. Review them before export.');",
+  'ASC duplicate alias demand');
+ source = replaceOnce(source, 'venues=new Map(),events=new Map();', 'venues=new Map(),events=new Map(),assignmentSubjects=new Map();', 'ASC original assignment identities');
+ source = replaceOnce(source,
+  "   for(const subject of a.subject==='FT'?FT:[alias(a.subject)]){\n    const load=g?vg().periods(d,g):wl().rate(d,c.level,subject),kind=g?'tg':'class',target=g?.id||c.ref;",
+  "   for(const rawSubject of a.subject==='FT'?FT:[a.subject]){\n    const sourceLevel=g?(g.level??vg().levels(g)[0]??''):c.level,subject=sourceSubject(d,sourceLevel,rawSubject,issues,g);\n    const load=g?sourceGroupLoad(d,g,subject):wl().rate(d,c.level,subject),kind=g?'tg':'class',target=g?.id||c.ref;\n    const targetKey=JSON.stringify([kind,target]),seen=assignmentSubjects.get(targetKey)||new Set();if(seen.has(subjectAlternative(rawSubject)))fail('Target '+target+': multiple source subject aliases describe the same teaching target. Review the assignments before export.');seen.add(rawSubject);assignmentSubjects.set(targetKey,seen);",
+  'ASC exact source load identity');
+ source = replaceOnce(source,
+  "put('class',c.ref,subject,wl().rate(d,c.level,subject),[],[],vg().key(c)+' '+subject,c.level,[c.ref])",
+  "put('class',c.ref,sourceSubject(d,c.level,subject,issues),wl().rate(d,c.level,subject),[],[],vg().key(c)+' '+subject,c.level,[c.ref])",
+  'ASC unassigned source load checks');
+ source = replaceOnce(source,
+  "   for(const g of groups.values())put('tg',g.id,g.subject,vg().periods(d,g),[],[],g.name,g.level,[]);",
+  "   for(const g of groups.values()){let subject=sourceSubject(d,g.level,g.subject,issues,g,false);const alternative=subjectAlternative(subject),assigned=events.get(JSON.stringify(['tg',g.id,subject]))||(alternative!==undefined?events.get(JSON.stringify(['tg',g.id,alternative])):undefined);if(assigned)subject=assigned.subject;put('tg',g.id,subject,sourceGroupLoad(d,g,subject),[],[],g.name,g.level,[]);}",
+  'ASC unassigned TG load identity');
+ source = replaceOnce(source, 'mapped(s.subjects,raw)', 'sourceMapping(s,raw,blockers)', 'ASC source subject crosswalk');
+ source = replaceOnce(source, 'mapped(s.subjects,e.subject)', 'sourceMapping(s,e.subject,blockers)', 'ASC event subject crosswalk');
+ source = replaceOnce(source, 'sourceBlocks(d,e,s)', 'sourceBlocks(d,e,s,blockers)', 'ASC split conflict evidence');
+ return before + source + after;
+}
+
 function transform(module,rel,text){
  for(const [host,id]of Object.entries(productionHosts))text=text.replaceAll('https://'+host+'/', '/'+id+'/').replaceAll('https://'+host, '/'+id+'/');
  for(const id of ['contacts','deploy','roster','calendar','layout','venues','lord','overlord','starlord'])text=text.replaceAll('https://'+id+'.gsps.edu.sg/', '/'+id+'/').replaceAll('https://'+id+'.gsps.edu.sg','/'+id+'/');
@@ -521,6 +634,7 @@ function transform(module,rel,text){
   }
   if(module.id==='roster'&&rel==='roster-operations-ui.js')text=updateRosterCapacity(text);
   if(module.id==='deploy'&&rel==='app.js')text=updateDeploy(text);
+  if(module.id==='deploy'&&rel==='app.js')text=updateAscSubjectIdentity(text);
   if(module.id==='deploy'&&rel==='teaching-rules.js'){
    text=replaceOnce(text,"if(Array.isArray(catalogue)){p['EO Appt Level']=rule?String(rule.level||''):'';out.groups=rule?memberships(rule.role,rule.level,rule.groups):[];}","out.groups=(live&&live.groups||t.groups||[]).slice();out.authority=live&&live.authority||t.authority||{};",'Accepted Contacts facts remain authoritative');
    const syntax=parse(text,{ecmaVersion:'latest',sourceType:'script'}),matches=[];function walk(node){if(!node||typeof node!=='object')return;if(node.type==='FunctionDeclaration'&&node.id?.name==='eligible')matches.push(node);for(const value of Object.values(node))if(Array.isArray(value))value.forEach(walk);else if(value&&typeof value==='object')walk(value);}walk(syntax);if(matches.length!==1)throw Error('Teaching eligibility baseline changed');const node=matches[0];text=text.slice(0,node.start)+"function eligible(t){return t.authority?.eo?.value===true&&t.active!==false&&t.profile?.Active!=='N'&&t.schoolSection!=='mk'&&!t.mk;}"+text.slice(node.end);
