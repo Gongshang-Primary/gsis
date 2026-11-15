@@ -81,6 +81,10 @@
   async function clearProtectedState() {
     securityEpoch++;
     readFlights.clear();
+    lordGroups.clear();
+    lordSelections.clear();
+    lordVisibleGroups.clear();
+    lordGrid = null;
     for (const store of [global.localStorage, global.sessionStorage]) {
       try {
         for (const key of Object.keys(store))
@@ -528,6 +532,314 @@
     }
     return data;
   }
+  const lordGroups = new Map(),
+    lordSelections = new Map();
+  let lordGrid = null,
+    lordVisibleGroups = new Map();
+  const groupStoragePrefix = "gsis-lord-group-bindings:v1:";
+  function groupError(message, code = "GROUP_SELECTION_REQUIRED") {
+    return Object.assign(Error(message), { code, status: 409 });
+  }
+  function checkedGroup(value) {
+    if (
+      !value ||
+      typeof value.cart !== "string" ||
+      !value.cart.trim() ||
+      value.cart.length > 160 ||
+      !/^[a-f0-9]{64}$/.test(value.revision || "") ||
+      !Array.isArray(value.members) ||
+      !value.members.length ||
+      value.members.length > 20 ||
+      new Set(value.members.map((x) => x?.resourceId)).size !==
+        value.members.length ||
+      value.members.some(
+        (x) =>
+          !x ||
+          typeof x.resourceId !== "string" ||
+          !x.resourceId ||
+          x.resourceId.length > 160 ||
+          !Number.isSafeInteger(x.revision) ||
+          x.revision < 1 ||
+          !Number.isSafeInteger(x.capacity) ||
+          x.capacity < 1 ||
+          x.capacity > 200,
+      )
+    )
+      throw groupError(
+        "The cart selection is incomplete. Refresh LORD booking choices before trying again.",
+        "GROUP_SELECTION_INVALID",
+      );
+    return {
+      cart: value.cart,
+      revision: value.revision,
+      members: value.members.map(({ resourceId, revision, capacity }) => ({
+        resourceId,
+        revision,
+        capacity,
+      })),
+    };
+  }
+  function observeLordGroups(data) {
+    if (!Array.isArray(data?.bookingResources)) return;
+    lordGroups.clear();
+    for (const row of data.bookingResources) {
+      const matches = lordGroups.get(row.resource) || [];
+      matches.push(row.bookingGroup ? structuredClone(row.bookingGroup) : null);
+      lordGroups.set(row.resource, matches);
+    }
+  }
+  function viewedLordGroup(resource) {
+    const matches =
+      lordSelections.get(resource) ||
+      lordVisibleGroups.get(resource) ||
+      lordGroups.get(resource);
+    if (!matches)
+      throw groupError(
+        "Refresh LORD booking choices before booking this cart.",
+      );
+    if (matches.length !== 1)
+      throw groupError(
+        "This cart label is ambiguous. Ask an administrator to correct the inventory.",
+        "GROUP_SELECTION_AMBIGUOUS",
+      );
+    return matches[0] ? checkedGroup(matches[0]) : null;
+  }
+  // The native grid captures its reference rows when rendered. Keep the same
+  // evidence if a background refresh happens before the selected range is sent.
+  if (module === "lord") {
+    const bindGrid = () => {
+      const grid = document.querySelector(".resource-timetable");
+      if (!grid || grid === lordGrid) return;
+      lordGrid = grid;
+      lordVisibleGroups = new Map(
+        [...lordGroups].map(([name, values]) => [
+          name,
+          structuredClone(values),
+        ]),
+      );
+      const retained = new Set(
+        [
+          ...grid.querySelectorAll(
+            ".timetable-cell.selected,.timetable-cell.start-selected",
+          ),
+        ].map((cell) => cell.dataset.resource),
+      );
+      for (const name of lordSelections.keys())
+        if (!retained.has(name)) lordSelections.delete(name);
+    };
+    new MutationObserver(bindGrid).observe(document.documentElement, {
+      childList: true,
+      subtree: true,
+    });
+    document.addEventListener(
+      "click",
+      (event) => {
+        const cell = event.target.closest?.(".timetable-cell:not(.occupied)");
+        if (!cell) return;
+        bindGrid();
+        if (!lordSelections.has(cell.dataset.resource)) {
+          const selected = lordVisibleGroups.get(cell.dataset.resource);
+          if (selected)
+            lordSelections.set(
+              cell.dataset.resource,
+              structuredClone(selected),
+            );
+        }
+      },
+      true,
+    );
+  }
+  function groupBindings() {
+    if (!session?.schoolId || !session.user?.accountId)
+      throw groupError("Sign in before preparing a cart booking.");
+    const key =
+      groupStoragePrefix +
+      JSON.stringify([session.schoolId, session.user.accountId]);
+    const raw = sessionStorage.getItem(key);
+    if (raw && raw.length > 262144)
+      throw groupError(
+        "Stored cart confirmations exceed the supported bound. Resolve the original requests first.",
+      );
+    let values;
+    try {
+      values = raw ? JSON.parse(raw) : [];
+    } catch {
+      throw groupError(
+        "Stored cart confirmation evidence is unreadable. Do not resend this booking with a new cart selection.",
+        "GROUP_SELECTION_INVALID",
+      );
+    }
+    if (
+      !Array.isArray(values) ||
+      values.length > 128 ||
+      new Set(values.map((x) => x?.operationId)).size !== values.length ||
+      values.some(
+        (x) =>
+          !x ||
+          typeof x.operationId !== "string" ||
+          !/^[a-f0-9]{64}$/.test(x.intentHash || "") ||
+          !/^[a-f0-9]{64}$/.test(x.ownerDigest || "") ||
+          !Array.isArray(x.selections) ||
+          x.selections.length > 20 ||
+          new Set(x.selections.map((s) => s?.index)).size !==
+            x.selections.length ||
+          typeof x.terminal !== "boolean",
+      )
+    )
+      throw groupError(
+        "Stored cart confirmation evidence is invalid. Resolve the original booking before continuing.",
+        "GROUP_SELECTION_INVALID",
+      );
+    for (const item of values)
+      for (const selection of item.selections) {
+        if (
+          !selection ||
+          !Number.isSafeInteger(selection.index) ||
+          selection.index < 0 ||
+          selection.index >= 20
+        )
+          throw groupError(
+            "Stored cart confirmation evidence is invalid.",
+            "GROUP_SELECTION_INVALID",
+          );
+        checkedGroup(selection.group);
+      }
+    return { key, values };
+  }
+  function saveGroupBindings(store) {
+    let text = JSON.stringify(store.values);
+    while (store.values.length > 128 || text.length > 262144) {
+      const index = store.values.findIndex((x) => x.terminal);
+      if (index < 0)
+        throw groupError(
+          "Resolve the existing unconfirmed cart bookings before starting another.",
+        );
+      store.values.splice(index, 1);
+      text = JSON.stringify(store.values);
+    }
+    sessionStorage.setItem(store.key, text);
+  }
+  function matchingLordGroupReceipt(operationId, receipt) {
+    const entry = groupBindings().values.find(
+      (x) => x.operationId === operationId,
+    );
+    return (
+      !!entry &&
+      receipt?.operationId === operationId &&
+      receipt.digest === entry.ownerDigest &&
+      ["committed", "terminal-not-committed"].includes(receipt.state)
+    );
+  }
+  async function prepareLordBooking(body, path, expectedEpoch) {
+    if (expectedEpoch !== securityEpoch)
+      throw groupError(
+        "Your account changed. Reopen LORD before continuing.",
+        "SESSION_CHANGED",
+      );
+    const initial = groupBindings(),
+      epoch = securityEpoch,
+      owner = JSON.stringify([session.schoolId, session.user.accountId]);
+    const first = initial.values.find(
+      (x) => x.operationId === body.operationId,
+    );
+    const copy = structuredClone(body),
+      lines = Array.isArray(copy.bookings) ? copy.bookings : [copy];
+    if (lines.length > 20)
+      throw groupError(
+        "Submit no more than twenty bookings.",
+        "GROUP_SELECTION_INVALID",
+      );
+    // Capture the displayed evidence before either hash yields control.
+    const candidates = first?.selections
+      ? structuredClone(first.selections)
+      : [];
+    if (!first)
+      for (const [index, line] of lines.entries()) {
+        const group = line.bookingGroup
+          ? checkedGroup(line.bookingGroup)
+          : !line.items && line.resource
+            ? viewedLordGroup(line.resource)
+            : null;
+        if (group) candidates.push({ index, group });
+      }
+    const apply = (selections) => {
+      for (const { index, group } of selections) {
+        if (!lines[index])
+          throw groupError(
+            "The retained cart selection does not match this request.",
+            "GROUP_SELECTION_INVALID",
+          );
+        lines[index].bookingGroup = structuredClone(group);
+      }
+    };
+    apply(candidates);
+    const action =
+      path.endsWith("/update") ||
+      String(copy.action || "").toLowerCase() === "bookingupdate"
+        ? "bookingupdate"
+        : Array.isArray(copy.bookings)
+          ? "bookingcreatebatch"
+          : "bookingcreate";
+    const intent = structuredClone(copy);
+    delete intent.requestId;
+    const ownerIntent = {
+      schoolId: session.schoolId,
+      actorId: session.user.accountId,
+      action: "lord." + action,
+      intent,
+    };
+    const hashes = await Promise.all(
+      [canonical([path, body]), canonical(ownerIntent)].map((value) =>
+        crypto.subtle.digest("SHA-256", new TextEncoder().encode(value)),
+      ),
+    );
+    if (
+      epoch !== securityEpoch ||
+      owner !== JSON.stringify([session?.schoolId, session?.user?.accountId])
+    )
+      throw groupError(
+        "Your account changed. Reopen LORD before continuing.",
+        "SESSION_CHANGED",
+      );
+    const [intentHash, candidateDigest] = hashes.map((value) =>
+      [...new Uint8Array(value)]
+        .map((x) => x.toString(16).padStart(2, "0"))
+        .join(""),
+    );
+    // No await between this fresh read, merge and persist: overlapping writes
+    // and matching receipts cannot overwrite each other's retained evidence.
+    const store = groupBindings(),
+      prior = store.values.find((x) => x.operationId === body.operationId);
+    if (prior && prior.intentHash !== intentHash)
+      throw groupError(
+        "This operation already belongs to different booking details. Check its original receipt.",
+        "OPERATION_ID_REUSED",
+      );
+    const selections = prior?.selections || candidates,
+      ownerDigest = prior?.ownerDigest || candidateDigest;
+    apply(selections);
+    if (!prior && selections.length) {
+      store.values.push({
+        operationId: body.operationId,
+        intentHash,
+        ownerDigest,
+        selections,
+        terminal: false,
+      });
+      saveGroupBindings(store);
+    }
+    return { body: copy, ownerDigest, grouped: selections.length > 0 };
+  }
+  function settleLordGroupBinding(operationId, receipt) {
+    if (!matchingLordGroupReceipt(operationId, receipt)) return;
+    const store = groupBindings(),
+      prior = store.values.find((x) => x.operationId === operationId);
+    if (prior) {
+      prior.terminal = true;
+      saveGroupBindings(store);
+    }
+  }
+
   async function lordMovement(body) {
     const id = body.operationId;
     if (lordPrepared.has(id)) return lordPrepared.get(id);
@@ -666,10 +978,24 @@
           url.pathname = "/api/lord/signage";
       }
     }
+    if (
+      service === "lord" &&
+      (url.pathname.endsWith("/bookings/availability") ||
+        url.searchParams.get("action")?.toLowerCase() ===
+          "bookingavailability") &&
+      url.searchParams.has("resource") &&
+      !url.searchParams.has("bookingGroup")
+    ) {
+      const selected = viewedLordGroup(url.searchParams.get("resource"));
+      if (selected)
+        url.searchParams.set("bookingGroup", JSON.stringify(selected));
+    }
     const method = (options.method || "GET").toUpperCase();
     let body =
         typeof options.body === "string" ? JSON.parse(options.body) : null,
-      key = null;
+      key = null,
+      freshPendingEntry = null,
+      lordGroupAttempt = false;
     if (method !== "GET" && method !== "HEAD") {
       const current = await getSession();
       if (!current) {
@@ -711,12 +1037,44 @@
           body.revision = revisions.get(service + ":" + body.versionId);
         if (body.leaseFence === undefined && Number.isSafeInteger(body.fence))
           body.leaseFence = body.fence;
-        pending.set(key, {
+        const entry = {
           operationId: body.operationId,
           body: structuredClone(body),
           path: url.pathname,
-        });
+        };
+        pending.set(key, entry);
+        if (!existing) freshPendingEntry = entry;
       }
+    }
+    if (
+      service === "lord" &&
+      body &&
+      (["bookingcreate", "bookingcreatebatch", "bookingupdate"].includes(
+        String(body.action || "").toLowerCase(),
+      ) ||
+        [
+          "/api/lord/bookings",
+          "/api/lord/bookings/batch",
+          "/api/lord/bookings/update",
+        ].includes(url.pathname))
+    ) {
+      let prepared;
+      try {
+        prepared = await prepareLordBooking(body, url.pathname, requestEpoch);
+      } catch (error) {
+        // This invocation has not sent a request. Remove only its own new slot;
+        // an earlier unknown operation or a concurrent replacement must remain.
+        if (freshPendingEntry && pending.get(key) === freshPendingEntry)
+          pending.delete(key);
+        throw error;
+      }
+      lordGroupAttempt = prepared.grouped;
+      body = prepared.body;
+      if (requestEpoch !== securityEpoch)
+        throw groupError(
+          "Your account changed. Reopen LORD before continuing.",
+          "SESSION_CHANGED",
+        );
     }
     if (
       service === "lord" &&
@@ -781,6 +1139,16 @@
       );
     if (result.headers.get("Content-Type")?.includes("application/json")) {
       const failure = await result.clone().json();
+      if (service === "lord" && requestEpoch !== securityEpoch)
+        return response(
+          {
+            ok: false,
+            error:
+              "The account changed while LORD was reading the response. Reload before continuing.",
+            code: "SESSION_CHANGED",
+          },
+          401,
+        );
       if (
         failure.ok === false &&
         failure.error &&
@@ -827,6 +1195,16 @@
     if (!result.headers.get("Content-Type")?.includes("application/json"))
       return result;
     const envelope = await result.clone().json();
+    if (service === "lord" && requestEpoch !== securityEpoch)
+      return response(
+        {
+          ok: false,
+          error:
+            "The account changed while LORD was reading the response. Reload before continuing.",
+          code: "SESSION_CHANGED",
+        },
+        401,
+      );
     if (envelope.ok === false) return result;
     const data = envelope.data;
     const capabilities = data?.user?.capabilities ?? data?.capabilities;
@@ -839,6 +1217,58 @@
     }
     captureRevision(url, body, data);
     const receipt = data?.receipt || data;
+    if (
+      lordGroupAttempt &&
+      ["committed", "terminal-not-committed"].includes(receipt?.state) &&
+      !matchingLordGroupReceipt(body.operationId, receipt)
+    )
+      return response(
+        {
+          ok: false,
+          error:
+            "The receipt does not confirm the original cart booking. Check the original request before retrying.",
+          code: "RECEIPT_MISMATCH",
+          retryable: true,
+        },
+        202,
+      );
+    if (service === "lord") {
+      if (
+        url.pathname.endsWith("/reference") ||
+        url.searchParams.get("action")?.toLowerCase() === "reference"
+      )
+        observeLordGroups(data);
+      const groupOperation =
+        body?.operationId || url.searchParams.get("operationId");
+      if (
+        session &&
+        groupOperation &&
+        (lordGroupAttempt || url.pathname.endsWith("/receipt"))
+      ) {
+        if (
+          url.pathname.endsWith("/receipt") &&
+          ["committed", "terminal-not-committed"].includes(receipt?.state) &&
+          groupBindings().values.some(
+            (x) => x.operationId === groupOperation,
+          ) &&
+          !matchingLordGroupReceipt(groupOperation, receipt)
+        )
+          return response(
+            {
+              ok: false,
+              error:
+                "The receipt does not match the original cart booking details.",
+              code: "RECEIPT_MISMATCH",
+              retryable: true,
+            },
+            202,
+          );
+        // Cleanup failure cannot overturn a correctly bound owner receipt.
+        try {
+          settleLordGroupBinding(groupOperation, receipt);
+        } catch {}
+      }
+    }
     if (
       key &&
       (receipt?.state === "committed" ||
@@ -877,7 +1307,28 @@
     ) {
       if (url.pathname.endsWith("/transaction"))
         return response(
-          { ...envelope, ...data, result: data.result ?? data },
+          {
+            ...envelope,
+            ...data,
+            ...(Array.isArray(data.bookings)
+              ? {
+                  bookings: data.bookings.map((b) => ({
+                    ...b,
+                    requestedQuantity: b.requestedQuantity ?? "Not recorded",
+                  })),
+                }
+              : {}),
+            ...(data.booking
+              ? {
+                  booking: {
+                    ...data.booking,
+                    requestedQuantity:
+                      data.booking.requestedQuantity ?? "Not recorded",
+                  },
+                }
+              : {}),
+            result: data.result ?? data,
+          },
           result.status,
         );
       if (url.pathname.endsWith("/board") || url.pathname.endsWith("/signage"))
@@ -969,6 +1420,7 @@
         moduleCapabilities.get(service)?.has(cap)),
     pending: () => [...pending.values()],
     canonical,
+    verifyLordBookingReceipt: matchingLordGroupReceipt,
   };
   global.GSISV1 = api;
 })(window);

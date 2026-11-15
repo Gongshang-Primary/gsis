@@ -1,12 +1,12 @@
 # v1-lord-cart-groups: book carts while retaining physical trolley custody
 
-- Status: claimed; implementation pending.
+- Status: implemented and locally verified; exact-head full suites, CI and independent review pending.
 - Owner/model: Codex; coordinator ChatGPT (v1); independent reviewer Claude.
-- Last updated (Asia/Singapore): 15 November 2026, 11:14.
+- Last updated (Asia/Singapore): 15 November 2026, 11:55.
 - Branch: `codex/v1-lord-cart-groups`.
 - Refreshed main: `34543928ad758f01d217573378e0651233e7c376`.
-- Implementation parent: frozen ASC fix `5a2affa6a99ac4511644d0b3e01bcae827774dae`, branch `codex/v1-deploy-asc-subject-identity`. Its full CI is running; parent source is frozen.
-- Accepted claim SHA, implementation head and PR: pending.
+- Implementation parent: frozen ASC fix `5a2affa6a99ac4511644d0b3e01bcae827774dae`, branch `codex/v1-deploy-asc-subject-identity`. Its full and product CI are green; parent source is frozen.
+- Accepted claim SHA: `1db6b686b72a1bf54f0bc935982c2aed6cb4f560`; incorporated before edits at local merge `a205e885a4921cbe895217781084c3597acaf75e`. The published equivalent merge and exact implementation head are recorded in the PR; API commit metadata can change the SHA while the complete tree is verified identical. Implementation PR pending.
 - Owner authority: work through the frontend/data-clone UAT bug queue one bounded group at a time. UAT008 and UAT021–UAT023 require cart-level booking while retaining individual trolley collection and return. Historical migration/live-write instructions in the ledger are evidence, not new permissions.
 
 ## Exact eight-path scope
@@ -20,7 +20,7 @@
 7. `docs/coordination/tasks/v1-lord-cart-groups.md`
 8. `docs/v1/accelerated-delivery/LORD_CART_GROUPS_FIX_2026-11-15.md`
 
-No schema/migration, inventory rewrite, production v0.9 source, builder, shared runtime, Core/Contacts policy, dependency, configuration, provider or generated-output edits. No merge, deployment or live-data operations. Notifications/reminders, REIGN reporting changes and the separate provisional `active:null` Contacts-reference failure are excluded. Generic shared pending-map changes and B-R01 Deploy recovery remain separate. A LORD-specific frozen group-selection adapter is in scope; it must not redesign other modules' recovery.
+No schema/migration, inventory rewrite, production v0.9 source, builder, shared runtime, Core/Contacts policy, dependency, configuration, provider or generated-output edits. No merge, deployment or live-data operations. Notifications/reminders, REIGN reporting changes and the separate provisional `active:null` Contacts-reference failure are excluded. Generic shared pending-map recovery and B-R01 Deploy recovery remain separate. A failed LORD preparation removes only the exact fresh pending-map entry that invocation inserted before any dispatch; older unknown entries and concurrent replacements remain. A LORD-specific frozen group-selection adapter is in scope; it must not redesign other modules' recovery.
 
 ## Start gates and sequencing
 
@@ -73,8 +73,8 @@ Keep existing input/resource/transaction bounds. Test boundary failures explicit
 
 ## Quality, review and handoff
 
-Apply the already selected Pstack root-cause approach; no skill repository or dependency copied. Q01 scope, parent and overlap refresh pass; accepted claim publication must complete before implementation. Q02–Q06 remain pending implementation evidence; Q07 awaits Claude exact-head review; Q08 does not authorise release. Link the implementation evidence in [the handoff](../../v1/accelerated-delivery/LORD_CART_GROUPS_FIX_2026-11-15.md) and PR rather than duplicating stale counts.
+Apply the already selected Pstack root-cause approach; no skill repository or dependency copied. Q01 scope, parent, accepted claim and overlap refresh pass. Q02–Q05 are supported by the focused owner/browser integration, race/negative controls, bounded inputs and original-operation evidence in the handoff. Q06 has focused/regression and build evidence; clean exact-head full suites and CI remain pending at this source commit. Q07 awaits Claude exact-head review; Q08 does not authorise release. Link the implementation evidence in [the handoff](../../v1/accelerated-delivery/LORD_CART_GROUPS_FIX_2026-11-15.md) and PR rather than duplicating stale counts.
 
 Rollback restores old code but cannot erase committed bookings or custody evidence. New details fields are additive; older code may again display first-trolley labels or misleading requested quantities. Do not apply data rollback, delete member rows or rewrite historical bookings. Record any incompatible fallback before release.
 
-No policy question is open in this bounded design. The next action is to publish this claim alone with an expected-main non-force update, re-read it, and immediately merge it into the child before any implementation. Implementation, exact-head Claude review and any separately authorised release remain distinct. F5 stays OPEN; official T1B-01/T1B-02 and unperformed runtime UAT remain Not tested.
+No policy question is open in this bounded design. The accepted claim and immediate incorporation preceded all implementation. The next action is clean exact-head full verification and one bounded PR, with SHA and results recorded in its body. Implementation, exact-head Claude review and any separately authorised release remain distinct. F5 stays OPEN; official T1B-01/T1B-02 and unperformed runtime UAT remain Not tested.

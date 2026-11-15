@@ -181,6 +181,27 @@
       throw Error("Only your own uncollected bookings can be edited.");
   }
 
+  function groupedBooking(booking) {
+    if (booking.groupState === "unresolved")
+      throw Error(
+        "This booking does not prove one complete current cart. Ask a LORD administrator to review its physical reservations before editing.",
+      );
+    if (booking.groupState !== "verified") return null;
+    const group = booking.bookingGroup;
+    if (
+      !group ||
+      typeof group.cart !== "string" ||
+      !Array.isArray(group.members) ||
+      !group.members.length ||
+      group.members.length > 20 ||
+      !group.revision
+    )
+      throw Error(
+        "The cart membership could not be verified. Reload the booking before editing.",
+      );
+    return group;
+  }
+
   async function openBookings() {
     if (!active) return;
     const view = modal("gsisLordBookingEditor", "Edit my bookings");
@@ -241,6 +262,7 @@
   function renderBooking(view, booking) {
     try {
       requireOwnBooking(booking);
+      groupedBooking(booking);
     } catch (error) {
       message(view.status, error.message, true);
       return;
@@ -291,8 +313,55 @@
       { maxlength: "2000", rows: "3" },
       "textarea",
     );
-    fields.append(element("h3", "Reserved resources"));
-    for (const [index, item] of body.items.entries()) {
+    const group = groupedBooking(booking);
+    fields.append(
+      element("h3", group ? "Reserved cart" : "Reserved resources"),
+    );
+    if (group) {
+      const capacity = group.members.reduce(
+        (sum, member) => sum + member.capacity,
+        0,
+      );
+      fields.append(
+        element(
+          "p",
+          group.cart +
+            " · " +
+            capacity +
+            " devices reserved across " +
+            group.members.length +
+            " physical trolleys.",
+        ),
+      );
+      if (booking.requestedQuantity == null)
+        fields.append(
+          element(
+            "p",
+            "The original requested quantity was not recorded. Enter the quantity you need; the full cart stays reserved.",
+          ),
+        );
+      field(
+        fields,
+        "requestedQuantity",
+        "Devices requested",
+        body.requestedQuantity,
+        {
+          type: "number",
+          min: "1",
+          max: String(Math.min(capacity, 200)),
+          step: "1",
+          required: "",
+          "data-lord-cart-quantity": "",
+        },
+      );
+      fields.append(
+        element(
+          "p",
+          "Physical collection and return quantities are recorded separately.",
+        ),
+      );
+    }
+    for (const [index, item] of (group ? [] : body.items).entries()) {
       const name =
         booking.trolleys?.find(
           (resource) => resource.resourceId === item.resourceId,
@@ -351,10 +420,17 @@
           classOrActivity: values.get("classOrActivity"),
           subject: values.get("subject"),
           remarks: values.get("remarks"),
-          items: booking.items.map((item, index) => ({
-            resourceId: item.resourceId,
-            quantity: Number(values.get("quantity" + index)),
-          })),
+          ...(group
+            ? {
+                bookingGroup: structuredClone(group),
+                requestedQuantity: Number(values.get("requestedQuantity")),
+              }
+            : {
+                items: booking.items.map((item, index) => ({
+                  resourceId: item.resourceId,
+                  quantity: Number(values.get("quantity" + index)),
+                })),
+              }),
           headphones: booking.headphones === true,
           styluses: booking.styluses === true,
           deviceType: booking.deviceType || "",
@@ -537,6 +613,53 @@
               body: structuredClone(attempt.body),
             });
         if (!active) return;
+        const receipt = result?.receipt || result;
+        if (
+          kind === "booking" &&
+          attempt.body.bookingGroup &&
+          !api.verifyLordBookingReceipt(attempt.body.operationId, receipt)
+        ) {
+          uncertain(
+            Error("The receipt does not match the original booking request."),
+          );
+          return;
+        }
+        if (
+          kind === "booking" &&
+          ["terminal-not-committed", "aborted"].includes(
+            result?.state || result?.receipt?.state,
+          )
+        ) {
+          persist(kind, null);
+          forms[kind].form.remove();
+          message(
+            forms[kind].status,
+            "The original booking change was not saved. Reload the current booking before making a new request.",
+          );
+          const currentView = forms[kind].view;
+          const reload = button(
+            "Reload current booking",
+            "data-lord-reload-booking",
+            async () => {
+              reload.disabled = true;
+              try {
+                await currentSession();
+                const fresh = await api.request(
+                  "lord",
+                  "/bookings/get?bookingId=" +
+                    encodeURIComponent(viewed.bookingId),
+                );
+                if (!active || !currentView.dialog.isConnected) return;
+                renderBooking(currentView, fresh.booking);
+              } catch (error) {
+                message(currentView.status, error.message, true);
+                reload.disabled = false;
+              }
+            },
+          );
+          currentView.content.append(reload);
+          return;
+        }
         if (!committed(result)) {
           uncertain();
           return;
@@ -564,7 +687,7 @@
       event.preventDefault();
       send();
     };
-    forms[kind] = { form, status: view.status, update };
+    forms[kind] = { form, status: view.status, update, view };
     update();
     if (pending[kind]) uncertain();
     else
