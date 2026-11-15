@@ -33,6 +33,9 @@ import {
   applyEdits,
   validateDocument,
   mergeContacts,
+  canonicalTeachingDocument,
+  changedTeachingStaff,
+  validateTeachingBindings,
   calculate,
   can,
 } from "./model.mjs";
@@ -68,6 +71,7 @@ const WRITE = new Set([
   "/acknowledgeNotices",
   "/staff/register",
   "/exports/reconcile",
+  "/operations/withdraw",
 ]);
 export function policy(method, path, body = {}) {
   check(
@@ -76,6 +80,13 @@ export function policy(method, path, body = {}) {
     "METHOD_NOT_ALLOWED",
     405,
   );
+  if (path === "/operations/withdraw")
+    check(
+      method === "POST",
+      "Withdrawal requires POST.",
+      "METHOD_NOT_ALLOWED",
+      405,
+    );
   if (path.startsWith("/internal/pins/"))
     return {
       action: "deploy.internal",
@@ -231,6 +242,183 @@ function cleanIntent(body) {
   ])
     delete b[k];
   return b;
+}
+const recoveryHash = (value) =>
+  typeof value === "string" && /^[a-f0-9]{64}$/.test(value);
+function recoveryView(op, versionId) {
+  const receipt = op.receipt;
+  const terminal = op.state === "committed" || op.state === "aborted";
+  check(
+    Number.isSafeInteger(op.fence) &&
+      op.fence >= 1 &&
+      (terminal
+        ? receipt &&
+          receipt.operationId === op.operationId &&
+          receipt.digest === op.digest &&
+          (op.state === "committed"
+            ? receipt.state === "committed" && receipt.fence === op.fence
+            : receipt.state === "terminal-not-committed" && op.fence >= 2)
+        : op.state === "prepared" && receipt === null),
+    "The original operation has no consistent recovery receipt.",
+    "RECOVERY_BINDING_INVALID",
+    409,
+  );
+  return {
+    ...receipt?.result,
+    state: op.state,
+    saved: op.state === "committed",
+    receipt,
+    bindingVerified: true,
+    service: "deploy",
+    schoolId: op.schoolId,
+    actorId: op.actorId,
+    operationId: op.operationId,
+    versionId,
+    action: op.action,
+    digest: op.digest,
+    requestDigest: op.requestDigest,
+    currentFence: op.fence,
+    // abortOperation advances the owning row exactly once, only from prepared.
+    // Its terminal receipt was checked above; an unknown row has no such proof.
+    originalFence: op.state === "aborted" ? op.fence - 1 : op.fence,
+  };
+}
+async function verifyRecoveryBinding(ctx, op, versionId) {
+  check(
+    op.actorId === ctx.principal.actorId &&
+      op.schoolId === ctx.principal.schoolId &&
+      op.action === "deploy.edit" &&
+      op.authorityAction === "deploy.edit",
+    "Only your own Deploy edit operation can be recovered here.",
+    "CAPABILITY_DENIED",
+    403,
+  );
+  check(
+    recoveryHash(op.digest) &&
+      recoveryHash(op.requestDigest) &&
+      typeof op.decisionId === "string" &&
+      op.decisionId.length > 0,
+    "The original authorization binding is unavailable.",
+    "RECOVERY_BINDING_INVALID",
+    409,
+  );
+  const proof = await inspectDecision(ctx.env, op.decisionId, {
+    schoolId: op.schoolId,
+    operationId: op.operationId,
+    service: "deploy",
+    actions: ["deploy.edit"],
+    allowHistorical: true,
+  });
+  const original = proof?.principal,
+    descriptor = proof?.descriptor;
+  check(
+    original?.schoolId === op.schoolId &&
+      original.actorId === op.actorId &&
+      original.decisionId === op.decisionId &&
+      !original.impersonating &&
+      original.action === "deploy.edit" &&
+      original.requestDigest === op.requestDigest &&
+      descriptor?.service === "deploy" &&
+      descriptor.action === "deploy.edit" &&
+      descriptor.write === true &&
+      descriptor.operationId === op.operationId &&
+      descriptor.resourceId === versionId &&
+      descriptor.bodyDigest === op.requestDigest,
+    "The original authorization does not match this operation and version.",
+    "RECOVERY_BINDING_INVALID",
+    409,
+  );
+  return recoveryView(op, versionId);
+}
+function unknownOperation(operationId) {
+  return {
+    state: "unknown",
+    saved: false,
+    operationId,
+    reason:
+      "No durable result found; absence does not prove a writer cannot commit.",
+  };
+}
+async function withdrawOperation(ctx) {
+  check(
+    ctx.method === "POST",
+    "Withdrawal requires POST.",
+    "METHOD_NOT_ALLOWED",
+    405,
+  );
+  check(
+    !ctx.principal.impersonating &&
+      can(ctx.principal, "deploy.edit") &&
+      ctx.principal.action === "deploy.edit" &&
+      ctx.principal.validUntil > Date.now(),
+    "Current permission to edit Deploy is required.",
+    "CAPABILITY_DENIED",
+    403,
+  );
+  const b = ctx.body,
+    operationId = id(b.targetOperationId, "original operation"),
+    controlId = id(b.operationId, "withdrawal operation"),
+    versionId = id(b.versionId, "version");
+  check(
+    controlId !== operationId &&
+      recoveryHash(b.expectedDigest) &&
+      recoveryHash(b.expectedRequestDigest) &&
+      Number.isSafeInteger(b.expectedFence) &&
+      b.expectedFence >= 1,
+    "Withdrawal requires the original binding and a separate control reference.",
+  );
+  const op = await operationStatus(
+    ctx.env.DB,
+    ctx.principal.schoolId,
+    operationId,
+  );
+  if (!op) return unknownOperation(operationId);
+  const view = await verifyRecoveryBinding(ctx, op, versionId);
+  check(
+    b.expectedDigest === view.digest &&
+      b.expectedRequestDigest === view.requestDigest &&
+      b.expectedFence === view.originalFence,
+    "The original operation binding changed. Check its receipt again.",
+    "OPERATION_INTENT_CONFLICT",
+    409,
+  );
+  // This controls the original operation; preparing a second domain write would
+  // give an abort acknowledgement a competing identity and outcome.
+  const outcome =
+    op.state === "prepared"
+      ? await abortOperation(ctx.env.DB, op, "OWNER_WITHDRAWN", Date.now())
+      : op.receipt;
+  const settled = await operationStatus(ctx.env.DB, op.schoolId, operationId);
+  check(
+    settled &&
+      settled.digest === op.digest &&
+      settled.requestDigest === op.requestDigest &&
+      settled.actorId === op.actorId &&
+      settled.decisionId === op.decisionId &&
+      settled.action === op.action &&
+      settled.authorityAction === op.authorityAction &&
+      outcome &&
+      canonical(settled.receipt) === canonical(outcome),
+    "The original operation outcome needs confirmation.",
+    "RECOVERY_PENDING",
+    503,
+  );
+  const result = recoveryView(settled, versionId);
+  check(
+    result.state !== "prepared",
+    "Withdrawal is not yet confirmed.",
+    "RECOVERY_PENDING",
+    503,
+  );
+  const resolution = await resolveAdmission(
+    ctx.env,
+    ctx.env.DB,
+    settled,
+    { decisionId: op.decisionId, pins: [] },
+    outcome,
+    Date.now(),
+  );
+  return { ...result, admissionResolution: resolution.state };
 }
 async function prepare(
   ctx,
@@ -389,10 +577,167 @@ export function changesFor(school, version, beforeRows, next) {
 }
 
 async function contacts(ctx) {
-  return serviceCall(ctx.env, "contacts", "/internal/projection", {
-    purpose: "deploy",
-    schoolId: ctx.principal.schoolId,
-    decisionId: ctx.principal.decisionId,
+  const pages = [],
+    people = [],
+    seenIds = new Set(),
+    cursors = new Set();
+  let cursor = null,
+    first = null,
+    size = 0,
+    validUntil = Infinity;
+  for (let index = 0; index < 32; index++) {
+    const ref = await serviceCall(ctx.env, "contacts", "/internal/projection", {
+      purpose: "deploy",
+      schoolId: ctx.principal.schoolId,
+      decisionId: ctx.principal.decisionId,
+      page: { cursor },
+    });
+    // Compatibility with earlier injected/native single-page providers. The
+    // real owner returns the bounded page contract for the request above.
+    if (index === 0 && ref && !Object.hasOwn(ref, "page")) return ref;
+    const page = ref?.page;
+    size += new TextEncoder().encode(JSON.stringify(ref)).byteLength;
+    check(
+      ref?.schemaVersion === 1 &&
+        ref.schoolId === ctx.principal.schoolId &&
+        typeof ref.revision === "string" &&
+        Number.isSafeInteger(ref.sequence) &&
+        Number.isSafeInteger(ref.asOf) &&
+        ref.observation &&
+        typeof ref.observation === "object" &&
+        !Array.isArray(ref.observation) &&
+        ref.observation.asOf === ref.asOf &&
+        typeof ref.observation.evaluationId === "string" &&
+        ref.observation.evaluationId.length > 0 &&
+        Array.isArray(ref.staff) &&
+        ref.staff.length <= 64 &&
+        Array.isArray(ref.catalogues) &&
+        Array.isArray(ref.dependencies) &&
+        typeof ref.catalogueDigest === "string" &&
+        page &&
+        Number.isSafeInteger(page.total) &&
+        page.total >= 0 &&
+        page.total <= 512 &&
+        page.offset === people.length &&
+        typeof page.complete === "boolean" &&
+        (page.nextCursor === null ||
+          (typeof page.nextCursor === "string" &&
+            page.nextCursor.length > 0 &&
+            page.nextCursor.length <= 4096)) &&
+        ref.staff.length + people.length <= page.total &&
+        size <= 8 * 1024 * 1024 &&
+        new TextEncoder().encode(JSON.stringify(ref)).byteLength <=
+          512 * 1024 &&
+        (ref.validUntil == null || Number.isSafeInteger(ref.validUntil)),
+      "Contacts pages could not be verified.",
+      "CONTACTS_UNAVAILABLE",
+      503,
+    );
+    if (!first) first = ref;
+    check(
+      ref.revision === first.revision &&
+        ref.sequence === first.sequence &&
+        page.total === first.page.total &&
+        ref.catalogueDigest === first.catalogueDigest &&
+        (await digest(ref.catalogues)) === ref.catalogueDigest,
+      "Contacts changed while the reference inventory was read.",
+      "SOURCE_REVISION_CHANGED",
+      409,
+    );
+    for (const person of ref.staff) {
+      const staffId = person?.staffId;
+      check(
+        typeof staffId === "string" &&
+          staffId.length > 0 &&
+          !seenIds.has(staffId) &&
+          (!people.length || people.at(-1).staffId < staffId),
+        "Contacts page identities are incomplete or repeated.",
+        "CONTACTS_UNAVAILABLE",
+        503,
+      );
+      seenIds.add(staffId);
+      people.push(person);
+    }
+    validUntil = Math.min(validUntil, ref.validUntil ?? Infinity);
+    pages.push(ref);
+    if (page.complete) {
+      check(
+        page.nextCursor === null && people.length === page.total,
+        "Contacts did not complete its reference inventory.",
+        "CONTACTS_UNAVAILABLE",
+        503,
+      );
+      check(
+        Math.max(ctx.now, Date.now(), ...pages.map((p) => p.asOf)) < validUntil,
+        "Contacts evidence expired while the inventory was read.",
+        "AUTHORITY_CHANGED",
+        409,
+      );
+      const dependencies = new Map();
+      for (const p of pages)
+        for (const dependency of p.dependencies) {
+          const key = dependency.owner + ":" + dependency.scope,
+            previous = dependencies.get(key);
+          check(
+            !previous ||
+              String(previous.revision) === String(dependency.revision),
+            "Contacts page dependencies changed.",
+            "SOURCE_REVISION_CHANGED",
+            409,
+          );
+          const boundary = Math.min(
+            validUntil,
+            previous?.validUntil ?? Infinity,
+            dependency.validUntil ?? Infinity,
+          );
+          dependencies.set(key, {
+            ...dependency,
+            validUntil: boundary === Infinity ? null : boundary,
+          });
+        }
+      const { page: ignored, ...base } = first;
+      return {
+        ...base,
+        staff: people,
+        smcIds: people
+          .filter((person) => person.smc === true)
+          .map((person) => person.staffId),
+        asOf: Math.max(...pages.map((p) => p.asOf)),
+        validUntil: validUntil === Infinity ? null : validUntil,
+        dependencies: [...dependencies.values()],
+        observation: {
+          kind: "paged",
+          observations: pages.map((p) => p.observation),
+          asOf: Math.max(...pages.map((p) => p.asOf)),
+        },
+      };
+    }
+    check(
+      ref.staff.length > 0 &&
+        page.nextCursor !== null &&
+        people.length < page.total &&
+        !cursors.has(page.nextCursor),
+      "Contacts page cursor did not advance.",
+      "CONTACTS_UNAVAILABLE",
+      503,
+    );
+    cursor = page.nextCursor;
+    cursors.add(cursor);
+  }
+  check(
+    false,
+    "Contacts inventory exceeds the bounded page count.",
+    "CONTACTS_UNAVAILABLE",
+    503,
+  );
+}
+function contactsDependencies(ref) {
+  return (ref.dependencies || []).map((dependency) => {
+    const until = Math.min(
+      dependency.validUntil ?? Infinity,
+      ref.validUntil ?? Infinity,
+    );
+    return { ...dependency, validUntil: until === Infinity ? null : until };
   });
 }
 async function bootstrap(ctx) {
@@ -417,6 +762,17 @@ async function bootstrap(ctx) {
     projection = await contacts(ctx);
     if (doc) doc = mergeContacts(doc, projection);
   } catch (e) {
+    if (doc)
+      doc = {
+        ...doc,
+        teachers: doc.teachers.map((t) => ({
+          ...t,
+          teachingEligibility: {
+            state: "unavailable",
+            reasons: ["CONTACTS_UNAVAILABLE"],
+          },
+        })),
+      };
     referenceError = {
       code: e.code || "CONTACTS_UNAVAILABLE",
       message:
@@ -766,9 +1122,11 @@ async function save(
     preview = null,
     dependencies = [],
     baseRevision = null,
+    preparedOperation = null,
+    contactsProjection = null,
   } = {},
 ) {
-  const op = await prepare(ctx, "deploy.edit");
+  const op = preparedOperation || (await prepare(ctx, "deploy.edit"));
   if (op.receipt) return op.receipt.result;
   const b = ctx.body,
     school = ctx.principal.schoolId,
@@ -797,28 +1155,34 @@ async function save(
     );
   }
   let next = document;
-  let extraDependencies = dependencies;
+  let extraDependencies = dependencies,
+    ref = contactsProjection;
+  const before = loaded.doc,
+    edits = b.edits || [b];
+  const explicitStaffIds = !document
+    ? edits
+        .filter(
+          (e) =>
+            e.operation === "upsertTeacherProfile" &&
+            e.referenceAction === "add-existing",
+        )
+        .map((e) => e.teacher)
+    : [];
   if (
     !next &&
-    (b.edits || [b]).some((e) =>
-      ["initReporting", "setReportingOfficer"].includes(e.operation),
-    )
+    (explicitStaffIds.length ||
+      edits.some(
+        (e) =>
+          ["addTeacher", "initReporting", "setReportingOfficer"].includes(
+            e.operation,
+          ) ||
+          (e.operation === "upsertTeacherProfile" &&
+            !before.teachers.some((t) => t.id === e.teacher)),
+      ))
   ) {
-    const ref = await contacts(ctx);
-    loaded.doc = mergeContacts(loaded.doc, ref);
-    extraDependencies = ref.dependencies || [];
-  }
-  if (
-    !next &&
-    (b.edits || [b]).some(
-      (e) =>
-        e.operation === "upsertTeacherProfile" &&
-        !loaded.doc.teachers.some((t) => t.id === e.teacher),
-    )
-  ) {
-    const ref = await contacts(ctx);
-    loaded.doc = mergeContacts(loaded.doc, ref);
-    extraDependencies = ref.dependencies || [];
+    ref ||= await contacts(ctx);
+    loaded.doc = mergeContacts(before, ref);
+    extraDependencies = contactsDependencies(ref);
   }
   if (!next) {
     if (b.operation === "saveVersionNote") {
@@ -839,6 +1203,13 @@ async function save(
         b.edits || [{ ...b, operation: b.operation }],
       );
   }
+  const bindingChanged =
+    changedTeachingStaff(before, next, explicitStaffIds).length > 0;
+  if (bindingChanged) {
+    ref ||= await contacts(ctx);
+    next = validateTeachingBindings(before, next, ref, explicitStaffIds);
+    extraDependencies = contactsDependencies(ref);
+  }
   validateDocument(next);
   let delta;
   try {
@@ -850,6 +1221,10 @@ async function save(
     throw error;
   }
   const guards = [...delta.guards, leaseGuard(ctx, scope)];
+  // A binding also reads its class/TG scope. Fence changes to those unchanged
+  // rows between comparison and commit, even without a caller revision.
+  if (bindingChanged)
+    guards.push(scopeGuard(school, b.versionId, loaded.version.revision));
   if (clearGuard) {
     // Recheck inside the same D1 commit: publication does not advance the
     // working revision. If clear wins before preparation, its revision bump
@@ -914,11 +1289,19 @@ async function save(
     },
   );
 }
+function workbookDocument(document, scope) {
+  return ["IP", "TG"].includes(scope)
+    ? canonicalTeachingDocument(document)
+    : document;
+}
 async function previewImport(ctx) {
   const b = ctx.body,
     loaded = await loadVersion(ctx.env.DB, ctx.principal.schoolId, b.versionId),
     ref = await contacts(ctx);
-  loaded.doc = mergeContacts(loaded.doc, ref);
+  loaded.doc = workbookDocument(
+    mergeContacts(loaded.doc, ref),
+    b.workbook?.metadata?.["Table Scope"],
+  );
   const dependencyDigest = await digest(ref.dependencies || []);
   const validated = validateWorkbook(
     b.workbook,
@@ -926,6 +1309,11 @@ async function previewImport(ctx) {
     ctx.principal.schoolId,
     loaded.version.revision,
     { matches: b.matches || {} },
+  );
+  validated.document = validateTeachingBindings(
+    loaded.doc,
+    validated.document,
+    ref,
   );
   const before = flatten(loaded.doc),
     after = flatten(validated.document),
@@ -971,6 +1359,8 @@ async function previewImport(ctx) {
   };
 }
 async function applyImport(ctx) {
+  const op = await prepare(ctx, "deploy.edit");
+  if (op.receipt) return op.receipt.result;
   const b = ctx.body,
     p = await one(
       ctx.env.DB,
@@ -1000,7 +1390,10 @@ async function applyImport(ctx) {
     "PREVIEW_CONFLICT",
     409,
   );
-  loaded.doc = mergeContacts(loaded.doc, ref);
+  loaded.doc = workbookDocument(
+    mergeContacts(loaded.doc, ref),
+    input.workbook?.metadata?.["Table Scope"],
+  );
   const validated = validateWorkbook(
     input.workbook,
     loaded.doc,
@@ -1011,7 +1404,9 @@ async function applyImport(ctx) {
   return save(ctx, {
     document: validated.document,
     preview: p,
-    dependencies: ref.dependencies || [],
+    dependencies: contactsDependencies(ref),
+    preparedOperation: op,
+    contactsProjection: ref,
   });
 }
 function usedVenueIds(document) {
@@ -1085,11 +1480,28 @@ function refreshedVenues(document, catalogue, schoolId) {
       ...(prior && Object.hasOwn(prior, "forms")
         ? { forms: structuredClone(prior.forms) }
         : {}),
+      ...(prior && Object.hasOwn(prior, "uses")
+        ? { uses: structuredClone(prior.uses) }
+        : {}),
     };
   });
   check(
     usedVenueIds(document).every((venueId) => ids.has(venueId)),
     "A referenced venue is no longer in the current catalogue. Review its assignment before refreshing.",
+    "VENUE_REFERENCE_CHANGED",
+    409,
+  );
+  // Legacy use metadata is not a current occupancy or publication reference.
+  // Still refuse a refresh that would discard it; unknown JSON is not empty.
+  check(
+    document.venues.every(
+      (v) =>
+        ids.has(v.id) ||
+        !Object.hasOwn(v, "uses") ||
+        v.uses === null ||
+        (Array.isArray(v.uses) && v.uses.length === 0),
+    ),
+    "A removed venue retains saved room-use metadata. Review that metadata before refreshing.",
     "VENUE_REFERENCE_CHANGED",
     409,
   );
@@ -1488,6 +1900,7 @@ export async function handle(ctx) {
     "SESSION_INVALID",
     401,
   );
+  if (p === "/operations/withdraw") return withdrawOperation(ctx);
   if (p.startsWith("/internal/pins/")) {
     await requireMembership(ctx.env, ctx.request);
     if (p.endsWith("/acquire")) {
@@ -1632,7 +2045,7 @@ export async function handle(ctx) {
   if (p === "/export") {
     const { doc, version } = await loadVersion(ctx.env.DB, school, b.versionId);
     return exportWorkbook(
-      mergeContacts(doc, await contacts(ctx)),
+      workbookDocument(mergeContacts(doc, await contacts(ctx)), b.scope),
       b.scope,
       school,
       version.revision,
@@ -1772,14 +2185,9 @@ export async function handle(ctx) {
   ) {
     const operationId = id(b.operationId || b.requestId);
     const op = await operationStatus(ctx.env.DB, school, operationId);
-    if (!op)
-      return {
-        state: "unknown",
-        saved: false,
-        operationId,
-        reason:
-          "No durable result found; absence does not prove a writer cannot commit.",
-      };
+    if (!op) return unknownOperation(operationId);
+    if (p === "/receipt" && b.recovery === true)
+      return verifyRecoveryBinding(ctx, op, id(b.versionId, "version"));
     check(
       op.actorId === ctx.principal.actorId || can(ctx.principal, "admin"),
       "Receipt belongs to another actor.",

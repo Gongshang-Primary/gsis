@@ -43,6 +43,7 @@ import { dispatchProvider } from "../../runtime/providers.mjs";
 import {
   loadState,
   recordChanges,
+  compactAdministrativeSave,
   accountingChanges,
   weekOf,
   scopeRevision,
@@ -1605,6 +1606,78 @@ async function captureObservedQuotas(ctx, loaded, next, c) {
   next.entitlements = next.entitlements.filter((r) => !remove.has(r.id));
   return { guards, writes };
 }
+// Per-layer controls supersede these editors, but imported/manual paths still
+// retain their saved values. Never erase them as a side effect of an active edit.
+const retainedSettingsFields = [
+  "allocationRuleEnabled",
+  "allocationPreferences",
+  "maxDailyPeriods",
+  "maxConsecutivePeriods",
+  "maxDailyReliefPeriods",
+  "adhocReliefMaxPeriods",
+  "consecutiveSubjectRules",
+];
+function settingsCompatibility(state, context, body) {
+  const saved = state.systemConfig,
+    input = { ...body };
+  for (const key of retainedSettingsFields) {
+    requireValue(
+      !Object.hasOwn(body, key) ||
+        canonical(body[key]) === canonical(saved[key]),
+      "LAYER_SETTINGS_READ_ONLY",
+      400,
+      "Use Allocation layers to edit current limits and preferences. Retained settings cannot be changed here.",
+    );
+    input[key] = structuredClone(saved[key]);
+  }
+  // Match the shared domain's private subjectNormal exactly. Its exported norm
+  // lowercases instead; that is not equivalent for every Unicode subject code.
+  const subjectKey = (value) =>
+      String(value || "")
+        .normalize("NFKC")
+        .trim()
+        .replace(/\s+/g, " ")
+        .toUpperCase(),
+    known = new Set(
+      [...(context.subjects || []), ...saved.sharedSubjectCoverSubjects].map(
+        subjectKey,
+      ),
+    ),
+    selected =
+      body.sharedSubjectCoverSubjects ?? saved.sharedSubjectCoverSubjects;
+  requireValue(
+    Array.isArray(selected) &&
+      selected.length <= 200 &&
+      selected.every(
+        (value) =>
+          typeof value === "string" &&
+          value.length <= 100 &&
+          value.trim() &&
+          known.has(subjectKey(value)),
+      ),
+    "ROSTER_RULE_REJECTED",
+    400,
+    "Choose shared lesson subjects from the baseline timetable.",
+  );
+  const retainedRules = input.consecutiveSubjectRules;
+  input.consecutiveSubjectRules =
+    Allocation.normalizeConsecutiveSubjectRules(retainedRules);
+  return {
+    input,
+    retainedRules,
+    // Only legacy validation sees these retained names. Do not turn them into
+    // baseline cells, current subject evidence, dependencies or response data.
+    context: {
+      ...context,
+      subjects: [
+        ...new Set([
+          ...(context.subjects || []),
+          ...input.consecutiveSubjectRules.map((rule) => rule.subject),
+        ]),
+      ],
+    },
+  };
+}
 async function operations(ctx) {
   const schoolId = ctx.principal.schoolId,
     body = ctx.body,
@@ -1617,7 +1690,9 @@ async function operations(ctx) {
       ...(body.ids || []),
       ...(body.absenceIds || []),
     ].filter(Boolean),
-    scope = (adminWrites.has(opName) || opName === "openingBalances") ? "config" : "day:" + range.from,
+    scope = (adminWrites.has(opName) || ["openingBalances", "systemConfig"].includes(opName) ||
+      (opName === "read" && ["types", "systemConfig"].includes(body.view)))
+      ? "config" : "day:" + range.from,
     revision = await scopeRevision(ctx.env.DB, schoolId, scope),
     configRevision = await scopeRevision(ctx.env.DB, schoolId, "config"),
     loaded = await loadState(ctx.env.DB, schoolId, range, { recordIds: ids });
@@ -1739,18 +1814,77 @@ async function operations(ctx) {
     next = structuredClone(loaded.state);
   let result;
   try {
-    result = Operations.apply(next, c, {
-      ...body,
+    const compatible =
+      opName === "saveSystemConfig"
+        ? settingsCompatibility(next, c, body)
+        : { input: body, context: c };
+    result = Operations.apply(next, compatible.context, {
+      ...compatible.input,
       operation: opName,
       requestId: op.operationId,
     });
+    if (opName === "saveSystemConfig") {
+      const retainedRules = compatible.retainedRules;
+      if (
+        canonical(next.systemConfig.consecutiveSubjectRules) !==
+        canonical(retainedRules)
+      ) {
+        // Legacy validation accepts equivalent annotated/cased labels. The
+        // allocator normalizes them when used; retain their saved representation.
+        const audit = next.audit.at(-1);
+        requireValue(
+          canonical(
+            Allocation.normalizeConsecutiveSubjectRules(retainedRules),
+          ) === canonical(next.systemConfig.consecutiveSubjectRules) &&
+            audit?.operation === "saveSystemConfig" &&
+            audit.config &&
+            !loaded.state.audit.some((old) => old.id === audit.id),
+          "STORED_SETTINGS_INVALID",
+          503,
+        );
+        next.systemConfig.consecutiveSubjectRules =
+          structuredClone(retainedRules);
+        audit.config.consecutiveSubjectRules = structuredClone(retainedRules);
+      }
+      for (const key of retainedSettingsFields)
+        requireValue(
+          canonical(next.systemConfig[key]) ===
+            canonical(
+              key === "consecutiveSubjectRules"
+                ? retainedRules
+                : compatible.input[key],
+            ),
+          "STORED_SETTINGS_INVALID",
+          503,
+          "Retained settings could not be preserved. No settings were saved.",
+        );
+      // A saved view must not fabricate legacy migration links or persist read
+      // initialization. Existing actual links remain untouched in the clone.
+      const viewState = structuredClone(next);
+      viewState.nameBridgesSeeded = true;
+      result = { ...Operations.systemConfigView(viewState, c), ...result };
+    } else if (opName === "saveTypes") {
+      const view = Operations.read(structuredClone(next), c, {
+        operation: "read",
+        view: "types",
+        date: range.from,
+      });
+      result = {
+        date: view.date,
+        types: view.types,
+        periods: view.periods,
+        ...result,
+      };
+    }
   } catch (e) {
     throw safeLegacyError(e);
   }
   await updateCapacityWarnings(ctx, loaded, next, c, range.dates, revision);
   const quotaPlan = await captureObservedQuotas(ctx, loaded, next, c),
     change = await recordChanges(schoolId, loaded.before, next, loaded.records,
-      opName === "saveOpeningBalances" ? { maxWrites: 6000 } : undefined),
+      opName === "saveOpeningBalances" ? { maxWrites: 6000 }
+        : ["saveSystemConfig", "saveTypes"].includes(opName)
+          ? { administrativeSave: opName } : undefined),
     sc = scopeChange(schoolId, scope, revision);
   accountingChanges(schoolId, loaded, change, {
     forceWeeks: quotaPlan.writes.length ? [weekOf(range.from)] : [],
@@ -1860,7 +1994,10 @@ async function operations(ctx) {
     },
     outbox,
   };
-  return commit(ctx, op, opName === "saveOpeningBalances" ? compactOpeningSave(schoolId, plan) : plan);
+  return commit(ctx, op, opName === "saveOpeningBalances"
+    ? compactOpeningSave(schoolId, plan)
+    : ["saveSystemConfig", "saveTypes"].includes(opName)
+      ? compactAdministrativeSave(schoolId, opName, plan) : plan);
 }
 async function preparePublication(ctx, op, state, c, date, revision) {
   const schoolId = ctx.principal.schoolId,

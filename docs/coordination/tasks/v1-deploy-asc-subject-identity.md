@@ -1,6 +1,6 @@
 # v1-deploy-asc-subject-identity: preserve source loads and block mappings
 
-- Status: claimed; implementation pending.
+- Status: implemented and locally verified; exact-head full CI and Claude review pending.
 - Owner/model: Codex; v1 coordinator ChatGPT; independent exact-head reviewer Claude.
 - Updated (Asia/Singapore): 15 November 2026, 10:51.
 - Branch: `codex/v1-deploy-asc-subject-identity`.
@@ -31,6 +31,8 @@ V1 coordinator permits this sequential stacked task while frozen predecessors aw
 
 Preserve actual source subject identity, exact loads and level/subject block keys. Use the existing legacy alias only as an unambiguous compatibility fallback when the exact source is absent. Distinguish absent from zero; do not invent demand or default every lesson to singles. Conflicting alias definitions, loads or mappings must produce a visible blocker rather than choosing silently. Keep TG actual loads, class-local divisions, explicit subject crosswalks, teacher references and stable namespace/export IDs. Do not merge subjects merely because labels resemble each other. Preserve valid existing legacy exports.
 
+Explicit and multi-level TG compatibility: unused level-default loads must not change export identity. Retain the existing profile mapping for assigned TGs and raw identity for unassigned-only TGs; do not double-count an assigned TG when includeUnassigned is selected. This leaves the historical first-assignment identity transition as an explicit installed-aSc validation limit, without rewriting any stored source or mapping.
+
 Use actual built ASC code and a browser download with synthetic data. Test Science/Sci and PE/PHE, exact and fallback keys, zero/missing/conflicting loads and splits, TG load and crosswalk/division preservation, deterministic repeated XML, no duplicate lesson demand, valid foreign keys and unchanged IDs for already-valid exports. Reparse downloaded XML securely. Preserve no-network pure conversion and unchanged source snapshot; no stored-map writes during download.
 
 Skill applied: `skill://user/6ada82d03e8c8191a64f562e42ddf844/export-asc-timetables/SKILL.md`, read15November. Apply its identity, block-count and structural/semantic validation rules. This repair retains the current compatibility profile; fresh installed-aSc export/import and round-trip acceptance are separate unperformed gates, not claimed or requested as a prerequisite to this source repair. Do not copy the skill or private reference files into the product.
@@ -39,4 +41,6 @@ Run TZ=Asia/Singapore focused red/green, unchanged existing ASC/Deploy and paren
 
 ## Handoff
 
-Q01 claim pending publication; Q02–Q06 pending implementation evidence; Q07 Claude pending; Q08 no release action. Rollback restores the alias defect without data/schema changes. F5 remains OPEN. Official T1B-01/T1B-02, runtime UAT and installed-aSc application import remain Not tested. The next deployed release remains v1.01 under the separate version task.
+Q01 passed: claim accepted on main at `34543928ad758f01d217573378e0651233e7c376`, merged into the frozen parent before editing at `5d73579a3f9777c0235d01f7849e1329f0681f17`. Q02–Q05 passed: bounded v1-only adapter, exact identity/zero/conflict handling, no data mutation, four owned paths and unchanged parent code outside the helper/call. Q06 focused/build/discovery passed; full exact-head suites/CI pending publication. Q07 Claude pending; Q08 no release action. [Verification and limitations](../../v1/accelerated-delivery/ASC_SUBJECT_IDENTITY_FIX_2026-11-15.md) and the PR provide the tested implementation SHA and final CI evidence.
+
+Rollback restores the alias defect without data/schema changes. F5 remains OPEN. Official T1B-01/T1B-02, runtime UAT and installed-aSc application import remain Not tested. The next deployed release remains v1.01 under the separate version task.

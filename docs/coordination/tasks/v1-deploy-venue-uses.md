@@ -1,13 +1,13 @@
 # v1-deploy-venue-uses: B-V01c preserve saved room-use metadata
 
-- Status: claimed for bounded implementation under the owner's continuing frontend UAT repair instruction. Publish this claim and incorporate it before edits; no merge or deployment authorised.
+- Status: implementation and focused verification complete; full suites through exact-head CI, publication and Claude review pending. No merge or deployment authorised.
 - Owner/model: Codex; coordinator ChatGPT for v1; independent exact-head reviewer Claude.
-- Last updated: 15 November 2026, 13:09 SGT.
-- Intended branch: `codex/v1-deploy-venue-uses`.
+- Last updated: 15 November 2026, 13:18 SGT.
+- Branch: `codex/v1-deploy-venue-uses`.
 - Selected frozen parent: `ecaa37e87bc34ba85b8d3649184b0279e973539d`, branch `codex/v1-deploy-save-recovery`. PR #168 is open at that frozen head. Full CI `43678891012` is green: 1,184 Node programs and 40 LORD programs in every shard; clean local product passes 85/85. PR product/build CI and Claude review remain pending. No parent source edits continue during this handoff.
-- Refreshed main: `b0266811578109327bb3a51d60d1267647a4ba79`; use this expected head for the non-force claim update and stop/reassess if it moves.
+- Pre-claim main: `b0266811578109327bb3a51d60d1267647a4ba79`; the non-force claim update was accepted at `68f0504f408a52b00d1d0cd625f21a3ea87c76f2`.
 - Run B source: `9b6b9361a42de0e54153e7a0a63d719150ac2392`, `docs/v1/accelerated-delivery/UAT_RUN_B_2026-11-15.md` on `codex/v1-uat-run-b-20261115`.
-- Accepted claim SHA / incorporation SHA / implementation head / PR: pending.
+- Accepted claim: `68f0504f408a52b00d1d0cd625f21a3ea87c76f2`. Incorporated before implementation at `d4b2ebacc6cc7a66f59291cb60795e74be121761`, tree `8d4f20ee1a70c606623f00ec51953fc94dc387c1`. Final implementation head and PR: pending.
 - Authorisation: next bounded repair in the continuing owner-authorised frontend UAT queue, selected by ChatGPT as v1 coordinator. The accepted Git claim is required before implementation; no live action is authorised.
 
 ## Exact four-path scope
@@ -25,11 +25,11 @@ At 13:09 SGT all heads, main, Run B, Claude review branch and all 28 actual open
 
 ## Preserved parent and incorporation
 
-Refresh all heads, main, active claims, actual open-PR file inventories, UAT/review branches and CI. Read current root/v1 instructions and owner decisions. Record the current B-R01 PR/head/CI state; a running or missing check is pending, not a pass. Confirm its source is frozen and this is a same-builder serial handoff, with no competing service/test editor. Do not edit B-R01 or its predecessor branches.
+The refresh and read recorded above established the same-builder serial handoff. B-R01 PR #168 is frozen at `ecaa37e87bc34ba85b8d3649184b0279e973539d`. Its full CI and clean local product results are parent evidence only; its PR product/build CI and Claude review remain pending at this checkpoint. No B-R01 or predecessor branch is being edited.
 
 The selected parent already contains PR #160 publication recovery `ab24739203f3bcc03c5b7e6c96f8fa2144a84654`, PR #164 clear-authority guards `11370014ed8b8eb73b8f0f15ec30eff744f7b1f9`, LORD #167 `af6065e30c667b453f72b27ffbdec742ceaac92f`, and the ASC/Fortnight/Contacts/saved-draft chain. It also includes B-R01 claims `5260b40c06f6a25652530c6a63db35048ec0a619`, `2e62819640458b9b78438158d1785e570b88d346` and `b0266811578109327bb3a51d60d1267647a4ba79`. These ancestry relationships were checked read-only. Parent verification is not child verification.
 
-Publish only this task record on the refreshed main using the existing non-force expected-head claim exception. Re-read claims after acceptance. Start the implementation branch from the frozen parent and immediately incorporate the accepted claim before any implementation edit, recording the resulting exact SHA. If current main introduces overlapping changes, stop that overlap and let the coordinator resolve the base. A changed parent requires revalidation; never overwrite or silently omit its fixes.
+The coordinator published only this task claim on main, re-read the accepted record, and incorporated it into the frozen parent before implementation. The exact claim/base/tree are recorded above and were verified locally. Public preimplementation merge `e8de600a00ca0f682c49092b7b69a229703c2300` has the same tree `8d4f20ee1a70c606623f00ec51953fc94dc387c1` as local `d4b2ebacc6cc7a66f59291cb60795e74be121761`; neither is a tested implementation head. Refresh actual overlaps again before publication. A changed parent or new overlap requires coordinator reassessment and child revalidation; do not overwrite or omit predecessor fixes.
 
 ## Defect and smallest repair
 
@@ -51,7 +51,7 @@ Keep existing generic JSON validation and document/delta bounds. Historical seed
 
 ## Proportionate acceptance tests
 
-Extend `tests/v1-product-deploy-venues.mjs` using its existing actual local Worker/D1 school, catalogue setup, revision/lease helpers and one restart. Keep the existing eight groups and shared fixtures; add a small table of values rather than a new test framework.
+The existing actual local Worker/D1 program now passes 11 groups, retaining all eight original groups and adding three groups with a nine-value table. It reuses the school, catalogue, revision/lease helpers and one restart. The following acceptance requirements are covered by `/tmp/gsis-venue-uses-final.log`:
 
 1. First reproduce omission with a same-ID room containing form/forms and nonempty uses. After repair, current canonical label/revision changes, uses/form/forms stay exact, unrelated planning data stays unchanged, and the input snapshot is not mutated.
 2. Cover own-property absence, `null`, `[]`, ordered/duplicate label arrays and bounded unknown JSON. Include `false`, `0`, an empty string and an object so no truthiness guard can silently lose them. No sample-derived three-item/twelve-character cap. These are retention cases, not new allocations.
@@ -63,8 +63,20 @@ Use synthetic records and controlled faults only. A new browser test is unnecess
 
 ## Verification, handoff and rollback
 
-Implementation verification is pending. Under `TZ=Asia/Singapore`, run canonical build, the focused venue program, relevant unchanged Deploy storage/clear-authority/B-R01 and Core/Contacts regressions, runner discovery, required product/Node/LORD suites and exact-head CI. Preserve existing assertions, runner limits and historical exclusions. Record actual commands, counts, failures/omissions, exact commit, four-file diff and tracked build parity. Size implementation and focused cases to this small repair; full-suite requirements still apply.
+The source change adds 17 lines to `refreshedVenues()`: same-ID own-property cloning and a refresh-local retained-data guard. `usedVenueIds()` and `referenceVenues()` are unchanged. The [handoff](../../v1/accelerated-delivery/DEPLOY_VENUE_USES_FIX_2026-11-15.md) records the commands and evidence. These are working-tree results, not a published exact-head pass.
 
-Update the paired handoff with actual results and give Claude the exact PR head. New code requires updated review. Q01–Q07 remain pending their actual claim/implementation/verification/review evidence; Q08 is not applicable to deployment. F5 stays OPEN; official T1B-01/T1B-02 and unperformed runtime UAT stay Not tested.
+| Check | Actual status |
+| --- | --- |
+| `TZ=Asia/Singapore npm run build` | Baseline and final working-tree builds pass, all 18 components; no tracked drift. `/tmp/gsis-venue-uses-canonical-base.log`, `/tmp/gsis-venue-uses-canonical-final.log`. |
+| Red focused venue run before source repair | Seven groups passed, one failed on missing uses; elapsed 15.536s. `/tmp/gsis-venue-uses-red-actual.log`. The preceding `/usr/bin/time` invocation failed before tests with exit 127 because that binary was absent; `/tmp/gsis-venue-uses-red.log`. |
+| Four unchanged Deploy programs plus 12 Core/Contacts files | Pass, process exit 0; 56/56 Core/Contacts cases. `/tmp/gsis-venue-uses-regressions.log`. |
+| Service syntax, Prettier and scoped whitespace | Pass for the current source change. |
+| `TZ=Asia/Singapore node tests/v1-product-deploy-venues.mjs` | 11/11 actual Worker/D1 groups pass in 16.791s, preserving all eight original groups. `/tmp/gsis-venue-uses-final.log`. |
+| Four-path scope and existing runner discovery | Pass: exact claimed inventory, 85 product and 1,184 Node programs; `/tmp/gsis-venue-uses-product-list.json`, `/tmp/gsis-venue-uses-node-list.json`. Discovery is not full execution. |
+| Full product/Node/LORD, exact-head CI, PR and Claude review | Pending. The 85-product suite will run through PR CI and 1,184 Node/LORD through full CI. No child local full-suite run is claimed. |
+
+All runtime checks use `TZ=Asia/Singapore`. Preserve existing assertions, runner limits and historical exclusions; the pending full-suite requirements remain in force.
+
+Update the paired handoff with actual results and give Claude the exact PR head. New code requires updated review. Q01 has accepted-claim, parent and overlap evidence; Q02–Q05 have the bounded source change and passing focused/security/recovery regressions. Q06 remains pending full exact-head CI, and Q07 pending PR/exact-head handoff and Claude review; Q08 is not applicable to deployment. F5 stays OPEN; official T1B-01/T1B-02 and unperformed runtime UAT stay Not tested.
 
 Rollback requires no schema or data migration. Reverting reintroduces loss on future refreshes; it cannot reconstruct values already discarded by an earlier operation. Never fill historical rooms from generic seed values. B-V01a initial-register UI, B-V01b navigation, B-D03 pending publication and B-CA01/B-CA02 Calendar findings remain separate tasks.

@@ -36,6 +36,7 @@ import {
   requireCapability,
   requireOwner,
   resourceInput,
+  bookingGroupInput,
   bookingInput,
   publicBooking,
   csv,
@@ -200,12 +201,20 @@ export function policy(method, path, body = {}) {
   fail("NOT_FOUND", "Unknown LORD operation.", 404);
 }
 function parameters(ctx) {
-  return {
+  const input = {
     ...Object.fromEntries(
       new URL(ctx.request?.url || "https://internal" + ctx.path).searchParams,
     ),
     ...(ctx.body || {}),
   };
+  if (typeof input.bookingGroup === "string") {
+    try {
+      input.bookingGroup = JSON.parse(input.bookingGroup);
+    } catch {
+      fail("INVALID_INPUT", "Invalid cart selection.");
+    }
+  }
+  return input;
 }
 function requireRevision(value) {
   return integer(value, 0, Number.MAX_SAFE_INTEGER, "revision");
@@ -232,10 +241,251 @@ async function booking(db, school, bookingId) {
   if (!b) fail("NOT_FOUND", "Booking not found.", 404);
   return b;
 }
+const cartOf = (row) =>
+  text(JSON.parse(row.metadata_json).cart || "", "cart", 160);
+async function cartProjection(school, cart, rows) {
+  const members = rows
+    .map((r) => ({
+      resourceId: r.resource_id,
+      revision: r.revision,
+      capacity: r.capacity,
+    }))
+    .sort((a, b) =>
+      a.resourceId < b.resourceId ? -1 : a.resourceId > b.resourceId ? 1 : 0,
+    );
+  const capacity = members.reduce((n, m) => n + m.capacity, 0);
+  const invalid =
+    !members.length ||
+    members.length > 20 ||
+    rows.some(
+      (r) =>
+        r.type !== rows[0].type ||
+        !Number.isSafeInteger(r.capacity) ||
+        r.capacity < 1 ||
+        r.capacity > 200,
+    );
+  return {
+    resource: cart,
+    name: cart,
+    deviceType: rows[0]?.type || "",
+    capacity,
+    active: !invalid,
+    groupState: invalid ? "unresolved" : "verified",
+    ...(invalid
+      ? {
+          unavailableReason:
+            "Cart membership must have one device type and one to twenty members, each with capacity from 1 to 200.",
+        }
+      : {}),
+    stylusOption: rows.some(
+      (r) => JSON.parse(r.metadata_json).stylusOption === true,
+    ),
+    headphoneOption: rows.some(
+      (r) => JSON.parse(r.metadata_json).headphoneOption === true,
+    ),
+    bookingGroup: {
+      cart,
+      revision: await digest({ schoolId: school, cart, members }),
+      members,
+    },
+  };
+}
+async function bookingResources(school, rows) {
+  const carts = new Map(),
+    result = [];
+  for (const r of rows.filter((r) => r.active === 1)) {
+    const cart = cartOf(r),
+      metadata = JSON.parse(r.metadata_json);
+    if (cart) {
+      if (!carts.has(cart)) carts.set(cart, []);
+      carts.get(cart).push(r);
+    } else
+      result.push({
+        resource: r.resource_id,
+        name: r.name,
+        deviceType: r.type,
+        capacity: r.capacity,
+        active: true,
+        groupState: "standalone",
+        bookingGroup: null,
+        stylusOption: metadata.stylusOption === true,
+        headphoneOption: metadata.headphoneOption === true,
+      });
+  }
+  result.push(
+    ...(await Promise.all(
+      [...carts].map(([cart, members]) =>
+        cartProjection(school, cart, members),
+      ),
+    )),
+  );
+  const rank = (r) =>
+    /ipad/i.test(r.deviceType)
+      ? 1
+      : /laptop|windows|notebook|chromebook|macbook/i.test(r.deviceType)
+        ? 2
+        : 0;
+  return result
+    .sort(
+      (a, b) =>
+        rank(a) - rank(b) ||
+        a.resource.localeCompare(b.resource, "en", {
+          numeric: true,
+          sensitivity: "base",
+        }),
+    )
+    .map((r, sortOrder) => ({ ...r, sortOrder }));
+}
+function cartMembershipGuard(school, selection) {
+  const members = canonical(selection.members);
+  return guard(
+    `SELECT
+    (SELECT COUNT(*) FROM lord_resources WHERE school_id=? AND active=1 AND json_extract(metadata_json,'$.cart')=?)=json_array_length(?)
+    AND NOT EXISTS(SELECT 1 FROM json_each(?) x LEFT JOIN lord_resources r
+      ON r.school_id=? AND r.resource_id=json_extract(x.value,'$.resourceId')
+      WHERE r.resource_id IS NULL OR r.active<>1 OR r.revision<>json_extract(x.value,'$.revision')
+        OR r.capacity<>json_extract(x.value,'$.capacity') OR COALESCE(json_extract(r.metadata_json,'$.cart'),'')<>?) AS ok`,
+    [school, selection.cart, members, members, school, selection.cart],
+  );
+}
+async function resolveBookingGroup(db, school, planned) {
+  if (!planned.bookingGroup) return planned;
+  const selection = planned.bookingGroup;
+  const rows = await query(
+    db,
+    "SELECT * FROM lord_resources WHERE school_id=? AND active=1 AND json_extract(metadata_json,'$.cart')=? ORDER BY resource_id LIMIT 21",
+    [school, selection.cart],
+  );
+  const group = await cartProjection(school, selection.cart, rows);
+  if (!group.active || canonical(group.bookingGroup) !== canonical(selection))
+    fail(
+      "GROUP_REVISION_CONFLICT",
+      "Cart membership changed or cannot be verified. Reload the cart before booking.",
+      409,
+    );
+  if (planned.details.requestedQuantity > group.capacity)
+    fail("RESOURCE_CAPACITY", "Requested quantity exceeds cart capacity.", 409);
+  return {
+    ...planned,
+    items: group.bookingGroup.members.map((m) => ({
+      resourceId: m.resourceId,
+      quantity: m.capacity,
+    })),
+    details: {
+      ...planned.details,
+      deviceType: group.deviceType,
+      bookingGroup: group.bookingGroup,
+    },
+  };
+}
+function inventoryCartGuards(school, rows, existing) {
+  const affected = new Set();
+  for (const row of rows) {
+    const old = existing.find((r) => r.resource_id === row.resourceId),
+      oldCart = old ? cartOf(old) : "";
+    if (
+      !old ||
+      oldCart !== row.metadata.cart ||
+      Boolean(old.active) !== row.active ||
+      old.capacity !== row.capacity ||
+      old.type !== row.type ||
+      Boolean(old.exclusive) !== row.exclusive ||
+      old.buffer_periods !== row.bufferPeriods
+    ) {
+      if (oldCart && old?.active) affected.add(oldCart);
+      if (row.metadata.cart && row.active) affected.add(row.metadata.cart);
+    }
+  }
+  return [...affected].map((cart) =>
+    guard(
+      "SELECT NOT EXISTS(SELECT 1 FROM lord_bookings b JOIN lord_booking_items i USING(school_id,booking_id) JOIN lord_resources r USING(school_id,resource_id) WHERE b.school_id=? AND b.status IN('BOOKED','COLLECTED') AND json_extract(r.metadata_json,'$.cart')=?) AS ok",
+      [school, cart],
+    ),
+  );
+}
+function recordedRequestedQuantity(details) {
+  return Number.isSafeInteger(details.requestedQuantity) &&
+    details.requestedQuantity >= 1 &&
+    details.requestedQuantity <= 200
+    ? details.requestedQuantity
+    : null;
+}
+function capturedBookingGroup(details, items) {
+  if (!details.bookingGroup) return null;
+  try {
+    const saved = bookingGroupInput(details.bookingGroup);
+    return saved.members.length === items.length &&
+      saved.members.every((m) =>
+        items.some(
+          (i) => i.resource_id === m.resourceId && i.quantity === m.capacity,
+        ),
+      )
+      ? saved
+      : null;
+  } catch {
+    return null;
+  }
+}
+async function bookingGroupView(db, row, items) {
+  const details = JSON.parse(row.details_json),
+    reservedCapacity = items.reduce((n, i) => n + i.quantity, 0);
+  const requestedQuantity = recordedRequestedQuantity(details),
+    carts = new Set(items.map(cartOf));
+  const captured = capturedBookingGroup(details, items);
+  // A captured cart is historical evidence. Current inventory only determines
+  // whether its complete membership can still be selected for an edit.
+  const cart = details.bookingGroup
+    ? captured?.cart
+    : carts.size === 1 && !carts.has("")
+      ? [...carts][0]
+      : null;
+  if (cart) {
+    const current = await query(
+      db,
+      "SELECT * FROM lord_resources WHERE school_id=? AND active=1 AND json_extract(metadata_json,'$.cart')=? ORDER BY resource_id LIMIT 21",
+      [row.school_id, cart],
+    );
+    const group = await cartProjection(row.school_id, cart, current);
+    if (
+      group.active &&
+      group.bookingGroup.members.length === items.length &&
+      group.bookingGroup.members.every((m) =>
+        items.some(
+          (i) => i.resource_id === m.resourceId && i.quantity === m.capacity,
+        ),
+      )
+    )
+      return {
+        resource: cart,
+        groupState: "verified",
+        bookingGroup: group.bookingGroup,
+        reservedCapacity,
+        requestedQuantity,
+      };
+    if (captured)
+      return {
+        resource: captured.cart,
+        groupState: "unresolved",
+        bookingGroup: null,
+        reservedCapacity,
+        requestedQuantity,
+      };
+  }
+  const standalone = !details.bookingGroup && carts.size === 1 && carts.has("");
+  return {
+    resource: standalone
+      ? items.map((i) => i.resource_id).join(", ")
+      : "Unresolved resource group",
+    groupState: standalone ? "standalone" : "unresolved",
+    bookingGroup: null,
+    reservedCapacity,
+    requestedQuantity: standalone ? reservedCapacity : requestedQuantity,
+  };
+}
 async function bookingView(db, row) {
   const items = await query(
       db,
-      "SELECT i.*,r.name,r.type FROM lord_booking_items i JOIN lord_resources r USING(school_id,resource_id) WHERE i.school_id=? AND i.booking_id=? ORDER BY resource_id",
+      "SELECT i.*,r.name,r.type,r.metadata_json FROM lord_booking_items i JOIN lord_resources r USING(school_id,resource_id) WHERE i.school_id=? AND i.booking_id=? ORDER BY resource_id",
       [row.school_id, row.booking_id],
     ),
     accessories = await query(
@@ -255,8 +505,7 @@ async function bookingView(db, row) {
     ...result,
     teacher: ref?.name || "",
     teacherTtbName: ref?.name || "",
-    resource: items[0]?.resource_id || "",
-    requestedQuantity: items.reduce((n, i) => n + i.quantity, 0),
+    ...(await bookingGroupView(db, row, items)),
     sessionId: row.booking_id,
     isOpen: row.status === "COLLECTED",
     trolleys: items.map((i) => ({
@@ -424,8 +673,14 @@ async function reference(ctx) {
         parameters(ctx).includeInactive === "1"
           ? ""
           : "AND active=1 ") +
-        "ORDER BY name",
+        "ORDER BY name LIMIT 2001",
       [school],
+    );
+  if (resources.length > 2000)
+    fail(
+      "RESULT_BOUNDS",
+      "Inventory exceeds the supported reference bound.",
+      422,
     );
   const state = await one(
     ctx.env.DB,
@@ -482,16 +737,7 @@ async function reference(ctx) {
       revision: r.revision,
       ...JSON.parse(r.metadata_json),
     })),
-    bookingResources: resources.map((r, i) => ({
-      resource: r.resource_id,
-      name: r.name,
-      deviceType: r.type,
-      capacity: r.capacity,
-      active: true,
-      sortOrder: i,
-      stylusOption: JSON.parse(r.metadata_json).stylusOption === true,
-      headphoneOption: JSON.parse(r.metadata_json).headphoneOption === true,
-    })),
+    bookingResources: await bookingResources(school, resources),
     trolleys,
     teachers: staff.map((r) => r.name),
     staff: staff.map((r) => ({
@@ -531,6 +777,7 @@ async function resourceSave(ctx, input) {
     else if (revision !== 0)
       fail("REVISION_CONFLICT", "Resource no longer exists.", 409);
     const guards = [
+      ...inventoryCartGuards(school, [row], old ? [old] : []),
       old
         ? guard(
             "SELECT revision=? AS ok FROM lord_resources WHERE school_id=? AND resource_id=?",
@@ -657,6 +904,7 @@ async function resourcesSave(ctx, input) {
     );
     return {
       guards: [
+        ...inventoryCartGuards(school, rows, existing),
         guard(
           "SELECT NOT EXISTS(SELECT 1 FROM json_each(?) x LEFT JOIN lord_resources r ON r.school_id=? AND r.resource_id=json_extract(x.value,'$.resourceId') WHERE COALESCE(r.revision,0)<>json_extract(x.value,'$.revision')) AS ok",
           [payload, school],
@@ -714,7 +962,11 @@ async function saveBookings(ctx, input, update = false) {
       }
       const planned = await Promise.all(
         raw.map(async (value, i) => ({
-          ...bookingInput({ ...input, ...value }, p),
+          ...(await resolveBookingGroup(
+            db,
+            p.schoolId,
+            bookingInput({ ...input, ...value }, p),
+          )),
           bookingId:
             prior?.booking_id || (await generatedId("b", op.operationId, i)),
         })),
@@ -735,6 +987,8 @@ async function saveBookings(ctx, input, update = false) {
         ),
       );
       for (const b of planned) {
+        if (b.bookingGroup)
+          guards.push(cartMembershipGuard(p.schoolId, b.bookingGroup));
         const ref = await one(
           db,
           "SELECT * FROM lord_references WHERE school_id=? AND staff_id=?",
@@ -777,6 +1031,12 @@ async function saveBookings(ctx, input, update = false) {
             fail(
               "RESOURCE_UNAVAILABLE",
               "A selected resource is unavailable.",
+              409,
+            );
+          if (!b.bookingGroup && cartOf(r))
+            fail(
+              "GROUP_SELECTION_REQUIRED",
+              "Select the whole cart from its current reference before booking.",
               409,
             );
           if (line.quantity > r.capacity)
@@ -904,6 +1164,14 @@ async function saveBookings(ctx, input, update = false) {
             status: "BOOKED",
             revision: (prior?.revision || 0) + 1,
             items: b.items,
+            ...(b.bookingGroup
+              ? {
+                  resource: b.bookingGroup.cart,
+                  bookingGroup: b.bookingGroup,
+                  requestedQuantity: b.details.requestedQuantity,
+                  reservedCapacity: b.items.reduce((n, i) => n + i.quantity, 0),
+                }
+              : {}),
           })),
           ...(planned.length === 1
             ? {
@@ -2453,7 +2721,7 @@ async function board(ctx, input) {
   const date = day(input.date || sgDay(ctx.now ?? Date.now())),
     rows = await query(
       ctx.env.DB,
-      "SELECT b.booking_id,b.staff_id,b.service_date,b.start_period,b.end_period,b.status,b.revision,b.details_json,b.updated_at,i.resource_id,i.quantity,i.collected_quantity,i.returned_quantity,r.name,ref.name AS teacher_name FROM lord_bookings b JOIN lord_booking_items i USING(school_id,booking_id) JOIN lord_resources r USING(school_id,resource_id) LEFT JOIN lord_references ref ON ref.school_id=b.school_id AND ref.staff_id=b.staff_id WHERE b.school_id=? AND b.service_date=? AND b.status<>'CANCELLED' ORDER BY b.start_period,r.name LIMIT 501",
+      "SELECT b.booking_id,b.staff_id,b.service_date,b.start_period,b.end_period,b.status,b.revision,b.details_json,b.updated_at,i.resource_id,i.quantity,i.collected_quantity,i.returned_quantity,r.name,r.type,r.metadata_json,r.revision AS resource_revision,ref.name AS teacher_name FROM lord_bookings b JOIN lord_booking_items i USING(school_id,booking_id) JOIN lord_resources r USING(school_id,resource_id) LEFT JOIN lord_references ref ON ref.school_id=b.school_id AND ref.staff_id=b.staff_id WHERE b.school_id=? AND b.service_date=? AND b.status<>'CANCELLED' ORDER BY b.start_period,r.name LIMIT 501",
       [ctx.principal.schoolId, date],
     );
   if (rows.length > 500)
@@ -2469,6 +2737,8 @@ async function board(ctx, input) {
         r.revision,
         r.start_period,
         r.end_period,
+        r.resource_id,
+        r.resource_revision,
       ]),
     );
   const deviceExpiry = ctx.principal.deviceScope
@@ -2482,14 +2752,51 @@ async function board(ctx, input) {
       [ctx.principal.schoolId],
     ),
     periods = timing ? JSON.parse(timing.value_json).periods : [];
-  const bookings = filtered.map((r) => {
+  // Scope filtering precedes grouping. A cart never broadens a device's
+  // physical-resource authority, including access to booking-wide photographs.
+  const grouped = new Map();
+  for (const row of filtered) {
+    if (!grouped.has(row.booking_id)) grouped.set(row.booking_id, []);
+    grouped.get(row.booking_id).push(row);
+  }
+  const complete = new Set(
+    [...grouped]
+      .filter(
+        ([bookingId, visible]) =>
+          visible.length ===
+          rows.filter((r) => r.booking_id === bookingId).length,
+      )
+      .map(([bookingId]) => bookingId),
+  );
+  const bookings = [...grouped.values()].map((members) => {
+    const r = members[0],
+      carts = new Set(members.map(cartOf)),
+      savedDetails = JSON.parse(r.details_json);
+    const allItems = rows.filter((item) => item.booking_id === r.booking_id);
+    const captured = capturedBookingGroup(savedDetails, allItems);
+    const cart = savedDetails.bookingGroup
+      ? captured?.cart
+      : carts.size === 1 && !carts.has("")
+        ? [...carts][0]
+        : null;
+    const standalone =
+      !savedDetails.bookingGroup && carts.size === 1 && carts.has("");
+    const reservedCapacity = members.reduce((n, m) => n + m.quantity, 0);
+    const collected = members.reduce((n, m) => n + m.collected_quantity, 0);
+    const returned = members.reduce((n, m) => n + m.returned_quantity, 0);
     const details = JSON.parse(r.details_json),
       start = periods.find((p) => Number(p.code) === r.start_period),
       end = periods.find((p) => Number(p.code) === r.end_period - 1);
     return {
       bookingId: r.booking_id,
-      resource: r.name,
-      resourceId: r.resource_id,
+      resource:
+        cart ||
+        (standalone
+          ? members.map((m) => m.name).join(", ")
+          : "Unresolved resource group"),
+      resourceId: members.length === 1 ? r.resource_id : null,
+      resourceIds: members.map((m) => m.resource_id),
+      reservedCapacity,
       startPeriod: String(r.start_period),
       endPeriod: String(r.end_period - 1),
       startTime: start?.start || "",
@@ -2506,7 +2813,10 @@ async function board(ctx, input) {
       subject: details.subject,
       teacherTtbName: r.teacher_name || "",
       teacherStatutoryName: r.teacher_name || "",
-      requestedQuantity: r.quantity,
+      requestedQuantity: !complete.has(r.booking_id)
+        ? null
+        : (recordedRequestedQuantity(details) ??
+          (standalone ? reservedCapacity : null)),
       deviceType: details.deviceType || "",
       accessories:
         [
@@ -2516,21 +2826,21 @@ async function board(ctx, input) {
           .filter(Boolean)
           .join(", ") || "None",
       physicalReturnConfirmed:
-        r.returned_quantity === r.collected_quantity &&
-        r.collected_quantity > 0,
+        complete.has(r.booking_id) && collected > 0 && returned === collected,
     };
   });
   if (ctx.principal.deviceScope?.photos) {
     for (const booking of bookings) {
-      booking.photoIds = booking.isOpen
-        ? (
-            await query(
-              ctx.env.DB,
-              "SELECT photo_id FROM lord_photos WHERE school_id=? AND booking_id=? AND phase='collection' ORDER BY recorded_at DESC LIMIT 20",
-              [ctx.principal.schoolId, booking.bookingId],
-            )
-          ).map((p) => p.photo_id)
-        : [];
+      booking.photoIds =
+        booking.isOpen && complete.has(booking.bookingId)
+          ? (
+              await query(
+                ctx.env.DB,
+                "SELECT photo_id FROM lord_photos WHERE school_id=? AND booking_id=? AND phase='collection' ORDER BY recorded_at DESC LIMIT 20",
+                [ctx.principal.schoolId, booking.bookingId],
+              )
+            ).map((p) => p.photo_id)
+          : [];
     }
   }
   return {
@@ -3169,7 +3479,11 @@ export async function handle(ctx) {
       };
     }
     case "bookingavailability": {
-      const b = bookingInput(input, ctx.principal),
+      const b = await resolveBookingGroup(
+          ctx.env.DB,
+          ctx.principal.schoolId,
+          bookingInput(input, ctx.principal),
+        ),
         checks = [];
       for (const item of b.items) {
         const r = await one(
@@ -3179,6 +3493,12 @@ export async function handle(ctx) {
         );
         if (!r || !r.active) checks.push(false);
         else {
+          if (!b.bookingGroup && cartOf(r))
+            fail(
+              "GROUP_SELECTION_REQUIRED",
+              "Select the whole cart from its current reference before booking.",
+              409,
+            );
           const g = capacityGuard(
             ctx.principal.schoolId,
             b.date,

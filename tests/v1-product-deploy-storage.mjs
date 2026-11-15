@@ -6,7 +6,7 @@ import {
   recoverOperations,
   readContactsDeployment,
 } from "../v1/services/deploy/service.mjs";
-import { one, query, statement } from "../v1/runtime/store.mjs";
+import { one, query, statement, digest } from "../v1/runtime/store.mjs";
 const h = await createDatabase("deploy");
 const now = Date.now(),
   school = "synthetic-school";
@@ -36,6 +36,7 @@ const staff = [
     staffId: "staff-a",
     name: "Alpha",
     active: true,
+    schoolSection: "primary",
     profile: {
       "Basic Name": "Alpha",
       "EO Appt Level": "EO",
@@ -62,12 +63,64 @@ for (let i = 0; i < 22; i++)
 let failVenues = false;
 let venueCatalogue = null;
 let onCatalogueRead = null;
+let failContacts = false,
+  contactsOverride = null,
+  contactsRevision = "1";
+let onContactsPin = null,
+  contactsPinDeadline = null;
+let contactsReads = 0,
+  contactsPageProvider = null;
+
+let measuredDb = null,
+  saveMetrics = null;
+function measureOwner(db) {
+  const metrics = { statements: 0, maxBindings: 0, jsonBytes: 0 };
+  const account = (rows) => {
+    metrics.statements += rows.length;
+    for (const row of rows) {
+      metrics.maxBindings = Math.max(metrics.maxBindings, row.args.length);
+      for (const value of row.args)
+        if (typeof value === "string" && /^[\[{]/.test(value))
+          metrics.jsonBytes += Buffer.byteLength(value);
+    }
+    assert(
+      metrics.statements <= 50,
+      "Dependent owner save exceeds the existing 50-statement budget.",
+    );
+    assert(metrics.maxBindings < 100);
+    assert(metrics.jsonBytes < 1024 * 1024);
+  };
+  const wrap = (native, sql, args = []) => {
+    const wrapped = {
+      native,
+      sql,
+      args,
+      bind: (...values) => wrap(native.bind(...values), sql, values),
+    };
+    for (const method of ["first", "all", "run", "raw"])
+      wrapped[method] = (...values) => {
+        account([wrapped]);
+        return native[method](...values);
+      };
+    return wrapped;
+  };
+  return {
+    metrics,
+    db: {
+      prepare: (sql) => wrap(db.prepare(sql), sql),
+      batch: (rows) => {
+        account(rows);
+        return db.batch(rows.map((row) => row.native));
+      },
+    },
+  };
+}
 const env = {
   SCHOOL_ID: school,
   SERVICE_NAME: "deploy",
   GSIS_SECRET: "synthetic-non-production-secret",
   get DB() {
-    return h.db;
+    return measuredDb || h.db;
   },
   get ARTIFACTS() {
     return h.bucket;
@@ -90,11 +143,49 @@ const env = {
       });
     },
   },
+  // Contacts/Core source proofs are synthetic here; the owning Deploy D1,
+  // admissions, CAS, audit, receipts and restart are real.
   CONTACTS: {
-    fetch: async () =>
-      Response.json({
+    fetch: async (request) => {
+      const b = await request.json(),
+        path = new URL(request.url).pathname;
+      if (path.endsWith("/release"))
+        return Response.json({
+          ok: true,
+          data: { pinId: b.pinId, state: "released" },
+        });
+      if (path.endsWith("/acquire")) {
+        contactsPinDeadline = b.validUntil;
+        if (onContactsPin) await onContactsPin();
+        if (String(b.revision) !== contactsRevision)
+          return Response.json(
+            {
+              ok: false,
+              error: {
+                code: "SOURCE_REVISION_CHANGED",
+                message: "Synthetic accepted facts changed.",
+              },
+            },
+            { status: 409 },
+          );
+        return Response.json({
+          ok: true,
+          data: {
+            pinId: b.pinId,
+            owner: "contacts",
+            scope: b.scope,
+            revision: b.revision,
+            validUntil: b.validUntil,
+          },
+        });
+      }
+      contactsReads++;
+      if (contactsPageProvider)
+        return Response.json({ ok: true, data: await contactsPageProvider(b) });
+      if (failContacts) throw Error("synthetic Contacts outage");
+      return Response.json({
         ok: true,
-        data: {
+        data: contactsOverride || {
           staff,
           revision: "contacts-1",
           sequence: 1,
@@ -102,7 +193,8 @@ const env = {
           observation: { evaluationId: "observation-a", asOf: now },
           dependencies: [],
         },
-      }),
+      });
+    },
   },
   VENUES: {
     fetch: async (request) => {
@@ -118,17 +210,28 @@ const env = {
     },
   },
 };
-const call = (path, body, p = principal) =>
-  handle({
-    env,
-    path,
-    body: JSON.parse(JSON.stringify(body)),
-    principal: p,
-    now,
-    method: "POST",
-    request: new Request("https://test" + path),
-    requestId: crypto.randomUUID(),
-  });
+const call = async (path, body, p = principal) => {
+  const measured =
+    body.operationId === "eligibility-classes" ? measureOwner(h.db) : null;
+  if (measured) measuredDb = measured.db;
+  try {
+    return await handle({
+      env,
+      path,
+      body: JSON.parse(JSON.stringify(body)),
+      principal: p,
+      now,
+      method: "POST",
+      request: new Request("https://test" + path),
+      requestId: crypto.randomUUID(),
+    });
+  } finally {
+    if (measured) {
+      saveMetrics = measured.metrics;
+      measuredDb = null;
+    }
+  }
+};
 const edit = async (versionId, operationId, edits, revision) => {
   const lease = await call("/lease", {
     operationId: operationId + "-lease",
@@ -304,7 +407,7 @@ try {
     scope: "meta",
     clientId: "client-a",
   });
-  const applied = await call("/imports/apply", {
+  const importInput = {
     operationId: "import-apply",
     versionId,
     previewId: preview.previewId,
@@ -312,7 +415,8 @@ try {
     scope: "meta",
     clientId: "client-a",
     leaseFence: importLease.fence,
-  });
+  };
+  const applied = await call("/imports/apply", importInput);
   assert.equal(applied.saved, true);
   const afterImport = await loadVersion(h.db, school, versionId);
   assert.equal(
@@ -335,6 +439,24 @@ try {
     (await loadVersion(h.db, school, versionId)).version.revision,
     afterImport.version.revision,
   );
+  await statement(
+    h.db,
+    "UPDATE deploy_previews SET expires_at=? WHERE school_id=? AND id=?",
+    [now - 1, school, preview.previewId],
+  ).run();
+  failContacts = true;
+  const beforeReplayReads = contactsReads;
+  assert.deepEqual(
+    await call("/imports/apply", importInput),
+    applied,
+    "A committed import replays before expired preview and unavailable source checks.",
+  );
+  assert.equal(contactsReads, beforeReplayReads);
+  await assert.rejects(
+    call("/imports/apply", { ...importInput, digest: "different" }),
+    (e) => e.code === "OPERATION_INTENT_CONFLICT",
+  );
+  failContacts = false;
   updated = afterImport;
   await assert.rejects(
     call(
@@ -428,6 +550,13 @@ try {
   assert.deepEqual(capRow.capNonTeachingPeriods, { DUTY: 0 });
   assert.deepEqual(historical.envelope.subjectCategories, {});
   await h.restart();
+  failContacts = true;
+  assert.deepEqual(
+    await call("/imports/apply", importInput),
+    applied,
+    "Original committed import survives process restart and source outage.",
+  );
+  failContacts = false;
   const activeProjection = await call("/current-publication", {});
   const activeCap = activeProjection.rows.find((r) => r.staffId === "staff-a");
   assert.equal(activeCap.capBasis, "total");
@@ -531,6 +660,621 @@ try {
     ),
     (e) => e.code === "OPERATION_ABORTED",
   );
+  // Exercise new teaching references through the actual owner save/import paths.
+  const accepted = (value) => ({
+    state: "accepted",
+    effective: true,
+    value,
+    revision: "1",
+    validFrom: null,
+    validUntil: null,
+    revoked: false,
+  });
+  const selectedStaff = {
+    staffId: "staff-a",
+    basicName: "Shared",
+    ttbName: "Shared (BT)",
+    active: true,
+    fields: Object.fromEntries(
+      Object.entries({
+        role: "",
+        eoAppointmentLevel: "",
+        appointmentStatus: "",
+        employmentActive: true,
+        schoolSection: { code: "primary" },
+        employmentArrangement: "Full-time",
+        employmentTags: [],
+        subjectTags: [],
+        mkTags: [],
+        memberships: [],
+        eo: true,
+        smc: false,
+        schoolLeader: false,
+      }).map(([k, v]) => [k, accepted(v)]),
+    ),
+  };
+  selectedStaff.fields.role = { state: "superseded", effective: false };
+  selectedStaff.fields.eoAppointmentLevel = {
+    state: "missing",
+    effective: false,
+  };
+  contactsOverride = {
+    staff: [selectedStaff],
+    revision: "contacts-1",
+    sequence: 1,
+    asOf: now,
+    validUntil: null,
+    dependencies: [
+      {
+        owner: "contacts",
+        scope: "staff:staff-a",
+        revision: "1",
+        validUntil: null,
+      },
+    ],
+  };
+  const eligibilityPlan = await call("/versions/create", {
+    operationId: "eligibility-create",
+    name: "Current accepted teaching facts",
+  });
+  const eligibilityVersion = eligibilityPlan.versionId;
+  await edit(
+    eligibilityVersion,
+    "eligibility-classes",
+    [
+      {
+        operation: "addClass",
+        ref: "eligible-class-a",
+        level: "1",
+        name: "A",
+        shortName: "A",
+      },
+      {
+        operation: "addClass",
+        ref: "eligible-class-b",
+        level: "2",
+        name: "B",
+        shortName: "B",
+      },
+      {
+        operation: "addTeacher",
+        teacher: "staff-a",
+        target: "1A",
+        targetRef: "eligible-class-a",
+        subject: "EL",
+      },
+      {
+        operation: "addTeacher",
+        teacher: "staff-a",
+        target: "1A",
+        targetRef: "eligible-class-a",
+        subject: "FT",
+      },
+    ],
+    0,
+  );
+  assert(saveMetrics && saveMetrics.statements > 0);
+  console.log(
+    "PASS dependent owner save strict50 metrics " + JSON.stringify(saveMetrics),
+  );
+  let eligibleSaved = await loadVersion(h.db, school, eligibilityVersion);
+  assert.equal(
+    eligibleSaved.doc.teachers[0].teachingEligibility.state,
+    "eligible",
+  );
+  assert.equal(eligibleSaved.doc.teachers[0].quality, "unavailable");
+  const originalAssignments = structuredClone(eligibleSaved.doc.assignments);
+  selectedStaff.fields.employmentActive.value = false;
+  failContacts = true;
+  await edit(
+    eligibilityVersion,
+    "inactive-note-offline",
+    [
+      {
+        operation: "setTeacherNote",
+        teacher: "staff-a",
+        value: "Keep the historical assignment.",
+      },
+    ],
+    1,
+  );
+  assert.deepEqual(
+    (await loadVersion(h.db, school, eligibilityVersion)).doc.assignments,
+    originalAssignments,
+    "Unrelated note saves preserve historical references during a source outage.",
+  );
+  const offline = await call("/bootstrap", { versionId: eligibilityVersion });
+  assert.equal(
+    offline.current.teachers[0].teachingEligibility.state,
+    "unavailable",
+  );
+  failContacts = false;
+  const invalidCases = [
+    [
+      "inactive",
+      () => {
+        selectedStaff.fields.employmentActive.value = false;
+      },
+    ],
+    [
+      "non-eo",
+      () => {
+        selectedStaff.fields.eo.value = false;
+      },
+    ],
+    [
+      "mk",
+      () => {
+        selectedStaff.fields.schoolSection.value = { code: "MK" };
+      },
+    ],
+    [
+      "pending",
+      () => {
+        selectedStaff.fields.eo.state = "pending";
+      },
+    ],
+  ];
+  for (const [label, alter] of invalidCases) {
+    selectedStaff.fields.employmentActive = accepted(true);
+    selectedStaff.fields.eo = accepted(true);
+    selectedStaff.fields.schoolSection = accepted({ code: "primary" });
+    alter();
+    const before = await loadVersion(h.db, school, eligibilityVersion);
+    await assert.rejects(
+      edit(
+        eligibilityVersion,
+        "eligibility-" + label,
+        [
+          {
+            operation: "setTeacherNote",
+            teacher: "staff-a",
+            value: "Must not partly save",
+          },
+          {
+            operation: "addTeacher",
+            teacher: "staff-a",
+            target: "2B",
+            targetRef: "eligible-class-b",
+            subject: "Math",
+          },
+        ],
+        before.version.revision,
+      ),
+      (e) => e.code === "TEACHING_ELIGIBILITY_REQUIRED",
+    );
+    const after = await loadVersion(h.db, school, eligibilityVersion);
+    assert.deepEqual(after, before);
+    // Lease acquisition is separately audited; no failed business-save audit exists.
+    assert.equal(
+      (
+        await one(
+          h.db,
+          "SELECT COUNT(*) n FROM product_audit WHERE school_id=? AND operation_id=?",
+          [school, "eligibility-" + label],
+        )
+      ).n,
+      0,
+    );
+  }
+  selectedStaff.fields.employmentActive = accepted(false);
+  selectedStaff.fields.eo = accepted(true);
+  const oldWorkbook = await call("/export", {
+    versionId: eligibilityVersion,
+    scope: "IP",
+  });
+  oldWorkbook.sheets.Classes.rows[0][2] = "Renamed A";
+  oldWorkbook.sheets.Classes.rows[0][3] = "R";
+  // Simulate a legacy FT binding without targetRef; the codec must preserve its ID.
+  const oldFt = originalAssignments.find((a) => a.subject === "FT");
+  const legacyFt = { ...oldFt };
+  delete legacyFt.targetRef;
+  await statement(
+    h.db,
+    "UPDATE deploy_rows SET value=? WHERE school_id=? AND version_id=? AND scope='assignments' AND row_id=?",
+    [JSON.stringify(legacyFt), school, eligibilityVersion, oldFt.id],
+  ).run();
+  const retainedPreview = await call("/imports/preview", {
+    versionId: eligibilityVersion,
+    workbook: oldWorkbook,
+  });
+  const retainedLease = await call("/lease", {
+    operationId: "retained-import-lease",
+    versionId: eligibilityVersion,
+    scope: "meta",
+    clientId: "client-a",
+  });
+  await call("/imports/apply", {
+    operationId: "retained-import",
+    versionId: eligibilityVersion,
+    previewId: retainedPreview.previewId,
+    digest: retainedPreview.digest,
+    scope: "meta",
+    clientId: "client-a",
+    leaseFence: retainedLease.fence,
+  });
+  eligibleSaved = await loadVersion(h.db, school, eligibilityVersion);
+  assert.equal(
+    eligibleSaved.doc.assignments.find((a) => a.subject === "FT").id,
+    oldFt.id,
+  );
+  assert.equal(
+    eligibleSaved.doc.assignments.find((a) => a.subject === "FT").target,
+    "1R",
+  );
+  const imported = await call("/export", {
+    versionId: eligibilityVersion,
+    scope: "IP",
+  });
+  imported.sheets.TeachingAssignments.rows[0][2] = "Math";
+  await assert.rejects(
+    call("/imports/preview", {
+      versionId: eligibilityVersion,
+      workbook: imported,
+    }),
+    (e) => e.code === "TEACHING_ELIGIBILITY_REQUIRED",
+  );
+  selectedStaff.fields.employmentActive = {
+    ...accepted(true),
+    validUntil: now + 1,
+  };
+  const activePreview = await call("/imports/preview", {
+    versionId: eligibilityVersion,
+    workbook: imported,
+  });
+  contactsOverride.asOf = now + 2; // Same immutable facts/revisions, later observation.
+  const activeLease = await call("/lease", {
+    operationId: "preview-race-lease",
+    versionId: eligibilityVersion,
+    scope: "meta",
+    clientId: "client-a",
+  });
+  await assert.rejects(
+    call("/imports/apply", {
+      operationId: "preview-facts-changed",
+      versionId: eligibilityVersion,
+      previewId: activePreview.previewId,
+      digest: activePreview.digest,
+      scope: "meta",
+      clientId: "client-a",
+      leaseFence: activeLease.fence,
+    }),
+    (e) => e.code === "TEACHING_ELIGIBILITY_REQUIRED",
+  );
+  assert.deepEqual(
+    (await loadVersion(h.db, school, eligibilityVersion)).doc.assignments,
+    eligibleSaved.doc.assignments,
+  );
+  selectedStaff.fields.employmentActive = accepted(true);
+  contactsOverride.asOf = now;
+  onContactsPin = async () => {
+    onContactsPin = null;
+    contactsRevision = "2";
+  };
+  await assert.rejects(
+    edit(
+      eligibilityVersion,
+      "pin-facts-race",
+      [
+        {
+          operation: "addTeacher",
+          teacher: "staff-a",
+          target: "2B",
+          targetRef: "eligible-class-b",
+          subject: "Math",
+        },
+      ],
+      eligibleSaved.version.revision,
+    ),
+    (e) => e.code === "SOURCE_REVISION_CHANGED",
+  );
+  assert.deepEqual(
+    (await loadVersion(h.db, school, eligibilityVersion)).doc.assignments,
+    eligibleSaved.doc.assignments,
+  );
+  contactsRevision = "1";
+  onContactsPin = async () => {
+    onContactsPin = null;
+    await h.db.batch([
+      statement(
+        h.db,
+        "UPDATE deploy_rows SET value=json_set(value,'$.level','3'),revision=revision+1 WHERE school_id=? AND version_id=? AND scope='classes' AND row_id='eligible-class-b'",
+        [school, eligibilityVersion],
+      ),
+      statement(
+        h.db,
+        "UPDATE deploy_versions SET revision=revision+1 WHERE school_id=? AND id=?",
+        [school, eligibilityVersion],
+      ),
+    ]);
+  };
+  await assert.rejects(
+    edit(eligibilityVersion, "class-scope-race", [
+      {
+        operation: "addTeacher",
+        teacher: "staff-a",
+        target: "2B",
+        targetRef: "eligible-class-b",
+        subject: "Math",
+      },
+    ]),
+    (e) => e.code === "REVISION_CONFLICT",
+    "A class/TG scope read participates in the final CAS even without an expected client revision.",
+  );
+  const scopeRace = await loadVersion(h.db, school, eligibilityVersion);
+  assert.deepEqual(scopeRace.doc.assignments, eligibleSaved.doc.assignments);
+  assert.equal(
+    scopeRace.doc.classes.find((c) => c.ref === "eligible-class-b").level,
+    "3",
+  );
+  // Reconcile the synthetic concurrent class edit before the independent expiry case.
+  await h.db.batch([
+    statement(
+      h.db,
+      "UPDATE deploy_rows SET value=json_set(value,'$.level','2'),revision=revision+1 WHERE school_id=? AND version_id=? AND scope='classes' AND row_id='eligible-class-b'",
+      [school, eligibilityVersion],
+    ),
+    statement(
+      h.db,
+      "UPDATE deploy_versions SET revision=revision+1 WHERE school_id=? AND id=?",
+      [school, eligibilityVersion],
+    ),
+  ]);
+  eligibleSaved = await loadVersion(h.db, school, eligibilityVersion);
+  const deadline = Date.now() + 160;
+  contactsOverride.validUntil = deadline;
+  onContactsPin = async () => {
+    onContactsPin = null;
+    await new Promise((resolve) =>
+      setTimeout(resolve, Math.max(0, deadline - Date.now() + 20)),
+    );
+  };
+  await assert.rejects(
+    edit(
+      eligibilityVersion,
+      "interval-expired-during-pin",
+      [
+        {
+          operation: "addTeacher",
+          teacher: "staff-a",
+          target: "2B",
+          targetRef: "eligible-class-b",
+          subject: "Math",
+        },
+      ],
+      eligibleSaved.version.revision,
+    ),
+    (e) => e.code === "REVISION_CONFLICT",
+  );
+  assert.equal(
+    contactsPinDeadline,
+    deadline,
+    "Projection boundary clamps otherwise unbounded staff pins.",
+  );
+  assert.deepEqual(
+    (await loadVersion(h.db, school, eligibilityVersion)).doc.assignments,
+    eligibleSaved.doc.assignments,
+  );
+  assert.equal(
+    (
+      await one(
+        h.db,
+        "SELECT COUNT(*) n FROM product_audit WHERE operation_id='interval-expired-during-pin'",
+      )
+    ).n,
+    0,
+  );
+  // Synthetic bounded page proofs exercise the real consumer; producer HMAC
+  // and real source epoch integration are verified in the Contacts program.
+  const catalogueDigest = await digest([]);
+  const pageStaff = Array.from({ length: 512 }, (_, i) => ({
+    ...structuredClone(selectedStaff),
+    staffId: i === 0 ? "staff-a" : "staff-z" + String(i).padStart(3, "0"),
+  }));
+  const pageFor = (offset, total = 512) => ({
+    schemaVersion: 1,
+    schoolId: school,
+    revision: "contacts-paged",
+    sequence: 7,
+    asOf: now,
+    validUntil: null,
+    observation: { evaluationId: "page-" + offset, asOf: now },
+    staff: structuredClone(
+      pageStaff.slice(offset, Math.min(offset + 64, total)),
+    ),
+    catalogues: [],
+    catalogueDigest,
+    dependencies: [],
+    page: {
+      offset,
+      total,
+      complete: offset + 64 >= total,
+      nextCursor: offset + 64 >= total ? null : "cursor-" + (offset + 64),
+    },
+  });
+  const pageOffset = (body) =>
+    body.page.cursor === null ? 0 : Number(body.page.cursor.slice(7));
+  let pageReads = 0,
+    maxPageBytes = 0;
+  contactsPageProvider = (body) => {
+    pageReads++;
+    const page = pageFor(pageOffset(body));
+    maxPageBytes = Math.max(
+      maxPageBytes,
+      new TextEncoder().encode(JSON.stringify(page)).byteLength,
+    );
+    return page;
+  };
+  const allStaff = await call("/bootstrap", { versionId: eligibilityVersion });
+  assert.equal(allStaff.referenceError, null);
+  assert.equal(allStaff.current.teachers.length, 512);
+  assert.equal(new Set(allStaff.current.teachers.map((t) => t.id)).size, 512);
+  assert.equal(pageReads, 8);
+  assert(maxPageBytes < 512 * 1024);
+  const pageNegatives = [
+    [
+      "duplicate",
+      (page) => {
+        if (page.page.offset) page.staff[0].staffId = "staff-a";
+      },
+    ],
+    [
+      "observation-mismatch",
+      (page) => {
+        page.observation.asOf++;
+      },
+    ],
+    [
+      "source-change",
+      (page) => {
+        if (page.page.offset) page.revision = "contacts-new";
+      },
+    ],
+    [
+      "catalogue-change",
+      (page) => {
+        if (page.page.offset) page.catalogueDigest = "wrong";
+      },
+    ],
+    [
+      "skipped-offset",
+      (page) => {
+        if (page.page.offset) page.page.offset++;
+      },
+    ],
+    [
+      "early-complete",
+      (page) => {
+        page.page.complete = true;
+        page.page.nextCursor = null;
+      },
+    ],
+    [
+      "repeated-cursor",
+      (page) => {
+        if (page.page.offset) page.page.nextCursor = "cursor-64";
+      },
+    ],
+    [
+      "oversized-total",
+      (page) => {
+        page.page.total = 513;
+      },
+    ],
+    [
+      "oversized-page",
+      (page) => {
+        page.staff.push(pageStaff[100]);
+      },
+    ],
+    [
+      "expired-boundary",
+      (page) => {
+        page.validUntil = now + 1;
+        if (page.page.offset) page.asOf = page.observation.asOf = now + 2;
+      },
+    ],
+  ];
+  for (const [label, alter] of pageNegatives) {
+    contactsPageProvider = (body) => {
+      const page = pageFor(pageOffset(body));
+      alter(page);
+      return page;
+    };
+    const rejected = await call("/bootstrap", {
+      versionId: eligibilityVersion,
+    });
+    assert.equal(
+      rejected.referenceError?.code,
+      label === "source-change" || label === "catalogue-change"
+        ? "SOURCE_REVISION_CHANGED"
+        : label === "expired-boundary"
+          ? "AUTHORITY_CHANGED"
+          : "CONTACTS_UNAVAILABLE",
+      label,
+    );
+    assert.equal(
+      rejected.current.teachers[0].teachingEligibility.state,
+      "unavailable",
+      label,
+    );
+    assert.equal(
+      rejected.current.teachers.length,
+      eligibleSaved.doc.teachers.length,
+      "A partial page collection never replaces the saved reference inventory.",
+    );
+  }
+  contactsPageProvider = null;
+  contactsOverride.validUntil = null;
+  contactsOverride.staff.push({
+    staffId: "staff-provisional",
+    basicName: "Provisional",
+    ttbName: "Provisional",
+    active: null,
+    fields: {},
+  });
+  contactsOverride.dependencies = [
+    {
+      owner: "contacts",
+      scope: "staff:staff-provisional",
+      revision: "1",
+      validUntil: null,
+    },
+  ];
+  await edit(eligibilityVersion, "provisional-proposal", [
+    {
+      operation: "upsertTeacherProfile",
+      teacher: "staff-provisional",
+      profile: { "Basic Name": "Provisional proposed", Active: "Y" },
+    },
+  ]);
+  const proposed = await loadVersion(h.db, school, eligibilityVersion);
+  assert.equal(proposed.doc.teacherDrafts["staff-provisional"].Active, "Y");
+  assert.equal(
+    proposed.doc.teachers.find((t) => t.id === "staff-provisional")
+      .teachingEligibility.state,
+    "unavailable",
+  );
+  assert.equal(
+    proposed.doc.assignments.some((a) => a.teacher === "staff-provisional"),
+    false,
+  );
+  await assert.rejects(
+    edit(eligibilityVersion, "provisional-assignment", [
+      {
+        operation: "addTeacher",
+        teacher: "staff-provisional",
+        target: "2B",
+        targetRef: "eligible-class-b",
+        subject: "Math",
+      },
+    ]),
+    (e) => e.code === "TEACHING_ELIGIBILITY_REQUIRED",
+  );
+  await assert.rejects(
+    edit(eligibilityVersion, "provisional-add-existing", [
+      {
+        operation: "upsertTeacherProfile",
+        teacher: "staff-provisional",
+        referenceAction: "add-existing",
+        profile: { Active: "Y" },
+      },
+    ]),
+    (e) => e.code === "TEACHING_ELIGIBILITY_REQUIRED",
+  );
+  assert.deepEqual(
+    (await loadVersion(h.db, school, eligibilityVersion)).doc,
+    proposed.doc,
+  );
+  contactsOverride = null;
+  console.log(
+    "PASS bounded 512-staff/8-page collector and ten malformed/stale/expired page cases; max encoded page bytes=" +
+      maxPageBytes,
+  );
+  console.log(
+    "PASS owner save/import teaching eligibility, retained inactive/legacy FT references, source-change and interval commit fences; committed import expiry/outage/restart replay",
+  );
+
   // Refresh only changes canonical room metadata, even when the source is
   // malformed or a saved planning row changes while the owner is being read.
   const refreshPlan = await call("/versions/create", {

@@ -142,15 +142,40 @@
   const status = document.createElement("span");
   status.setAttribute("role", "status");
   bar.append(status);
+  let statusOwner = null,
+    statusEpoch = suite.saveStatus?.().contextEpoch ?? 0;
+  function showStatus(text, owner) {
+    status.textContent = text;
+    statusOwner = owner;
+  }
+  function renderSaveStatus() {
+    const saved = suite.saveStatus?.();
+    if (
+      Number.isSafeInteger(saved?.contextEpoch) &&
+      saved.contextEpoch !== statusEpoch
+    ) {
+      statusEpoch = saved.contextEpoch;
+      showStatus("", null);
+    }
+    const count = saved?.uncertainCount;
+    if (count > 0 && (!statusOwner || statusOwner === "uncertainty"))
+      showStatus(
+        "Save outcome unknown. Check the original receipt before retrying.",
+        "uncertainty",
+      );
+    else if (count === 0 && statusOwner === "uncertainty")
+      showStatus("", null);
+  }
   const signout = document.createElement("button");
   signout.textContent = "Sign out";
   signout.onclick = async () => {
     signout.disabled = true;
+    const epoch = statusEpoch;
     try {
       await suite.logout();
       location.assign("/");
     } catch (error) {
-      status.textContent = error.message;
+      if (epoch === statusEpoch) showStatus(error.message, "other");
       signout.disabled = false;
     }
   };
@@ -171,15 +196,21 @@
     document.documentElement.dataset.gsisSchool = session.schoolId;
     document.documentElement.dataset.gsisActor = session.user.accountId;
   }
+  const initialStatusEpoch = statusEpoch;
   suite
     .getSession()
     .then((session) => {
       if (session) { show(session); schedule(); }
     })
     .catch((error) => {
-      status.textContent = error.message;
+      if (initialStatusEpoch === statusEpoch) showStatus(error.message, "other");
     });
   window.addEventListener("gsis:clear-protected-state", () => {
+    if (Number.isSafeInteger(suite.saveStatus?.().contextEpoch)) renderSaveStatus();
+    else {
+      statusEpoch++;
+      showStatus("", null);
+    }
     panels.clear();
     lordUser = null;
     document
@@ -188,12 +219,13 @@
     if (suite.module === "admin")
       document.querySelector("#adminContent")?.replaceChildren();
   });
-  window.addEventListener("gsis:uncertain", () => {
-    status.textContent =
-      "Save outcome unknown. Check the original receipt before retrying.";
-  });
+  window.addEventListener("gsis:save-status", renderSaveStatus);
+  window.addEventListener("gsis:uncertain", renderSaveStatus);
   window.addEventListener("gsis:denied", () => {
-    status.textContent =
-      "Permission could not be confirmed. Protected saved drafts have been cleared.";
+    showStatus(
+      "Permission could not be confirmed. Protected saved drafts have been cleared.",
+      "denied",
+    );
   });
+  renderSaveStatus();
 })();

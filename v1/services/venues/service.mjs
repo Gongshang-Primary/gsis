@@ -1069,61 +1069,137 @@ export async function sourceBegin(ctx) {
     "Provide bounded canonical room references.",
     413,
   );
-  for (const ref of references) {
-    const room = await one(
-      ctx.env.DB,
-      "SELECT revision FROM venues_records WHERE school_id=? AND kind='venues' AND record_id=?",
-      [x.schoolId, id(ref.venueId)],
+  const referenceIds = references.map((ref) => id(ref?.venueId));
+  const roomIds = [
+    ...new Set([...referenceIds, ...scopes.map((s) => s.venueId)]),
+  ];
+  // Count repeated SQL bindings, not only distinct JSON documents. Leave space
+  // below the existing 1 MiB transport bound for the operation receipt/audit.
+  let sqlBytes = 0;
+  const sqlJson = (value, copies = 1) => {
+    const json = JSON.stringify(value);
+    sqlBytes += new TextEncoder().encode(json).byteLength * copies;
+    need(
+      sqlBytes < 1040000,
+      "BOUNDS_EXCEEDED",
+      "Source fence data exceeds the bounded owner transaction.",
+      413,
     );
+    return json;
+  };
+  const roomIdsJson = sqlJson(roomIds);
+  const snapshot = await query(
+    ctx.env.DB,
+    "SELECT record_id,revision,data_json FROM venues_records WHERE school_id=? AND kind='venues' AND record_id IN (SELECT value FROM json_each(?))",
+    [x.schoolId, roomIdsJson],
+  );
+  const rooms = new Map(snapshot.map((room) => [room.record_id, room]));
+  // Validate every original reference before deduplication: conflicting repeated
+  // revisions and numeric-looking strings must not pass SQLite coercion.
+  for (const ref of references) {
+    const room = rooms.get(ref.venueId);
     need(
       room && room.revision === ref.revision,
       "VENUE_REFERENCE_CHANGED",
       "Refresh canonical venue references before publication.",
       409,
     );
-    guards.push(rowGuard(x.schoolId, "venues", ref.venueId, room));
-    writes.push({
-      sql: "INSERT OR IGNORE INTO venues_fence_scopes VALUES(?,?,?,?,0,0)",
-      args: [x.schoolId, x.sourceDomain, x.sourceOperationId, ref.venueId],
-    });
   }
-  for (const scope of scopes) {
-    const venue = await one(
-      ctx.env.DB,
-      "SELECT * FROM venues_records WHERE school_id=? AND kind='venues' AND record_id=?",
-      [x.schoolId, scope.venueId],
-    );
+  const occupied = scopes.map((scope) => {
+    const venue = rooms.get(scope.venueId);
     need(
       venue,
       "INVALID_VENUE",
       "Source projection references an unknown venue.",
       409,
     );
-    const v = parse(venue);
-    guards.push(rowGuard(x.schoolId, "venues", scope.venueId, venue));
-    guards.push({
-      sql: "SELECT NOT EXISTS(SELECT 1 FROM venues_intervals WHERE school_id=? AND kind IN ('booking','closure') AND status IN ('confirmed','pending','active') AND (venue_id=? OR (?<>'' AND overlap_group=?)) AND start_at-buffer_ms<? AND end_at+buffer_ms>?) AS ok",
-      args: [
-        x.schoolId,
-        scope.venueId,
-        v.overlapGroup || "",
-        v.overlapGroup || "",
-        scope.end + (v.bufferMinutes || 0) * 60000,
-        scope.start - (v.bufferMinutes || 0) * 60000,
-      ],
-    });
-    writes.push({
-      sql: "INSERT OR IGNORE INTO venues_fence_scopes VALUES(?,?,?,?,?,?)",
-      args: [
-        x.schoolId,
-        x.sourceDomain,
-        x.sourceOperationId,
-        scope.venueId,
-        scope.start,
-        scope.end,
-      ],
-    });
+    const v = parse(venue),
+      group = v.overlapGroup || "",
+      buffer = (v.bufferMinutes || 0) * 60000,
+      bufferedEnd = scope.end + buffer,
+      bufferedStart = scope.start - buffer;
+    // Preserve the old scalar SQL bindings and JavaScript buffer arithmetic.
+    // Malformed metadata must not turn into JSON text or SQL NULL and bypass a
+    // conflict that the former per-room binding would have rejected.
+    need(
+      (typeof group === "string" ||
+        (typeof group === "number" && Number.isFinite(group))) &&
+        Number.isFinite(bufferedEnd) &&
+        Number.isFinite(bufferedStart),
+      "INVALID_VENUE",
+      "Source venue conflict metadata is invalid.",
+      409,
+    );
+    return [
+      scope.venueId,
+      scope.start,
+      scope.end,
+      group,
+      bufferedEnd,
+      bufferedStart,
+    ];
+  });
+  const revisionsJson = sqlJson(
+    roomIds.map((roomId) => [roomId, rooms.get(roomId).revision]),
+  );
+  const referencesJson = sqlJson([...new Set(referenceIds)]);
+  const occupiedJson = sqlJson(occupied, scopes.length ? 3 : 0);
+  guards.push({
+    sql: `SELECT NOT EXISTS(
+      SELECT 1 FROM json_each(?) AS expected
+      LEFT JOIN venues_records AS current
+        ON current.school_id=? AND current.kind='venues'
+        AND current.record_id=json_extract(expected.value,'$[0]')
+      WHERE current.record_id IS NULL
+        OR current.revision<>json_extract(expected.value,'$[1]')
+    ) AS ok`,
+    args: [revisionsJson, x.schoolId],
+  });
+  if (scopes.length) {
+    // Separate indexed lookups retain the original direct-or-linked rule without
+    // a room-by-interval Cartesian scan. Revision guards above bind this captured
+    // metadata to the same owner transaction as both conflict checks and writes.
+    guards.push(
+      {
+        sql: `SELECT NOT EXISTS(
+          SELECT 1 FROM json_each(?) AS scope
+          CROSS JOIN venues_intervals AS occupied INDEXED BY venues_intervals_overlap
+          WHERE occupied.school_id=?
+            AND occupied.venue_id=json_extract(scope.value,'$[0]')
+            AND occupied.kind IN ('booking','closure')
+            AND occupied.status IN ('confirmed','pending','active')
+            AND occupied.start_at-occupied.buffer_ms<json_extract(scope.value,'$[4]')
+            AND occupied.end_at+occupied.buffer_ms>json_extract(scope.value,'$[5]')
+        ) AS ok`,
+        args: [occupiedJson, x.schoolId],
+      },
+      {
+        sql: `SELECT NOT EXISTS(
+          SELECT 1 FROM json_each(?) AS scope
+          CROSS JOIN venues_intervals AS occupied INDEXED BY venues_intervals_linked
+          WHERE occupied.school_id=?
+            AND json_extract(scope.value,'$[3]')<>''
+            AND occupied.overlap_group=json_extract(scope.value,'$[3]')
+            AND occupied.kind IN ('booking','closure')
+            AND occupied.status IN ('confirmed','pending','active')
+            AND occupied.start_at-occupied.buffer_ms<json_extract(scope.value,'$[4]')
+            AND occupied.end_at+occupied.buffer_ms>json_extract(scope.value,'$[5]')
+        ) AS ok`,
+        args: [occupiedJson, x.schoolId],
+      },
+    );
   }
+  // Reference markers precede occupancies exactly as before. Explicit array
+  // order preserves INSERT OR IGNORE's winner for equal room/start identities.
+  writes.push({
+    sql: "INSERT OR IGNORE INTO venues_fence_scopes SELECT ?,?,?,value,0,0 FROM json_each(?) ORDER BY CAST(key AS INTEGER)",
+    args: [x.schoolId, x.sourceDomain, x.sourceOperationId, referencesJson],
+  });
+  if (scopes.length)
+    writes.push({
+      sql: "INSERT OR IGNORE INTO venues_fence_scopes SELECT ?,?,?,json_extract(value,'$[0]'),json_extract(value,'$[1]'),json_extract(value,'$[2]') FROM json_each(?) ORDER BY CAST(key AS INTEGER)",
+      args: [x.schoolId, x.sourceDomain, x.sourceOperationId, occupiedJson],
+    });
   const result = {
     state: "pending",
     sourceOperationId: x.sourceOperationId,

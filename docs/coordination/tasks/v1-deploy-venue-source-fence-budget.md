@@ -1,13 +1,13 @@
 # v1-deploy-venue-source-fence-budget: B-D03 bounded Venues source-begin
 
-- Status: claimed for the next bounded implementation under the owner's continuing frontend UAT repair instruction. Incorporate the accepted claim before editing; no merge or deployment authorised.
+- Status: implementation and focused verification complete; final owner-budget, actual nine-Worker integration, unchanged regressions and canonical build pass locally. Child full CI, PR and Claude review pending; no merge or deployment authorised.
 - Owner/model: Codex; coordinator ChatGPT for v1; independent exact-head reviewer Claude.
-- Last updated (Asia/Singapore): 15 November 2026, 13:31.
+- Last updated (Asia/Singapore): 15 November 2026, 13:45.
 - Branch: `codex/v1-deploy-venue-source-fence-budget`.
-- Selected frozen parent: [`f14543449882b47774dc2799298d8d0c1382dbb3`](https://github.com/helper-gsps/gsis/commit/f14543449882b47774dc2799298d8d0c1382dbb3), branch `codex/v1-deploy-venue-uses`. Parent PR #169 is open at this frozen head. Full CI `43680646355` is green: 1,184 Node programs and 40 LORD programs per shard. Focused 11/11 groups, canonical no-drift and unchanged regressions pass; isolated product/build CI and Claude review remain pending. Parent evidence is not child verification.
-- Pre-claim main: `68f0504f408a52b00d1d0cd625f21a3ea87c76f2`. Accepted claim / incorporated base / child PR / tested head: pending actual publication. Use expected-head non-force update; never infer acceptance.
+- Selected frozen parent: [`f14543449882b47774dc2799298d8d0c1382dbb3`](https://github.com/helper-gsps/gsis/commit/f14543449882b47774dc2799298d8d0c1382dbb3), branch `codex/v1-deploy-venue-uses`. Parent PR #169 is open at this frozen head. Full CI `43680646355` is green: 1,184 Node programs and 40 LORD programs per shard. Focused 11/11 groups, canonical no-drift and unchanged regressions pass; isolated product/build CI `43681374870` is also green. Claude review remains pending. Parent evidence is not child verification.
+- Pre-claim main: `68f0504f408a52b00d1d0cd625f21a3ea87c76f2`. Accepted main claim: `91811d9aa893a73026d53ad703bba1aef107a890`. Incorporated before implementation at local `498576d65e3e951f05b9c1de3f41ff277c40c40f`, tree `49ae2a2e23abe28789788788b52cbbcc8901150b`. Final child PR and exact tested implementation head: pending.
 - Discovery: Run B [`9b6b9361a42de0e54153e7a0a63d719150ac2392`](https://github.com/helper-gsps/gsis/blob/9b6b9361a42de0e54153e7a0a63d719150ac2392/docs/v1/accelerated-delivery/UAT_RUN_B_2026-11-15.md), B-D03 and the 12:06–12:21 SGT continuation.
-- Authorisation: next bounded repair in the continuing owner-authorised UAT queue, selected by ChatGPT as v1 coordinator. Publish and re-read this Git claim and incorporate it into the frozen parent before edits. No live authority is granted.
+- Authorisation: next bounded repair in the continuing owner-authorised UAT queue, selected by ChatGPT as v1 coordinator. The Git claim was accepted, re-read and incorporated into the frozen parent before edits. No live authority is granted.
 
 ## Exact five-path scope
 
@@ -23,7 +23,7 @@ Venues alone owns canonical physical rooms, room revisions, conflict checks and 
 
 After opening PR #169, main, all branches, claims, review and discovery heads, CI and actual file inventories of all 29 open PRs were refreshed. Main remains `68f0504f408a52b00d1d0cd625f21a3ea87c76f2`; Run B remains `9b6b9361a42de0e54153e7a0a63d719150ac2392`; Claude review branch remains `58e22a7bf7ba4a49caa2caabe877605153b098db`. Only frozen same-builder PRs #160/#168/#169 overlap the existing integration test. No open PR changes the proposed Venues source path; no competing implementer was identified. Applicable root/v1, coordination and engineering instructions were read. Production coordination remains separate.
 
-The parent source is frozen and handed forward; do not edit its branch. Publish only this claim on the refreshed main using expected-head protection, re-read it, and immediately incorporate the accepted commit into the new branch before any implementation. Preserve all frozen parent fixes. Parent review/product CI remain separate gates; any later code change in a parent requires child revalidation. This is a serial same-builder handoff, not concurrent editing of the shared test.
+The parent source is frozen and handed forward; do not edit its branch. The coordinator published only this claim on main using expected-head protection, re-read it, and incorporated it before implementation. The accepted claim, local base and tree above were verified locally. Public preimplementation equivalent merge `9c435ddc99c80398970ef18b65b7ec3363d802ec` has that same tree; neither reference is a tested implementation head. Preserve all frozen parent fixes. Parent review and child CI remain separate gates; any later code change in a parent requires child revalidation. This is a serial same-builder handoff, not concurrent editing of the shared test.
 
 ## Defect and evidence boundary
 
@@ -62,10 +62,29 @@ Use indexed room identity and direct/linked conflict predicates; inspect plans o
 6. Keep each focused test program within the existing 45-second execution budget, including Worker startup and restart. Share fixtures sensibly and avoid one test runtime per room. Do not increase the runner timeout, skip original groups, substitute mocked authority for the actual integration, or claim a timeout as pass. If meaningful coverage cannot fit, report the measured cause and obtain a bounded scope decision.
 7. Run canonical build with no tracked drift, focused new/existing tests, unchanged Venues/source-projection and Deploy/Core/Contacts regressions, runner-discovery checks, full required Node/LORD/product suites and exact-head CI. All relevant commands use `TZ=Asia/Singapore`. Record exact commands/head/results, including failures and omissions. Claude reviews the final exact head; no approval inherited from the parent.
 
+## Implementation and local evidence checkpoint
+
+The service now reads one bounded room snapshot, validates every raw reference before deduplication, then uses one set revision guard and separate indexed direct/linked conflict guards in the original owning-D1 transaction. Two bulk scope inserts retain zero-range reference precedence and original sorted occupancy identity. `sourceProof`, `scopeRows`, preparation intent, result/replay, `sourceComplete` and staged dispatch are unchanged. UTF-8 SQL payload accounting includes repeated bindings, with a 1,040,000-byte normalized-input cap below the existing 1 MiB request budget. No deadline or generic runtime change.
+
+The [handoff](../../v1/accelerated-delivery/DEPLOY_VENUE_SOURCE_FENCE_BUDGET_2026-11-15.md) contains detailed metrics and evidence boundaries. All runs use `TZ=Asia/Singapore` and the existing 45-second program limits.
+
+| Check | Actual result |
+| --- | --- |
+| Tracked-test red against unchanged service | Eleven references exceed the synthetic 50-statement budget: 54 attempted, 15 dispatched/completed, rejected 38-statement batch; exact operation prepared/fence 1, no source fence. 8.665s, `/tmp/gsis-source-fence-budget-red.log`. |
+| Final actual owning-D1 budget/guard/race/restart test | 8/8 groups pass in 20.391s with synthetic proof adapters. References 1/10/11/41/143/1,000 each use 13 SQL, one 8-statement batch, maximum 11 binds; occupied case uses 18 SQL/13-statement batch. Unicode 700-scope case uses 911,579 aggregate JSON-bound bytes; 1,000 rejects before a fence. Final failure counters and 10,000 raw-duplicate boundary pass. `/tmp/gsis-source-fence-budget-final.log`; initial eight-group 20.909s run retained separately. |
+| Actual nine-Worker publication/recovery integration | 13/13 groups pass in 19.602s, retaining all 11 original groups and fixed assertions. Added 143 physical rooms with 41 then 143 used references; immutable publications, exact pointer/fence/adoption and restart evidence. `/tmp/gsis-b-d03-deploy-integration-green1.log`. |
+| Unchanged regressions | All 20 programs pass: eight product, five Core and seven Contacts; 56 Core/Contacts cases. `/tmp/gsis-source-fence-regressions.log`. |
+| Query plans, syntax, formatting and scoped whitespace | Pass; room identity/direct interval/linked interval indexes are used. `/tmp/gsis-source-fence-query-plan.log`. |
+| Baseline and final canonical build | Pass, 18 components, no tracked generated drift; final log `/tmp/gsis-source-fence-canonical-final.log`. |
+| Existing runner discovery | 86 product and 1,185 Node programs, including the new budget program. `/tmp/gsis-source-fence-product-discovery.json`, `/tmp/gsis-source-fence-node-discovery.json`. This is discovery, not full execution. |
+| Child full product/Node/LORD, exact-head CI, PR and Claude review | Pending publication and exact-head checks. No parent pass substitutes for child verification. |
+
+These are uncommitted working-tree results; final implementation head/base and CI links belong in the PR metadata. No self-referential tested commit is invented. Full child 86-product and 1,185-Node/LORD verification remains required through exact-head CI; no child local full-suite pass is claimed.
+
 ## Explicit remaining limits and release boundary
 
 The staged Roster `beginStaged` path in `venues/projection.mjs` has separate per-room guards; this claim does not repair its scalability. Nonstaged `sourceComplete` retains per-occupancy work. This repair must not claim all 10,000-occupancy lifecycles meet the new budget. Keep their unchanged behavioral regressions and record future measured bounds, especially for B-R02.
 
-No migration or data rewrite is needed. Reverting restores the old query fanout and cannot repair a hosted pending operation. The original hosted operation remains subject to separately authorised receipt/recovery handling; do not replace it with a fresh publication. An owner-authorised post-deployment check is required to close hosted B-D03. F5 remains OPEN; official T1B-01/T1B-02 and unperformed hosted runtime UAT remain Not tested.
+No migration or data rewrite is needed. Reverting restores the old query fanout and cannot repair a hosted pending operation. A remote source can change after proof and before the local commit; this batching repair does not close that cross-owner check-to-commit interval. The late-writer test proves only a durable local owning-operation abort. It is not proof of atomic remote-source cancellation. The original hosted operation remains subject to separately authorised receipt/recovery handling; do not replace it with a fresh publication. An owner-authorised post-deployment check is required to close hosted B-D03. F5 remains OPEN; official T1B-01/T1B-02 and unperformed hosted runtime UAT remain Not tested.
 
-Q01 remains pending actual claim/base/overlap publication. Q02–Q05 require implementation and its evidence; Q06–Q07 remain pending tests, exact-head CI and independent review. Q08 is not applicable to deployment in this task. No skill package was executed to draft this scope; repository boundary, failure-reproduction and recovery principles were applied directly.
+Q01 has the accepted claim, incorporated base and overlap assessment. Q02–Q05 have implementation, final budget/index and focused recovery/security evidence above. Q06–Q07 remain pending exact-head full CI, PR handoff and independent review. Q08 is not applicable to deployment in this task. No skill package was executed to draft this scope; repository boundary, failure-reproduction and recovery principles were applied directly.

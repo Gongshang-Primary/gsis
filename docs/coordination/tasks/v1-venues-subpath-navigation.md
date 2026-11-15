@@ -1,12 +1,12 @@
 # v1-venues-subpath-navigation: B-V01b preserve Venues routing on reload
 
-- Status: claimed for bounded implementation; acceptance/incorporation will be recorded before implementation edits.
+- Status: implemented; local focused/regression/build evidence complete; child exact-head CI and Claude review pending publication.
 - Owner/model: Codex; coordinator ChatGPT for v1; independent exact-head reviewer Claude.
-- Updated: 15 November 2026, 14:00 Asia/Singapore.
+- Updated: 15 November 2026, 14:12 Asia/Singapore.
 - Branch: `codex/v1-venues-subpath-navigation`.
 - Read-only source baseline: `f14543449882b47774dc2799298d8d0c1382dbb3`, frozen `codex/v1-deploy-venue-uses`, PR #169. This is inspected source, not the selected future implementation parent.
-- Implementation parent: frozen B-D03 `01c1db1d3eb9d0edd99a6e5a46ee772cb09a6cef`, branch `codex/v1-deploy-venue-source-fence-budget`. PR #170 is open at this exact head. Full Node/LORD CI43682564064 is green (1185 distinct Node programs, 40 LORD per shard); product/build CI43683326122 and Claude review remain pending. Parent evidence is not child verification; do not amend the frozen branch.
-- Accepted claim / incorporation / implementation head / PR / verification: pending.
+- Implementation parent: frozen B-D03 `01c1db1d3eb9d0edd99a6e5a46ee772cb09a6cef`, branch `codex/v1-deploy-venue-source-fence-budget`. PR #170 is open at this exact head. Full Node/LORD CI43682564064 is green (1185 distinct Node programs, 40 LORD per shard); product/build CI43683326122 is now green (86 parent product programs); Claude review remains pending. Parent evidence is not child verification; do not amend the frozen branch.
+- Accepted main claim: `56391d911d8ba24bd1235111380871bb7ca772f4`; re-read and incorporated before implementation at `5ee27aa5db075c44361150b6f2de3e491345c8a6`, tree `4838d0bfa356c938dd3b8adc0b7c292137c8b153`. Implementation head, PR and exact-head verification remain pending.
 - Discovery: Run B `ec6267b62cbca6c774e4895dfab7a422e56af804`, `docs/v1/accelerated-delivery/UAT_RUN_B_2026-11-15.md`, 12:00–12:07 SGT continuation and B-V01. Admin navigation was observed changing the URL to `/?view=admin`, so reload can lose the module.
 - Authorisation boundary: next bounded task selected by ChatGPT as v1 coordinator in the continuing owner-authorised frontend UAT queue. The predecessor is frozen and handed forward; this main claim must be accepted/re-read/incorporated before edits. No live operation is authorised.
 
@@ -24,11 +24,9 @@ The v1 builder owns the copied frontend adaptation. Venues retains its native vi
 After PR170 opened, main, all branches, claims, CI, review/discovery heads and actual file inventories of all 30 open PRs were refreshed. Main is `91811d9aa893a73026d53ad703bba1aef107a890`; Run B is `ec6267b62cbca6c774e4895dfab7a422e56af804`; Claude review branch is `58e22a7bf7ba4a49caa2caabe877605153b098db`. Builder overlaps are frozen same-builder PRs #161/#163/#165/#166/#168, all inherited by the selected parent. No competing implementer or concurrent builder editor was identified. Current root/v1, coordination and engineering instructions were read; production responsibilities remain separate.
 
 
-After B-D03 source freezes and its PR handoff is published, refresh main, all branch heads, task claims, actual open-PR file inventories, UAT/review branches and CI. Read current root/v1 and coordination instructions. Record the exact selected combined parent, its verification state and every builder overlap. A pending parent check stays pending; do not inherit a parent pass for the child.
+The accepted claim advanced main from the refreshed `91811d9…` to `56391d9…`. It was re-read and incorporated into the frozen B-D03 parent at `5ee27aa…` before implementation. Parent CI/review statuses remain separate from this child. If source or overlapping allocation changes, reassess the affected work before editing.
 
 The builder contains Contacts recovery, Deploy saved-draft/Fortnight/ASC, LORD cart/preflight and B-R01 recovery adaptations. Preserve them all. The prior known chain is PR #168 `ecaa37e87bc34ba85b8d3649184b0279e973539d` followed by #169 `f14543449882b47774dc2799298d8d0c1382dbb3`; the selected B-D03 descendant is the exact head above. No concurrent builder editor is allowed without an explicit handoff.
-
-Publish only this task record on refreshed main using the existing non-force expected-head claim exception, re-read the accepted claim, then immediately incorporate it into the selected frozen parent before implementation edits. Record accepted/incorporated SHAs. If parent source or overlapping allocation changes, reassess that affected work first. Record the accepted main claim and its incorporation before any implementation edit.
 
 ## Pinned source and policy evidence
 
@@ -48,9 +46,9 @@ An actual nine-Worker/Chromium probe at frozen `01c1db1d3eb9d0edd99a6e5a46ee772c
 
 The previous source-only probe `/tmp/gsis-discovery-pr167/source-probes.mjs` reproduced the root URL. This read-only preparation confirmed the target literal occurs once in the source and is absent from the builder adaptation; source has zero `pushState` and zero `popstate` occurrences. The newer actual local browser probe above supersedes the prior source-only evidence; no hosted test ran.
 
-## Smallest implementation
+## Implemented change
 
-Inside the existing Venues/app.js transform only, use `replaceOnce` to replace:
+Inside the existing Venues/app.js transform, one added `replaceOnce` call replaces:
 
 ```js
 history.replaceState(null,'','/?'+p);
@@ -62,7 +60,7 @@ with:
 history.replaceState(null,'','/venues/?'+p);
 ```
 
-Give the checked replacement a specific Venues subpath label. The test must verify a single original target occurrence and the single replacement in built Venues output. Keep the existing helper unchanged and avoid whole-file reformatting. Do not modify the source `changeURL()` or generated assets directly.
+The checked replacement has a specific Venues subpath label. The focused test verifies the original and built occurrences. The global helper and original source remain unchanged; no whole-file reformatting or tracked generated edit was made.
 
 Use the fixed trusted module path, not a query-supplied base or current pathname. Preserve `URLSearchParams`, all current field inclusion/omission rules, room order/encoding and `replaceState(null, '', ...)`. Do not start preserving arbitrary extra query keys or add fragments/history entries as part of this fix. Copy dashboard link will naturally copy the corrected URL through its existing caller.
 
@@ -86,10 +84,15 @@ Drain routed requests with `context.unrouteAll({behavior:'wait'})` before closin
 
 ## Verification, limits and handoff
 
-Implementation/results are pending. Use `TZ=Asia/Singapore` and `GSIS_BROWSER_EXECUTABLE=/usr/bin/chromium` for browser checks. Run the focused program, unchanged navigation/shared-web/actual-browser regressions appropriate to the builder, canonical build/no tracked drift, runner discovery, required product/Node/LORD CI and Claude exact-head review. Preserve existing test selection, behavior assertions and timeouts. Record commands, timing, failure history, exact commit, screenshots and the exact four-file diff. No parent result is a new exact-head pass.
+Actual local checks use `TZ=Asia/Singapore` and browser checks add `GSIS_BROWSER_EXECUTABLE=/usr/bin/chromium`. The [handoff](../../v1/accelerated-delivery/VENUES_NAVIGATION_FIX_2026-11-15.md) records exact commands, groups, timings, screenshot paths, inherited limits and tested file hashes.
 
-The repair changes only future v1 query navigation. Rollback restores the bad root URL; no schema/data operation is needed. Initial canonical register setup, metadata uses preservation, source-fence budgets, publication recovery, deep-link protocols and other Run B findings are independent scopes. Do not claim source readiness, completed migration or hosted acceptance from local route tests.
+- Test-first red: new `tests/v1-product-venues-navigation.mjs` failed before the builder change in 8.617s, observing `/` and launcher on Admin reload. First green passed eight groups in 13.571s; final formatted program passed **8/8 in 13.592s**. Logs `/tmp/gsis-venues-navigation-{red,green1,final}.log`.
+- Eight unchanged regression programs passed: navigation, shared web (25 cases), actual nine-Worker browser, v0.9 frontend parity, Contacts recovery (eight groups), Fortnight (six groups), ASC identity (seven groups) and LORD cart browser (19 groups). `/tmp/gsis-venues-navigation-regressions.log`.
+- Baseline and final `npm run build` passed all 18 canonical components with no tracked generated drift. Syntax checks for both JavaScript files and `git diff --check` passed; final inventory is exactly the four claimed paths. `/tmp/gsis-venues-navigation-canonical-{base,final}.log`.
+- Runner discovery lists 87 product and 1,186 Node programs, including the new test in both. These counts are discovery, not a local full-suite pass. Child full Node/LORD/product CI, PR and Claude exact-head review remain pending publication; parent passes are not child verification.
 
-Q01 requires this accepted/incorporated claim; Q02–Q07 remain pending actual implementation/verification/review evidence. Q08 is not applicable to deployment. F5 remains OPEN. Official T1B-01/T1B-02 and unperformed runtime UAT remain Not tested. No live product was fetched during this preparation.
+This presentation repair changes future query navigation only. Rollback restores the defective root URL; no schema/data action is needed. At 390px the inherited horizontally scrolling native strip can leave Administration partly offscreen after direct reload; selected view/title/content are correct, controls remain reachable and there is no page overflow. The patch does not redesign that strip. Initial register setup, source readiness, uses metadata, source-fence budgets, publication recovery and booking/transfer path deep links remain separate scopes. Local synthetic routing checks do not establish hosted UAT or completed migration.
 
-Next deployment remains v1.01. Parent full CI and source freeze do not authorize merge or deployment.
+Q01 Pass: accepted/incorporated claim and overlap evidence. Q02–Q05 Pass for the bounded presentation change, unchanged ownership/history and actual permission/session negatives; no owner mutation or retry contract changes. Q06 local checks Pass, required full exact-head CI Pending. Q07 Pending publication/review. Q08 Not applicable to deployment. F5 remains **OPEN**. Official T1B-01/T1B-02 and unperformed runtime UAT remain **Not tested**. No live product was fetched or changed by this task. Next deployment remains v1.01 under separate authority.
+
+Skill record for documentation preparation: repository engineering/skill principles were applied; no external skill was executed or represented as installed. No third-party material was copied.

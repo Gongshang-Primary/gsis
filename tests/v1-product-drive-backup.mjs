@@ -239,6 +239,7 @@ const env = () => ({
   ARTIFACTS: h.bucket,
   SERVICE_NAME: "contacts",
   SCHOOL_ID: "school",
+  HOSTED_DOMAIN: "example.invalid",
   GOOGLE_ACCESS_TOKEN: "synthetic-only",
   PROVIDER_FETCH: cloud.fetch,
   DRIVE_BACKUP_ENABLED: "true",
@@ -259,9 +260,55 @@ try {
     )
     .bind("other", "staff-other", "Other", "Other", 1, 1, now)
     .run();
+  // Storage fixtures exercise the export boundary independently of the Contacts
+  // writer integration in v1-product-contacts-projection.mjs. General aliases
+  // must never fill a dedicated email cell or a blank appointment field.
+  for (const [field, value] of Object.entries({
+    statutoryName: "=Synthetic literal text",
+    mobile: "90000000",
+    ext: "123",
+    email: "Mixed@EXAMPLE.invalid",
+    iconEmail: "IconCase@MOE.EDU.SG",
+    cesEmail: "CesCase@schools.gov.sg",
+    aliases: ["obsolete@example.invalid", "obsolete@moe.edu.sg"],
+    birthday: "02-09",
+    employmentActive: true,
+    role: { catalogueId: "roles", revision: "1", code: "T" },
+    employmentTags: [{ catalogueId: "employment", revision: "1", code: "BT" }],
+    subjectTags: [{ catalogueId: "subjects", revision: "1", code: "PE" }],
+    eo: true,
+  }))
+    await h.db
+      .prepare(
+        "INSERT INTO contacts_fields(school_id,staff_id,field,revision,state,value_json,valid_from,valid_until,revoked,proposer,accepter,accepted_at,operation_id) VALUES('school','staff-1',?,1,'accepted',?,0,NULL,0,'synthetic-proposer','synthetic-accepter',?,'fixture')",
+      )
+      .bind(field, JSON.stringify(value), now)
+      .run();
   const initial = await buildBackupDataset(env(), { id: "staff" }, now);
   assert.equal(initial.book.sheets.Contacts.rows.length, 1);
   assert.equal(initial.book.metadata.Schema, "gsis.contacts.grid.v1");
+  const expectedContact = [
+    "staff-1",
+    "Teacher",
+    "Teacher",
+    "=Synthetic literal text",
+    "90000000",
+    "123",
+    "T",
+    "",
+    "",
+    "Y",
+    "BT",
+    "PE",
+    "",
+    "9",
+    "2",
+    "Mixed",
+    "IconCase",
+    "CesCase",
+  ];
+  assert.deepEqual(initial.book.sheets.Contacts.rows[0], expectedContact);
+  assert.deepEqual(initial.book.sheets.Baseline.rows[0], expectedContact);
   const encoded = await encodeBackupWorkbook(initial.book),
     dom = new JSDOM("");
   globalThis.DOMParser = dom.window.DOMParser;
@@ -269,6 +316,40 @@ try {
   delete globalThis.DOMParser;
   dom.window.close();
   assert.equal(decoded.sheets.Contacts.rows[0][0], "staff-1");
+  assert.deepEqual(decoded.sheets.Contacts.rows[0], expectedContact);
+  assert.deepEqual(decoded.sheets.Baseline.rows[0], expectedContact);
+  const zip = await JSZip.loadAsync(encoded);
+  for (const path of Object.keys(zip.files).filter((p) =>
+    /^xl\/worksheets\/sheet\d+\.xml$/.test(p),
+  ))
+    assert.doesNotMatch(
+      await zip.file(path).async("string"),
+      /<f(?:\s|>)/,
+      "formula-looking contact text is a literal cell",
+    );
+  await h.db
+    .prepare(
+      "UPDATE contacts_fields SET state='superseded',value_json=NULL,revision=2 WHERE school_id='school' AND staff_id='staff-1' AND field='iconEmail'",
+    )
+    .run();
+  const cleared = await buildBackupDataset(env(), { id: "staff" }, now);
+  assert.equal(
+    cleared.book.sheets.Contacts.rows[0][16],
+    "",
+    "cleared dedicated email does not resurrect general aliases",
+  );
+  await h.db
+    .prepare(
+      "UPDATE contacts_fields SET value_json=?,revision=2 WHERE school_id='school' AND staff_id='staff-1' AND field='email'",
+    )
+    .bind(JSON.stringify("Visible@other.invalid"))
+    .run();
+  const foreignDomain = await buildBackupDataset(env(), { id: "staff" }, now);
+  assert.equal(
+    foreignDomain.book.sheets.Contacts.rows[0][15],
+    "Visible@other.invalid",
+    "wrong-domain addresses stay visible rather than being rewritten",
+  );
   const contactUi = new JSDOM("<!doctype html><body></body>", {
     runScripts: "dangerously",
   });

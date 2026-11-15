@@ -82,6 +82,42 @@ export function resourceInput(input) {
     },
   };
 }
+export function bookingGroupInput(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value))
+    fail("INVALID_INPUT", "Invalid cart selection.");
+  const cart = text(value.cart, "cart", 160, true);
+  if (
+    typeof value.revision !== "string" ||
+    !/^[a-f0-9]{64}$/.test(value.revision)
+  )
+    fail("INVALID_INPUT", "Invalid cart revision.");
+  if (
+    !Array.isArray(value.members) ||
+    !value.members.length ||
+    value.members.length > 20
+  )
+    fail(
+      "INVALID_INPUT",
+      "A cart must contain one to twenty physical resources.",
+    );
+  const seen = new Set();
+  const members = value.members.map((member) => {
+    const resourceId = id(member?.resourceId, "cart member");
+    if (seen.has(resourceId)) fail("INVALID_INPUT", "Duplicate cart member.");
+    seen.add(resourceId);
+    return {
+      resourceId,
+      revision: integer(
+        member.revision,
+        1,
+        Number.MAX_SAFE_INTEGER,
+        "member revision",
+      ),
+      capacity: integer(member.capacity, 1, 200, "member capacity"),
+    };
+  });
+  return { cart, revision: value.revision, members };
+}
 export function bookingInput(input, p) {
   const staffId = id(
     input.staffId || input.teacherStaffId || p.staffId,
@@ -96,13 +132,30 @@ export function bookingInput(input, p) {
   const start = period(input.startPeriod),
     end = period(input.endPeriod) + 1;
   if (end <= start) fail("INVALID_INPUT", "End period precedes the start.");
-  const items = input.items || [
-    {
-      resourceId: input.resourceId || input.resource,
-      quantity: input.quantity ?? input.requestedQuantity ?? 1,
-    },
-  ];
-  if (!Array.isArray(items) || items.length < 1 || items.length > 20)
+  const bookingGroup =
+    input.bookingGroup === undefined
+      ? null
+      : bookingGroupInput(input.bookingGroup);
+  if (
+    bookingGroup &&
+    (input.items !== undefined ||
+      input.resourceId !== undefined ||
+      (input.resource !== undefined && input.resource !== bookingGroup.cart))
+  )
+    fail("INVALID_INPUT", "Choose a cart or physical resources, not both.");
+  const items = bookingGroup
+    ? []
+    : input.items || [
+        {
+          resourceId: input.resourceId || input.resource,
+          quantity: input.quantity ?? input.requestedQuantity ?? 1,
+        },
+      ];
+  if (
+    !Array.isArray(items) ||
+    (!bookingGroup && items.length < 1) ||
+    items.length > 20
+  )
     fail("INVALID_INPUT", "Choose between one and twenty resources.");
   const seen = new Set();
   const lines = items.map((item) => {
@@ -139,13 +192,32 @@ export function bookingInput(input, p) {
       500,
     ),
   };
+  if (bookingGroup) {
+    const quantity = input.requestedQuantity ?? input.quantity;
+    details.requestedQuantity = integer(
+      typeof quantity === "string" && /^\d+$/.test(quantity)
+        ? Number(quantity)
+        : quantity,
+      1,
+      200,
+      "requested quantity",
+    );
+  }
   if (details.bufferOverrideReason && !has(p, "lord.admin"))
     fail(
       "CAPABILITY_DENIED",
       "Only a LORD administrator may override preparation time.",
       403,
     );
-  return { staffId, date: day(input.date), start, end, items: lines, details };
+  return {
+    staffId,
+    date: day(input.date),
+    start,
+    end,
+    items: lines,
+    details,
+    ...(bookingGroup ? { bookingGroup } : {}),
+  };
 }
 export function publicBooking(row, items = []) {
   const details = JSON.parse(row.details_json);
