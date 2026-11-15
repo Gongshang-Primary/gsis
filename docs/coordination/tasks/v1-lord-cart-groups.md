@@ -1,6 +1,6 @@
 # v1-lord-cart-groups: book carts while retaining physical trolley custody
 
-- Status: implemented and locally verified; exact-head full suites, CI and independent review pending.
+- Status: merged through PR175; PR167, reviewed head `af6065e30c667b453f72b27ffbdec742ceaac92f`, carrying merge `334731cdb1d4fc5d37d7bdf6de761d668c062994`. Not deployed. See the 16 November checkpoint below; older pending statements are historical.
 - Owner/model: Codex; coordinator ChatGPT (v1); independent reviewer Claude.
 - Last updated (Asia/Singapore): 15 November 2026, 11:55.
 - Branch: `codex/v1-lord-cart-groups`.
@@ -78,3 +78,9 @@ Apply the already selected Pstack root-cause approach; no skill repository or de
 Rollback restores old code but cannot erase committed bookings or custody evidence. New details fields are additive; older code may again display first-trolley labels or misleading requested quantities. Do not apply data rollback, delete member rows or rewrite historical bookings. Record any incompatible fallback before release.
 
 No policy question is open in this bounded design. The accepted claim and immediate incorporation preceded all implementation. The next action is clean exact-head full verification and one bounded PR, with SHA and results recorded in its body. Implementation, exact-head Claude review and any separately authorised release remain distinct. F5 stays OPEN; official T1B-01/T1B-02 and unperformed runtime UAT remain Not tested.
+
+## Merge checkpoint — 16 November 2026 (Asia/Singapore)
+
+[PR167](https://github.com/helper-gsps/gsis/pull/167) at reviewed head `af6065e30c667b453f72b27ffbdec742ceaac92f` is included in main by [merge `334731cdb1d4fc5d37d7bdf6de761d668c062994`](https://github.com/helper-gsps/gsis/commit/334731cdb1d4fc5d37d7bdf6de761d668c062994). [Claude's controlling review](https://github.com/helper-gsps/gsis/blob/afeba886cd97f365cfb530200bcf46309812cd1b/docs/coordination/review/v1-pr175-chain-claude-recheck.md) and green exact-head CI were checked before integration. The task claim is closed; prior implementation, test failures and pending checkpoints above remain dated history.
+
+The owner amended the sequence to merge PR175 once, preserving all eleven reviewed heads. This head is an ancestor of that carrying merge; it was not separately reimplemented or resolved by hand. The resulting product tree equals the tested tree outside two review documents. [The merge inventory](v1-merge-records-20261115.md#verified-merge-inventory) records the exact heads, carrying commits and verification. Not deployed; no new hosted UAT, migration or provider send. F5 remains **OPEN**; official T1B-01/T1B-02 and unperformed runtime UAT remain **Not tested**.

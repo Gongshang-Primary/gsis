@@ -1,6 +1,6 @@
 # v1-deploy-venue-source-fence-budget: B-D03 bounded Venues source-begin
 
-- Status: implementation and focused verification complete; final owner-budget, actual nine-Worker integration, unchanged regressions and canonical build pass locally. Child full CI, PR and Claude review pending; no merge or deployment authorised.
+- Status: merged through PR175; PR170, reviewed head `01c1db1d3eb9d0edd99a6e5a46ee772cb09a6cef`, carrying merge `334731cdb1d4fc5d37d7bdf6de761d668c062994`. Not deployed. See the 16 November checkpoint below; older pending statements are historical.
 - Owner/model: Codex; coordinator ChatGPT for v1; independent exact-head reviewer Claude.
 - Last updated (Asia/Singapore): 15 November 2026, 13:45.
 - Branch: `codex/v1-deploy-venue-source-fence-budget`.
@@ -88,3 +88,9 @@ The staged Roster `beginStaged` path in `venues/projection.mjs` has separate per
 No migration or data rewrite is needed. Reverting restores the old query fanout and cannot repair a hosted pending operation. A remote source can change after proof and before the local commit; this batching repair does not close that cross-owner check-to-commit interval. The late-writer test proves only a durable local owning-operation abort. It is not proof of atomic remote-source cancellation. The original hosted operation remains subject to separately authorised receipt/recovery handling; do not replace it with a fresh publication. An owner-authorised post-deployment check is required to close hosted B-D03. F5 remains OPEN; official T1B-01/T1B-02 and unperformed hosted runtime UAT remain Not tested.
 
 Q01 has the accepted claim, incorporated base and overlap assessment. Q02–Q05 have implementation, final budget/index and focused recovery/security evidence above. Q06–Q07 remain pending exact-head full CI, PR handoff and independent review. Q08 is not applicable to deployment in this task. No skill package was executed to draft this scope; repository boundary, failure-reproduction and recovery principles were applied directly.
+
+## Merge checkpoint — 16 November 2026 (Asia/Singapore)
+
+[PR170](https://github.com/helper-gsps/gsis/pull/170) at reviewed head `01c1db1d3eb9d0edd99a6e5a46ee772cb09a6cef` is included in main by [merge `334731cdb1d4fc5d37d7bdf6de761d668c062994`](https://github.com/helper-gsps/gsis/commit/334731cdb1d4fc5d37d7bdf6de761d668c062994). [Claude's controlling review](https://github.com/helper-gsps/gsis/blob/afeba886cd97f365cfb530200bcf46309812cd1b/docs/coordination/review/v1-pr175-chain-claude-recheck.md) and green exact-head CI were checked before integration. The task claim is closed; prior implementation, test failures and pending checkpoints above remain dated history.
+
+The owner amended the sequence to merge PR175 once, preserving all eleven reviewed heads. This head is an ancestor of that carrying merge; it was not separately reimplemented or resolved by hand. The resulting product tree equals the tested tree outside two review documents. [The merge inventory](v1-merge-records-20261115.md#verified-merge-inventory) records the exact heads, carrying commits and verification. Not deployed; no new hosted UAT, migration or provider send. F5 remains **OPEN**; official T1B-01/T1B-02 and unperformed runtime UAT remain **Not tested**.

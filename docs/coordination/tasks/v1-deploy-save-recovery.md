@@ -1,6 +1,6 @@
 # v1-deploy-save-recovery: B-R01 ordinary save outcome recovery
 
-- Status: implemented in the working tree; focused verification complete; full suites, publication and Claude exact-head review pending. No merge or deployment authorised.
+- Status: merged through PR175; PR168, reviewed head `ecaa37e87bc34ba85b8d3649184b0279e973539d`, carrying merge `334731cdb1d4fc5d37d7bdf6de761d668c062994`. Not deployed. See the 16 November checkpoint below; older pending statements are historical.
 - Owner/model: Codex; coordinator ChatGPT (v1); independent reviewer Claude.
 - Last updated (Asia/Singapore): 15 November 2026, 12:54.
 - Branch: `codex/v1-deploy-save-recovery`.
@@ -82,3 +82,9 @@ The v1 coordinator authorises one additional test path, number10 above, to adapt
 The unchanged `TZ=Asia/Singapore node tests/v1-product-web.mjs` regression fails before its assertions because its JSDOM fixture has no WebCrypto SubtleCrypto (`TypeError` at `crypto.subtle.digest`); evidence `/tmp/gsis-br01-web-regression.log`. Real HTTPS browser tests already exercise the required digest operation. The coordinator adds only the existing test path11 above to provide Node's real WebCrypto and text encoders in that fixture, retain its18 existing cases and add bounded shared-client compatibility negatives where needed. Do not add an application crypto fallback or weaken receipt hashes.
 
 This test also verifies preservation of existing owner response contracts where shared pending cleanup changes: a direct successful preparation/create/import result must not leak a slot; unknown/partial/mismatched evidence still cannot settle another request. Production changes stay in the already claimed client path and must be grounded in actual owner finish/receipt contracts. No provider, dependency, schema, authority or new module feature is added. Publish this claim-only supplement and incorporate it before editing path11. The earlier ten-path supplement and its failure evidence remain history.
+
+## Merge checkpoint — 16 November 2026 (Asia/Singapore)
+
+[PR168](https://github.com/helper-gsps/gsis/pull/168) at reviewed head `ecaa37e87bc34ba85b8d3649184b0279e973539d` is included in main by [merge `334731cdb1d4fc5d37d7bdf6de761d668c062994`](https://github.com/helper-gsps/gsis/commit/334731cdb1d4fc5d37d7bdf6de761d668c062994). [Claude's controlling review](https://github.com/helper-gsps/gsis/blob/afeba886cd97f365cfb530200bcf46309812cd1b/docs/coordination/review/v1-pr175-chain-claude-recheck.md) and green exact-head CI were checked before integration. The task claim is closed; prior implementation, test failures and pending checkpoints above remain dated history.
+
+The owner amended the sequence to merge PR175 once, preserving all eleven reviewed heads. This head is an ancestor of that carrying merge; it was not separately reimplemented or resolved by hand. The resulting product tree equals the tested tree outside two review documents. [The merge inventory](v1-merge-records-20261115.md#verified-merge-inventory) records the exact heads, carrying commits and verification. Not deployed; no new hosted UAT, migration or provider send. F5 remains **OPEN**; official T1B-01/T1B-02 and unperformed runtime UAT remain **Not tested**.

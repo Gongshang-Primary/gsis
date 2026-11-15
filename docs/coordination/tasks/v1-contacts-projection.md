@@ -1,6 +1,6 @@
 # v1-contacts-projection: canonical Contacts projection and current Deploy eligibility
 
-- Status: implementation and local verification complete; source frozen. Publication, full exact-head Node/LORD/product CI and Claude review pending. No merge or deployment.
+- Status: merged through PR175; PR173, reviewed head `f7f9ea2b0a6c7667e128a0752ad2c6f3551b91dd`, carrying merge `334731cdb1d4fc5d37d7bdf6de761d668c062994`. Not deployed. See the 16 November checkpoint below; older pending statements are historical.
 - Last updated (Asia/Singapore): 15 November 2026, 15:50.
 - Owner/model: Codex. Coordinator: ChatGPT for v1. Independent exact-head reviewer: Claude.
 - Branch: `codex/v1-contacts-projection`.
@@ -206,3 +206,9 @@ done
 ```
 
 Q01 **Pass**: accepted claim/incorporation and inherited overlap decision. Q02–Q05 **Pass locally**: documented ownership, privacy negatives, revision/interval/recovery checks and bounded-page/owner-query evidence above, including final consumer correction. Q06 **Pass for recorded local scope; full exact-head CI Pending**: distinguish the pre-correction38 programs from final seven-group browser/five affected reruns and final canonical/syntax/scope checks. Q07 **Pending**: implementation PR and Claude exact-head review. Q08 **Not applicable — no deployment authorised**; runtime UAT **Not tested**. Skill catalog inspected; repository ownership, minimal-projection, systematic-debugging and recovery principles applied. No optional skill execution or third-party copying is claimed.
+
+## Merge checkpoint — 16 November 2026 (Asia/Singapore)
+
+[PR173](https://github.com/helper-gsps/gsis/pull/173) at reviewed head `f7f9ea2b0a6c7667e128a0752ad2c6f3551b91dd` is included in main by [merge `334731cdb1d4fc5d37d7bdf6de761d668c062994`](https://github.com/helper-gsps/gsis/commit/334731cdb1d4fc5d37d7bdf6de761d668c062994). [Claude's controlling review](https://github.com/helper-gsps/gsis/blob/afeba886cd97f365cfb530200bcf46309812cd1b/docs/coordination/review/v1-pr175-chain-claude-recheck.md) and green exact-head CI were checked before integration. The task claim is closed; prior implementation, test failures and pending checkpoints above remain dated history.
+
+The owner amended the sequence to merge PR175 once, preserving all eleven reviewed heads. This head is an ancestor of that carrying merge; it was not separately reimplemented or resolved by hand. The resulting product tree equals the tested tree outside two review documents. [The merge inventory](v1-merge-records-20261115.md#verified-merge-inventory) records the exact heads, carrying commits and verification. Not deployed; no new hosted UAT, migration or provider send. F5 remains **OPEN**; official T1B-01/T1B-02 and unperformed runtime UAT remain **Not tested**.

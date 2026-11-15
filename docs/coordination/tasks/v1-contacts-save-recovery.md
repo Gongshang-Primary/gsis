@@ -1,6 +1,6 @@
 # v1-contacts-save-recovery: UAT004 durable save outcomes
 
-- Status: implemented; focused verification passed; full exact-head results and CI recorded in the implementation PR. Claude review pending.
+- Status: merged; PR163, reviewed head `c791713cbf283fad9a63e66e963353e54d802636`, carrying merge `ea7656309f79a9927b6092d6550ab72d584f9cf7`. Not deployed. See the 16 November checkpoint below; older pending statements are historical.
 - Owner/model: Codex; coordinator ChatGPT (v1); independent reviewer Claude.
 - Last updated (Asia/Singapore): 15 November 2026.
 - Branch: `codex/v1-contacts-save-recovery`.
@@ -72,3 +72,9 @@ Run and record `node scripts/v1/test.mjs`, full `npm test` Node/LORD CI and the 
 Known limit: the current grid draft remains browser-memory state; service restart tests are not browser-crash recovery. The shared client's endpoint-keyed pending map can retain an original failed save entry after a terminal receipt lookup; that pre-existing bounded-map cleanup is recorded separately, outside this claim's file list. No original live operation was inspected. The Run B ordinary Deploy recovery finding is a separate service/UI path, not closed by this Contacts fix.
 
 Internal review at published `66092376ba5267fa23f7100c9d7500128b85cda8` found a late continuation after the final recovery-panel render. A real browser MutationObserver plus protected-state-clear event reproduced the old operation reference reappearing. The same-scope correction rechecks both account/login context and the original attempt after that await. Evidence: `/tmp/gsis-contacts-browser-boundary-red.log`, `/tmp/gsis-contacts-browser-boundary-green.log` (8 groups), `/tmp/gsis-contacts-service-boundary-regression.log` (7 groups), `/tmp/gsis-contacts-canonical-boundary.log` (no generated drift). The earlier local 76-program run overlapped this correction and is supplementary, not final exact-head evidence. New clean-head verification is required; prior-head CI is not substituted. Internal review is not Claude approval.
+
+## Merge checkpoint — 16 November 2026 (Asia/Singapore)
+
+[PR163](https://github.com/helper-gsps/gsis/pull/163) at reviewed head `c791713cbf283fad9a63e66e963353e54d802636` is included in main by [merge `ea7656309f79a9927b6092d6550ab72d584f9cf7`](https://github.com/helper-gsps/gsis/commit/ea7656309f79a9927b6092d6550ab72d584f9cf7). [Claude's controlling review](https://github.com/helper-gsps/gsis/blob/42873cd068c24c54d4738be5503942333bc1e9ae/docs/coordination/review/v1-pr163-136-137-179-claude-review.md) and green exact-head CI were checked before integration. The task claim is closed; prior implementation, test failures and pending checkpoints above remain dated history.
+
+[The merge inventory](v1-merge-records-20261115.md#verified-merge-inventory) records the exact heads, carrying commits and verification. Not deployed; no new hosted UAT, migration or provider send. F5 remains **OPEN**; official T1B-01/T1B-02 and unperformed runtime UAT remain **Not tested**.

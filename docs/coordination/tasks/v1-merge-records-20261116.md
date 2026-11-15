@@ -1,6 +1,6 @@
 # v1-merge-records-20261116: amended chain merge inventory
 
-- Status: claimed; documentation only. Part A/B merges are complete; Part C verification/recheck and one task-record conflict remain separate gates.
+- Status: documented; local verification passed; exact-head CI and Claude review pending. Part A/B merges are complete; Part C verification/recheck and one task-record conflict remain separate gates.
 - Owner/model: Codex; coordinator ChatGPT v1; independent exact-head reviewer Claude.
 - Last updated (Asia/Singapore): 16 November 2026, 01:12.
 - Branch: `codex/v1-merge-records-20261116`.
@@ -46,3 +46,53 @@ Validate exact seventeen-document scope, whitespace, relative links, every inven
 ## Deployment and handoff
 
 Not deployed. Documentation rollback changes records only; it does not undo any already-merged code. Preserve PR176 C-1 Memberships and C-2 immediate pre-deployment Contacts D1 backup as separate owner gates. F5 remains **OPEN**. Official T1B-01/T1B-02 and unperformed runtime UAT remain **Not tested**. Publish one bounded bookkeeping PR for Claude; do not confuse claims, review, merge, deployment and hosted proof.
+
+## Accepted claim and implementation checkpoint
+
+Accepted task-only main claim: `fa6666b3f846dfc10bebfe47e5a10ed9a264b0ed`. Re-read after publication; this branch starts at that exact commit. The seventeen-path update closes fifteen merged task records, preserves the earlier eight inventory entries and adds the fifteen Part A/B entries. The master changelog gains a dated status checkpoint. PR176/178 task files and all review/owner-directive records are untouched.
+
+### Reproducible documentation verification
+
+Run from the repository root with `TZ=Asia/Singapore`. This checks the actual inventory and Git objects, not application behavior.
+
+```python
+from pathlib import Path
+import re,subprocess,urllib.parse
+root=Path.cwd()
+base='fa6666b3f846dfc10bebfe47e5a10ed9a264b0ed'
+claim=Path('docs/coordination/tasks/v1-merge-records-20261116.md')
+def git(*a):return subprocess.check_output(['git',*a],text=True).strip()
+allowed=set(re.search(r'```text\n(.*?)\n```',claim.read_text(),re.S).group(1).splitlines())
+changed=set(git('diff','--name-only',base).splitlines())
+assert changed==allowed,(changed-allowed,allowed-changed)
+assert all(p.startswith('docs/') for p in changed)
+inventory=Path('docs/coordination/tasks/v1-merge-records-20261115.md').read_text()
+rows=re.findall(r'\| \[#(\d+)\]\([^\n]+?\) \| `([0-9a-f]{40})` \| `([0-9a-f]{40})` \|',inventory)
+assert len(rows)==23 and len({p for p,_,_ in rows})==23
+carrier='334731cdb1d4fc5d37d7bdf6de761d668c062994'
+for pr,head,merge in rows:
+    subprocess.run(['git','merge-base','--is-ancestor',head,merge],check=True)
+    if 165<=int(pr)<=175:assert merge==carrier
+for merge in {m for _,_,m in rows}:
+    parents=git('show','-s','--format=%P',merge).split()
+    assert len(parents)==2
+    assert git('merge-tree','--write-tree',*parents)==git('rev-parse',merge+'^{tree}')
+assert git('rev-parse',carrier+'^{tree}')=='f0b0d0892ddd61aceaccb97ff16d8c3cbb0893f0'
+assert git('diff','--name-only','d3f24176b859c6dc3fb10388adfa490a727d0c73',carrier).splitlines()==['docs/coordination/review/v1-pr157-codex-review.md','docs/coordination/review/v1-pr175-chain-claude-recheck.md']
+links=0
+for p in changed:
+    text=Path(p).read_text()
+    for target in re.findall(r'\[[^\]]*\]\(([^)]+)\)',text):
+        if re.match(r'^[a-zA-Z]+:',target) or target.startswith('#'):continue
+        local=urllib.parse.unquote(target.split('#')[0])
+        assert (root/p).parent.joinpath(local).exists(),(p,target)
+        links+=1
+    if p!=str(claim):
+        delta=git('diff','--unified=0',base,'--',p)
+        removed=[s[1:] for s in delta.splitlines() if s.startswith('-') and not s.startswith('---')]
+        assert all(re.match(r'^(?:- )?Status:',s) for s in removed),(p,removed)
+subprocess.run(['git','diff','--check',base],check=True)
+print(f'PASS: {len(changed)} documentation paths; {len(rows)} inventory entries; 13 automatic merge trees; identical product tree; {links} local links; historical prose retained; whitespace clean.')
+```
+
+Actual result: **PASS**, seventeen documentation paths, 23 distinct inventory entries, thirteen automatic merge trees, identical product tree, thirty local links, historical prose retained and whitespace clean. The command was `TZ=Asia/Singapore python3 /tmp/gsis-verify-merge-records.py`, whose complete source is preserved above for reproducibility. No local application build or Node/LORD suite is repeated for this documentation-only change. Fresh branch CI and Claude exact-head review remain separate; no earlier approval transfers to this bookkeeping head. Rollback affects records only.

@@ -1,6 +1,6 @@
 # v1-global-save-status: settle the shared unknown-save banner from verified client state
 
-- Status: implemented; initial local gates passed, but full CI at5518011 failed one existing browser assertion. The authorised test-only correction and final local gates pass; full corrected-head CI and Claude review remain pending.
+- Status: merged through PR175; PR175, reviewed head `778352626cb5c9eb7ba51633575b16bc7922a078`, carrying merge `334731cdb1d4fc5d37d7bdf6de761d668c062994`. Not deployed. See the 16 November checkpoint below; older pending statements are historical.
 - Owner/model: Codex. Coordinator: ChatGPT v1.
 - Reviewer/model: Claude, independent exact-head reviewer; review pending.
 - Last updated (Asia/Singapore): 15 November 2026, 17:15.
@@ -122,3 +122,9 @@ Not deployed to staging or production. This task changes display notification on
 Next: publish the bounded implementation PR, record its actual head/base and full CI, then request Claude exact-head review. The coordinator owns source/test assignments and publication; only the two documentation paths were assigned to this documentation agent. Final head/base, exact inventory, CI and Claude review belong in the implementation PR. No optional skill execution is claimed; repository ownership, minimal-state, R07 request/context binding and R09 recovery principles inform this contract.
 
 Code-only rollback restores the misleading banner and does not undo any durable operation or receipt. F5 remains **OPEN**. Official T1B-01/T1B-02 and unperformed runtime UAT remain **Not tested**. No secrets or private school data belong in the task, test or handoff.
+
+## Merge checkpoint — 16 November 2026 (Asia/Singapore)
+
+[PR175](https://github.com/helper-gsps/gsis/pull/175) at reviewed head `778352626cb5c9eb7ba51633575b16bc7922a078` is included in main by [merge `334731cdb1d4fc5d37d7bdf6de761d668c062994`](https://github.com/helper-gsps/gsis/commit/334731cdb1d4fc5d37d7bdf6de761d668c062994). [Claude's controlling review](https://github.com/helper-gsps/gsis/blob/afeba886cd97f365cfb530200bcf46309812cd1b/docs/coordination/review/v1-pr175-chain-claude-recheck.md) and green exact-head CI were checked before integration. The task claim is closed; prior implementation, test failures and pending checkpoints above remain dated history.
+
+The owner amended the sequence to merge PR175 once, preserving all eleven reviewed heads. This head is an ancestor of that carrying merge; it was not separately reimplemented or resolved by hand. The resulting product tree equals the tested tree outside two review documents. [The merge inventory](v1-merge-records-20261115.md#verified-merge-inventory) records the exact heads, carrying commits and verification. Not deployed; no new hosted UAT, migration or provider send. F5 remains **OPEN**; official T1B-01/T1B-02 and unperformed runtime UAT remain **Not tested**.

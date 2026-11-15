@@ -1,6 +1,6 @@
 # v1-deploy-fortnight-editor: UAT014 input, save and navigation recovery
 
-- Status: implemented; focused verification passed; full exact-head suites/CI and Claude review pending.
+- Status: merged through PR175; PR165, reviewed head `38dabe6ad46a5f0fdf37baa92811ffca86206cf7`, carrying merge `334731cdb1d4fc5d37d7bdf6de761d668c062994`. Not deployed. See the 16 November checkpoint below; older pending statements are historical.
 - Owner/model: Codex; v1 coordinator ChatGPT; independent exact-head reviewer Claude.
 - Updated (Asia/Singapore): 15 November 2026, 10:30.
 - Branch: `codex/v1-deploy-fortnight-editor`.
@@ -53,3 +53,9 @@ Passed with TZ=Asia/Singapore and GSIS_BROWSER_EXECUTABLE=/usr/bin/chromium:
 - Canonical `npm run build`, whitespace and parent-content comparison passed, with no tracked generated drift. Runner discovery includes the new program:77 product/1,176 Node.
 
 Pre-commit formatting used cached Prettier3.6.2 only on the new test, followed by another passing six-group browser run. Unchanged Core/Contacts passed12programs/56cases. Logs: `/tmp/gsis-fortnight-formatted-final.log` and `/tmp/gsis-fortnight-contracts.log`. Full product and Node/LORD CI results and the exact published head belong in the PR. Logs are supplementary local evidence; no deployed or original live incident result is claimed. Independent Claude review remains pending.
+
+## Merge checkpoint — 16 November 2026 (Asia/Singapore)
+
+[PR165](https://github.com/helper-gsps/gsis/pull/165) at reviewed head `38dabe6ad46a5f0fdf37baa92811ffca86206cf7` is included in main by [merge `334731cdb1d4fc5d37d7bdf6de761d668c062994`](https://github.com/helper-gsps/gsis/commit/334731cdb1d4fc5d37d7bdf6de761d668c062994). [Claude's controlling review](https://github.com/helper-gsps/gsis/blob/afeba886cd97f365cfb530200bcf46309812cd1b/docs/coordination/review/v1-pr175-chain-claude-recheck.md) and green exact-head CI were checked before integration. The task claim is closed; prior implementation, test failures and pending checkpoints above remain dated history.
+
+The owner amended the sequence to merge PR175 once, preserving all eleven reviewed heads. This head is an ancestor of that carrying merge; it was not separately reimplemented or resolved by hand. The resulting product tree equals the tested tree outside two review documents. [The merge inventory](v1-merge-records-20261115.md#verified-merge-inventory) records the exact heads, carrying commits and verification. Not deployed; no new hosted UAT, migration or provider send. F5 remains **OPEN**; official T1B-01/T1B-02 and unperformed runtime UAT remain **Not tested**.

@@ -1,6 +1,6 @@
 # v1-accelerated-spec-20261113
 
-Status: specification complete; independent review pending
+Status: merged; PR137, reviewed head `2cdc58d039004f4be40e3c37ee96ec960672c84e`, carrying merge `5e077e23337689a874f14a13e94b691e1e11ca95`. Not deployed. See the 16 November checkpoint below; older pending statements are historical.
 Owner/model: ChatGPT v1 coordinator / Codex
 Reviewer/model: Claude, independent review pending
 Updated: 13 November 2026, Asia/Singapore
@@ -46,3 +46,9 @@ Claude approved head `b6cd8f5702fbea8fc4dc22c245de00b6dfdd2a22` as a historical 
 Merged main `c69d30c682e11f10421e42efa746edc9b8729777` cleanly into this branch. This refresh stays within the existing three-document scope. Link, whitespace, preservation and documentation-only scope checks pass. No local build/application suite was run for prose; fresh CI and Claude exact-head recheck remain pending. The owner now authorises applicable merges after their gates pass; deployment and live-data operations remain outside this task. F5 OPEN; official T1B-01/T1B-02 and unperformed runtime UAT Not tested. The exact refreshed head is recorded in PR137.
 
 Check detail: an initial staged whitespace check against the old branch also inspected unrelated files inherited from current main and reported their pre-existing whitespace. The relevant check compares the resulting tree with current main. For the frozen CRLF specification, `git -c core.whitespace=blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol diff --cached --check origin/main` recognises its preserved CRLF endings; that scoped check passes. No inherited application/licence/test whitespace was changed.
+
+## Merge checkpoint — 16 November 2026 (Asia/Singapore)
+
+[PR137](https://github.com/helper-gsps/gsis/pull/137) at reviewed head `2cdc58d039004f4be40e3c37ee96ec960672c84e` is included in main by [merge `5e077e23337689a874f14a13e94b691e1e11ca95`](https://github.com/helper-gsps/gsis/commit/5e077e23337689a874f14a13e94b691e1e11ca95). [Claude's controlling review](https://github.com/helper-gsps/gsis/blob/42873cd068c24c54d4738be5503942333bc1e9ae/docs/coordination/review/v1-pr163-136-137-179-claude-review.md) and green exact-head CI were checked before integration. The task claim is closed; prior implementation, test failures and pending checkpoints above remain dated history.
+
+[The merge inventory](v1-merge-records-20261115.md#verified-merge-inventory) records the exact heads, carrying commits and verification. Not deployed; no new hosted UAT, migration or provider send. F5 remains **OPEN**; official T1B-01/T1B-02 and unperformed runtime UAT remain **Not tested**.

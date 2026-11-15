@@ -1,6 +1,6 @@
 # v1-deploy-venue-uses: B-V01c preserve saved room-use metadata
 
-- Status: implementation and focused verification complete; full suites through exact-head CI, publication and Claude review pending. No merge or deployment authorised.
+- Status: merged through PR175; PR169, reviewed head `f14543449882b47774dc2799298d8d0c1382dbb3`, carrying merge `334731cdb1d4fc5d37d7bdf6de761d668c062994`. Not deployed. See the 16 November checkpoint below; older pending statements are historical.
 - Owner/model: Codex; coordinator ChatGPT for v1; independent exact-head reviewer Claude.
 - Last updated: 15 November 2026, 13:18 SGT.
 - Branch: `codex/v1-deploy-venue-uses`.
@@ -80,3 +80,9 @@ All runtime checks use `TZ=Asia/Singapore`. Preserve existing assertions, runner
 Update the paired handoff with actual results and give Claude the exact PR head. New code requires updated review. Q01 has accepted-claim, parent and overlap evidence; Q02–Q05 have the bounded source change and passing focused/security/recovery regressions. Q06 remains pending full exact-head CI, and Q07 pending PR/exact-head handoff and Claude review; Q08 is not applicable to deployment. F5 stays OPEN; official T1B-01/T1B-02 and unperformed runtime UAT stay Not tested.
 
 Rollback requires no schema or data migration. Reverting reintroduces loss on future refreshes; it cannot reconstruct values already discarded by an earlier operation. Never fill historical rooms from generic seed values. B-V01a initial-register UI, B-V01b navigation, B-D03 pending publication and B-CA01/B-CA02 Calendar findings remain separate tasks.
+
+## Merge checkpoint — 16 November 2026 (Asia/Singapore)
+
+[PR169](https://github.com/helper-gsps/gsis/pull/169) at reviewed head `f14543449882b47774dc2799298d8d0c1382dbb3` is included in main by [merge `334731cdb1d4fc5d37d7bdf6de761d668c062994`](https://github.com/helper-gsps/gsis/commit/334731cdb1d4fc5d37d7bdf6de761d668c062994). [Claude's controlling review](https://github.com/helper-gsps/gsis/blob/afeba886cd97f365cfb530200bcf46309812cd1b/docs/coordination/review/v1-pr175-chain-claude-recheck.md) and green exact-head CI were checked before integration. The task claim is closed; prior implementation, test failures and pending checkpoints above remain dated history.
+
+The owner amended the sequence to merge PR175 once, preserving all eleven reviewed heads. This head is an ancestor of that carrying merge; it was not separately reimplemented or resolved by hand. The resulting product tree equals the tested tree outside two review documents. [The merge inventory](v1-merge-records-20261115.md#verified-merge-inventory) records the exact heads, carrying commits and verification. Not deployed; no new hosted UAT, migration or provider send. F5 remains **OPEN**; official T1B-01/T1B-02 and unperformed runtime UAT remain **Not tested**.
