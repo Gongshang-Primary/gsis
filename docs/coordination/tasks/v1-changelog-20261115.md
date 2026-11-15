@@ -1,6 +1,6 @@
 # v1 owner change log — 15 November 2026
 
-- Status: draft documentation ready for handoff; bug V1-20261115-01 queued, implementation not claimed.
+- Status: draft documentation queue; V1-20261115-01 implementation separately claimed at `bef1ac8c1d5e310a3468b92b72da38d59e49aeb1`.
 - Owner/model: Codex. Coordinator: ChatGPT (v1). Independent reviewer: Claude.
 - Last updated (Asia/Singapore): 15 November 2026, 08:48.
 - Branch: `codex/v1-changelog-20261115`.
@@ -13,7 +13,7 @@
 1. `docs/coordination/tasks/v1-changelog-20261115.md` (this claim and evidence).
 2. `docs/v1/accelerated-delivery/CHANGELOG_2026-11-15.md` (reported bug, source evidence and future acceptance criteria).
 
-No application, test, generated, configuration or policy edits. No live receipt reads, publication retries, data writes, migration, merge or deployment. Prior release approval does not authorise fixing this newly reported bug. No screenshot or real operation identifier is committed.
+No application, test, generated, configuration or policy edits in this documentation task. No live receipt reads, publication retries, data writes, migration, merge or deployment. Owner subsequently said “read project chat data clone uat ledger, treat them as change log for bug fixes too. proceed to work on them one by one”; the first fix now has its own seven-path implementation claim and branch `codex/v1-deploy-venue-publication`. The separate project chat was inaccessible through current tools; owner asked for entries/Git handoff. Do not invent its findings. No screenshot or real operation identifier is committed.
 
 ## Start and ownership checks
 
@@ -27,4 +27,4 @@ Documentation checks passed: `git diff --check 26bbccd229962700409bb6e9c80b1e9be
 
 Q01 Pass: bounded documentation claim and overlap check. Q02–Q04 Pass for documentation: source-pinned report preserves domain ownership, publication uncertainty and the original operation identity; future runtime verification remains pending. Q05 Not applicable: no runtime resources/dependencies change; no skill executed. Q06 Pass for documentation checks only; unrun implementation/CI checks remain pending if this draft is proposed for merge. Q07 Pending: Claude review at the published exact head. Q08 Not applicable: no release action authorised. Rollback removes only the documentation entry; it cannot undo any live publication.
 
-Next: owner/coordinator triage of V1-20261115-01 and Claude review of the draft record. Implementation requires its own bounded claim and authorisation. F5 remains OPEN. Official T1B-01/T1B-02 and unperformed runtime UAT remain Not tested.
+Next: record separately verified fix progress and import the requested UAT ledger once supplied; Claude reviews exact heads. First implementation is independently claimed; later items remain unknown until the ledger is read. No merge/deployment approval is inferred. F5 remains OPEN. Official T1B-01/T1B-02 and unperformed runtime UAT remain Not tested.

@@ -2,9 +2,11 @@
 
 Documentation only. Model: Codex; coordinator: ChatGPT (v1); independent reviewer: Claude. [Task and scope](../../coordination/tasks/v1-changelog-20261115.md). Entries record reported problems and future acceptance criteria; they do not authorise implementation or live operations.
 
+Owner subsequently authorised working through the bug fixes one by one, including entries from the separate “data clone UAT ledger” project conversation. Implementation now uses separate bounded claims/PRs; this PR remains documentation only. That conversation is not accessible through the current connected tools and was not found in main or connected Pages. Its entries or Git handoff have been requested; they are not yet imported or presumed known.
+
 ## V1-20261115-01 — Deploy publication blocked by venue metadata
 
-**Status: Reported / queued. Not reproduced or fixed.** Owner request: “deploy is unable to publish, changelog for bug fix”.
+**Status: Implementation in progress; not yet fixed or deployed.** Owner request: “deploy is unable to publish, changelog for bug fix”. The authorised fix is separately claimed in `docs/coordination/tasks/v1-deploy-venue-publication.md`, main claim `bef1ac8c1d5e310a3468b92b72da38d59e49aeb1`, branch `codex/v1-deploy-venue-publication`. The original live outcome remains unverified.
 
 ### Observed and expected behaviour
 
