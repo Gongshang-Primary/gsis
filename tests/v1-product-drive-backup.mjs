@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { createDatabase } from "./v1-product/helpers.mjs";
 import { canonical } from "../v1/runtime/store.mjs";
+import { CONTACT_GRID_SCHEMA } from "../v1/services/contacts/grid-projection.mjs";
 import {
   allocateDriveFileId,
   verifyDriveFile,
@@ -273,9 +274,9 @@ try {
     aliases: ["obsolete@example.invalid", "obsolete@moe.edu.sg"],
     birthday: "02-09",
     employmentActive: true,
-    role: { catalogueId: "roles", revision: "1", code: "T" },
-    employmentTags: [{ catalogueId: "employment", revision: "1", code: "BT" }],
-    subjectTags: [{ catalogueId: "subjects", revision: "1", code: "PE" }],
+    role: { schemaVersion: 2, value: "T" },
+    employmentTags: { schemaVersion: 2, value: ["BT"] },
+    subjectTags: { schemaVersion: 2, value: ["PE"] },
     eo: true,
   }))
     await h.db
@@ -286,7 +287,7 @@ try {
       .run();
   const initial = await buildBackupDataset(env(), { id: "staff" }, now);
   assert.equal(initial.book.sheets.Contacts.rows.length, 1);
-  assert.equal(initial.book.metadata.Schema, "gsis.contacts.grid.v1");
+  assert.equal(initial.book.metadata.Schema, "gsis.contacts.grid.v2");
   const expectedContact = [
     "staff-1",
     "Teacher",
@@ -306,6 +307,14 @@ try {
     "Mixed",
     "IconCase",
     "CesCase",
+    "",
+    "",
+    "",
+    "",
+    "",
+    "obsolete@example.invalid\nobsolete@moe.edu.sg",
+    "",
+    "provisional",
   ];
   assert.deepEqual(initial.book.sheets.Contacts.rows[0], expectedContact);
   assert.deepEqual(initial.book.sheets.Baseline.rows[0], expectedContact);
@@ -360,15 +369,18 @@ try {
       "utf8",
     ),
   );
+  contactUi.window.GSISContactsEditor.install({}, CONTACT_GRID_SCHEMA, () => ({
+    available: true,
+    name: "Unused import preview",
+  }));
   const currentGrid = {
+    gridSchema: CONTACT_GRID_SCHEMA,
     editable: true,
     fields: initial.book.sheets.Contacts.columns.slice(1),
     rows: initial.book.sheets.Contacts.rows.map((row) => ({
       id: row[0],
       values: row.slice(1),
-      computed: row
-        .slice(1)
-        .map((_, i) => ![0, 2, 3, 8, 14, 15, 16].includes(i)),
+      computed: row.slice(1).map((_, i) => i === 1),
     })),
   };
   const editable = structuredClone(decoded);
@@ -380,8 +392,28 @@ try {
   );
   assert.equal(validImport.errors.length, 0);
   assert.equal(validImport.changes.length, 1);
+  const appointment = structuredClone(decoded);
+  appointment.sheets.Contacts.rows[0][7] = "EO";
+  const appointmentImport = contactUi.window.GSISContactsTables.validate(
+    appointment,
+    currentGrid,
+    "school",
+  );
+  assert.equal(appointmentImport.errors.length, 0);
+  assert.equal(
+    appointmentImport.changes.length,
+    1,
+    "EO appointment is editable ordinary data, never authority acceptance",
+  );
+  assert.equal(appointmentImport.changes[0].field, "EO Appt Level");
+  assert(
+    !initial.book.sheets.Contacts.columns.some((name) =>
+      ["SMC", "EO", "School Leader"].includes(name),
+    ),
+    "authority acceptance has no workbook column",
+  );
   const authority = structuredClone(decoded);
-  authority.sheets.Contacts.rows[0][7] = "EO";
+  authority.sheets.Contacts.rows[0][2] = "Fabricated derived name";
   assert.equal(
     contactUi.window.GSISContactsTables.validate(
       authority,
@@ -396,7 +428,7 @@ try {
       currentGrid,
       "school",
     ).errors.length > 0,
-    "backup cannot grant EO through Contacts grid import",
+    "backup cannot replace the derived TTb name through Contacts grid import",
   );
   contactUi.window.close();
   cloud.lose();
