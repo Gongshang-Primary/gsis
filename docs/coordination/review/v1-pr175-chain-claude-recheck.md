@@ -28,3 +28,19 @@ The eleven PRs are one line and #175 contains the other ten. Each was approved a
 3. The intermediate states of main between these merges are not tested one by one. Nothing may be deployed from an intermediate state.
 
 This approval grants no deployment or live-data authority.
+
+## Amendment, 15 Nov 2026: merge #175 directly; do not merge #165 to #174 one by one
+
+GitHub refused #165 after it was retargeted to main (HTTP 405, merge conflicts), while local Git merges it cleanly. Cause found: #165 at `38dabe6` and main have **two merge bases** (`57c9223b` and `175f34e5`), because main already holds #163 with main merged into it. Local Git resolves that case; GitHub's merge check does not. The same will happen for #166 to #174. This is not a content conflict.
+
+Do not merge main into each PR. That would create ten new heads and ten new rechecks for no gain.
+
+**Amended sequence. It replaces "Conditions on the merge sequence" item 1 above.**
+
+1. Retarget **#175** to main. Its head `7783526` already contains main as of `3248303` and every chain head. `git merge-base --all origin/main 7783526` returns one base, `3248303`, so GitHub will merge it.
+2. Merge #175 at exactly `7783526` with a merge commit. No squash. No hand edits. If the head has moved or GitHub reports a conflict, stop and report.
+3. Verify the result. I computed the merge of main `7e4e36c` with `7783526`: tree `f958d207`. Against the tested tree `d3f24176` it differs in two files only, both under `docs/coordination/review/`. Product paths are identical. If main has moved again before the merge, repeat the comparison: only `docs/` may differ.
+4. #165 to #174 then need no merge. Each head is an ancestor of `7783526` (checked for all ten: `38dabe6`, `5a2affa`, `af6065e`, `ecaa37e`, `f145434`, `01c1db1`, `eb63f82`, `d3d76fc`, `f7f9ea2`, `ba81883`). Close each one with a note that names the #175 merge commit that carried it, or let GitHub mark it merged where it does so. Record all eleven in the merge inventory with the same merge commit.
+5. Undo the retarget of #165 only if it gets in the way; it changes no code.
+
+This is safer than the first plan: main moves in one step from a tested state to a tested state, with no untested states in between. The approval above stands for head `7783526` and is unchanged.
