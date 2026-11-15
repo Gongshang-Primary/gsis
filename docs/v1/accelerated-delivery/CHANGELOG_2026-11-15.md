@@ -1,5 +1,11 @@
 # Owner change log — 15 November 2026
 
+## Merge checkpoint — 15 November 2026
+
+Owner-authorised merges completed in order: **#160, #164, #161, #144, #158, #159, #162, #177**. The three implementation fixes and five documentation records are on application main `c69d30c682e11f10421e42efa746edc9b8729777`; every merge preserves its reviewed head and required green exact-head CI. No deployment occurred. [Exact merge evidence and resume order](../../coordination/tasks/v1-merge-records-20261115.md).
+
+The next implementation gate is Claude's recheck of PR163 at `c791713cbf283fad9a63e66e963353e54d802636`, a main integration with no hand edits. PR136 at `8d62eda95bb1e38ecab0ae0eeabcc67991623d10` and PR137 at `2cdc58d039004f4be40e3c37ee96ec960672c84e` address Claude's documentation refreshes and also await recheck. The earlier dated queue below remains historical; none of its hosted findings is cleared merely by merging. F5 OPEN; official T1B-01/T1B-02 and unperformed runtime UAT Not tested.
+
 Documentation only. Model: Codex; coordinator: ChatGPT (v1); independent reviewer: Claude. [Task and scope](../../coordination/tasks/v1-changelog-20261115.md). Entries record reported problems and future acceptance criteria; they do not authorise implementation or live operations. The latest 17:03 SGT checkpoint below supersedes earlier queue/review statuses; their dated evidence remains intact.
 
 Owner subsequently authorised working through the reported bug fixes one by one, including the data-clone UAT findings. Implementation uses separate bounded claims/PRs; [PR159](https://github.com/helper-gsps/gsis/pull/159) remains documentation only. The project conversation was initially inaccessible. The owner has now supplied `GSIS_FRONTEND_UAT_LEDGER.md`; this revision incorporates all 28 UAT IDs and four environment IDs from that document.

@@ -1,6 +1,6 @@
 # v1 owner change log — 15 November 2026
 
-- Status: documentation queue in [PR159](https://github.com/helper-gsps/gsis/pull/159); 49 ledger/Run B findings incorporated. All 14 published fix PRs are ready for Claude; their approval/release gates remain separate.
+- Status: merged [PR159](https://github.com/helper-gsps/gsis/pull/159) at reviewed head `1dca6e7315431e7d8226c4e0b1555a34ebb1df21` as `d1fc7efd5c64a492be30624ad05f08eb12a150ba`; not deployed by this merge task.
 - Owner/model: Codex. Coordinator: ChatGPT (v1). Independent reviewer: Claude.
 - Last updated (Asia/Singapore): 15 November 2026, 17:03.
 - Branch: `codex/v1-changelog-20261115`; documentation head before this update `2a0b5f3e09aff43b7fa14bb86e904170489f0d99`. The PR body records the new exact head after commit.
@@ -139,3 +139,7 @@ Coordinator refresh: main `f3f48ef4fbbd00cf4654719b3210c5aa7071e72a` includes th
 Contacts B will incorporate main's 20-path v0.9 release change mechanically as ancestry, then remain within its own 38-path implementation claim; no B source edits are made now. Only the existing two PR159 documents change. Root publishes the final documentation head; no commit, application test, merge, deployment, bootstrap change or live action is performed by this update. F5 remains **OPEN**; official and unperformed runtime UAT remain **Not tested**.
 
 Revalidation: `TZ=Asia/Singapore python3 /tmp/validate-gsis-uat-docs.py` passes exact two-file scope, whitespace, 151 links (58 pinned source anchors, 73 external-reference URL forms), all 49 unique rows and no operation UUIDs. No application/runtime tests were needed for this documentation-only delta.
+
+## 15 November 2026 — owner-authorised integration
+
+The owner instructed Codex to merge applicable PRs one by one in logical order. Claude's approval and exact-head CI were rechecked before this merge; its tree matches the automatic merge of both parents without hand edits. This closes the implementation/documentation claim represented by this PR. Later UAT findings remain in their own queue and claims; merging is not hosted acceptance. The merge inventory and remaining gates are in `docs/coordination/tasks/v1-merge-records-20261115.md`. No deployment or live-data operation occurred. F5 OPEN; official T1B-01/T1B-02 and unperformed runtime UAT Not tested.
