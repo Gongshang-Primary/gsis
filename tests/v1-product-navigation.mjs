@@ -34,14 +34,14 @@ try {
  const iconBounds=await page.locator('.module-icon').evaluateAll(nodes=>nodes.map(n=>({box:n.getBoundingClientRect().height,image:n.firstElementChild.getBoundingClientRect().height})));assert(iconBounds.every(x=>x.image<=x.box+1),'all reused icons fit their equal square icon bounds');
  await page.screenshot({path:join(evidence,'home-desktop.png')});await page.setViewportSize({width:390,height:844});await page.screenshot({path:join(evidence,'home-narrow.png')});await page.setViewportSize({width:1440,height:1000});
  // Native Contacts tab handlers remain the source of navigation and dirty guards.
- await page.setContent(`<style>${css}.page:not(.active){display:none}</style><nav class="navbar"><button class="nav-button" data-page="contacts">Contact list</button><button class="nav-button active" data-page="data">Edit Info</button><button class="nav-button" data-page="admin">Sys Admin</button></nav><section class="page" id="contacts"></section><section class="page active" id="data"></section><section class="page" id="admin"></section><section id="diy"></section><details class="gsis-panel"><summary>Staff classifications and controlled catalogues</summary><input id="keptDraft" value="unsaved"></details>`);
+ await page.setContent(`<style>${css}.page:not(.active){display:none}</style><nav class="navbar"><button class="nav-button" data-page="contacts">Contact list</button><button class="nav-button active" data-page="data">Edit Info</button><button class="nav-button" data-page="admin">Sys Admin</button></nav><section class="page" id="contacts"></section><section class="page active" id="data"><input id="keptDraft" data-person="synthetic-person" data-field="Role" value="unsaved"></section><section class="page" id="admin"></section><section id="diy"></section>`);
  await page.evaluate(()=>{
   window.GSISV1={module:'contacts',capable:()=>true,getSession:async()=>({user:{email:'test@example.invalid',accountId:'test'},schoolId:'school'})};
   window.dirty=true;
   for(const b of document.querySelectorAll('[data-page]'))b.onclick=()=>{if(window.dirty)return;document.querySelectorAll('.active').forEach(n=>n.classList.remove('active'));b.classList.add('active');document.getElementById(b.dataset.page).classList.add('active');};
  });
  await page.addScriptTag({content:shell});
- await page.waitForFunction(()=>document.querySelector('#data details.gsis-panel'));
+ await page.waitForFunction(()=>document.querySelector('.gsis-suitebar [aria-current=page]'));
  assert.equal(await page.locator('.gsis-suitebar [aria-current=page]').textContent(),'Edit Info');
  assert.equal(await page.locator('.gsis-suitebar').getByRole('button',{name:'Catalogues & staff'}).count(),0);
  await page.locator('.gsis-suitebar').getByRole('link',{name:'Contacts',exact:true}).click();
@@ -49,8 +49,8 @@ try {
  await page.evaluate(()=>window.dirty=false);
  await page.locator('.gsis-suitebar').getByRole('link',{name:'Contacts',exact:true}).click();
  await page.waitForFunction(()=>document.querySelector('.gsis-suitebar [aria-current=page]').textContent==='Contact list');
- assert.equal(await page.locator('#keptDraft').inputValue(),'unsaved','panel move preserves draft node');
- assert.equal(await page.locator('#data details').isVisible(),false);
+ assert.equal(await page.locator('#keptDraft').inputValue(),'unsaved','native tab navigation preserves the direct-editor draft node');
+ assert.equal(await page.locator('#keptDraft').isVisible(),false);
  assert.equal(await page.locator('body > details.gsis-panel').count(),0);
  // Role-hidden panels stay hidden after placement, even when their host is visible.
  await page.evaluate(()=>{const p=document.createElement('details');p.className='gsis-panel';p.hidden=true;p.innerHTML='<summary>Accepted authority records and readiness</summary>';document.body.append(p);});
