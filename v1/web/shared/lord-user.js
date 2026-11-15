@@ -273,6 +273,8 @@
     fields.style.border = "0";
     fields.style.padding = "0";
     fields.append(element("legend", "Booking " + booking.bookingId));
+    fields.style.minInlineSize = "0";
+    fields.querySelector("legend").style.overflowWrap = "anywhere";
     const body = pending.booking?.body || booking;
     field(fields, "date", "Date", body.date, {
       type: "date",
@@ -573,11 +575,25 @@
     function update() {
       fields.disabled = submitting[kind] || !!pending[kind];
       submit.disabled = submitting[kind];
-      submit.textContent = pending[kind] ? "Retry the same request" : label;
-      check.hidden = !pending[kind];
+      submit.textContent = pending[kind]?.cleanupPrepared
+        ? "Retry local cleanup"
+        : pending[kind]
+          ? "Retry the same request"
+          : label;
+      check.hidden = !pending[kind] || !!pending[kind].cleanupPrepared;
       check.disabled = submitting[kind];
     }
     function uncertain(error) {
+      if (pending[kind]?.cleanupPrepared) {
+        message(
+          forms[kind].status,
+          (error ? error.message + " " : "") +
+            "This new request was not sent. Restore browser storage, then retry local cleanup before editing. Reference: " +
+            pending[kind].body.operationId,
+          true,
+        );
+        return;
+      }
       message(
         forms[kind].status,
         (error ? error.message + " " : "") +
@@ -587,14 +603,58 @@
       );
     }
     async function send(checkOnly = false) {
-      if (submitting[kind] || !active) return;
+      if (submitting[kind] || !active || (checkOnly && !pending[kind])) return;
       if (!pending[kind] && !form.reportValidity()) return;
       submitting[kind] = true;
+      let prepared = null,
+        createdAttempt = null;
+      const ownsView = () =>
+        active &&
+        view.dialog.isConnected &&
+        view.dialog.open &&
+        forms[kind]?.form === form;
       try {
-        if (!pending[kind])
-          persist(kind, { viewed: structuredClone(viewed), body: makeBody() });
+        // FormData omits disabled controls. Capture the new draft before the
+        // submitting guard disables the fieldset, then retain it across awaits.
+        const candidate = pending[kind] ? null : makeBody();
         update();
         await currentSession();
+        if (!ownsView()) return;
+        if (pending[kind]?.cleanupPrepared) {
+          const local = pending[kind];
+          if (!local.cleanupDone) {
+            if (!api.releasePrepared(local.cleanupPrepared))
+              throw Error(
+                "The original local preparation cannot be cleared in this context.",
+              );
+            local.cleanupDone = true;
+          }
+          persist(kind, null);
+          message(
+            forms[kind].status,
+            "The unsent preparation was cleared. Review the form before submitting.",
+          );
+          return;
+        }
+        if (!pending[kind]) {
+          const body = candidate;
+          if (kind === "booking")
+            prepared = await api.prepareLordBookingRequest(
+              "/api/lord" + path,
+              body,
+              { fresh: true },
+            );
+          if (!ownsView()) {
+            if (prepared) api.releasePrepared(prepared);
+            return;
+          }
+          createdAttempt = {
+            viewed: structuredClone(viewed),
+            body: prepared ? structuredClone(prepared.body) : body,
+          };
+          persist(kind, createdAttempt);
+        }
+        update();
         const attempt = pending[kind];
         message(
           forms[kind].status,
@@ -602,22 +662,40 @@
             ? "Checking the original receipt…"
             : "Waiting for confirmation…",
         );
-        const result = checkOnly
-          ? await api.request(
-              "lord",
-              "/receipt?operationId=" +
-                encodeURIComponent(attempt.body.operationId),
-            )
-          : await api.request("lord", path, {
-              method: "POST",
-              body: structuredClone(attempt.body),
-            });
-        if (!active) return;
+        const checked =
+          checkOnly && kind === "booking"
+            ? await api.checkLordBookingReceipt(attempt.body, {
+                path: "/api/lord" + path,
+              })
+            : null;
+        const result = checked
+          ? checked.result
+          : checkOnly
+            ? await api.request(
+                "lord",
+                "/receipt?operationId=" +
+                  encodeURIComponent(attempt.body.operationId),
+              )
+            : await api.request("lord", path, {
+                method: "POST",
+                body: structuredClone(attempt.body),
+                prepared,
+                retainedAttempt: kind === "booking" && !prepared,
+              });
+        if (
+          !active ||
+          pending[kind] !== attempt ||
+          forms[kind]?.targetId !==
+            (attempt.viewed.bookingId || attempt.viewed.incidentId)
+        )
+          return;
         const receipt = result?.receipt || result;
         if (
           kind === "booking" &&
-          attempt.body.bookingGroup &&
-          !api.verifyLordBookingReceipt(attempt.body.operationId, receipt)
+          (checked
+            ? !checked.verified
+            : attempt.body.bookingGroup &&
+              !api.verifyLordBookingReceipt(attempt.body.operationId, receipt))
         ) {
           uncertain(
             Error("The receipt does not match the original booking request."),
@@ -669,7 +747,40 @@
         message(forms[kind].status, success);
       } catch (error) {
         if (!active) return;
-        if (pending[kind] && !checkOnly && invalidInput(error)) {
+        let released = false;
+        prepared ||= error.prepared || null;
+        if (prepared) {
+          try {
+            released = api.releasePrepared(prepared);
+          } catch (cleanup) {
+            error = cleanup;
+            const retained = createdAttempt || {
+              viewed: structuredClone(viewed),
+              body: structuredClone(prepared.body),
+            };
+            // The opaque handle proves only this live, undispatched preparation.
+            // Never serialize that proof or promote a restored draft to unsent.
+            Object.defineProperty(retained, "cleanupPrepared", {
+              value: prepared,
+              configurable: true,
+            });
+            pending[kind] = retained;
+          }
+        }
+        if (released && pending[kind] === createdAttempt) {
+          try {
+            persist(kind, null);
+          } catch (storage) {
+            error = storage;
+          }
+        }
+        if (!ownsView()) return;
+        if (
+          kind !== "booking" &&
+          pending[kind] &&
+          !checkOnly &&
+          invalidInput(error)
+        ) {
           persist(kind, null);
           message(
             forms[kind].status,
@@ -687,7 +798,13 @@
       event.preventDefault();
       send();
     };
-    forms[kind] = { form, status: view.status, update, view };
+    forms[kind] = {
+      form,
+      status: view.status,
+      update,
+      view,
+      targetId: viewed.bookingId || viewed.incidentId,
+    };
     update();
     if (pending[kind]) uncertain();
     else

@@ -68,6 +68,7 @@ const WRITE = new Set([
   "/acknowledgeNotices",
   "/staff/register",
   "/exports/reconcile",
+  "/operations/withdraw",
 ]);
 export function policy(method, path, body = {}) {
   check(
@@ -76,6 +77,13 @@ export function policy(method, path, body = {}) {
     "METHOD_NOT_ALLOWED",
     405,
   );
+  if (path === "/operations/withdraw")
+    check(
+      method === "POST",
+      "Withdrawal requires POST.",
+      "METHOD_NOT_ALLOWED",
+      405,
+    );
   if (path.startsWith("/internal/pins/"))
     return {
       action: "deploy.internal",
@@ -231,6 +239,183 @@ function cleanIntent(body) {
   ])
     delete b[k];
   return b;
+}
+const recoveryHash = (value) =>
+  typeof value === "string" && /^[a-f0-9]{64}$/.test(value);
+function recoveryView(op, versionId) {
+  const receipt = op.receipt;
+  const terminal = op.state === "committed" || op.state === "aborted";
+  check(
+    Number.isSafeInteger(op.fence) &&
+      op.fence >= 1 &&
+      (terminal
+        ? receipt &&
+          receipt.operationId === op.operationId &&
+          receipt.digest === op.digest &&
+          (op.state === "committed"
+            ? receipt.state === "committed" && receipt.fence === op.fence
+            : receipt.state === "terminal-not-committed" && op.fence >= 2)
+        : op.state === "prepared" && receipt === null),
+    "The original operation has no consistent recovery receipt.",
+    "RECOVERY_BINDING_INVALID",
+    409,
+  );
+  return {
+    ...receipt?.result,
+    state: op.state,
+    saved: op.state === "committed",
+    receipt,
+    bindingVerified: true,
+    service: "deploy",
+    schoolId: op.schoolId,
+    actorId: op.actorId,
+    operationId: op.operationId,
+    versionId,
+    action: op.action,
+    digest: op.digest,
+    requestDigest: op.requestDigest,
+    currentFence: op.fence,
+    // abortOperation advances the owning row exactly once, only from prepared.
+    // Its terminal receipt was checked above; an unknown row has no such proof.
+    originalFence: op.state === "aborted" ? op.fence - 1 : op.fence,
+  };
+}
+async function verifyRecoveryBinding(ctx, op, versionId) {
+  check(
+    op.actorId === ctx.principal.actorId &&
+      op.schoolId === ctx.principal.schoolId &&
+      op.action === "deploy.edit" &&
+      op.authorityAction === "deploy.edit",
+    "Only your own Deploy edit operation can be recovered here.",
+    "CAPABILITY_DENIED",
+    403,
+  );
+  check(
+    recoveryHash(op.digest) &&
+      recoveryHash(op.requestDigest) &&
+      typeof op.decisionId === "string" &&
+      op.decisionId.length > 0,
+    "The original authorization binding is unavailable.",
+    "RECOVERY_BINDING_INVALID",
+    409,
+  );
+  const proof = await inspectDecision(ctx.env, op.decisionId, {
+    schoolId: op.schoolId,
+    operationId: op.operationId,
+    service: "deploy",
+    actions: ["deploy.edit"],
+    allowHistorical: true,
+  });
+  const original = proof?.principal,
+    descriptor = proof?.descriptor;
+  check(
+    original?.schoolId === op.schoolId &&
+      original.actorId === op.actorId &&
+      original.decisionId === op.decisionId &&
+      !original.impersonating &&
+      original.action === "deploy.edit" &&
+      original.requestDigest === op.requestDigest &&
+      descriptor?.service === "deploy" &&
+      descriptor.action === "deploy.edit" &&
+      descriptor.write === true &&
+      descriptor.operationId === op.operationId &&
+      descriptor.resourceId === versionId &&
+      descriptor.bodyDigest === op.requestDigest,
+    "The original authorization does not match this operation and version.",
+    "RECOVERY_BINDING_INVALID",
+    409,
+  );
+  return recoveryView(op, versionId);
+}
+function unknownOperation(operationId) {
+  return {
+    state: "unknown",
+    saved: false,
+    operationId,
+    reason:
+      "No durable result found; absence does not prove a writer cannot commit.",
+  };
+}
+async function withdrawOperation(ctx) {
+  check(
+    ctx.method === "POST",
+    "Withdrawal requires POST.",
+    "METHOD_NOT_ALLOWED",
+    405,
+  );
+  check(
+    !ctx.principal.impersonating &&
+      can(ctx.principal, "deploy.edit") &&
+      ctx.principal.action === "deploy.edit" &&
+      ctx.principal.validUntil > Date.now(),
+    "Current permission to edit Deploy is required.",
+    "CAPABILITY_DENIED",
+    403,
+  );
+  const b = ctx.body,
+    operationId = id(b.targetOperationId, "original operation"),
+    controlId = id(b.operationId, "withdrawal operation"),
+    versionId = id(b.versionId, "version");
+  check(
+    controlId !== operationId &&
+      recoveryHash(b.expectedDigest) &&
+      recoveryHash(b.expectedRequestDigest) &&
+      Number.isSafeInteger(b.expectedFence) &&
+      b.expectedFence >= 1,
+    "Withdrawal requires the original binding and a separate control reference.",
+  );
+  const op = await operationStatus(
+    ctx.env.DB,
+    ctx.principal.schoolId,
+    operationId,
+  );
+  if (!op) return unknownOperation(operationId);
+  const view = await verifyRecoveryBinding(ctx, op, versionId);
+  check(
+    b.expectedDigest === view.digest &&
+      b.expectedRequestDigest === view.requestDigest &&
+      b.expectedFence === view.originalFence,
+    "The original operation binding changed. Check its receipt again.",
+    "OPERATION_INTENT_CONFLICT",
+    409,
+  );
+  // This controls the original operation; preparing a second domain write would
+  // give an abort acknowledgement a competing identity and outcome.
+  const outcome =
+    op.state === "prepared"
+      ? await abortOperation(ctx.env.DB, op, "OWNER_WITHDRAWN", Date.now())
+      : op.receipt;
+  const settled = await operationStatus(ctx.env.DB, op.schoolId, operationId);
+  check(
+    settled &&
+      settled.digest === op.digest &&
+      settled.requestDigest === op.requestDigest &&
+      settled.actorId === op.actorId &&
+      settled.decisionId === op.decisionId &&
+      settled.action === op.action &&
+      settled.authorityAction === op.authorityAction &&
+      outcome &&
+      canonical(settled.receipt) === canonical(outcome),
+    "The original operation outcome needs confirmation.",
+    "RECOVERY_PENDING",
+    503,
+  );
+  const result = recoveryView(settled, versionId);
+  check(
+    result.state !== "prepared",
+    "Withdrawal is not yet confirmed.",
+    "RECOVERY_PENDING",
+    503,
+  );
+  const resolution = await resolveAdmission(
+    ctx.env,
+    ctx.env.DB,
+    settled,
+    { decisionId: op.decisionId, pins: [] },
+    outcome,
+    Date.now(),
+  );
+  return { ...result, admissionResolution: resolution.state };
 }
 async function prepare(
   ctx,
@@ -1488,6 +1673,7 @@ export async function handle(ctx) {
     "SESSION_INVALID",
     401,
   );
+  if (p === "/operations/withdraw") return withdrawOperation(ctx);
   if (p.startsWith("/internal/pins/")) {
     await requireMembership(ctx.env, ctx.request);
     if (p.endsWith("/acquire")) {
@@ -1772,14 +1958,9 @@ export async function handle(ctx) {
   ) {
     const operationId = id(b.operationId || b.requestId);
     const op = await operationStatus(ctx.env.DB, school, operationId);
-    if (!op)
-      return {
-        state: "unknown",
-        saved: false,
-        operationId,
-        reason:
-          "No durable result found; absence does not prove a writer cannot commit.",
-      };
+    if (!op) return unknownOperation(operationId);
+    if (p === "/receipt" && b.recovery === true)
+      return verifyRecoveryBinding(ctx, op, id(b.versionId, "version"));
     check(
       op.actorId === ctx.principal.actorId || can(ctx.principal, "admin"),
       "Receipt belongs to another actor.",

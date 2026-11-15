@@ -80,6 +80,8 @@
   }
   async function clearProtectedState() {
     securityEpoch++;
+    loadedRecoveryContext = null;
+    recoveryStorageError = null;
     readFlights.clear();
     lordGroups.clear();
     lordSelections.clear();
@@ -153,6 +155,7 @@
         await clearProtectedState();
       }
       session = next;
+      loadRecoveryReferences();
       global.dispatchEvent(new CustomEvent("gsis:session", { detail: next }));
       return next;
     })().finally(() => {
@@ -336,6 +339,11 @@
       "delta",
       "receipt",
       "receiptStatus",
+      "publication-status",
+      "save-receipt",
+      "recovery-status",
+      "recover-save",
+      "withdraw",
       "publishReview",
       "auditPage",
       "versionNote",
@@ -386,8 +394,840 @@
     )
       revisions.set(
         url.pathname.split("/")[2] + ":" + id,
-        data.current?.revision ?? data.workingRevision ?? data.revision,
+        Math.max(
+          revisions.get(url.pathname.split("/")[2] + ":" + id) ?? -1,
+          data.current?.revision ?? data.workingRevision ?? data.revision,
+        ),
       );
+  }
+  // The existing pending map owns preparation, dispatch and receipt recovery.
+  // Persistent references contain identities/hashes only, never save payloads.
+  const recoveryPrefix = "gsis-operation-references:v1:";
+  let loadedRecoveryContext = null,
+    recoveryStorageError = null;
+  const unsentOperations = new WeakMap();
+  function markUnsentOperation(
+    error,
+    domain,
+    operationId,
+    epoch,
+    freshAttempt,
+  ) {
+    if (
+      freshAttempt !== true ||
+      !operationId ||
+      recoveryStorageError ||
+      epoch !== securityEpoch
+    )
+      return error;
+    const proof = {
+      ...operationContext(),
+      service: domain,
+      operationId,
+      epoch,
+    };
+    if (!pending.has(operationKey(proof))) unsentOperations.set(error, proof);
+    return error;
+  }
+  function isUnsentOperation(error, domain, operationId) {
+    const proof =
+      error && typeof error === "object" ? unsentOperations.get(error) : null;
+    return (
+      !!proof &&
+      proof.service === domain &&
+      proof.operationId === operationId &&
+      proof.epoch === securityEpoch &&
+      contextMatches(proof) &&
+      !pending.has(operationKey(proof))
+    );
+  }
+  const recoveryError = (message, code = "RECOVERY_UNAVAILABLE") =>
+    Object.assign(Error(message), { code, status: 409 });
+  const textHash = async (value) =>
+    [
+      ...new Uint8Array(
+        await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value)),
+      ),
+    ]
+      .map((x) => x.toString(16).padStart(2, "0"))
+      .join("");
+  const hash = (value) => textHash(canonical(value));
+  function operationContext() {
+    if (!session?.schoolId || !session.user?.accountId)
+      throw recoveryError(
+        "Sign in before preparing a request.",
+        "SESSION_REQUIRED",
+      );
+    return {
+      schoolId: session.schoolId,
+      accountId: session.user.accountId,
+      previewAccountId: session.impersonating
+        ? session.previewAccountId || session.user.accountId
+        : null,
+    };
+  }
+  function contextMatches(value) {
+    if (!session) return false;
+    const current = operationContext();
+    return ["schoolId", "accountId", "previewAccountId"].every(
+      (k) => (value[k] ?? null) === current[k],
+    );
+  }
+  function operationKey(value) {
+    return canonical([
+      value.schoolId,
+      value.accountId,
+      value.previewAccountId ?? null,
+      value.service,
+      value.operationId,
+    ]);
+  }
+  function pendingCapacity() {
+    const entries = [...pending.values()].filter((entry) => !entry.terminal);
+    return (
+      entries.length +
+      entries.filter(
+        (entry) =>
+          entry.requiresLease &&
+          !pending.has(
+            operationKey({
+              ...entry,
+              operationId: entry.operationId + ":lease",
+            }),
+          ),
+      ).length
+    );
+  }
+  function isDeploySave(path, body) {
+    return (
+      path === "/api/deploy/change" &&
+      typeof body?.versionId === "string" &&
+      !isDeploySettingsImport(path, body) &&
+      ![
+        "publish",
+        "retryContactsSync",
+        "refreshVenueRegistry",
+        "create",
+        "createVersion",
+        "clone",
+      ].includes(body.operation)
+    );
+  }
+  function isDeployCreation(path, body) {
+    return (
+      path === "/api/deploy/versions/create" ||
+      (path === "/api/deploy/change" &&
+        ["create", "createVersion", "clone"].includes(body?.operation))
+    );
+  }
+  function isDeploySettingsImport(path, body) {
+    return (
+      path === "/api/deploy/change" &&
+      body?.clientId === "v1-settings-import" &&
+      body.scope === "meta" &&
+      !Object.hasOwn(body, "operation") &&
+      Array.isArray(body.edits)
+    );
+  }
+  function isDeployPublish(path, body) {
+    return (
+      path === "/api/deploy/publish" ||
+      (path === "/api/deploy/change" && body?.operation === "publish")
+    );
+  }
+  function isDeployDeliveryRetry(path, body) {
+    return (
+      path === "/api/deploy/change" && body?.operation === "retryContactsSync"
+    );
+  }
+  function calendarCommitInput(path, body) {
+    if (!path.startsWith("/api/calendar/")) return null;
+    const action = body.action || path.slice("/api/calendar/".length);
+    if (!["savePdf", "archiveYearsCommit", "tableImportApply"].includes(action))
+      return null;
+    return {
+      action,
+      payload: body.action
+        ? {
+            ...(body.payload || {}),
+            operationId: body.operationId || body.payload?.operationId,
+          }
+        : structuredClone(body),
+    };
+  }
+  function operationReference(entry) {
+    return {
+      schemaVersion: 1,
+      schoolId: entry.schoolId,
+      accountId: entry.accountId,
+      previewAccountId: entry.previewAccountId ?? null,
+      service: entry.service,
+      operationId: entry.operationId,
+      versionId: entry.versionId || null,
+      phase: entry.phase,
+      preparationOperationId:
+        entry.preparation?.operationId || entry.preparationOperationId || null,
+      requestDigest: entry.requestDigest || null,
+      digest: entry.ownerDigest || null,
+      ...(entry.binding ? { originalFence: entry.binding.originalFence } : {}),
+    };
+  }
+  function validReference(ref) {
+    return (
+      ref?.schemaVersion === 1 &&
+      ref.service === "deploy" &&
+      [ref.schoolId, ref.accountId, ref.operationId, ref.versionId].every(
+        (x) => typeof x === "string" && x.length > 0 && x.length <= 256,
+      ) &&
+      [ref.requestDigest, ref.digest].every(
+        (x) => x == null || /^[a-f0-9]{64}$/.test(x),
+      )
+    );
+  }
+  function loadRecoveryReferences() {
+    if (module !== "deploy" || !session) return;
+    const owner = canonical(operationContext());
+    if (loadedRecoveryContext === owner) return;
+    loadedRecoveryContext = owner;
+    recoveryStorageError = null;
+    try {
+      const raw = sessionStorage.getItem(recoveryPrefix + owner);
+      if (raw && raw.length > 131072) throw Error("Reference bound exceeded");
+      const refs = raw ? JSON.parse(raw) : [];
+      if (
+        !Array.isArray(refs) ||
+        refs.length > 128 ||
+        refs.some((r) => !validReference(r) || !contextMatches(r)) ||
+        new Set(refs.map(operationKey)).size !== refs.length
+      )
+        throw Error("Invalid references");
+      const additions = refs.filter((ref) => !pending.has(operationKey(ref)));
+      if (pendingCapacity() + additions.length > 128)
+        throw Error("Reference bound exceeded");
+      for (const ref of additions)
+        pending.set(operationKey(ref), {
+          ...ref,
+          key: operationKey(ref),
+          recoverable: true,
+          phase: "reference-only",
+          body: null,
+          wire: null,
+          ownerDigest: ref.digest,
+          epoch: securityEpoch,
+        });
+    } catch {
+      recoveryStorageError =
+        "Saved operation references cannot be read. Keep this tab open and restore storage access before another save.";
+    }
+  }
+  function persistRecoveryReferences() {
+    if (module !== "deploy" || !session) return;
+    if (recoveryStorageError)
+      throw recoveryError(recoveryStorageError, "RECOVERY_STORAGE_UNAVAILABLE");
+    const refs = [...pending.values()]
+      .filter((x) => x.recoverable && contextMatches(x) && !x.terminal)
+      .map(operationReference);
+    if (refs.length > 128)
+      throw recoveryError(
+        "Resolve existing operations before starting another save.",
+        "PENDING_BOUNDS",
+      );
+    try {
+      sessionStorage.setItem(
+        recoveryPrefix + canonical(operationContext()),
+        JSON.stringify(refs),
+      );
+    } catch {
+      throw recoveryError(
+        "The original save reference could not be stored. No new request was sent; keep the draft and restore storage access.",
+        "RECOVERY_STORAGE_UNAVAILABLE",
+      );
+    }
+  }
+  function snapshot(entry) {
+    if (!entry) return null;
+    return {
+      ...operationReference(entry),
+      preparationState: entry.preparationState || null,
+      canRetry: !!entry.wire && !entry.terminal && contextMatches(entry),
+      canRetryPreparation:
+        entry.phase === "preparing" &&
+        !!entry.preparation &&
+        !!entry.initialBody &&
+        contextMatches(entry),
+      canWithdraw:
+        !!entry.binding &&
+        !entry.terminal &&
+        entry.binding.action === "deploy.edit",
+      storageError: entry.storageError || recoveryStorageError || null,
+      ...(entry.terminal
+        ? { state: entry.terminal.state, verified: true }
+        : {}),
+    };
+  }
+  function operationState(
+    domain,
+    operationId,
+    { versionId, referenceOnly = false } = {},
+  ) {
+    loadRecoveryReferences();
+    if (!session) return null;
+    const ref = {
+        schemaVersion: 1,
+        ...operationContext(),
+        service: domain,
+        operationId,
+        versionId,
+      },
+      key = operationKey(ref);
+    if (!pending.has(key) && referenceOnly) {
+      if (!validReference(ref) || session.impersonating)
+        throw recoveryError(
+          "The old save reference is invalid.",
+          "RECOVERY_REFERENCE_INVALID",
+        );
+      if (pendingCapacity() >= 128)
+        throw recoveryError(
+          "Resolve existing operations before restoring another reference.",
+          "PENDING_BOUNDS",
+        );
+      const entry = {
+        ...ref,
+        key,
+        epoch: securityEpoch,
+        recoverable: true,
+        phase: "reference-only",
+        wire: null,
+      };
+      pending.set(key, entry);
+      try {
+        persistRecoveryReferences();
+      } catch (error) {
+        pending.delete(key);
+        throw error;
+      }
+    }
+    return snapshot(pending.get(key));
+  }
+  function operationStates(domain) {
+    loadRecoveryReferences();
+    if (recoveryStorageError)
+      throw recoveryError(recoveryStorageError, "RECOVERY_STORAGE_UNAVAILABLE");
+    return [...pending.values()]
+      .filter(
+        (x) =>
+          x.service === domain &&
+          contextMatches(x) &&
+          x.recoverable &&
+          !x.terminal,
+      )
+      .map(snapshot);
+  }
+  function trimTerminalEntries() {
+    const terminal = [...pending.entries()].filter(([, v]) => v.terminal);
+    for (const [key] of terminal.slice(0, Math.max(0, terminal.length - 32)))
+      pending.delete(key);
+  }
+  async function freezeEntry(entry, body) {
+    const copy = structuredClone(body),
+      intent = structuredClone(copy);
+    delete intent.requestId;
+    const requestDigest = await hash(intent);
+    let ownerDigest = entry.ownerDigest || null;
+    if (
+      entry.recoverable ||
+      isDeploySettingsImport(entry.path, copy) ||
+      isDeployPublish(entry.path, copy) ||
+      isDeployDeliveryRetry(entry.path, copy) ||
+      ["/api/deploy/lease", "/api/deploy/imports/apply"].includes(entry.path) ||
+      (entry.path === "/api/deploy/change" &&
+        copy.operation === "refreshVenueRegistry") ||
+      isDeployCreation(entry.path, copy)
+    ) {
+      const clean = structuredClone(copy);
+      for (const k of [
+        "requestId",
+        "operationId",
+        "protocol",
+        "authority",
+        "auditPaged",
+        "reliefResults",
+        "returnDelta",
+        "since",
+        "knownCatalogueHash",
+      ])
+        delete clean[k];
+      ownerDigest = await hash({
+        schoolId: entry.schoolId,
+        actorId: entry.accountId,
+        action:
+          isDeployPublish(entry.path, copy) ||
+          isDeployDeliveryRetry(entry.path, copy)
+            ? "deploy.publish"
+            : "deploy.edit",
+        intent: clean,
+      });
+    } else if (
+      ["/api/contacts/save-data", "/api/contacts/save-diy"].includes(
+        entry.path,
+      ) &&
+      Array.isArray(copy.changes)
+    ) {
+      ownerDigest = await hash({
+        schoolId: entry.schoolId,
+        actorId: entry.accountId,
+        action: entry.path.endsWith("save-diy")
+          ? "contacts.self"
+          : "contacts.manage",
+        intent: { changes: copy.changes, additions: copy.additions || [] },
+      });
+    }
+    const calendar = calendarCommitInput(entry.path, copy);
+    if (calendar) {
+      const payload = { ...calendar.payload };
+      delete payload.requestId;
+      ownerDigest = await hash({
+        schoolId: entry.schoolId,
+        actorId: entry.accountId,
+        action: "calendar." + calendar.action,
+        intent: { action: calendar.action, payload },
+      });
+      if (calendar.action === "savePdf" && typeof payload.base64 === "string")
+        entry.pdfDigest = await textHash(payload.base64);
+    }
+    if (isDeployPublish(entry.path, copy))
+      entry.createdPublicationId =
+        "pub-" +
+        (
+          await hash({ school: entry.schoolId, operationId: entry.operationId })
+        ).slice(0, 24);
+    if (isDeployCreation(entry.path, copy))
+      entry.createdVersionId =
+        "version-" +
+        (
+          await hash({ school: entry.schoolId, operationId: entry.operationId })
+        ).slice(0, 24);
+    if (
+      entry.epoch !== securityEpoch ||
+      !contextMatches(entry) ||
+      pending.get(entry.key) !== entry
+    )
+      throw recoveryError(
+        "The account or original request changed during preparation.",
+        "SESSION_CHANGED",
+      );
+    entry.body = copy;
+    entry.wire = JSON.stringify(copy);
+    entry.requestDigest = requestDigest;
+    entry.ownerDigest = ownerDigest;
+    entry.phase = "ready";
+    if (entry.recoverable) persistRecoveryReferences();
+  }
+  function receiptFor(data) {
+    return data?.receipt || data;
+  }
+  function settleMatchingReceipt(domain, data, epoch, dispatchedEntry = null) {
+    if (epoch !== securityEpoch || !session) return;
+    const receipt = receiptFor(data);
+    if (
+      !receipt?.operationId ||
+      !["committed", "terminal-not-committed"].includes(receipt.state) ||
+      !/^[a-f0-9]{64}$/.test(receipt.digest || "")
+    )
+      return;
+    const key = operationKey({
+        ...operationContext(),
+        service: domain,
+        operationId: receipt.operationId,
+      }),
+      entry = pending.get(key);
+    if (!entry || !contextMatches(entry) || entry.recoverable) return;
+    if (
+      (data?.schoolId && data.schoolId !== entry.schoolId) ||
+      (data?.actorId && data.actorId !== entry.accountId) ||
+      (entry.ownerDigest && receipt.digest !== entry.ownerDigest)
+    )
+      return;
+    const exactRequestBinding =
+      data?.requestDigest === entry.requestDigest &&
+      data?.schoolId === entry.schoolId &&
+      data?.actorId === entry.accountId;
+    // A direct terminal reply is tied to this exact dispatched request. A
+    // different endpoint needs a known owner digest or complete request binding;
+    // matching an ID alone cannot prove that an older same-ID intent is ours.
+    if (!entry.ownerDigest && !exactRequestBinding && dispatchedEntry !== entry)
+      return;
+    pending.delete(key);
+  }
+  function settleDirectLease(entry, data, epoch) {
+    if (
+      !entry ||
+      entry.path !== "/api/deploy/lease" ||
+      !entry.dispatched ||
+      epoch !== securityEpoch ||
+      !contextMatches(entry) ||
+      pending.get(entry.key) !== entry
+    )
+      return;
+    const body = entry.body,
+      scope = body.scope || body.key || "meta";
+    if (
+      entry.versionId !== body.versionId ||
+      typeof body.versionId !== "string"
+    )
+      return;
+    // This endpoint returns only finish()'s committed result. This narrow direct
+    // response contract settles the lease itself, never the save it prepares.
+    const valid = body.release
+      ? data?.released === true
+      : Number.isSafeInteger(data?.fence) &&
+        data.fence > 0 &&
+        data.token === data.fence &&
+        Number.isSafeInteger(data.until) &&
+        data.until > 0 &&
+        data.scope === scope &&
+        data.key === scope &&
+        Number.isSafeInteger(data.revision) &&
+        data.revision >= 0;
+    if (valid) pending.delete(entry.key);
+  }
+  function settleDirectCreation(entry, data, epoch) {
+    if (
+      !entry ||
+      !isDeployCreation(entry.path, entry.body) ||
+      !entry.dispatched ||
+      epoch !== securityEpoch ||
+      !contextMatches(entry) ||
+      pending.get(entry.key) !== entry
+    )
+      return;
+    // Creation/clone shares create(): the version identity derives from the
+    // owning school and operation, and finish() returns its committed result.
+    if (
+      data?.saved === true &&
+      data.revision === 0 &&
+      data.versionId === entry.createdVersionId &&
+      data.requestId === (entry.body.requestId || entry.operationId)
+    )
+      pending.delete(entry.key);
+  }
+  function settleDirectImport(entry, data, epoch) {
+    if (
+      !entry ||
+      (entry.path !== "/api/deploy/imports/apply" &&
+        !isDeploySettingsImport(entry.path, entry.body)) ||
+      !entry.dispatched ||
+      epoch !== securityEpoch ||
+      !contextMatches(entry) ||
+      pending.get(entry.key) !== entry
+    )
+      return;
+    // applyImport() delegates to save()/finish(); this direct acknowledgment is
+    // its existing committed result, not an ordinary native save response.
+    if (
+      data?.saved === true &&
+      data.versionId === entry.body.versionId &&
+      data.requestId === (entry.body.requestId || entry.operationId) &&
+      Number.isSafeInteger(data.changedRows) &&
+      data.changedRows >= 0
+    )
+      pending.delete(entry.key);
+  }
+  function settleDirectPublication(entry, data, epoch) {
+    if (
+      !entry ||
+      !entry.dispatched ||
+      epoch !== securityEpoch ||
+      !contextMatches(entry) ||
+      pending.get(entry.key) !== entry ||
+      data?.saved !== true ||
+      data.versionId !== entry.body.versionId
+    )
+      return;
+    const body = entry.body;
+    let valid = false;
+    if (isDeployPublish(entry.path, body)) {
+      valid =
+        data.state === "committed" &&
+        data.requestId === (body.requestId || entry.operationId) &&
+        data.publicationId === entry.createdPublicationId &&
+        Number.isSafeInteger(body.expectedPointerSequence) &&
+        data.sequence === body.expectedPointerSequence + 1 &&
+        Number.isSafeInteger(data.workingRevision) &&
+        data.workingRevision === (body.revision ?? body.expectedRevision);
+    } else if (isDeployDeliveryRetry(entry.path, body)) {
+      valid =
+        typeof body.publicationCommit === "string" &&
+        data.publicationId === body.publicationCommit &&
+        data.contactsSync?.publicationCommit === body.publicationCommit &&
+        ["updated", "pending"].includes(data.contactsSync.status);
+    }
+    // Publication and local requeue finish independently of recipient delivery.
+    // Never settle an ordinary save from these independently managed responses.
+    if (valid) pending.delete(entry.key);
+  }
+  function settleDirectCalendar(entry, data, epoch) {
+    if (
+      !entry ||
+      !entry.dispatched ||
+      epoch !== securityEpoch ||
+      !contextMatches(entry) ||
+      pending.get(entry.key) !== entry
+    )
+      return;
+    const calendar = calendarCommitInput(entry.path, entry.body);
+    if (!calendar) return;
+    let valid = false;
+    if (calendar.action === "savePdf") {
+      valid =
+        !!entry.pdfDigest &&
+        data?.saved === true &&
+        data.digest === entry.pdfDigest &&
+        data.key ===
+          entry.schoolId + "/calendar/pdf/" + entry.pdfDigest + ".pdf";
+    } else if (calendar.action === "tableImportApply") {
+      const book = calendar.payload.workbook;
+      valid =
+        data?.saved === true &&
+        ["lanes", "tags"].includes(book?.kind) &&
+        data.kind === book.kind &&
+        /^[a-f0-9]{64}$/.test(book.sourceRevision || "") &&
+        data.sourceRevision === book.sourceRevision &&
+        Number.isSafeInteger(data.changedRecords) &&
+        data.changedRecords >= 0 &&
+        data.changedRecords <= 12;
+    } else if (calendar.action === "archiveYearsCommit") {
+      const prefix = entry.schoolId + "/calendar/archive/",
+        key = data?.artifactKey;
+      valid =
+        data?.state === "committed" &&
+        data.archived === true &&
+        data.historyRetained === true &&
+        data.driveExport === "queued" &&
+        typeof data.fileName === "string" &&
+        data.fileName.length > 0 &&
+        typeof key === "string" &&
+        key.startsWith(prefix) &&
+        /^[a-f0-9]{64}\.json$/.test(key.slice(prefix.length)) &&
+        data.downloadUrl ===
+          "/api/calendar/archive-download?key=" + encodeURIComponent(key) &&
+        [data.counts?.years, data.counts?.events, data.counts?.Events].every(
+          (n) => Number.isSafeInteger(n) && n >= 0,
+        ) &&
+        data.counts.events === data.counts.Events;
+    }
+    // These existing routes return finish() only after the owner-local
+    // commit. Queued Drive work is not delivery success or a cross-owner commit.
+    if (valid) pending.delete(entry.key);
+  }
+  function verifyDeployRecovery(entry, data) {
+    if (data?.state === "unknown" && !data.receipt)
+      return {
+        state: "unknown",
+        verified: false,
+        result: data,
+        reference: snapshot(entry),
+      };
+    const expected = {
+      schoolId: entry.schoolId,
+      actorId: entry.accountId,
+      service: "deploy",
+      operationId: entry.operationId,
+      action: "deploy.edit",
+      versionId: entry.versionId,
+    };
+    if (
+      data?.bindingVerified !== true ||
+      Object.entries(expected).some(([k, v]) => data[k] !== v) ||
+      !/^[a-f0-9]{64}$/.test(data.digest || "") ||
+      !/^[a-f0-9]{64}$/.test(data.requestDigest || "") ||
+      !Number.isSafeInteger(data.originalFence) ||
+      data.originalFence < 1 ||
+      !Number.isSafeInteger(data.currentFence) ||
+      (entry.ownerDigest && entry.ownerDigest !== data.digest) ||
+      (entry.requestDigest && entry.requestDigest !== data.requestDigest)
+    )
+      throw recoveryError(
+        "The response does not prove the original save binding.",
+        "RECEIPT_MISMATCH",
+      );
+    const receipt = data.receipt,
+      terminal = ["committed", "aborted"].includes(data.state);
+    if (
+      terminal &&
+      (!receipt ||
+        receipt.operationId !== entry.operationId ||
+        receipt.digest !== data.digest ||
+        (data.state === "committed"
+          ? receipt.state !== "committed" ||
+            receipt.fence !== data.originalFence ||
+            data.currentFence !== data.originalFence
+          : receipt.state !== "terminal-not-committed" ||
+            data.currentFence !== data.originalFence + 1))
+    )
+      throw recoveryError(
+        "The terminal receipt does not match the original save.",
+        "RECEIPT_MISMATCH",
+      );
+    if (
+      !terminal &&
+      (data.state !== "prepared" || data.currentFence !== data.originalFence)
+    )
+      throw recoveryError(
+        "The original save state could not be verified.",
+        "RECEIPT_MISMATCH",
+      );
+    entry.binding = structuredClone(data);
+    entry.ownerDigest = data.digest;
+    entry.requestDigest = data.requestDigest;
+    const outcome = {
+      state: data.state,
+      verified: true,
+      result: data,
+      reference: snapshot(entry),
+    };
+    if (terminal) {
+      entry.terminal = outcome;
+      entry.phase = data.state;
+      try {
+        persistRecoveryReferences();
+      } catch (error) {
+        entry.storageError = error.message;
+      }
+      trimTerminalEntries();
+    }
+    outcome.reference = snapshot(entry);
+    outcome.canRetry = outcome.reference.canRetry;
+    outcome.canWithdraw = outcome.reference.canWithdraw;
+    return outcome;
+  }
+  async function recoverOperation(reference, mode = "check") {
+    if (
+      !["check", "retry", "withdraw"].includes(mode) ||
+      !validReference(reference)
+    )
+      throw recoveryError(
+        "Use the original protected save reference.",
+        "RECOVERY_REFERENCE_INVALID",
+      );
+    await getSession(true);
+    if (!contextMatches(reference) || session.impersonating)
+      throw recoveryError(
+        "This save belongs to another account or permission context.",
+        "SESSION_CHANGED",
+      );
+    const epoch = securityEpoch,
+      key = operationKey(reference);
+    let entry = pending.get(key);
+    if (!entry) {
+      if (pendingCapacity() >= 128)
+        throw recoveryError(
+          "Resolve existing operations before restoring another reference.",
+          "PENDING_BOUNDS",
+        );
+      entry = {
+        ...reference,
+        key,
+        epoch,
+        recoverable: true,
+        phase: "reference-only",
+        ownerDigest: reference.digest,
+        wire: null,
+      };
+      pending.set(key, entry);
+      try {
+        persistRecoveryReferences();
+      } catch (error) {
+        pending.delete(key);
+        throw error;
+      }
+    }
+    if (entry.versionId !== reference.versionId)
+      throw recoveryError(
+        "The save belongs to another version.",
+        "RECOVERY_REFERENCE_INVALID",
+      );
+    // A retained terminal result is UI history, not current permission. Even a
+    // repeated check reauthorizes at the owner; never replay a terminal write.
+    if (entry.terminal) mode = "check";
+    if (mode === "retry") {
+      if (
+        !entry.wire &&
+        !(entry.phase === "preparing" && entry.preparation && entry.initialBody)
+      )
+        throw recoveryError(
+          "The complete original request is unavailable. Check its receipt; do not reconstruct it.",
+          "ORIGINAL_REQUEST_UNAVAILABLE",
+        );
+      await request("deploy", "/change", {
+        method: "POST",
+        body: structuredClone(entry.body || entry.initialBody),
+        retainedEntry: entry,
+      });
+    }
+    const data = await request("deploy", "/receipt", {
+      method: "POST",
+      body: {
+        operationId: entry.operationId,
+        versionId: entry.versionId,
+        recovery: true,
+      },
+    });
+    if (
+      epoch !== securityEpoch ||
+      !contextMatches(entry) ||
+      pending.get(key) !== entry
+    )
+      throw recoveryError(
+        "The active request context changed.",
+        "SESSION_CHANGED",
+      );
+    let outcome = verifyDeployRecovery(entry, data);
+    if (mode === "check" && entry.phase === "preparing" && entry.preparation) {
+      const status = await request("deploy", "/receipt", {
+        method: "POST",
+        body: {
+          operationId: entry.preparation.operationId,
+          versionId: entry.versionId,
+        },
+      });
+      if (epoch !== securityEpoch || !contextMatches(entry))
+        throw recoveryError(
+          "The active request context changed.",
+          "SESSION_CHANGED",
+        );
+      entry.preparationState = status?.state || "unknown";
+      outcome.reference = snapshot(entry);
+    }
+    if (
+      mode === "withdraw" &&
+      outcome.verified &&
+      outcome.state === "prepared"
+    ) {
+      entry.withdrawalId ||= crypto.randomUUID();
+      const stopped = await request("deploy", "/operations/withdraw", {
+        method: "POST",
+        body: {
+          operationId: entry.withdrawalId,
+          targetOperationId: entry.operationId,
+          versionId: entry.versionId,
+          expectedDigest: data.digest,
+          expectedRequestDigest: data.requestDigest,
+          expectedFence: data.originalFence,
+        },
+      });
+      if (
+        epoch !== securityEpoch ||
+        !contextMatches(entry) ||
+        pending.get(key) !== entry
+      )
+        throw recoveryError(
+          "The active request context changed.",
+          "SESSION_CHANGED",
+        );
+      outcome = verifyDeployRecovery(entry, stopped);
+    }
+    return outcome;
   }
   function contactsProjection(path, data) {
     if (
@@ -730,7 +1570,155 @@
       ["committed", "terminal-not-committed"].includes(receipt.state)
     );
   }
-  async function prepareLordBooking(body, path, expectedEpoch) {
+  function completeStandaloneBooking(body) {
+    const lines = Array.isArray(body?.bookings) ? body.bookings : [body];
+    return (
+      lines.length > 0 &&
+      lines.length <= 20 &&
+      lines.every(
+        (line) =>
+          !line?.resource &&
+          !line?.bookingGroup &&
+          Array.isArray(line?.items) &&
+          line.items.length > 0 &&
+          line.items.every(
+            (item) =>
+              typeof item?.resourceId === "string" &&
+              item.resourceId.length > 0 &&
+              Number.isSafeInteger(item.quantity) &&
+              item.quantity > 0,
+          ),
+      )
+    );
+  }
+  async function checkLordBookingReceipt(
+    input,
+    { path = "/api/lord/transaction" } = {},
+  ) {
+    if (
+      ![
+        "/api/lord/transaction",
+        "/api/lord/bookings",
+        "/api/lord/bookings/batch",
+        "/api/lord/bookings/update",
+      ].includes(path)
+    )
+      throw recoveryError(
+        "The original booking endpoint is invalid.",
+        "RECOVERY_REFERENCE_INVALID",
+      );
+    await getSession(true);
+    if (service !== "lord" || session?.impersonating)
+      throw recoveryError(
+        "Sign in to check the original booking.",
+        "SESSION_REQUIRED",
+      );
+    const epoch = securityEpoch,
+      owner = operationContext(),
+      body = structuredClone(input);
+    const operationId =
+      body?.operationId || body?.clientRequestId || body?.requestId;
+    if (
+      typeof operationId !== "string" ||
+      !operationId ||
+      operationId.length > 256
+    )
+      throw recoveryError(
+        "The original booking reference is missing.",
+        "RECOVERY_REFERENCE_INVALID",
+      );
+    let expected = null;
+    const lines = Array.isArray(body.bookings) ? body.bookings : [body];
+    const completeGroups =
+      lines.length > 0 &&
+      lines.length <= 20 &&
+      lines.every((line) => {
+        if (!line?.bookingGroup) return false;
+        try {
+          checkedGroup(line.bookingGroup);
+          return true;
+        } catch {
+          return false;
+        }
+      });
+    // An enriched final wire is immutable evidence. Never derive missing cart
+    // membership from today's inventory or write replacement binding storage.
+    if (
+      body.operationId === operationId &&
+      (completeGroups || completeStandaloneBooking(body))
+    ) {
+      const action =
+        path.endsWith("/update") ||
+        String(body.action || "").toLowerCase() === "bookingupdate" ||
+        (!Array.isArray(body.bookings) && typeof body.bookingId === "string")
+          ? "bookingupdate"
+          : Array.isArray(body.bookings)
+            ? "bookingcreatebatch"
+            : "bookingcreate";
+      const intent = structuredClone(body);
+      delete intent.requestId;
+      expected = await hash({
+        schoolId: owner.schoolId,
+        actorId: owner.accountId,
+        action: "lord." + action,
+        intent,
+      });
+    }
+    if (!expected) {
+      // Historical native/editor drafts may predate the enriched-wire format.
+      // The original scoped binding can prove that exact raw request and path;
+      // another body with the same ID cannot borrow its stored owner digest.
+      let binding = null;
+      try {
+        binding = groupBindings().values.find(
+          (value) => value.operationId === operationId,
+        );
+      } catch {}
+      if (binding) {
+        const raw = structuredClone(body);
+        raw.operationId = operationId;
+        delete raw.authority;
+        if ((await hash([path, raw])) === binding.intentHash)
+          expected = binding.ownerDigest;
+      }
+    }
+    if (epoch !== securityEpoch || !contextMatches(owner))
+      throw recoveryError("The active account changed.", "SESSION_CHANGED");
+    const result = await requestUnshared(
+      "lord",
+      "/receipt?operationId=" + encodeURIComponent(operationId),
+      { readOnlyLordReceipt: true },
+    );
+    if (epoch !== securityEpoch || !contextMatches(owner))
+      throw recoveryError("The active account changed.", "SESSION_CHANGED");
+    const receipt = receiptFor(result),
+      verified =
+        !!expected &&
+        receipt?.operationId === operationId &&
+        receipt.digest === expected &&
+        ["committed", "terminal-not-committed"].includes(receipt.state);
+    if (verified) {
+      const key = operationKey({ ...owner, service: "lord", operationId }),
+        entry = pending.get(key);
+      if (entry && contextMatches(entry) && entry.ownerDigest === expected)
+        pending.delete(key);
+    }
+    return {
+      state: verified
+        ? receipt.state === "committed"
+          ? "committed"
+          : "aborted"
+        : "unknown",
+      verified,
+      result,
+    };
+  }
+  async function prepareLordBooking(
+    body,
+    path,
+    expectedEpoch,
+    { retained = false } = {},
+  ) {
     if (expectedEpoch !== securityEpoch)
       throw groupError(
         "Your account changed. Reopen LORD before continuing.",
@@ -742,6 +1730,11 @@
     const first = initial.values.find(
       (x) => x.operationId === body.operationId,
     );
+    if (retained && !first && !completeStandaloneBooking(body))
+      throw groupError(
+        "The original cart binding is unavailable. Check the original receipt; do not rebuild this request from current inventory.",
+        "ORIGINAL_REQUEST_UNAVAILABLE",
+      );
     const copy = structuredClone(body),
       lines = Array.isArray(copy.bookings) ? copy.bookings : [copy];
     if (lines.length > 20)
@@ -772,6 +1765,18 @@
         lines[index].bookingGroup = structuredClone(group);
       }
     };
+    if (first)
+      for (const { index, group } of candidates) {
+        if (
+          lines[index]?.bookingGroup &&
+          canonical(checkedGroup(lines[index].bookingGroup)) !==
+            canonical(group)
+        )
+          throw groupError(
+            "This operation belongs to different cart evidence.",
+            "OPERATION_ID_REUSED",
+          );
+      }
     apply(candidates);
     const action =
       path.endsWith("/update") ||
@@ -810,7 +1815,11 @@
     // and matching receipts cannot overwrite each other's retained evidence.
     const store = groupBindings(),
       prior = store.values.find((x) => x.operationId === body.operationId);
-    if (prior && prior.intentHash !== intentHash)
+    if (
+      prior &&
+      prior.intentHash !== intentHash &&
+      prior.ownerDigest !== candidateDigest
+    )
       throw groupError(
         "This operation already belongs to different booking details. Check its original receipt.",
         "OPERATION_ID_REUSED",
@@ -828,7 +1837,12 @@
       });
       saveGroupBindings(store);
     }
-    return { body: copy, ownerDigest, grouped: selections.length > 0 };
+    return {
+      body: copy,
+      ownerDigest,
+      grouped: selections.length > 0,
+      created: !prior && selections.length > 0,
+    };
   }
   function settleLordGroupBinding(operationId, receipt) {
     if (!matchingLordGroupReceipt(operationId, receipt)) return;
@@ -933,6 +1947,257 @@
     lordPrepared.set(id, prepared);
     return prepared;
   }
+  function reserveWrite(
+    url,
+    body,
+    epoch,
+    retainedEntry = null,
+    freshAttempt = false,
+  ) {
+    const owner = operationContext(),
+      domain = url.pathname.split("/")[2],
+      inputKey = url.pathname + url.search + "|" + canonical(body);
+    const suppliedId =
+      body.operationId ||
+      body.requestId ||
+      body.clientRequestId ||
+      body.payload?.operationId ||
+      body.payload?.requestId ||
+      body.mutationId;
+    let entry = suppliedId
+      ? pending.get(
+          operationKey({ ...owner, service: domain, operationId: suppliedId }),
+        )
+      : [...pending.values()].find(
+          (x) =>
+            !x.terminal &&
+            contextMatches(x) &&
+            x.service === domain &&
+            x.inputKey === inputKey,
+        );
+    if (
+      retainedEntry &&
+      (entry !== retainedEntry || !contextMatches(retainedEntry))
+    )
+      throw recoveryError(
+        "The original request is no longer available in this context.",
+        "ORIGINAL_REQUEST_UNAVAILABLE",
+      );
+    if (entry) {
+      if (
+        !retainedEntry &&
+        entry.inputKey !== inputKey &&
+        canonical(body) !== canonical(entry.initialBody) &&
+        canonical(body) !== canonical(entry.body)
+      )
+        throw recoveryError(
+          "This operation already belongs to different request details.",
+          "OPERATION_ID_REUSED",
+        );
+      return {
+        entry,
+        fresh: false,
+        body: structuredClone(entry.body || entry.initialBody || body),
+      };
+    }
+    const requiresLease =
+      domain === "deploy" &&
+      url.pathname === "/api/deploy/change" &&
+      body.versionId &&
+      !["create", "createVersion", "clone"].includes(body.operation) &&
+      !body.leaseFence &&
+      !body.token &&
+      !(Number.isSafeInteger(body.fence) && body.fence > 0);
+    const needsLease =
+      requiresLease &&
+      !(
+        suppliedId &&
+        pending.has(
+          operationKey({
+            ...owner,
+            service: domain,
+            operationId: suppliedId + ":lease",
+          }),
+        )
+      );
+    const consumesReservation =
+      domain === "deploy" &&
+      url.pathname === "/api/deploy/lease" &&
+      [...pending.values()].some(
+        (parent) =>
+          !parent.terminal &&
+          parent.requiresLease &&
+          contextMatches(parent) &&
+          parent.preparation?.operationId === suppliedId &&
+          canonical(parent.preparation) === canonical(body),
+      );
+    // The live main entry reserves its missing prerequisite across every await;
+    // only that exact child consumes the reserved slot, so unrelated writes
+    // cannot steal it between the capacity check and lease dispatch.
+    if (
+      pendingCapacity() + (consumesReservation ? 0 : needsLease ? 2 : 1) >
+      128
+    )
+      throw markUnsentOperation(
+        recoveryError(
+          "Resolve the existing unconfirmed operations before starting another save.",
+          "PENDING_BOUNDS",
+        ),
+        domain,
+        suppliedId,
+        epoch,
+        freshAttempt,
+      );
+    const copy = structuredClone(body);
+    copy.operationId = suppliedId || crypto.randomUUID();
+    delete copy.authority;
+    if (
+      copy.revision === undefined &&
+      copy.versionId &&
+      revisions.has(domain + ":" + copy.versionId)
+    )
+      copy.revision = revisions.get(domain + ":" + copy.versionId);
+    if (copy.leaseFence === undefined && Number.isSafeInteger(copy.fence))
+      copy.leaseFence = copy.fence;
+    entry = {
+      ...owner,
+      service: domain,
+      operationId: copy.operationId,
+      versionId: copy.versionId || null,
+      path: url.pathname,
+      search: url.search,
+      inputKey,
+      epoch,
+      phase: "preparing",
+      requiresLease: !!requiresLease,
+      recoverable: isDeploySave(url.pathname, copy),
+      initialBody: structuredClone(copy),
+      body: null,
+      wire: null,
+      dispatched: false,
+    };
+    entry.key = operationKey(entry);
+    pending.set(entry.key, entry);
+    try {
+      if (entry.recoverable) persistRecoveryReferences();
+    } catch (error) {
+      if (pending.get(entry.key) === entry) pending.delete(entry.key);
+      throw markUnsentOperation(error, domain, suppliedId, epoch, freshAttempt);
+    }
+    return { entry, fresh: true, body: copy };
+  }
+  async function prepareLordBookingRequest(
+    path,
+    input,
+    { fresh = false } = {},
+  ) {
+    if (service !== "lord" || fresh !== true)
+      throw recoveryError(
+        "Only a new local booking may use preflight.",
+        "RETAINED_OPERATION",
+      );
+    await getSession();
+    const epoch = securityEpoch,
+      url = routeUrl(path),
+      body = structuredClone(input);
+    if (!url.pathname.startsWith("/api/lord/"))
+      throw recoveryError("Invalid LORD booking endpoint.");
+    const slot = reserveWrite(url, body, epoch);
+    if (!slot.fresh)
+      throw Object.assign(
+        recoveryError(
+          "This is an earlier request. Check its original receipt.",
+          "RETAINED_OPERATION",
+        ),
+        { reference: snapshot(slot.entry) },
+      );
+    const entry = slot.entry;
+    try {
+      const prior = groupBindings().values.find(
+        (x) => x.operationId === entry.operationId,
+      );
+      if (prior)
+        throw recoveryError(
+          "This operation already has retained booking evidence.",
+          "RETAINED_OPERATION",
+        );
+      const prepared = await prepareLordBooking(slot.body, url.pathname, epoch);
+      entry.ownerDigest = prepared.ownerDigest;
+      entry.grouped = prepared.grouped;
+      entry.groupBindingCreated = prepared.created;
+      entry.freshPreparation = true;
+      entry.preparedBody = structuredClone(prepared.body);
+      await freezeEntry(entry, prepared.body);
+      const handle = Object.freeze({
+        body: structuredClone(entry.body),
+        reference: Object.freeze(snapshot(entry)),
+      });
+      entry.handle = handle;
+      return handle;
+    } catch (error) {
+      if (pending.get(entry.key) === entry && !entry.dispatched) {
+        if (entry.groupBindingCreated && contextMatches(entry)) {
+          try {
+            const store = groupBindings();
+            store.values = store.values.filter(
+              (x) =>
+                !(
+                  x.operationId === entry.operationId &&
+                  x.ownerDigest === entry.ownerDigest &&
+                  !x.terminal
+                ),
+            );
+            saveGroupBindings(store);
+          } catch (cleanup) {
+            entry.cleanupRequired = true;
+            entry.handle ||= Object.freeze({
+              body: structuredClone(entry.body || entry.preparedBody),
+              reference: Object.freeze(snapshot(entry)),
+            });
+            throw Object.assign(
+              recoveryError(
+                "The new request was not sent, but its local preparation could not be cleared. Restore browser storage and retry cleanup.",
+                "PREPARATION_CLEANUP_REQUIRED",
+              ),
+              { prepared: entry.handle, cause: cleanup },
+            );
+          }
+        }
+        pending.delete(entry.key);
+      }
+      throw error;
+    }
+  }
+  function releasePrepared(handle) {
+    const entry = handle?.reference
+      ? pending.get(operationKey(handle.reference))
+      : null;
+    if (
+      !entry ||
+      entry.handle !== handle ||
+      !entry.freshPreparation ||
+      entry.dispatched ||
+      entry.epoch !== securityEpoch ||
+      !contextMatches(entry) ||
+      pending.get(entry.key) !== entry
+    )
+      return false;
+    if (entry.grouped) {
+      const store = groupBindings(),
+        index = store.values.findIndex(
+          (x) =>
+            x.operationId === entry.operationId &&
+            x.ownerDigest === entry.ownerDigest &&
+            !x.terminal,
+        );
+      if (index >= 0) {
+        store.values.splice(index, 1);
+        saveGroupBindings(store);
+      }
+    }
+    pending.delete(entry.key);
+    return true;
+  }
   async function suiteFetch(input, options = {}) {
     const requestEpoch = securityEpoch;
     const originalUrl = new URL(
@@ -995,6 +2260,7 @@
         typeof options.body === "string" ? JSON.parse(options.body) : null,
       key = null,
       freshPendingEntry = null,
+      activeEntry = null,
       lordGroupAttempt = false;
     if (method !== "GET" && method !== "HEAD") {
       const current = await getSession();
@@ -1013,42 +2279,49 @@
         !Array.isArray(body) &&
         !readOnlyRequest(url.pathname, body)
       ) {
-        delete body.authority;
-        key = url.pathname + "?" + url.search + "|" + canonical(body);
-        const existing = pending.get(key);
-        if (!existing && pending.size >= 128)
-          throw Error(
-            "Resolve the existing unconfirmed operations before starting another save.",
+        const handle = options.prepared;
+        if (handle) {
+          const entry = handle.reference
+            ? pending.get(operationKey(handle.reference))
+            : null;
+          if (
+            !entry ||
+            entry.cleanupRequired ||
+            entry.handle !== handle ||
+            pending.get(entry.key) !== entry ||
+            !contextMatches(entry) ||
+            entry.epoch !== requestEpoch ||
+            entry.path !== url.pathname ||
+            entry.search !== url.search ||
+            canonical(body) !== canonical(entry.body)
+          )
+            throw recoveryError(
+              "The prepared request no longer matches this form or account.",
+              "PREPARATION_CHANGED",
+            );
+          activeEntry = entry;
+          body = structuredClone(entry.body);
+          key = entry.key;
+          lordGroupAttempt = !!entry.grouped;
+        } else {
+          const slot = reserveWrite(
+            url,
+            body,
+            requestEpoch,
+            options.retainedEntry,
+            options.freshAttempt,
           );
-        body.operationId =
-          body.operationId ||
-          body.requestId ||
-          body.clientRequestId ||
-          body.payload?.operationId ||
-          body.payload?.requestId ||
-          body.mutationId ||
-          existing?.operationId ||
-          crypto.randomUUID();
-        if (
-          body.revision === undefined &&
-          body.versionId &&
-          revisions.has(service + ":" + body.versionId)
-        )
-          body.revision = revisions.get(service + ":" + body.versionId);
-        if (body.leaseFence === undefined && Number.isSafeInteger(body.fence))
-          body.leaseFence = body.fence;
-        const entry = {
-          operationId: body.operationId,
-          body: structuredClone(body),
-          path: url.pathname,
-        };
-        pending.set(key, entry);
-        if (!existing) freshPendingEntry = entry;
+          activeEntry = slot.entry;
+          body = slot.body;
+          key = activeEntry.key;
+          if (slot.fresh) freshPendingEntry = activeEntry;
+        }
       }
     }
     if (
       service === "lord" &&
       body &&
+      !options.prepared &&
       (["bookingcreate", "bookingcreatebatch", "bookingupdate"].includes(
         String(body.action || "").toLowerCase(),
       ) ||
@@ -1060,7 +2333,10 @@
     ) {
       let prepared;
       try {
-        prepared = await prepareLordBooking(body, url.pathname, requestEpoch);
+        prepared = await prepareLordBooking(body, url.pathname, requestEpoch, {
+          retained:
+            options.retainedAttempt === true || !!activeEntry?.dispatched,
+        });
       } catch (error) {
         // This invocation has not sent a request. Remove only its own new slot;
         // an earlier unknown operation or a concurrent replacement must remain.
@@ -1069,6 +2345,10 @@
         throw error;
       }
       lordGroupAttempt = prepared.grouped;
+      if (activeEntry) {
+        activeEntry.grouped = prepared.grouped;
+        activeEntry.ownerDigest = prepared.ownerDigest;
+      }
       body = prepared.body;
       if (requestEpoch !== securityEpoch)
         throw groupError(
@@ -1091,19 +2371,42 @@
       !body.leaseFence &&
       !body.token
     ) {
+      const leaseBody = activeEntry?.preparation || {
+        operationId: body.operationId + ":lease",
+        versionId: body.versionId,
+        scope: body.scope || body.key || "meta",
+        clientId: body.clientId || "v1-draft",
+        ...((body.revision ?? body.expectedRevision) !== undefined
+          ? { revision: body.revision ?? body.expectedRevision }
+          : {}),
+      };
+      if (activeEntry) {
+        activeEntry.preparation = structuredClone(leaseBody);
+        persistRecoveryReferences();
+      }
       const grantResponse = await suiteFetch("/api/deploy/lease", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          operationId: body.operationId + ":lease",
-          versionId: body.versionId,
-          scope: body.scope || body.key || "meta",
-          clientId: body.clientId || "v1-draft",
-          revision: body.revision ?? body.expectedRevision,
-        }),
+        body: JSON.stringify(leaseBody),
       });
       if (!grantResponse.ok) return grantResponse;
       const grant = (await grantResponse.json()).data;
+      if (
+        !Number.isSafeInteger(grant?.fence) ||
+        grant.fence < 1 ||
+        grant.token !== grant.fence ||
+        !Number.isSafeInteger(grant.until) ||
+        grant.until < 1 ||
+        grant.scope !== leaseBody.scope ||
+        grant.key !== leaseBody.scope ||
+        !Number.isSafeInteger(grant.revision) ||
+        grant.revision < 0
+      )
+        throw recoveryError(
+          "The original lease result could not be confirmed. Check its receipt before retrying.",
+          "LEASE_RESULT_UNCONFIRMED",
+        );
+      if (activeEntry) activeEntry.requiresLease = false;
       body = {
         ...body,
         clientId: body.clientId || "v1-draft",
@@ -1111,14 +2414,39 @@
         leaseFence: grant.fence,
       };
     }
+    if (activeEntry) {
+      if (!activeEntry.wire) await freezeEntry(activeEntry, body);
+      if (
+        activeEntry.epoch !== securityEpoch ||
+        !contextMatches(activeEntry) ||
+        pending.get(activeEntry.key) !== activeEntry
+      )
+        throw recoveryError(
+          "The active account changed before dispatch.",
+          "SESSION_CHANGED",
+        );
+      body = structuredClone(activeEntry.body);
+      lordGroupAttempt = !!activeEntry.grouped;
+      activeEntry.dispatched = true;
+      activeEntry.phase = "dispatched";
+      if (activeEntry.recoverable) persistRecoveryReferences();
+    }
+    const {
+      prepared: _prepared,
+      retainedEntry: _retained,
+      retainedAttempt: _retainedAttempt,
+      readOnlyLordReceipt: _readOnlyLordReceipt,
+      freshAttempt: _freshAttempt,
+      ...fetchOptions
+    } = options;
     let result;
     try {
       result = await nativeFetch(url, {
-        ...options,
+        ...fetchOptions,
         headers,
         credentials: "same-origin",
         cache: "no-store",
-        ...(body ? { body: JSON.stringify(body) } : {}),
+        ...(body ? { body: activeEntry?.wire || JSON.stringify(body) } : {}),
       });
     } catch (error) {
       if (key)
@@ -1139,7 +2467,7 @@
       );
     if (result.headers.get("Content-Type")?.includes("application/json")) {
       const failure = await result.clone().json();
-      if (service === "lord" && requestEpoch !== securityEpoch)
+      if (requestEpoch !== securityEpoch)
         return response(
           {
             ok: false,
@@ -1195,7 +2523,7 @@
     if (!result.headers.get("Content-Type")?.includes("application/json"))
       return result;
     const envelope = await result.clone().json();
-    if (service === "lord" && requestEpoch !== securityEpoch)
+    if (requestEpoch !== securityEpoch)
       return response(
         {
           ok: false,
@@ -1232,7 +2560,7 @@
         },
         202,
       );
-    if (service === "lord") {
+    if (service === "lord" && !options.readOnlyLordReceipt) {
       if (
         url.pathname.endsWith("/reference") ||
         url.searchParams.get("action")?.toLowerCase() === "reference"
@@ -1269,14 +2597,18 @@
         } catch {}
       }
     }
-    if (
-      key &&
-      (receipt?.state === "committed" ||
-        receipt?.status === "committed" ||
-        receipt?.saved === true ||
-        receipt?.state === "terminal-not-committed")
-    )
-      pending.delete(key);
+    if (!options.readOnlyLordReceipt)
+      settleMatchingReceipt(
+        url.pathname.split("/")[2],
+        data,
+        requestEpoch,
+        activeEntry,
+      );
+    settleDirectLease(activeEntry, data, requestEpoch);
+    settleDirectCreation(activeEntry, data, requestEpoch);
+    settleDirectImport(activeEntry, data, requestEpoch);
+    settleDirectPublication(activeEntry, data, requestEpoch);
+    settleDirectCalendar(activeEntry, data, requestEpoch);
     if (
       key &&
       ["pending", "prepared", "unknown"].includes(receipt?.state) &&
@@ -1339,8 +2671,19 @@
   async function requestUnshared(
     domain,
     path,
-    { method = "GET", body, signal, headers: providedHeaders } = {},
+    {
+      method = "GET",
+      body,
+      signal,
+      headers: providedHeaders,
+      prepared,
+      retainedEntry,
+      retainedAttempt,
+      readOnlyLordReceipt,
+      freshAttempt,
+    } = {},
   ) {
+    const epoch = securityEpoch;
     const headers = new Headers(providedHeaders || {});
     if (body) headers.set("Content-Type", "application/json");
     const result = await suiteFetch("/api/" + domain + path, {
@@ -1348,6 +2691,11 @@
       headers,
       ...(body ? { body: JSON.stringify(body) } : {}),
       signal,
+      prepared,
+      retainedEntry,
+      retainedAttempt,
+      readOnlyLordReceipt,
+      freshAttempt,
     });
     let value;
     try {
@@ -1357,6 +2705,11 @@
         "The result could not be confirmed. Check its receipt before retrying.",
       );
     }
+    if (epoch !== securityEpoch)
+      throw recoveryError(
+        "The active account changed while reading the response.",
+        "SESSION_CHANGED",
+      );
     if (!result.ok || value.ok === false)
       throw Object.assign(
         Error(value.error || "The request was not accepted."),
@@ -1418,7 +2771,21 @@
       (session.capabilities.includes(cap) ||
         session.capabilities.includes("admin") ||
         moduleCapabilities.get(service)?.has(cap)),
-    pending: () => [...pending.values()],
+    pending: () =>
+      [...pending.values()]
+        .filter((x) => !x.terminal)
+        .map((x) => ({
+          operationId: x.operationId,
+          body: structuredClone(x.body || x.initialBody),
+          path: x.path,
+        })),
+    operationState,
+    operationStates,
+    recoverOperation,
+    isUnsentOperation,
+    prepareLordBookingRequest,
+    releasePrepared,
+    checkLordBookingReceipt,
     canonical,
     verifyLordBookingReceipt: matchingLordGroupReceipt,
   };

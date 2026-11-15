@@ -67,8 +67,42 @@ try {
     window.__requests = [];
     window.__canEdit = true;
     window.__mode = "success";
+    window.__attemptBodies = new Map();
+    window.__receipts = new Map();
+    window.__verified = new Set();
+    const reference = (id) =>
+      window.__attemptBodies.has(id)
+        ? {
+            service: "deploy",
+            operationId: id,
+            versionId: window.__saved.id,
+            canRetry: !window.__verified.has(id),
+            canWithdraw: false,
+          }
+        : null;
     window.GSISV1 = {
       capable: () => window.__canEdit,
+      isUnsentOperation: () => false,
+      operationState: (_service, id) => reference(id),
+      operationStates: () =>
+        [...window.__attemptBodies.keys()]
+          .filter((id) => !window.__verified.has(id))
+          .map(reference),
+      recoverOperation: async (ref, mode) => {
+        if (mode === "retry")
+          await window.GSISV1.fetch("/api/change", {
+            method: "POST",
+            body: JSON.stringify(window.__attemptBodies.get(ref.operationId)),
+          });
+        const response = await window.GSISV1.fetch("/api/receipt", {
+          method: "POST",
+          body: JSON.stringify({ requestId: ref.operationId }),
+        });
+        const outcome = (await response.json()).data;
+        if (["committed", "aborted"].includes(outcome.state))
+          window.__verified.add(ref.operationId);
+        return { ...outcome, reference: reference(ref.operationId) };
+      },
       fetch: async (url, options) => {
         const action = String(url).split("/").at(-1),
           body = JSON.parse(options?.body || "{}");
@@ -82,34 +116,62 @@ try {
             ),
             { status, headers: { "content-type": "application/json" } },
           );
-        if (action === "change") {
-          if (window.__mode === "denied") return reply(null, 403);
-          window.__pending = structuredClone(body);
-          if (window.__mode === "unknown")
-            throw Error("Synthetic response lost");
-        } else if (action === "receipt") {
-          if (window.__mode === "unknown")
-            return reply({ saved: false, state: "unknown" });
-          if (!window.__pending)
-            return reply({ saved: false, state: "unknown" });
-        } else throw Error("Unexpected synthetic transport action " + action);
-        const intent = window.__pending,
-          before = structuredClone(window.__saved);
-        for (const edit of intent.edits) {
+        if (action === "sync" || action === "bootstrap")
+          return reply({
+            user: { roles: ["Admin"], email: "synthetic@example.invalid" },
+            versions: [structuredClone(window.__saved)],
+            current: structuredClone(window.__saved),
+            currentId: window.__saved.id,
+            cacheKey: "synthetic-" + window.__saved.revision,
+            revision: window.__saved.revision,
+          });
+        if (action === "receipt")
+          return reply(
+            window.__receipts.get(body.requestId) || {
+              state: "unknown",
+              verified: false,
+              result: { saved: false },
+            },
+          );
+        if (action !== "change")
+          throw Error("Unexpected synthetic transport action " + action);
+        window.__attemptBodies.set(body.requestId, structuredClone(body));
+        window.__pending = structuredClone(body);
+        if (window.__mode === "denied") {
+          // Explicit synthetic durable abort; HTTP403 alone is not terminal proof.
+          window.__receipts.set(body.requestId, {
+            state: "aborted",
+            verified: true,
+            result: { saved: false },
+          });
+          return reply({}, 403);
+        }
+        if (window.__mode === "unknown")
+          return reply({ saved: false, state: "unknown" });
+        const before = structuredClone(window.__saved);
+        for (const edit of body.edits) {
           if (edit.operation !== "setFortnight")
             throw Error("Unexpected write operation");
           window.__saved.fortnight[edit.row] ||= {};
           window.__saved.fortnight[edit.row][edit.field] = edit.value;
         }
         window.__saved.revision++;
-        const delta = {
-          versionId: window.__saved.id,
-          revision: window.__saved.revision,
-          globalRevision: window.__saved.revision,
-          changes: GSISFields.diff(before, window.__saved),
+        const result = {
+          saved: true,
+          delta: {
+            versionId: window.__saved.id,
+            revision: window.__saved.revision,
+            globalRevision: window.__saved.revision,
+            changes: GSISFields.diff(before, window.__saved),
+          },
         };
         window.__pending = null;
-        return reply({ saved: true, delta });
+        window.__receipts.set(body.requestId, {
+          state: "committed",
+          verified: true,
+          result,
+        });
+        return reply(result);
       },
     };
   });
@@ -130,11 +192,15 @@ try {
     fortnight: { [row]: { enabled: true, wd: 2, remarks: "Saved note" } },
   };
   const input = (field) => page.locator('[data-split-field="' + field + '"]');
-  const save = () => page.locator("#saveQueue button").first();
+  const save = () => page.locator("#saveQueue button:visible").first();
   const discard = () =>
     page
       .locator("#saveQueue")
-      .getByRole("button", { name: "Discard", exact: true });
+      .getByRole("button", {
+        name: "Discard",
+        exact: true,
+        includeHidden: true,
+      });
   async function reset({
     canEdit = true,
     mode = "success",
@@ -152,6 +218,9 @@ try {
         }
         window.__requests = [];
         window.__pending = null;
+        window.__attemptBodies.clear();
+        window.__receipts.clear();
+        window.__verified.clear();
         window.__saved = structuredClone(doc);
         window.__canEdit = canEdit;
         window.__mode = mode;
@@ -295,7 +364,7 @@ try {
   assert.equal(
     stateNow.value.wd,
     3,
-    "normal queue applies the confirmed response delta",
+    "normal queue displays the confirmed saved revision",
   );
   await input("remarks").fill("Keyboard note");
   await input("remarks").press("Tab");
@@ -389,7 +458,7 @@ try {
   await page.locator('#nav [data-section="Program Settings"]').click();
   assert.equal((await inspect()).tab, "Fortnight Split");
   assert.equal(await discard().isDisabled(), true);
-  await save().click();
+  await page.locator('[data-deploy-recovery-action="retry"]').click();
   await page.waitForFunction(
     () =>
       queueFlight &&
@@ -416,6 +485,13 @@ try {
   await reset({ mode: "denied" });
   await input("wd").fill("3");
   await save().click();
+  await page.waitForFunction(() => queueFlight && !queueFlight.running);
+  assert.equal(
+    (await inspect()).inert,
+    true,
+    "HTTP denial alone keeps submitted input locked",
+  );
+  await page.locator('[data-deploy-recovery-action="check"]').click();
   await page.waitForFunction(
     () => !queueFlight && queuedEdits().length === 1 && !!queueError,
   );

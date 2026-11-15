@@ -517,6 +517,242 @@ try {
     0,
     "cart editing cannot shrink physical reservations",
   );
+  const beforeEditorPreflight = writes.length;
+  const corruptEditorStore = await page.evaluate(() => {
+    const key = Object.keys(sessionStorage).find((key) =>
+      key.startsWith("gsis-lord-group-bindings:"),
+    );
+    const raw = sessionStorage.getItem(key);
+    sessionStorage.setItem(key, "{");
+    return { key, raw };
+  });
+  await editor.locator("[name=requestedQuantity]").fill("18");
+  await editor.locator("[data-lord-submit]").click();
+  await editor
+    .locator("[data-lord-status]")
+    .filter({ hasText: /unreadable/ })
+    .waitFor();
+  assert.equal(
+    writes.length,
+    beforeEditorPreflight,
+    "failed editor preflight sends no POST",
+  );
+  assert.equal(
+    await editor.locator("fieldset").evaluate((node) => node.disabled),
+    false,
+    "a new editor request that failed before send remains editable",
+  );
+  assert.equal(
+    await editor.locator("[name=requestedQuantity]").inputValue(),
+    "18",
+  );
+  assert.equal(
+    await editor.locator("[data-lord-check-receipt]").isVisible(),
+    false,
+  );
+  assert.equal(
+    await page.evaluate(() => {
+      const key = Object.keys(sessionStorage).find((key) =>
+        key.startsWith("gsis-lord-user:"),
+      );
+      return key
+        ? (JSON.parse(sessionStorage.getItem(key)).booking ?? null)
+        : null;
+    }),
+    null,
+    "unsent editor draft must not become a persisted unknown operation",
+  );
+  await page.evaluate(
+    ({ key, raw }) => sessionStorage.setItem(key, raw),
+    corruptEditorStore,
+  );
+  console.log(
+    "PASS LORD new editor preflight failure preserves an editable unsent draft.",
+  );
+  for (const failure of ["group-read", "group-write", "editor-write"]) {
+    const priorGroups = await stored(),
+      priorPending = await page.evaluate(() => GSISV1.pending());
+    const beforeFailedWrite = writes.length;
+    await page.evaluate((failure) => {
+      window.__storageFaults = 0;
+      window.__originalStorageGet = Storage.prototype.getItem;
+      window.__originalStorageSet = Storage.prototype.setItem;
+      const blocked = (key) =>
+        failure === "editor-write"
+          ? key.startsWith("gsis-lord-user:")
+          : key.startsWith("gsis-lord-group-bindings:");
+      Storage.prototype.getItem = function (key) {
+        if (failure === "group-read" && blocked(key)) {
+          window.__storageFaults++;
+          throw new DOMException(
+            "Synthetic local storage is unavailable",
+            "SecurityError",
+          );
+        }
+        return window.__originalStorageGet.call(this, key);
+      };
+      Storage.prototype.setItem = function (key, value) {
+        if (failure !== "group-read" && blocked(key)) {
+          window.__storageFaults++;
+          throw new DOMException(
+            "Synthetic local storage is unavailable",
+            "QuotaExceededError",
+          );
+        }
+        return window.__originalStorageSet.call(this, key, value);
+      };
+    }, failure);
+    await editor.locator("[data-lord-submit]").click();
+    await page.waitForFunction(
+      () =>
+        window.__storageFaults > 0 &&
+        !document.querySelector("[data-lord-submit]").disabled,
+    );
+    await page.evaluate(() => {
+      Storage.prototype.getItem = window.__originalStorageGet;
+      Storage.prototype.setItem = window.__originalStorageSet;
+    });
+    assert.equal(
+      writes.length,
+      beforeFailedWrite,
+      failure + " must fail before POST",
+    );
+    assert.equal(
+      await editor.locator("fieldset").evaluate((node) => node.disabled),
+      false,
+      failure + " leaves the fresh draft editable",
+    );
+    assert.equal(
+      await editor.locator("[name=requestedQuantity]").inputValue(),
+      "18",
+    );
+    assert.deepEqual(
+      await stored(),
+      priorGroups,
+      failure + " must preserve older group bindings",
+    );
+    assert.deepEqual(
+      await page.evaluate(() => GSISV1.pending()),
+      priorPending,
+      failure + " must not leak fresh preparation",
+    );
+  }
+  const beforeComposedFailure = writes.length,
+    groupsBeforeComposed = await stored();
+  const pendingBeforeComposed = await page.evaluate(() => GSISV1.pending());
+  await page.evaluate(() => {
+    window.__composedSet = Storage.prototype.setItem;
+    window.__composedGroupWrites = 0;
+    window.__composedEditorFailures = 0;
+    Storage.prototype.setItem = function (key, value) {
+      if (key.startsWith("gsis-lord-user:")) {
+        window.__composedEditorFailures++;
+        throw new DOMException(
+          "Synthetic editor persistence failed",
+          "QuotaExceededError",
+        );
+      }
+      if (
+        key.startsWith("gsis-lord-group-bindings:") &&
+        ++window.__composedGroupWrites > 1
+      )
+        throw new DOMException(
+          "Synthetic local cleanup failed",
+          "QuotaExceededError",
+        );
+      return window.__composedSet.call(this, key, value);
+    };
+  });
+  await editor.locator("[data-lord-submit]").click();
+  await editor
+    .locator("[data-lord-submit]")
+    .filter({ hasText: "Retry local cleanup" })
+    .waitFor();
+  assert.equal(
+    await editor.locator("fieldset").evaluate((node) => node.disabled),
+    true,
+    "failed unsent cleanup retains the exact live preparation",
+  );
+  assert.equal(
+    await editor.locator("[data-lord-check-receipt]").isVisible(),
+    false,
+    "unsent live cleanup must not fabricate a receipt task",
+  );
+  const protectedPreparation = await page.evaluate(() => GSISV1.pending());
+  assert.equal(protectedPreparation.length, pendingBeforeComposed.length + 1);
+  await editor.locator("[data-lord-submit]").click();
+  await page.waitForFunction(
+    () =>
+      window.__composedGroupWrites >= 3 &&
+      !document.querySelector("[data-lord-submit]").disabled,
+  );
+  assert.equal(writes.length, beforeComposedFailure);
+  assert.deepEqual(
+    await page.evaluate(() => GSISV1.pending()),
+    protectedPreparation,
+    "cleanup failure must not allocate or replace the unsent operation",
+  );
+  await page.evaluate(() => (Storage.prototype.setItem = window.__composedSet));
+  await editor.locator("[data-lord-submit]").click();
+  await page.waitForFunction(
+    () => !document.querySelector("#gsisLordBookingEditor fieldset").disabled,
+  );
+  assert.equal(
+    writes.length,
+    beforeComposedFailure,
+    "successful local cleanup still sends no request",
+  );
+  assert.deepEqual(await stored(), groupsBeforeComposed);
+  assert.deepEqual(
+    await page.evaluate(() => GSISV1.pending()),
+    pendingBeforeComposed,
+  );
+  assert.equal(
+    await editor.locator("[name=requestedQuantity]").inputValue(),
+    "18",
+  );
+  console.log(
+    "PASS LORD composed persistence and cleanup failures retain one unsent operation until exact local cleanup.",
+  );
+  const beforeClosedPreparation = writes.length,
+    groupsBeforeClosedPreparation = await stored();
+  await page.evaluate(() => {
+    window.__editorPendingBefore = JSON.stringify(GSISV1.pending());
+    window.__originalEditorDigest = crypto.subtle.digest.bind(crypto.subtle);
+    window.__editorHashHeld = false;
+    crypto.subtle.digest = async (...args) => {
+      const hold = new TextDecoder().decode(args[1]).startsWith("[");
+      if (hold) {
+        window.__editorHashHeld = true;
+        await new Promise((resolve) => (window.__releaseEditorHash = resolve));
+      }
+      const result = await window.__originalEditorDigest(...args);
+      if (hold) window.__editorHashCompleted = true;
+      return result;
+    };
+  });
+  await editor.locator("[data-lord-submit]").click();
+  await page.waitForFunction(() => window.__editorHashHeld);
+  await editor.locator("[data-lord-close]").click();
+  await page.evaluate(() => {
+    crypto.subtle.digest = window.__originalEditorDigest;
+    window.__releaseEditorHash();
+  });
+  await page.waitForFunction(
+    () =>
+      window.__editorHashCompleted &&
+      JSON.stringify(GSISV1.pending()) === window.__editorPendingBefore,
+  );
+  assert.equal(
+    writes.length,
+    beforeClosedPreparation,
+    "closing the editor during preparation prevents dispatch",
+  );
+  assert.deepEqual(await stored(), groupsBeforeClosedPreparation);
+  editor = await editCurrent();
+  console.log(
+    "PASS LORD storage failures and closing a preparing editor preserve older evidence without sending.",
+  );
   await editor.locator("[name=requestedQuantity]").fill("18");
   await editor.locator("[data-lord-submit]").click();
   await editor
@@ -528,6 +764,87 @@ try {
   assert.equal(editWrite.items, undefined);
   assert.deepEqual(editWrite.bookingGroup, originalGroup);
   await editor.locator("[data-lord-close]").click();
+  const legacyRaw = structuredClone(editWrite);
+  delete legacyRaw.bookingGroup;
+  legacyRaw.operationId = "legacy-raw-editor-original";
+  legacyRaw.resource = originalGroup.cart;
+  // Seed the historical serialization explicitly: the retained editor held raw
+  // input while its scoped binding held the exact enriched owner's digest.
+  const legacyBindingFixture = {
+    operationId: legacyRaw.operationId,
+    intentHash: await digest(["/api/lord/bookings/update", legacyRaw]),
+    ownerDigest: await digest({
+      schoolId: session.schoolId,
+      actorId: session.user.accountId,
+      action: "lord.bookingupdate",
+      intent: { ...legacyRaw, bookingGroup: originalGroup },
+    }),
+    selections: [{ index: 0, group: originalGroup }],
+    terminal: false,
+  };
+  ownerDigests.set(legacyRaw.operationId, legacyBindingFixture.ownerDigest);
+  await page.evaluate((entry) => {
+    const key =
+      "gsis-lord-group-bindings:v1:" +
+      JSON.stringify(["synthetic-school", "synthetic-user"]);
+    const values = JSON.parse(sessionStorage.getItem(key) || "[]");
+    values.push(entry);
+    sessionStorage.setItem(key, JSON.stringify(values));
+  }, legacyBindingFixture);
+  const legacyBindings = await stored();
+  const legacyBinding = legacyBindings
+    .flatMap((store) => store.value)
+    .find((entry) => entry.operationId === legacyRaw.operationId);
+  assert.ok(
+    legacyBinding,
+    "the original legacy request must retain its scoped cart binding",
+  );
+  assert.equal(
+    legacyBinding.intentHash,
+    await digest(["/api/lord/bookings/update", legacyRaw]),
+  );
+  const beforeLegacyChecks = writes.length;
+  mode = "terminal";
+  const inspectLegacy = (body, path) =>
+    page.evaluate(
+      ({ body, path }) => GSISV1.checkLordBookingReceipt(body, { path }),
+      { body, path },
+    );
+  assert.equal(
+    (
+      await inspectLegacy(
+        { ...legacyRaw, requestedQuantity: 17 },
+        "/api/lord/bookings/update",
+      )
+    ).verified,
+    false,
+    "changed raw details cannot borrow the same operation's retained owner digest",
+  );
+  assert.equal(
+    (await inspectLegacy(legacyRaw, "/api/lord/transaction")).verified,
+    false,
+    "the same raw details at another route cannot borrow a binding",
+  );
+  const originalLegacyReceipt = await inspectLegacy(
+    legacyRaw,
+    "/api/lord/bookings/update",
+  );
+  assert.equal(
+    originalLegacyReceipt.verified,
+    true,
+    "exact original legacy raw request and scoped binding can verify its terminal receipt",
+  );
+  assert.equal(originalLegacyReceipt.state, "aborted");
+  assert.equal(
+    writes.length,
+    beforeLegacyChecks,
+    "legacy receipt checks never resend or enrich the request",
+  );
+  assert.deepEqual(
+    await stored(),
+    legacyBindings,
+    "legacy receipt checks never rewrite saved group evidence",
+  );
   booking.requestedQuantity = null;
   editor = await editCurrent();
   assert.equal(
@@ -551,6 +868,56 @@ try {
     true,
   );
   const staleOperation = writes.at(-1).body.operationId;
+  const priorEditorState = await page.evaluate(() => {
+    const userKey = Object.keys(sessionStorage).find((key) =>
+      key.startsWith("gsis-lord-user:"),
+    );
+    const groupKey = Object.keys(sessionStorage).find((key) =>
+      key.startsWith("gsis-lord-group-bindings:"),
+    );
+    return {
+      userKey,
+      userRaw: sessionStorage.getItem(userKey),
+      groupKey,
+      groupRaw: sessionStorage.getItem(groupKey),
+    };
+  });
+  await page.reload();
+  await page.locator("[data-lord-edit-bookings]").click();
+  editor = page.locator("#gsisLordBookingEditor");
+  await editor.locator("[data-lord-booking-form]").waitFor();
+  await page.evaluate(
+    (key) => sessionStorage.setItem(key, "{"),
+    priorEditorState.groupKey,
+  );
+  const beforeRestoredEditorRetry = writes.length;
+  await editor.locator("[data-lord-submit]").click();
+  await editor
+    .locator("[data-lord-status]")
+    .filter({ hasText: /unreadable/ })
+    .waitFor();
+  assert.equal(
+    writes.length,
+    beforeRestoredEditorRetry,
+    "restored editor preflight failure never posts a replacement",
+  );
+  assert.equal(
+    await editor.locator("fieldset").evaluate((node) => node.disabled),
+    true,
+    "restored unknown editor remains locked",
+  );
+  assert.equal(
+    await page.evaluate(
+      (key) => sessionStorage.getItem(key),
+      priorEditorState.userKey,
+    ),
+    priorEditorState.userRaw,
+    "restored unknown identity and body survive local failure",
+  );
+  await page.evaluate(
+    ({ groupKey, groupRaw }) => sessionStorage.setItem(groupKey, groupRaw),
+    priorEditorState,
+  );
   mode = "holdTerminal";
   const terminalStarted = new Promise((resolve) => (receiptStarted = resolve));
   await editor.locator("[data-lord-check-receipt]").click();
@@ -586,6 +953,58 @@ try {
   booking.groupState = "verified";
   console.log(
     "PASS LORD cart-only edits, unknown historical requested quantity and terminal receipt/reload separation.",
+  );
+
+  const groupedBookingFixture = structuredClone(booking);
+  booking = {
+    ...booking,
+    resource: "Standalone camera",
+    groupState: "standalone",
+    bookingGroup: null,
+    requestedQuantity: 2,
+    reservedCapacity: 2,
+    items: [{ resourceId: "standalone-camera", quantity: 2 }],
+    trolleys: [
+      {
+        resourceId: "standalone-camera",
+        name: "Standalone camera",
+        quantity: 0,
+        remainingQuantity: 0,
+      },
+    ],
+  };
+  editor = await editCurrent();
+  await editor.locator("[name=quantity0]").fill("1");
+  mode = "lost";
+  await editor.locator("[data-lord-submit]").click();
+  await editor
+    .locator("[data-lord-status]")
+    .filter({ hasText: /outcome is not confirmed/ })
+    .waitFor();
+  const standaloneWire = structuredClone(writes.at(-1).body);
+  assert.deepEqual(standaloneWire.items, [
+    { resourceId: "standalone-camera", quantity: 1 },
+  ]);
+  assert.equal(standaloneWire.bookingGroup, undefined);
+  await page.reload();
+  await page.locator("[data-lord-edit-bookings]").click();
+  editor = page.locator("#gsisLordBookingEditor");
+  await editor.locator("[data-lord-booking-form]").waitFor();
+  mode = "success";
+  await editor.locator("[data-lord-submit]").click();
+  await editor
+    .locator("[data-lord-status]")
+    .filter({ hasText: "confirmed saved" })
+    .waitFor();
+  assert.deepEqual(
+    writes.at(-1).body,
+    standaloneWire,
+    "standalone physical edit replay does not invent cart evidence",
+  );
+  await editor.locator("[data-lord-close]").click();
+  booking = groupedBookingFixture;
+  console.log(
+    "PASS LORD exact standalone editor retry survives reload without requiring a cart binding.",
   );
 
   await page.evaluate(() => loadEligibleBookings());
@@ -662,6 +1081,361 @@ try {
     "PASS LORD narrow collection remains physical, partial return IDs and unbooked trolley rejection.",
   );
 
+  async function openNativeCart() {
+    await page.reload();
+    await page.locator("#bookBtn").click();
+    await page
+      .locator(".resource-name strong")
+      .filter({ hasText: "Z2" })
+      .waitFor();
+    await page.locator("#classOrActivity").fill("Synthetic class");
+    await page.locator("#subject").fill("Science");
+    await page
+      .locator('.timetable-cell[data-resource="Z2"][data-code="1"]')
+      .click();
+    await page
+      .locator('.timetable-cell[data-resource="Z2"][data-code="2"]')
+      .click();
+    await page.locator(".selection-qty").fill("20");
+    await page.waitForFunction(
+      () =>
+        state.booking.selections.length === 1 &&
+        state.booking.selections.every(
+          (selection) =>
+            !selection.checking &&
+            !["ERROR", "OVERLAP"].includes(selection.conflictType),
+        ),
+    );
+  }
+  await openNativeCart();
+  const nativeBound = await page.evaluate((group) => {
+    const key =
+      "gsis-lord-group-bindings:v1:" +
+      JSON.stringify(["synthetic-school", "synthetic-user"]);
+    const raw = sessionStorage.getItem(key);
+    const entries = Array.from({ length: 128 }, (_, index) => ({
+      operationId: "native-bound-" + index,
+      intentHash: "a".repeat(64),
+      ownerDigest: "b".repeat(64),
+      selections: [{ index: 0, group }],
+      terminal: false,
+    }));
+    const full = JSON.stringify(entries);
+    sessionStorage.setItem(key, full);
+    return {
+      key,
+      raw,
+      full,
+      selections: structuredClone(state.booking.selections),
+      pending: GSISV1.pending(),
+    };
+  }, originalGroup);
+  const beforeNativeBound = writes.length;
+  await page.locator("#confirmBookingBtn").click();
+  await page
+    .locator("#draftStatus")
+    .filter({ hasText: /Resolve the existing unconfirmed cart bookings/ })
+    .waitFor();
+  await page.waitForFunction(() => !state.busy);
+  assert.equal(
+    writes.length,
+    beforeNativeBound,
+    "full binding storage rejects the new native request before POST",
+  );
+  assert.equal(
+    await page.evaluate(() => state.booking.pendingBatch ?? null),
+    null,
+    "new unsent native batch must not become an unknown operation",
+  );
+  assert.deepEqual(
+    await page.evaluate(() => state.booking.selections),
+    nativeBound.selections,
+  );
+  assert.equal(await page.locator(".selection-qty").inputValue(), "20");
+  assert.deepEqual(
+    await page.evaluate(() => GSISV1.pending()),
+    nativeBound.pending,
+  );
+  assert.equal(
+    await page.evaluate((key) => sessionStorage.getItem(key), nativeBound.key),
+    nativeBound.full,
+  );
+  await page.evaluate(
+    ({ key, raw }) =>
+      raw === null
+        ? sessionStorage.removeItem(key)
+        : sessionStorage.setItem(key, raw),
+    nativeBound,
+  );
+  await page.locator("#confirmBookingBtn").click();
+  await page.locator(".booking-success-list").waitFor();
+  assert.equal(
+    writes.length,
+    beforeNativeBound + 1,
+    "corrected new native draft sends once",
+  );
+  assert.deepEqual(
+    writes.at(-1).body.bookings[0].bookingGroup,
+    reference.bookingResources[3].bookingGroup,
+  );
+  console.log(
+    "PASS LORD full local capacity preserves a new native draft until correction and one dispatch.",
+  );
+
+  await openNativeCart();
+  const beforeNativePersistence = writes.length;
+  const beforeNativeBindings = await stored();
+  await page.evaluate(() => {
+    window.__originalDraftStore = LordDraftStore;
+    window.__failedDraftSaves = 0;
+    window.LordDraftStore = {
+      ...LordDraftStore,
+      save: async () => {
+        window.__failedDraftSaves++;
+        return { saved: false, photosSaved: false };
+      },
+    };
+  });
+  await page.locator("#confirmBookingBtn").click();
+  await page.waitForFunction(
+    () => window.__failedDraftSaves > 0 && !state.busy,
+  );
+  assert.match(
+    await page.locator("#draftStatus").innerText(),
+    /could not be saved on this device/,
+  );
+  assert.equal(
+    writes.length,
+    beforeNativePersistence,
+    "failed native persistence after preflight must prevent POST",
+  );
+  assert.equal(
+    await page.evaluate(() => state.booking.pendingBatch ?? null),
+    null,
+  );
+  assert.equal(await page.locator(".selection-qty").inputValue(), "20");
+  assert.deepEqual(
+    await stored(),
+    beforeNativeBindings,
+    "failed persistence releases only its fresh group preparation",
+  );
+  await page.evaluate(
+    () => (window.LordDraftStore = window.__originalDraftStore),
+  );
+  await page.locator("#confirmBookingBtn").click();
+  await page.locator(".booking-success-list").waitFor();
+  assert.equal(writes.length, beforeNativePersistence + 1);
+  console.log(
+    "PASS LORD failed native persistence leaves an editable unsent form and releases its own preparation.",
+  );
+
+  await openNativeCart();
+  const beforeNativeCleanup = writes.length;
+  const nativeCleanupState = await page.evaluate(() => {
+    const key =
+      "gsis-lord-group-bindings:v1:" +
+      JSON.stringify(["synthetic-school", "synthetic-user"]);
+    const result = {
+      key,
+      raw: sessionStorage.getItem(key),
+      pending: GSISV1.pending(),
+    };
+    window.__originalDraftStore = LordDraftStore;
+    window.__originalNativeSetItem = Storage.prototype.setItem;
+    window.__nativeGroupWrites = 0;
+    window.LordDraftStore = {
+      ...LordDraftStore,
+      save: async () => ({ saved: false, photosSaved: false }),
+    };
+    Storage.prototype.setItem = function (name, value) {
+      if (name === key && ++window.__nativeGroupWrites > 1)
+        throw Error("Synthetic native cleanup failed");
+      return window.__originalNativeSetItem.call(this, name, value);
+    };
+    return result;
+  });
+  await page.locator("#confirmBookingBtn").click();
+  await page
+    .locator("#retryBtn")
+    .filter({ hasText: "Retry local cleanup" })
+    .waitFor();
+  await page.waitForFunction(() => !state.busy);
+  const nativeUnsentWire = await page.evaluate(() =>
+    structuredClone(state.booking.pendingBatch),
+  );
+  assert.ok(
+    nativeUnsentWire.operationId,
+    "fresh unsent preparation keeps its exact operation identity while cleanup is unavailable",
+  );
+  assert.equal(writes.length, beforeNativeCleanup);
+  assert.equal(
+    await page.locator("#checkBookingReceipt").count(),
+    0,
+    "a proven live unsent attempt needs cleanup, not a receipt",
+  );
+  const nativePendingCleanup = await page.evaluate(() => GSISV1.pending());
+  await page.locator("#retryBtn").click();
+  await page.waitForFunction(() => !state.busy);
+  assert.equal(
+    writes.length,
+    beforeNativeCleanup,
+    "retrying local cleanup never sends a booking",
+  );
+  assert.deepEqual(
+    await page.evaluate(() => state.booking.pendingBatch),
+    nativeUnsentWire,
+  );
+  assert.deepEqual(
+    await page.evaluate(() => GSISV1.pending()),
+    nativePendingCleanup,
+  );
+  await page.evaluate(() => {
+    Storage.prototype.setItem = window.__originalNativeSetItem;
+    window.LordDraftStore = window.__originalDraftStore;
+  });
+  await page.locator("#retryBtn").click();
+  await page
+    .locator("#draftStatus")
+    .filter({ hasText: "Local preparation cleared" })
+    .waitFor();
+  assert.equal(writes.length, beforeNativeCleanup);
+  assert.equal(
+    await page.evaluate(() => state.booking.pendingBatch ?? null),
+    null,
+  );
+  assert.equal(await page.locator(".selection-qty").inputValue(), "20");
+  assert.equal(
+    await page.evaluate(
+      (key) => sessionStorage.getItem(key),
+      nativeCleanupState.key,
+    ),
+    nativeCleanupState.raw,
+  );
+  assert.deepEqual(
+    await page.evaluate(() => GSISV1.pending()),
+    nativeCleanupState.pending,
+  );
+  console.log(
+    "PASS LORD composed native persistence and cleanup failures retain one unsent operation until exact local cleanup.",
+  );
+
+  await openNativeCart();
+  mode = "lost";
+  await page.locator("#confirmBookingBtn").click();
+  await page.locator("#retryBtn").waitFor();
+  await page.waitForFunction(() => !state.busy);
+  const earlierNativeWire = structuredClone(writes.at(-1).body);
+  const earlierNative = await page.evaluate((operationId) => {
+    const stableKey = Object.keys(localStorage).find((key) => {
+      if (!key.startsWith("lordPendingRequest:")) return false;
+      return JSON.parse(localStorage.getItem(key))?.id === operationId;
+    });
+    if (!stableKey)
+      throw Error("The unknown native request must retain its stable identity");
+    const stable = JSON.parse(localStorage.getItem(stableKey));
+    stable.at = Date.now() - 48 * 60 * 60 * 1000;
+    localStorage.setItem(stableKey, JSON.stringify(stable));
+    const groupKey = Object.keys(sessionStorage).find((key) =>
+      key.startsWith("gsis-lord-group-bindings:"),
+    );
+    const groupRaw = sessionStorage.getItem(groupKey);
+    sessionStorage.removeItem(groupKey);
+    pendingWriteIds.clear();
+    state.booking.pendingBatch = null;
+    renderBooking();
+    return {
+      stableKey,
+      stableRaw: localStorage.getItem(stableKey),
+      groupKey,
+      groupRaw,
+    };
+  }, earlierNativeWire.operationId);
+  const beforeReusedNative = writes.length;
+  await page.locator("#confirmBookingBtn").click();
+  await page.waitForFunction(() => !state.busy);
+  assert.equal(
+    writes.length,
+    beforeReusedNative,
+    "an older reused ID is not classified as a new unsent request or posted without evidence",
+  );
+  assert.equal(
+    await page.evaluate(
+      () =>
+        state.booking.pendingBatch?.operationId ||
+        state.booking.pendingBatch?.clientRequestId,
+    ),
+    earlierNativeWire.operationId,
+  );
+  assert.equal(
+    await page.evaluate(
+      (key) => localStorage.getItem(key),
+      earlierNative.stableKey,
+    ),
+    earlierNative.stableRaw,
+    "expired local cache age cannot allocate or persist a replacement ID",
+  );
+  mode = "success";
+  await page.locator("#checkBookingReceipt").click();
+  await page.waitForFunction(() => !state.busy);
+  assert.equal(
+    writes.length,
+    beforeReusedNative,
+    "receipt inspection of old raw intent is read-only",
+  );
+  assert.equal(
+    await page.locator(".booking-success-list").count(),
+    0,
+    "old raw input without its group evidence cannot prove a committed intent",
+  );
+  assert.equal(
+    await page.evaluate(
+      () =>
+        state.booking.pendingBatch?.operationId ||
+        state.booking.pendingBatch?.clientRequestId,
+    ),
+    earlierNativeWire.operationId,
+  );
+  await page.evaluate(
+    ({ groupKey, groupRaw }) => sessionStorage.setItem(groupKey, groupRaw),
+    earlierNative,
+  );
+  mode = "success";
+  await page.evaluate(() => {
+    window.__nativeFetchBeforeDiagnostic = GSISV1.fetch;
+    GSISV1.fetch = async (...args) => {
+      try {
+        return await window.__nativeFetchBeforeDiagnostic(...args);
+      } catch (error) {
+        window.__nativeRetryError = {
+          code: error.code,
+          message: error.message,
+        };
+        throw error;
+      }
+    };
+  });
+  await page.locator("#retryBtn").click();
+  try {
+    await page.locator(".booking-success-list").waitFor();
+  } catch (error) {
+    console.error(
+      "Retained native retry state:",
+      await page.evaluate(() => ({
+        message: document.querySelector(".notice.error")?.textContent,
+        pending: state.booking.pendingBatch,
+        error: window.__nativeRetryError,
+      })),
+    );
+    throw error;
+  }
+  await page.evaluate(
+    () => (GSISV1.fetch = window.__nativeFetchBeforeDiagnostic),
+  );
+  assert.deepEqual(writes.at(-1).body, earlierNativeWire);
+  console.log(
+    "PASS LORD reused native identity remains unknown despite an absent batch and expired cache age.",
+  );
+
   reference.bookingResources.push({
     resource: "Z2",
     name: "Standalone collision",
@@ -672,6 +1446,11 @@ try {
   await page.evaluate(async () => {
     state.reference = await GSISV1.request("lord", "/reference");
     state.mode = "booking";
+    // Start a new ambiguous choice; preceding native flows intentionally retain
+    // an already-viewed selection, which must keep its original group evidence.
+    state.booking.selections = [];
+    state.booking.resource = "";
+    state.booking.startPeriod = "";
     renderBooking();
   });
   const beforeAmbiguous = writes.length;
@@ -1014,12 +1793,26 @@ try {
       sameSite: "Lax",
     },
   ]);
+  const actualBookingWrites = [];
+  let actualReceiptReads = 0;
+  let loseFirstActualBookingReply = true;
   await context.route("**/*", async (route) => {
     const r = route.request();
     if (!r.url().startsWith(workerOrigin + "/")) {
       unexpected.push(r.url());
       return route.abort();
     }
+    const wire = r.method() === "POST" ? r.postDataJSON() : null;
+    if (
+      r.method() === "GET" &&
+      new URL(r.url()).pathname === "/api/lord/receipt"
+    )
+      actualReceiptReads++;
+    const isBookingWrite =
+      wire &&
+      (String(wire.action || "").toLowerCase() === "bookingcreatebatch" ||
+        new URL(r.url()).pathname === "/api/lord/bookings");
+    if (isBookingWrite) actualBookingWrites.push(structuredClone(wire));
     const response = await live.mf.dispatchFetch(r.url(), {
       method: r.method(),
       headers: await r.allHeaders(),
@@ -1029,10 +1822,20 @@ try {
     });
     const headers = Object.fromEntries(response.headers);
     delete headers["transfer-encoding"];
+    const responseBody = Buffer.from(await response.arrayBuffer());
+    if (isBookingWrite && loseFirstActualBookingReply) {
+      assert.equal(
+        response.status,
+        200,
+        "the lost reply follows an actual durable commit",
+      );
+      loseFirstActualBookingReply = false;
+      return route.abort("failed");
+    }
     return route.fulfill({
       status: response.status,
       headers,
-      body: Buffer.from(await response.arrayBuffer()),
+      body: responseBody,
     });
   });
   const actual = await context.newPage();
@@ -1056,7 +1859,123 @@ try {
   await actual.locator(".selection-qty").fill("20");
   await capture("lord-cart-grid-local-worker.png", actual);
   await actual.locator("#confirmBookingBtn").click();
+  await actual.locator("#retryBtn").waitFor();
+  await actual.waitForFunction(() => !state.busy);
+  assert.equal(actualBookingWrites.length, 1);
+  const originalActualWire = structuredClone(actualBookingWrites[0]);
+  assert.deepEqual(
+    await actual.evaluate(() => state.booking.pendingBatch),
+    originalActualWire,
+    "unknown native draft retains the complete original wire",
+  );
+  assert.equal(
+    (await db.prepare("SELECT COUNT(*) AS n FROM lord_bookings").first()).n,
+    1,
+  );
+  await db
+    .prepare("UPDATE lord_resources SET revision=revision+1 WHERE school_id=?")
+    .bind("synthetic-school")
+    .run();
+  await actual.reload();
+  await actual
+    .getByRole("button", { name: "Review unconfirmed booking" })
+    .click();
+  const oldBinding = await actual.evaluate(() => {
+    const key = Object.keys(sessionStorage).find((key) =>
+      key.startsWith("gsis-lord-group-bindings:"),
+    );
+    const raw = sessionStorage.getItem(key);
+    sessionStorage.removeItem(key);
+    return { key, raw };
+  });
+  await actual.locator("#retryBtn").click();
+  await actual.waitForFunction(() => !state.busy);
+  assert.equal(
+    actualBookingWrites.length,
+    1,
+    "restored unknown operation with missing evidence is never rebuilt from current inventory",
+  );
+  assert.deepEqual(
+    await actual.evaluate(() => state.booking.pendingBatch),
+    originalActualWire,
+    "local retry failure must not discard the original unknown wire or ID",
+  );
+  assert.equal(
+    (await db.prepare("SELECT COUNT(*) AS n FROM lord_bookings").first()).n,
+    1,
+  );
+  const readsBeforeRecovery = actualReceiptReads;
+  await actual.locator("#checkBookingReceipt").click();
   await actual.locator(".booking-success-list").waitFor();
+  assert.equal(
+    actualReceiptReads,
+    readsBeforeRecovery + 1,
+    "native recovery reads the original owner receipt",
+  );
+  assert.equal(
+    actualBookingWrites.length,
+    1,
+    "receipt recovery must not resend the committed booking",
+  );
+  assert.equal(
+    await actual.evaluate(() => state.booking.pendingBatch ?? null),
+    null,
+  );
+  assert.equal(
+    await actual.evaluate((key) => sessionStorage.getItem(key), oldBinding.key),
+    null,
+    "receipt recovery does not rebuild missing group storage",
+  );
+  const replacementBinding = JSON.stringify(
+    JSON.parse(oldBinding.raw).map((entry) => ({
+      ...entry,
+      ownerDigest: "0".repeat(64),
+      terminal: false,
+    })),
+  );
+  await actual.evaluate(({ key, raw }) => sessionStorage.setItem(key, raw), {
+    key: oldBinding.key,
+    raw: replacementBinding,
+  });
+  const provedAgain = await actual.evaluate(
+    (body) => GSISV1.checkLordBookingReceipt(body),
+    originalActualWire,
+  );
+  assert.equal(provedAgain.verified, true);
+  assert.equal(provedAgain.state, "committed");
+  assert.equal(
+    await actual.evaluate((key) => sessionStorage.getItem(key), oldBinding.key),
+    replacementBinding,
+    "an old matching receipt cannot retire a replacement local binding with a different owner digest",
+  );
+  assert.equal(actualBookingWrites.length, 1);
+  await actual.evaluate(
+    ({ key, raw }) => sessionStorage.setItem(key, raw),
+    oldBinding,
+  );
+  await actual.evaluate(
+    (body) =>
+      GSISV1.request("lord", "/transaction", {
+        method: "POST",
+        body,
+        retainedAttempt: true,
+      }),
+    originalActualWire,
+  );
+  assert.equal(actualBookingWrites.length, 2);
+  assert.deepEqual(
+    actualBookingWrites[1],
+    originalActualWire,
+    "reload retry sends byte-equivalent original membership and operation identity",
+  );
+  assert.equal(
+    (await db.prepare("SELECT COUNT(*) AS n FROM lord_bookings").first()).n,
+    1,
+    "lost-reply retry has one durable booking",
+  );
+  console.log(
+    "PASS LORD native lost reply and reload preserve the original unknown request without reconstructing missing evidence.",
+  );
   const confirmation = await actual
     .locator(".booking-success-list")
     .innerText();
@@ -1075,6 +1994,37 @@ try {
   await actual.locator("[data-lord-edit-booking]").click();
   await actual.locator("[name=requestedQuantity]").fill("18");
   await actual.setViewportSize({ width: 390, height: 844 });
+  const narrowEditor = await actual
+    .locator("#gsisLordBookingEditor")
+    .evaluate((dialog) => {
+      const bounds = dialog.getBoundingClientRect();
+      return {
+        horizontalOverflow: dialog.scrollWidth - dialog.clientWidth,
+        verticalScroll: dialog.scrollHeight > dialog.clientHeight,
+        controlsContained: [
+          ...dialog.querySelectorAll(
+            "[data-lord-booking-form] input, [data-lord-booking-form] textarea",
+          ),
+        ].every((control) => {
+          const box = control.getBoundingClientRect();
+          return box.left >= bounds.left && box.right <= bounds.right;
+        }),
+        legend: dialog.querySelector("legend").textContent,
+      };
+    });
+  assert(
+    narrowEditor.horizontalOverflow <= 1,
+    "long booking IDs must not create horizontal editor overflow",
+  );
+  assert(
+    narrowEditor.controlsContained,
+    "narrow booking controls must remain inside the dialog",
+  );
+  assert(
+    narrowEditor.verticalScroll,
+    "the complete narrow form must remain vertically reachable",
+  );
+  assert.equal(narrowEditor.legend, "Booking " + saved.bookingId);
   await capture("lord-cart-editor-narrow-local-worker.png", actual);
   await actual.locator("[data-lord-submit]").click();
   await actual

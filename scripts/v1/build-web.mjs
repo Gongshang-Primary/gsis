@@ -375,8 +375,324 @@ function updateFortnightEditor(source) {
  return source + '\n' + helpers.map(helper => helper.toString()).join('\n');
 }
 
+function updateLordPreparation(source) {
+ const helpers = [
+  async function retryNativePreparationCleanup() {
+   const attempt=v1NativePreparation;
+   if(!attempt||state.busy||state.booking!==attempt.booking||draftOwner()!==attempt.owner)return;
+   state.busy=true;main.inert=true;
+   try {
+    if(!window.GSISV1.releasePrepared(attempt.prepared))throw Error('The original local preparation cannot be released in this context.');
+    v1NativePreparation=null;attempt.booking.pendingBatch=null;attempt.booking.pendingBatchIdentity=null;
+    await persistDraft();
+    if(state.booking!==attempt.booking||draftOwner()!==attempt.owner)return;
+    state.busy=false;main.inert=false;renderBooking();showDraftStatus('Local preparation cleared. Your selections remain editable.');
+   } catch(error) {if(state.booking===attempt.booking&&draftOwner()===attempt.owner){state.busy=false;main.inert=false;renderErrorRetry(error.message+' Retry local cleanup; no booking was sent.',retryNativePreparationCleanup);document.getElementById('retryBtn').textContent='Retry local cleanup';}}
+  },
+  function nativeBookingIdentity(booking) {
+   const pending=booking.pendingBatchIdentity,body=booking.pendingBatch;
+   if(pending&&typeof pending.key==='string'&&/^lordPendingRequest:v1\.4:[a-f0-9]{64}$/.test(pending.key)&&
+      typeof pending.id==='string'&&pending.id===(body?.operationId||body?.clientRequestId)){
+    try {const stored=JSON.parse(localStorage.getItem(pending.key)||'null'),memory=pendingWriteIds.get(pending.key);if((stored&&stored.id!==pending.id)||(memory&&memory!==pending.id))return null;}catch{return null;}
+    return pending;
+   }
+   return null;
+  },
+  async function checkNativeBookingReceipt() {
+   const booking=state.booking,payload=booking.pendingBatch,owner=draftOwner();
+   if(state.busy||!payload)return;
+   const active=()=>state.booking===booking&&draftOwner()===owner;
+   state.busy=true;main.inert=true;
+   try {
+    const outcome=await window.GSISV1.checkLordBookingReceipt(payload);
+    if(!active())return;
+    if(outcome.verified&&['committed','aborted'].includes(outcome.state)) {
+     const identity=nativeBookingIdentity(booking);if(identity)clearPendingRequest(identity);
+     booking.pendingBatch=null;booking.pendingBatchIdentity=null;
+     state.busy=false;main.inert=false;
+     if(outcome.state==='committed') {
+      await clearDraft();if(active())renderMultiBookingSuccess(outcome.result?.bookings||outcome.result?.receipt?.result?.bookings||[]);
+     } else {await persistDraft();if(active()){renderBooking();showDraftStatus('The original booking did not commit. Review your selections before a new submission.');}}
+    } else {state.busy=false;main.inert=false;renderErrorRetry('The original booking remains unconfirmed. Its saved request is retained.',retryPendingBookingBatch);}
+   } catch(error) {if(active()){state.busy=false;main.inert=false;renderErrorRetry(error.message+' Original booking retained.',retryPendingBookingBatch);}}
+  },
+  async function prepareNativeBookingBatch(payload) {
+   const booking = state.booking, owner = draftOwner(), form = document.getElementById('confirmBookingBtn');
+   const signature = JSON.stringify([state.identity,booking.date,booking.selections]);
+   const active = () => draftOwner() === owner && state.booking === booking && form?.isConnected &&
+    JSON.stringify([state.identity,booking.date,booking.selections]) === signature;
+   state.busy = true; main.inert = true;
+   let prepared = null, pending = null;
+   try {
+    pending = await stableClientRequestId(payload, true);
+    if (!active()) throw Error('The booking form or account changed. Review the current form.');
+    prepared = await window.GSISV1.prepareLordBookingRequest('/api/lord/transaction',payload,{fresh:pending.fresh});
+    if (!active()) throw Error('The booking form or account changed. Review the current form.');
+    booking.pendingBatch = prepared.body;booking.pendingBatchIdentity={key:pending.key,id:pending.id};
+    if (!await persistDraft()) throw Error('This booking could not be saved on this device. Correct browser storage before submitting.');
+    if (!active()) throw Error('The booking form or account changed. Review the current form.');
+    localStorage.setItem(pending.key,JSON.stringify({id:pending.id,at:Date.now()}));
+    pendingWriteIds.set(pending.key,pending.id);
+    state.busy = false; main.inert = false;
+    await retryPendingBookingBatch(prepared,pending);
+   } catch (error) {
+    prepared=prepared||error.prepared||null;
+    let released = !prepared && pending?.fresh && !['RETAINED_OPERATION','OPERATION_ID_REUSED'].includes(error.code);
+    if (prepared && pending?.fresh) {
+     try {released = await window.GSISV1.releasePrepared(prepared);} catch (cleanup) {error.message += ' '+cleanup.message;}
+    }
+    if (state.booking !== booking || draftOwner() !== owner) return;
+    state.busy = false; main.inert = false;
+    if(prepared&&pending?.fresh&&!released){v1NativePreparation={booking,owner,prepared};renderErrorRetry(error.message+' The unsent preparation could not be cleared. Retry local cleanup before editing.',retryNativePreparationCleanup);document.getElementById('retryBtn').textContent='Retry local cleanup';return;}
+    if (released || !pending) {
+     booking.pendingBatch = null;booking.pendingBatchIdentity=null;
+     renderBooking();showDraftStatus(error.message+' Your selections remain editable.');
+    } else {
+     booking.pendingBatch = booking.pendingBatch || payload;
+     await persistDraft();
+     if (state.booking === booking && draftOwner() === owner) renderErrorRetry(error.message+' The original booking identity is retained; it has no confirmed outcome.',retryPendingBookingBatch);
+    }
+   }
+  },
+ ];
+ source=replaceOnce(source,"  state.booking.pendingBatch=payload;\n  await retryPendingBookingBatch();","  await prepareNativeBookingBatch(payload);",'LORD prepares before persisting a submitted batch');
+ source=replaceOnce(source,"async function retryPendingBookingBatch(){","async function retryPendingBookingBatch(prepared=null,pending=null){",'LORD consumes explicit prepared handle');
+ source=replaceOnce(source,"  const payload=state.booking.pendingBatch;","  const payload=state.booking.pendingBatch,booking=state.booking,owner=draftOwner();pending=pending||nativeBookingIdentity(booking);",'LORD frozen native context');
+ source=replaceOnce(source,"    const result=await postTransaction(payload);\n    state.booking.pendingBatch=null;","    const result=await postTransaction(payload,prepared,pending);\n    if(state.booking!==booking||draftOwner()!==owner)return;\n    state.booking.pendingBatch=null;state.booking.pendingBatchIdentity=null;",'LORD exact prepared native send');
+ source=replaceOnce(source,"    await clearDraft();\n    renderMultiBookingSuccess(result.bookings || []);","    await clearDraft();\n    if(state.booking!==booking||draftOwner()!==owner)return;\n    renderMultiBookingSuccess(result.bookings || []);",'LORD late completion cannot repaint another form');
+ source=replaceOnce(source,"    if(error.code==='AUTH_EXPIRED')return;\n    if(error.code==='SUBMISSION_REJECTED')", "    if(state.booking!==booking||draftOwner()!==owner)return;\n    if(error.code==='AUTH_EXPIRED')return;\n    if(error.code==='SUBMISSION_REJECTED')",'LORD late failure keeps another account isolated');
+ source=replaceOnce(source,"async function postTransaction(payload) {\n  const pending = await stableClientRequestId(payload);","async function postTransaction(payload, prepared=null, originalPending=null) {\n  const pending = originalPending || await stableClientRequestId(payload);",'LORD prepared request keeps selected identity');
+ source=replaceOnce(source,"if(String(payload.action).toLowerCase()==='bookingcreatebatch'){state.booking.pendingBatch=payload;await persistDraft();}","if(!prepared&&String(payload.action).toLowerCase()==='bookingcreatebatch'){state.booking.pendingBatch=payload;await persistDraft();}",'LORD prepared body persists once before dispatch');
+ source=replaceOnce(source,"    response = await lordFetch(API.transaction, {\n      method: 'POST',","    response = await lordFetch(API.transaction, {\n      prepared,retainedAttempt:!prepared&&String(payload.action).toLowerCase()==='bookingcreatebatch',\n      method: 'POST',",'LORD passes opaque preparation to shared client');
+ source=replaceOnce(source,"async function stableClientRequestId(payload) {","async function stableClientRequestId(payload, prepareOnly=false) {",'LORD fresh identity provenance');
+ source=replaceOnce(source,"  let id=pendingWriteIds.get(key);","  let id=pendingWriteIds.get(key),fresh=false;",'LORD distinguishes reused intent');
+ source=replaceOnce(source,"    if(saved && Date.now()-saved.at<24*60*60*1000) id=saved.id;\n  } catch {}\n  if(!id) id=payload.clientRequestId || crypto.randomUUID();","    if(saved && (prepareOnly || Date.now()-saved.at<24*60*60*1000)) {if(typeof saved.id!=='string'||!saved.id)throw Error('Stored booking request identity is invalid. Keep the original draft.');id=saved.id;}\n  } catch(error) {if(prepareOnly)throw error;}\n  if(!id) {id=payload.clientRequestId || crypto.randomUUID();fresh=!payload.clientRequestId;}\n  if(prepareOnly){payload.clientRequestId=id;return {key,id,fresh};}",'LORD no age or absence inference for reused identity');
+ source=replaceOnce(source,"  document.getElementById('retryBtn').onclick = retryFn;", "  document.getElementById('retryBtn').onclick = ()=>retryFn();\n  if(retryFn===retryPendingBookingBatch&&state.booking.pendingBatch){const check=document.createElement('button');check.id='checkBookingReceipt';check.className='secondary-button';check.textContent='Check original receipt';check.onclick=checkNativeBookingReceipt;document.getElementById('retryBtn').before(check);}",'LORD original receipt inspection is read-only');
+ return source+'\nlet v1NativePreparation=null;window.addEventListener(\'gsis:clear-protected-state\',()=>{v1NativePreparation=null;});\n'+helpers.map(fn=>fn.toString()).join('\n');
+}
+
+function updateDeployRecovery(source) {
+ const helpers = [
+  function deployRecoveryReference(attempt) {
+   if (!attempt.requestId) return null;
+   try {return window.GSISV1.operationState('deploy', attempt.requestId,attempt.referenceOnly?{versionId:attempt.versionId,referenceOnly:true}:undefined) || attempt.reference;}
+   catch(error) {attempt.recoveryError=error.message;return attempt.reference||null;}
+  },
+  function deployAttemptActive(attempt) {
+   return !!token && attempt.epoch === sessionEpoch && attempt.versionId === current &&
+    (queueFlight === attempt || v1DirectSave === attempt);
+  },
+  async function submitDeployAttempt(attempt, send) {
+   const result = await send();
+   attempt.reference = deployRecoveryReference(attempt);
+   if (!attempt.reference) throw Error('Original save reference is unavailable. Keep this page open.');
+   const outcome = await window.GSISV1.recoverOperation(attempt.reference, 'check');
+   if (!outcome.verified || outcome.state !== 'committed') {
+    const error = Error(outcome.state === 'aborted' && outcome.verified ? 'The original save did not commit. Check its recorded outcome before editing again.' : 'The original save is not confirmed. Check its receipt.');
+    error.outcome = outcome;
+    throw error;
+   }
+   return outcome.result || result;
+  },
+  function restoreDeployRecovery() {
+   if (!token || !current || queueFlight || v1DirectSave) return;
+   let refs;
+   try {refs=window.GSISV1.operationStates('deploy').filter(ref=>ref.versionId===current);}
+   catch(error) {queueFlight={versionId:current,requestId:null,edits:[],running:false,referenceOnly:true,epoch:sessionEpoch,storageBlocked:true};queueError=error.message+' Saving is blocked until original recovery references can be read. Reload after correcting browser storage.';el('content').inert=true;return;}
+   if (!refs.length) return;
+   const ref = refs[0];
+   queueFlight = {versionId: current, requestId: ref.operationId, reference: ref, edits: [], running: false, referenceOnly: true, epoch: sessionEpoch};
+   queueError = 'An earlier save needs an outcome check. Its full submitted contents are not stored in this browser reference.';
+   el('content').inert = true;
+  },
+  function drawDeployRecovery() {
+   const attempt = queueFlight || v1DirectSave;
+   const bar = el('saveQueue');
+   if (!bar || !attempt) return;
+   bar.hidden = false;
+   bar.style.maxWidth='100%';bar.style.minWidth='0';
+   for (const button of bar.querySelectorAll('button,[role=status]')) {
+    if (!button.closest('[data-deploy-recovery]')) { button.hidden = true; button.dataset.recoveryHidden = ''; }
+   }
+   let host = bar.querySelector('[data-deploy-recovery]');
+   if (!host) { host = document.createElement('div'); host.dataset.deployRecovery = ''; bar.append(host); }
+   host.replaceChildren();Object.assign(host.style,{display:'flex',flexWrap:'wrap',gap:'6px',minWidth:'0',maxWidth:'100%'});
+   const ref = deployRecoveryReference(attempt);
+   const status = document.createElement('span'); status.setAttribute('role', 'status');status.style.overflowWrap='anywhere';status.style.flexBasis='100%';
+   status.textContent = attempt.recoveryError || queueError || 'The original save outcome is not confirmed.';
+   host.append(status);
+   for (const [mode,label,allowed] of [['check','Check original save',!!ref],['retry',ref?.canRetryPreparation?'Retry original preparation':'Retry original save',!!(ref?.canRetry||ref?.canRetryPreparation)],['withdraw','Stop original save',!!ref?.canWithdraw]]) {
+    const action = button(label, () => recoverDeploySave(attempt, mode), attempt.running || !allowed);
+    action.dataset.deployRecoveryAction = mode;
+    host.append(action);
+   }
+   if (ref?.storageError) host.append(document.createTextNode(' '+ref.storageError));
+   el('content').inert = true;
+  },
+  function drawQueueStatus() {
+   const bar = el('saveQueue');
+   if (bar) {
+    for (const button of bar.querySelectorAll('[data-recovery-hidden]')) {button.hidden = false; delete button.dataset.recoveryHidden;}
+    bar.querySelector('[data-deploy-recovery]')?.remove();
+   }
+   drawDraftQueueStatus();
+   drawDeployRecovery();
+  },
+  async function finishDeployQueue(flight, result) {
+   if (!deployAttemptActive(flight)) return;
+   queueFlight = null; queueError = ''; cellQueue = []; draftBase = null;
+   classDraftRecoveryConflict = false; unsavedDraft = false; viewEpoch++;
+   persistClassDraft(); el('content').inert = false;
+   el('status').textContent = 'Saved';
+   // A receipt confirms the original write, not that its old snapshot is current.
+   snapshotCache = null;
+   await refresh(true);
+   if (flight.epoch !== sessionEpoch || current !== flight.versionId) return;
+   el('status').textContent = snapshotCache ? 'Saved' : 'Saved · refresh needed';
+   if (!snapshotCache) {el('status').textContent = 'Saved · refresh needed';el('connection').textContent = 'Your original save is confirmed. Refresh to load the current saved version.';}
+   drawQueueStatus();
+  },
+  async function recoverDeploySave(attempt, mode = 'check') {
+   if (!deployAttemptActive(attempt) || attempt.running) return;
+   if (mode === 'withdraw' && !confirm('Stop the original save if it has not committed? A committed save remains saved.')) return;
+   attempt.running = true; drawQueueStatus();
+   try {
+    const ref = deployRecoveryReference(attempt);
+    if (!ref) throw Error('The original operation reference is unavailable. Keep the draft and original save ID; do not submit it as a new save.');
+    const outcome = await window.GSISV1.recoverOperation(ref, mode);
+    if (!deployAttemptActive(attempt)) return;
+    attempt.reference = outcome.reference || ref;
+    if (outcome.verified && outcome.state === 'committed') {
+     if (queueFlight === attempt) await finishDeployQueue(attempt, outcome.result);
+     else {
+      v1DirectSave = null; forgetLease(); unsavedDraft = false; queueError = ''; el('content').inert = false;
+      const dialog = document.querySelector('dialog'); if (dialog.open) dialog.close();
+      if (inlineDraftEditor?.open) inlineDraftEditor.close();
+      snapshotCache = null; await refresh(true);
+      if (attempt.epoch === sessionEpoch && current === attempt.versionId) el('status').textContent = snapshotCache ? 'Saved' : 'Saved · refresh needed';
+     }
+    } else if (outcome.verified && outcome.state === 'aborted') {
+     if (queueFlight === attempt) { cellQueue = attempt.edits || []; queueFlight = null; }
+     else { v1DirectSave = null; forgetLease(); }
+     queueError = 'Original save did not commit. Your draft is retained; review current saved values before a new save.';
+     el('content').inert = false; persistClassDraft();
+    } else queueError = 'Original save remains unconfirmed. Check again or retry its exact retained request; a missing receipt does not prove it failed.';
+   } catch (error) { if (deployAttemptActive(attempt)) queueError = error.message+' Original save retained.'; }
+   finally { if (attempt.epoch === sessionEpoch && current === attempt.versionId) {attempt.running = false; drawQueueStatus();} }
+  },
+  async function pumpQueue(retry = false) {
+   if (noteSaving()) {alert('Wait for the note save to finish.');return;}
+   if (queueFlight) { await recoverDeploySave(queueFlight, 'check'); return; }
+   if (!token || !cellQueue.length || v1DirectSave) return;
+   const error = teacherInputError() || teacherNameError(v()) || classRenameError();
+   if (error) {drawQueueStatus();alert(error);return;}
+   document.activeElement?.blur();
+   if (inlineDraftEditor?.open || unsavedDraft) {alert('Finish the current input before saving.');return;}
+   const edits = cellQueue.slice(), wire = saveWireEdits(edits);
+   const flight = queueFlight = {versionId:current,requestId:uid(),issuedAt:Date.now(),edits,wire,baselineRevision:snapshotCache?.revision,epoch:sessionEpoch,running:true};
+   cellQueue = []; queueError = ''; drawQueueStatus();
+   try {
+    const result = await submitDeployAttempt(flight, () => api('change',{operation:'saveDraft',versionId:flight.versionId,requestId:flight.requestId,issuedAt:flight.issuedAt,clientId,edits:flight.wire},false,undefined,true));
+    if (deployAttemptActive(flight)) await finishDeployQueue(flight,result);
+   } catch (error) {
+    if (deployAttemptActive(flight)) {if(window.GSISV1.isUnsentOperation(error,'deploy',flight.requestId)){cellQueue=flight.edits;queueFlight=null;el('content').inert=false;queueError=error.message+' Nothing was sent. Your draft remains editable.';}else{flight.reference = deployRecoveryReference(flight);queueError = error.message+' Original save and draft retained.';}}
+   } finally {if (flight.epoch === sessionEpoch && current === flight.versionId) {flight.running = false;drawQueueStatus();}}
+  },
+  function updateVersionNoteControls(id) {
+   updateDraftVersionNoteControls(id);
+   const row = [...document.querySelectorAll('[data-version-row]')].find(row => row.dataset.versionRow === id), draft = versionNoteDrafts.get(id);
+   if (!row || !draft) return;
+   const input=row.querySelector('[data-note-input]');if(input.value!==draft.value)input.value=draft.value;
+   row.querySelector('[data-note-recovery]')?.remove();
+   row.querySelector('[data-note-save]').hidden = !!draft.attempt;
+   if (!draft.attempt) return;
+   const host = document.createElement('span'); host.dataset.noteRecovery = '';
+   const ref = deployRecoveryReference(draft.attempt);
+   for (const [mode,label,enabled] of [['check','Check original note',true],['retry',ref?.canRetryPreparation?'Retry original preparation':'Retry original note',!!(ref?.canRetry||ref?.canRetryPreparation)],['withdraw','Stop original note',!!ref?.canWithdraw]]) {
+    const action = button(label,()=>recoverVersionNote(id,mode),draft.saving || !enabled);host.append(action);
+   }
+   row.querySelector('[data-note-save]').after(host);
+  },
+  async function finishVersionNote(id,draft,attempt) {
+   draft.attempt=null;draft.status='Original note save confirmed.';
+   const entry=state.versions.find(row=>row.id===id),notes=entry?.notes||'',rawNotes=entry?.notes,revision=entry?.revision;
+   draft.expected=draft.value=notes;
+   try {
+    const latest=await api('versionNote',{versionId:id},false);
+    if(!token||attempt.epoch!==sessionEpoch||versionNoteDrafts.get(id)!==draft||draft.attempt)return;
+    const currentEntry=state.versions.find(row=>row.id===id);
+    if(currentEntry!==entry||currentEntry?.notes!==rawNotes||currentEntry?.revision!==revision)return;
+    if(latest.versionId!==id||typeof latest.notes!=='string')throw Error('Current note response is incomplete.');
+    if(entry)entry.notes=latest.notes;
+    draft.expected=draft.value=latest.notes;
+    draft.status='Original note save confirmed. Current saved note loaded.';
+   } catch(error) {if(attempt.epoch===sessionEpoch&&versionNoteDrafts.get(id)===draft&&!draft.attempt)draft.status='Original note save confirmed · current note refresh needed. '+error.message;}
+  },
+  async function recoverVersionNote(id, mode) {
+   const draft = versionNoteDrafts.get(id), attempt = draft?.attempt;
+   if (!attempt || draft.saving || attempt.epoch !== sessionEpoch || !token) return;
+   if (mode === 'withdraw' && !confirm('Stop this original note save if it has not committed?')) return;
+   draft.saving = true; updateVersionNoteControls(id);
+   const active = () => !!token && attempt.epoch === sessionEpoch && versionNoteDrafts.get(id) === draft && draft.attempt === attempt;
+   try {
+    const outcome = await window.GSISV1.recoverOperation(deployRecoveryReference(attempt), mode);
+    if (!active()) return;
+    if (outcome.verified && outcome.state === 'committed') {
+     await finishVersionNote(id,draft,attempt);
+    } else if (outcome.verified && outcome.state === 'aborted') {
+     draft.attempt = null; draft.conflict = true; draft.status = 'Original note did not commit. Review the latest saved note before a new save.';
+    } else draft.status = 'Original note is unconfirmed. Its text and request are retained.';
+   } catch (error) {if (active()) draft.status = error.message+' Original note retained.';}
+   finally {if (attempt.epoch === sessionEpoch && versionNoteDrafts.get(id) === draft) {draft.saving = false;updateVersionNoteControls(id);}}
+  },
+  async function saveVersionNote(id) {
+   const row = state.versions.find(row => row.id === id);if (!row || !(admin() || kp())) return;
+   const draft = versionNoteDraft(row);
+   if (draft.attempt) {await recoverVersionNote(id,'check');return;}
+   if (draft.saving || noteSaving() || queueFlight || v1DirectSave || busy || editing || acquiring || refreshing || draft.value === draft.expected) return;
+   const attempt = draft.attempt = {versionId:id,operation:'saveVersionNote',notes:draft.value,expected:draft.expected,requestId:crypto.randomUUID(),issuedAt:Date.now(),clientId,epoch:sessionEpoch};
+   draft.saving = true;draft.conflict = false;draft.status = 'Saving…';updateVersionNoteControls(id);
+   const active = () => !!token && attempt.epoch === sessionEpoch && versionNoteDrafts.get(id) === draft && draft.attempt === attempt;
+   try {
+    const {epoch,...body} = attempt;
+    const result = await submitDeployAttempt(attempt,()=>api('change',body,undefined,undefined,true));
+    if (!active()) return;
+    await finishVersionNote(id,draft,attempt);
+   } catch (error) {if (active()) {if(window.GSISV1.isUnsentOperation(error,'deploy',attempt.requestId)){draft.attempt=null;draft.status=error.message+' Nothing was sent. Your note remains editable.';}else{attempt.reference = deployRecoveryReference(attempt);draft.status = error.message+' Original note retained.';}}}
+   finally {if (attempt.epoch === sessionEpoch && versionNoteDrafts.get(id) === draft) {draft.saving = false;updateVersionNoteControls(id);}}
+  },
+ ];
+ const ast = parse(source,{ecmaVersion:'latest',sourceType:'script'}), edits = [];
+ for (const [name,replacement] of [['pumpQueue',helpers.find(fn=>fn.name==='pumpQueue')],['saveVersionNote',helpers.find(fn=>fn.name==='saveVersionNote')]]) {
+  const node=ast.body.find(node=>node.type==='FunctionDeclaration'&&node.id?.name===name);
+  if(!node)throw Error('Deploy recovery baseline changed: '+name);
+  edits.push([node.start,node.end,replacement.toString()]);
+ }
+ for(const [name,replacement] of [['drawQueueStatus','drawDraftQueueStatus'],['updateVersionNoteControls','updateDraftVersionNoteControls']]) {
+  const node=ast.body.find(node=>node.type==='FunctionDeclaration'&&node.id?.name===name);
+  if(!node)throw Error('Deploy recovery baseline changed: '+name);
+  edits.push([node.id.start,node.id.end,replacement]);
+ }
+ for(const [start,end,value] of edits.sort((a,b)=>b[0]-a[0]))source=source.slice(0,start)+value+source.slice(end);
+ source=replaceOnce(source,"async function api(action,input={},feedback,signal){","async function api(action,input={},feedback,signal,freshAttempt=false){",'Deploy local fresh attempt provenance');
+ source=replaceOnce(source,"const {r,body}=await requestJSON('/api/'+action,{method:'POST',","const {r,body}=await requestJSON('/api/'+action,{freshAttempt,method:'POST',",'Fresh provenance remains transport-only');
+ source=replaceOnce(source,"current=doc.id;SEED.layout=doc.layout||[];restoreClassDraft();","current=doc.id;SEED.layout=doc.layout||[];restoreClassDraft();restoreDeployRecovery();",'Deploy restored outcome references');
+ source=replaceOnce(source,"if(saved.flight){queueFlight={...saved.flight,edits:saved.edits,running:false};","if(saved.flight){queueFlight={...saved.flight,edits:saved.edits,running:false,epoch:sessionEpoch,referenceOnly:true};",'Legacy class flight never reconstructs final request');
+ source=replaceOnce(source,"if(queueFlight?.running){alert('Waiting for the current save response. Your draft is retained.');return}","if(queueFlight){await recoverDeploySave(queueFlight,'check');return;}",'Submitted queue review is receipt-only');
+ source=replaceOnce(source,"const beforeRevision=snapshotCache?.revision;busy=true;", "const directEpoch=sessionEpoch,directEditing=editing,beforeRevision=snapshotCache?.revision;busy=true;",'Direct edit continuation owns its context');
+ source=replaceOnce(source,"editing.requestId=args.requestId||editing.requestId||crypto.randomUUID();", "const freshDirectId=!args.requestId&&!editing.requestId;editing.requestId=args.requestId||editing.requestId||crypto.randomUUID();",'Only newly allocated direct IDs are fresh');
+ source=replaceOnce(source,"}catch(e){el('status').textContent='Save not confirmed — draft retained';throw e}","}catch(e){if(directEpoch===sessionEpoch&&editing===directEditing){if(v1DirectSave&&window.GSISV1.isUnsentOperation(e,'deploy',v1DirectSave.requestId)){v1DirectSave=null;delete editing.attempt;delete editing.requestId;}el('status').textContent='Save not confirmed — draft retained';}throw e}",'Direct late error cannot modify another context');
+ source=replaceOnce(source,"result=await api('change',{...lease,operation,...args,requestId:editing.requestId});","const directAttempt=v1DirectSave=v1DirectSave||{versionId:editing.versionId,requestId:editing.requestId,epoch:sessionEpoch,running:true};result=await submitDeployAttempt(directAttempt,()=>api('change',{...lease,operation,...args,requestId:editing.requestId},undefined,undefined,freshDirectId));if(!deployAttemptActive(directAttempt))throw Error('The active save context changed.');v1DirectSave=null;",'Direct edit verified original outcome');
+ source=replaceOnce(source,"async function release(){clearInterval(leaseTimer);","async function release(){if(v1DirectSave)return;clearInterval(leaseTimer);",'Closing an unresolved direct edit is not withdrawal');
+ source=replaceOnce(source,"finally{busy=false;buttons.forEach(([b,disabled])=>b.disabled=disabled)}","finally{if(directEpoch===sessionEpoch&&editing===directEditing){busy=false;if(v1DirectSave&&v1DirectSave.requestId===directEditing.requestId){v1DirectSave.running=false;drawQueueStatus();}buttons.forEach(([b,disabled])=>{if(b.isConnected)b.disabled=disabled})}}",'Direct save recovery remains reachable');
+ source=replaceOnce(source,"d.querySelector('#ok').onclick=async()=>{const ok=d.querySelector('#ok');ok.disabled=true;try{await submit(d);d.close()}catch(e){d.querySelector('#formerror').textContent=e.message}finally{ok.disabled=false}};", "const modalForm=d.querySelector('form'),modalEpoch=sessionEpoch;d.querySelector('#ok').onclick=async()=>{const ok=d.querySelector('#ok'),active=()=>modalEpoch===sessionEpoch&&d.open&&d.querySelector('form')===modalForm;ok.disabled=true;try{await submit(d);if(active())d.close()}catch(e){if(active())d.querySelector('#formerror').textContent=e.message}finally{if(active())ok.disabled=false}};",'Deploy modal response belongs to its original form');
+ source=replaceOnce(source,"async function change(operation,args={}){","async function change(operation,args={}){\n if(v1DirectSave){await recoverDeploySave(v1DirectSave,'check');throw Error('Check the original save outcome before submitting another edit.');}",'Direct retry is explicit original recovery');
+ return source+'\nlet v1DirectSave=null;\nwindow.addEventListener(\'gsis:clear-protected-state\',()=>{v1DirectSave=null;});\n'+helpers.filter(fn=>!['pumpQueue','saveVersionNote'].includes(fn.name)).map(fn=>fn.toString()).join('\n');
+}
+
 function updateDeploy(source){
  source=updateFortnightEditor(source);
+ source=updateDeployRecovery(source);
  // The server is authoritative; preventing a forbidden editor here is an extra UX boundary.
  source=replaceOnce(source,"function compact(p){const v=p.profile||{},role=v.Role||p.role||'';return {id:p.id,name:v['Basic Name']||p.basicName||p.name||p.id,role,active:v.Active!=null?v.Active==='Y':p.active===true||p.active==='Y',groups:p.groups||[],mk:!!(p.mk||v['MK Modifier']||(p.groups||[]).includes('MK')||/^MK(?:\\b|E)/i.test(role))};}","function compact(p){const v=p.profile||{},role=v.Role||p.role||'';return {id:p.id,name:v['Basic Name']||p.basicName||p.name||p.id,role,active:p.active===true||p.active==='Y',groups:p.groups||[],authority:p.authority||{},schoolSection:p.schoolSection,mk:String(p.schoolSection?.code||p.schoolSection||'').toLowerCase()==='mk'};}",'Reporting uses accepted section and authority');
  source=replaceOnce(source,"const row=compact({...p,profile:{...p.profile,...d.teacherDrafts?.[p.id]}});by.set(p.id,row);","const authoritySource=(people||[]).find(person=>person.id===p.id)||p;const row=compact({...p,active:authoritySource.active,authority:authoritySource.authority,schoolSection:authoritySource.schoolSection,profile:{...p.profile,...d.teacherDrafts?.[p.id]}});by.set(p.id,row);",'Reporting takes current Contacts authority ahead of embedded planning snapshot');
@@ -594,6 +910,7 @@ function transform(module,rel,text){
  if(rel.endsWith('.js')&&!rel.includes('vendor/')&&!/\.min\.js$/.test(rel)){
   if(module.id==='starlord'&&rel==='assets/app.js')text=updateStarlord(text);
   if(module.id==='lord'&&rel==='assets/app.js'){
+   text=updateLordPreparation(text);
    text=text.replaceAll('<strong>Bookings cannot be edited.</strong> If any detail is wrong, cancel the booking and make a new booking.','<strong>Bookings can be revised before collection.</strong> Use Edit my bookings to revise a saved booking. You can also cancel and make a new booking.');
    text+=`\nwindow.addEventListener('gsis:clear-protected-state',()=>{state.referenceGeneration++;resetStateKeepTeacher(false);state.auth.session=null;state.reference=null;state.identity.teacher='';main.replaceChildren();});`;
    text=replaceOnce(text,"try { await lordFetch('/api/auth/logout', { method: 'POST', timeoutMs: 8000 }); } catch {}","try { await window.GSISV1.logout();location.assign('/');return; } catch(error) {setReloadDataStatus(error.message,true);return;}",'LORD sign-out must be confirmed');
