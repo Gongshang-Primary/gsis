@@ -8,9 +8,17 @@ const element = (tag, text) => {
 };
 const exact = value => String(value || "").normalize("NFKC").trim();
 const cache = new Map();
+let generation = 0;
+const dismissals = new Set();
+window.addEventListener("gsis:clear-protected-state", () => {
+  generation++; cache.clear();
+  for (const dismiss of [...dismissals]) dismiss();
+});
 window.GSISV1RosterMapping = async function (model) {
+  const epoch = generation;
   const [reference, session] = await Promise.all([api.request("roster", "/reference"), api.getSession()]);
   const bytes = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(JSON.stringify(model)));
+  if (epoch !== generation) throw Error("Account access changed. Reopen the import.");
   const key = "gsis-roster-mapping:" + session.schoolId + ":" + session.user.accountId + ":" +
     [...new Uint8Array(bytes)].map(b => b.toString(16).padStart(2, "0")).join("");
   let retained = cache.get(key);
@@ -51,6 +59,9 @@ window.GSISV1RosterMapping = async function (model) {
   };
   return new Promise((resolve, reject) => {
     const dialog = element("dialog"), form = element("form"), status = element("p");
+    const remove = () => { dismissals.delete(dismiss); dialog.close(); dialog.remove(); };
+    const dismiss = () => { remove(); reject(Error("Account access changed. Reopen the import.")); };
+    dismissals.add(dismiss);
     dialog.className = "v1-panel";
     form.append(element("h2", "Confirm timetable identities"), element("p",
       `${names.length - new Set(unresolved).size} teacher labels matched exactly. Choose only unresolved identities. Room labels can map to several venues or remain flagged as unmapped.`));
@@ -81,7 +92,7 @@ window.GSISV1RosterMapping = async function (model) {
     }
     const cancel = element("button", "Cancel"), confirm = element("button", "Confirm identity mapping");
     cancel.type = "button"; confirm.type = "submit";
-    cancel.onclick = () => { remember(); dialog.close(); dialog.remove(); reject(Error("Import cancelled before any write.")); };
+    cancel.onclick = () => { remember(); remove(); reject(Error("Import cancelled before any write.")); };
     form.append(status, cancel, confirm); dialog.append(form); document.body.append(dialog);
     form.onsubmit = event => {
       event.preventDefault();
@@ -89,7 +100,7 @@ window.GSISV1RosterMapping = async function (model) {
       if (ids.some(id => !id) || new Set(ids).size !== ids.length) {
         status.textContent = "Each source teacher must map to a different permanent Staff ID."; return;
       }
-      remember(); dialog.close(); dialog.remove(); resolve(structuredClone(result));
+      remember(); remove(); resolve(structuredClone(result));
     };
     dialog.addEventListener("cancel", event => { event.preventDefault(); cancel.click(); });
     dialog.showModal();

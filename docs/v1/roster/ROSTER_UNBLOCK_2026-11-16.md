@@ -34,7 +34,7 @@ If a verified publication is present, the existing immutable-publication path re
 ## Visible changes for owner review
 
 - Native Stapler controls can acquire/release their editing lease and show the accepted plan after saving.
-- The mapping dialog auto-selects unique exact identities, allows several rooms per label, and keeps failed/cancelled mapping choices for that school/account/model in the browser tab. It retains at most eight drafts; unavailable browser storage falls back to memory.
+- The mapping dialog auto-selects unique exact identities, allows several rooms per label, and keeps failed/cancelled mapping choices for that school/account/model in the browser tab. It retains at most eight drafts; unavailable browser storage falls back to memory. Core's protected-state reset closes the dialog and clears in-memory choices alongside its existing browser-storage cleanup.
 - Saved timetables visibly identify explicitly unmapped room labels and incomplete occupancy after reload.
 - Allocation/candidate/availability and capacity/forecast views show **Estimated workload** with the saved source/revision when applicable. They retain the v0.9 layout.
 - Both native relief and full-teacher Excel downloads identify estimated workload in their existing headers. Readable published-day CSV carries the same distinction if an authorised manual publication used estimates.
@@ -42,7 +42,7 @@ If a verified publication is present, the existing immutable-publication path re
 
 ## Verification and limitations
 
-Implementation/test commit: [`c89b362d676c1af3ee165a84d172011bc88962bf`](https://github.com/helper-gsps/gsis/commit/c89b362d676c1af3ee165a84d172011bc88962bf). Later documentation commits do not replace exact-head CI. The implementation PR is the final source for its head, command outcomes, CI run links and Claude review status.
+Initial implementation/test commit: [`c89b362d676c1af3ee165a84d172011bc88962bf`](https://github.com/helper-gsps/gsis/commit/c89b362d676c1af3ee165a84d172011bc88962bf). Publication-row verification and protected-state reset received bounded follow-up commits. The implementation PR identifies the final exact head, superseding verification, command outcomes, CI links and Claude review status; earlier passes do not certify later code changes.
 
 Six new programs use synthetic identities with the actual built assets, nine local Workers, service bindings and persistent D1/R2. Browser programs use Chromium and the real transport; they do not replace product handlers with mocks.
 

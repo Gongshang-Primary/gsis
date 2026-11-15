@@ -34,6 +34,7 @@ document.addEventListener("click", event => {
   if (event.target.closest("[data-page]")) { evidence = null; draw(); }
 }, true);
 window.addEventListener("gsis:denied", () => { evidence = null; draw(); });
+window.addEventListener("gsis:clear-protected-state", () => { evidence = null; baselines = []; draw(); });
 const host = document.getElementById("content");
 if (host) new MutationObserver(draw).observe(host, { childList: true });
 

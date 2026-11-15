@@ -10,7 +10,8 @@ try {
   const page = await f.pageFor();
   async function openMapping() {
     await page.evaluate(model => { window.mappingResult = null;
-      window.mappingPromise = GSISV1RosterMapping(model).then(value => { window.mappingResult = value; }); }, s.model);
+      window.mappingPromise = GSISV1RosterMapping(model).then(value => { window.mappingResult = value; })
+        .catch(error => { window.mappingError = error.message; }); }, s.model);
     await page.getByRole("heading", { name: "Confirm timetable identities" }).waitFor();
   }
   await openMapping();
@@ -54,5 +55,13 @@ try {
   await page.reload();
   await page.getByRole("button", { name: /^Baseline Timetable/ }).click();
   await page.locator("[data-roster-mapping-warning]").getByText(/Venue occupancy is incomplete/).waitFor();
+  await openMapping();
+  await page.evaluate(() => GSISV1.clearProtectedState());
+  assert.equal(await page.locator("dialog[open]").count(), 0);
+  assert.equal(await page.locator("[data-roster-mapping-warning]").count(), 0);
+  await openMapping();
+  assert.equal(await page.locator('select[aria-label^="Teachers:"]').count(), 1,
+    "access reset clears in-memory choices as well as browser storage");
+  await page.getByRole("button", { name: "Cancel", exact: true }).click();
   console.log("PASS real built mapping modal / nine Workers / D1: exact bridge, unresolved-only selection, multiple rooms, failed-save reload and flagged unmapped labels");
 } catch (error) { console.error(error); throw error; } finally { await f.close(); }

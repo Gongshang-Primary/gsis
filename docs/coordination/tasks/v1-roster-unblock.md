@@ -6,7 +6,7 @@
 - Last updated (Asia/Singapore): 16 November 2026, 06:15.
 - Branch: `codex/v1-roster-unblock`.
 - Base SHA: `71a7c5c040350b46d8332e5ba2e3b44665aebe5f` (refreshed main after #180, #178, #176). The implementation branch starts from this claim's accepted main commit.
-- Implementation/test head: `c89b362d676c1af3ee165a84d172011bc88962bf`; final branch head and CI are identified by the implementation PR. Documentation-only follow-up does not imply an earlier review covers a later head.
+- Initial implementation/test head: `c89b362d676c1af3ee165a84d172011bc88962bf`; superseding code changes, final branch head and CI are identified by [PR181](https://github.com/helper-gsps/gsis/pull/181). Earlier verification/review does not cover a later head.
 - User-authorised scope: Job 3 in the standing owner prompt, explicitly resumed after the 16 November recheck: F01/F02 Stapler lock; H02/B04/B05 baseline mapping; B08/G01/G02 estimated allocation and visible labels in the same PR; G03 empty current-duty read. Update the merge inventory. One claim and one implementation PR; no later job.
 - Overlap: fetched main/all remote heads and actual open PRs after integration; none open. Earlier active #176/#178/#180 task status text is superseded by the exact merges below. Existing v0.9 claims are untouched.
 
