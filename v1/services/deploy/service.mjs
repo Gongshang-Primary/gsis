@@ -27,6 +27,7 @@ import {
 import { ApiError } from "../../runtime/errors.mjs";
 import { drainOutbox } from "../../runtime/jobs.mjs";
 import { exportDrive, reconcileDrive } from "./exports.mjs";
+import { rosterWorkload } from "./roster-workload.mjs";
 import { check, id, text, finite, plain } from "./validation.mjs";
 import {
   defaults,
@@ -56,6 +57,7 @@ const READ = new Set([
   "/current-publication",
   "/internal/publication",
   "/internal/publication/current",
+  "/internal/roster-workload",
   "/internal/publication-status",
   "/versionNote",
   "/auditPage",
@@ -1221,6 +1223,8 @@ async function save(
     throw error;
   }
   const guards = [...delta.guards, leaseGuard(ctx, scope)];
+  const planning = await protectPlanningChange(ctx, op, b.versionId);
+  guards.push(planning.guard);
   // A binding also reads its class/TG scope. Fence changes to those unchanged
   // rows between comparison and commit, even without a caller revision.
   if (bindingChanged)
@@ -1265,7 +1269,7 @@ async function save(
         sql: "UPDATE deploy_versions SET revision=revision+1 WHERE school_id=? AND id=?",
         args: [school, b.versionId],
       };
-  const writes = [...delta.writes, versionWrite, expiredLeaseWrite(ctx, scope)];
+  const writes = [...delta.writes, versionWrite, expiredLeaseWrite(ctx, scope), planning.done];
   return finish(
     ctx,
     op,
@@ -2091,6 +2095,9 @@ export async function handle(ctx) {
     const { doc } = await loadVersion(ctx.env.DB, school, b.versionId);
     return { versionId: doc.id, notes: doc.notes || "" };
   }
+  if (p === "/internal/roster-workload") return rosterWorkload(ctx, {
+    loadVersion, currentPublication: () => handle({ ...ctx, path: "/internal/publication/current" }),
+  });
   if (p === "/current-publication" || p === "/internal/publication/current") {
     const pointer = await one(
       ctx.env.DB,
@@ -2406,6 +2413,7 @@ export async function handle(ctx) {
         if (outcome?.state === "committed") return outcome.result;
         throw error;
       }
+      const planning = await protectPlanningChange(ctx, op, b.versionId);
       return finish(
         ctx,
         op,
@@ -2416,8 +2424,9 @@ export async function handle(ctx) {
             args: [school, b.versionId],
           },
           expiredLeaseWrite(ctx, b.scope || b.key || "meta"),
+          planning.done,
         ],
-        [...delta.guards, leaseGuard(ctx, b.scope || b.key || "meta")],
+        [...delta.guards, leaseGuard(ctx, b.scope || b.key || "meta"), planning.guard],
         {
           saved: true,
           versionId: b.versionId,
@@ -2433,6 +2442,7 @@ export async function handle(ctx) {
       const op = await prepare(ctx);
       if (op.receipt) return op.receipt.result;
       const loaded = await loadVersion(ctx.env.DB, school, b.versionId);
+      const planning = await protectPlanningChange(ctx, op, b.versionId);
       return finish(
         ctx,
         op,
@@ -2441,8 +2451,10 @@ export async function handle(ctx) {
             sql: "UPDATE deploy_versions SET deleted=1,revision=revision+1 WHERE school_id=? AND id=?",
             args: [school, b.versionId],
           },
+          planning.done,
         ],
         [
+          planning.guard,
           scopeGuard(
             school,
             b.versionId,
@@ -2467,17 +2479,34 @@ export async function handle(ctx) {
   check(false, "Unsupported Deploy operation.", "NOT_FOUND", 404);
 }
 
+async function protectPlanningChange(ctx, op, versionId) {
+  const schoolId = ctx.principal.schoolId, scope = "planning:" + id(versionId, "version");
+  let held = await queueSourceChange(ctx.env.DB, schoolId, scope, op.operationId, ctx.now, "deploy");
+  if (held.length) {
+    await requestSourceCancellations(ctx.env, held);
+    held = await queueSourceChange(ctx.env.DB, schoolId, scope, op.operationId, ctx.now, "deploy");
+  }
+  check(!held.length, "Roster is using this saved workload. Resolve its original receipt before changing it.", "SOURCE_CHANGE_PENDING", 409);
+  return { guard: sourceChangeGuard(schoolId, scope, op.operationId, "deploy"),
+    done: sourceChangeDone(schoolId, scope, op.operationId) };
+}
 export async function internal(ctx) {
   await requireMembership(ctx.env, ctx.request);
   const b = ctx.body,
     school = ctx.env.SCHOOL_ID;
   check(b.schoolId === school, "Foreign school.", "SCHOOL_MISMATCH", 403);
   if (ctx.path === "/internal/pins/acquire") {
-    check(b.scope === "publication", "Invalid publication pin scope.");
+    const planning = b.scope?.startsWith("planning:") ? id(b.scope.slice(9), "version") : null;
+    check(b.scope === "publication" || planning, "Invalid workload pin scope.");
     return acquireSourcePin(
       ctx.env,
       b,
-      {
+      planning ? {
+        sql: "EXISTS(SELECT 1 FROM deploy_versions WHERE school_id=? AND id=? AND deleted=0 AND revision=?)",
+        args: [school, planning, String(b.revision)],
+      } : b.revision === "absent" ? {
+        sql: "NOT EXISTS(SELECT 1 FROM deploy_pointer WHERE school_id=?)", args: [school],
+      } : {
         sql: "EXISTS(SELECT 1 FROM deploy_pointer WHERE school_id=? AND revision=?)",
         args: [school, String(b.revision)],
       },
@@ -2491,6 +2520,7 @@ export async function internal(ctx) {
     [
       "/internal/publication",
       "/internal/publication/current",
+      "/internal/roster-workload",
       "/internal/publication-status",
     ].includes(ctx.path),
     "Unknown internal Deploy operation.",
@@ -2515,6 +2545,8 @@ export async function internal(ctx) {
     "SERVICE_DENIED",
     403,
   );
+  if (ctx.path === "/internal/roster-workload") check(decision.descriptor.service === "roster",
+    "Only Roster consumes planning workload estimates.", "SERVICE_DENIED", 403);
   const value = await handle({ ...ctx, principal: decision.principal });
   if (
     (decision.descriptor.service === "layout" ||

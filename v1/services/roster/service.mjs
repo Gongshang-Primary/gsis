@@ -165,6 +165,11 @@ const writes = new Set([
   "inboxAssign",
   "inboxSetHandled",
 ]);
+const leaseOperations = new Map([
+  ["acquireStaplerLock", "acquire"],
+  ["renewStaplerLock", "renew"],
+  ["releaseStaplerLock", "release"],
+]);
 const ownViews = new Set([
   "report",
   "reportForm",
@@ -214,6 +219,8 @@ export function policy(method, path, body = {}) {
     const op = operation(body, path);
     if (path === "/profile")
       return { action: "roster.own", write: false, resourceId: "profile" };
+    if (leaseOperations.has(op))
+      return { action: "roster.own", write: true, resourceId: body.date };
     if (reads.has(op) || op === "read")
       return {
         action:
@@ -475,7 +482,7 @@ async function bootstrap(ctx) {
     schema: 1,
     user: c.user,
     revision,
-    entries: c.entries.map(({ modelKey, digest, mapping, ...e }) => e),
+    entries: c.entries.map(({ modelKey, digest, mapping, ...e }) => ({ ...e, ...publicBaseline(e) })),
     active:
       selected.selection === "current" ? publicBaseline(selected.entry) : null,
     upcoming:
@@ -762,6 +769,8 @@ export async function handle(ctx) {
   if (["/upload", "/update", "/remove"].includes(ctx.path))
     return baselineWrite(ctx);
   if (ctx.path === "/lease") return lease(ctx);
+  if (ctx.path === "/operations" && leaseOperations.has(ctx.body.operation))
+    return lease(ctx, leaseOperations.get(ctx.body.operation));
   return operations(ctx);
 }
 async function layerSettings(ctx) {
@@ -875,7 +884,10 @@ async function layerSettings(ctx) {
 function publicBaseline(entry) {
   if (!entry) return null;
   const { id, name, from, to, priority, revision, pruned } = entry;
-  return { id, name, from, to, priority, revision, pruned };
+  const unmappedVenueLabels = Object.entries(entry.venueMapping || {})
+    .filter(([, value]) => Array.isArray(value) && value.length === 0).map(([label]) => label);
+  return { id, name, from, to, priority, revision, pruned,
+    unmappedVenueLabels, occupancyComplete: unmappedVenueLabels.length === 0 };
 }
 async function baselineRead(ctx) {
   const schoolId = ctx.principal.schoolId,
@@ -931,6 +943,7 @@ async function reference(ctx) {
         purpose: "roster",
       }),
     ]);
+  const loaded = await loadState(ctx.env.DB, schoolId, requestedDates({}, ctx.now));
   return {
     schoolId,
     staff: (contacts.people || contacts.staff).map((p) => ({
@@ -939,6 +952,7 @@ async function reference(ctx) {
       active: p.active,
     })),
     venues: venues.venues,
+    nameBridges: (loaded.state.nameBridges || []).map(({ timetableName, staffId }) => ({ timetableName, staffId })),
     contactsRevision: contacts.revision,
     revision: await scopeRevision(ctx.env.DB, schoolId, "baselines"),
   };
@@ -1048,7 +1062,15 @@ async function holdOccupancy(ctx, op, projection) {
     },
   };
 }
-function occupancyRows(day, date, venueMapping, validIds) {
+function mappedVenues(venueMapping, label) {
+  const value = venueMapping[label];
+  requireValue(typeof value === "string" || Array.isArray(value), "VENUE_MAPPING_REQUIRED", 409);
+  const ids = typeof value === "string" ? [value] : value;
+  requireValue(ids.length <= 32 && ids.every(id => typeof id === "string") &&
+    new Set(ids).size === ids.length, "VENUE_MAPPING_INVALID", 409);
+  return ids;
+}
+function occupancyRows(day, date, venueMapping, validIds, { allowUnmapped = false } = {}) {
   const result = new Map();
   for (const teacher of day.teachers || [])
     for (let period = 0; period < (teacher.cells || []).length; period++) {
@@ -1056,13 +1078,14 @@ function occupancyRows(day, date, venueMapping, validIds) {
         timing = day.periods.find((p) => p.period === period);
       if (!cell?.[2] || !cell.some((x) => String(x).trim()) || !timing)
         continue;
-      const venueId = venueMapping[cell[2]];
+      const ids = mappedVenues(venueMapping, cell[2]);
       requireValue(
-        venueId && validIds.has(venueId),
+        (allowUnmapped || ids.length) && ids.every(id => validIds.has(id)),
         "VENUE_MAPPING_REQUIRED",
         409,
         { label: cell[2] },
       );
+      for (const venueId of ids) {
       const start =
           Date.parse(date + "T00:00:00+08:00") + timing.startMinutes * 60000,
         end = Date.parse(date + "T00:00:00+08:00") + timing.endMinutes * 60000,
@@ -1075,6 +1098,7 @@ function occupancyRows(day, date, venueMapping, validIds) {
         period,
         displayName: cell[1] || cell[3] || cell[0],
       });
+      }
     }
   return [...result.values()].sort(
     (a, b) =>
@@ -1152,7 +1176,7 @@ async function baselineWrite(ctx) {
     409,
   );
   requireValue(
-    labels.every((label) => venueIds.has(venueMapping[label])),
+    labels.every((label) => mappedVenues(venueMapping, label).every(id => venueIds.has(id))),
     "VENUE_MAPPING_REQUIRED",
     409,
   );
@@ -1287,6 +1311,7 @@ async function baselineWrite(ctx) {
         date,
         entry.venueMapping,
         venueIds,
+        { allowUnmapped: true },
       ),
     );
     while (chunkRows.length >= 256) await flushChunk();
@@ -1358,9 +1383,13 @@ async function baselineWrite(ctx) {
     ],
     result: {
       id,
+      savedId: id,
       revision: revision + 1,
       ...metadata,
       pruned,
+      entries: all.map(publicBaseline),
+      unmappedVenueLabels: labels.filter(label => !mappedVenues(venueMapping, label).length),
+      occupancyComplete: labels.every(label => mappedVenues(venueMapping, label).length > 0),
       confirmedDailyPlansPreserved: true,
     },
     audit: { baselineId: id, sourceDigest: artifact.digest },
@@ -1467,10 +1496,20 @@ async function offlineEdits(ctx) {
     },
   });
 }
-async function lease(ctx) {
+function leaseHolder(ctx) {
+  const tab = ctx.body.leaseSessionId;
+  return tab === undefined ? ctx.principal.actorId
+    : ctx.principal.actorId + "/tab/" + identifier(tab, "leaseSessionId");
+}
+function lockView(ctx, date, row) {
+  const active = !!row && row.expires_at > ctx.now;
+  const mine = active && row.actor_id === leaseHolder(ctx);
+  return { date, active, mine, fence: row?.fence || 0,
+    expiresAt: row?.expires_at || 0, ownerName: mine ? "This planner" : active ? "Another planner" : "" };
+}
+async function lease(ctx, action = ctx.body.action) {
   const schoolId = ctx.principal.schoolId,
-    date = dateOnly(ctx.body.date),
-    action = ctx.body.action;
+    date = dateOnly(ctx.body.date), holder = leaseHolder(ctx);
   requireValue(
     ["acquire", "renew", "release"].includes(action),
     "LEASE_ACTION_INVALID",
@@ -1482,6 +1521,7 @@ async function lease(ctx) {
     "SELECT * FROM roster_leases WHERE school_id=? AND service_date=?",
     [schoolId, date],
   );
+  const revision = await scopeRevision(ctx.env.DB, schoolId, "day:" + date);
   const loaded = await loadState(ctx.env.DB, schoolId, {
       from: date,
       to: date,
@@ -1492,12 +1532,15 @@ async function lease(ctx) {
     "CAPABILITY_DENIED",
     403,
   );
-  const owner = row?.actor_id === ctx.principal.actorId,
+  const planRevision = loaded.state.staplerPlans.find(p => p.date === date)?.revision || 0;
+  requireValue(ctx.body.staplerRevision === undefined || ctx.body.staplerRevision === planRevision,
+    "STAPLER_CONFLICT", 409);
+  const owner = row?.actor_id === holder,
     available = !row || row.expires_at <= ctx.now;
   requireValue(
     action === "acquire"
       ? owner || available
-      : owner && row.fence === ctx.body.fence && row.expires_at > ctx.now,
+      : owner && row.fence === (ctx.body.leaseFence ?? ctx.body.fence) && row.expires_at > ctx.now,
     "LEASE_CONFLICT",
     409,
   );
@@ -1509,22 +1552,32 @@ async function lease(ctx) {
   return commit(ctx, op, {
     dependencies: c.dependencies,
     guards: [
+      ...(c.localGuards || []),
+      { sql: "SELECT COALESCE((SELECT revision FROM roster_scopes WHERE school_id=? AND scope=?),0)=? AS ok",
+        args: [schoolId, "day:" + date, revision] },
       {
-        sql: "SELECT COALESCE((SELECT fence FROM roster_leases WHERE school_id=? AND service_date=?),0)=? AS ok",
-        args: [schoolId, date, row?.fence || 0],
+        sql: row
+          ? "SELECT actor_id=? AND fence=? AND expires_at=? AS ok FROM roster_leases WHERE school_id=? AND service_date=?"
+          : "SELECT NOT EXISTS(SELECT 1 FROM roster_leases WHERE school_id=? AND service_date=?) AS ok",
+        args: row ? [row.actor_id, row.fence, row.expires_at, schoolId, date] : [schoolId, date],
       },
+      ...(action === "acquire" ? [] : [{ deadlineAt: row.expires_at }]),
     ],
     writes: [
       {
         sql: "INSERT INTO roster_leases(school_id,service_date,actor_id,fence,expires_at) VALUES(?,?,?,?,?) ON CONFLICT(school_id,service_date) DO UPDATE SET actor_id=excluded.actor_id,fence=excluded.fence,expires_at=excluded.expires_at",
-        args: [schoolId, date, ctx.principal.actorId, fence, expiresAt],
+        args: [schoolId, date, holder, fence, expiresAt],
       },
     ],
-    result: { date, fence, expiresAt, holder: ctx.principal.actorId },
+    result: { date, fence, expiresAt, holder: ctx.principal.actorId,
+      lock: lockView(ctx, date, { actor_id: holder, fence, expires_at: expiresAt }) },
   });
 }
 async function captureObservedQuotas(ctx, loaded, next, c) {
-  const oldIds = new Set(loaded.state.entitlements.map((r) => r.id)),
+  const oldIds = new Set(loaded.state.entitlements.map((r) => r.id));
+  if (c.workloadEvidence?.quality === "estimated") next.entitlements = next.entitlements.filter(
+    r => oldIds.has(r.id) || r.mode !== "observed");
+  const
     added = next.entitlements.filter(
       (r) => r.mode === "observed" && !oldIds.has(r.id),
     ),
@@ -1757,7 +1810,8 @@ async function operations(ctx) {
     ? await recordContext(ctx, loaded, range)
     : await context(ctx, loaded, range, {
         needsQuota:
-          workloadOperations.has(opName) &&
+          (workloadOperations.has(opName) || opName === "read" &&
+            ["allocation", "availability", "health", "accounting"].includes(body.view)) &&
           !(opName === "requestMutual" && body.proposalOnly),
       });
   if (opName === "capacityForecast") {
@@ -1767,7 +1821,7 @@ async function operations(ctx) {
     requireValue(await scopeRevision(ctx.env.DB, schoolId, "config") === configRevision, "FORECAST_CHANGED", 409);
     for (const guard of c.localGuards || []) requireValue((await one(ctx.env.DB, guard.sql, guard.args))?.ok === 1, "FORECAST_CHANGED", 409);
     requireValue(await scopeRevision(ctx.env.DB, schoolId, scope) === revision, "FORECAST_CHANGED", 409);
-    return {...forecast, revision, sourceDependencies: c.dependencies};
+    return {...forecast, revision, sourceDependencies: c.dependencies, workloadEvidence: c.workloadEvidence};
   }
   if (opName === "directory")
     return {
@@ -1796,6 +1850,7 @@ async function operations(ctx) {
     try {
       const result = Operations.read(loaded.state, c, { ...body, operation: opName });
       if (result.health) result.health = await layeredHealth(ctx, loaded, c, range.from, revision, result.health);
+      workloadView(result, loaded.state, c, range.from, revision);
       return {...result, revision, calendarByDate: c.calendarByDate};
     } catch (e) {
       throw safeLegacyError(e);
@@ -1810,6 +1865,7 @@ async function operations(ctx) {
   );
   if (["optimise", "autoAllocate"].includes(opName))
     return allocationRun(ctx, loaded, c, range, scope, revision, op);
+  if (opName === "publish") assertPublicationWorkload(ctx, c);
   const beforeOutbox = new Set(loaded.state.outbox.map((j) => j.id)),
     next = structuredClone(loaded.state);
   let result;
@@ -1875,11 +1931,21 @@ async function operations(ctx) {
         periods: view.periods,
         ...result,
       };
+    } else if (stapleWrites.has(opName)) {
+      // The native planner consumes the accepted view, not just saved IDs.
+      // Freeze it in the receipt so a replay cannot substitute a newer plan.
+      const view = Operations.read(structuredClone(next), c, {
+        operation: body.view === "staplerDates" ? "staplerDates" : "stapler",
+        date: range.from,
+      });
+      result = { ...view, ...result };
     }
   } catch (e) {
     throw safeLegacyError(e);
   }
   await updateCapacityWarnings(ctx, loaded, next, c, range.dates, revision);
+  if (c.workloadEvidence) for (const row of next.assignments)
+    if (!loaded.state.assignments.some(old => old.id === row.id)) row.workloadEvidence = c.workloadEvidence;
   const quotaPlan = await captureObservedQuotas(ctx, loaded, next, c),
     change = await recordChanges(schoolId, loaded.before, next, loaded.records,
       opName === "saveOpeningBalances" ? { maxWrites: 6000 }
@@ -1904,11 +1970,17 @@ async function operations(ctx) {
       "createStapler",
       "importStapler",
     ].includes(opName)
-  )
+  ) {
+    const held = await one(ctx.env.DB,
+      "SELECT actor_id,fence,expires_at FROM roster_leases WHERE school_id=? AND service_date=?",
+      [schoolId, range.from]);
+    requireValue(held?.actor_id === leaseHolder(ctx) && held.fence === (body.leaseFence ?? body.fence) &&
+      held.expires_at > ctx.now, "LEASE_CONFLICT", 409);
     change.guards.push({
       sql: "SELECT actor_id=? AND fence=? AND expires_at>? AS ok FROM roster_leases WHERE school_id=? AND service_date=?",
-      args: [ctx.principal.actorId, body.fence, ctx.now, schoolId, range.from],
-    });
+      args: [leaseHolder(ctx), body.leaseFence ?? body.fence, ctx.now, schoolId, range.from],
+    }, { deadlineAt: held.expires_at });
+  }
   for (const assignment of next.assignments.filter(
     (a) =>
       a.status === "draft" &&
@@ -1976,6 +2048,8 @@ async function operations(ctx) {
   outbox.push(...emailJobs(loaded.state, next, ctx.now));
   const output = {
     ...result,
+    ...(c.workloadEvidence ? { workloadEvidence: c.workloadEvidence,
+      automaticPublicationAllowed: c.workloadEvidence.quality === "verified" } : {}),
     revision: revision + 1,
     acceptedRevision: revision + 1,
     requestId: op.operationId,
@@ -1999,7 +2073,13 @@ async function operations(ctx) {
     : ["saveSystemConfig", "saveTypes"].includes(opName)
       ? compactAdministrativeSave(schoolId, opName, plan) : plan);
 }
+function assertPublicationWorkload(ctx, c) {
+  requireValue(c.workloadEvidence?.quality !== "estimated" ||
+    !(ctx.body.automatic === true || ctx.body.scheduleKey || ctx.principal.serviceIdentity === "roster"),
+    "WORKLOAD_ESTIMATED_AUTOPUBLISH_BLOCKED", 409);
+}
 async function preparePublication(ctx, op, state, c, date, revision) {
+  assertPublicationWorkload(ctx, c);
   const schoolId = ctx.principal.schoolId,
     day = Operations.effectiveTimetableDay(state, c, date) || c.days[date];
   requireValue(day && Array.isArray(day.periods), "TIMETABLE_UNAVAILABLE", 409);
@@ -2119,6 +2199,7 @@ async function preparePublication(ctx, op, state, c, date, revision) {
   }
   const payload = {
     schemaVersion: 1,
+    workloadEvidence: c.workloadEvidence || null,
     publicationId,
     date,
     sequence,
@@ -2228,7 +2309,7 @@ async function allocationRun(ctx, loaded, c, range, scope, revision, op) {
     ],
   ).run();
   const mode =
-      ctx.body.mode === "fill-only" || ctx.body.fillOnly === true
+      ctx.body.mode === "fill-only" || ctx.body.allocationMode === "fill-only" || ctx.body.fillOnly === true
         ? "fill-only"
         : "auto",
     proposal = runEngine(snapshot, policyValue, { mode }, allocate),
@@ -2269,10 +2350,11 @@ async function allocationRun(ctx, loaded, c, range, scope, revision, op) {
       createdBy: ctx.principal.actorId,
       instructions: Operations.assignmentInstructions(next, d, c),
       publicationEvidence: {
-        publicationId: c.publication.publicationId,
-        sequence: c.publication.publicationSequence,
+        publicationId: c.publication.publicationId ?? null,
+        sequence: c.publication.publicationSequence ?? null,
         calculationVersion: c.publication.calculationVersion,
       },
+      workloadEvidence: c.workloadEvidence || null,
     });
   }
   next.dayRevisions[date] = (loaded.state.dayRevisions[date] || 0) + 1;
@@ -2327,7 +2409,10 @@ async function allocationRun(ctx, loaded, c, range, scope, revision, op) {
     ],
   });
   const result = {
+    ...Operations.read(next, c, { operation: "allocation", date, compact: ctx.body.compact }),
     revision: revision + 1,
+    workloadEvidence: c.workloadEvidence || null,
+    automaticPublicationAllowed: c.workloadEvidence?.quality !== "estimated",
     runId: op.operationId,
     assigned: proposal.assignments.length,
     unresolved: proposal.unresolved,
@@ -2335,19 +2420,46 @@ async function allocationRun(ctx, loaded, c, range, scope, revision, op) {
     engineVersion: proposal.engineVersion,
     allocationRevision: revision + 1,
   };
+  result.health = await layeredHealth(ctx, { ...loaded, state: next }, c, date, revision + 1, result.health);
+  workloadView(result, next, c, date, revision + 1);
   return commit(ctx, op, {
     dependencies: c.dependencies,
     guards: [...change.guards, ...(c.localGuards || [])],
     writes: change.writes,
-    result,
+    // Legacy read projections have optional undefined properties. Freeze the
+    // same JSON representation the browser receives into the durable receipt.
+    result: JSON.parse(JSON.stringify(result)),
     outbox: next.outbox.filter(j=>!loaded.state.outbox.some(old=>old.id===j.id)).map(j=>({id:j.id,type:'roster-notification',payload:j,dueAt:j.dueAt||ctx.now})),
     audit: {
       runId: op.operationId,
       inputDigest: snapshot.inputDigest,
       policyVersion: policyValue.version,
-      publicationId: c.publication.publicationId,
+      publicationId: c.publication.publicationId ?? null,
     },
   });
+}
+// The retained UI exports its complete current snapshot locally. Return that
+// projection with the same revision and evidence as the allocation view/receipt.
+// Correct the legacy numeric-R flag only at this display boundary: its pure
+// eligibility calculator historically calls any finite R "verified".
+function workloadView(result, state, c, date, revision) {
+  if (result.allocationModel && result.timetable?.id) {
+    result.exportContext = { ...Operations.dailyExport(state, c, { date, fullTeachers: true }), revision };
+  }
+  if (!c.workloadEvidence) return;
+  result.workloadEvidence = c.workloadEvidence;
+  result.automaticPublicationAllowed = c.workloadEvidence.quality === "verified";
+  if (result.exportContext) {
+    result.exportContext.workloadEvidence = c.workloadEvidence;
+    if (c.workloadEvidence.quality === "estimated") result.exportContext.legend =
+      "Estimated workload. " + (result.exportContext.legend || "");
+  }
+  if (c.workloadEvidence.quality === "estimated") {
+    for (const teacher of result.allocationModel?.teachers || []) {
+      teacher.balance.quotaVerified = false;
+      teacher.balance.workloadQuality = "estimated";
+    }
+  }
 }
 async function cancelRun(ctx) {
   const runId = identifier(ctx.body.runId || ctx.body.id),

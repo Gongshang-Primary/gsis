@@ -42,8 +42,8 @@ export async function allocationSnapshot(ctx, loaded, c, date, revision, runId) 
     409,
   );
   requireValue(
-    c.publication?.publicationId &&
-      Number.isSafeInteger(c.publication.publicationSequence),
+    c.workloadEvidence?.quality === "estimated" || (c.publication?.publicationId &&
+      Number.isSafeInteger(c.publication.publicationSequence)),
     "WORKLOAD_UNVERIFIED",
     503,
   );
@@ -88,9 +88,10 @@ export async function allocationSnapshot(ctx, loaded, c, date, revision, runId) 
       ),
       row = byStaff.get(p.id),
       previous = capturedMap.get(p.id),
-      quality = row?.quality === "verified" ? "verified" : "unavailable";
+      quality = row?.quality === "verified" ? "verified" :
+        c.workloadEvidence?.quality === "estimated" && row?.quality === "estimated" ? "estimated" : "unavailable";
     const q =
-        quality === "verified" &&
+        quality !== "unavailable" &&
         Number.isFinite(row.budget) &&
         Number.isFinite(row.weightedWi ?? row.Wi) &&
         Number.isFinite(row.factor)
@@ -102,7 +103,7 @@ export async function allocationSnapshot(ctx, loaded, c, date, revision, runId) 
             )
           : null,
       quota = previous ? (previous.excluded ? 0 : previous.quota) : q;
-    if (!previous && q !== null && teaching && p.active && p.eo) {
+    if (quality === "verified" && !previous && q !== null && teaching && p.active && p.eo) {
       weeklyGuards.push({
         sql: "SELECT NOT EXISTS(SELECT 1 FROM roster_weekly WHERE school_id=? AND staff_id=? AND week=?) AS ok",
         args: [schoolId, p.id, week],
@@ -147,10 +148,11 @@ export async function allocationSnapshot(ctx, loaded, c, date, revision, runId) 
       ),
       weekly: {
         quality:
-          quality === "verified" && quota !== null ? "verified" : "unavailable",
+          quality !== "unavailable" && quota !== null ? quality : "unavailable",
         remaining:
           quota === null ? null : Math.max(0, quota - (used.get(p.id) || 0)),
-        publicationId: previous?.publication_id || c.publication.publicationId,
+        publicationId: previous?.publication_id || c.publication.publicationId || null,
+        workloadEvidence: c.workloadEvidence || null,
       },
       subjects: p.subjects || [],
       levels: p.levels || [],
@@ -202,7 +204,8 @@ export async function allocationSnapshot(ctx, loaded, c, date, revision, runId) 
     revisions: {
       day: revision,
       config: policyRevision,
-      publication: c.publication.publicationSequence,
+      publication: c.publication.publicationSequence ?? null,
+      ...(c.workloadEvidence?.quality === "estimated" ? { planning: c.workloadEvidence } : {}),
       accounting: loaded.accountingRevisions,
     },
     employmentCapEvidence: c.effectiveCaps,
