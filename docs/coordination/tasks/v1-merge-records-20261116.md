@@ -1,6 +1,6 @@
 # v1-merge-records-20261116: amended chain merge inventory
 
-- Status: documented; local verification passed; exact-head CI and Claude review pending. Part A/B merges are complete; Part C verification/recheck and one task-record conflict remain separate gates.
+- Status: documented; local verification passed; exact-head CI and Claude review pending. Part A/B merges are complete; Part C new-head verification/rechecks remain separate gates.
 - Owner/model: Codex; coordinator ChatGPT v1; independent exact-head reviewer Claude.
 - Last updated (Asia/Singapore): 16 November 2026, 01:12.
 - Branch: `codex/v1-merge-records-20261116`.
@@ -37,7 +37,7 @@ Refresh main, all heads and actual files in all three open PRs before claiming. 
 
 Record Part A's four merges and the eleven reviewed chain heads. All eleven chain entries use `334731cdb1d4fc5d37d7bdf6de761d668c062994`, not separate child merges. #165 was marked merged by GitHub; #166–174 were closed with carrying-commit notes. Preserve their branches/heads. Record tested tree `d3f24176b859c6dc3fb10388adfa490a727d0c73`, merged main tree `f0b0d0892ddd61aceaccb97ff16d8c3cbb0893f0`, and the two review-document-only differences. Keep the previous eight inventory entries and prior dated checkpoints intact.
 
-Record Part C outcomes honestly: PR176's mechanical integration head `de4d2834bbd6391db4a0df291c941770b3d9233f` needs fresh CI and Claude's recheck; PR178's attempted rebase stopped on its task record, was aborted, and still has head `bf2067c52bf7390b8651194022eb32791e8c086f`. Any later owner-authorised resolution/new head must be recorded accurately before publication. This bookkeeping work is independent of that stopped resolution and cannot approve either implementation. Do not close either active claim or merge them through this documentation PR.
+Record Part C outcomes honestly: PR176's mechanical integration head `de4d2834bbd6391db4a0df291c941770b3d9233f` now passes both CI workflows and all 97 local product programs, but needs Claude's recheck. PR178's initial rebase stopped on its task record and was aborted; the owner then explicitly approved retaining the exact reviewed record. The completed rebase plus N2 guard is `530a7add936a168184becaaacb82a24deaf5da18`, based on `fa6666b3f846dfc10bebfe47e5a10ed9a264b0ed`, with a clean-head 24.507-second focused pass. Fresh CI and Claude recheck remain required. This bookkeeping cannot approve either implementation. Do not close either active claim or merge them through this documentation PR.
 
 ## Verification
 
