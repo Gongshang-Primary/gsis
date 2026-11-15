@@ -550,6 +550,12 @@
       ].includes(body.operation)
     );
   }
+  function isStaplerSave(path, body) {
+    return path === "/api/roster/operations" && [
+      "saveStapler", "confirmStapler", "publishStapler", "resetStapler",
+      "renameStapler", "moveStapler", "deleteStapler", "restoreStapler",
+    ].includes(body?.operation);
+  }
   function isDeployCreation(path, body) {
     return (
       path === "/api/deploy/versions/create" ||
@@ -1929,10 +1935,11 @@
       };
     }
     const requiresLease =
-      domain === "deploy" &&
+      ((domain === "deploy" &&
       url.pathname === "/api/deploy/change" &&
       body.versionId &&
-      !["create", "createVersion", "clone"].includes(body.operation) &&
+      !["create", "createVersion", "clone"].includes(body.operation)) ||
+        isStaplerSave(url.pathname, body)) &&
       !body.leaseFence &&
       !body.token &&
       !(Number.isSafeInteger(body.fence) && body.fence > 0);
@@ -1949,8 +1956,8 @@
         )
       );
     const consumesReservation =
-      domain === "deploy" &&
-      url.pathname === "/api/deploy/lease" &&
+      ((domain === "deploy" && url.pathname === "/api/deploy/lease") ||
+        (url.pathname === "/api/roster/operations" && body.operation === "acquireStaplerLock")) &&
       [...pending.values()].some(
         (parent) =>
           !parent.terminal &&
@@ -2342,6 +2349,28 @@
         leaseFence: grant.fence,
       };
     }
+    if (isStaplerSave(url.pathname, body) && !body.leaseFence && !body.fence) {
+      // Derive the preparation from the retained request ID. After reload, the
+      // native draft replays the same lease receipt, never a replacement fence.
+      const leaseBody = activeEntry?.preparation || {
+        operation: "acquireStaplerLock", operationId: body.operationId + ":lease",
+        date: body.date, leaseSessionId: "save-" + await hash(body.operationId),
+        ...(body.staplerRevision !== undefined ? { staplerRevision: body.staplerRevision } : {}),
+      };
+      if (activeEntry) activeEntry.preparation = structuredClone(leaseBody);
+      const grantResponse = await suiteFetch("/api/roster/operations", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(leaseBody),
+      });
+      if (!grantResponse.ok) return grantResponse;
+      const grant = (await grantResponse.json()).data;
+      if (!Number.isSafeInteger(grant?.fence) || grant.fence < 1 ||
+          grant.date !== body.date || grant.receipt?.operationId !== leaseBody.operationId ||
+          grant.receipt?.state !== "committed")
+        throw recoveryError("The original editing lock could not be confirmed. Retry the same save.", "LEASE_RESULT_UNCONFIRMED");
+      if (activeEntry) activeEntry.requiresLease = false;
+      body = { ...body, leaseSessionId: leaseBody.leaseSessionId, leaseFence: grant.fence };
+    }
     if (activeEntry) {
       if (!activeEntry.wire) await freezeEntry(activeEntry, body);
       if (
@@ -2460,6 +2489,13 @@
       );
     if (envelope.ok === false) return result;
     const data = envelope.data;
+    if (service === "roster" && Array.isArray(data?.entries))
+      global.dispatchEvent(new CustomEvent("gsis:roster-baselines", { detail: data.entries }));
+    if (service === "roster" && data?.workloadEvidence)
+      global.dispatchEvent(new CustomEvent("gsis:roster-workload", { detail: {
+        evidence: data.workloadEvidence, operation: body?.operation, view: body?.view,
+        date: data.date || body?.date,
+      } }));
     const capabilities = data?.user?.capabilities ?? data?.capabilities;
     if (
       Array.isArray(capabilities) &&
@@ -2470,6 +2506,19 @@
     }
     captureRevision(url, body, data);
     const receipt = data?.receipt || data;
+    if (isStaplerSave(url.pathname, body) && receipt?.state === "committed" &&
+        receipt.operationId === body.operationId && body.leaseSessionId && body.leaseFence) {
+      // A confirmed save releases only its exact fence. A failed release cannot
+      // undo the saved result; the bounded lease expires without another write.
+      try {
+        await suiteFetch("/api/roster/operations", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ operation: "releaseStaplerLock",
+            operationId: body.operationId + ":release", date: body.date,
+            leaseSessionId: body.leaseSessionId, leaseFence: body.leaseFence }),
+        });
+      } catch { /* Saved receipt remains authoritative; no automatic retry. */ }
+    }
     if (
       lordGroupAttempt &&
       ["committed", "terminal-not-committed"].includes(receipt?.state) &&

@@ -1,12 +1,12 @@
 # v1-roster-unblock: Job 3 after reviewed Contacts and operation probe
 
-- Status: claimed; reproduction and implementation pending.
+- Status: implemented; full verification and independent exact-head review pending. See the implementation PR for final verification/CI outcomes.
 - Owner/model: Codex; v1 coordinator ChatGPT.
 - Reviewer/model: Claude, independent exact-head review.
 - Last updated (Asia/Singapore): 16 November 2026, 06:15.
 - Branch: `codex/v1-roster-unblock`.
 - Base SHA: `71a7c5c040350b46d8332e5ba2e3b44665aebe5f` (refreshed main after #180, #178, #176). The implementation branch starts from this claim's accepted main commit.
-- Current head: task-only claim; no implementation or PR yet.
+- Initial implementation/test head: `c89b362d676c1af3ee165a84d172011bc88962bf`; superseding code changes, final branch head and CI are identified by [PR181](https://github.com/helper-gsps/gsis/pull/181). Earlier verification/review does not cover a later head.
 - User-authorised scope: Job 3 in the standing owner prompt, explicitly resumed after the 16 November recheck: F01/F02 Stapler lock; H02/B04/B05 baseline mapping; B08/G01/G02 estimated allocation and visible labels in the same PR; G03 empty current-duty read. Update the merge inventory. One claim and one implementation PR; no later job.
 - Overlap: fetched main/all remote heads and actual open PRs after integration; none open. Earlier active #176/#178/#180 task status text is superseded by the exact merges below. Existing v0.9 claims are untouched.
 
@@ -85,4 +85,19 @@ Deployment remains explicitly NOT authorised: owner must confirm C-1 Memberships
 
 ## Handoff
 
-Next: publish this task-only claim via expected-head main update, start the implementation branch from the accepted claim, update the merge inventory, then reproduce/fix the four ordered Job 3 parts. No implementation test has run yet.
+Claim accepted on main at `a1606c2af30ebbab3b5ceee5ab671694bc8a48c6`; branch begins there. [Implementation handoff](../../v1/roster/ROSTER_UNBLOCK_2026-11-16.md) records reproduction, ownership, visible changes, test commands, limitations and rollback. Merge records are updated on this branch; all three reviewed integrations are already on main.
+
+F01/F02, H02/B04/B05 and B08/G01/G02 have implementation and local browser/Worker/D1 evidence. G03's claimed empty-school failure is disproved by the actual home request and was not changed. The probe removes only F01/F02; unrelated missing operations and all negative controls remain. No later job or overlapping implementation PR was started. Pre-publication refresh found no open PRs and main still at the claim commit.
+
+Focused local flows and unchanged Roster service regression passed. Canonical build passed with no tracked drift; both unchanged runners discover all six new programs (104 product / 1,205 Node). Full reruns and exact-head CI are pending at this documentation checkpoint; the PR records their actual outcomes, including failures. The final code inventory is a subset of the 34 explicit allowed paths. Product code remains entirely under `v1/`; there are no build, workflow, schema, generated-output or v0.9 changes.
+
+| Gate | Evidence/status at handoff preparation |
+| --- | --- |
+| Q01 | Pass: explicit Job 3 authority, accepted claim, exact allowlist, fresh main/open-PR check and mechanical merge inventory. |
+| Q02 | Pass for builder inspection: Roster leases/mappings/allocations, Contacts identity/authority, Venues room IDs and Deploy saved-workload projection retain separate owners. Claude review pending. |
+| Q03 | Pass for focused local checks: capability, current accepted authority, foreign-room/school, stale revision and changed-intent guards; no role inference or secret changes. Full regression outcome in PR. |
+| Q04 | Local evidence: competing tabs, fencing/expiry, same-operation reload/restart recovery, exact saved-revision pins; no cross-D1 atomicity claim. New source-pin/corrupt-pointer assertions are included in the full rerun. |
+| Q05 | Pass for builder inspection: existing bounds retained, 120-second lease, maximum eight mapping drafts, maximum 32 rooms per source label, one saved-version estimate, no new dependencies/build patches. |
+| Q06 | Pending full local/CI results in PR. Focused browser and owner tests, discovery and clean canonical build are recorded in the handoff. |
+| Q07 | Pending Claude exact-head review of the single bounded implementation PR. Every commit is attributed `Model: Codex`. |
+| Q08 | Not applicable to deployment: no authority granted. C-1/C-2 remain release gates; runtime UAT and T1B-01/T1B-02 Not tested; F5 OPEN. |

@@ -253,14 +253,14 @@ export async function forecastCapacity(ctx, loaded, c, dates, revision) {
     try {
       const {snapshot, policyValue} = await allocationSnapshot(ctx, scratch, c, date, revision, "forecast:" + date);
       const reserve = inspectCapacity(snapshot, policyValue, day.periods.map(p => p.period));
-      if (!reserve.verified || incomplete) {
+      if (!(reserve.usable ?? reserve.verified) || incomplete) {
         incomplete = true;
         days.push({date, state: "not-verified", reason: "Required capacity evidence is unavailable, including earlier days in this forecast."});
         continue;
       }
       const proposal = runEngine(snapshot, policyValue, {mode: "fill-only", maxComparisons: 10000});
       const unresolved = proposal.unresolved.map(x => ({...x, ...snapshot.demands.find(d => d.id === x.demandId)}));
-      days.push({date, state: "projected", observedAt: ctx.now, revisions: snapshot.revisions,
+      days.push({date, state: "projected", workloadEvidence: c.workloadEvidence || null, observedAt: ctx.now, revisions: snapshot.revisions,
         inputDigest: snapshot.inputDigest, reserve, planned: proposal.assignments.length,
         retained: proposal.retained.length, unresolved, search: proposal.search});
       for (const a of proposal.assignments) scratch.state.assignments.push({...a, date, rCost: a.charge ?? 1});
@@ -271,7 +271,7 @@ export async function forecastCapacity(ctx, loaded, c, dates, revision) {
     }
   }
   return {schemaVersion: 1, observedAt: ctx.now, from: dates[0], to: dates.at(-1),
-    state: incomplete ? "incomplete" : "projected", days, optimalityProven: false,
+    state: incomplete ? "incomplete" : "projected", workloadEvidence: c.workloadEvidence || null, days, optimalityProven: false,
     note: "Known demand only. Saved duties remain fixed. Projected duties do not change assignments or R. Uncovered means no valid cover found in this bounded projection."};
 }
 export async function layeredHealth(ctx, loaded, c, date, revision, previous) {
@@ -281,11 +281,11 @@ export async function layeredHealth(ctx, loaded, c, date, revision, previous) {
       baseline = inspectCapacity({...snapshot, assignments: []}, policyValue, periods);
     const potential = baseline.periods.reduce((n,p) => n+p.green.length,0), remaining = current.periods.reduce((n,p) => n+p.green.length,0);
     return {...previous, engineVersion: current.engineVersion, policyVersion: current.policyVersion,
-      observedAt: ctx.now, incomplete: !current.verified, verified: current.verified,
-      reason: current.verified ? "" : "Current quota or employment-cap evidence is not verified.",
+      observedAt: ctx.now, incomplete: !current.usable, usable: current.usable, verified: current.verified, workloadEvidence: c.workloadEvidence || null,
+      reason: current.usable ? "" : "Current quota or employment-cap evidence is not verified.",
       potential, remaining, consumed: Math.max(0,potential-remaining),
-      percentage: current.verified && potential ? 100*remaining/potential : null,
-      critical: current.verified && remaining === 0, balances: current.balances, note: current.note,
+      percentage: current.usable && potential ? 100*remaining/potential : null,
+      critical: current.usable && remaining === 0, balances: current.balances, note: current.note,
       periods: current.periods.map(p => ({...day.periods.find(x => x.period === p.period), ...p,
         potential: baseline.periods.find(x => x.period === p.period).green.length,
         potentialStaffIds: baseline.periods.find(x => x.period === p.period).green,

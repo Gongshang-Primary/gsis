@@ -3,14 +3,14 @@ import Allocation from '../../../shared/roster-allocation.js';
 import {layeredHealth,forecastCapacity} from './capacity.mjs';
 
 export function capacityText(h,c,date=h.date){
-  if(!h?.verified||h.incomplete)return 'Capacity not verified; check Roster. Unknown is not zero.';
+  if(!(h?.usable??h?.verified)||h.incomplete)return 'Capacity not verified; check Roster. Unknown is not zero.';
   const future=h.periods.filter(p=>!p.started&&(!c||!Allocation.periodStarted(c,date,p.period))),low=future.filter(p=>p.green.length<=2);
-  return 'Eligible choices by period: '+(low.map(p=>'P'+p.period+'='+p.green.length).join(', ')||'no low-capacity periods')+'. Choices overlap across periods; not additive R.';
+  return (h.workloadEvidence?.quality==='estimated'?'Estimated workload. ':'')+'Eligible choices by period: '+(low.map(p=>'P'+p.period+'='+p.green.length).join(', ')||'no low-capacity periods')+'. Choices overlap across periods; not additive R.';
 }
 export function outlookText(forecast){
   const rows=forecast.days.filter(d=>d.state!=='not-school-day');
   const text=rows.map(d=>d.state!=='projected'?d.date+': not verified':d.date+': '+d.unresolved.length+' uncovered after projected cover').join('; ');
-  return 'Known-demand outlook: '+text+'. '+(rows.some(d=>d.state==='projected'&&d.unresolved.length)?'Consider external ad hoc relief; review Roster. ':'')+'Bounded projection, not a booking or minimum external headcount.';
+  return (forecast.workloadEvidence?.quality==='estimated'?'Estimated workload. ':'')+'Known-demand outlook: '+text+'. '+(rows.some(d=>d.state==='projected'&&d.unresolved.length)?'Consider external ad hoc relief; review Roster. ':'')+'Bounded projection, not a booking or minimum external headcount.';
 }
 export function replaceLegacyWarnings(before,next){
   const oldJobs=new Set(before.outbox.map(j=>j.id)),oldAlerts=new Set(before.smcAlerts.map(a=>a.id));

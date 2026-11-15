@@ -1,6 +1,6 @@
 # v1-merge-records-20261116: amended chain merge inventory
 
-- Status: documented; local verification passed; exact-head CI and Claude review pending. Part A/B merges are complete; Part C new-head verification/rechecks remain separate gates.
+- Status: merged as PR180, reviewed head `fc256d771b44121e7375f620c7ec859ee8a66590`, merge `750ba8cbd5e4be80b03e15a925f471f0edd753f7`. Not deployed; earlier pending statements are historical.
 - Owner/model: Codex; coordinator ChatGPT v1; independent exact-head reviewer Claude.
 - Last updated (Asia/Singapore): 16 November 2026, 01:12.
 - Branch: `codex/v1-merge-records-20261116`.
@@ -98,3 +98,9 @@ print(f'PASS: {len(changed)} documentation paths; {len(rows)} inventory entries;
 Actual result: **PASS**, seventeen documentation paths, 24 distinct inventory entries, fourteen automatic merge trees, identical product tree, thirty local links, historical prose retained and whitespace clean. The command was `TZ=Asia/Singapore python3 /tmp/gsis-verify-merge-records.py`, whose complete source is preserved above for reproducibility. No local application build or Node/LORD suite is repeated for this documentation-only change. Fresh branch CI and Claude exact-head review remain separate; no earlier approval transfers to this bookkeeping head. Rollback affects records only.
 
 The additional PR157 entry follows its successful exact-head CI and independent Codex review of the Claude-authored row. New main is `5ae81158f12c8131f4657e4ce77055d008bd6419`; it changes no product path. Part C also passed one unpublished combined-tree probe at `97701d7ce8f9bc0214cbc18e639cd5ddeac05278` (22.944s, 397 bindings, 29 known gaps, fifteen pins). This is supplementary synthetic compatibility evidence, not a replacement for either exact-head CI/review or a full combined-suite/hosted result.
+
+## Reviewed integration — 16 November 2026
+
+[Claude's exact-head recheck](../review/v1-pr176-178-180-claude-recheck.md) at `2e77d3c` approved `fc256d771b44121e7375f620c7ec859ee8a66590`; owner authorised the #180 → #178 → #176 merge sequence. PR180 merged as [`750ba8cbd5e4be80b03e15a925f471f0edd753f7`](https://github.com/helper-gsps/gsis/commit/750ba8cbd5e4be80b03e15a925f471f0edd753f7) after green exact-head CI. Its second parent is the reviewed head and its tree exactly matches `git merge-tree --write-tree` on its parents. No hand edits or conflict occurred. [Merge inventory](v1-merge-records-20261115.md#verified-merge-inventory).
+
+The task is closed. Deployment remains blocked on owner C-1 Memberships and C-2 immediate pre-deployment Contacts D1 backup confirmation. F5 OPEN; official T1B-01/T1B-02 and hosted/runtime UAT Not tested. No migration, live data or provider operations.

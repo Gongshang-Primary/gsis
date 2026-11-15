@@ -25,6 +25,8 @@ export const workloadOperations = new Set([
   "autoAllocate",
   "saveRecess",
   "deleteRecess",
+  "exportDaily",
+  "publish",
 ]);
 export async function baselines(env, schoolId) {
   return (
@@ -131,7 +133,7 @@ export async function context(ctx, loaded, range, { needsQuota = false } = {}) {
     publication = await serviceCall(
       env,
       "deploy",
-      "/internal/publication/current",
+      "/internal/roster-workload",
       { schoolId, decisionId: principal.decisionId, date: range.from },
     );
     requireValue(
@@ -164,6 +166,7 @@ export async function context(ctx, loaded, range, { needsQuota = false } = {}) {
   const quotas = new Map(
     (payload?.rows || payload?.workload?.rows || []).map((r) => [r.staffId, r]),
   );
+  const estimated = payload?.workloadEvidence?.quality === "estimated";
   const captured = await query(
       env.DB,
       "SELECT * FROM roster_weekly WHERE school_id=? AND week BETWEEN ? AND ?",
@@ -224,6 +227,7 @@ export async function context(ctx, loaded, range, { needsQuota = false } = {}) {
       if (!person) continue;
       const row = quotas.get(staffId),
         verified = row?.quality === "verified",
+        usable = verified || (estimated && row?.quality === "estimated"),
         wi = row?.weightedWi ?? row?.Wi,
         budget = row?.budget,
         factor = row?.factor,
@@ -235,11 +239,11 @@ export async function context(ctx, loaded, range, { needsQuota = false } = {}) {
           .slice(0, 10),
         savedQuota = frozen.get(staffId + "|" + weekStart),
         R =
-          savedQuota && verified
+          savedQuota && usable
             ? savedQuota.excluded
               ? 0
               : savedQuota.quota
-            : verified &&
+            : usable &&
                 Number.isFinite(wi) &&
                 Number.isFinite(budget) &&
                 Number.isFinite(factor)
@@ -258,19 +262,20 @@ export async function context(ctx, loaded, range, { needsQuota = false } = {}) {
             : [],
         R,
         rawR: R,
+        workloadEvidence: payload?.workloadEvidence || null,
         quotaSource: payload
           ? {
               publicationId:
-                savedQuota?.publication_id || payload.publicationId,
+                savedQuota?.publication_id || payload.publicationId || null,
               publicationSequence:
-                savedQuota?.publication_sequence || payload.publicationSequence,
+                savedQuota?.publication_sequence || payload.publicationSequence || null,
               calculationVersion:
                 savedQuota?.calculation_version || payload.calculationVersion,
-              currentPublicationId: payload.publicationId,
+              currentPublicationId: payload.publicationId || null,
               ...(savedQuota &&
               savedQuota.publication_id !== payload.publicationId
                 ? {
-                    pendingPublicationId: payload.publicationId,
+                    pendingPublicationId: payload.publicationId || null,
                     appliesFrom: new Date(Date.parse(weekStart) + 7 * 86400000)
                       .toISOString()
                       .slice(0, 10),
@@ -312,8 +317,8 @@ export async function context(ctx, loaded, range, { needsQuota = false } = {}) {
       recesses: model.recesses || [],
       quotaSource: payload
         ? {
-            publicationId: payload.publicationId,
-            publicationSequence: payload.publicationSequence,
+            publicationId: payload.publicationId || null,
+            publicationSequence: payload.publicationSequence || null,
           }
         : null,
       formClasses: payload?.formClasses || [],
@@ -515,6 +520,10 @@ export async function context(ctx, loaded, range, { needsQuota = false } = {}) {
     calendarByDate,
     projection,
     publication: payload,
+    workloadEvidence: !needsQuota ? null : payload?.workloadEvidence || {
+      quality: payload?.rows?.every(row => row.quality === "verified") ? "verified" : "unavailable",
+      sourceKind: "publication", sourceId: payload?.publicationId || null,
+      sourceRevision: payload?.publicationSequence || null },
     effectiveCaps: capEvidence.byKey,
     dependencies,
     entries,

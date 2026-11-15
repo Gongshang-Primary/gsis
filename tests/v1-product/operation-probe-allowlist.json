@@ -1,6 +1,6 @@
 {
   "source": "PR177 follow-up ledger Section 2 at 429367ed23bf4edf8d10cbb575226c84c228474c",
-  "review": "Missing-handler entries approved by Claude at bf2067c52bf7390b8651194022eb32791e8c086f; runtime-site pins require the Part C exact-head recheck. Allowances do not close findings.",
+  "review": "Missing-handler entries approved by Claude at bf2067c52bf7390b8651194022eb32791e8c086f; runtime-site pins require the Part C exact-head recheck. Allowances do not close findings. Job 3 removes F01/F02 only after real built-browser and Worker/D1 lock/save coverage; unrelated allowances remain open.",
   "entries": [
     {
       "domain": "calendar",
@@ -134,14 +134,6 @@
       "domain": "roster",
       "path": "/operations",
       "selector": "operation",
-      "name": "acquireStaplerLock",
-      "ledger": "F01",
-      "reason": "Opening a copied Stapler editor still calls the absent lock-acquire operation."
-    },
-    {
-      "domain": "roster",
-      "path": "/operations",
-      "selector": "operation",
       "name": "archiveColdOutput",
       "ledger": "F10",
       "reason": "Additional caller confirmed in the same archive feature: the copied archive-confirm button submits this absent operation; not named individually in the ledger."
@@ -177,14 +169,6 @@
       "name": "dismissDeliveryIssues",
       "ledger": "F05",
       "reason": "The delivery-review clear button submits this absent operation; the ledger static finding is now request-confirmed."
-    },
-    {
-      "domain": "roster",
-      "path": "/operations",
-      "selector": "operation",
-      "name": "releaseStaplerLock",
-      "ledger": "F02",
-      "reason": "Leaving a copied Stapler editor still calls the absent lock-release operation."
     },
     {
       "domain": "roster",

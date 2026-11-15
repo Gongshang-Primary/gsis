@@ -324,7 +324,7 @@ function stateFor(p, assignments, policy) {
 function quotaRemaining(p, state) {
   return p.dailyAdhoc === true && p.hasBaseline === false
     ? 40
-    : p.weekly?.quality === "verified" && Number.isFinite(p.weekly.remaining)
+    : ["verified", "estimated"].includes(p.weekly?.quality) && Number.isFinite(p.weekly.remaining)
       ? Math.max(
           0,
           p.weekly.remaining -
@@ -436,13 +436,17 @@ export function inspectCapacity(input, rawPolicy, periods) {
   const staff = s.staff.map(person => ({person, layer: policy.layers.find(l => l.id === resolveLayer(person, policy))}));
   const balances = staff.filter(x => x.layer && (x.person.active === true || x.person.dateActive === true && x.person.dailyAdhoc === true && x.person.adhocEligible === true) && (x.person.eo === true || x.person.dailyAdhoc === true && x.person.hasBaseline === false && x.person.adhocEligible === true)).map(({person, layer}) => {
     const state = stateFor(person, s.assignments, policy);
+    const usable = quotaRemaining(person, state) !== null &&
+      !(person.employmentCapRequired && !Number.isFinite(person.actualWeeklyCap)) &&
+      !(person.actualWeeklyCap != null && !Number.isFinite(person.actualWeeklyOccupied));
     return {staffId: person.staffId, remainingR: quotaRemaining(person, state), layer: layer.id,
-      verified: quotaRemaining(person, state) !== null &&
-        !(person.employmentCapRequired && !Number.isFinite(person.actualWeeklyCap)) &&
-        !(person.actualWeeklyCap != null && !Number.isFinite(person.actualWeeklyOccupied))};
+      quality: person.weekly?.quality || "unavailable",
+      usable, verified: usable && person.weekly?.quality !== "estimated" };
   });
   return {engineVersion: ENGINE_VERSION, policyVersion: policy.version, balances,
-    verified: balances.every(x => x.verified),
+    usable: balances.every(x => x.usable),
+    verified: balances.every(x => x.usable && x.quality !== "estimated"),
+    quality: !balances.every(x => x.usable) ? "unavailable" : balances.some(x => x.quality === "estimated") ? "estimated" : "verified",
     periods: periods.map(period => {
       const green = [], exclusions = {};
       for (const {person, layer} of staff) {

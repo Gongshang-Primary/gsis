@@ -22,6 +22,8 @@ const csvValue = (value) =>
   '"';
 export function readableDay(schoolId, value) {
   const rows = [
+    ...(value.workloadEvidence?.quality === "estimated" ? [["Workload", "Estimated",
+      "Source", value.workloadEvidence.sourceId, "Revision", value.workloadEvidence.sourceRevision]] : []),
     [
       "GSiS Roster",
       schoolId,
