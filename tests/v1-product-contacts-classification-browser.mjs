@@ -835,11 +835,20 @@ try {
       await page.evaluate(() => Boolean(GSISV1.capable("contacts.manage"))),
       false,
     );
+    // Session readiness precedes Contacts bootstrap and its follow-up read.
+    // Keep the local Worker bridge installed until the reader view settles.
+    await page.locator("#app:not(.hidden)").waitFor();
+    await page.waitForFunction(
+      () => !document.querySelector("#deploymentStatus .contacts-spinner"),
+    );
+    assert.equal(await page.locator("#dataTab").isVisible(), false);
   });
   assert.deepEqual(pageErrors, []);
   assert(
     egress.every((url) => url === "https://accounts.google.com/gsi/client"),
   );
+  // Stop the document producing requests before draining/removing its bridge.
+  await page.goto("about:blank");
   await context.unrouteAll({ behavior: "wait" });
   await context.close();
 } finally {
