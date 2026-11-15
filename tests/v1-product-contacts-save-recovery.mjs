@@ -61,12 +61,13 @@ try {
     capabilities: [],
   });
   let db = await active.db("contacts");
-  const invalid = addition("grid-invalid-role", "Synthetic Recovery Person", {
-    Role: "P",
+  const invalid = addition("grid-invalid-date", "Synthetic Recovery Person", {
+    "Day of Birth": "31",
+    "Month of birth": "2",
   });
   const rejected = await request(admin, "/save-data", invalid);
-  assert.equal(rejected.status, 409);
-  assert.equal(rejected.body.error.code, "CATALOGUE_SELECTION_REQUIRED");
+  assert.equal(rejected.status, 400);
+  assert.equal(rejected.body.error.code, "INVALID_INPUT");
   const original = await operationStatus(db, school, invalid.operationId);
   assert.equal(original.state, "aborted");
   assert.equal(original.receipt.state, "terminal-not-committed");
@@ -120,7 +121,7 @@ try {
   assert.equal(changed.status, 409);
   assert.equal(changed.body.error.code, "OPERATION_INTENT_CONFLICT");
   done(
-    "known catalogue rejection retains an immutable readable abort; replay cannot change intent",
+    "known date rejection retains an immutable readable abort; replay cannot change intent",
   );
 
   const good = addition("grid-corrected", "Synthetic Recovery Person");
@@ -286,6 +287,48 @@ try {
     const admission = await admit(env, db, op, principal, [], now);
     return { env, principal, op, admission };
   }
+  // An earlier input schema may already have prepared this exact intent.
+  // New lexical preflight must not hide its original durable outcome.
+  const oldShape = addition(
+    "pre-upgrade-prepared",
+    "Synthetic Legacy Pending",
+    { Role: "Legacy,role" },
+  );
+  const preparedOld = await prepareRace(oldShape);
+  assert.equal(preparedOld.op.state, "prepared");
+  const rejectedOld = await request(admin, "/save-data", oldShape);
+  assert.equal(rejectedOld.status, 400);
+  const oldTerminal = await call(admin, "/save-receipt", {
+    operationId: oldShape.operationId,
+  });
+  assert.equal(oldTerminal.receipt.state, "terminal-not-committed");
+  const oldReplay = await call(admin, "/save-data", oldShape);
+  assert.deepEqual(oldReplay.receipt, oldTerminal.receipt);
+  assert.equal(oldReplay.saved, false);
+  const changedOld = await request(admin, "/save-data", {
+    ...oldShape,
+    additions: [
+      {
+        ...oldShape.additions[0],
+        values: { "Basic Name": "Changed old intent", Role: "Different,role" },
+      },
+    ],
+  });
+  assert.equal(changedOld.status, 409);
+  assert.equal(changedOld.body.error.code, "OPERATION_INTENT_CONFLICT");
+  assert.equal(
+    (
+      await db
+        .prepare("SELECT COUNT(*) AS n FROM product_audit WHERE operation_id=?")
+        .bind(oldShape.operationId)
+        .first()
+    ).n,
+    0,
+  );
+  done(
+    "pre-upgrade prepared input terminalises safely; original receipt replay precedes new validation and changed intent still rejects",
+  );
+
   const winningBody = addition(
     "commit-wins-recovery",
     "Synthetic Commit Winner",

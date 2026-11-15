@@ -1,5 +1,8 @@
 import assert from "node:assert/strict";
 import { productSuite } from "./v1-product/suite.mjs";
+import { canonical, statement } from "../v1/runtime/store.mjs";
+import { staffRecord, makeSnapshots } from "../v1/services/contacts/store.mjs";
+import { replaceField } from "../v1/services/contacts/intervals.mjs";
 
 // Real local gateway/Core/Contacts/Deploy Workers and D1. Owner inputs, sessions
 // and catalogue definitions are synthetic. No hosted data or provider is used.
@@ -21,6 +24,14 @@ const fields = [
   "GSPS Alias (@gsps.edu.sg)",
   "iCON Alias (@moe.edu.sg)",
   "CES Alias (@schools.gov.sg)",
+  "School Section",
+  "Personnel Category",
+  "Employment Arrangement",
+  "Employment Status",
+  "Memberships",
+  "General Aliases",
+  "Name Suffix",
+  "Profile Completion",
 ];
 const deployFields = [
   "role",
@@ -194,13 +205,25 @@ try {
     "School.Local",
     "Icon.Local",
     "Ces.Local",
+    "",
+    "",
+    "",
+    "",
+    "",
+    "NotDedicated@moe.edu.sg\nNotDedicated@schools.gov.sg",
+    "",
+    "provisional",
   ];
-  await test("actual owner records produce exact public seventeen-cell values without EO appointment inference", async () => {
+  await test("actual owner records produce exact public twenty-five-cell values without EO appointment inference", async () => {
     const data = await get(admin, "contacts", "/data"),
       row = data.rows.find((row) => row.id === staffId);
     assert.deepEqual(data.fields, fields);
     assert.deepEqual(row.values, expected);
-    assert.equal(row.computed.length, 17);
+    assert.equal(row.computed.length, 25);
+    assert.deepEqual(
+      row.computed,
+      fields.map((f) => f === "TTb Name"),
+    );
     assert.deepEqual(data.aliasDomains, {
       gsps: "example.invalid",
       icon: "moe.edu.sg",
@@ -231,7 +254,7 @@ try {
           id: staffId,
           field: "CES Alias (@schools.gov.sg)",
           expected: "Ces.Local",
-          value: "Wrong.Domain@outside.example",
+          value: "Changed.Ces@schools.gov.sg",
         },
       ],
     });
@@ -241,13 +264,36 @@ try {
     assert.equal(row.values[4], "5678");
     assert.equal(row.values[12], "8");
     assert.equal(row.values[15], "");
-    assert.equal(row.values[16], "Wrong.Domain@outside.example");
+    assert.equal(row.values[16], "Changed.Ces");
     const raw = await get(admin, "contacts", `/staff/${staffId}`);
     assert.deepEqual(raw.fields.aliases.value, [
       "NotDedicated@moe.edu.sg",
       "NotDedicated@schools.gov.sg",
     ]);
-    assert.equal(raw.fields.cesEmail.value, "Wrong.Domain@outside.example");
+    assert.equal(raw.fields.cesEmail.value, "Changed.Ces@schools.gov.sg");
+    const wrongDomain = await suite.request(manager, "contacts", "/save-data", {
+      method: "POST",
+      body: {
+        operationId: operationId(),
+        changes: [
+          {
+            id: staffId,
+            field: "CES Alias (@schools.gov.sg)",
+            expected: "Changed.Ces",
+            value: "Wrong.Domain@outside.example",
+          },
+        ],
+      },
+    });
+    assert.equal(
+      wrongDomain.status,
+      400,
+      "new dedicated aliases must use the owning domain",
+    );
+    assert.equal(
+      (await get(admin, "contacts", `/staff/${staffId}`)).fields.cesEmail.value,
+      "Changed.Ces@schools.gov.sg",
+    );
     const stale = await suite.request(manager, "contacts", "/save-data", {
       method: "POST",
       body: {
@@ -259,6 +305,49 @@ try {
     });
     assert.equal(stale.status, 409);
     assert.equal(stale.body.error.code, "REVISION_CONFLICT");
+  });
+  await test("visible birthday edits preserve a retained year and reject invalid dates without erasing it", async () => {
+    await update(staffId, { birthday: "1988-03-08" });
+    for (const [field, expectedValue, value, stored] of [
+      ["Day of Birth", "8", "9", "1988-03-09"],
+      ["Month of birth", "3", "2", "1988-02-09"],
+    ]) {
+      const changed = await post(manager, "contacts", "/save-data", {
+        changes: [{ id: staffId, field, expected: expectedValue, value }],
+      });
+      assert.equal(changed.receipt.state, "committed");
+      assert.equal(
+        (await get(admin, "contacts", `/staff/${staffId}`)).fields.birthday
+          .value,
+        stored,
+      );
+    }
+    const invalid = await suite.request(manager, "contacts", "/save-data", {
+      method: "POST",
+      body: {
+        operationId: operationId(),
+        changes: [
+          { id: staffId, field: "Day of Birth", expected: "9", value: "30" },
+        ],
+      },
+    });
+    assert.equal(invalid.status, 400);
+    assert.equal(
+      (await get(admin, "contacts", `/staff/${staffId}`)).fields.birthday.value,
+      "1988-02-09",
+    );
+    const cleared = await post(manager, "contacts", "/save-data", {
+      changes: [
+        { id: staffId, field: "Day of Birth", expected: "9", value: "" },
+        { id: staffId, field: "Month of birth", expected: "2", value: "" },
+      ],
+    });
+    assert.equal(cleared.receipt.state, "committed");
+    assert.equal(
+      (await get(admin, "contacts", `/staff/${staffId}`)).fields.birthday.state,
+      "superseded",
+    );
+    await update(staffId, { birthday: "03-08" });
   });
   await test("owner, self, ordinary and other-module projections preserve privacy and write boundaries", async () => {
     for (const user of [ordinary, otherPower]) {
@@ -355,13 +444,26 @@ try {
       latestProjection.observation.evaluationId,
     );
   });
-  for (const catalogue of [hr, roles, tags])
-    await post(admin, "contacts", "/catalogues", { revision: 0, catalogue });
+  // Legacy definitions are isolated historical fixtures, never new public writes.
+  const legacyDb = await suite.db("contacts");
+  async function definition(catalogue) {
+    await statement(
+      legacyDb,
+      "INSERT INTO contacts_catalogues(school_id,catalogue_id,revision,body) VALUES(?,?,?,?)",
+      [
+        school,
+        catalogue.catalogueId,
+        Number(catalogue.revision),
+        canonical(catalogue),
+      ],
+    ).run();
+  }
+  await definition(roles);
   // Ordinary teachers may legitimately have no appointment or optional tags.
   // These explicit owner facts establish eligibility without fabricating them.
   await update(staffId, {
     employmentActive: true,
-    schoolSection: ref(hr.catalogueId, "PRIMARY"),
+    schoolSection: "Primary",
   });
   const teacher = "projection-teacher",
     twin = "projection-twin";
@@ -378,11 +480,10 @@ try {
   }
   await update(teacher, {
     employmentActive: true,
-    schoolSection: ref(hr.catalogueId, "PRIMARY"),
-    employmentArrangement: ref(hr.catalogueId, "Full-time"),
-    role: ref(roles.catalogueId, "Teacher"),
-    eoAppointmentLevel: ref(hr.catalogueId, "EO"),
-    appointmentStatus: ref(hr.catalogueId, "Confirmed"),
+    schoolSection: "Primary",
+    employmentArrangement: "Full-time",
+    eoAppointmentLevel: "EO",
+    appointmentStatus: "Confirmed",
     employmentTags: [],
     subjectTags: [],
   });
@@ -390,16 +491,59 @@ try {
   await accept(teacher, "eo", true);
   await update(twin, {
     employmentActive: false,
-    employmentTags: [ref(tags.catalogueId, "FAJT")],
+    employmentTags: ["FAJT"],
   });
-  await test("schema1 codes survive duplicate labels and retirement with historical references; same Basic Name keeps distinct permanent identities", async () => {
+  // Install an immutable schema1 role row/history before testing mixed reads.
+  const historical = await staffRecord(legacyDb, school, teacher),
+    context = {
+      schoolId: school,
+      staffId: teacher,
+      actorId: "historical-fixture",
+      operationId: "historical-role-fixture",
+      now: Date.now(),
+    },
+    installed = replaceField(
+      undefined,
+      "role",
+      ref(roles.catalogueId, "Teacher"),
+      context,
+      context.now,
+      null,
+    );
+  historical.fields.role = installed.row;
+  const nextRevision = historical.staff.revision + 1;
+  const historicalWrites = [
+    ...installed.writes,
+    ...(await makeSnapshots(
+      legacyDb,
+      school,
+      teacher,
+      nextRevision,
+      historical.fields,
+    )),
+    {
+      sql: "UPDATE contacts_staff SET revision=? WHERE school_id=? AND staff_id=?",
+      args: [nextRevision, school, teacher],
+    },
+    {
+      sql: "UPDATE contacts_epoch SET revision=revision+1 WHERE school_id=?",
+      args: [school],
+    },
+  ];
+  await legacyDb.batch(
+    historicalWrites.map((w) => statement(legacyDb, w.sql, w.args)),
+  );
+  const immutableHistory = await legacyDb
+    .prepare(
+      "SELECT record_json FROM contacts_history WHERE school_id=? AND staff_id=? AND field='role' AND revision=1",
+    )
+    .bind(school, teacher)
+    .first();
+  await test("schema1 codes survive duplicate labels and newer retirement definitions without rewriting history; same Basic Name keeps distinct permanent identities", async () => {
     const retired = structuredClone(roles);
     retired.revision = "2";
     retired.entries[0].active = false;
-    await post(admin, "contacts", "/catalogues", {
-      revision: 1,
-      catalogue: retired,
-    });
+    await definition(retired);
     const data = await get(admin, "contacts", "/data"),
       a = data.rows.find((row) => row.id === teacher),
       b = data.rows.find((row) => row.id === twin);
@@ -411,16 +555,18 @@ try {
     assert.equal(b.values[9], "FAJT");
     assert.equal(b.values[8], "N");
     const raw = await get(admin, "contacts", `/staff/${teacher}`);
-    assert.deepEqual(
-      raw.fields.role.value,
-      ref(roles.catalogueId, "Teacher", "2"),
-    );
+    assert.deepEqual(raw.fields.role.value, ref(roles.catalogueId, "Teacher"));
     const history = await (await suite.db("contacts"))
       .prepare(
         "SELECT record_json FROM contacts_history WHERE school_id=? AND staff_id=? AND field='role' AND revision=1",
       )
       .bind(school, teacher)
       .first();
+    assert.deepEqual(
+      history,
+      immutableHistory,
+      "a new definition never rewrites prior history",
+    );
     assert.deepEqual(
       JSON.parse(history.record_json).value,
       ref(roles.catalogueId, "Teacher"),
