@@ -448,6 +448,61 @@ try {
     "import retains its account-bound operation across reload and clears it only on the nested durable abort receipt",
   );
 
+  // Account clearance can occur during the microtask yield after the final
+  // recovery-panel render, not only while the network request is in flight.
+  let boundaryRequest;
+  fault = async ({ route, path, body }) => {
+    if (path !== "/api/contacts/save-data") return false;
+    boundaryRequest = structuredClone(body);
+    await route.abort("failed");
+    return true;
+  };
+  await page.waitForFunction(
+    () => !document.querySelector("#addContactRow").disabled,
+  );
+  await addDraft("Synthetic Recovery Boundary");
+  await page.locator("#saveData").click();
+  await settle();
+  const boundaryId = boundaryRequest.operationId || boundaryRequest.requestId;
+  assert.equal(await operationStatus(db, "synthetic-school", boundaryId), null);
+  fault = null;
+  await page.evaluate(() => {
+    window.contactsRecoveryBoundaryCleared = false;
+    const observer = new MutationObserver(() => {
+      observer.disconnect();
+      window.dispatchEvent(new CustomEvent("gsis:clear-protected-state"));
+      window.contactsRecoveryBoundaryCleared = true;
+    });
+    observer.observe(document.querySelector("#recoveryRequests"), {
+      childList: true,
+    });
+    window.contactsRecoveryBoundaryCompletion = document
+      .querySelector("[data-contacts-recover-attempt]")
+      .onclick();
+  });
+  await page.evaluate(() => window.contactsRecoveryBoundaryCompletion);
+  assert.equal(
+    await page.evaluate(() => window.contactsRecoveryBoundaryCleared),
+    true,
+  );
+  assert.equal(
+    await page.locator("#recoveryStatus").textContent(),
+    "",
+    "A final recovery-render continuation must not restore the cleared account's operation",
+  );
+  assert.equal(await page.locator("#contactRecovery").isHidden(), true);
+  assert.equal(await page.locator("#dataGrid").textContent(), "");
+  assert.equal(
+    await page.locator("[data-contacts-recover-attempt]").count(),
+    0,
+  );
+  done(
+    "account clearance during the final recovery render cannot restore the original operation status",
+  );
+  // The synthetic event clears browser state only. A fresh page must rebuild
+  // its state from the still-valid local session before the next scenario.
+  await page.reload();
+  await page.locator("#dataTab").click();
   await page.waitForFunction(
     () => !document.querySelector("#addContactRow").disabled,
   );

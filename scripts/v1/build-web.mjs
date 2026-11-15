@@ -158,7 +158,10 @@ function updateContactsRecovery(source) {
      $('dataStatus').textContent = message || 'The original save is unconfirmed.';
      $('dataGrid').inert = false;
      syncContactDataControls();
-     if (dataRequest === attempt) { await showContactRecovery(); $('recoveryStatus').textContent = message + ' Operation: ' + attempt.requestId; }
+     if (dataRequest === attempt) {
+      await showContactRecovery();
+      if (contactAttemptContext(attempt, credential, authAttempt) && dataRequest === attempt) $('recoveryStatus').textContent = message + ' Operation: ' + attempt.requestId;
+     }
     }
    }
   },
