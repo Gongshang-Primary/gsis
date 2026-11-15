@@ -1,5 +1,38 @@
 # v1 — PR #157 review, Codex
 
+## Recheck of the second-session addition — 16 November 2026, 00:49 SGT
+
+Project: **v1 coordination**. Model: **Codex**, independent reviewer. This new review supersedes the earlier head-specific verdicts for the current PR.
+
+- Exact reviewed head: [`c68e8a942d873f596323b7694ce407f23f2692ca`](https://github.com/helper-gsps/gsis/commit/c68e8a942d873f596323b7694ce407f23f2692ca), branch `claude/beautiful-dirac-uiflqu`.
+- Previous reviewed parent: `67def221c912ae178f45e28d153dbd13297a3443`.
+- Main inspected: `a84849ea335f33293be3e431284845636fa7deec`.
+- Head tree: `f4694e4a3034784628ced6981fa1b803ae918dc9`.
+- Verdict: **Approve the documentation at this exact head. No findings.** Exact-head CI is still pending; this is not a ready-to-merge or deployment claim.
+
+### Verified change and owner authority
+
+The owner explicitly confirmed in the current handoff that Claude session `session_01L5sZ14xpe864PwuPQKyrDF` also reviews v1 as of 15 November, and that reviews from both named v1 sessions count. The added sentence matches that ruling. It does not transfer v1 coordination away from ChatGPT, change the v0.9 split, confer application capability, or grant deployment/live-data authority.
+
+The only change from `67def22` is one edited line in `docs/coordination/OWNER_DIRECTIVES.md`. Automated byte comparisons prove:
+
+1. Removing the exact newly approved suffix from that line produces the original row verbatim.
+2. Replacing the edited row with its previous version produces the entire previous file verbatim; no other content changed.
+3. Removing the complete PR157 row from the current branch produces main's OWNER_DIRECTIVES file exactly. Both 15 November rules, the Contacts B1 rule and all history remain intact.
+4. The prospective merge into inspected main changes only OWNER_DIRECTIVES. All current main review records are retained byte-for-byte; the branch's older copies do not replace them.
+
+`git diff --check 67def221c912ae178f45e28d153dbd13297a3443 c68e8a942d873f596323b7694ce407f23f2692ca` passes. `git merge-tree --write-tree a84849ea335f33293be3e431284845636fa7deec c68e8a942d873f596323b7694ce407f23f2692ca` exits 0 with tree `bb4ab7ff72a1214435270056fd0439c7a3ceed92`. There is no product, test, build, CI, dependency, configuration or generated-output change.
+
+### Verification and remaining queue gates
+
+[Exact-head full regression CI 43736969772](https://github.com/helper-gsps/gsis/actions/runs/43736969772) is **in progress** with all four shards running at publication. No older head's CI is transferred. Require a complete green `full-suite` for `c68e8a942d873f596323b7694ce407f23f2692ca` and refresh the unchanged head/mergeability before merge.
+
+No local build or application suites were rerun for this documentation-only addition. Scope, policy preservation and the independent document review **Pass**; exact-head CI **Pending**. No skill package was executed. Runtime UAT and official T1B-01/T1B-02 remain **Not tested**; F5 remains **OPEN**.
+
+The owner's latest chain instruction explicitly permits differences anywhere under `docs/` in the final product-tree comparison; that supersedes the earlier narrower review/task-only wording quoted below. The chain is nevertheless currently stopped at #165: GitHub returned HTTP405 `Pull Request has merge conflicts` at approved head `38dabe6`, despite a clean local mechanical merge. The blocker is recorded in PR165. No #165–#175 merge or #157 merge was performed. Resume only under the owner's no-conflict/stop rules; this approval does not bypass that queue hold.
+
+The reviewer did not edit Claude's branch. No deployment, migration, provider send or live-data access.
+
 ## Recheck of the resolved head — 16 November 2026, 00:33 SGT
 
 Project: **v1 coordination**. Model: **Codex**, independent reviewer. The earlier approval below did not cover the conflict resolution; this is a fresh review of it.
