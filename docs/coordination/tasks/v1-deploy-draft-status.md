@@ -1,6 +1,6 @@
 # v1-deploy-draft-status: UAT019 saved draft venue controls
 
-- Status: claimed; implementation and verification pending.
+- Status: implemented; focused verification passed; full exact-head results and CI recorded in the PR. Claude review pending.
 - Owner/model: Codex; coordinator ChatGPT (v1); independent reviewer Claude.
 - Last updated (Asia/Singapore): 15 November 2026, 09:43.
 - Branch: `codex/v1-deploy-draft-status`.
@@ -35,6 +35,20 @@ UAT019 reports a saved v1 draft labelled ineligible. Source `public/app.js` requ
 
 ## Verification, review and release
 
-Pending. Apply the already selected Pstack root-cause skill (`skill://plugins_6a85a87df50c8191bd7f010bb7b17794/principle-fix-root-causes/SKILL.md`): reproduce behaviour, fix the compatibility boundary and test negative cases. No new skill/dependency installation.
+Applied the already selected Pstack root-cause skill (`skill://plugins_6a85a87df50c8191bd7f010bb7b17794/principle-fix-root-causes/SKILL.md`): reproduce behaviour, fix the compatibility boundary and test negative cases. No new skill/dependency installation.
 
-Q01 Pass after claim publication and re-read; Q02–Q06 pending implementation/evidence; Q07 pending Claude; Q08 not applicable to deployment. Rollback restores the prior v1 builder; there is no data/schema change. F5 remains OPEN. Official T1B-01/T1B-02 and unperformed runtime UAT remain Not tested.
+Claim accepted on main at `7b5f1eb2a9c12b9d27ffd9dab4de694f8885aefd`, then re-read. The implementation adds one anchored v1-only builder replacement: `planning` becomes `draft` in the venue-clear predicate, with every other conjunct unchanged. Production `public/app.js` and backend contracts are untouched.
+
+Red: the actual built mobile-width browser, backed by local Workers/D1, failed `A native v1 saved draft must offer clear-assignment preview to Admin` (false versus true). Green: six groups cover draft eligibility, preview/cancel with zero writes, queue-only then actual saved clear preserving identities, published and previously published versions, a non-Admin editor, and read-only Admin impersonation. Fixture setup corrections (operation ID slug, packed-toolbar locator, about:blank storage initialization) preceded the final result and were not product failures. Only the new test was formatted with cached Prettier 3.6.2; no dependency was added.
+
+Commands already passed with `TZ=Asia/Singapore` and browser `/usr/bin/chromium`:
+- `node tests/v1-product-deploy-draft-status.mjs` — six groups.
+- `node tests/release089-clear-venues-ui.cjs` and `node tests/v1-product-table-deploy-settings.mjs` — unchanged regressions.
+- `for f in tests/v1-core-*.mjs tests/v1-contacts-*.mjs; do node "$f" || exit; done` — 12 programs, 56 cases.
+- `npm run build` — canonical build, no tracked generated drift.
+- Both runner `--list` commands — new program discovered; 74 product and 1,173 full Node programs. The first auxiliary discovery assertion expected a `tests/` prefix; corrected to the runners' actual basename lists without changing either runner.
+- Syntax and `git diff --check` — passed.
+
+Exact committed-head commands to record in the PR: `node scripts/v1/test.mjs`; `npm test` (Node plus LORD); existing full-suite and isolated-product CI. Use `LORD_TEST_CHROMIUM`, `ROSTER_TEST_CHROMIUM` and `GSIS_BROWSER_EXECUTABLE` as `/usr/bin/chromium` locally. The PR records actual exit codes, counts, omissions, head SHA and run URLs; a planned command here is not a pass. Build/test output stays in ignored delivery paths, not this four-file diff.
+
+Q01–Q05 Pass: bounded accepted claim, unchanged authoritative state/permission/commit contracts, built-browser negatives, no new dependencies or runtime work. Q06: focused/build/discovery pass above; full exact-head results are authoritative in the PR, pending until supplied. Q07 Pending Claude. Q08 Not applicable to deployment. Rollback restores the prior v1 builder; there is no data/schema change. F5 remains OPEN. Official T1B-01/T1B-02 and unperformed runtime UAT remain Not tested.
