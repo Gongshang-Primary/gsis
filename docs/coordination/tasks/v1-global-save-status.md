@@ -1,11 +1,11 @@
 # v1-global-save-status: settle the shared unknown-save banner from verified client state
 
-- Status: claimed for bounded implementation after accepted-claim incorporation; source edits have not begun.
+- Status: implemented; final focused11/11, unchanged regressions22/22 and local publication gates pass. Full exact-head CI and Claude review pending.
 - Owner/model: Codex. Coordinator: ChatGPT v1.
 - Reviewer/model: Claude, independent exact-head reviewer; review pending.
-- Last updated (Asia/Singapore): 15 November 2026, 16:39.
+- Last updated (Asia/Singapore): 15 November 2026, 16:57.
 - Branch: `codex/v1-global-save-status`.
-- Base SHA: frozen published classification `ba818831fc318ccd7c5d5f501aed9dce5d141457`, complete tree `6ef5e38ee4026e1348fc9ca6b225410cd803595b`; local equivalent `461f538` has the same tree. Classification full CI is running at this exact head; its PR will open only after full Node/LORD green. Its parent PR173 is ready for Claude at f7f9ea2 with full1190/40 and product91 CI green. No parent result counts as this task’s verification.
+- Base SHA: frozen published classification `ba818831fc318ccd7c5d5f501aed9dce5d141457`, complete tree `6ef5e38ee4026e1348fc9ca6b225410cd803595b`; local equivalent `461f538` has the same tree. At claim time classification full CI was running at this exact head; its subsequent PR174 is recorded in the final checkpoint below. Its parent PR173 is ready for Claude at f7f9ea2 with full1190/40 and product91 CI green. No parent result counts as this task’s verification.
 - Current head SHA (or PR head; avoid self-referential commit hashes): not created.
 - PR: not created.
 - User-authorised scope: the owner's existing instruction to work through v1 frontend findings sequentially. Coordinator selected this as the next bounded fix after classification is published/frozen. The coordinator explicitly authorises this bounded implementation after claim incorporation, as a serial descendant while the frozen parent awaits CI/review. Only this child branch may be edited; no concurrent parent changes. No merge, deployment, live-data change or provider action.
@@ -20,6 +20,12 @@
 Current coordinator main at preparation is `b3406e3359a9eebceaf772bcd5ef2a8c81d64dc3`. Coordinator has rechecked all33 actual open-PR file inventories: generic-client overlap is only frozen ancestors173/168/167; no other module-shell writer was found. The coordinator explicitly selected the next claim after publishing the frozen classification head; source implementation still waits for accepted claim incorporation. Coordinator refreshed all heads/main/discovery/review branches and all33 actual open-PR file inventories immediately before this claim: main b3406e3, RunB 4c2c5eef3389f5291c6152bfe4b1bb49a0ae0acd and Claude branch58e22a7bf7ba4a49caa2caabe877605153b098db are unchanged. There is no competing editor; client overlaps are frozen ancestors only. The queue remains48 official source IDs; this additional demonstrated source finding is tracked by task name. Record the classification parent's exact head/tree/PR and actual CI/review state. No parent result substitutes for this child's exact-head evidence.
 
 Follow root/v1 AGENTS, workflow, owner directives, engineering/skill policy and quality gates. Publish only this task via the existing expected-head, non-force claim exception, re-read acceptance/overlap, and incorporate that accepted claim into the selected frozen parent before implementation. Do not edit the frozen classification parent or expand its five-path claim.
+
+### Accepted claim and serial handoff
+
+The claim landed on main at [`24a8872b506393021824269be18660fa702f8e51`](https://github.com/helper-gsps/gsis/commit/24a8872b506393021824269be18660fa702f8e51). Before source edits, local incorporation `6a55e9f9b61656e1fbbe99811d40321302fe056c` and public equivalent [`b7c68ed007cc3a12f888c41efa5f7a2c4c4c613a`](https://github.com/helper-gsps/gsis/commit/b7c68ed007cc3a12f888c41efa5f7a2c4c4c613a) share complete tree `f42ab9597856c5c0e8f84ca63e0d821fd8ca5adb`. Worktree: `/workspace/gsis-v1-global-save-status`; branch `codex/v1-global-save-status`. Incorporation is not an implementation or tested final head.
+
+The coordinator rechecked all33 actual PR file inventories after the claim: unchanged, with no competing writer. Run B remains `4c2c5eef3389f5291c6152bfe4b1bb49a0ae0acd`, Claude remains `58e22a7bf7ba4a49caa2caabe877605153b098db`; no official source ID was added. Frozen classification parent [`ba818831fc318ccd7c5d5f501aed9dce5d141457`](https://github.com/helper-gsps/gsis/commit/ba818831fc318ccd7c5d5f501aed9dce5d141457) has full1,191-program CI running and no PR yet at this checkpoint. Its parent [PR173](https://github.com/helper-gsps/gsis/pull/173), exact `f7f9ea2`, is ready for Claude with full1,190/LORD40 and product91 CI green. These parent results are historical context, never child passes. The [save-status contract](../../v1/core/SAVE_STATUS_CONTRACT.md) is the durable design/evidence handoff.
 
 ### Exact five-path allowlist
 
@@ -53,6 +59,8 @@ Only mark a lost response if the captured epoch/account/school/preview context a
 
 Notify after already-verified settlement, including generic terminal receipts, exact direct-result compatibility paths, Deploy verified recovery/withdrawal terminal caching and LORD read-only exact-receipt cleanup. Derive terminal entries as settled even when retained in the existing UI-history cache. Do not modify receipt validators, omit fresh authorisation, clear an operation merely because a status message is cleared, or treat pre-send cleanup as a commit. Context clearing resets this presentation without making any claim that an old operation was committed/aborted.
 
+The final interface is `GSISV1.saveStatus() -> {contextEpoch, uncertainCount}` and a payload-free `gsis:save-status` event. The epoch is the existing nonprivate monotonic security counter, not an account/session identifier. It lets the shell reset old status/error ownership immediately when protected-state clearing advances the epoch but awaits storage; the later clear event cannot erase a newer same-epoch warning/error. A successful same-account session restoration also notifies, restoring an unresolved warning hidden by401. Request/receipt/auth/storage semantics are unchanged.
+
 The shell marks which message it owns as uncertainty. Remove/replace that message when its derived relevant unknown count reaches zero. A successful unrelated request, one of several settlements, same-ID/wrong-domain/digest evidence or unverified acknowledgement cannot clear a genuine remaining warning. Settlement must not wipe permission-denied, sign-out failure or other unrelated status text. Preserve breadcrumb layout and operation-specific recovery controls.
 
 ### Acceptance checks
@@ -66,17 +74,27 @@ The shell marks which message it owns as uncertainty. Remove/replace that messag
 
 ## Verification
 
-Preparation only: existing read-only two-case counterexample passes as described; no production source changed. New tracked red/green test, unchanged regressions, canonical build, discovery, full CI and review are **Not run / Pending** for this task.
+All commands use `TZ=Asia/Singapore`; browser programs use `GSIS_BROWSER_EXECUTABLE=/usr/bin/chromium`. The [contract](../../v1/core/SAVE_STATUS_CONTRACT.md) records exact source hashes, full selected regression inventory and fixture/visual limitations.
 
-Planned focused command: `TZ=Asia/Singapore GSIS_BROWSER_EXECUTABLE=/usr/bin/chromium node tests/v1-product-save-status.mjs`.
+| Check | Actual result |
+| --- | --- |
+| Meaningful tracked red | `node tests/v1-product-save-status.mjs` failed at the intended pending0/stale-banner assertion; `/tmp/gsis-save-status-red.log`, exit1. Elapsed time was not recorded. Full client/shell, synthetic transport and real hashes. |
+| Final focused test | Same command: **11/11 groups pass, exit0,9.705s**; `/tmp/gsis-save-status-final.log`. Ten full-client/shell matrix groups plus the identified actual local nine-Worker Contacts owner/built-Chromium case. Two lost responses (commit and abort), original exact wire/receipts, pending/count/banner2→1→0, one committed audit and no aborted audit. |
+| Review corrections | Same-account session401 restoration and blocked-storage async clear counterexamples fixed. Final three-case synthetic peer recheck passes in0.667s (`/tmp/gsis-save-status-review-final.mjs`); not Claude review. |
+| Unchanged regressions | **22/22 programs pass**, no timeouts, maximum27.045s under the unchanged45-second bound. Files are byte-identical to parent `ba81883`; source hashes stable. `/tmp/gsis-global-save-status-regressions.log`, `-results.json`; exact selection in `...-regression-files.json` and contract. |
+| Canonical build and local gates | Baseline and final `npm run build` pass18 components/no tracked generated drift. Final log `/tmp/gsis-global-save-status-canonical-final.log`. All three JavaScript files pass `node --check`; whitespace, frozen hashes and exact five-path scope pass. |
+| Discovery | `node scripts/v1/test.mjs --list`:93 product programs; `node tests/run.cjs --list`:1,192 Node programs. Both include the new test; `/tmp/gsis-global-save-status-{product,node}-list.json`. Discovery is not a full run. |
+| Full exact-head CI / review | **Pending:**1,192-program Node/LORD,93-program product CI and independent Claude review at the published implementation head. No local full-suite pass claimed. |
 
-Required unchanged coverage selected from the exact diff includes shared-web transport/contracts, native navigation, Contacts recovery/classification/projection, Deploy save/receipt/compatibility and LORD cart/recovery. Run canonical `TZ=Asia/Singapore npm run build`, verify no tracked generated drift, syntax/diff/scope checks and discovery in both test runners. Run required exact-head full Node/LORD and product CI with unchanged limits. Root coordinates serial heavy runtime use. Record failures, fixture corrections and limits honestly; no parent-pass substitution.
+An intermediate expanded test passed two groups before a supposed-unsent fixture actually dispatched; the fixture was corrected, not counted as a product defect. Eleven groups then passed in9.702s (`/tmp/gsis-save-status-green2.log`) before final test-only refinements;9.705s is the final result. The original red is retained. Actual local owner/browser evidence is distinct from synthetic matrix/peer evidence and unperformed hosted runtime UAT.
 
-Q01 claim/incorporation **Pending**; Q02 bounded contract **Proposed**; Q03–Q06 implementation/evidence **Pending**; Q07 PR/exact-head Claude review **Pending**; Q08 **Not applicable — deployment not authorised**.
+Final discovery checkpoint: all34 actual open-PR inventories refreshed after [parent PR174](https://github.com/helper-gsps/gsis/pull/174); the prior33 were unchanged and only the frozen classification PR's five paths were added. Run B now `ee052420628e3567038df5141c448bc366d0d9ba` adds RUN-B-025, bringing official source IDs to49. Its baseline SERVICE_DENIED report is separate; read-only source comparison identifies the same Calendar-bound action addressed in PR172, not a hosted resolution proof. No expansion of this five-path task.
+
+Q01–Q05 **Pass locally** for claim/design/implementation and bounded security/recovery evidence. Q06 **Pass locally / full exact-head CI pending**. Q07 PR/exact-head Claude review **Pending**. Q08 **Not applicable — deployment not authorised**.
 
 ## Review
 
-Read-only source route inventory and synthetic counterexample informed preparation. No independent implementation review exists. Claude reviews the eventual exact implementation head without editing it. Advisory/model review is not human release approval.
+Read-only source inventory, synthetic peer counterexamples and final three-case recheck informed the fix. They are not an independent Claude review. Claude reviews the eventual exact implementation head without editing it. Advisory/model review is not human release approval.
 
 ## Deployment
 
@@ -84,6 +102,6 @@ Not deployed to staging or production. This task changes display notification on
 
 ## Handoff
 
-Next: coordinator verifies/incorporates this bounded claim on the frozen classification parent identified above, records the accepted claim/incorporation head/tree and fresh discovery checkpoint, then assigns source/test ownership. Carry `/tmp/gsis-global-save-status-design.md` route inventory and final evidence into `SAVE_STATUS_CONTRACT.md`; temporary notes are not the final Git handoff.
+Next: publish the bounded implementation PR, record its actual head/base and full CI, then request Claude exact-head review. The coordinator owns source/test assignments and publication; only the two documentation paths were assigned to this documentation agent. Final head/base, exact inventory, CI and Claude review belong in the implementation PR. No optional skill execution is claimed; repository ownership, minimal-state, R07 request/context binding and R09 recovery principles inform this contract.
 
 Code-only rollback restores the misleading banner and does not undo any durable operation or receipt. F5 remains **OPEN**. Official T1B-01/T1B-02 and unperformed runtime UAT remain **Not tested**. No secrets or private school data belong in the task, test or handoff.

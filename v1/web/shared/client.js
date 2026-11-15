@@ -15,7 +15,8 @@
     config = null,
     challenge = null,
     logoutOperationId = null,
-    securityEpoch = 0;
+    securityEpoch = 0,
+    lastSaveStatus = null;
   const suiteDomains = new Set([
     "core",
     "contacts",
@@ -80,6 +81,7 @@
   }
   async function clearProtectedState() {
     securityEpoch++;
+    notifySaveStatus();
     loadedRecoveryContext = null;
     recoveryStorageError = null;
     readFlights.clear();
@@ -127,6 +129,7 @@
       if (!r.ok || data.ok === false) {
         if (r.status === 401) {
           session = null;
+          notifySaveStatus();
           return null;
         }
         throw Object.assign(
@@ -156,6 +159,7 @@
       }
       session = next;
       loadRecoveryReferences();
+      notifySaveStatus();
       global.dispatchEvent(new CustomEvent("gsis:session", { detail: next }));
       return next;
     })().finally(() => {
@@ -472,6 +476,39 @@
     return ["schoolId", "accountId", "previewAccountId"].every(
       (k) => (value[k] ?? null) === current[k],
     );
+  }
+  function saveStatus() {
+    return {
+      contextEpoch: securityEpoch,
+      uncertainCount: [...pending.values()].filter(
+        (entry) =>
+          entry.uncertain &&
+          !entry.terminal &&
+          entry.epoch === securityEpoch &&
+          contextMatches(entry),
+      ).length,
+    };
+  }
+  function notifySaveStatus() {
+    const signature = securityEpoch + ":" + saveStatus().uncertainCount;
+    if (signature === lastSaveStatus) return;
+    lastSaveStatus = signature;
+    global.dispatchEvent(new CustomEvent("gsis:save-status"));
+  }
+  function markWriteUncertain(entry, epoch) {
+    if (
+      !entry ||
+      !entry.dispatched ||
+      entry.terminal ||
+      epoch !== securityEpoch ||
+      entry.epoch !== epoch ||
+      !contextMatches(entry) ||
+      pending.get(entry.key) !== entry
+    )
+      return;
+    entry.uncertain = true;
+    notifySaveStatus();
+    global.dispatchEvent(new CustomEvent("gsis:uncertain", { detail: entry }));
   }
   function operationKey(value) {
     return canonical([
@@ -1095,6 +1132,7 @@
         entry.storageError = error.message;
       }
       trimTerminalEntries();
+      notifySaveStatus();
     }
     outcome.reference = snapshot(entry);
     outcome.canRetry = outcome.reference.canRetry;
@@ -1588,8 +1626,10 @@
     if (verified) {
       const key = operationKey({ ...owner, service: "lord", operationId }),
         entry = pending.get(key);
-      if (entry && contextMatches(entry) && entry.ownerDigest === expected)
+      if (entry && contextMatches(entry) && entry.ownerDigest === expected) {
         pending.delete(key);
+        notifySaveStatus();
+      }
     }
     return {
       state: verified
@@ -2337,10 +2377,7 @@
         ...(body ? { body: activeEntry?.wire || JSON.stringify(body) } : {}),
       });
     } catch (error) {
-      if (key)
-        global.dispatchEvent(
-          new CustomEvent("gsis:uncertain", { detail: pending.get(key) }),
-        );
+      markWriteUncertain(activeEntry, requestEpoch);
       throw error;
     }
     if (requestEpoch !== securityEpoch)
@@ -2497,6 +2534,7 @@
     settleDirectImport(activeEntry, data, requestEpoch);
     settleDirectPublication(activeEntry, data, requestEpoch);
     settleDirectCalendar(activeEntry, data, requestEpoch);
+    notifySaveStatus();
     if (
       key &&
       ["pending", "prepared", "unknown"].includes(receipt?.state) &&
@@ -2669,6 +2707,7 @@
         })),
     operationState,
     operationStates,
+    saveStatus,
     recoverOperation,
     isUnsentOperation,
     prepareLordBookingRequest,
