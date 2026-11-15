@@ -29,7 +29,7 @@ Roster independently reads current Contacts authority and current Calendar/basel
 
 Allocation admissions bind both the selected saved planning revision and the absence of a publication pointer. Deploy edits, Contacts refresh into a saved version, and deletion use the existing source-change/pin protocol. A held destination operation must resolve or cancel before its source changes. These are owner-local checks and receipts; **no cross-D1 atomicity is claimed**. The existing check-to-commit interval and durable admission/recovery protocol remain material limits. Source outages, a corrupt/missing pointed-to publication, stale revisions, changed operation intent, wrong capabilities and current authority failures do not fall back to estimated success.
 
-If a verified publication is present, the existing immutable-publication path remains authoritative. This change does not add automatic publishing or provider sends. Existing verified-only capacity-warning notification gating stays intact; estimated capacity is available on screen and in explicit forecasts. Hosted scheduling/provider behaviour is not proved here.
+If a verified publication is present, the existing immutable-publication path remains authoritative. A publication ID alone is insufficient for automatic publishing: its workload rows must also be verified. The existing Roster service regression adds that negative case, complementing the real Worker estimate tests. This change does not add automatic publishing or provider sends. Existing verified-only capacity-warning notification gating stays intact; estimated capacity is available on screen and in explicit forecasts. Hosted scheduling/provider behaviour is not proved here.
 
 ## Visible changes for owner review
 
