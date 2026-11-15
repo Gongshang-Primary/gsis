@@ -1,6 +1,6 @@
 # v1-deploy-draft-status: UAT019 saved draft venue controls
 
-- Status: implemented; focused verification passed; full exact-head results and CI recorded in the PR. Claude review pending.
+- Status: merged [PR161](https://github.com/helper-gsps/gsis/pull/161) at reviewed head `1f4121a6b54de6f9973934992fea395fdc3cab81` as `706d9c8c274211c880d27e41711db49e721e3c6c`; not deployed by this merge task.
 - Owner/model: Codex; coordinator ChatGPT (v1); independent reviewer Claude.
 - Last updated (Asia/Singapore): 15 November 2026, 09:43.
 - Branch: `codex/v1-deploy-draft-status`.
@@ -52,3 +52,7 @@ Commands already passed with `TZ=Asia/Singapore` and browser `/usr/bin/chromium`
 Exact committed-head commands to record in the PR: `node scripts/v1/test.mjs`; `npm test` (Node plus LORD); existing full-suite and isolated-product CI. Use `LORD_TEST_CHROMIUM`, `ROSTER_TEST_CHROMIUM` and `GSIS_BROWSER_EXECUTABLE` as `/usr/bin/chromium` locally. The PR records actual exit codes, counts, omissions, head SHA and run URLs; a planned command here is not a pass. Build/test output stays in ignored delivery paths, not this four-file diff.
 
 Q01–Q05 Pass: bounded accepted claim, unchanged authoritative state/permission/commit contracts, built-browser negatives, no new dependencies or runtime work. Q06: focused/build/discovery pass above; full exact-head results are authoritative in the PR, pending until supplied. Q07 Pending Claude. Q08 Not applicable to deployment. Rollback restores the prior v1 builder; there is no data/schema change. F5 remains OPEN. Official T1B-01/T1B-02 and unperformed runtime UAT remain Not tested.
+
+## 15 November 2026 — owner-authorised integration
+
+The owner instructed Codex to merge applicable PRs one by one in logical order. Claude's approval and exact-head CI were rechecked before this merge; its tree matches the automatic merge of both parents without hand edits. This closes the implementation/documentation claim represented by this PR. Later UAT findings remain in their own queue and claims; merging is not hosted acceptance. The merge inventory and remaining gates are in `docs/coordination/tasks/v1-merge-records-20261115.md`. No deployment or live-data operation occurred. F5 OPEN; official T1B-01/T1B-02 and unperformed runtime UAT Not tested.

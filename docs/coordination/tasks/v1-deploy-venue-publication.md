@@ -1,6 +1,6 @@
 # v1 Deploy venue publication recovery
 
-- Status: implemented; first bug in the 15 November queue, V1-20261115-01. Full exact-head verification and Claude review are recorded in the implementation PR; no merge/deployment.
+- Status: merged [PR160](https://github.com/helper-gsps/gsis/pull/160) at reviewed head `ab24739203f3bcc03c5b7e6c96f8fa2144a84654` as `2d264b4fac63641218f15f922edcc8a8437b6d31`; not deployed by this merge task.
 - Owner/model: Codex. Coordinator: ChatGPT (v1). Independent reviewer: Claude.
 - Updated (Asia/Singapore): 15 November 2026, 09:16.
 - Branch: `codex/v1-deploy-venue-publication`.
@@ -39,3 +39,7 @@ Q01–Q05 Pass within this scope: authorization/overlap, owner boundaries, valid
 Skill used: Pstack `principle-fix-root-causes` (`skill://plugins_6a85a87df50c8191bd7f010bb7b17794/principle-fix-root-causes/SKILL.md`), read for reproduce-first diagnosis and avoiding weakened validation. No third-party code copied.
 
 No merge/deploy, live receipt lookup/retry, staff import or activation. F5 OPEN. Official T1B-01/T1B-02 and unperformed runtime UAT Not tested.
+
+## 15 November 2026 — owner-authorised integration
+
+The owner instructed Codex to merge applicable PRs one by one in logical order. Claude's approval and exact-head CI were rechecked before this merge; its tree matches the automatic merge of both parents without hand edits. This closes the implementation/documentation claim represented by this PR. Later UAT findings remain in their own queue and claims; merging is not hosted acceptance. The merge inventory and remaining gates are in `docs/coordination/tasks/v1-merge-records-20261115.md`. No deployment or live-data operation occurred. F5 OPEN; official T1B-01/T1B-02 and unperformed runtime UAT Not tested.
