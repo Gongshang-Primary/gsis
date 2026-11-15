@@ -1,6 +1,6 @@
 # Active-staff authority readiness — Package C, simplified after C1
 
-Model: Codex. 13 November 2026 SGT. **Design only; no query, report, store or cutover implemented.** ChatGPT selects Claude's C1 recommendation, as requested by the owner: one bounded consistent read inside the Contacts owner, then a cutover epoch recheck. This supersedes the manifest/page/cursor protocol in the original PR134 design at `b0abd003fceb59b4a8dd21904049f177b53c935a`. Review/owner source: `docs/coordination/review/pr134-claude-review.md` at `afae51b4037fc14447a1d70a046b76321fd96be3`. C must be scoped against this simpler design before any implementation begins.
+Model: Codex. 13 November 2026 SGT. **13 November design record; this document makes no query, report, store or cutover changes.** ChatGPT selects Claude's C1 recommendation, as requested by the owner: one bounded consistent read inside the Contacts owner, then a cutover epoch recheck. This supersedes the manifest/page/cursor protocol in the original PR134 design at `b0abd003fceb59b4a8dd21904049f177b53c935a`. Review/owner source: `docs/coordination/review/pr134-claude-review.md` at `afae51b4037fc14447a1d70a046b76321fd96be3`. C must be scoped against this simpler design before any implementation begins.
 
 The school has roughly 150 staff according to C1. Cross-service per-person fetching, manifests, root/page digests, ordinals, cursor validation and a pagination state machine are unnecessary at that scale. Pagination is deferred unless a measured directory exceeds one bounded owner read; that would require a separately reviewed extension, not an automatic fallback.
 
@@ -10,7 +10,7 @@ Contacts owns staff, accepted active status, the three authority records and the
 
 Every active staff member, including provisional and unlinked entries, must be checked. Inactive entries may appear in a separate informational section; blank authority records on them do not block. Active=false must be accepted and effective at evaluation time. Unknown, malformed, expired or otherwise unverified active status cannot silently exclude a person. Do not substitute date-scoped Roster activation for Contacts employment status. No default or bulk false values are written.
 
-Current `v1/contacts/accepted-facts.mjs` is an injected per-person reader, not an owner-side database or directory enumeration service. No authoritative v1 Contacts store exists in this repository. This design proposes an interface for the future owner, not a query against current production.
+`v1/contacts/accepted-facts.mjs` remains an injected per-person contract reader. As of 15 November 2026, main at `c69d30c682e11f10421e42efa746edc9b8729777` also contains an authoritative Contacts D1 owner in `v1/services/contacts/store.mjs` and `v1/services/contacts/service.mjs`, including `/readiness` and `/readiness/check`. The future-store wording in this 13 November design is historical. Assess that implementation against the guarantees below using its exact-head evidence; the existence of the store does not establish hosted readiness, durable recovery or completion of this document's future tests. No production query or data change is performed by this documentation refresh.
 
 ## One consistent owner read
 

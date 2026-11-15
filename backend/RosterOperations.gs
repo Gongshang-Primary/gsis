@@ -845,6 +845,7 @@ function rosterOperationsDispatchCore_(req,c){gsisRequireBackendRole_('roster');
  if(op==='acknowledge')return rosterAcknowledgementDispatch_(req,c);
  if(op==='statisticsCalendar'){const user=rosterOperationsAuthority_(c,req.identity);if(!user.smc&&!user.admin)error_(403,'SMC or Admin access is required.');return {allowed:true};}
  if(op==='statistics')return rosterStatisticsRead_(req,c,p);
+ if(op==='statisticsRPercent')return rosterStatisticsRPercent_(req,c);
  if(op==='saveAbsence'||op==='saveInstructions')return rosterAbsenceDispatch_(req,c);
  if(op==='read'&&p.view==='allocationLearning')return rosterOperationsAllocationLearning_(req,c);
  if(op==='publish'&&(p.publicationAcknowledgement===true||p.compact===true))return rosterOperationsPublishDispatch_(req,c);
@@ -856,7 +857,7 @@ function rosterOperationsDispatchCore_(req,c){gsisRequireBackendRole_('roster');
  if(p.view==='notificationReadiness'||op==='saveRecessSettings'){const user=rosterOperationsAuthority_(c,req.identity);if(!user.smc&&!user.admin)error_(403,'SMC or Admin access is required.');}
  if(op==='directory'){
   rosterOperationsAuthority_(c,req.identity);const date=GSISRosterOperations.date(p.date||rosterToday_()),activated=new Set(rosterOperationsState_(true).adhoc.filter(a=>!a.deletedAt&&a.date===date).map(a=>a.staffId));
-  return {date,people:c.rosterPeople.filter(p=>p.active===true||activated.has(p.id)).map(p=>({id:String(p.id),name:String(p.name||'')}))};
+  return {date,people:c.rosterPeople.filter(p=>p.active===true).map(p=>({id:String(p.id),name:String(p.name||'')}))};
  }
  if(op==='contactCreate'){
   const user=rosterOperationsAuthority_(c,req.identity);if(!user.smc&&!user.admin)error_(403,'SMC or Admin access is required.');
@@ -1115,7 +1116,7 @@ function rosterDailyEmploymentMailDispatch_(input={}){gsisRequireBackendRole_('r
  if(!/^https:\/\/[^\s/?#]+$/i.test(publicOrigin))return {...outcome,blocked:1,reason:'Configure the Roster public origin before sending Daily Updates.'};
  if(typeof MailApp==='undefined')return {...outcome,blocked:1,reason:'Authorise the Apps Script email service.'};
  let remaining;try{remaining=MailApp.getRemainingDailyQuota();}catch(e){return {...outcome,blocked:1,reason:'Authorise the Apps Script email service.'};}
- const fresh=rosterServiceContacts_().c,addresses=new Set(fresh.rosterPeople.flatMap(p=>Array.isArray(p.emails)?p.emails:[]).map(v=>String(v).trim().toLowerCase()));
+ const fresh=rosterServiceContacts_().c,addresses=new Set(fresh.rosterPeople.filter(p=>p.active===true).flatMap(p=>Array.isArray(p.emails)?p.emails:[]).map(v=>String(v).trim().toLowerCase()));
  for(let attempt=0;attempt<Math.min(5,remaining);attempt++){
   let claim,snapshot;const lock=LockService.getScriptLock();if(!deployLock_(lock,8000))return {...outcome,busy:true};
   try{const s=rosterOperationsState_(),now=Date.now();let changed=false;
@@ -1251,7 +1252,7 @@ function rosterNotificationEligible_(s,j,now,fresh,index,allowed){
  if(j.data.templateKey==='smc_attention'&&j.data.audience!=='duty-smc')return 'SMC duty wording requires a current duty recipient.';
  if(j.data.audience==='duty-smc'){const row=s.smcDutyRoster.find(r=>r.date===j.date);if(!GSISRosterOperations.dutyEligible(person)||!(fresh.rosterSMCIds||[]).includes(j.recipientId)||!row?.staffIds.includes(j.recipientId)||!GSISRosterOperations.dutyWindow(row,j.date,now))return 'Recipient is no longer on relief duty for this time window.';}
  if(j.data.audience==='urgent-smc'&&!(fresh.rosterUrgentSMCIds||[]).includes(j.recipientId))return 'Recipient is no longer eligible for urgent staff messages.';
- if(!person.active&&!s.adhoc.some(a=>a.staffId===j.recipientId&&a.date===j.date&&!a.deletedAt))return 'Recipient is inactive and is not engaged for the selected date.';
+ if(person.active!==true&&(!['relief_publication','relief_reminder','conditional_relief_instruction','stapler_timetable','mutual_request','mutual_override'].includes(j.kind)||!GSISRosterAllocation.reliefActive(s,{people:fresh.rosterPeople},person,j.date)))return 'Recipient is inactive in Contacts.';
  j.mobile=GSISRosterOperations.mobile(person.mobile);j.name=person.name;j.external=person.active!==true;
  if(!/^\d{8,15}$/.test(j.mobile))return 'Recipient mobile number is missing or invalid. Contact the teacher directly.';
  // Explicit Notify actions and proven emergency-absence events bypass quiet hours.

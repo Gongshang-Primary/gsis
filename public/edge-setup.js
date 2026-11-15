@@ -8,15 +8,17 @@ const text=(value,max=180)=>String(value??'').slice(0,max),validDigest=value=>ty
 function message(value,tone='info'){$('status-message').textContent=value;$('status-message').dataset.tone=tone;}
 function preparationFailure(data){
  if(data?.serverImport?.code==='ROSTER_IMPORT_FREEZE_CANCELLED')return 'Import stopped because the freeze was cancelled. Review the retained evidence and restart before starting a new import.';
- const reason=data?.failureReason,step=Number.isSafeInteger(data?.step)&&Number.isSafeInteger(data?.total)&&data.step>=1&&data.total>=data.step?'Preparation step '+data.step+' of '+data.total+'. ':'';
+ const reason=data?.failureReason,items=data?.progressUnit==='work-items'&&[data.workDone,data.workTotal,data.preparedParts].every(Number.isSafeInteger)&&data.workDone>=0&&data.workTotal>0&&data.workDone<=data.workTotal&&data.preparedParts>=0,step=items?'Preparation: '+data.workDone+' of '+data.workTotal+' work items complete · '+data.preparedParts+' parts saved. ':Number.isSafeInteger(data?.step)&&data.step>=1?'Preparation step '+data.step+'. ':'';
  if(reason&&typeof reason.message==='string')return step+'Preparation failed'+(typeof reason.phase==='string'?' during '+text(reason.phase,80):'')+(Number.isSafeInteger(reason.elapsed)&&reason.elapsed>=0?' after '+Math.floor(reason.elapsed/1000)+' s':'')+(Number.isInteger(reason.status)?' (status '+reason.status+')':'')+(typeof reason.code==='string'?' '+text(reason.code,80):'')+(Number.isSafeInteger(reason.bytes)?' · '+reason.bytes+' bytes':'')+(Number.isSafeInteger(reason.records)?' · '+reason.records+' records':'')+': '+text(reason.message,240);
  return (data?.state==='failed'||data?.requiresRestart)&&typeof data.lastPhase==='string'?'Preparation stopped. Last phase: '+text(data.lastPhase,80)+'.':'';
 }
 function stopPreparationClock(){if(preparationTimer!==null)clearInterval(preparationTimer);preparationTimer=null;}
 function preparationMessage(data,extraMs=0){
  if(['step','done','total','elapsedMs'].every(key=>data[key]===undefined)){message('Preparing one immutable source. The same request will resume after preparation.','busy');return false;}
- if(!Number.isSafeInteger(data.step)||!Number.isSafeInteger(data.done)||!Number.isSafeInteger(data.total)||data.step<1||data.total<data.step||data.done<0||data.done>data.total||!Number.isFinite(data.elapsedMs)||data.elapsedMs<0)throw Error('Preparation progress was not verified. Retry the same request.');
- message('Preparing: step '+data.step+' of '+data.total+' · '+Math.floor((data.elapsedMs+extraMs)/1000)+' s','busy');
+ const items=data.progressUnit==='work-items';
+ if(data.progressUnit!==undefined&&!items||!Number.isSafeInteger(data.step)||!Number.isSafeInteger(data.done)||!Number.isSafeInteger(data.total)||data.step<1||data.total<data.step||data.done<0||data.done>data.total||!Number.isFinite(data.elapsedMs)||data.elapsedMs<0||items&&(![data.workDone,data.workTotal,data.preparedParts].every(Number.isSafeInteger)||data.workDone<0||data.workTotal<1||data.workDone>data.workTotal||data.preparedParts<0))throw Error('Preparation progress was not verified. Retry the same request.');
+ const progress=items?data.workDone+' of '+data.workTotal+' work items complete · '+data.preparedParts+' parts saved':'step '+data.step;
+ message('Preparing: '+progress+' · '+Math.floor((data.elapsedMs+extraMs)/1000)+' s','busy');
  return true;
 }
 async function advanceImport(body,preparation,receivedAt){

@@ -1,7 +1,7 @@
 const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
 const {JSDOM}=require(process.env.GSIS_TEST_JSDOM||'jsdom');
 const tick=()=>new Promise(r=>setTimeout(r,0));
-async function harness(domain,handler,initialIds,{manualClock=false}={}){
+async function harness(domain,handler,initialIds,{manualClock=false,legacyProgress=false}={}){
  const html=fs.readFileSync((domain==='roster'?'roster-update/public':'public')+'/edge-setup.html','utf8');
  const dom=new JSDOM(html,{url:'https://'+domain+'.gsps.edu.sg/edge-setup.html',runScripts:'outside-only'}),w=dom.window,calls=[];
  w.HTMLDialogElement.prototype.showModal=function(){this.open=true};w.HTMLDialogElement.prototype.close=function(){this.open=false};w.URL.createObjectURL=()=> 'blob:export';w.URL.revokeObjectURL=()=>{};w.HTMLAnchorElement.prototype.click=function(){};
@@ -9,7 +9,9 @@ async function harness(domain,handler,initialIds,{manualClock=false}={}){
  if(manualClock){const timeout=w.setTimeout.bind(w);w.setTimeout=(fn)=>timeout(fn,0);Object.defineProperty(w.performance,'now',{value:()=>elapsed});w.setInterval=fn=>{const id=++timerId;intervals.set(id,fn);return id;};w.clearInterval=id=>intervals.delete(id);}
  w.fetch=async(path,options)=>{const body=JSON.parse(options.body);calls.push({path,options,body});const result=await handler(body,calls.length);return {ok:result.status!==403&&result.status!==401,status:result.status||200,json:async()=>result}};
  if(initialIds)w.sessionStorage.setItem('gsis-edge-setup-v094:'+domain,JSON.stringify(initialIds));
- vm.runInContext(fs.readFileSync('shared/edge-setup.js','utf8'),dom.getInternalVMContext());await tick();await tick();return {dom,w,calls,intervals,advance(ms){elapsed+=ms;for(const fn of intervals.values())fn();},click:async(id)=>{w.document.getElementById(id).click();await tick();await tick()}};
+ let script=fs.readFileSync('shared/edge-setup.js','utf8');
+ if(legacyProgress){const start=script.indexOf('function preparationMessage('),end=script.indexOf('async function advanceImport(',start);assert(start>=0&&end>start);script=script.slice(0,start)+fs.readFileSync('tests/fixtures/edge-setup-legacy-preparation.js','utf8')+script.slice(end);}
+ vm.runInContext(script,dom.getInternalVMContext());await tick();await tick();return {dom,w,calls,intervals,advance(ms){elapsed+=ms;for(const fn of intervals.values())fn();},click:async(id)=>{w.document.getElementById(id).click();await tick();await tick()}};
 }
 async function until(check){for(let n=0;n<100;n++){if(check())return;await tick();}assert.fail('Setup did not reach the expected step');}
 (async()=>{
@@ -22,9 +24,9 @@ async function until(check){for(let n=0;n<100;n++){if(check())return;await tick(
  let preparationCalls=0,finishPreparing,failStaging;
  const preparing=await harness('roster',body=>{if(body.operation==='status')return {ok:true,data:{scopes:[{scope:'roster',mode:'legacy',revision:0}]}};if(body.operation==='import'){preparationCalls++;if(preparationCalls===1)return {ok:true,data:{imported:false,sessionId:session,preparing:true,step:3,done:2,total:9,elapsedMs:47000,completedParts:0,totalParts:0,retryAfterMs:1000}};if(preparationCalls===2)return new Promise(resolve=>finishPreparing=resolve);if(preparationCalls===3)return new Promise((_,reject)=>failStaging=reject);return {ok:true,data:{imported:true,sessionId:session}};}throw Error('unexpected operation');},undefined,{manualClock:true});
  await preparing.click('op-import');await until(()=>finishPreparing);
- assert.equal(preparing.w.document.getElementById('status-message').textContent,'Preparing: step 3 of 9 · 47 s');
+ assert.equal(preparing.w.document.getElementById('status-message').textContent,'Preparing: step 3 · 47 s','old replies cannot present their estimated total as exact');
  assert.equal(preparing.intervals.size,1,'only one elapsed timer runs while a preparation call is in flight');preparing.advance(2000);
- assert.equal(preparing.w.document.getElementById('status-message').textContent,'Preparing: step 3 of 9 · 49 s');assert.equal(preparationCalls,2,'elapsed timer does not make import requests');
+ assert.equal(preparing.w.document.getElementById('status-message').textContent,'Preparing: step 3 · 49 s');assert.equal(preparationCalls,2,'elapsed timer does not make import requests');
  await preparing.click('op-import');assert.equal(preparationCalls,2,'a second click cannot start a concurrent step');
  const captured=JSON.parse(preparing.w.sessionStorage.getItem('gsis-edge-setup-v094:roster'));assert.equal(captured.session,session,'session is retained before advancing');
  finishPreparing({ok:true,data:{imported:false,sessionId:session,completedParts:0,totalParts:2,next:'part'}});await until(()=>failStaging);
@@ -34,6 +36,28 @@ async function until(check){for(let n=0;n<100;n++){if(check())return;await tick(
  assert.equal(preparationCalls,4,'transient staging loss recovers without a manual retry');const preparationBodies=preparing.calls.filter(c=>c.body.operation==='import').map(c=>c.body);assert.equal(new Set(preparationBodies.map(p=>p.requestId)).size,1);assert(preparationBodies.slice(1).every(p=>p.sessionId===session),'retry keeps the same preparation request and session');preparing.dom.window.close();
  let legacyCalls=0;const legacyPreparing=await harness('roster',body=>body.operation==='status'?{ok:true,data:{scopes:[{scope:'roster',mode:'legacy',revision:0}]}}:{ok:true,data:++legacyCalls===1?{imported:false,sessionId:session,preparing:true,completedParts:0,totalParts:0}:{imported:true,sessionId:session}},undefined,{manualClock:true});
  await legacyPreparing.click('op-import');await until(()=>legacyCalls===2);assert.equal(legacyPreparing.intervals.size,0,'legacy preparation never fabricates elapsed progress');assert.equal(legacyPreparing.calls.filter(c=>c.body.operation==='import').length,2);assert.equal(new Set(legacyPreparing.calls.filter(c=>c.body.operation==='import').map(c=>c.body.requestId)).size,1);legacyPreparing.dom.window.close();
+ const exporter={};vm.createContext(exporter);vm.runInContext(fs.readFileSync('backend/RosterEdgeMigration.gs','utf8'),exporter);
+ exporter.rosterEdgeExportHash_=text=>require('node:crypto').createHash('sha256').update(text).digest('hex');
+ const itemReply={...exporter.rosterEdgeExportReplyV2_({sessionId:session,requestId:'mixed-version-request',sourceDigest:digest,stage:'objects',jobs:3,jobIndex:1,ordinal:19,work:{header:{partMetadata:[]},parts:15,next:4},parts:Array.from({length:8},()=>({})),elapsedMs:47000,lastStep:'Freeze parts'},{fileId:'private-checkpoint',digest}),imported:false,completedParts:0,totalParts:0};
+ let itemCalls=0,finishItems;
+ const itemPreparing=await harness('roster',body=>body.operation==='status'?{ok:true,data:{scopes:[{scope:'roster',mode:'legacy',revision:0}]}}:++itemCalls===1?{ok:true,data:itemReply}:new Promise(resolve=>finishItems=resolve),undefined,{manualClock:true});
+ await itemPreparing.click('op-import');await until(()=>finishItems);
+ assert.equal(itemPreparing.w.document.getElementById('status-message').textContent,'Preparing: 2 of 6 work items complete · 8 parts saved · 47 s','a high call ordinal must not overstate completed work');
+ itemPreparing.advance(3000);assert.match(itemPreparing.w.document.getElementById('status-message').textContent,/2 of 6 work items complete.*8 parts saved.*50 s/);assert.equal(itemCalls,2,'the elapsed clock neither changes work totals nor sends requests');
+ finishItems({ok:true,data:{imported:true,sessionId:session}});await until(()=>!itemPreparing.w.document.getElementById('op-import').disabled);itemPreparing.dom.window.close();
+ // Old Workers forwarded only these public progress keys. Run the new backend
+ // reply through that exact projection, then let the real new setup continue.
+ const oldWorkerReply={imported:false,sessionId:session,completedParts:0,totalParts:0};for(const key of ['step','done','total','elapsedMs','preparing','retryAfterMs'])oldWorkerReply[key]=itemReply[key];
+ for(const mixed of [{name:'old UI and new backend',legacyProgress:true,reply:itemReply},{name:'new UI and old Worker',legacyProgress:false,reply:oldWorkerReply}]){
+  let mixedCalls=0,finishMixed;
+  const compatible=await harness('roster',body=>body.operation==='status'?{ok:true,data:{scopes:[{scope:'roster',mode:'legacy',revision:0}]}}:++mixedCalls===1?{ok:true,data:mixed.reply}:new Promise(resolve=>finishMixed=resolve),undefined,{manualClock:true,legacyProgress:mixed.legacyProgress});
+  await compatible.click('op-import');await until(()=>finishMixed);assert.equal(mixedCalls,2,mixed.name+' advances past preparation');assert.match(compatible.w.document.getElementById('status-message').textContent,mixed.legacyProgress?/Preparing: step 20 of 30/:/Preparing: step 20 · 47 s/);
+  finishMixed({ok:true,data:{imported:true,sessionId:session}});await until(()=>!compatible.w.document.getElementById('op-import').disabled);assert.match(compatible.w.document.getElementById('status-message').textContent,/Import confirmed/,mixed.name+' completes without a restart');compatible.dom.window.close();
+ }
+ for(const invalid of [{progressUnit:'calls'},{preparedParts:-1},{preparedParts:undefined},{workDone:7},{workDone:undefined},{workTotal:0},{workTotal:undefined}]){
+  const brokenItems=await harness('roster',body=>body.operation==='status'?{ok:true,data:{scopes:[{scope:'roster',mode:'legacy',revision:0}]}}:{ok:true,data:{...itemReply,...invalid}},undefined,{manualClock:true});
+  await brokenItems.click('op-import');assert.match(brokenItems.w.document.getElementById('status-message').textContent,/Preparation progress was not verified/);assert.equal(brokenItems.calls.filter(c=>c.body.operation==='import').length,1,'unverified units and counts stop automatic continuation');brokenItems.dom.window.close();
+ }
  const malformed=await harness('roster',body=>body.operation==='status'?{ok:true,data:{scopes:[{scope:'roster',mode:'legacy',revision:0}]}}:{ok:true,data:{imported:false,sessionId:session,preparing:true,step:3,done:2,total:1,elapsedMs:47000,completedParts:0,totalParts:0}},undefined,{manualClock:true});
  await malformed.click('op-import');assert.match(malformed.w.document.getElementById('status-message').textContent,/Preparation progress was not verified/);assert.equal(malformed.calls.filter(c=>c.body.operation==='import').length,1,'malformed counters do not advance another step');assert.equal(JSON.parse(malformed.w.sessionStorage.getItem('gsis-edge-setup-v094:roster')).session,session);assert.equal(malformed.intervals.size,0);malformed.dom.window.close();
  let failedCalls=0;const failed=await harness('roster',body=>{if(body.operation==='status')return {ok:true,data:{scopes:[{scope:'roster',mode:'legacy',revision:0}],canResume:true,importSession:{state:'failed',requestId:captured.import,sessionId:session}}};if(body.operation==='import'){failedCalls++;return {ok:true,data:{imported:false,sessionId:session,requiresRestart:true,completedParts:0,totalParts:0}};}if(body.operation==='export')return {ok:true,data:{exports:[{scope:'roster',mode:'legacy',revision:0}]}};if(body.operation==='restart')return {ok:true,data:{restarted:true}};throw Error('unexpected operation');},captured,{manualClock:true});

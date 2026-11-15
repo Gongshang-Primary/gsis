@@ -1,3 +1,24 @@
+# Pending hotfix: activated ad hoc relief eligibility, 14 November 2026
+
+Model: Codex. Restore active-or-dated-ad-hoc eligibility after #38: manual/automatic relief, shared cover, daily reports and duty WhatsApp include activated inactive Contacts within their dates/periods. Truly inactive staff remain blocked. Dated labels read “ad hoc”; Contacts status and allocation rules are unchanged. See `docs/coordination/tasks/roster-adhoc-inactive-regression.md` and `docs/plans/2026-11-15-adhoc-hotfix-deploy-steps.md`. Not deployed.
+
+# Stapler teacher-row write-across, 14 November 2026
+
+Model: Codex. In the Stapler planner teacher view, each teacher row has Subject / Venue / Group fields with a "→" button that mass-writes one value across the whole row (all periods for that teacher), mirroring the class-row fields. Only existing lesson tiles change unless "In empty cells, create tiles" is chosen, in which case empty cells gain a tile for that teacher with the picked classes. Recess is never filled. Changes stay local until Save to online; one Undo restores the previous values and removes created tiles. See docs/coordination/tasks/stapler-teacher-row-write-across.md.
+
+
+
+# Pending: inactive staff excluded from new relief and delivery, 13 November 2026
+
+Model: Codex. Inactive Contacts staff are excluded from new relief allocation, ad hoc selection, peer eligibility and final WhatsApp/email delivery. Inactive teachers' saved duties and history stay, marked for review with an ` (inactive)` label; no automatic removal or refill. The allocator preserves manual, peer, published, protected and started duties. Daily employment settings can remove a retained ineligible recipient. See docs/coordination/tasks/roster-inactive-teacher.md.
+## Unreleased: timetabled occupancy wording
+
+Deploy and Roster use the approved individual occupancy and relief quota wording in calculations, statistics, help, tooltips and Excel headers. Current configured budgets, formulas, policy names and data fields are unchanged.
+## PR #58 refresh, 6 November 2026
+
+Refresh the test-only D1 activation acceptance harness on current main. Verify current cron authority resolution, disabled allocation-cycle gating and no hidden job failures at t+20.
+
+
 # Pending: D1 Drive backup progress and cache-loss recovery, 12 November 2026
 
 Model: Codex. Completed, failed and expired runs remove their transient captured copies while retaining every ledger row and manifest. Full/increment exports and their scheduled worker renew ownership from actual progress, retain stage timings, and wait an hour after failures. Missing or corrupt derived timetable-cache entries are listed in `missingCacheParts` and omitted; authoritative digest failures remain fatal. Verified full/restore results appear in System Health. Per-day Admin alert identities survive recovery, which closes incidents without resetting blocked delivery history. Synthetic coverage includes 14,081 records, scheduled restore, increments, a 20-minute export/competing cron and retained blocked alerts. No live configuration, template activation, provider calls, merge or deployment. See docs/coordination/tasks/roster-d1-full-backup-fix.md.
@@ -60,6 +81,9 @@ Model: Muse. The Teacher field in the Add teacher tile dialog (and Edit teacher 
 # Pending: LORD return and collection as one long scrolling page, 6 November 2026
 
 Model: Muse. Return and collection trolley cards render open in a single scrolling list with no collapsible sections and no one-open-at-a-time binding. The return page no longer has the per-trolley "I am physically returning" checkbox or the two placement declaration checkboxes; quantity and photo per trolley still gate submission, partial returns remain barred by the backend, and both placement declarations are still sent as true with every trolley, covered by the single submit confirmation. Source and template copies kept byte-identical; return and collection browser tests updated. No deployment or live action. See [task](docs/coordination/tasks/lord-return-collection-scroll.md).
+## Unreleased: restore import health visibility
+
+System Health now shows retained Roster import job outcomes and recent failures alongside the current Drive and Venues diagnostics.
 
 # Pending: reliable Deploy to Contacts publication sync, 6 November 2026
 

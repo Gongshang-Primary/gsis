@@ -1,0 +1,340 @@
+/** Canonical multi-sheet OOXML. Identifiers are literal strings, never formulas. */
+const MAX_BYTES = 8 * 1024 * 1024,
+  MAX_CELLS = 30000,
+  MAX_SHEETS = 32;
+const xml = (value) =>
+  String(value ?? "")
+    .replace(/[\x00-\x08\x0b\x0c\x0e-\x1f]/g, "")
+    .replace(
+      /[&<>"']/g,
+      (c) =>
+        ({
+          "&": "&amp;",
+          "<": "&lt;",
+          ">": "&gt;",
+          '"': "&quot;",
+          "'": "&apos;",
+        })[c],
+    );
+const column = (index) => {
+  let value = "";
+  for (index++; index; index = Math.floor((index - 1) / 26))
+    value = String.fromCharCode(65 + ((index - 1) % 26)) + value;
+  return value;
+};
+async function library(provided) {
+  if (provided) return provided;
+  if (window.JSZip) return window.JSZip;
+  await new Promise((resolve, reject) => {
+    const script = document.createElement("script");
+    script.src = "/roster/jszip.min.js";
+    script.onload = resolve;
+    script.onerror = () => reject(Error("Excel support did not load."));
+    document.head.append(script);
+  });
+  return window.JSZip;
+}
+export async function encodeWorkbook(workbook, { Zip } = {}) {
+  const JSZip = await library(Zip),
+    archive = new JSZip(),
+    ns = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
+  const sheets = [
+    [
+      "Metadata",
+      {
+        columns: ["Field", "Value"],
+        rows: Object.entries(
+          workbook.metadata || { ...workbook, sheets: undefined },
+        ).filter(([, v]) => v !== undefined && typeof v !== "object"),
+      },
+    ],
+    ...Object.entries(workbook.sheets || {}),
+  ];
+  if (sheets.length > MAX_SHEETS || !workbook.sheets)
+    throw Error("Invalid workbook.");
+  let count = 0;
+  sheets.forEach(([name, sheet], i) => {
+    if (
+      !Array.isArray(sheet.columns) ||
+      !Array.isArray(sheet.rows) ||
+      !name ||
+      name.length > 31 ||
+      /[\\/?*\[\]:]/.test(name)
+    )
+      throw Error("Invalid worksheet.");
+    const rows = [sheet.columns, ...sheet.rows];
+    count += rows.reduce((n, row) => n + row.length, 0);
+    if (count > MAX_CELLS)
+      throw Error("Workbook exceeds the supported cell count.");
+    const data = rows
+      .map(
+        (row, r) =>
+          '<row r="' +
+          (r + 1) +
+          '">' +
+          row
+            .map((v, c) => {
+              const ref = column(c) + (r + 1);
+              if (v === null || v === undefined) return '<c r="' + ref + '"/>';
+              if (typeof v === "number") {
+                if (!Number.isFinite(v))
+                  throw Error("Workbook numbers must be finite.");
+                return '<c r="' + ref + '" t="n"><v>' + v + "</v></c>";
+              }
+              if (typeof v === "boolean")
+                return (
+                  '<c r="' + ref + '" t="b"><v>' + (v ? 1 : 0) + "</v></c>"
+                );
+              return (
+                '<c r="' +
+                ref +
+                '" t="inlineStr"><is><t xml:space="preserve">' +
+                xml(v) +
+                "</t></is></c>"
+              );
+            })
+            .join("") +
+          "</row>",
+      )
+      .join("");
+    archive.file(
+      "xl/worksheets/sheet" + (i + 1) + ".xml",
+      '<?xml version="1.0" encoding="UTF-8"?><worksheet xmlns="' +
+        ns +
+        '"><sheetViews><sheetView workbookViewId="0"><pane xSplit="1" ySplit="1" topLeftCell="B2" activePane="bottomRight" state="frozen"/></sheetView></sheetViews><sheetData>' +
+        data +
+        "</sheetData></worksheet>",
+    );
+  });
+  archive.file(
+    "[Content_Types].xml",
+    '<?xml version="1.0"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>' +
+      sheets
+        .map(
+          (_, i) =>
+            '<Override PartName="/xl/worksheets/sheet' +
+            (i + 1) +
+            '.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>',
+        )
+        .join("") +
+      "</Types>",
+  );
+  archive.file(
+    "_rels/.rels",
+    '<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>',
+  );
+  archive.file(
+    "xl/workbook.xml",
+    '<?xml version="1.0"?><workbook xmlns="' +
+      ns +
+      '" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets>' +
+      sheets
+        .map(
+          ([name], i) =>
+            '<sheet name="' +
+            xml(name) +
+            '" sheetId="' +
+            (i + 1) +
+            '" r:id="rId' +
+            (i + 1) +
+            '"/>',
+        )
+        .join("") +
+      "</sheets></workbook>",
+  );
+  archive.file(
+    "xl/_rels/workbook.xml.rels",
+    '<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
+      sheets
+        .map(
+          (_, i) =>
+            '<Relationship Id="rId' +
+            (i + 1) +
+            '" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet' +
+            (i + 1) +
+            '.xml"/>',
+        )
+        .join("") +
+      "</Relationships>",
+  );
+  return archive.generateAsync({ type: "uint8array", compression: "DEFLATE" });
+}
+export async function decodeWorkbook(
+  bytes,
+  { Zip, XMLParser = globalThis.DOMParser } = {},
+) {
+  // CRC preflight inflates every archive entry; inspect declared sizes before reading any part.
+  if (bytes.byteLength > MAX_BYTES) throw Error("The workbook exceeds 8 MiB.");
+  const JSZip = await library(Zip),
+    archive = await JSZip.loadAsync(bytes, { checkCRC32: false });
+  const files = Object.values(archive.files);
+  if (files.length > 160) throw Error("Too many workbook parts.");
+  let expanded = 0;
+  for (const file of files) {
+    expanded += file._data?.uncompressedSize || 0;
+    if (expanded > MAX_BYTES * 4)
+      throw Error("The workbook expands beyond the supported size.");
+    if (/vbaProject|externalLinks|connections\.xml/i.test(file.name))
+      throw Error("Macros and external data links are not supported.");
+  }
+  async function doc(name) {
+    const part = archive.file(name);
+    if (!part) throw Error("Missing workbook part: " + name);
+    const text = await new Promise((resolve, reject) => {
+      const chunks = [];
+      let length = 0;
+      const stream = part.internalStream("string");
+      stream
+        .on("data", (chunk) => {
+          length += chunk.length;
+          if (length > MAX_BYTES) {
+            stream.pause();
+            reject(Error("Workbook XML exceeds the supported size."));
+            return;
+          }
+          chunks.push(chunk);
+        })
+        .on("error", reject)
+        .on("end", () => resolve(chunks.join("")))
+        .resume();
+    });
+    if (/<!DOCTYPE|<!ENTITY/i.test(text))
+      throw Error("Unsupported workbook XML.");
+    const parsed = new XMLParser().parseFromString(text, "application/xml");
+    if (parsed.getElementsByTagName("parsererror").length)
+      throw Error("Malformed workbook XML.");
+    return parsed;
+  }
+  const wb = await doc("xl/workbook.xml"),
+    rels = await doc("xl/_rels/workbook.xml.rels");
+  const targets = new Map();
+  for (const relation of rels.getElementsByTagName("Relationship")) {
+    if (relation.getAttribute("TargetMode") === "External")
+      throw Error("External workbook links are not permitted.");
+    const target = relation.getAttribute("Target");
+    if (target.includes("..") || target.startsWith("/") || target.includes(":"))
+      throw Error("Invalid workbook reference.");
+    targets.set(relation.getAttribute("Id"), "xl/" + target);
+  }
+  const strings = [];
+  if (archive.file("xl/sharedStrings.xml"))
+    for (const item of (await doc("xl/sharedStrings.xml")).getElementsByTagName(
+      "si",
+    ))
+      strings.push(
+        [...item.getElementsByTagName("t")].map((x) => x.textContent).join(""),
+      );
+  const sheets = {},
+    seen = new Set();
+  let count = 0;
+  const sheetElements = [...wb.getElementsByTagName("sheet")];
+  if (sheetElements.length > MAX_SHEETS) throw Error("Too many worksheets.");
+  for (const sheet of sheetElements) {
+    const name = sheet.getAttribute("name");
+    if (["__proto__", "constructor", "prototype"].includes(name))
+      throw Error("Unsupported worksheet name.");
+    if (seen.has(name)) throw Error("Duplicate worksheet names.");
+    seen.add(name);
+    const target = targets.get(sheet.getAttribute("r:id"));
+    if (!target) throw Error("Missing worksheet reference.");
+    const data = await doc(target),
+      rows = [];
+    let lastRow = 0;
+    for (const row of data.getElementsByTagName("row")) {
+      const rowNumber = Number(row.getAttribute("r"));
+      if (
+        !Number.isSafeInteger(rowNumber) ||
+        rowNumber <= lastRow ||
+        rowNumber > MAX_CELLS + 1
+      )
+        throw Error("Invalid or duplicate worksheet row.");
+      lastRow = rowNumber;
+      const values = [],
+        used = new Set();
+      for (const cell of row.getElementsByTagName("c")) {
+        if (++count > MAX_CELLS)
+          throw Error("Workbook exceeds the supported cell count.");
+        const ref = cell.getAttribute("r"),
+          match = /^([A-Z]{1,3})(\d+)$/.exec(ref || "");
+        if (!match || Number(match[2]) !== rowNumber)
+          throw Error("Invalid cell reference.");
+        let index = 0;
+        for (const char of match[1])
+          index = index * 26 + char.charCodeAt(0) - 64;
+        index--;
+        if (index >= 256 || used.has(index))
+          throw Error("Invalid or duplicate cell.");
+        used.add(index);
+        if (cell.getElementsByTagName("f").length)
+          throw Error(
+            "Formulas are not accepted. Export values before importing.",
+          );
+        const type = cell.getAttribute("t"),
+          raw = cell.getElementsByTagName("v")[0]?.textContent;
+        let value = null;
+        if (type === "inlineStr")
+          value = [...cell.getElementsByTagName("t")]
+            .map((x) => x.textContent)
+            .join("");
+        else if (type === "s") {
+          value = strings[Number(raw)];
+          if (value === undefined) throw Error("Invalid shared string.");
+        } else if (type === "b") {
+          if (!["0", "1"].includes(raw)) throw Error("Invalid boolean.");
+          value = raw === "1";
+        } else if (raw !== undefined && raw !== "") {
+          value = type === "str" ? raw : Number(raw);
+          if (typeof value === "number" && !Number.isFinite(value))
+            throw Error("Invalid number.");
+        }
+        values[index] = value;
+      }
+      for (let i = 0; i < values.length; i++)
+        if (!(i in values)) values[i] = null;
+      rows.push(values);
+    }
+    if (!rows.length) throw Error("Worksheet " + name + " has no columns.");
+    const columns = rows.shift();
+    if (
+      columns.some((x) => typeof x !== "string" || !x) ||
+      new Set(columns).size !== columns.length
+    )
+      throw Error("Worksheet columns must be unique nonempty text.");
+    if (rows.some((row) => row.length > columns.length))
+      throw Error("Data extends beyond the declared worksheet columns.");
+    sheets[name] = {
+      columns,
+      rows: rows.map((row) =>
+        Array.from({ length: columns.length }, (_, i) => row[i] ?? null),
+      ),
+    };
+  }
+  const metadataSheet = sheets.Metadata;
+  if (!metadataSheet || metadataSheet.columns.join("|") !== "Field|Value")
+    throw Error("Use an Export All workbook with visible Metadata.");
+  delete sheets.Metadata;
+  if (
+    metadataSheet.rows.some((row) => typeof row[0] !== "string" || !row[0]) ||
+    new Set(metadataSheet.rows.map((row) => row[0])).size !==
+      metadataSheet.rows.length
+  )
+    throw Error("Metadata keys must be unique nonempty text.");
+  const metadata = Object.fromEntries(metadataSheet.rows);
+  if (["reporting", "reporting-only"].includes(metadata.mode))
+    throw Error(
+      "Export Visible is for reporting. Use Export All for an importable workbook.",
+    );
+  return { schemaVersion: 1, metadata, sheets };
+}
+export function download(
+  bytes,
+  name,
+  mime = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+) {
+  const url = URL.createObjectURL(new Blob([bytes], { type: mime })),
+    link = document.createElement("a");
+  link.href = url;
+  link.download = name;
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(url), 60000);
+}

@@ -10,6 +10,9 @@ try { first = h.call(h.input); } catch (error) { failure = error; }
 assert.equal(h.stats().decodes, 0, 'capture must never inflate any of the 10 stored plans, 9 archives or compressed audit evidence');
 if (failure) throw failure;
 assert(first.preparing);
+assert.equal(first.progressUnit, 'work-items');
+assert.equal(first.workTotal, 60, '57 captured plan references, source, records and manifest are the complete work inventory');
+assert.equal(first.workDone, 1, 'capture completes only the frozen source item');
 assert.equal(h.stats().captures, 1);
 const source = [...h.files.values()].find(file => file.name.endsWith('source.json'));
 assert(source, 'capture uploads the frozen source');
@@ -24,13 +27,19 @@ assert(h.calls[0].elapsed < 120000, 'capture stays below the simulated two-minut
 
 let response = first, polls = 0;
 while (response.preparing) {
+  const previousDone=response.workDone;
   assert(++polls < 250, 'production-shaped import completes in bounded polls');
   response = h.call({...h.input, preparation: response.preparation});
+  assert.equal(response.workTotal,60);
+  assert(response.workDone>=previousDone&&response.workDone<=previousDone+1);
+  assert(response.total>=response.step&&response.done===response.step);
   assert(h.calls.at(-1).decodes <= 1, 'one preparation call expands at most its selected dated plan');
   if(response.phase==='Freeze parts')assert.equal(h.calls.at(-1).decodes,0,'freezing cached parts never reopens a stored plan');
   assert(h.calls.at(-1).elapsed < 120000, 'every preparation call stays below the simulated two-minute budget');
 }
 assert(response.manifest);
+assert.equal(response.workDone,60);
+assert(response.step>response.workTotal);
 const parts = response.manifest.parts.map(part => h.call({operation: 'edgeExportPart', requestId: h.input.requestId,
   partId: part.id, preparation: response.preparation}).payload);
 const rows = parts.flatMap((payload, i) => response.manifest.parts[i].kind === 'records'

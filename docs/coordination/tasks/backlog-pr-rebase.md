@@ -43,3 +43,11 @@ For each PR, in the order #38, #42, #46, #47, #48, #58, #60, #72, #40:
 - Merging any PR (owner merges on their word only).
 - Fixing #72's five blockers or #40's ranking/FAJT policy (rebase only).
 - New features, policy changes, live data, deployments, or touching the v1 lanes.
+
+## PR #38 rebase checkpoint (Model: Codex, 13 Nov)
+
+- Fetched main is `f7014a14b0bdcd84b6e35c4665a49d241e0981c7`; its changes after the supplied `5aac5f7` are coordination records. Original PR head `6d2a835742f017fe4b91803eb139ac09a17e0fda` is preserved locally at `archive/backlog-pr38-6d2a835` and is the explicit remote push lease.
+- Historical main-merge/refresh commits were consolidated into an equivalent net patch before rebasing. The consolidated pre-rebase tree exactly matched original tree `b11c239a02c1c898b8467f6c0a6aa7092e88144f`; this avoids replaying interim changes that the PR itself later undid.
+- Conflicts resolved by preserving current attendance transport, for-info instruction handling/LSE traces and the D1 employment drain while applying the PR's active-only eligibility/delivery intent. Personal instruction notices retain their trace; final provider eligibility still blocks inactive recipients. Generated artifacts were regenerated, never hand-edited.
+- Canonical build passed and repeat build left no diff before the generated reference update. All 22 affected test programs passed, plus instruction-info-only (3), employment drain, LSE (2), and both parity checks (30 programs total after refreshing parity references). All 272 parity classifications/outcomes remain identical; only source/handler line references changed.
+- Fresh CI and exact-head Muse handoff remain to be recorded in PR #38. Earlier approvals do not approve the rebased head. No main push, merge, deployment or live access.

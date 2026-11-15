@@ -1,0 +1,6 @@
+{
+ "name":"gsis-v1-product","version":"1.0.0-dev","private":true,"type":"module",
+ "scripts":{"build":"node ../scripts/v1/build.mjs","dev":"node ../scripts/v1/dev.mjs","test":"node ../scripts/v1/test.mjs"},
+ "devDependencies":{"wrangler":"4.161.0"},
+ "engines":{"node":">=24.15.0"}
+}

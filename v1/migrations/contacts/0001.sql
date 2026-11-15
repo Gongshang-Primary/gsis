@@ -1,0 +1,20 @@
+CREATE TABLE IF NOT EXISTS contacts_staff(school_id TEXT NOT NULL,staff_id TEXT NOT NULL,basic_name TEXT NOT NULL,ttb_name TEXT NOT NULL,active INTEGER CHECK(active IN(0,1) OR active IS NULL),section TEXT,profile_state TEXT NOT NULL DEFAULT 'provisional',revision INTEGER NOT NULL,authority_revision INTEGER NOT NULL DEFAULT 0,created_at INTEGER NOT NULL,PRIMARY KEY(school_id,staff_id));
+CREATE INDEX IF NOT EXISTS contacts_staff_active ON contacts_staff(school_id,active,staff_id);
+CREATE TABLE IF NOT EXISTS contacts_fields(school_id TEXT NOT NULL,staff_id TEXT NOT NULL,field TEXT NOT NULL,revision INTEGER NOT NULL,state TEXT NOT NULL CHECK(state IN('accepted','pending','rejected','superseded')),value_json TEXT,timeline_json TEXT,valid_from INTEGER NOT NULL,valid_until INTEGER,revoked INTEGER NOT NULL DEFAULT 0,proposer TEXT NOT NULL,accepter TEXT,accepted_at INTEGER,operation_id TEXT NOT NULL,PRIMARY KEY(school_id,staff_id,field));
+CREATE TABLE IF NOT EXISTS contacts_history(school_id TEXT NOT NULL,staff_id TEXT NOT NULL,field TEXT NOT NULL,revision INTEGER NOT NULL,record_json TEXT NOT NULL,PRIMARY KEY(school_id,staff_id,field,revision));
+CREATE TABLE IF NOT EXISTS contacts_snapshots(school_id TEXT NOT NULL,staff_id TEXT NOT NULL,profile TEXT NOT NULL,snapshot_id TEXT NOT NULL,revision TEXT NOT NULL,sequence INTEGER NOT NULL,staff_revision INTEGER NOT NULL,valid_from INTEGER NOT NULL DEFAULT 0,valid_until INTEGER,digest TEXT NOT NULL,body TEXT NOT NULL,PRIMARY KEY(school_id,snapshot_id));
+CREATE UNIQUE INDEX IF NOT EXISTS contacts_snapshot_identity ON contacts_snapshots(school_id,staff_id,profile,revision);
+CREATE TABLE IF NOT EXISTS contacts_catalogues(school_id TEXT NOT NULL,catalogue_id TEXT NOT NULL,revision INTEGER NOT NULL,body TEXT NOT NULL,PRIMARY KEY(school_id,catalogue_id,revision));
+CREATE TABLE IF NOT EXISTS contacts_contributions(school_id TEXT NOT NULL,contribution_id TEXT NOT NULL,staff_id TEXT NOT NULL,field TEXT NOT NULL,value_json TEXT NOT NULL,base_revision INTEGER NOT NULL,source_publication TEXT,source_sequence INTEGER NOT NULL DEFAULT 0,source_json TEXT,proposal_json TEXT,outcome_json TEXT,decision_id TEXT NOT NULL,proposer TEXT NOT NULL,state TEXT NOT NULL DEFAULT 'pending',created_at INTEGER NOT NULL,PRIMARY KEY(school_id,contribution_id));
+CREATE TABLE IF NOT EXISTS contacts_acceptance_audit(school_id TEXT NOT NULL,event_id TEXT NOT NULL,staff_id TEXT NOT NULL,field TEXT NOT NULL,proposer TEXT NOT NULL,accepter TEXT NOT NULL,accepted_at INTEGER NOT NULL,operation_id TEXT NOT NULL,before_json TEXT,after_json TEXT NOT NULL,PRIMARY KEY(school_id,event_id));
+CREATE INDEX IF NOT EXISTS contacts_acceptance_staff ON contacts_acceptance_audit(school_id,staff_id,accepted_at);
+CREATE TABLE IF NOT EXISTS contacts_epoch(school_id TEXT PRIMARY KEY,revision INTEGER NOT NULL);
+CREATE TABLE IF NOT EXISTS contacts_readiness(school_id TEXT NOT NULL,scan_id TEXT NOT NULL,epoch INTEGER NOT NULL,scanned_at INTEGER NOT NULL,valid_until INTEGER NOT NULL,result_json TEXT NOT NULL,PRIMARY KEY(school_id,scan_id));
+CREATE TABLE IF NOT EXISTS source_pins(school_id TEXT NOT NULL,scope TEXT NOT NULL,pin_id TEXT NOT NULL,destination TEXT NOT NULL,operation_id TEXT NOT NULL,digest TEXT NOT NULL,fence INTEGER NOT NULL,revision TEXT NOT NULL,valid_until INTEGER NOT NULL,decision_id TEXT NOT NULL,state TEXT NOT NULL CHECK(state IN('held','released')),created_at INTEGER NOT NULL,PRIMARY KEY(school_id,pin_id));
+CREATE INDEX IF NOT EXISTS source_pins_scope ON source_pins(school_id,scope,state);
+CREATE TABLE IF NOT EXISTS source_changes(school_id TEXT NOT NULL,scope TEXT NOT NULL,operation_id TEXT NOT NULL,created_at INTEGER NOT NULL,state TEXT NOT NULL DEFAULT 'pending',PRIMARY KEY(school_id,scope,operation_id));
+CREATE TABLE IF NOT EXISTS source_assertions(id TEXT PRIMARY KEY,ok INTEGER NOT NULL CHECK(ok=1));
+
+CREATE TABLE IF NOT EXISTS contacts_settings(school_id TEXT NOT NULL,setting TEXT NOT NULL,revision INTEGER NOT NULL,body TEXT NOT NULL,PRIMARY KEY(school_id,setting));
+
+CREATE UNIQUE INDEX IF NOT EXISTS contacts_operational_name ON contacts_staff(school_id,lower(ttb_name));

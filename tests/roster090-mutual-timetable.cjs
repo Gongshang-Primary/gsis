@@ -5,7 +5,7 @@ const copy=value=>JSON.parse(JSON.stringify(value));
  const {O,state,ctx,date,teachers,people}=fixture(),actor={...ctx,user:{...ctx.user,smc:false,admin:false}};ctx.minute=actor.minute=360;
  teachers.find(t=>t.staffId==='bob').cells[2]=['MA','3B','C2-01',''];teachers.find(t=>t.staffId==='dora').cells[5]=['Absent — PRIVATE_REASON','','',''];
  for(const [i,separator] of ['\n','\r','\u2028','\u2029'].entries())teachers.find(t=>t.staffId==='dora').cells[6+i]=['EL (absent — PRIVATE'+separator+'REASON)','4A','Room',''];
- people.push({id:'external',name:'External relief',active:false,mobile:'89876543'});O.apply(state,ctx,{operation:'saveAdhoc',date,staffId:'external',periods:[2]});
+ people.push({id:'external',name:'External relief',active:true,mobile:'89876543'});O.apply(state,ctx,{operation:'saveAdhoc',date,staffId:'external',periods:[2]});
  const absenceId=O.apply(state,actor,{operation:'saveAbsence',date,staffId:'alice',typeId:'mc',periods:[2,3]}).savedId,demandIds=O.demand(ctx,state,date).filter(d=>d.absenceId===absenceId).map(d=>d.id);
  const input={operation:'candidates',purpose:'mutual',byPeriod:true,date,demandIds},before=copy(state),legacy=O.read(state,actor,input),result=O.read(state,actor,{...input,includeTimetable:true});
  assert(result.timetable,'one candidate response includes the full-day grid when requested');assert.equal(legacy.timetable,undefined,'legacy callers keep their small response');
