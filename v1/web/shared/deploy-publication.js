@@ -15,7 +15,7 @@ const panel = document.createElement("details");
 panel.className = "gsis-panel";
 panel.dataset.panelId = "deploy-publication";
 panel.innerHTML =
-  '<summary>Canonical Excel and publication receipts</summary><p>Save changes a draft. Publish makes the selected saved revision active. Contacts proposals and recipient deliveries have independent outcomes.</p><div class="gsis-formrow"><label>Table scope<select data-scope></select></label><button data-export>Export All · importable</button><label>Import Export All workbook<input type="file" data-import accept=".xlsx"></label></div><p data-status role="status"></p><div data-preview></div><form data-receipt class="gsis-formrow"><label>Publication operation ID<input data-operation required></label><button>Check original receipt</button></form><div data-result></div>';
+  '<summary>Canonical Excel and publication receipts</summary><p>Save changes a draft. Publish makes the selected saved revision active. Contacts proposals and recipient deliveries have independent outcomes.</p><div class="gsis-formrow"><label>Table scope<select data-scope></select></label><button data-export>Export All · importable</button><label>Import Export All workbook<input type="file" data-import accept=".xlsx"></label></div><p data-status role="status"></p><div data-preview></div><form data-receipt class="gsis-formrow"><label>Operation ID<input data-operation required></label><button>Check original receipt</button></form><div data-result></div>';
 for (const scope of scopes) {
   const option = document.createElement("option");
   option.value = option.textContent = scope;
@@ -45,21 +45,28 @@ function message(text, error = false) {
   if (importStatus) importStatus.textContent = text;
   status.classList.toggle("gsis-error", error);
 }
-function showReceipt(result, host = panel.querySelector("[data-result]")) {
+function showReceipt(
+  result,
+  host = panel.querySelector("[data-result]"),
+  label = result.receipt?.result?.publicationId || result.publicationId
+    ? "Publication"
+    : "Operation",
+) {
   host.replaceChildren();
   const receipt = result.receipt || result;
   const text = document.createElement("p");
   text.textContent =
     receipt.state === "committed"
-      ? "Publication committed."
-      : receipt.state === "terminal-not-committed"
-        ? "Publication did not commit."
-        : receipt.state === "pending"
-          ? "Publication is pending."
-          : "The publication outcome is not yet confirmed.";
+      ? label + " committed."
+      : ["terminal-not-committed", "aborted"].includes(receipt.state)
+        ? label + " did not commit."
+        : ["pending", "prepared"].includes(receipt.state)
+          ? label + " is pending."
+          : "The " + label.toLowerCase() + " outcome is not yet confirmed.";
   host.append(text);
   const info = document.createElement("pre");
   info.className = "gsis-code";
+  info.style.cssText = "white-space:pre-wrap;overflow-wrap:anywhere";
   info.textContent = JSON.stringify(
     {
       operationId: receipt.operationId,
@@ -393,10 +400,43 @@ panel.querySelector("[data-import]").onchange = async (event) => {
     if (epoch === importReadEpoch) message(error.message, true);
   }
 };
+// Keep unresolved identities when the dialog is closed and reopened in this tab.
+// A missing receipt is not permission to create another operation.
+const publicationAttempts = new Map();
+function publicationHasDraft() {
+  return !!(
+    window.queuedEdits?.().length ||
+    (typeof unsavedDraft !== "undefined" && unsavedDraft) ||
+    (typeof editing !== "undefined" && editing) ||
+    (typeof acquiring !== "undefined" && acquiring) ||
+    (typeof busy !== "undefined" && busy) ||
+    (typeof exclusionEdits !== "undefined" && exclusionEdits.size) ||
+    window.notesUnresolved?.() ||
+    (typeof versionCreateAttempt !== "undefined" && versionCreateAttempt) ||
+    document.querySelector(".inline-editor")?.open
+  );
+}
+function operationState(result) {
+  return result?.receipt?.state || result?.state;
+}
+function terminalReceipt(result) {
+  return ["committed", "aborted", "terminal-not-committed"].includes(
+    operationState(result),
+  );
+}
 window.GSISV1Publication = {
   async open({ versionId, revision, name, onCommitted }) {
+    let state = publicationAttempts.get(versionId);
+    if (!state) {
+      state = { revision, review: null, attempt: null, stale: false };
+      publicationAttempts.set(versionId, state);
+    }
+    const epoch = protectedEpoch;
     const dialog = document.createElement("dialog");
     dialog.className = "gsis-panel";
+    dialog.dataset.publicationDialog = "";
+    dialog.style.cssText =
+      "max-width:min(42rem,calc(100vw - 2rem));box-sizing:border-box;max-height:calc(100dvh - 2rem);overflow:auto";
     const heading = document.createElement("h2");
     heading.textContent = "Publish " + (name || versionId);
     const intro = document.createElement("p");
@@ -410,113 +450,323 @@ window.GSISV1Publication = {
     const confirm = document.createElement("button");
     confirm.textContent = "Publish saved revision";
     confirm.className = "primary";
+    const refresh = document.createElement("button");
+    refresh.textContent = "Refresh venues and review";
+    const recheck = document.createElement("button");
+    recheck.textContent = "Review saved revision";
     const check = document.createElement("button");
-    check.textContent = "Check original receipt";
-    check.hidden = true;
     const cancel = document.createElement("button");
     cancel.textContent = "Close";
     cancel.onclick = () => dialog.close();
-    actions.append(confirm, check, cancel);
+    actions.append(confirm, refresh, recheck, check, cancel);
     dialog.append(heading, intro, progress, resultHost, actions);
     document.body.append(dialog);
     dialog.showModal();
-    const operationId = crypto.randomUUID();
-    panel.querySelector("[data-operation]").value = operationId;
-    let request = null,
-      review = null,
-      leaseRequest = null;
-    try {
-      review = await api.request("deploy", "/publishReview", {
+    dialog.addEventListener("close", () => dialog.remove(), { once: true });
+    dialog.addEventListener("cancel", (event) => {
+      if (state.busy) event.preventDefault();
+    });
+    function live() {
+      if (epoch !== protectedEpoch)
+        throw Error("Session changed. Reopen publication after signing in.");
+    }
+    function clean() {
+      live();
+      if (version() !== versionId)
+        throw Error(
+          "The selected version changed. Return to this version before continuing.",
+        );
+      if (publicationHasDraft())
+        throw Error(
+          "Save or discard all drafts, including version notes, before continuing. Your edits have been retained.",
+        );
+    }
+    function unresolved() {
+      return state.attempt?.sent && !terminalReceipt(state.attempt.result);
+    }
+    function controls() {
+      const pending = unresolved();
+      confirm.textContent =
+        pending && state.attempt.kind === "publish"
+          ? "Retry same publication"
+          : "Publish saved revision";
+      confirm.disabled =
+        state.busy ||
+        (pending ? state.attempt.kind !== "publish" : !state.review);
+      refresh.hidden = !state.stale && state.attempt?.kind !== "refresh";
+      refresh.textContent =
+        pending && state.attempt.kind === "refresh"
+          ? "Retry same venue refresh"
+          : "Refresh venues and review";
+      refresh.disabled =
+        state.busy ||
+        (pending && state.attempt.kind !== "refresh") ||
+        !api.capable("deploy.edit");
+      recheck.hidden =
+        !!state.review || pending || (!!state.attempt && !state.attempt.sent);
+      recheck.disabled = state.busy;
+      check.hidden = !state.attempt?.leaseSent;
+      check.textContent = !state.attempt?.sent
+        ? "Check preparation receipt"
+        : state.attempt.kind === "refresh"
+          ? "Check venue refresh receipt"
+          : "Check original receipt";
+      check.disabled = state.busy;
+      cancel.disabled = state.busy;
+      progress.textContent = state.message || "Reviewing saved revision…";
+      if (state.attempt)
+        panel.querySelector("[data-operation]").value = state.attempt.sent
+          ? state.attempt.operationId
+          : state.attempt.leaseRequest.operationId;
+      if (state.receiptDisplay)
+        showReceipt(
+          state.receiptDisplay.result,
+          resultHost,
+          state.receiptDisplay.label,
+        );
+    }
+    state.render = controls;
+    dialog.addEventListener("close", () => {
+      if (state.render === controls) state.render = null;
+    });
+    async function run(work) {
+      if (state.busy) return;
+      state.busy = true;
+      controls();
+      try {
+        await work();
+      } catch (error) {
+        if (epoch !== protectedEpoch) return;
+        if (
+          ["VENUE_REFERENCE_STALE", "VENUE_REFERENCE_CHANGED"].includes(
+            error.code,
+          )
+        )
+          state.stale = true;
+        if (!state.attempt || state.attempt.sent) state.review = null;
+        const pendingId = state.attempt?.sent
+          ? state.attempt.operationId
+          : state.attempt?.leaseSent
+            ? state.attempt.leaseRequest.operationId
+            : null;
+        state.message =
+          error.message +
+          (pendingId
+            ? " Check the original receipt before starting another operation. Operation ID: " +
+              pendingId
+            : "");
+      } finally {
+        state.busy = false;
+        if (epoch === protectedEpoch) state.render?.();
+      }
+    }
+    async function reviewSaved(expectedRevision, reload = false) {
+      clean();
+      state.review = null;
+      if (reload) {
+        const snapshot = await api.request("deploy", "/bootstrap", {
+          method: "POST",
+          body: { versionId },
+        });
+        clean();
+        if (
+          snapshot.current?.id !== versionId ||
+          !Number.isSafeInteger(snapshot.current.revision) ||
+          (expectedRevision !== undefined &&
+            snapshot.current.revision !== expectedRevision)
+        )
+          throw Error(
+            "The saved revision changed after venue refresh. Close, refresh the version and review it again.",
+          );
+        expectedRevision = snapshot.current.revision;
+        state.revision = expectedRevision;
+      }
+      const reviewed = await api.request("deploy", "/publishReview", {
         method: "POST",
         body: { versionId },
       });
+      clean();
       if (
-        Number.isSafeInteger(review.workingRevision) &&
-        review.workingRevision !== revision
+        reviewed.versionId !== versionId ||
+        reviewed.workingRevision !== expectedRevision
       )
         throw Error(
-          "The saved revision changed. Refresh and review it before publishing.",
+          "The saved revision changed. Close, refresh the version and review it again.",
         );
-      progress.textContent = "Review complete. Publication has not started.";
-    } catch (error) {
-      progress.textContent = error.message;
-      confirm.disabled = true;
+      state.revision = expectedRevision;
+      state.review = reviewed;
+      state.stale = false;
+      state.attempt = null;
+      state.message =
+        "Review complete for saved revision " +
+        expectedRevision +
+        ". Publication has not started.";
     }
-    async function receive(result) {
-      showReceipt(result, resultHost);
-      const receipt = result.receipt || result;
-      if (receipt.state === "committed" || result.saved === true) {
-        progress.textContent =
-          "Publication committed. Delivery status is independent.";
-        confirm.disabled = true;
-        onCommitted?.();
-      } else if (receipt.state === "terminal-not-committed") {
-        progress.textContent =
-          "This operation did not commit. Close and refresh before creating another.";
-        confirm.disabled = true;
-      } else
-        progress.textContent =
-          "Publication remains pending. Check this original receipt.";
-    }
-    check.onclick = async () => {
-      try {
-        await receive(
-          await api.request("deploy", "/receipt", {
-            method: "POST",
-            body: { operationId, versionId },
-          }),
-        );
-      } catch (error) {
-        progress.textContent = error.message;
+    async function receive(result, attempt) {
+      live();
+      if (state.attempt !== attempt) return;
+      attempt.result = result;
+      state.receiptDisplay = {
+        result,
+        label: attempt.kind === "refresh" ? "Venue refresh" : "Publication",
+      };
+      const receiptState = operationState(result);
+      if (receiptState === "committed") {
+        if (attempt.kind === "refresh") {
+          const saved = result.receipt?.result || result;
+          if (
+            saved.versionId !== versionId ||
+            !Number.isSafeInteger(saved.workingRevision)
+          )
+            throw Error(
+              "Venue refresh committed, but its exact saved revision is unavailable. Keep this receipt and reload the version before reviewing.",
+            );
+          state.stale = false;
+          state.message =
+            "Venue refresh committed. Checking saved revision " +
+            saved.workingRevision +
+            "…";
+          await reviewSaved(saved.workingRevision, true);
+        } else {
+          state.review = null;
+          state.message =
+            "Publication committed. Delivery status is independent.";
+          // Receipt recovery must not replace drafts made since submission.
+          if (version() === versionId && !publicationHasDraft())
+            await onCommitted?.();
+        }
+      } else if (terminalReceipt(result)) {
+        state.review = null;
+        state.message =
+          "This operation did not commit. You may explicitly refresh venues or review the saved version again.";
+      } else {
+        state.review = null;
+        state.message =
+          "The original operation outcome is not confirmed. Check its receipt; a new publication or venue refresh is blocked.";
       }
-    };
-    confirm.onclick = async () => {
-      confirm.disabled = true;
-      check.hidden = false;
-      try {
-        if (!request) {
-          leaseRequest ??= {
+    }
+    async function send(kind) {
+      clean();
+      if (!api.capable(kind === "refresh" ? "deploy.edit" : "deploy.publish"))
+        throw Error("You do not have permission for this action.");
+      if (
+        state.attempt &&
+        !terminalReceipt(state.attempt.result) &&
+        kind !== state.attempt.kind
+      )
+        throw Error("Resolve the original operation receipt first.");
+      if (!state.attempt || terminalReceipt(state.attempt.result)) {
+        if (kind === "publish" && !state.review)
+          throw Error("Review the saved revision before publishing.");
+        if (kind === "refresh") {
+          const snapshot = await api.request("deploy", "/bootstrap", {
+            method: "POST",
+            body: { versionId },
+          });
+          clean();
+          if (
+            snapshot.current?.id !== versionId ||
+            !Number.isSafeInteger(snapshot.current.revision)
+          )
+            throw Error(
+              "The saved version is unavailable. Reload before refreshing venues.",
+            );
+          state.revision = snapshot.current.revision;
+        }
+        state.attempt = {
+          kind,
+          operationId: crypto.randomUUID(),
+          leaseRequest: {
             operationId: crypto.randomUUID(),
             versionId,
-            revision,
+            revision: state.revision,
             scope: "meta",
             clientId: "v1-publish",
-          };
-          const lease = await api.request("deploy", "/lease", {
-            method: "POST",
-            body: leaseRequest,
-          });
-          request = {
-            operationId,
-            versionId,
-            revision,
-            expectedPointerSequence: review.expectedPointerSequence,
-            leaseFence: lease.fence,
-            scope: "meta",
-            clientId: "v1-publish",
-          };
-        }
-        progress.textContent = "Publishing…";
-        await receive(
-          await api.request("deploy", "/publish", {
-            method: "POST",
-            body: request,
-          }),
-        );
-      } catch (error) {
-        progress.textContent =
-          error.message +
-          " The original operation ID is " +
-          operationId +
-          ". Check its receipt before retrying.";
-        confirm.textContent = "Retry same publication";
-        confirm.disabled =
-          !!error.status && error.status < 500 && error.status !== 408;
-      } finally {
-        check.hidden = false;
+          },
+        };
       }
-    };
-    dialog.addEventListener("close", () => dialog.remove(), { once: true });
+      const attempt = state.attempt;
+      if (!attempt.request) {
+        attempt.leaseSent = true;
+        attempt.lease ||= await api.request("deploy", "/lease", {
+          method: "POST",
+          body: attempt.leaseRequest,
+        });
+        clean();
+        attempt.request = Object.freeze({
+          operationId: attempt.operationId,
+          versionId,
+          revision: state.revision,
+          leaseFence: attempt.lease.fence,
+          scope: "meta",
+          clientId: "v1-publish",
+          ...(kind === "refresh"
+            ? { operation: "refreshVenueRegistry" }
+            : {
+                expectedPointerSequence: state.review.expectedPointerSequence,
+              }),
+        });
+      }
+      attempt.sent = true;
+      state.message =
+        kind === "refresh" ? "Refreshing venue references…" : "Publishing…";
+      state.render?.();
+      let result = await api.request(
+        "deploy",
+        kind === "refresh" ? "/change" : "/publish",
+        { method: "POST", body: attempt.request },
+      );
+      live();
+      // /change acknowledges a saved mutation; its durable receipt supplies the
+      // committed state and exact revision used for the next review.
+      if (
+        kind === "refresh" &&
+        result.saved === true &&
+        !operationState(result)
+      )
+        result = await api.request("deploy", "/receipt", {
+          method: "POST",
+          body: { operationId: attempt.operationId, versionId },
+        });
+      await receive(result, attempt);
+    }
+    confirm.onclick = () => run(() => send("publish"));
+    refresh.onclick = () => run(() => send("refresh"));
+    recheck.onclick = () => run(() => reviewSaved(undefined, true));
+    check.onclick = () =>
+      run(async () => {
+        const attempt = state.attempt;
+        const result = await api.request("deploy", "/receipt", {
+          method: "POST",
+          body: {
+            operationId: attempt.sent
+              ? attempt.operationId
+              : attempt.leaseRequest.operationId,
+            versionId,
+          },
+        });
+        live();
+        if (attempt.sent) return receive(result, attempt);
+        state.receiptDisplay = { result, label: "Preparation" };
+        if (operationState(result) === "committed") {
+          const lease = result.receipt?.result || result;
+          if (!Number.isSafeInteger(lease.fence))
+            throw Error(
+              "Preparation committed, but its lease fence is unavailable. Keep this receipt.",
+            );
+          attempt.lease = lease;
+          state.message =
+            "Preparation confirmed. Retry the original action to continue; publication has not started.";
+        } else if (terminalReceipt(result)) {
+          state.attempt = null;
+          state.message =
+            "Preparation did not commit. You may retry with a new lease or review the saved version again.";
+        } else
+          state.message =
+            "Preparation outcome is not confirmed. Check this receipt or retry the same original action.";
+      });
+    controls();
+    if (!state.busy && !state.attempt) await run(() => reviewSaved(revision));
   },
 };
 
@@ -570,6 +820,13 @@ window.addEventListener("gsis:clear-protected-state", () => {
   ++importReadEpoch;
   ++validationEpoch;
   ++protectedEpoch;
+  publicationAttempts.clear();
+  document
+    .querySelectorAll("dialog[data-publication-dialog]")
+    .forEach((dialog) => {
+      dialog.close();
+      dialog.remove();
+    });
   workbook = null;
   pendingPreview = null;
   matchStaff = [];
