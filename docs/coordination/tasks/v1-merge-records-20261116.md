@@ -35,7 +35,7 @@ Refresh main, all heads and actual files in all three open PRs before claiming. 
 
 ## Decisions and acceptance
 
-Record Part A's four merges and the eleven reviewed chain heads. All eleven chain entries use `334731cdb1d4fc5d37d7bdf6de761d668c062994`, not separate child merges. #165 was marked merged by GitHub; #166–174 were closed with carrying-commit notes. Preserve their branches/heads. Record tested tree `d3f24176b859c6dc3fb10388adfa490a727d0c73`, merged main tree `f0b0d0892ddd61aceaccb97ff16d8c3cbb0893f0`, and the two review-document-only differences. Keep the previous eight inventory entries and prior dated checkpoints intact.
+Record Part A's four merges and the eleven reviewed chain heads. All eleven chain entries use `334731cdb1d4fc5d37d7bdf6de761d668c062994`, not separate child merges. #165 was marked merged by GitHub; #166–174 were closed with carrying-commit notes. Preserve their branches/heads. Record tested tree `d3f24176b859c6dc3fb10388adfa490a727d0c73`, merged main tree `f0b0d0892ddd61aceaccb97ff16d8c3cbb0893f0`, and the two review-document-only differences. Keep the previous eight inventory entries and prior dated checkpoints intact. Also record the separately approved PR157 directive merge after the chain comparison; it adds one documentation row and no product changes.
 
 Record Part C outcomes honestly: PR176's mechanical integration head `de4d2834bbd6391db4a0df291c941770b3d9233f` now passes both CI workflows and all 97 local product programs, but needs Claude's recheck. PR178's initial rebase stopped on its task record and was aborted; the owner then explicitly approved retaining the exact reviewed record. The completed rebase plus N2 guard is `530a7add936a168184becaaacb82a24deaf5da18`, based on `fa6666b3f846dfc10bebfe47e5a10ed9a264b0ed`, with a clean-head 24.507-second focused pass. Fresh CI and Claude recheck remain required. This bookkeeping cannot approve either implementation. Do not close either active claim or merge them through this documentation PR.
 
@@ -49,7 +49,7 @@ Not deployed. Documentation rollback changes records only; it does not undo any 
 
 ## Accepted claim and implementation checkpoint
 
-Accepted task-only main claim: `fa6666b3f846dfc10bebfe47e5a10ed9a264b0ed`. Re-read after publication; this branch starts at that exact commit. The seventeen-path update closes fifteen merged task records, preserves the earlier eight inventory entries and adds the fifteen Part A/B entries. The master changelog gains a dated status checkpoint. PR176/178 task files and all review/owner-directive records are untouched.
+Accepted task-only main claim: `fa6666b3f846dfc10bebfe47e5a10ed9a264b0ed`. Re-read after publication; this branch starts at that exact commit. The seventeen-path update closes fifteen merged task records, preserves the earlier eight inventory entries and adds the fifteen Part A/B entries and the subsequently completed PR157 directive merge. The master changelog gains a dated status checkpoint. PR176/178 task files and all review/owner-directive records are untouched.
 
 ### Reproducible documentation verification
 
@@ -68,7 +68,7 @@ assert changed==allowed,(changed-allowed,allowed-changed)
 assert all(p.startswith('docs/') for p in changed)
 inventory=Path('docs/coordination/tasks/v1-merge-records-20261115.md').read_text()
 rows=re.findall(r'\| \[#(\d+)\]\([^\n]+?\) \| `([0-9a-f]{40})` \| `([0-9a-f]{40})` \|',inventory)
-assert len(rows)==23 and len({p for p,_,_ in rows})==23
+assert len(rows)==24 and len({p for p,_,_ in rows})==24
 carrier='334731cdb1d4fc5d37d7bdf6de761d668c062994'
 for pr,head,merge in rows:
     subprocess.run(['git','merge-base','--is-ancestor',head,merge],check=True)
@@ -92,7 +92,9 @@ for p in changed:
         removed=[s[1:] for s in delta.splitlines() if s.startswith('-') and not s.startswith('---')]
         assert all(re.match(r'^(?:- )?Status:',s) for s in removed),(p,removed)
 subprocess.run(['git','diff','--check',base],check=True)
-print(f'PASS: {len(changed)} documentation paths; {len(rows)} inventory entries; 13 automatic merge trees; identical product tree; {links} local links; historical prose retained; whitespace clean.')
+print(f'PASS: {len(changed)} documentation paths; {len(rows)} inventory entries; 14 automatic merge trees; identical product tree; {links} local links; historical prose retained; whitespace clean.')
 ```
 
-Actual result: **PASS**, seventeen documentation paths, 23 distinct inventory entries, thirteen automatic merge trees, identical product tree, thirty local links, historical prose retained and whitespace clean. The command was `TZ=Asia/Singapore python3 /tmp/gsis-verify-merge-records.py`, whose complete source is preserved above for reproducibility. No local application build or Node/LORD suite is repeated for this documentation-only change. Fresh branch CI and Claude exact-head review remain separate; no earlier approval transfers to this bookkeeping head. Rollback affects records only.
+Actual result: **PASS**, seventeen documentation paths, 24 distinct inventory entries, fourteen automatic merge trees, identical product tree, thirty local links, historical prose retained and whitespace clean. The command was `TZ=Asia/Singapore python3 /tmp/gsis-verify-merge-records.py`, whose complete source is preserved above for reproducibility. No local application build or Node/LORD suite is repeated for this documentation-only change. Fresh branch CI and Claude exact-head review remain separate; no earlier approval transfers to this bookkeeping head. Rollback affects records only.
+
+The additional PR157 entry follows its successful exact-head CI and independent Codex review of the Claude-authored row. New main is `5ae81158f12c8131f4657e4ce77055d008bd6419`; it changes no product path. Part C also passed one unpublished combined-tree probe at `97701d7ce8f9bc0214cbc18e639cd5ddeac05278` (22.944s, 397 bindings, 29 known gaps, fifteen pins). This is supplementary synthetic compatibility evidence, not a replacement for either exact-head CI/review or a full combined-suite/hosted result.
