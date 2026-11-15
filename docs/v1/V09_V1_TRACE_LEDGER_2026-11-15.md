@@ -234,7 +234,7 @@ Do the steps in order. Do not start a step until the one before has hosted proof
 ## 11. Owner decisions needed
 
 1. Validation rule in Section 6: **accepted, 15 November 2026.** Codex may plan B02 to B09 and B15 as one bounded job under the normal claim workflow.
-2. B08: may relief allocation run before a verified Deploy publication exists, with numbers marked "estimated"?
+2. B08: **accepted, 15 November 2026.** Allocation may run on saved data with workload marked "estimated" on every affected screen and export. Automatic publishing stays blocked until workload is verified.
 3. A03 to A06: which Roster panels may be retired in v1?
 4. Ledger C: which look changes are accepted?
 5. H08: migrate application access grants to Core, or grant afresh?
