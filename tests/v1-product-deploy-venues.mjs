@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { rm } from "node:fs/promises";
 import { join } from "node:path";
+import { digest } from "../v1/runtime/store.mjs";
 import { startProduct } from "../scripts/v1/dev.mjs";
 import { productSuite, origin } from "./v1-product/suite.mjs";
 
@@ -740,6 +741,272 @@ try {
       prepared.document,
     );
   });
+  const scaledPublications = [];
+  const register = [
+    { id: "room-a", name: "Canonical room A", unit: "A-01", revision: 8 },
+    ...Array.from({ length: 142 }, (_, i) => ({
+      id: "budget-room-" + String(i + 1).padStart(3, "0"),
+      name: "Synthetic room " + (i + 1),
+      unit: "B-" + String(i + 1).padStart(3, "0"),
+      revision: 1,
+    })),
+  ];
+  await venues.batch(
+    register
+      .slice(1)
+      .map((room) =>
+        venues
+          .prepare(
+            "INSERT INTO venues_records(school_id,kind,record_id,revision,data_json) VALUES(?,'venues',?,?,?)",
+          )
+          .bind(school, room.id, room.revision, JSON.stringify(room)),
+      ),
+  );
+  assert.equal(
+    (
+      await venues
+        .prepare(
+          "SELECT COUNT(*) n FROM venues_records WHERE school_id=? AND kind='venues'",
+        )
+        .bind(school)
+        .first()
+    ).n,
+    143,
+  );
+  for (const usedCount of [41, 143]) {
+    await test(`${usedCount} used rooms publish from a 143-room register with exact owner fences and immutable receipt`, async () => {
+      const sequence = scaledPublications.length + 2;
+      const operationId = "budget-publish-" + usedCount;
+      const { versionId } = await suite.call(
+        admin,
+        "deploy",
+        "/versions/create",
+        {
+          operationId: "budget-version-" + usedCount,
+          name: "Synthetic " + usedCount + " referenced rooms",
+          year: 2026,
+        },
+      );
+      const used = register.slice(0, usedCount);
+      const classes = used.map((room, i) => ({
+        ref: "budget-class-" + i,
+        level: "1",
+        name: "Synthetic class " + i,
+        shortName: "B" + i,
+        venueId: room.id,
+      }));
+      await db.batch(
+        [
+          ...register.map((room) => ["venues", room.id, room]),
+          ...classes.map((row) => ["classes", row.ref, row]),
+        ].map(([scope, rowId, row]) =>
+          db
+            .prepare(
+              "INSERT INTO deploy_rows(school_id,version_id,scope,row_id,revision,value) VALUES(?,?,?,?,1,?)",
+            )
+            .bind(school, versionId, scope, rowId, JSON.stringify(row)),
+        ),
+      );
+      const review = await suite.call(admin, "deploy", "/publishReview", {
+        versionId,
+      });
+      assert.equal(review.workingRevision, 0);
+      assert.equal(review.expectedPointerSequence, sequence - 1);
+      const l = await lease(versionId, operationId);
+      const input = {
+        operationId,
+        versionId,
+        revision: 0,
+        expectedPointerSequence: sequence - 1,
+        scope: "meta",
+        clientId: "venue-test",
+        leaseFence: l.fence,
+      };
+      // Discard the first HTTP reply. The original durable receipt must prove
+      // the result before any replay or source-completion check.
+      await suite.request(admin, "deploy", "/publish", {
+        method: "POST",
+        body: input,
+      });
+      const receipt = await suite.call(admin, "deploy", "/receipt", {
+        operationId,
+      });
+      assert.equal(
+        receipt.receipt?.state,
+        "committed",
+        JSON.stringify(receipt),
+      );
+      assert.equal(receipt.receipt.operationId, operationId);
+      assert.equal(receipt.receipt.result.sequence, sequence);
+      const stored = await db
+        .prepare(
+          "SELECT * FROM deploy_prepared_publications WHERE school_id=? AND operation_id=?",
+        )
+        .bind(school, operationId)
+        .first();
+      const original = await suite.call(admin, "deploy", "/publications", {
+        publicationId: receipt.receipt.result.publicationId,
+      });
+      const frozenDocument = JSON.parse(stored.document);
+      const frozenEnvelope = JSON.parse(stored.envelope);
+      delete frozenEnvelope.payloadDigest;
+      assert.equal(
+        await digest({
+          schemaVersion: 1,
+          document: frozenDocument,
+          envelope: frozenEnvelope,
+        }),
+        stored.payload_digest,
+      );
+      assert.equal(original.digest, stored.payload_digest);
+      assert.deepEqual(original.document, frozenDocument);
+      assert.equal(original.document.venues.length, 143);
+      assert.equal(original.document.classes.length, usedCount);
+      const operation = await db
+        .prepare(
+          "SELECT * FROM product_operations WHERE school_id=? AND operation_id=?",
+        )
+        .bind(school, operationId)
+        .first();
+      assert.equal(operation.action, "deploy.publish");
+      assert.equal(operation.actor_id, admin.id);
+      assert.equal(operation.digest, receipt.receipt.digest);
+      const evidence = await (await suite.db("core"))
+        .prepare(
+          "SELECT principal_json,descriptor_json FROM core_evidence WHERE school_id=? AND decision_id=?",
+        )
+        .bind(school, operation.decision_id)
+        .first();
+      assert(
+        evidence,
+        "real Core must have authorised the original publication",
+      );
+      const principal = JSON.parse(evidence.principal_json);
+      const descriptor = JSON.parse(evidence.descriptor_json);
+      assert.equal(principal.actorId, admin.id);
+      assert.equal(principal.schoolId, school);
+      assert.equal(principal.requestDigest, operation.request_digest);
+      assert.equal(descriptor.operationId, operationId);
+      assert.equal(descriptor.action, "deploy.publish");
+      assert.equal(descriptor.service, "deploy");
+      const scopes = await venues
+        .prepare(
+          "SELECT venue_id,start_at,end_at FROM venues_fence_scopes WHERE school_id=? AND source_operation_id=? ORDER BY venue_id",
+        )
+        .bind(school, operationId)
+        .all();
+      assert.deepEqual(
+        scopes.results,
+        used
+          .map((room) => ({ venue_id: room.id, start_at: 0, end_at: 0 }))
+          .sort((a, b) => a.venue_id.localeCompare(b.venue_id)),
+        "unused canonical rooms must not become fence references or occupancy",
+      );
+      const fence = await venues
+        .prepare(
+          "SELECT * FROM venues_source_fences WHERE school_id=? AND source_operation_id=?",
+        )
+        .bind(school, operationId)
+        .first();
+      assert.equal(fence.state, "pending");
+      assert.equal(fence.source_digest, receipt.receipt.digest);
+      assert.equal(fence.source_fence, receipt.receipt.fence);
+      assert.equal(fence.decision_id, operation.decision_id);
+      const fenceId =
+        "fence:" + (await digest(["deploy", operationId])).slice(0, 40);
+      const localReceipt = await venues
+        .prepare(
+          "SELECT state,receipt_json FROM product_operations WHERE school_id=? AND operation_id=?",
+        )
+        .bind(school, fenceId)
+        .first();
+      assert.equal(localReceipt.state, "committed");
+      assert.equal(JSON.parse(localReceipt.receipt_json).result.scopeCount, 0);
+      const repeated = await suite.call(admin, "deploy", "/publish", input);
+      assert.equal(repeated.publicationId, original.publicationId);
+      assert.equal(repeated.sequence, sequence);
+      assert.deepEqual(
+        await suite.call(admin, "deploy", "/publications", {
+          publicationId: original.publicationId,
+        }),
+        original,
+      );
+      assert.equal(
+        (
+          await db
+            .prepare("SELECT sequence FROM deploy_pointer WHERE school_id=?")
+            .bind(school)
+            .first()
+        ).sequence,
+        sequence,
+      );
+      assert.equal(
+        (
+          await db
+            .prepare(
+              "SELECT COUNT(*) n FROM deploy_publications WHERE school_id=?",
+            )
+            .bind(school)
+            .first()
+        ).n,
+        sequence,
+      );
+      assert.equal(
+        (
+          await venues
+            .prepare(
+              "SELECT COUNT(*) n FROM product_audit WHERE school_id=? AND operation_id=?",
+            )
+            .bind(school, fenceId)
+            .first()
+        ).n,
+        1,
+      );
+      await suite.trigger("deploy");
+      assert.equal(
+        (
+          await venues
+            .prepare(
+              "SELECT state FROM venues_source_fences WHERE school_id=? AND source_operation_id=?",
+            )
+            .bind(school, operationId)
+            .first()
+        ).state,
+        "adopted",
+      );
+      assert.equal(
+        (
+          await venues
+            .prepare(
+              "SELECT sequence FROM venues_source_heads WHERE school_id=? AND source_domain='deploy'",
+            )
+            .bind(school)
+            .first()
+        ).sequence,
+        sequence,
+      );
+      assert.equal(
+        (
+          await venues
+            .prepare(
+              "SELECT COUNT(*) n FROM venues_intervals WHERE school_id=? AND kind='source' AND source_domain='deploy'",
+            )
+            .bind(school)
+            .first()
+        ).n,
+        0,
+        "reference-only publication must not manufacture booked time intervals",
+      );
+      scaledPublications.push({
+        input,
+        receipt: receipt.receipt,
+        original,
+        scopes: scopes.results,
+        fenceId,
+      });
+    });
+  }
+
   await test("durable publication and aborted receipts remain authoritative after Worker restart", async () => {
     await suite.mf.dispose();
     originalDisposed = true;
@@ -759,6 +1026,70 @@ try {
       assert.equal(response.status, 200, JSON.stringify(result));
       return result.data;
     }
+    assert.equal(
+      scaledPublications.length,
+      2,
+      "both large publication fixtures must succeed",
+    );
+    const restoredVenues = await restarted.db("venues");
+    const restoredDeploy = await restarted.db("deploy");
+    for (const saved of scaledPublications) {
+      assert.deepEqual(
+        (await readReceipt(saved.input.operationId)).receipt,
+        saved.receipt,
+      );
+      const response = await restarted.mf.dispatchFetch(
+        origin +
+          "/api/deploy/publications?publicationId=" +
+          saved.original.publicationId,
+        { headers: { origin, cookie: "__Host-gsis_session=" + admin.token } },
+      );
+      const result = await response.json();
+      assert.equal(response.status, 200, JSON.stringify(result));
+      assert.deepEqual(result.data, saved.original);
+      assert.deepEqual(
+        (
+          await restoredVenues
+            .prepare(
+              "SELECT venue_id,start_at,end_at FROM venues_fence_scopes WHERE school_id=? AND source_operation_id=? ORDER BY venue_id",
+            )
+            .bind(school, saved.input.operationId)
+            .all()
+        ).results,
+        saved.scopes,
+      );
+      assert.equal(
+        (
+          await restoredVenues
+            .prepare(
+              "SELECT state FROM venues_source_fences WHERE school_id=? AND source_operation_id=?",
+            )
+            .bind(school, saved.input.operationId)
+            .first()
+        ).state,
+        "adopted",
+      );
+      assert.equal(
+        (
+          await restoredVenues
+            .prepare(
+              "SELECT COUNT(*) n FROM product_audit WHERE school_id=? AND operation_id=?",
+            )
+            .bind(school, saved.fenceId)
+            .first()
+        ).n,
+        1,
+      );
+    }
+    assert.equal(
+      (
+        await restoredDeploy
+          .prepare("SELECT sequence FROM deploy_pointer WHERE school_id=?")
+          .bind(school)
+          .first()
+      ).sequence,
+      3,
+    );
     const committed = await readReceipt("valid-publish");
     assert.equal(committed.receipt.state, "committed");
     assert.equal(
