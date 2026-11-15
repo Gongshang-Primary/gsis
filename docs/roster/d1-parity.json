@@ -14,7 +14,7 @@
     }
    ],
    "caller": "roster-update/public/_worker.js",
-   "handler": "roster-update/public/edge-roster.js:350 edgeRosterArchive",
+   "handler": "roster-update/public/edge-roster.js:353 edgeRosterArchive",
    "outcome": {
     "family": "archive",
     "ok": false,
@@ -40,7 +40,7 @@
     }
    ],
    "caller": "roster-update/public/_worker.js, operations-worker/index.js",
-   "handler": "roster-update/public/edge-roster.js:389 edgeRosterMigration",
+   "handler": "roster-update/public/edge-roster.js:392 edgeRosterMigration",
    "outcome": {
     "family": "migration",
     "ok": false,
@@ -152,7 +152,7 @@
     }
    ],
    "caller": "roster-update/public/_worker.js, operations-worker/index.js",
-   "handler": "roster-update/public/edge-roster.js:140 dispatch",
+   "handler": "roster-update/public/edge-roster.js:141 dispatch",
    "outcome": {
     "family": "action",
     "ok": true,
@@ -208,7 +208,7 @@
     }
    ],
    "caller": "roster-update/public/_worker.js, operations-worker/index.js",
-   "handler": "roster-update/public/edge-roster.js:141 dispatch",
+   "handler": "roster-update/public/edge-roster.js:142 dispatch",
    "outcome": {
     "family": "action",
     "ok": true,
@@ -238,7 +238,7 @@
     }
    ],
    "caller": "roster-update/public/_worker.js, operations-worker/index.js",
-   "handler": "roster-update/public/edge-roster.js:142 dispatch",
+   "handler": "roster-update/public/edge-roster.js:143 dispatch",
    "outcome": {
     "family": "action",
     "ok": true,
@@ -263,7 +263,7 @@
     }
    ],
    "caller": "roster-update/public/_worker.js",
-   "handler": "roster-update/public/edge-roster.js:216 edgeRosterService",
+   "handler": "roster-update/public/edge-roster.js:219 edgeRosterService",
    "outcome": {
     "family": "service",
     "ok": true,
@@ -303,7 +303,7 @@
     }
    ],
    "caller": "roster-update/public/_worker.js, operations-worker/index.js",
-   "handler": "roster-update/public/edge-roster.js:143 dispatch",
+   "handler": "roster-update/public/edge-roster.js:144 dispatch",
    "outcome": {
     "family": "action",
     "ok": false,
@@ -364,7 +364,7 @@
     }
    ],
    "caller": "roster-update/public/_worker.js, operations-worker/index.js",
-   "handler": "roster-update/public/edge-roster.js:143 dispatch",
+   "handler": "roster-update/public/edge-roster.js:144 dispatch",
    "outcome": {
     "family": "action",
     "ok": false,
@@ -536,7 +536,7 @@
     }
    ],
    "caller": "roster-update/public/_worker.js, roster-update/public/roster-acknowledgement-ui.js, roster-update/public/roster.js",
-   "handler": "roster-update/public/edge-roster.js:159 operations",
+   "handler": "roster-update/public/edge-roster.js:161 operations",
    "outcome": {
     "family": "operations",
     "ok": true,
@@ -566,7 +566,7 @@
     }
    ],
    "caller": "roster-update/public/_worker.js, roster-update/public/roster-stapler-ui.js",
-   "handler": "roster-update/public/edge-roster.js:158 operations",
+   "handler": "roster-update/public/edge-roster.js:160 operations",
    "outcome": {
     "family": "operations",
     "ok": false,
@@ -602,7 +602,7 @@
     }
    ],
    "caller": "roster-update/public/_worker.js, roster-update/public/roster-duty-ui.js, roster-update/public/roster-operations-model.js",
-   "handler": "roster-update/public/edge-roster.js:145 dispatch",
+   "handler": "roster-update/public/edge-roster.js:146 dispatch",
    "outcome": {
     "family": "migration",
     "ok": false,
@@ -690,7 +690,7 @@
     }
    ],
    "caller": "roster-update/public/_worker.js, roster-update/public/system-health.js",
-   "handler": "roster-update/public/edge-roster.js:224 edgeRosterService",
+   "handler": "roster-update/public/edge-roster.js:227 edgeRosterService",
    "outcome": {
     "family": "service",
     "ok": true,
@@ -730,7 +730,7 @@
     }
    ],
    "caller": "roster-update/public/_worker.js, roster-update/public/roster-operations-ui.js, roster-update/public/roster.js",
-   "handler": "roster-update/public/edge-roster.js:159 operations",
+   "handler": "roster-update/public/edge-roster.js:161 operations",
    "outcome": {
     "family": "operations",
     "ok": true,
@@ -856,7 +856,7 @@
     }
    ],
    "caller": "roster-update/public/_worker.js",
-   "handler": "roster-update/public/edge-roster.js:390 edgeRosterMigration",
+   "handler": "roster-update/public/edge-roster.js:393 edgeRosterMigration",
    "outcome": {
     "family": "migration",
     "ok": false,
@@ -1005,7 +1005,7 @@
     }
    ],
    "caller": "roster-update/public/_worker.js, roster-update/public/roster-operations-model.js, roster-update/public/roster.js",
-   "handler": "roster-update/public/edge-roster.js:164 operations",
+   "handler": "roster-update/public/edge-roster.js:166 operations",
    "outcome": {
     "family": "operations",
     "ok": true,
@@ -1085,7 +1085,7 @@
     }
    ],
    "caller": "roster-update/public/_worker.js, roster-update/public/roster-operations-model.js, roster-update/public/roster-operations-ui.js",
-   "handler": "roster-update/public/edge-roster.js:150 operations",
+   "handler": "roster-update/public/edge-roster.js:151 operations",
    "outcome": {
     "family": "operations",
     "ok": true,
@@ -1172,7 +1172,7 @@
     }
    ],
    "caller": "roster-update/public/_worker.js, roster-update/public/archive.js, roster-update/public/roster-calculations.js",
-   "handler": "roster-update/public/edge-roster.js:159 operations",
+   "handler": "roster-update/public/edge-roster.js:161 operations",
    "outcome": {
     "family": "operations",
     "ok": false,
@@ -1203,7 +1203,7 @@
     }
    ],
    "caller": "roster-update/public/_worker.js, roster-update/public/roster-operations-ui.js",
-   "handler": "roster-update/public/edge-roster.js:175 operations",
+   "handler": "roster-update/public/edge-roster.js:177 operations",
    "outcome": {
     "family": "operations",
     "ok": true,
@@ -1228,7 +1228,7 @@
     }
    ],
    "caller": "roster-update/public/_worker.js",
-   "handler": "roster-update/public/edge-roster.js:404 edgeRosterMigration",
+   "handler": "roster-update/public/edge-roster.js:407 edgeRosterMigration",
    "outcome": {
     "family": "migration",
     "ok": false,
@@ -1403,7 +1403,7 @@
     }
    ],
    "caller": "roster-update/public/_worker.js, roster-update/public/system-health.js",
-   "handler": "roster-update/public/edge-roster.js:77 buildEdgeRosterContext",
+   "handler": "roster-update/public/edge-roster.js:78 buildEdgeRosterContext",
    "outcome": {
     "family": "notification-service",
     "ok": false,
@@ -1603,7 +1603,7 @@
     }
    ],
    "caller": "roster-update/public/_worker.js, roster-update/public/roster-operations-model.js, roster-update/public/roster-stapler-ui.js",
-   "handler": "roster-update/public/edge-roster.js:188 operations",
+   "handler": "roster-update/public/edge-roster.js:190 operations",
    "outcome": {
     "family": "operations",
     "ok": false,
@@ -1645,7 +1645,7 @@
     }
    ],
    "caller": "roster-update/public/roster-operations-model.js, roster-update/public/timetable-review.js",
-   "handler": "roster-update/public/edge-roster.js:620 recordOnly",
+   "handler": "roster-update/public/edge-roster.js:626 recordOnly",
    "outcome": {
     "family": "operations",
     "ok": false,
@@ -1682,7 +1682,7 @@
     }
    ],
    "caller": "roster-update/public/_worker.js",
-   "handler": "roster-update/public/edge-roster.js:225 edgeRosterService",
+   "handler": "roster-update/public/edge-roster.js:228 edgeRosterService",
    "outcome": {
     "family": "service",
     "ok": true,
@@ -1707,7 +1707,7 @@
     }
    ],
    "caller": "roster-update/public/roster-operations-ui.js, roster-update/public/roster-stapler-ui.js",
-   "handler": "roster-update/public/edge-roster.js:153 operations",
+   "handler": "roster-update/public/edge-roster.js:154 operations",
    "outcome": {
     "family": "operations",
     "ok": false,
@@ -1841,7 +1841,7 @@
     }
    ],
    "caller": "roster-update/public/_worker.js, roster-update/public/roster-operations-model.js, roster-update/public/roster-stapler-ui.js",
-   "handler": "roster-update/public/edge-roster.js:188 operations",
+   "handler": "roster-update/public/edge-roster.js:190 operations",
    "outcome": {
     "family": "operations",
     "ok": false,
@@ -2008,7 +2008,7 @@
     }
    ],
    "caller": "roster-update/public/_worker.js, roster-update/public/system-health.js",
-   "handler": "roster-update/public/edge-roster.js:216 edgeRosterService",
+   "handler": "roster-update/public/edge-roster.js:219 edgeRosterService",
    "outcome": {
     "family": "service",
     "ok": true,
@@ -2063,7 +2063,7 @@
     }
    ],
    "caller": "roster-update/public/_worker.js, roster-update/public/roster-operations-model.js, roster-update/public/roster-operations-ui.js",
-   "handler": "roster-update/public/edge-roster.js:620 recordOnly",
+   "handler": "roster-update/public/edge-roster.js:626 recordOnly",
    "outcome": {
     "family": "operations",
     "ok": true,
@@ -2250,7 +2250,7 @@
     }
    ],
    "caller": "roster-update/public/_worker.js, roster-update/public/roster-operations-model.js, roster-update/public/roster-operations-ui.js",
-   "handler": "roster-update/public/edge-roster.js:176 operations",
+   "handler": "roster-update/public/edge-roster.js:178 operations",
    "outcome": {
     "family": "operations",
     "ok": false,
@@ -2354,7 +2354,7 @@
     }
    ],
    "caller": "roster-update/public/_worker.js, roster-update/public/roster-operations-model.js, roster-update/public/roster-operations-ui.js",
-   "handler": "roster-update/public/edge-roster.js:620 recordOnly",
+   "handler": "roster-update/public/edge-roster.js:626 recordOnly",
    "outcome": {
     "family": "operations",
     "ok": false,
@@ -2421,7 +2421,7 @@
     }
    ],
    "caller": "roster-update/public/_worker.js, roster-update/public/roster-operations-model.js, roster-update/public/roster-settings-ui.js",
-   "handler": "roster-update/public/edge-roster.js:519 occupancyChange",
+   "handler": "roster-update/public/edge-roster.js:522 occupancyChange",
    "outcome": {
     "family": "operations",
     "ok": false,
@@ -2565,7 +2565,7 @@
     }
    ],
    "caller": "roster-update/public/_worker.js, roster-update/public/roster-operations-model.js, roster-update/public/roster-stapler-ui.js",
-   "handler": "roster-update/public/edge-roster.js:188 operations",
+   "handler": "roster-update/public/edge-roster.js:190 operations",
    "outcome": {
     "family": "operations",
     "ok": false,
@@ -2651,7 +2651,7 @@
     }
    ],
    "caller": "roster-update/public/_worker.js, roster-update/public/system-health.js",
-   "handler": "roster-update/public/edge-roster.js:216 edgeRosterService",
+   "handler": "roster-update/public/edge-roster.js:219 edgeRosterService",
    "outcome": {
     "family": "service",
     "ok": true,
@@ -2686,7 +2686,7 @@
     }
    ],
    "caller": "roster-update/public/_worker.js, roster-update/public/roster.js",
-   "handler": "roster-update/public/edge-roster.js:159 operations",
+   "handler": "roster-update/public/edge-roster.js:161 operations",
    "outcome": {
     "family": "operations",
     "ok": true,
@@ -2767,7 +2767,7 @@
     }
    ],
    "caller": "roster-update/public/_worker.js",
-   "handler": "roster-update/public/edge-roster.js:414 edgeRosterMigration",
+   "handler": "roster-update/public/edge-roster.js:417 edgeRosterMigration",
    "outcome": {
     "family": "migration",
     "ok": false,
@@ -3792,7 +3792,7 @@
     }
    ],
    "caller": "roster-update/public/_worker.js, roster-update/public/roster.js",
-   "handler": "roster-update/public/edge-roster.js:420 edgeRosterMigration",
+   "handler": "roster-update/public/edge-roster.js:423 edgeRosterMigration",
    "outcome": {
     "family": "migration",
     "ok": false,
@@ -3885,7 +3885,7 @@
     }
    ],
    "caller": "roster-update/public/_worker.js, operations-worker/index.js",
-   "handler": "roster-update/public/edge-roster.js:219 edgeRosterService",
+   "handler": "roster-update/public/edge-roster.js:222 edgeRosterService",
    "outcome": {
     "family": "service",
     "ok": false,
@@ -3921,7 +3921,7 @@
     }
    ],
    "caller": "roster-update/public/_worker.js",
-   "handler": "roster-update/public/edge-roster.js:218 edgeRosterService",
+   "handler": "roster-update/public/edge-roster.js:221 edgeRosterService",
    "outcome": {
     "family": "service",
     "ok": false,
@@ -3962,7 +3962,7 @@
     }
    ],
    "caller": "roster-update/public/_worker.js, roster-update/public/roster-operations-model.js, roster-update/public/roster-operations-ui.js",
-   "handler": "roster-update/public/edge-roster.js:159 operations",
+   "handler": "roster-update/public/edge-roster.js:161 operations",
    "outcome": {
     "family": "operations",
     "ok": false,
@@ -4004,7 +4004,7 @@
     }
    ],
    "caller": "roster-update/public/_worker.js, operations-worker/index.js",
-   "handler": "roster-update/public/edge-roster.js:219 edgeRosterService",
+   "handler": "roster-update/public/edge-roster.js:222 edgeRosterService",
    "outcome": {
     "family": "service",
     "ok": false,
@@ -4030,7 +4030,7 @@
     }
    ],
    "caller": "roster-update/public/_worker.js",
-   "handler": "roster-update/public/edge-roster.js:404 edgeRosterMigration",
+   "handler": "roster-update/public/edge-roster.js:407 edgeRosterMigration",
    "outcome": {
     "family": "migration",
     "ok": false,
@@ -4062,7 +4062,7 @@
     }
    ],
    "caller": "roster-update/public/_worker.js",
-   "handler": "roster-update/public/edge-roster.js:423 edgeRosterMigration",
+   "handler": "roster-update/public/edge-roster.js:426 edgeRosterMigration",
    "outcome": {
     "family": "migration",
     "ok": false,
@@ -4104,7 +4104,7 @@
     }
    ],
    "caller": "roster-update/public/_worker.js, roster-update/public/roster-operations-model.js, roster-update/public/roster.js",
-   "handler": "roster-update/public/edge-roster.js:87 buildEdgeRosterContext",
+   "handler": "roster-update/public/edge-roster.js:88 buildEdgeRosterContext",
    "outcome": {
     "family": "operations",
     "ok": true,
@@ -4195,7 +4195,7 @@
     }
    ],
    "caller": "roster-update/public/_worker.js, roster-update/public/roster-stapler-ui.js",
-   "handler": "roster-update/public/edge-roster.js:424 edgeRosterMigration",
+   "handler": "roster-update/public/edge-roster.js:427 edgeRosterMigration",
    "outcome": {
     "family": "migration",
     "ok": false,
@@ -4339,7 +4339,7 @@
     }
    ],
    "caller": "roster-update/public/_worker.js, roster-update/public/roster-operations-model.js, roster-update/public/roster-stapler-ui.js",
-   "handler": "roster-update/public/edge-roster.js:188 operations",
+   "handler": "roster-update/public/edge-roster.js:190 operations",
    "outcome": {
     "family": "operations",
     "ok": false,
@@ -4995,7 +4995,7 @@
     }
    ],
    "caller": "roster-update/public/roster-inbox-ui.js, roster-update/public/roster.js",
-   "handler": "roster-update/public/edge-roster.js:145 dispatch",
+   "handler": "roster-update/public/edge-roster.js:146 dispatch",
    "outcome": {
     "family": "action",
     "ok": false,
@@ -5046,7 +5046,7 @@
     }
    ],
    "caller": "roster-update/public/roster-operations-model.js, roster-update/public/timetable-review.js",
-   "handler": "roster-update/public/edge-roster.js:188 operations",
+   "handler": "roster-update/public/edge-roster.js:190 operations",
    "outcome": {
     "family": "operations",
     "ok": false,
@@ -5072,7 +5072,7 @@
     }
    ],
    "caller": "roster-update/public/_worker.js",
-   "handler": "roster-update/public/edge-roster.js:411 edgeRosterMigration",
+   "handler": "roster-update/public/edge-roster.js:414 edgeRosterMigration",
    "outcome": {
     "family": "migration",
     "ok": false,
@@ -5174,7 +5174,7 @@
     }
    ],
    "caller": "roster-update/public/_worker.js, roster-update/public/roster-operations-model.js, roster-update/public/roster-stapler-ui.js",
-   "handler": "roster-update/public/edge-roster.js:188 operations",
+   "handler": "roster-update/public/edge-roster.js:190 operations",
    "outcome": {
     "family": "operations",
     "ok": false,
@@ -5236,7 +5236,7 @@
     }
    ],
    "caller": "roster-update/public/_worker.js, roster-update/public/roster-operations-model.js, roster-update/public/roster.js",
-   "handler": "roster-update/public/edge-roster.js:620 recordOnly",
+   "handler": "roster-update/public/edge-roster.js:626 recordOnly",
    "outcome": {
     "family": "operations",
     "ok": true,
@@ -5267,7 +5267,7 @@
     }
    ],
    "caller": "roster-update/public/_worker.js, roster-update/public/system-health.js",
-   "handler": "roster-update/public/edge-roster.js:223 edgeRosterService",
+   "handler": "roster-update/public/edge-roster.js:226 edgeRosterService",
    "outcome": {
     "family": "service",
     "ok": true,
@@ -5293,7 +5293,7 @@
     }
    ],
    "caller": "roster-update/public/_worker.js, roster-update/public/roster.js",
-   "handler": "roster-update/public/edge-roster.js:152 operations",
+   "handler": "roster-update/public/edge-roster.js:153 operations",
    "outcome": {
     "family": "operations",
     "ok": true,
@@ -5385,7 +5385,7 @@
     }
    ],
    "caller": "roster-update/public/_worker.js",
-   "handler": "roster-update/public/edge-roster.js:139 edgeRosterBackend",
+   "handler": "roster-update/public/edge-roster.js:140 edgeRosterBackend",
    "outcome": {
     "family": "notification-service",
     "ok": false,
@@ -5411,7 +5411,7 @@
     }
    ],
    "caller": "roster-update/public/_worker.js",
-   "handler": "roster-update/public/edge-roster.js:139 edgeRosterBackend",
+   "handler": "roster-update/public/edge-roster.js:140 edgeRosterBackend",
    "outcome": {
     "family": "notification-service",
     "ok": false,
@@ -5457,7 +5457,7 @@
     }
    ],
    "caller": "roster-update/public/_worker.js, roster-update/public/system-health.js",
-   "handler": "roster-update/public/edge-roster.js:139 edgeRosterBackend",
+   "handler": "roster-update/public/edge-roster.js:140 edgeRosterBackend",
    "outcome": {
     "family": "notification-service",
     "ok": false,
@@ -5488,7 +5488,7 @@
     }
    ],
    "caller": "roster-update/public/_worker.js, roster-update/public/system-health.js",
-   "handler": "roster-update/public/edge-roster.js:139 edgeRosterBackend",
+   "handler": "roster-update/public/edge-roster.js:140 edgeRosterBackend",
    "outcome": {
     "family": "notification-service",
     "ok": false,
@@ -5569,7 +5569,7 @@
     }
    ],
    "caller": "roster-update/public/roster-operations-model.js, roster-update/public/roster-operations-ui.js, roster-update/public/system-health.js",
-   "handler": "roster-update/public/edge-roster.js:187 operations",
+   "handler": "roster-update/public/edge-roster.js:189 operations",
    "outcome": {
     "family": "operations",
     "ok": false,
@@ -5692,7 +5692,7 @@
     }
    ],
    "caller": "roster-update/public/_worker.js, roster-update/public/roster-operations-model.js, roster-update/public/roster-operations-ui.js",
-   "handler": "roster-update/public/edge-roster.js:150 operations",
+   "handler": "roster-update/public/edge-roster.js:151 operations",
    "outcome": {
     "family": "operations",
     "ok": true,
@@ -5833,7 +5833,7 @@
     }
    ],
    "caller": "roster-update/public/_worker.js, roster-update/public/system-health.js",
-   "handler": "roster-update/public/edge-roster.js:77 buildEdgeRosterContext",
+   "handler": "roster-update/public/edge-roster.js:78 buildEdgeRosterContext",
    "outcome": {
     "family": "notification-service",
     "ok": true,
@@ -5878,7 +5878,7 @@
     }
    ],
    "caller": "roster-update/public/_worker.js, roster-update/public/system-health.js",
-   "handler": "roster-update/public/edge-roster.js:77 buildEdgeRosterContext",
+   "handler": "roster-update/public/edge-roster.js:78 buildEdgeRosterContext",
    "outcome": {
     "family": "notification-service",
     "ok": false,
@@ -5965,7 +5965,7 @@
     }
    ],
    "caller": "roster-update/public/roster-operations-model.js, roster-update/public/timetable-review.js",
-   "handler": "roster-update/public/edge-roster.js:79 buildEdgeRosterContext",
+   "handler": "roster-update/public/edge-roster.js:80 buildEdgeRosterContext",
    "outcome": {
     "family": "operations",
     "ok": true,
@@ -6000,7 +6000,7 @@
     }
    ],
    "caller": "roster-update/public/roster-operations-model.js, roster-update/public/timetable-review.js",
-   "handler": "roster-update/public/edge-roster.js:620 recordOnly",
+   "handler": "roster-update/public/edge-roster.js:626 recordOnly",
    "outcome": {
     "family": "operations",
     "ok": true,
@@ -6080,7 +6080,7 @@
     }
    ],
    "caller": "roster-update/public/_worker.js, roster-update/public/roster-operations-model.js, roster-update/public/roster-operations-ui.js",
-   "handler": "roster-update/public/edge-roster.js:145 dispatch",
+   "handler": "roster-update/public/edge-roster.js:146 dispatch",
    "outcome": {
     "family": "operations",
     "ok": false,
@@ -6233,7 +6233,7 @@
     }
    ],
    "caller": "roster-update/public/roster-operations-model.js, roster-update/public/roster-operations-ui.js, roster-update/public/roster.js",
-   "handler": "roster-update/public/edge-roster.js:187 operations",
+   "handler": "roster-update/public/edge-roster.js:189 operations",
    "outcome": {
     "family": "operations",
     "ok": false,
@@ -6325,7 +6325,7 @@
     }
    ],
    "caller": "roster-update/public/_worker.js, roster-update/public/roster-operations-model.js, roster-update/public/roster-stapler-ui.js",
-   "handler": "roster-update/public/edge-roster.js:188 operations",
+   "handler": "roster-update/public/edge-roster.js:190 operations",
    "outcome": {
     "family": "operations",
     "ok": false,
@@ -6492,7 +6492,7 @@
     }
    ],
    "caller": "roster-update/public/_worker.js, roster-update/public/backup-ledger.js, roster-update/public/roster-learning.js",
-   "handler": "roster-update/public/edge-roster.js:154 operations",
+   "handler": "roster-update/public/edge-roster.js:155 operations",
    "outcome": {
     "family": "operations",
     "ok": true,
@@ -6558,7 +6558,7 @@
     }
    ],
    "caller": "roster-update/public/_worker.js, roster-update/public/roster-acknowledgement-ui.js, roster-update/public/roster-operations-ui.js",
-   "handler": "roster-update/public/edge-roster.js:157 operations",
+   "handler": "roster-update/public/edge-roster.js:159 operations",
    "outcome": {
     "family": "operations",
     "ok": false,
@@ -6669,7 +6669,7 @@
     }
    ],
    "caller": "roster-update/public/_worker.js, roster-update/public/roster-stapler-ui.js",
-   "handler": "roster-update/public/edge-roster.js:158 operations",
+   "handler": "roster-update/public/edge-roster.js:160 operations",
    "outcome": {
     "family": "operations",
     "ok": false,
@@ -6765,7 +6765,7 @@
     }
    ],
    "caller": "roster-update/public/roster-operations-model.js, roster-update/public/roster-operations-ui.js, roster-update/public/system-health.js",
-   "handler": "roster-update/public/edge-roster.js:183 operations",
+   "handler": "roster-update/public/edge-roster.js:185 operations",
    "outcome": {
     "family": "operations",
     "ok": false,
@@ -6894,7 +6894,7 @@
     }
    ],
    "caller": "roster-update/public/_worker.js, roster-update/public/roster-operations-model.js, roster-update/public/roster-stapler-ui.js",
-   "handler": "roster-update/public/edge-roster.js:188 operations",
+   "handler": "roster-update/public/edge-roster.js:190 operations",
    "outcome": {
     "family": "operations",
     "ok": false,
@@ -6925,7 +6925,7 @@
     }
    ],
    "caller": "roster-update/public/_worker.js",
-   "handler": "roster-update/public/edge-roster.js:158 operations",
+   "handler": "roster-update/public/edge-roster.js:160 operations",
    "outcome": {
     "family": "operations",
     "ok": false,
@@ -7071,7 +7071,7 @@
     }
    ],
    "caller": "roster-update/public/_worker.js, roster-update/public/roster-operations-model.js, roster-update/public/roster-operations-ui.js",
-   "handler": "roster-update/public/edge-roster.js:178 operations",
+   "handler": "roster-update/public/edge-roster.js:180 operations",
    "outcome": {
     "family": "operations",
     "ok": false,
@@ -7169,7 +7169,7 @@
     }
    ],
    "caller": "roster-update/public/_worker.js",
-   "handler": "roster-update/public/edge-roster.js:394 edgeRosterMigration",
+   "handler": "roster-update/public/edge-roster.js:397 edgeRosterMigration",
    "outcome": {
     "family": "migration",
     "ok": false,
@@ -7241,7 +7241,7 @@
     }
    ],
    "caller": "roster-update/public/_worker.js, roster-update/public/roster-operations-model.js, roster-update/public/roster-stapler-ui.js",
-   "handler": "roster-update/public/edge-roster.js:188 operations",
+   "handler": "roster-update/public/edge-roster.js:190 operations",
    "outcome": {
     "family": "operations",
     "ok": false,
@@ -7293,7 +7293,7 @@
     }
    ],
    "caller": "roster-update/public/_worker.js, roster-update/public/roster-operations-ui.js, roster-update/public/system-health.js",
-   "handler": "roster-update/public/edge-roster.js:155 operations",
+   "handler": "roster-update/public/edge-roster.js:157 operations",
    "outcome": {
     "family": "operations",
     "ok": false,
@@ -7324,7 +7324,7 @@
     }
    ],
    "caller": "roster-update/public/_worker.js, roster-update/public/external.js",
-   "handler": "roster-update/public/edge-roster.js:216 edgeRosterService",
+   "handler": "roster-update/public/edge-roster.js:219 edgeRosterService",
    "outcome": {
     "family": "service",
     "ok": false,
@@ -7397,7 +7397,7 @@
     }
    ],
    "caller": "roster-update/public/_worker.js",
-   "handler": "roster-update/public/edge-roster.js:485 edgeRosterMigration",
+   "handler": "roster-update/public/edge-roster.js:488 edgeRosterMigration",
    "outcome": {
     "family": "migration",
     "ok": false,
@@ -7434,7 +7434,7 @@
     }
    ],
    "caller": "roster-update/public/backup-ledger.js, roster-update/public/roster.js",
-   "handler": "roster-update/public/edge-roster.js:145 dispatch",
+   "handler": "roster-update/public/edge-roster.js:146 dispatch",
    "outcome": {
     "family": "action",
     "ok": true,
@@ -7529,7 +7529,7 @@
     }
    ],
    "caller": "roster-update/public/_worker.js, roster-update/public/roster-operations-model.js, roster-update/public/roster-stapler-ui.js",
-   "handler": "roster-update/public/edge-roster.js:188 operations",
+   "handler": "roster-update/public/edge-roster.js:190 operations",
    "outcome": {
     "family": "operations",
     "ok": false,
@@ -7571,7 +7571,7 @@
     }
    ],
    "caller": "roster-update/public/_worker.js, roster-update/public/roster-operations-ui.js, roster-update/public/system-health.js",
-   "handler": "roster-update/public/edge-roster.js:156 operations",
+   "handler": "roster-update/public/edge-roster.js:158 operations",
    "outcome": {
     "family": "operations",
     "ok": false,
@@ -7859,7 +7859,7 @@
     }
    ],
    "caller": "roster-update/public/_worker.js, roster-update/public/roster-allocation.js, roster-update/public/roster-operations-model.js",
-   "handler": "roster-update/public/edge-roster.js:173 operations",
+   "handler": "roster-update/public/edge-roster.js:175 operations",
    "outcome": {
     "family": "operations",
     "ok": true,
@@ -7952,7 +7952,7 @@
     }
    ],
    "caller": "roster-update/public/_worker.js, roster-update/public/roster-operations-model.js, roster-update/public/roster-operations-ui.js",
-   "handler": "roster-update/public/edge-roster.js:620 recordOnly",
+   "handler": "roster-update/public/edge-roster.js:626 recordOnly",
    "outcome": {
     "family": "operations",
     "ok": false,
@@ -8029,7 +8029,7 @@
     }
    ],
    "caller": "roster-update/public/_worker.js, roster-update/public/roster-operations-model.js, roster-update/public/roster-settings-ui.js",
-   "handler": "roster-update/public/edge-roster.js:177 operations",
+   "handler": "roster-update/public/edge-roster.js:179 operations",
    "outcome": {
     "family": "operations",
     "ok": false,
@@ -8100,7 +8100,7 @@
     }
    ],
    "caller": "roster-update/public/_worker.js, roster-update/public/roster-operations-model.js, roster-update/public/roster-operations-ui.js",
-   "handler": "roster-update/public/edge-roster.js:180 operations",
+   "handler": "roster-update/public/edge-roster.js:182 operations",
    "outcome": {
     "family": "operations",
     "ok": false,
@@ -8162,7 +8162,7 @@
     }
    ],
    "caller": "roster-update/public/_worker.js, roster-update/public/roster-operations-model.js, roster-update/public/roster-settings-ui.js",
-   "handler": "roster-update/public/edge-roster.js:519 occupancyChange",
+   "handler": "roster-update/public/edge-roster.js:522 occupancyChange",
    "outcome": {
     "family": "operations",
     "ok": false,
@@ -8418,7 +8418,7 @@
     }
    ],
    "caller": "roster-update/public/_worker.js, roster-update/public/roster-operations-model.js, roster-update/public/roster-stapler-ui.js",
-   "handler": "roster-update/public/edge-roster.js:188 operations",
+   "handler": "roster-update/public/edge-roster.js:190 operations",
    "outcome": {
     "family": "operations",
     "ok": false,
@@ -8490,7 +8490,7 @@
     }
    ],
    "caller": "roster-update/public/_worker.js, roster-update/public/roster-operations-model.js, roster-update/public/roster-settings-ui.js",
-   "handler": "roster-update/public/edge-roster.js:620 recordOnly",
+   "handler": "roster-update/public/edge-roster.js:626 recordOnly",
    "outcome": {
     "family": "operations",
     "ok": false,
@@ -8579,7 +8579,7 @@
     }
    ],
    "caller": "roster-update/public/_worker.js, roster-update/public/roster-allocation.js, roster-update/public/roster-operations-model.js",
-   "handler": "roster-update/public/edge-roster.js:226 edgeRosterService",
+   "handler": "roster-update/public/edge-roster.js:229 edgeRosterService",
    "outcome": {
     "family": "service",
     "ok": true,
@@ -8645,7 +8645,7 @@
     }
    ],
    "caller": "roster-update/public/roster-operations-model.js, roster-update/public/roster-operations-ui.js, roster-update/public/roster-settings-ui.js",
-   "handler": "roster-update/public/edge-roster.js:620 recordOnly",
+   "handler": "roster-update/public/edge-roster.js:626 recordOnly",
    "outcome": {
     "family": "operations",
     "ok": false,
@@ -8717,7 +8717,7 @@
     }
    ],
    "caller": "roster-update/public/_worker.js, roster-update/public/system-health.js",
-   "handler": "roster-update/public/edge-roster.js:216 edgeRosterService",
+   "handler": "roster-update/public/edge-roster.js:219 edgeRosterService",
    "outcome": {
     "family": "service",
     "ok": true,
@@ -8772,7 +8772,7 @@
     }
    ],
    "caller": "roster-update/public/_worker.js, roster-update/public/roster-operations-model.js, roster-update/public/roster-operations-ui.js",
-   "handler": "roster-update/public/edge-roster.js:620 recordOnly",
+   "handler": "roster-update/public/edge-roster.js:626 recordOnly",
    "outcome": {
     "family": "operations",
     "ok": false,
@@ -9035,7 +9035,7 @@
     }
    ],
    "caller": "roster-update/public/_worker.js, roster-update/public/roster-allocation.js, roster-update/public/roster-export.js",
-   "handler": "roster-update/public/edge-roster.js:170 operations",
+   "handler": "roster-update/public/edge-roster.js:172 operations",
    "outcome": {
     "family": "operations",
     "ok": true,
@@ -9116,7 +9116,7 @@
     }
    ],
    "caller": "roster-update/public/_worker.js, roster-update/public/roster-operations-model.js, roster-update/public/roster-stapler-ui.js",
-   "handler": "roster-update/public/edge-roster.js:171 operations",
+   "handler": "roster-update/public/edge-roster.js:173 operations",
    "outcome": {
     "family": "operations",
     "ok": true,
@@ -9151,7 +9151,7 @@
     }
    ],
    "caller": "roster-update/public/_worker.js, roster-update/public/archive.js, roster-update/public/roster-statistics-ui.js",
-   "handler": "roster-update/public/edge-roster.js:159 operations",
+   "handler": "roster-update/public/edge-roster.js:161 operations",
    "outcome": {
     "family": "operations",
     "ok": true,
@@ -9197,7 +9197,7 @@
     }
    ],
    "caller": "roster-update/public/_worker.js, roster-update/public/roster-statistics-ui.js, roster-update/public/roster.js",
-   "handler": "roster-update/public/edge-roster.js:159 operations",
+   "handler": "roster-update/public/edge-roster.js:161 operations",
    "outcome": {
     "family": "operations",
     "ok": true,
@@ -9227,7 +9227,7 @@
     }
    ],
    "caller": "roster-update/public/_worker.js, roster-update/public/roster-statistics-ui.js",
-   "handler": "roster-update/public/edge-roster.js:159 operations",
+   "handler": "roster-update/public/edge-roster.js:161 operations",
    "outcome": {
     "family": "operations",
     "ok": true,
@@ -9258,7 +9258,7 @@
     }
    ],
    "caller": "roster-update/public/_worker.js, roster-update/public/backup-ledger.js, roster-update/public/external.js",
-   "handler": "roster-update/public/edge-roster.js:413 edgeRosterMigration",
+   "handler": "roster-update/public/edge-roster.js:416 edgeRosterMigration",
    "outcome": {
     "family": "migration",
     "ok": false,
@@ -9325,7 +9325,7 @@
     }
    ],
    "caller": "roster-update/public/_worker.js, roster-update/public/roster-operations-model.js, roster-update/public/roster-settings-ui.js",
-   "handler": "roster-update/public/edge-roster.js:620 recordOnly",
+   "handler": "roster-update/public/edge-roster.js:626 recordOnly",
    "outcome": {
     "family": "operations",
     "ok": true,
@@ -9421,7 +9421,7 @@
     }
    ],
    "caller": "roster-update/public/_worker.js, roster-update/public/roster-timetable-preload.js, roster-update/public/roster.js",
-   "handler": "roster-update/public/edge-roster.js:151 operations",
+   "handler": "roster-update/public/edge-roster.js:152 operations",
    "outcome": {
     "family": "operations",
     "ok": false,
@@ -9903,7 +9903,7 @@
     }
    ],
    "caller": "roster-update/public/_worker.js, roster-update/public/external.js",
-   "handler": "roster-update/public/edge-roster.js:216 edgeRosterService",
+   "handler": "roster-update/public/edge-roster.js:219 edgeRosterService",
    "outcome": {
     "family": "service",
     "ok": false,
@@ -9935,7 +9935,7 @@
     }
    ],
    "caller": "roster-update/public/_worker.js, roster-update/public/roster-duty-ui.js, roster-update/public/roster-operations-model.js",
-   "handler": "roster-update/public/edge-roster.js:139 edgeRosterBackend",
+   "handler": "roster-update/public/edge-roster.js:140 edgeRosterBackend",
    "outcome": {
     "family": "action",
     "ok": true,
@@ -9965,7 +9965,7 @@
     }
    ],
    "caller": "roster-update/public/roster-inbox-ui.js, roster-update/public/roster.js",
-   "handler": "roster-update/public/edge-roster.js:139 edgeRosterBackend",
+   "handler": "roster-update/public/edge-roster.js:140 edgeRosterBackend",
    "outcome": {
     "family": "action",
     "ok": false,
@@ -9996,7 +9996,7 @@
     }
    ],
    "caller": "roster-update/public/_worker.js, roster-update/public/roster-operations-model.js, roster-update/public/roster-operations-ui.js",
-   "handler": "roster-update/public/edge-roster.js:139 edgeRosterBackend",
+   "handler": "roster-update/public/edge-roster.js:140 edgeRosterBackend",
    "outcome": {
     "family": "action",
     "ok": false,
@@ -10027,7 +10027,7 @@
     }
    ],
    "caller": "roster-update/public/backup-ledger.js, roster-update/public/roster.js",
-   "handler": "roster-update/public/edge-roster.js:139 edgeRosterBackend",
+   "handler": "roster-update/public/edge-roster.js:140 edgeRosterBackend",
    "outcome": {
     "family": "action",
     "ok": true,
@@ -10610,7 +10610,7 @@
     }
    ],
    "caller": "roster-update/public/roster-operations-model.js, roster-update/public/roster-operations-ui.js",
-   "handler": "roster-update/public/edge-roster.js:139 edgeRosterBackend",
+   "handler": "roster-update/public/edge-roster.js:140 edgeRosterBackend",
    "outcome": {
     "family": "operations",
     "ok": true,
@@ -10748,7 +10748,7 @@
     }
    ],
    "caller": "roster-update/public/_worker.js, roster-update/public/archive.js, roster-update/public/roster-calculations.js",
-   "handler": "roster-update/public/edge-roster.js:351 edgeRosterArchive",
+   "handler": "roster-update/public/edge-roster.js:354 edgeRosterArchive",
    "outcome": {
     "family": "operations",
     "ok": true,
@@ -10814,7 +10814,7 @@
     }
    ],
    "caller": "roster-update/public/_worker.js, roster-update/public/roster-operations-model.js, roster-update/public/roster.js",
-   "handler": "roster-update/public/edge-roster.js:620 recordOnly",
+   "handler": "roster-update/public/edge-roster.js:626 recordOnly",
    "outcome": {
     "family": "operations",
     "ok": true,
@@ -10860,7 +10860,7 @@
     }
    ],
    "caller": "roster-update/public/_worker.js, roster-update/public/roster-operations-model.js, roster-update/public/roster-operations-ui.js",
-   "handler": "roster-update/public/edge-roster.js:620 recordOnly",
+   "handler": "roster-update/public/edge-roster.js:626 recordOnly",
    "outcome": {
     "family": "operations",
     "ok": true,
@@ -10911,7 +10911,7 @@
     }
    ],
    "caller": "roster-update/public/_worker.js, roster-update/public/roster-operations-model.js, roster-update/public/roster-settings-ui.js",
-   "handler": "roster-update/public/edge-roster.js:80 buildEdgeRosterContext",
+   "handler": "roster-update/public/edge-roster.js:81 buildEdgeRosterContext",
    "outcome": {
     "family": "operations",
     "ok": true,
@@ -10946,7 +10946,7 @@
     }
    ],
    "caller": "roster-update/public/_worker.js, roster-update/public/roster-operations-model.js, roster-update/public/roster-operations-ui.js",
-   "handler": "roster-update/public/edge-roster.js:620 recordOnly",
+   "handler": "roster-update/public/edge-roster.js:626 recordOnly",
    "outcome": {
     "family": "operations",
     "ok": true,
@@ -10992,7 +10992,7 @@
     }
    ],
    "caller": "roster-update/public/_worker.js, roster-update/public/external.js, roster-update/public/roster-operations-model.js",
-   "handler": "roster-update/public/edge-roster.js:80 buildEdgeRosterContext",
+   "handler": "roster-update/public/edge-roster.js:81 buildEdgeRosterContext",
    "outcome": {
     "family": "operations",
     "ok": true,
@@ -11037,7 +11037,7 @@
     }
    ],
    "caller": "roster-update/public/_worker.js, roster-update/public/roster-duty-ui.js, roster-update/public/roster-operations-model.js",
-   "handler": "roster-update/public/edge-roster.js:80 buildEdgeRosterContext",
+   "handler": "roster-update/public/edge-roster.js:81 buildEdgeRosterContext",
    "outcome": {
     "family": "operations",
     "ok": true,
@@ -11102,7 +11102,7 @@
     }
    ],
    "caller": "roster-update/public/_worker.js, roster-update/public/roster-operations-model.js, roster-update/public/roster-operations-ui.js",
-   "handler": "roster-update/public/edge-roster.js:620 recordOnly",
+   "handler": "roster-update/public/edge-roster.js:200 attachPlanTag",
    "outcome": {
     "family": "operations",
     "ok": true,
@@ -11143,7 +11143,7 @@
     }
    ],
    "caller": "roster-update/public/_worker.js, roster-update/public/archive.js, roster-update/public/roster-operations-model.js",
-   "handler": "roster-update/public/edge-roster.js:351 edgeRosterArchive",
+   "handler": "roster-update/public/edge-roster.js:354 edgeRosterArchive",
    "outcome": {
     "family": "operations",
     "ok": true,
@@ -11184,7 +11184,7 @@
     }
    ],
    "caller": "roster-update/public/_worker.js, roster-update/public/roster-operations-ui.js",
-   "handler": "roster-update/public/edge-roster.js:161 operations",
+   "handler": "roster-update/public/edge-roster.js:163 operations",
    "outcome": {
     "family": "operations",
     "ok": true,
@@ -11214,7 +11214,7 @@
     }
    ],
    "caller": "roster-update/public/_worker.js, roster-update/public/roster-operations-ui.js",
-   "handler": "roster-update/public/edge-roster.js:154 operations",
+   "handler": "roster-update/public/edge-roster.js:156 operations",
    "outcome": {
     "family": "operations",
     "ok": true,
@@ -11269,7 +11269,7 @@
     }
    ],
    "caller": "roster-update/public/_worker.js, roster-update/public/roster-operations-model.js, roster-update/public/roster-operations-ui.js",
-   "handler": "roster-update/public/edge-roster.js:80 buildEdgeRosterContext",
+   "handler": "roster-update/public/edge-roster.js:81 buildEdgeRosterContext",
    "outcome": {
     "family": "operations",
     "ok": true,
@@ -11314,7 +11314,7 @@
     }
    ],
    "caller": "roster-update/public/_worker.js, roster-update/public/roster-operations-model.js, roster-update/public/roster.js",
-   "handler": "roster-update/public/edge-roster.js:620 recordOnly",
+   "handler": "roster-update/public/edge-roster.js:626 recordOnly",
    "outcome": {
     "family": "operations",
     "ok": true,
@@ -11350,7 +11350,7 @@
     }
    ],
    "caller": "roster-update/public/_worker.js",
-   "handler": "roster-update/public/edge-roster.js:142 dispatch",
+   "handler": "roster-update/public/edge-roster.js:143 dispatch",
    "outcome": {
     "family": "operations",
     "ok": true,
@@ -11416,7 +11416,7 @@
     }
    ],
    "caller": "roster-update/public/_worker.js, roster-update/public/roster-operations-model.js",
-   "handler": "roster-update/public/edge-roster.js:80 buildEdgeRosterContext",
+   "handler": "roster-update/public/edge-roster.js:81 buildEdgeRosterContext",
    "outcome": {
     "family": "operations",
     "ok": true,
@@ -11451,7 +11451,7 @@
     }
    ],
    "caller": "roster-update/public/_worker.js, roster-update/public/roster-allocation.js, roster-update/public/roster-operations-model.js",
-   "handler": "roster-update/public/edge-roster.js:351 edgeRosterArchive",
+   "handler": "roster-update/public/edge-roster.js:354 edgeRosterArchive",
    "outcome": {
     "family": "operations",
     "ok": true,
@@ -11502,7 +11502,7 @@
     }
    ],
    "caller": "roster-update/public/_worker.js, roster-update/public/roster-operations-model.js, roster-update/public/roster-operations-ui.js",
-   "handler": "roster-update/public/edge-roster.js:80 buildEdgeRosterContext",
+   "handler": "roster-update/public/edge-roster.js:81 buildEdgeRosterContext",
    "outcome": {
     "family": "operations",
     "ok": true,
@@ -11628,7 +11628,7 @@
     }
    ],
    "caller": "roster-update/public/_worker.js, roster-update/public/roster-operations-model.js, roster-update/public/roster-operations-ui.js",
-   "handler": "roster-update/public/edge-roster.js:141 dispatch",
+   "handler": "roster-update/public/edge-roster.js:142 dispatch",
    "outcome": {
     "family": "operations",
     "ok": true,
@@ -11694,7 +11694,7 @@
     }
    ],
    "caller": "roster-update/public/_worker.js, roster-update/public/roster-operations-model.js, roster-update/public/roster.js",
-   "handler": "roster-update/public/edge-roster.js:141 dispatch",
+   "handler": "roster-update/public/edge-roster.js:142 dispatch",
    "outcome": {
     "family": "operations",
     "ok": true,
@@ -11749,7 +11749,7 @@
     }
    ],
    "caller": "roster-update/public/_worker.js, roster-update/public/roster-operations-model.js, roster-update/public/roster-operations-ui.js",
-   "handler": "roster-update/public/edge-roster.js:80 buildEdgeRosterContext",
+   "handler": "roster-update/public/edge-roster.js:81 buildEdgeRosterContext",
    "outcome": {
     "family": "operations",
     "ok": true,
@@ -11835,7 +11835,7 @@
     }
    ],
    "caller": "roster-update/public/_worker.js, roster-update/public/roster-allocation.js, roster-update/public/roster-export.js",
-   "handler": "roster-update/public/edge-roster.js:83 buildEdgeRosterContext",
+   "handler": "roster-update/public/edge-roster.js:84 buildEdgeRosterContext",
    "outcome": {
     "family": "operations",
     "ok": true,
@@ -11886,7 +11886,7 @@
     }
    ],
    "caller": "roster-update/public/_worker.js, roster-update/public/roster-operations-model.js, roster-update/public/roster-stapler-ui.js",
-   "handler": "roster-update/public/edge-roster.js:80 buildEdgeRosterContext",
+   "handler": "roster-update/public/edge-roster.js:81 buildEdgeRosterContext",
    "outcome": {
     "family": "operations",
     "ok": true,
@@ -11926,7 +11926,7 @@
     }
    ],
    "caller": "roster-update/public/roster-operations-model.js",
-   "handler": "roster-update/public/edge-roster.js:79 buildEdgeRosterContext",
+   "handler": "roster-update/public/edge-roster.js:80 buildEdgeRosterContext",
    "outcome": {
     "family": "operations",
     "ok": true,
@@ -11961,7 +11961,7 @@
     }
    ],
    "caller": "roster-update/public/_worker.js, roster-update/public/archive.js, roster-update/public/roster-statistics-ui.js",
-   "handler": "roster-update/public/edge-roster.js:351 edgeRosterArchive",
+   "handler": "roster-update/public/edge-roster.js:354 edgeRosterArchive",
    "outcome": {
     "family": "operations",
     "ok": true,
@@ -12012,7 +12012,7 @@
     }
    ],
    "caller": "roster-update/public/_worker.js, roster-update/public/roster-operations-model.js, roster-update/public/roster-settings-ui.js",
-   "handler": "roster-update/public/edge-roster.js:620 recordOnly",
+   "handler": "roster-update/public/edge-roster.js:626 recordOnly",
    "outcome": {
     "family": "operations",
     "ok": true,
@@ -12053,7 +12053,7 @@
     }
    ],
    "caller": "roster-update/public/_worker.js, roster-update/public/roster-operations-model.js, roster-update/public/roster-operations-ui.js",
-   "handler": "roster-update/public/edge-roster.js:80 buildEdgeRosterContext",
+   "handler": "roster-update/public/edge-roster.js:81 buildEdgeRosterContext",
    "outcome": {
     "family": "operations",
     "ok": true,
@@ -12088,7 +12088,7 @@
     }
    ],
    "caller": "roster-update/public/roster-operations-model.js",
-   "handler": "roster-update/public/edge-roster.js:620 recordOnly",
+   "handler": "roster-update/public/edge-roster.js:626 recordOnly",
    "outcome": {
     "family": "operations",
     "ok": true,
@@ -12134,7 +12134,7 @@
     }
    ],
    "caller": "roster-update/public/roster-operations-model.js, roster-update/public/system-health.js, roster-update/public/timetable-review.js",
-   "handler": "roster-update/public/edge-roster.js:78 buildEdgeRosterContext",
+   "handler": "roster-update/public/edge-roster.js:79 buildEdgeRosterContext",
    "outcome": {
     "family": "operations",
     "ok": true,
@@ -12159,7 +12159,7 @@
     }
    ],
    "caller": "roster-update/public/roster-operations-model.js, roster-update/public/roster-operations-ui.js",
-   "handler": "roster-update/public/edge-roster.js:139 edgeRosterBackend",
+   "handler": "roster-update/public/edge-roster.js:140 edgeRosterBackend",
    "outcome": {
     "family": "operations",
     "ok": true,

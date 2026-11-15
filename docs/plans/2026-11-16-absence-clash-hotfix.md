@@ -1,0 +1,33 @@
+# Absence clash hotfix on v0.9.9y
+
+Model: Codex. Owner-requested D1/frontend hotfix. The owner waived Claude review for v0.9 hotfixes; build, local tests and CI remain gates. The owner merges and deploys. Nothing in this record claims deployment or live verification.
+
+## Behaviour
+
+Disjoint absence periods save without confirmation. Overlapping periods show the current reports and require acknowledgement before replacing only those reports. Replacement retains superseded rows, instruction history and completed duties. A stale confirmation requires a new review; a lost response uses the existing request receipt. No automatic allocation or publication is added.
+
+## Package and deployment order
+
+Preserve the current v0.9.9y deployment versions for rollback. The build label stays v0.9.9y; identify this hotfix by its exact source commit and package SHA-256 sums.
+
+1. Update `gsis-roster-notifications` with `gsis-roster-notifications_worker.js` (canonical source: `notification-worker/dashboard-worker.mjs`).
+2. Update `gsis-operations` with `gsis-operations_worker.js` (canonical source: `operations-worker/dashboard-worker.mjs`). Both Workers embed the D1 handler and must retain replacement confirmation fields in the durable transport.
+3. Publish `Roster_Frontend.zip` to the existing Roster Pages project. It is the canonical `Roster_Frontend_v0.9.9.zip`, with files at the ZIP root and a bundled Pages `_worker.js`. Refresh the browser after publication.
+
+No Apps Script files, Deploy frontend, migrations, secrets, authority flags, bindings, URLs, cron settings or WhatsApp templates change. Keep all existing configuration. The builder does not deploy or run live checks.
+
+## Owner checks
+
+- A second report for disjoint periods saves without a replacement prompt.
+- An overlapping report shows the existing date, periods, type and reason. Cancel keeps the old record and the new form draft.
+- Confirm replaces only overlapping records. Verify the applied receipt, not merely a received acknowledgement.
+- If another edit changes the conflict while the report waits, Review replacement must show the current entries before another confirmation.
+- Check completed duties and unrelated reports remain intact. Do not send duplicate test notifications or resubmit a request whose outcome is uncertain; check its receipt.
+
+## Rollback
+
+Restore the previous matching y versions of both Workers and the Roster Pages deployment. Preserve D1/R2 data and all configuration. Rollback does not undo already confirmed report replacements; use retained history and the normal authorized absence editor for an owner-requested correction. Pending requests and receipts remain retained; inspect outcomes before retrying.
+
+## Evidence
+
+The three new synthetic tests exercise the D1 adapter, actual SQLite-backed D1 intake/receipts and the real report form. They cover disjoint saves, cancellation, atomic replacement, stale confirmation, validation rollback, permissions, queued review and exact replay. The core test also retains completed/unrelated duties and old instructions. No live data, Google reads or provider delivery is used. Exact-head local-suite/CI results and package checksums belong in the final handoff.

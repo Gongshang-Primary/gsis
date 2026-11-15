@@ -1,3 +1,7 @@
+# Pending hotfix: absence clash confirmation, 16 November 2026
+
+Model: Codex. The D1 Report Absence form accepts disjoint periods without a prompt. Overlapping reports show the current absence and require acknowledgement before an atomic replacement, retaining superseded records and completed work. Changed conflicts require fresh confirmation; request receipts prevent duplicate replacement after a lost response. D1/Pages and both Roster Workers only; no Apps Script change. See `docs/coordination/tasks/roster-absence-clash-confirm.md`. Not deployed.
+
 # Pending hotfix: activated ad hoc relief eligibility, 14 November 2026
 
 Model: Codex. Restore active-or-dated-ad-hoc eligibility after #38: manual/automatic relief, shared cover, daily reports and duty WhatsApp include activated inactive Contacts within their dates/periods. Truly inactive staff remain blocked. Dated labels read “ad hoc”; Contacts status and allocation rules are unchanged. See `docs/coordination/tasks/roster-adhoc-inactive-regression.md` and `docs/plans/2026-11-15-adhoc-hotfix-deploy-steps.md`. Not deployed.
