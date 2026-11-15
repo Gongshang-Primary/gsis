@@ -69,23 +69,7 @@ export const SCHEMAS = Object.freeze({
   Exclusions: {
     Exclusions: ["Staff ID", "TTb Name", "P1", "P2", "P3", "P4", "P5", "P6"],
   },
-  Membership: {
-    Membership: [
-      "Role Shortform",
-      "Formal Role Name",
-      "SL",
-      "SC",
-      "SMC",
-      "KP",
-      "TL",
-      "SDT",
-      "CMT",
-      "SAT",
-      "Support",
-      "MK",
-      "EO Appt Level",
-    ],
-  },
+  Membership: { Membership: ["Staff ID", "TTb Name", "Role", "Memberships"] },
   Offload: {
     Offload: [
       "Rule ID",
@@ -98,7 +82,7 @@ export const SCHEMAS = Object.freeze({
       "Notes",
     ],
   },
-  "HR Terms": { "HR Terms": ["Field", "Value"] },
+  "HR Terms": { "HR Terms": ["Staff ID", "TTb Name", "Field", "Value"] },
   "Span of Control": {
     Hierarchy: [
       "Staff ID",
@@ -257,11 +241,7 @@ export function exportWorkbook(
     };
   if (scope === "Membership")
     sheets = {
-      Membership: (doc.membership || []).map((row) =>
-        row.map((value, index) =>
-          index >= 2 && index <= 11 ? value === "1" || value === true : value,
-        ),
-      ),
+      Membership: (doc.contactsMemberships || []).map((row) => [...row]),
     };
   if (scope === "Offload")
     sheets = {
@@ -278,9 +258,7 @@ export function exportWorkbook(
     };
   if (scope === "HR Terms")
     sheets = {
-      "HR Terms": Object.entries(doc.hrTerms || {}).flatMap(([k, v]) =>
-        (v || []).map((x) => [k, x]),
-      ),
+      "HR Terms": (doc.contactsFacts || []).map((row) => [...row]),
     };
   if (scope === "Span of Control") {
     const parents =
@@ -425,7 +403,7 @@ export function validateWorkbook(
   check(SCHEMAS[scope], "Unknown scope.");
   check(
     !["Membership", "HR Terms"].includes(scope),
-    "This catalogue is reference-only in Deploy.",
+    "These Contacts facts are reporting-only in Deploy.",
     "REFERENCE_ONLY",
     403,
   );

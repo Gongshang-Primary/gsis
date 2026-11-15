@@ -348,16 +348,30 @@ const catalogueProjection = {
 };
 const withCatalogues = mergeContacts(d, catalogueProjection);
 assert.deepEqual(withCatalogues.hrTerms["EO Appt Level"], ["EO"]);
-assert.equal(withCatalogues.membership[0][4], "1");
+assert.deepEqual(
+  withCatalogues.membership,
+  [],
+  "the retired role-flag matrix must not contain staff facts",
+);
+assert.deepEqual(withCatalogues.contactsMemberships[0], [
+  "staff-a",
+  "Alpha",
+  "",
+  "",
+]);
+assert(
+  !withCatalogues.contactsFacts.some((row) => row[3] === "HOD"),
+  "unassigned historical definitions do not become current staff facts",
+);
 assert.equal(
   withCatalogues.teachers[0].authority.smc.value,
   false,
   "A display catalogue flag never grants authority.",
 );
-assert.equal(
+assert.deepEqual(
   exportWorkbook(withCatalogues, "Membership", "school", 1).sheets.Membership
-    .rows[0][4],
-  true,
+    .rows[0],
+  ["staff-a", "Alpha", "", ""],
 );
 // Real Contacts purpose projections carry selected accepted records, not a
 // preconstructed Deploy profile. Blank appointment is distinct from EO status.
