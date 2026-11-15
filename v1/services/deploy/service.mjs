@@ -1270,11 +1270,28 @@ function refreshedVenues(document, catalogue, schoolId) {
       ...(prior && Object.hasOwn(prior, "forms")
         ? { forms: structuredClone(prior.forms) }
         : {}),
+      ...(prior && Object.hasOwn(prior, "uses")
+        ? { uses: structuredClone(prior.uses) }
+        : {}),
     };
   });
   check(
     usedVenueIds(document).every((venueId) => ids.has(venueId)),
     "A referenced venue is no longer in the current catalogue. Review its assignment before refreshing.",
+    "VENUE_REFERENCE_CHANGED",
+    409,
+  );
+  // Legacy use metadata is not a current occupancy or publication reference.
+  // Still refuse a refresh that would discard it; unknown JSON is not empty.
+  check(
+    document.venues.every(
+      (v) =>
+        ids.has(v.id) ||
+        !Object.hasOwn(v, "uses") ||
+        v.uses === null ||
+        (Array.isArray(v.uses) && v.uses.length === 0),
+    ),
+    "A removed venue retains saved room-use metadata. Review that metadata before refreshing.",
     "VENUE_REFERENCE_CHANGED",
     409,
   );
