@@ -31,6 +31,15 @@ The first ledger searched for names. This scan ran the product.
 3. A screen may hide a control by role or by a config flag. "Called by" means the name is in the built file, not that a user can reach it.
 4. Probes ran as Global Admin. Permission errors for normal staff are not covered.
 
+## 0a. Corrections to this file from PR 178
+
+The operation probe in PR 178 (`bf2067c`) sends calls through the real browser transport. Where it disagrees with Section 2, the probe wins. See `docs/coordination/review/v1-pr178-claude-review.md`.
+
+1. F13 `sysFields`: false alarm. It is a response data field, not a route.
+2. F16: not a call. The names are in a copied model file only.
+3. Added to F10: `archiveColdOutput`. Added to F04: `cancelPendingNotifications`. Both are called by a built screen and have no handler.
+4. F09 `/backup-ledger` is called with `read`, `verify` and `restore`. All three are missing.
+
 ## 1. Corrections to the first ledger
 
 | First ledger row | Correction |
