@@ -1,3 +1,8 @@
+import {
+  CONTACT_FIELD_MAP,
+  CONTACT_GRID_FIELDS,
+  gridValues,
+} from "./grid-projection.mjs";
 import { validateMkeIntervals } from "./intervals.mjs";
 import { deriveDisplay, validateAssignments } from "./catalogues.mjs";
 import { birthdayIntents } from "./jobs.mjs";
@@ -38,46 +43,13 @@ const fail = (
 ) => {
   if (!ok) throw new ApiError(code, status, message);
 };
-export const FIELD_MAP = {
-  "TTb Name": "ttbName",
-  "Basic Name": "basicName",
-  "Statutory Name": "statutoryName",
-  "iCON Alias (@moe.edu.sg)": "iconEmail",
-  "CES Alias (@schools.gov.sg)": "cesEmail",
-  "GSPS Alias (@gsps.edu.sg)": "email",
-  "Mobile No": "mobile",
-  EXT: "ext",
-  "Day of Birth": "birthday",
-  "Month of birth": "birthday",
-  Role: "role",
-  "EO Appt Level": "eoAppointmentLevel",
-  "Appointment Status": "appointmentStatus",
-  "Employment Modifier": "employmentTags",
-  "Subject Modifier": "subjectTags",
-  Active: "employmentActive",
-  "MK Modifier": "mkTags",
-};
+export const FIELD_MAP = CONTACT_FIELD_MAP;
 export const GRID_FIELDS = Object.keys(FIELD_MAP);
 const aliases = {
   "iCON Alias (@moe.edu.sg)": "moe.edu.sg",
   "CES Alias (@schools.gov.sg)": "schools.gov.sg",
   "GSPS Alias (@gsps.edu.sg)": "gsps.edu.sg",
 };
-function displayed(field, row, now) {
-  const value = effectiveField(row, now);
-  if (value === null) return "";
-  if (field === "Active") return value ? "Y" : "N";
-  if (field === "Day of Birth") return String(Number(String(value).slice(-2)));
-  if (field === "Month of birth")
-    return String(Number(String(value).slice(-5, -3)));
-  if (aliases[field])
-    return String(value).endsWith("@" + aliases[field])
-      ? String(value).split("@")[0]
-      : String(value);
-  if (Array.isArray(value)) return value.map((v) => v.code ?? v).join(", ");
-  if (typeof value === "object") return value.code;
-  return String(value);
-}
 async function convert(env, field, value, current, changes) {
   fail(typeof value === "string" && value.length <= 4096);
   value = value.trim();
@@ -266,9 +238,15 @@ export async function saveGrid(ctx) {
             fields: {},
           }
         : await staffRecord(env.DB, env.SCHOOL_ID, staffId);
+    const baseline = gridValues(
+      publicStaff(old, now, { privateFields: true }),
+      {
+        schoolDomain: env.HOSTED_DOMAIN,
+      },
+    );
     for (const c of changes)
       fail(
-        displayed(c.field, old.fields[FIELD_MAP[c.field]], now) === c.expected,
+        baseline[CONTACT_GRID_FIELDS.indexOf(c.field)] === c.expected,
         "REVISION_CONFLICT",
         409,
         "An edited value changed. Review your draft.",

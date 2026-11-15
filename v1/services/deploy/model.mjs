@@ -153,13 +153,25 @@ export function mergeContacts(doc, projection) {
     503,
   );
   const code = (v) =>
-    typeof v === "object" && v ? v.code : typeof v === "string" ? v : "";
+    typeof v === "string" ? v : typeof v?.code === "string" ? v.code : "";
   const people = projection.staff.map((p) => {
     const fields = p.fields || null,
-      accepted = (name) =>
-        fields?.[name]?.state === "accepted" && fields[name].effective === true
-          ? fields[name].value
-          : null;
+      hasFact = (name) => {
+        const f = fields?.[name];
+        return (
+          f?.state === "accepted" &&
+          f.effective === true &&
+          f.revoked !== true &&
+          (f.validFrom == null || f.validFrom <= projection.asOf) &&
+          (f.validUntil == null || f.validUntil > projection.asOf)
+        );
+      },
+      accepted = (name) => (hasFact(name) ? fields[name].value : null),
+      active = fields ? accepted("employmentActive") : p.active,
+      section = fields
+        ? accepted("schoolSection")
+        : p.schoolSection || p.profile?.section,
+      sectionName = code(section).toLowerCase();
     const tokens = (value) =>
       Array.isArray(value) ? value.map(code).filter(Boolean) : [];
     const native = fields
@@ -176,15 +188,15 @@ export function mergeContacts(doc, projection) {
             .filter(Boolean)
             .join(";"),
           "Subject Modifier": tokens(accepted("subjectTags")).join(";"),
-          Active: p.active === true ? "Y" : p.active === false ? "N" : "",
+          "MK Modifier": tokens(accepted("mkTags")).join(";"),
+          Active: active === true ? "Y" : active === false ? "N" : "",
         }
       : p.profile || {};
     const authority = fields
       ? Object.fromEntries(
           ["eo", "smc", "schoolLeader"].map((name) => [
             name,
-            fields[name]?.state === "accepted" &&
-            fields[name].effective === true
+            hasFact(name)
               ? {
                   value: fields[name].value,
                   revision: fields[name].revision,
@@ -207,29 +219,49 @@ export function mergeContacts(doc, projection) {
       "eo",
     ];
     const quality = fields
-      ? required.every(
-          (name) =>
-            fields[name]?.state === "accepted" &&
-            fields[name].effective === true,
-        )
+      ? required.every((name) => hasFact(name))
         ? "verified"
         : "unavailable"
       : p.quality || "unavailable";
-    return {
+    const teacher = {
       id: p.staffId || p.id,
-      name: p.name || native["Basic Name"] || p.staffId,
+      name:
+        p.ttbName ||
+        native["TTb Name"] ||
+        p.name ||
+        native["Basic Name"] ||
+        p.staffId,
       ttbName: p.ttbName || native["TTb Name"] || p.name,
-      active: p.active === true,
-      activeKnown: typeof p.active === "boolean",
-      schoolSection: p.schoolSection || p.profile?.section || null,
-      mk: ["MK", "MKE"].includes(code(p.schoolSection || p.profile?.section)),
+      active: active === true,
+      activeKnown: typeof active === "boolean",
+      schoolSection: sectionName || null,
+      mk: ["mk", "mke"].includes(sectionName),
       profile: native,
-      groups: tokens(p.groups),
+      groups: tokens(fields ? accepted("memberships") : p.groups),
       authority,
       fieldRevisions: p.fieldRevisions || {},
       contactsRevision: String(p.revision || projection.revision),
       quality,
     };
+    const excluded = [
+      ...(active === false ? ["INACTIVE"] : []),
+      ...(authority.eo?.value === false ? ["NON_EO"] : []),
+      ...(teacher.mk ? ["MK_SECTION"] : []),
+      ...(!Rules.eligible(teacher) ? ["TEACHING_EXCLUSION"] : []),
+    ];
+    const missing = [
+      ...(typeof active !== "boolean" ? ["ACTIVITY_UNVERIFIED"] : []),
+      ...(typeof authority.eo?.value !== "boolean" ? ["EO_UNVERIFIED"] : []),
+      ...(sectionName !== "primary" && !teacher.mk
+        ? ["SECTION_UNVERIFIED"]
+        : []),
+    ];
+    teacher.teachingEligibility = excluded.length
+      ? { state: "excluded", reasons: excluded }
+      : missing.length
+        ? { state: "unavailable", reasons: missing }
+        : { state: "eligible", reasons: [] };
+    return teacher;
   });
   const display = projection.catalogues
     ? catalogueDisplay(projection.catalogues)
@@ -242,7 +274,15 @@ export function mergeContacts(doc, projection) {
       ...doc.teachers.map((t) =>
         map.has(t.id)
           ? map.get(t.id)
-          : { ...t, orphan: true, quality: "unavailable" },
+          : {
+              ...t,
+              orphan: true,
+              quality: "unavailable",
+              teachingEligibility: {
+                state: "unavailable",
+                reasons: ["CONTACTS_ID_MISSING"],
+              },
+            },
       ),
       ...people.filter((p) => !oldIds.has(p.id)),
     ],
@@ -250,6 +290,114 @@ export function mergeContacts(doc, projection) {
     membership: display?.membership || projection.membership || doc.membership,
     hrTerms: display?.hrTerms || projection.hrTerms || doc.hrTerms,
   };
+}
+// This canonicalization is private to comparison/import; reading never rewrites history.
+export function canonicalTeachingDocument(document, original = document) {
+  const next = structuredClone(document);
+  const legacyScope = (g) =>
+    JSON.stringify({
+      form: g.form ?? null,
+      sources: g.sources ?? null,
+      anchorRef: g.anchorRef ?? null,
+      levelWide: g.levelWide === true,
+      levels: VenueGroups.levels(g),
+    });
+  for (const group of next.groups) {
+    if (Array.isArray(group.classRefs)) continue;
+    const prior = original.groups.find((g) => g.id === group.id),
+      useOriginal = prior && legacyScope(prior) === legacyScope(group),
+      source = useOriginal ? original : document,
+      sourceGroup = useOriginal ? prior : group,
+      scope = VenueGroups.scope(source, sourceGroup);
+    if (
+      scope.unresolved.length ||
+      (!scope.classRefs.length && !scope.levelWide)
+    )
+      continue;
+    group.classRefs = scope.classRefs;
+    group.levelWide = scope.levelWide;
+    const anchor = VenueGroups.anchor(source, sourceGroup);
+    if (!scope.levelWide && anchor?.ref) group.anchorRef = anchor.ref;
+  }
+  for (const assignment of next.assignments) {
+    if (next.groups.some((g) => g.id === assignment.target)) continue;
+    const matches = next.classes.filter(
+      (c) =>
+        c.ref === assignment.targetRef ||
+        (!assignment.targetRef && classKey(c) === assignment.target),
+    );
+    if (matches.length === 1) assignment.targetRef = matches[0].ref;
+  }
+  return next;
+}
+function teachingBindings(document, original = document) {
+  const doc = canonicalTeachingDocument(document, original);
+  return new Map(
+    doc.assignments.map((a) => {
+      const group = doc.groups.find((g) => g.id === a.target),
+        cls = doc.classes.find((c) => c.ref === a.targetRef),
+        scope = group ? VenueGroups.scope(doc, group) : null,
+        levels = group
+          ? VenueGroups.levels(group)
+          : [String(cls?.level || a.level || "")];
+      const target = group
+        ? {
+            kind: "group",
+            id: group.id,
+            subject: group.subject,
+            levels,
+            levelWide: scope.levelWide,
+            classRefs: (scope.levelWide
+              ? doc.classes
+                  .filter((c) => levels.includes(String(c.level)))
+                  .map((c) => c.ref)
+              : scope.classRefs
+            )
+              .slice()
+              .sort(),
+            unresolved: scope.unresolved.slice().sort(),
+          }
+        : { kind: "class", id: cls?.ref || a.targetRef || a.target, levels };
+      return [
+        a.id,
+        {
+          staffId: a.teacher,
+          signature: JSON.stringify({
+            staffId: a.teacher,
+            subject: a.subject,
+            target,
+          }),
+        },
+      ];
+    }),
+  );
+}
+export function changedTeachingStaff(before, after, explicitStaffIds = []) {
+  const old = teachingBindings(before),
+    changed = new Set(explicitStaffIds);
+  for (const [id, binding] of teachingBindings(after, before))
+    if (old.get(id)?.signature !== binding.signature)
+      changed.add(binding.staffId);
+  return [...changed].sort();
+}
+export function validateTeachingBindings(
+  before,
+  after,
+  projection,
+  explicitStaffIds = [],
+) {
+  const changed = changedTeachingStaff(before, after, explicitStaffIds);
+  if (!changed.length) return after;
+  const normalized = mergeContacts(after, projection),
+    people = new Map(normalized.teachers.map((t) => [t.id, t]));
+  for (const staffId of changed)
+    check(
+      people.get(staffId)?.teachingEligibility?.state === "eligible",
+      "Choose staff with current accepted primary-school teaching eligibility. Existing historical assignments may be retained or removed.",
+      "TEACHING_ELIGIBILITY_REQUIRED",
+      409,
+    );
+  return normalized;
 }
 export function calculate(doc, contacts) {
   const source = mergeContacts(doc, contacts);
@@ -260,7 +408,10 @@ export function calculate(doc, contacts) {
   };
   const rules = (t) => {
     const r = Rules.calculate(t, accepted.offload);
-    return { ...r, eligible: r.eligible && t.authority?.eo?.value === true };
+    return {
+      ...r,
+      eligible: r.eligible && t.teachingEligibility?.state === "eligible",
+    };
   };
   const work = Workload.analyse(accepted, rules),
     relief = Relief.analyse(accepted, work);
@@ -274,8 +425,7 @@ export function calculate(doc, contacts) {
       subjectCategories[activity.code] = "Non-teaching";
   const sharedFactsComplete = source.teachers.every(
     (t) =>
-      t.quality === "verified" ||
-      (t.active === false && t.activeKnown !== false),
+      t.quality === "verified" || t.teachingEligibility?.state === "excluded",
   );
   const rows = relief.rows.map((r) => {
     const fact = source.teachers.find((t) => t.id === r.id),
@@ -481,7 +631,11 @@ export function applyEdits(doc, edits) {
     Array.isArray(edits) && edits.length > 0 && edits.length <= 500,
     "Use 1 to 500 edits.",
   );
-  const d = structuredClone(doc);
+  const d = edits.some((edit) =>
+    ["updateClass", "renameClasses"].includes(edit?.operation),
+  )
+    ? canonicalTeachingDocument(doc)
+    : structuredClone(doc);
   for (const e0 of edits) {
     const e = plain(e0),
       op = e.operation;
@@ -688,7 +842,8 @@ export function applyEdits(doc, edits) {
         sub = text(e.subject || prior?.subject, 60);
       if (!e.teacher && prior) e.teacher = prior.teacher;
       const t = teacher();
-      check(t.active || op === "removeTeacher", "Choose active staff.");
+      // Owning saves validate new bindings against fresh accepted Contacts facts.
+      // Retained references and removals do not depend on a cached active flag.
       if (op === "removeTeacher") {
         d.assignments = d.assignments.filter((a) =>
           e.assignmentId

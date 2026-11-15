@@ -1,4 +1,7 @@
-import { acquireContactsPins, releaseContactsPins } from "../../runtime/source-pin-batch.mjs";
+import {
+  acquireContactsPins,
+  releaseContactsPins,
+} from "../../runtime/source-pin-batch.mjs";
 import {
   signatureSettings,
   saveSignatureSettings,
@@ -29,6 +32,13 @@ export function readAuthorityProjection(env, input, now = Date.now()) {
   );
 }
 import { saveGrid, gridReceipt } from "./grid.mjs";
+import {
+  CONTACT_GRID_FIELDS,
+  contactAliasDomains,
+  projectGridRow,
+  projectGridPerson,
+} from "./grid-projection.mjs";
+import { choose } from "../../contacts/contracts.mjs";
 import { ApiError } from "../../runtime/errors.mjs";
 import {
   canonical,
@@ -170,7 +180,165 @@ async function allRows(env, now, privateFields = false) {
     ),
   }));
 }
-async function projection(env, body, principal, now) {
+const DEPLOY_FIELDS = [
+  "role",
+  "eoAppointmentLevel",
+  "appointmentStatus",
+  "employmentActive",
+  "schoolSection",
+  "employmentArrangement",
+  "employmentTags",
+  "subjectTags",
+  "mkTags",
+  "memberships",
+  "eo",
+  "smc",
+  "schoolLeader",
+];
+function deployField(row, now) {
+  const selected = choose(records(row), now),
+    r = selected.record ?? record(row);
+  return {
+    state: r.state,
+    effective: selected.state === "effective",
+    ...(r.state === "accepted"
+      ? {
+          value: r.value,
+          revision: r.revision,
+          validFrom: r.validFrom,
+          validUntil: r.validUntil,
+          revoked: r.revoked,
+        }
+      : {}),
+  };
+}
+const PROJECTION_PAGE_BYTES = 512 * 1024;
+async function projectionEpoch(env) {
+  return (
+    (
+      await one(
+        env.DB,
+        "SELECT revision FROM contacts_epoch WHERE school_id=?",
+        [env.SCHOOL_ID],
+      )
+    )?.revision ?? 0
+  );
+}
+async function projectionCursor(env, payload) {
+  const value = {
+    purpose: "contacts-deploy-page",
+    schoolId: env.SCHOOL_ID,
+    ...payload,
+  };
+  return (
+    btoa(canonical(value))
+      .replace(/=/g, "")
+      .replace(/\+/g, "-")
+      .replace(/\//g, "_") +
+    "." +
+    (await ownerProof(env, value))
+  );
+}
+async function readProjectionCursor(env, cursor) {
+  fail(
+    typeof cursor === "string" && cursor.length <= 2048,
+    "INVALID_CURSOR",
+    400,
+  );
+  let value, signature;
+  try {
+    const parts = cursor.split(".");
+    fail(parts.length === 2, "INVALID_CURSOR", 400);
+    value = JSON.parse(atob(parts[0].replace(/-/g, "+").replace(/_/g, "/")));
+    signature = parts[1];
+  } catch {
+    throw new ApiError("INVALID_CURSOR", 400);
+  }
+  fail(
+    value?.purpose === "contacts-deploy-page" &&
+      value.schoolId === env.SCHOOL_ID &&
+      typeof value.revision === "string" &&
+      typeof value.catalogueDigest === "string" &&
+      Number.isSafeInteger(value.offset) &&
+      value.offset > 0 &&
+      value.offset <= 512 &&
+      validId(value.lastStaffId) &&
+      typeof signature === "string" &&
+      /^[a-f0-9]{64}$/.test(signature) &&
+      (await secureEqual(await ownerProof(env, value), signature)),
+    "INVALID_CURSOR",
+    400,
+  );
+  return value;
+}
+async function projectionPage(env, result, cursor) {
+  const staff = result.staff
+      .slice()
+      .sort((a, b) =>
+        a.staffId < b.staffId ? -1 : a.staffId > b.staffId ? 1 : 0,
+      ),
+    catalogueDigest = await digest(result.catalogues),
+    offset = cursor?.offset ?? 0;
+  if (cursor) {
+    fail(
+      cursor.revision === result.revision &&
+        cursor.catalogueDigest === catalogueDigest,
+      "SOURCE_REVISION_CHANGED",
+      409,
+    );
+    fail(
+      offset < staff.length &&
+        staff[offset - 1]?.staffId === cursor.lastStaffId,
+      "INVALID_CURSOR",
+      400,
+    );
+  }
+  const { people: _people, ...base } = result,
+    encoder = new TextEncoder();
+  let end = Math.min(offset + 64, staff.length),
+    output;
+  for (;;) {
+    const rows = staff.slice(offset, end),
+      ids = new Set(rows.map((row) => `staff:${row.staffId}`)),
+      complete = end === staff.length;
+    output = {
+      ...base,
+      staff: rows,
+      catalogueDigest,
+      smcIds: rows.filter((row) => row.smc === true).map((row) => row.staffId),
+      dependencies: base.dependencies.filter(
+        (row) => row.scope.startsWith("catalogue:") || ids.has(row.scope),
+      ),
+      page: {
+        nextCursor: complete ? null : "x".repeat(2048),
+        total: staff.length,
+        offset,
+        complete,
+      },
+    };
+    if (
+      encoder.encode(JSON.stringify({ ok: true, data: output })).length <=
+      PROJECTION_PAGE_BYTES
+    )
+      break;
+    fail(
+      end > offset + 1,
+      "PROJECTION_BOUNDS",
+      413,
+      "The Contacts catalogue or one staff projection exceeds the supported page size.",
+    );
+    end--;
+  }
+  if (!output.page.complete)
+    output.page.nextCursor = await projectionCursor(env, {
+      revision: result.revision,
+      catalogueDigest,
+      offset: end,
+      lastStaffId: staff[end - 1].staffId,
+    });
+  return output;
+}
+async function projection(env, body, principal, now, internal = false) {
   fail(
     [
       "deploy",
@@ -233,6 +401,31 @@ async function projection(env, body, principal, now) {
       Array.isArray(body.staffIds) &&
         body.staffIds.length <= 512 &&
         body.staffIds.every(validId),
+    );
+  const paged = body.page !== undefined;
+  fail(
+    !paged ||
+      (internal &&
+        body.purpose === "deploy" &&
+        body.staffIds === undefined &&
+        body.page &&
+        typeof body.page === "object" &&
+        !Array.isArray(body.page) &&
+        Object.keys(body.page).every((key) => key === "cursor") &&
+        Object.hasOwn(body.page, "cursor")),
+    "INVALID_PAGE",
+    400,
+  );
+  const cursor =
+      paged && body.page.cursor !== null
+        ? await readProjectionCursor(env, body.page.cursor)
+        : null,
+    observedEpoch = paged ? await projectionEpoch(env) : null;
+  if (cursor)
+    fail(
+      cursor.revision === `contacts-${observedEpoch}`,
+      "SOURCE_REVISION_CHANGED",
+      409,
     );
   const rows = (await allRows(env, now)).filter(
     (r) => !body.staffIds || body.staffIds.includes(r.staff.staff_id),
@@ -302,6 +495,21 @@ async function projection(env, body, principal, now) {
         active: x.active,
         revision: x.revision,
       };
+    if (body.purpose === "deploy") {
+      x.fields = Object.fromEntries(
+        DEPLOY_FIELDS.map((name) => [name, deployField(r.fields[name], now)]),
+      );
+      x.fieldRevisions = Object.fromEntries(
+        DEPLOY_FIELDS.filter((name) => r.fields[name]).map((name) => [
+          name,
+          r.fields[name].revision,
+        ]),
+      );
+      x.profile = {
+        state: r.staff.profile_state,
+        section: value("schoolSection"),
+      };
+    }
     return x;
   });
   const epoch =
@@ -330,15 +538,19 @@ async function projection(env, body, principal, now) {
       validUntil: null,
     });
   const transition = rows.flatMap((r) =>
-    Object.values(r.fields).flatMap((f) =>
-      records(f)
-        .filter((r) => r.state === "accepted")
-        .flatMap((r) =>
-          [r.validFrom, r.validUntil].filter((t) => t !== null && t > now),
-        ),
-    ),
+    Object.entries(r.fields)
+      .filter(
+        ([name]) => body.purpose !== "deploy" || DEPLOY_FIELDS.includes(name),
+      )
+      .flatMap(([, f]) =>
+        records(f)
+          .filter((r) => r.state === "accepted")
+          .flatMap((r) =>
+            [r.validFrom, r.validUntil].filter((t) => t !== null && t > now),
+          ),
+      ),
   );
-  return {
+  const result = {
     schemaVersion: 1,
     schoolId: env.SCHOOL_ID,
     staff,
@@ -352,8 +564,17 @@ async function projection(env, body, principal, now) {
     dependencies,
     validUntil: transition.length ? Math.min(...transition) : null,
   };
+  if (paged) {
+    fail(
+      observedEpoch === epoch && epoch === (await projectionEpoch(env)),
+      "SOURCE_REVISION_CHANGED",
+      409,
+    );
+    return projectionPage(env, result, cursor);
+  }
+  return result;
 }
-async function readinessProof(env, report) {
+async function ownerProof(env, report) {
   fail(
     typeof env.GSIS_SECRET === "string" && env.GSIS_SECRET.length > 0,
     "CONFIGURATION_REQUIRED",
@@ -475,7 +696,7 @@ async function readiness(env, now) {
     inactive,
     scanId: crypto.randomUUID(),
   };
-  report.proof = await readinessProof(env, report);
+  report.proof = await ownerProof(env, report);
   return report;
 }
 export async function handle(ctx) {
@@ -816,10 +1037,12 @@ export async function handle(ctx) {
       const { principal: p } = await inspectDecision(env, body.decisionId, {
         schoolId: env.SCHOOL_ID,
       });
-      return projection(env, body, p, now);
+      return projection(env, body, p, now, true);
     }
-    if (path === "/internal/pins/acquire-batch") return acquireContactsPins(env, body, now);
-    if (path === "/internal/pins/release-batch") return releaseContactsPins(env, body, now);
+    if (path === "/internal/pins/acquire-batch")
+      return acquireContactsPins(env, body, now);
+    if (path === "/internal/pins/release-batch")
+      return releaseContactsPins(env, body, now);
     if (path === "/internal/pins/acquire") {
       if (body.scope?.startsWith("catalogue:"))
         return acquireSourcePin(
@@ -895,17 +1118,21 @@ export async function handle(ctx) {
   if (path === "/save-receipt") return gridReceipt(ctx);
   if (["/save-data", "/save-diy"].includes(path) && Array.isArray(body.changes))
     return saveGrid(ctx);
-  if (path === "/diy")
+  if (path === "/diy") {
+    const options = { schoolDomain: env.HOSTED_DOMAIN },
+      person = publicStaff(
+        await staffRecord(env.DB, env.SCHOOL_ID, principal.staffId),
+        now,
+        { privateFields: true },
+      );
     return {
-      rows: [
-        publicStaff(
-          await staffRecord(env.DB, env.SCHOOL_ID, principal.staffId),
-          now,
-          { privateFields: true },
-        ),
-      ],
+      fields: CONTACT_GRID_FIELDS,
+      rows: [projectGridRow(person, options)],
+      aliasDomains: contactAliasDomains(options),
       editable: true,
+      lists: { Active: ["Y", "N"] },
     };
+  }
   if (path === "/projection") return projection(env, body, principal, now);
   if (
     ["/bootstrap", "/data", "/deployment", "/staff"].includes(path) &&
@@ -939,15 +1166,21 @@ export async function handle(ctx) {
         admin: principal.capabilities.includes("admin"),
         powerUser: canManage(principal),
       },
-      people: rows,
-      rows,
+      people: rows.map((row) =>
+        projectGridPerson(row, { schoolDomain: env.HOSTED_DOMAIN }),
+      ),
+      rows: rows.map((row) =>
+        projectGridRow(row, { schoolDomain: env.HOSTED_DOMAIN }),
+      ),
+      aliasDomains: contactAliasDomains({ schoolDomain: env.HOSTED_DOMAIN }),
+      editable: canManage(principal),
       groups: [],
       access: { read: true, write: canManage(principal) },
       signatureSettings: await signatureSettings(env),
       catalogueRevision: revision,
       revision,
-      fields: ["basicName", "ttbName", "mobile", "email"],
-      lists: {},
+      fields: CONTACT_GRID_FIELDS,
+      lists: { Active: ["Y", "N"] },
     };
   }
   if (method === "GET" && /^\/staff\/[^/]+$/.test(path)) {
@@ -964,7 +1197,7 @@ export async function handle(ctx) {
     delete unsigned.proof;
     fail(
       typeof report.proof === "string" &&
-        (await secureEqual(await readinessProof(env, unsigned), report.proof)),
+        (await secureEqual(await ownerProof(env, unsigned), report.proof)),
       "READINESS_INVALID",
       400,
       "Readiness evidence was changed.",

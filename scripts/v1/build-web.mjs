@@ -226,6 +226,7 @@ function updateContactsRecovery(source) {
 function updateContacts(source){
  // EO and authority are accepted records. A display appointment must never create them.
  source=replaceOnce(source,"if(eo)eo.value=rule?.level||'';","if(eo)eo.value=r.values[eoIndex]??'';",'Contacts role-to-EO inference');
+ source=replaceOnce(source,"p.emails[key]=value?(value.includes('@')?value:value+'@'+domain):'';","const aliasDomain=contactData.aliasDomains?.[key]||state.aliasDomains?.[key],prior=p.emails[key],sameAlias=typeof prior==='string'&&prior.split('@')[0]===value&&prior.split('@')[1]?.toLowerCase()===aliasDomain?.toLowerCase();p.emails[key]=value?(value.includes('@')||!aliasDomain?value:sameAlias?prior:value+'@'+aliasDomain):'';",'Contacts saved aliases retain the owning configured domain');
  source=source.replaceAll("state?.user.roles.includes('Admin')","(state?.user.roles.includes('Admin')||state?.user.roles.includes('ContactsPowerUser'))");
  source=source.replaceAll("state.user.roles.includes('Admin')","(state.user.roles.includes('Admin')||state.user.roles.includes('ContactsPowerUser'))");
  source=source.replaceAll("r==='Admin'||r==='KP'","r==='Admin'||r==='KP'||r==='ContactsPowerUser'");
@@ -690,7 +691,30 @@ function updateDeployRecovery(source) {
  return source+'\nlet v1DirectSave=null;\nwindow.addEventListener(\'gsis:clear-protected-state\',()=>{v1DirectSave=null;});\n'+helpers.filter(fn=>!['pumpQueue','saveVersionNote'].includes(fn.name)).map(fn=>fn.toString()).join('\n');
 }
 
+// The browser loads the embedded rule engine in app.js. Restrict adaptation to
+// that initializer, leaving the shared v0.9 policy and other embedded engines intact.
+function updateDeployTeachingEligibility(source) {
+ const ast=parse(source,{ecmaVersion:'latest',sourceType:'script'}),engines=[];
+ function walk(node,visit){if(!node||typeof node!=='object')return;visit(node);for(const value of Object.values(node))if(Array.isArray(value))value.forEach(child=>walk(child,visit));else if(value&&typeof value==='object')walk(value,visit);}
+ walk(ast,node=>{if(node.type==='VariableDeclarator'&&node.id?.name==='GSISTeachingRules')engines.push(node.init);});
+ if(engines.length!==1)throw Error('Teaching engine baseline changed');
+ const engine=engines[0],eligible=[];walk(engine,node=>{if(node.type==='FunctionDeclaration'&&node.id?.name==='eligible')eligible.push(node);});
+ if(eligible.length!==1)throw Error('Teaching eligibility baseline changed');
+ const node=eligible[0],resolvers=[];walk(engine,item=>{if(item.type==='FunctionDeclaration'&&item.id?.name==='resolve')resolvers.push(item);});
+ if(resolvers.length!==1)throw Error('Teaching classification baseline changed');
+ const renamed=(item,name)=>source.slice(item.start,item.id.start)+name+source.slice(item.id.end,item.end);
+ const legacyClassification=renamed(node,'legacyClassificationEligible')+'\n'+renamed(resolvers[0],'legacyClassificationResolve')+"\nfunction classificationEligible(role,catalogue){return legacyClassificationEligible(legacyClassificationResolve({role:role},catalogue));}\n";
+ let body=source.slice(engine.start,node.start)+"function eligible(t){return t.teachingEligibility?.state==='eligible';}"+source.slice(node.end,engine.end);
+ body=replaceOnce(body,"if(Array.isArray(catalogue)){p['EO Appt Level']=rule?String(rule.level||''):'';out.groups=rule?memberships(rule.role,rule.level,rule.groups):[];}","out.groups=(live&&live.groups||t.groups||[]).slice();out.authority=live&&live.authority||t.authority||{};out.teachingEligibility=(live||t).teachingEligibility||{state:'unavailable',reasons:['Current Contacts eligibility is unavailable.']};",'Accepted Contacts facts remain authoritative');
+ body=replaceOnce(body,"out.active=p.Active==='Y';","out.active=(live||t).active===true;",'Deploy proposed Active cannot promote accepted employment activity');
+ body=replaceOnce(body,'return {memberships:memberships,resolve:resolve,eligible:eligible,',legacyClassification+'return {memberships:memberships,resolve:resolve,classificationEligible:classificationEligible,eligible:eligible,','Separate catalogue classification from current teacher eligibility');
+ return source.slice(0,engine.start)+body+source.slice(engine.end);
+}
 function updateDeploy(source){
+ source=replaceOnce(source,'return [...byId.values()].filter(t=>!t.active||eligibleTeacher(t));','return [...byId.values()].filter(t=>!t.active||eligibleTeacher(t)||t.orphan||(v().assignments||[]).some(a=>a.teacher===t.id)||Object.hasOwn(v().teacherNotes||{},t.id)||Object.hasOwn(v().teacherDrafts||{},t.id));','Teachers inventory retains historical references independently of new choices');
+ source=replaceOnce(source,'.filter(value=>eligibleTeacher({role:value}))','.filter(value=>GSISTeachingRules.classificationEligible(value,roleCatalogue.length?roleCatalogue:undefined))','Offload catalogue labels preserve their legacy negative classification filter');
+ source=replaceOnce(source,"profile.Active='Y';queueCell({operation:'upsertTeacherProfile',teacher:t.id,profile,expected:","queueCell({operation:'upsertTeacherProfile',referenceAction:'add-existing',teacher:t.id,profile,expected:",'Deploy Add existing uses current accepted eligibility without activating staff');
+ source=replaceOnce(source,"(!t.active?' <small>Inactive</small>':'')","(!t.active?(t.activeKnown===false?' <small>Activity unknown</small>':' <small>Inactive</small>'):'')+(t.teachingEligibility?.state==='unavailable'?' <small>Teaching eligibility unavailable</small>':t.teachingEligibility?.state==='excluded'?' <small>Not currently eligible</small>':'')",'Deploy teacher inventory distinguishes activity and teaching eligibility');
  source=updateFortnightEditor(source);
  source=updateDeployRecovery(source);
  // The server is authoritative; preventing a forbidden editor here is an extra UX boundary.
@@ -995,10 +1019,7 @@ function transform(module,rel,text){
   if(module.id==='roster'&&rel==='roster-operations-ui.js')text=updateRosterAdminSettings(updateRosterCapacity(text),false);
   if(module.id==='deploy'&&rel==='app.js')text=updateDeploy(text);
   if(module.id==='deploy'&&rel==='app.js')text=updateAscSubjectIdentity(text);
-  if(module.id==='deploy'&&rel==='teaching-rules.js'){
-   text=replaceOnce(text,"if(Array.isArray(catalogue)){p['EO Appt Level']=rule?String(rule.level||''):'';out.groups=rule?memberships(rule.role,rule.level,rule.groups):[];}","out.groups=(live&&live.groups||t.groups||[]).slice();out.authority=live&&live.authority||t.authority||{};",'Accepted Contacts facts remain authoritative');
-   const syntax=parse(text,{ecmaVersion:'latest',sourceType:'script'}),matches=[];function walk(node){if(!node||typeof node!=='object')return;if(node.type==='FunctionDeclaration'&&node.id?.name==='eligible')matches.push(node);for(const value of Object.values(node))if(Array.isArray(value))value.forEach(walk);else if(value&&typeof value==='object')walk(value);}walk(syntax);if(matches.length!==1)throw Error('Teaching eligibility baseline changed');const node=matches[0];text=text.slice(0,node.start)+"function eligible(t){return t.authority?.eo?.value===true&&t.active!==false&&t.profile?.Active!=='N'&&t.schoolSection!=='mk'&&!t.mk;}"+text.slice(node.end);
-  }
+  if(module.id==='deploy'&&(rel==='app.js'||rel==='teaching-rules.js'))text=updateDeployTeachingEligibility(text);
   text=replaceFetch(text,module.id+'/'+rel);
   text=text.replace(/(['\"`])\/(?!api\/|v1\/|contacts\/|deploy\/|roster\/|calendar\/|layout\/|venues\/|lord\/|overlord\/|starlord\/)([a-zA-Z0-9_./-]+\.(?:html|js|css|svg|png|webp|ico)(?:\?[^'\"`]*)?)\1/g,(_all,q,value)=>q+'/'+module.id+'/'+value+q);
   text=text.replaceAll("hd:'gsps.edu.sg'","hd:window.GSISV1.config?.hostedDomain,nonce:window.GSISV1.config?.nonce");

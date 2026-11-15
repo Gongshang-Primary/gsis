@@ -33,6 +33,9 @@ import {
   applyEdits,
   validateDocument,
   mergeContacts,
+  canonicalTeachingDocument,
+  changedTeachingStaff,
+  validateTeachingBindings,
   calculate,
   can,
 } from "./model.mjs";
@@ -574,10 +577,167 @@ export function changesFor(school, version, beforeRows, next) {
 }
 
 async function contacts(ctx) {
-  return serviceCall(ctx.env, "contacts", "/internal/projection", {
-    purpose: "deploy",
-    schoolId: ctx.principal.schoolId,
-    decisionId: ctx.principal.decisionId,
+  const pages = [],
+    people = [],
+    seenIds = new Set(),
+    cursors = new Set();
+  let cursor = null,
+    first = null,
+    size = 0,
+    validUntil = Infinity;
+  for (let index = 0; index < 32; index++) {
+    const ref = await serviceCall(ctx.env, "contacts", "/internal/projection", {
+      purpose: "deploy",
+      schoolId: ctx.principal.schoolId,
+      decisionId: ctx.principal.decisionId,
+      page: { cursor },
+    });
+    // Compatibility with earlier injected/native single-page providers. The
+    // real owner returns the bounded page contract for the request above.
+    if (index === 0 && ref && !Object.hasOwn(ref, "page")) return ref;
+    const page = ref?.page;
+    size += new TextEncoder().encode(JSON.stringify(ref)).byteLength;
+    check(
+      ref?.schemaVersion === 1 &&
+        ref.schoolId === ctx.principal.schoolId &&
+        typeof ref.revision === "string" &&
+        Number.isSafeInteger(ref.sequence) &&
+        Number.isSafeInteger(ref.asOf) &&
+        ref.observation &&
+        typeof ref.observation === "object" &&
+        !Array.isArray(ref.observation) &&
+        ref.observation.asOf === ref.asOf &&
+        typeof ref.observation.evaluationId === "string" &&
+        ref.observation.evaluationId.length > 0 &&
+        Array.isArray(ref.staff) &&
+        ref.staff.length <= 64 &&
+        Array.isArray(ref.catalogues) &&
+        Array.isArray(ref.dependencies) &&
+        typeof ref.catalogueDigest === "string" &&
+        page &&
+        Number.isSafeInteger(page.total) &&
+        page.total >= 0 &&
+        page.total <= 512 &&
+        page.offset === people.length &&
+        typeof page.complete === "boolean" &&
+        (page.nextCursor === null ||
+          (typeof page.nextCursor === "string" &&
+            page.nextCursor.length > 0 &&
+            page.nextCursor.length <= 4096)) &&
+        ref.staff.length + people.length <= page.total &&
+        size <= 8 * 1024 * 1024 &&
+        new TextEncoder().encode(JSON.stringify(ref)).byteLength <=
+          512 * 1024 &&
+        (ref.validUntil == null || Number.isSafeInteger(ref.validUntil)),
+      "Contacts pages could not be verified.",
+      "CONTACTS_UNAVAILABLE",
+      503,
+    );
+    if (!first) first = ref;
+    check(
+      ref.revision === first.revision &&
+        ref.sequence === first.sequence &&
+        page.total === first.page.total &&
+        ref.catalogueDigest === first.catalogueDigest &&
+        (await digest(ref.catalogues)) === ref.catalogueDigest,
+      "Contacts changed while the reference inventory was read.",
+      "SOURCE_REVISION_CHANGED",
+      409,
+    );
+    for (const person of ref.staff) {
+      const staffId = person?.staffId;
+      check(
+        typeof staffId === "string" &&
+          staffId.length > 0 &&
+          !seenIds.has(staffId) &&
+          (!people.length || people.at(-1).staffId < staffId),
+        "Contacts page identities are incomplete or repeated.",
+        "CONTACTS_UNAVAILABLE",
+        503,
+      );
+      seenIds.add(staffId);
+      people.push(person);
+    }
+    validUntil = Math.min(validUntil, ref.validUntil ?? Infinity);
+    pages.push(ref);
+    if (page.complete) {
+      check(
+        page.nextCursor === null && people.length === page.total,
+        "Contacts did not complete its reference inventory.",
+        "CONTACTS_UNAVAILABLE",
+        503,
+      );
+      check(
+        Math.max(ctx.now, Date.now(), ...pages.map((p) => p.asOf)) < validUntil,
+        "Contacts evidence expired while the inventory was read.",
+        "AUTHORITY_CHANGED",
+        409,
+      );
+      const dependencies = new Map();
+      for (const p of pages)
+        for (const dependency of p.dependencies) {
+          const key = dependency.owner + ":" + dependency.scope,
+            previous = dependencies.get(key);
+          check(
+            !previous ||
+              String(previous.revision) === String(dependency.revision),
+            "Contacts page dependencies changed.",
+            "SOURCE_REVISION_CHANGED",
+            409,
+          );
+          const boundary = Math.min(
+            validUntil,
+            previous?.validUntil ?? Infinity,
+            dependency.validUntil ?? Infinity,
+          );
+          dependencies.set(key, {
+            ...dependency,
+            validUntil: boundary === Infinity ? null : boundary,
+          });
+        }
+      const { page: ignored, ...base } = first;
+      return {
+        ...base,
+        staff: people,
+        smcIds: people
+          .filter((person) => person.smc === true)
+          .map((person) => person.staffId),
+        asOf: Math.max(...pages.map((p) => p.asOf)),
+        validUntil: validUntil === Infinity ? null : validUntil,
+        dependencies: [...dependencies.values()],
+        observation: {
+          kind: "paged",
+          observations: pages.map((p) => p.observation),
+          asOf: Math.max(...pages.map((p) => p.asOf)),
+        },
+      };
+    }
+    check(
+      ref.staff.length > 0 &&
+        page.nextCursor !== null &&
+        people.length < page.total &&
+        !cursors.has(page.nextCursor),
+      "Contacts page cursor did not advance.",
+      "CONTACTS_UNAVAILABLE",
+      503,
+    );
+    cursor = page.nextCursor;
+    cursors.add(cursor);
+  }
+  check(
+    false,
+    "Contacts inventory exceeds the bounded page count.",
+    "CONTACTS_UNAVAILABLE",
+    503,
+  );
+}
+function contactsDependencies(ref) {
+  return (ref.dependencies || []).map((dependency) => {
+    const until = Math.min(
+      dependency.validUntil ?? Infinity,
+      ref.validUntil ?? Infinity,
+    );
+    return { ...dependency, validUntil: until === Infinity ? null : until };
   });
 }
 async function bootstrap(ctx) {
@@ -602,6 +762,17 @@ async function bootstrap(ctx) {
     projection = await contacts(ctx);
     if (doc) doc = mergeContacts(doc, projection);
   } catch (e) {
+    if (doc)
+      doc = {
+        ...doc,
+        teachers: doc.teachers.map((t) => ({
+          ...t,
+          teachingEligibility: {
+            state: "unavailable",
+            reasons: ["CONTACTS_UNAVAILABLE"],
+          },
+        })),
+      };
     referenceError = {
       code: e.code || "CONTACTS_UNAVAILABLE",
       message:
@@ -951,9 +1122,11 @@ async function save(
     preview = null,
     dependencies = [],
     baseRevision = null,
+    preparedOperation = null,
+    contactsProjection = null,
   } = {},
 ) {
-  const op = await prepare(ctx, "deploy.edit");
+  const op = preparedOperation || (await prepare(ctx, "deploy.edit"));
   if (op.receipt) return op.receipt.result;
   const b = ctx.body,
     school = ctx.principal.schoolId,
@@ -982,28 +1155,34 @@ async function save(
     );
   }
   let next = document;
-  let extraDependencies = dependencies;
+  let extraDependencies = dependencies,
+    ref = contactsProjection;
+  const before = loaded.doc,
+    edits = b.edits || [b];
+  const explicitStaffIds = !document
+    ? edits
+        .filter(
+          (e) =>
+            e.operation === "upsertTeacherProfile" &&
+            e.referenceAction === "add-existing",
+        )
+        .map((e) => e.teacher)
+    : [];
   if (
     !next &&
-    (b.edits || [b]).some((e) =>
-      ["initReporting", "setReportingOfficer"].includes(e.operation),
-    )
+    (explicitStaffIds.length ||
+      edits.some(
+        (e) =>
+          ["addTeacher", "initReporting", "setReportingOfficer"].includes(
+            e.operation,
+          ) ||
+          (e.operation === "upsertTeacherProfile" &&
+            !before.teachers.some((t) => t.id === e.teacher)),
+      ))
   ) {
-    const ref = await contacts(ctx);
-    loaded.doc = mergeContacts(loaded.doc, ref);
-    extraDependencies = ref.dependencies || [];
-  }
-  if (
-    !next &&
-    (b.edits || [b]).some(
-      (e) =>
-        e.operation === "upsertTeacherProfile" &&
-        !loaded.doc.teachers.some((t) => t.id === e.teacher),
-    )
-  ) {
-    const ref = await contacts(ctx);
-    loaded.doc = mergeContacts(loaded.doc, ref);
-    extraDependencies = ref.dependencies || [];
+    ref ||= await contacts(ctx);
+    loaded.doc = mergeContacts(before, ref);
+    extraDependencies = contactsDependencies(ref);
   }
   if (!next) {
     if (b.operation === "saveVersionNote") {
@@ -1024,6 +1203,13 @@ async function save(
         b.edits || [{ ...b, operation: b.operation }],
       );
   }
+  const bindingChanged =
+    changedTeachingStaff(before, next, explicitStaffIds).length > 0;
+  if (bindingChanged) {
+    ref ||= await contacts(ctx);
+    next = validateTeachingBindings(before, next, ref, explicitStaffIds);
+    extraDependencies = contactsDependencies(ref);
+  }
   validateDocument(next);
   let delta;
   try {
@@ -1035,6 +1221,10 @@ async function save(
     throw error;
   }
   const guards = [...delta.guards, leaseGuard(ctx, scope)];
+  // A binding also reads its class/TG scope. Fence changes to those unchanged
+  // rows between comparison and commit, even without a caller revision.
+  if (bindingChanged)
+    guards.push(scopeGuard(school, b.versionId, loaded.version.revision));
   if (clearGuard) {
     // Recheck inside the same D1 commit: publication does not advance the
     // working revision. If clear wins before preparation, its revision bump
@@ -1099,11 +1289,19 @@ async function save(
     },
   );
 }
+function workbookDocument(document, scope) {
+  return ["IP", "TG"].includes(scope)
+    ? canonicalTeachingDocument(document)
+    : document;
+}
 async function previewImport(ctx) {
   const b = ctx.body,
     loaded = await loadVersion(ctx.env.DB, ctx.principal.schoolId, b.versionId),
     ref = await contacts(ctx);
-  loaded.doc = mergeContacts(loaded.doc, ref);
+  loaded.doc = workbookDocument(
+    mergeContacts(loaded.doc, ref),
+    b.workbook?.metadata?.["Table Scope"],
+  );
   const dependencyDigest = await digest(ref.dependencies || []);
   const validated = validateWorkbook(
     b.workbook,
@@ -1111,6 +1309,11 @@ async function previewImport(ctx) {
     ctx.principal.schoolId,
     loaded.version.revision,
     { matches: b.matches || {} },
+  );
+  validated.document = validateTeachingBindings(
+    loaded.doc,
+    validated.document,
+    ref,
   );
   const before = flatten(loaded.doc),
     after = flatten(validated.document),
@@ -1156,6 +1359,8 @@ async function previewImport(ctx) {
   };
 }
 async function applyImport(ctx) {
+  const op = await prepare(ctx, "deploy.edit");
+  if (op.receipt) return op.receipt.result;
   const b = ctx.body,
     p = await one(
       ctx.env.DB,
@@ -1185,7 +1390,10 @@ async function applyImport(ctx) {
     "PREVIEW_CONFLICT",
     409,
   );
-  loaded.doc = mergeContacts(loaded.doc, ref);
+  loaded.doc = workbookDocument(
+    mergeContacts(loaded.doc, ref),
+    input.workbook?.metadata?.["Table Scope"],
+  );
   const validated = validateWorkbook(
     input.workbook,
     loaded.doc,
@@ -1196,7 +1404,9 @@ async function applyImport(ctx) {
   return save(ctx, {
     document: validated.document,
     preview: p,
-    dependencies: ref.dependencies || [],
+    dependencies: contactsDependencies(ref),
+    preparedOperation: op,
+    contactsProjection: ref,
   });
 }
 function usedVenueIds(document) {
@@ -1835,7 +2045,7 @@ export async function handle(ctx) {
   if (p === "/export") {
     const { doc, version } = await loadVersion(ctx.env.DB, school, b.versionId);
     return exportWorkbook(
-      mergeContacts(doc, await contacts(ctx)),
+      workbookDocument(mergeContacts(doc, await contacts(ctx)), b.scope),
       b.scope,
       school,
       version.revision,

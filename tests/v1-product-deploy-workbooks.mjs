@@ -5,6 +5,9 @@ import {
   applyEdits,
   calculate,
   mergeContacts,
+  canonicalTeachingDocument,
+  changedTeachingStaff,
+  validateTeachingBindings,
 } from "../v1/services/deploy/model.mjs";
 import {
   SCHEMAS,
@@ -16,6 +19,7 @@ const person = (id, name, profile = {}) => ({
   staffId: id,
   name,
   active: true,
+  schoolSection: "primary",
   profile: {
     "Basic Name": name,
     "EO Appt Level": "EO",
@@ -355,6 +359,352 @@ assert.equal(
     .rows[0][4],
   true,
 );
+// Real Contacts purpose projections carry selected accepted records, not a
+// preconstructed Deploy profile. Blank appointment is distinct from EO status.
+const acceptedField = (value) => ({
+  state: "accepted",
+  effective: true,
+  value,
+  revision: 1,
+  validFrom: null,
+  validUntil: null,
+  revoked: false,
+});
+const selectedPerson = (staffId, overrides = {}) => ({
+  staffId,
+  basicName: "Shared",
+  ttbName: "Shared (BT)",
+  active: true,
+  fields: Object.fromEntries(
+    Object.entries({
+      role: "",
+      eoAppointmentLevel: "",
+      appointmentStatus: "",
+      employmentActive: true,
+      schoolSection: { code: "primary" },
+      employmentArrangement: "",
+      employmentTags: [],
+      subjectTags: [],
+      mkTags: [],
+      memberships: [],
+      eo: true,
+      smc: false,
+      schoolLeader: false,
+      ...overrides,
+    }).map(([key, value]) => [key, acceptedField(value)]),
+  ),
+});
+const selectedProjection = {
+  ...projection,
+  staff: [
+    selectedPerson("staff-a"),
+    selectedPerson("staff-b", { employmentActive: false }),
+  ],
+};
+const selected = mergeContacts(d, selectedProjection);
+assert.equal(
+  selected.teachers[0].teachingEligibility?.state,
+  "eligible",
+  "Selected accepted Contacts facts must supply usable teaching eligibility.",
+);
+assert.equal(selected.teachers[1].teachingEligibility?.state, "excluded");
+assert.equal(selected.teachers[0].profile["EO Appt Level"], "");
+assert.equal(selected.teachers[0].name, "Shared (BT)");
+assert.equal(
+  selected.teachers[1].active,
+  false,
+  "Selected accepted activity wins over a stale top-level convenience flag.",
+);
+
+// Identity inventory is broader than the set eligible for new teaching work.
+const eligibilityCases = [
+  ["inactive", { employmentActive: false }, "excluded"],
+  ["non-eo", { eo: false }, "excluded"],
+  ["mk", { schoolSection: { code: "MK" } }, "excluded"],
+  ["mke", { schoolSection: { code: "MKE" } }, "excluded"],
+  ["support", { role: "Support" }, "excluded"],
+  ["school-leader", { eoAppointmentLevel: "SL" }, "excluded"],
+  ["unknown-section", { schoolSection: null }, "unavailable"],
+  ["unknown-active", { employmentActive: null }, "unavailable"],
+  ["malformed-section", { schoolSection: { code: 7 } }, "unavailable"],
+  ["missing-section-code", { schoolSection: {} }, "unavailable"],
+];
+for (const [label, overrides, state] of eligibilityCases) {
+  const ref = {
+    ...selectedProjection,
+    staff: [selectedPerson("staff-a", overrides)],
+  };
+  assert.equal(
+    mergeContacts(d, ref).teachers[0].teachingEligibility.state,
+    state,
+    label,
+  );
+  const added = structuredClone(d);
+  added.assignments.push({
+    id: "new-" + label,
+    teacher: "staff-a",
+    target: "2T",
+    targetRef: "class-b",
+    subject: "Math",
+    level: "2",
+  });
+  assert.throws(
+    () => validateTeachingBindings(d, added, ref),
+    (e) => e.code === "TEACHING_ELIGIBILITY_REQUIRED",
+    label,
+  );
+  assert.equal(
+    validateTeachingBindings(d, d, ref),
+    d,
+    "An unchanged historical reference never requires current eligibility.",
+  );
+}
+for (const invalid of [
+  { state: "pending" },
+  { effective: false },
+  { revoked: true },
+  { validFrom: projection.asOf + 1 },
+  { validUntil: projection.asOf },
+]) {
+  const ref = structuredClone(selectedProjection);
+  Object.assign(ref.staff[0].fields.eo, invalid);
+  assert.equal(
+    mergeContacts(d, ref).teachers[0].teachingEligibility.state,
+    "unavailable",
+  );
+}
+const missingWorkloadOnly = structuredClone(selectedProjection);
+for (const field of [
+  "employmentArrangement",
+  "appointmentStatus",
+  "subjectTags",
+])
+  delete missingWorkloadOnly.staff[0].fields[field];
+const selectableWithoutWorkload = mergeContacts(d, missingWorkloadOnly)
+  .teachers[0];
+assert.equal(selectableWithoutWorkload.teachingEligibility.state, "eligible");
+assert.equal(
+  selectableWithoutWorkload.quality,
+  "unavailable",
+  "Selection evidence does not fabricate missing workload facts.",
+);
+for (const field of [
+  "role",
+  "eoAppointmentLevel",
+  "employmentTags",
+  "mkTags",
+  "memberships",
+]) {
+  const missingExclusion = structuredClone(selectedProjection);
+  delete missingExclusion.staff[0].fields[field];
+  assert.equal(
+    mergeContacts(d, missingExclusion).teachers[0].teachingEligibility.state,
+    "eligible",
+    "Optional classification absence cannot negate explicit active/EO/primary: " +
+      field,
+  );
+}
+const knownMembership = selectedPerson("staff-a", {
+  memberships: [{ code: "Support" }],
+});
+knownMembership.groups = [];
+assert.equal(
+  mergeContacts(d, { ...selectedProjection, staff: [knownMembership] })
+    .teachers[0].teachingEligibility.state,
+  "excluded",
+  "Accepted memberships govern negative teaching exclusions, not stale flattened groups.",
+);
+knownMembership.fields.memberships = acceptedField([]);
+knownMembership.groups = ["SL"];
+knownMembership.fields.schoolLeader = acceptedField(true);
+assert.equal(
+  mergeContacts(d, { ...selectedProjection, staff: [knownMembership] })
+    .teachers[0].teachingEligibility.state,
+  "eligible",
+  "Stale compatibility groups cannot override accepted facts; SL=true adds no new exclusion policy.",
+);
+const ordinaryTeacher = selectedPerson("staff-a");
+ordinaryTeacher.fields.role = { state: "superseded", effective: false };
+ordinaryTeacher.fields.eoAppointmentLevel = {
+  state: "missing",
+  effective: false,
+};
+ordinaryTeacher.fields.appointmentStatus = {
+  state: "missing",
+  effective: false,
+};
+const ordinaryProjection = { ...selectedProjection, staff: [ordinaryTeacher] };
+const ordinary = mergeContacts(d, ordinaryProjection).teachers[0];
+assert.equal(ordinary.teachingEligibility.state, "eligible");
+assert.equal(ordinary.profile.Role, "");
+assert.equal(ordinary.profile["EO Appt Level"], "");
+assert.equal(
+  ordinary.quality,
+  "unavailable",
+  "Explicit EO eligibility does not fabricate optional classification evidence.",
+);
+const incompleteNonTeacher = selectedPerson("nonteacher", { eo: false });
+delete incompleteNonTeacher.fields.employmentArrangement;
+delete incompleteNonTeacher.fields.role;
+const withNonTeacher = {
+  ...selectedProjection,
+  staff: [
+    selectedPerson("staff-a"),
+    selectedPerson("staff-b"),
+    incompleteNonTeacher,
+  ],
+};
+assert.equal(
+  calculate(d, withNonTeacher).rows.find((r) => r.staffId === "staff-a")
+    .quality,
+  "verified",
+  "An explicitly excluded non-teacher cannot poison other teachers' workload quality.",
+);
+const orphan = mergeContacts(d, { ...selectedProjection, staff: [] });
+assert.equal(orphan.teachers.length, d.teachers.length);
+assert.equal(orphan.teachers[0].teachingEligibility.state, "unavailable");
+assert.equal(orphan.teachers[0].orphan, true);
+
+const inactiveProjection = {
+  ...selectedProjection,
+  staff: [
+    selectedPerson("staff-a", { employmentActive: false }),
+    selectedPerson("staff-b", { employmentActive: false }),
+  ],
+};
+const legacy = structuredClone(d);
+delete legacy.assignments.find((a) => a.id === "assign-ft").targetRef;
+const renamedWorkbook = exportWorkbook(legacy, "IP", "school", 1);
+renamedWorkbook.sheets.Classes.rows[0][2] = "Renamed";
+renamedWorkbook.sheets.Classes.rows[0][3] = "R";
+const renamedImport = validateWorkbook(
+  renamedWorkbook,
+  canonicalTeachingDocument(legacy),
+  "school",
+  1,
+).document;
+assert.equal(
+  renamedImport.assignments.find((a) => a.subject === "FT").id,
+  "assign-ft",
+);
+assert.deepEqual(changedTeachingStaff(legacy, renamedImport), []);
+assert.equal(
+  validateTeachingBindings(legacy, renamedImport, inactiveProjection),
+  renamedImport,
+);
+assert.equal(
+  legacy.assignments.find((a) => a.id === "assign-ft").targetRef,
+  undefined,
+  "Private import normalization must not mutate stored historical evidence.",
+);
+for (const mutate of [
+  (next) => {
+    next.assignments[0].teacher = "staff-b";
+  },
+  (next) => {
+    next.assignments[0].subject = "Math";
+  },
+  (next) => {
+    Object.assign(next.assignments[0], { target: "2T", targetRef: "class-b" });
+  },
+  (next) => {
+    next.groups[0].levels = ["2"];
+    next.groups[0].level = "2";
+    next.groups[0].classRefs = ["class-b"];
+  },
+  (next) => {
+    next.groups[0].subject = "Art";
+  },
+  (next) => {
+    next.groups[0].levelWide = true;
+    next.groups[0].classRefs = [];
+  },
+]) {
+  const next = structuredClone(d);
+  mutate(next);
+  assert(changedTeachingStaff(d, next).length > 0);
+  assert.throws(
+    () => validateTeachingBindings(d, next, inactiveProjection),
+    (e) => e.code === "TEACHING_ELIGIBILITY_REQUIRED",
+  );
+}
+const legacyGroupPlan = structuredClone(d);
+Object.assign(legacyGroupPlan.groups[0], { form: "1P", sources: ["1P"] });
+delete legacyGroupPlan.groups[0].classRefs;
+const unrelatedLegacyNote = applyEdits(legacyGroupPlan, [
+  { operation: "setTeacherNote", teacher: "staff-b", value: "Unrelated note" },
+]);
+assert.deepEqual(unrelatedLegacyNote.groups, legacyGroupPlan.groups);
+assert.deepEqual(unrelatedLegacyNote.assignments, legacyGroupPlan.assignments);
+const renamedLegacyGroup = applyEdits(legacyGroupPlan, [
+  {
+    operation: "updateClass",
+    ref: "class-a",
+    level: "1",
+    name: "Renamed",
+    shortName: "R",
+  },
+]);
+assert.deepEqual(changedTeachingStaff(legacyGroupPlan, renamedLegacyGroup), []);
+assert.deepEqual(renamedLegacyGroup.groups[0].classRefs, ["class-a"]);
+assert.equal(renamedLegacyGroup.groups[0].anchorRef, "class-a");
+assert.equal(legacyGroupPlan.groups[0].classRefs, undefined);
+assert.equal(
+  validateTeachingBindings(
+    legacyGroupPlan,
+    renamedLegacyGroup,
+    inactiveProjection,
+  ),
+  renamedLegacyGroup,
+);
+const rawRename = structuredClone(legacyGroupPlan);
+rawRename.classes[0].shortName = "R";
+assert.deepEqual(changedTeachingStaff(legacyGroupPlan, rawRename), []);
+const repointedLegacyGroup = structuredClone(rawRename);
+repointedLegacyGroup.groups[0].form = "2T";
+repointedLegacyGroup.groups[0].sources = ["2T"];
+repointedLegacyGroup.groups[0].level = "2";
+repointedLegacyGroup.groups[0].levels = ["2"];
+assert.deepEqual(changedTeachingStaff(legacyGroupPlan, repointedLegacyGroup), [
+  "staff-b",
+]);
+assert.throws(
+  () =>
+    validateTeachingBindings(
+      legacyGroupPlan,
+      repointedLegacyGroup,
+      inactiveProjection,
+    ),
+  (e) => e.code === "TEACHING_ELIGIBILITY_REQUIRED",
+);
+const removed = structuredClone(d);
+removed.assignments = [];
+assert.deepEqual(changedTeachingStaff(d, removed), []);
+const renamedTg = structuredClone(d);
+renamedTg.groups[0].name = "Display only";
+assert.deepEqual(changedTeachingStaff(d, renamedTg), []);
+assert.throws(
+  () => validateTeachingBindings(d, d, inactiveProjection, ["staff-a"]),
+  (e) => e.code === "TEACHING_ELIGIBILITY_REQUIRED",
+  "Explicit Add existing must not reactivate a teacher.",
+);
+const fresh = structuredClone(d);
+fresh.assignments.push({
+  id: "new-eligible",
+  target: "2T",
+  targetRef: "class-b",
+  teacher: "staff-a",
+  subject: "Math",
+  level: "2",
+});
+assert.equal(
+  validateTeachingBindings(d, fresh, withNonTeacher).assignments.length,
+  d.assignments.length + 1,
+);
+console.log(
+  "PASS Contacts selected-fact eligibility matrix, non-teacher isolation, retained identities and stable IP/FT/TG binding comparisons",
+);
+
 const ascSettings = AscExport.defaults(d);
 const ascSaved = applyEdits(d, [
   { operation: "setAscExportSettings", expected: {}, value: ascSettings },

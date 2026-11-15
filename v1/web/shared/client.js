@@ -1230,84 +1230,9 @@
     return outcome;
   }
   function contactsProjection(path, data) {
-    if (
-      !data ||
-      !Array.isArray(data.rows) ||
-      data.rows.some((r) => Array.isArray(r.values))
-    )
-      return data;
-    const fields = [
-      "Basic Name",
-      "TTb Name",
-      "Statutory Name",
-      "Mobile No",
-      "EXT",
-      "Role",
-      "EO Appt Level",
-      "Appointment Status",
-      "Active",
-      "Employment Modifier",
-      "Subject Modifier",
-      "MK Modifier",
-      "Day of Birth",
-      "Month of birth",
-      "GSPS Alias (@gsps.edu.sg)",
-      "iCON Alias (@moe.edu.sg)",
-      "CES Alias (@schools.gov.sg)",
-    ];
-    const effective = (r, key) => {
-      const f = r.fields?.[key];
-      return f?.state === "accepted" && f.effective === true
-        ? f.value
-        : undefined;
-    };
-    const label = (value) =>
-      Array.isArray(value)
-        ? value.map(label).join(", ")
-        : value && typeof value === "object"
-          ? (value.label ?? value.code ?? "")
-          : (value ?? "");
-    const people = data.rows.map((r) => {
-      const value = (k) => effective(r, k),
-        email = value("email") || "",
-        birthday = value("birthday") || "",
-        parts = birthday.split("-"),
-        aliases = value("aliases") || [],
-        emails = { gsps: "", icon: "", ces: "" };
-      for (const address of [email, ...aliases])
-        for (const [key, domain] of [
-          ["gsps", "gsps.edu.sg"],
-          ["icon", "moe.edu.sg"],
-          ["ces", "schools.gov.sg"],
-        ])
-          if (
-            typeof address === "string" &&
-            address.toLowerCase().endsWith("@" + domain)
-          )
-            emails[key] = address;
-      return {
-        ...r,
-        id: r.staffId ?? r.id,
-        name: r.ttbName ?? r.basicName ?? r.name,
-        basicName: r.basicName ?? r.name,
-        statutoryName: value("statutoryName") ?? "",
-        mobile: value("mobile") ?? "",
-        ext: value("extension") ?? "",
-        role: label(value("role")),
-        appointmentLevel:
-          label(value("eoAppointmentLevel")) ||
-          (value("eo") === true ? "EO" : value("eo") === false ? "Non-EO" : ""),
-        appointmentStatus: label(value("appointmentStatus")),
-        active: r.active === true ? "Y" : r.active === false ? "N" : "",
-        employment: label(value("employmentTags")),
-        subject: label(value("subjectTags")),
-        mk: label(value("mkTags")),
-        dayOfBirth: parts.length >= 2 ? parts.at(-1) : "",
-        monthOfBirth: parts.length >= 2 ? parts.at(-2) : "",
-        emails,
-        groups: (value("memberships") || []).map(label),
-      };
-    });
+    if (!data) return data;
+    // Contacts owns formatting and privacy. Completed grid values and directory
+    // people pass through unchanged; capability adaptation is still local.
     if (path.endsWith("/bootstrap")) {
       const caps = data.user?.capabilities ?? [],
         admin = data.user?.admin === true || caps.includes("admin"),
@@ -1319,54 +1244,17 @@
           ...data.user,
           roles: admin ? ["Admin"] : manager ? ["ContactsPowerUser"] : [],
         },
-        people,
+        people: Array.isArray(data.people) ? data.people : [],
         access: Array.isArray(data.access) ? data.access : [],
         groups: data.groups || [],
         signatureSettings: data.signatureSettings || {},
       };
     }
     if (path.endsWith("/data") || path.endsWith("/diy")) {
-      const values = (p) => [
-        p.basicName,
-        p.name,
-        p.statutoryName,
-        p.mobile,
-        p.ext,
-        p.role,
-        p.appointmentLevel,
-        p.appointmentStatus,
-        p.active,
-        p.employment,
-        p.subject,
-        p.mk,
-        p.dayOfBirth,
-        p.monthOfBirth,
-        p.emails.gsps,
-        p.emails.icon,
-        p.emails.ces,
-      ];
       return {
         ...data,
-        fields,
         editable:
           data.editable ?? data.access?.write ?? data.user?.powerUser ?? false,
-        rows: people.map((p) => ({
-          id: p.id,
-          revision: p.revision,
-          values: values(p),
-          computed: fields.map(
-            (f) =>
-              ![
-                "Basic Name",
-                "Statutory Name",
-                "Mobile No",
-                "Active",
-                "GSPS Alias (@gsps.edu.sg)",
-                "iCON Alias (@moe.edu.sg)",
-                "CES Alias (@schools.gov.sg)",
-              ].includes(f),
-          ),
-        })),
         lists: { ...(data.lists || {}), Active: ["Y", "N"] },
       };
     }

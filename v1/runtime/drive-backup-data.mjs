@@ -7,6 +7,10 @@ import { inflate } from "../services/deploy/service.mjs";
 import { exportWorkbook, SCHEMAS } from "../services/deploy/workbooks.mjs";
 import { workbook as layoutWorkbook } from "../services/layout/service.mjs";
 import { publicStaff } from "../services/contacts/store.mjs";
+import {
+  CONTACT_GRID_FIELDS,
+  gridValues,
+} from "../services/contacts/grid-projection.mjs";
 import { readArtifact } from "../services/roster/repository.mjs";
 import { metadataWorkbook } from "../services/calendar/table-import.mjs";
 
@@ -478,25 +482,6 @@ export async function buildBackupDataset(env, dataset, now = Date.now()) {
   return { sourceDigest, book, importable: false };
 }
 
-const CONTACT_FIELDS = [
-  "Basic Name",
-  "TTb Name",
-  "Statutory Name",
-  "Mobile No",
-  "EXT",
-  "Role",
-  "EO Appt Level",
-  "Appointment Status",
-  "Active",
-  "Employment Modifier",
-  "Subject Modifier",
-  "MK Modifier",
-  "Day of Birth",
-  "Month of birth",
-  "GSPS Alias (@gsps.edu.sg)",
-  "iCON Alias (@moe.edu.sg)",
-  "CES Alias (@schools.gov.sg)",
-];
 async function contactsWorkbook(env, now) {
   const results = await boundedSource(env, [
     {
@@ -526,53 +511,15 @@ async function contactsWorkbook(env, now) {
     if (!byStaff.has(f.staff_id)) byStaff.set(f.staff_id, {});
     byStaff.get(f.staff_id)[f.field] = f;
   }
-  const label = (v) =>
-    Array.isArray(v)
-      ? v.map(label).join(", ")
-      : v && typeof v === "object"
-        ? (v.label ?? v.code ?? "")
-        : (v ?? "");
   const rows = results[0].results.map((staff) => {
     const r = publicStaff(
       { staff, fields: byStaff.get(staff.staff_id) || {} },
       now,
       { privateFields: true },
     );
-    const value = (k) =>
-      r.fields[k]?.state === "accepted" && r.fields[k].effective === true
-        ? r.fields[k].value
-        : undefined;
-    const emails = ["", "", ""];
-    for (const address of [value("email") || "", ...(value("aliases") || [])])
-      ["gsps.edu.sg", "moe.edu.sg", "schools.gov.sg"].forEach((domain, i) => {
-        if (
-          typeof address === "string" &&
-          address.toLowerCase().endsWith("@" + domain)
-        )
-          emails[i] = address;
-      });
-    const birthday = (value("birthday") || "").split("-");
-    return [
-      r.staffId,
-      r.basicName,
-      r.ttbName,
-      value("statutoryName") || "",
-      value("mobile") || "",
-      value("extension") || "",
-      label(value("role")),
-      label(value("eoAppointmentLevel")) ||
-        (value("eo") === true ? "EO" : value("eo") === false ? "Non-EO" : ""),
-      label(value("appointmentStatus")),
-      r.active === true ? "Y" : r.active === false ? "N" : "",
-      label(value("employmentTags")),
-      label(value("subjectTags")),
-      label(value("mkTags")),
-      birthday.length >= 2 ? birthday.at(-1) : "",
-      birthday.length >= 2 ? birthday.at(-2) : "",
-      ...emails,
-    ].map((v) => String(v ?? ""));
+    return [r.staffId, ...gridValues(r, { schoolDomain: env.HOSTED_DOMAIN })];
   });
-  const columns = ["Staff ID", ...CONTACT_FIELDS],
+  const columns = ["Staff ID", ...CONTACT_GRID_FIELDS],
     sourceDigest = await digest({
       rows,
       source: results.map((r) => r.results),
