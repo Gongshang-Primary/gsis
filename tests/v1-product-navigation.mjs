@@ -41,7 +41,9 @@ try {
   for(const b of document.querySelectorAll('[data-page]'))b.onclick=()=>{if(window.dirty)return;document.querySelectorAll('.active').forEach(n=>n.classList.remove('active'));b.classList.add('active');document.getElementById(b.dataset.page).classList.add('active');};
  });
  await page.addScriptTag({content:shell});
- await page.waitForFunction(()=>document.querySelector('.gsis-suitebar [aria-current=page]'));
+ // The shell creates the breadcrumb before its animation-frame reconciliation.
+ // Wait for the rendered view, not the initially empty placeholder.
+ await page.waitForFunction(()=>{const current=document.querySelector('.gsis-suitebar [aria-current=page]');return current?.textContent==='Edit Info'&&!current.hidden;});
  assert.equal(await page.locator('.gsis-suitebar [aria-current=page]').textContent(),'Edit Info');
  assert.equal(await page.locator('.gsis-suitebar').getByRole('button',{name:'Catalogues & staff'}).count(),0);
  await page.locator('.gsis-suitebar').getByRole('link',{name:'Contacts',exact:true}).click();
