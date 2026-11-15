@@ -58,6 +58,9 @@ No deployment, migration, provider send or live-data access. Documentation rollb
 | [#174](https://github.com/helper-gsps/gsis/pull/174) | `ba818831fc318ccd7c5d5f501aed9dce5d141457` | `334731cdb1d4fc5d37d7bdf6de761d668c062994` |
 | [#175](https://github.com/helper-gsps/gsis/pull/175) | `778352626cb5c9eb7ba51633575b16bc7922a078` | `334731cdb1d4fc5d37d7bdf6de761d668c062994` |
 | [#157](https://github.com/helper-gsps/gsis/pull/157) | `c68e8a942d873f596323b7694ce407f23f2692ca` | `5ae81158f12c8131f4657e4ce77055d008bd6419` |
+| [#180](https://github.com/helper-gsps/gsis/pull/180) | `fc256d771b44121e7375f620c7ec859ee8a66590` | `750ba8cbd5e4be80b03e15a925f471f0edd753f7` |
+| [#178](https://github.com/helper-gsps/gsis/pull/178) | `530a7add936a168184becaaacb82a24deaf5da18` | `439e9d973320b689bec0d25fdc683be2e5b899a0` |
+| [#176](https://github.com/helper-gsps/gsis/pull/176) | `de4d2834bbd6391db4a0df291c941770b3d9233f` | `71a7c5c040350b46d8332e5ba2e3b44665aebe5f` |
 
 Verification: fetched main and all remote heads; read current instructions and branch-only reviews; inspected all 27 original open PR file inventories and exact-head CI. Each of the eight merges has its approved head as its second parent and a tree exactly equal to `git merge-tree --write-tree` on its two parents. Seven documentation paths only in this follow-up; prior chronological task/changelog entries are preserved. Relative-link and scoped whitespace checks pass. Application suites were not rerun for this prose-only change; its fresh full-suite CI and Claude recheck are separate gates. No skill package was executed.
 
@@ -90,3 +93,14 @@ PR178's first rebase stopped with `CONFLICT (content): Merge conflict in docs/co
 After the chain comparison and Part C head publication, the separately approved PR157 merged at exact `c68e8a942d873f596323b7694ce407f23f2692ca` through `5ae81158f12c8131f4657e4ce77055d008bd6419`. Codex independently reviewed this Claude-authored documentation head; full CI 43736969772 was green at merge time. Actual parents are `fa6666b3f846dfc10bebfe47e5a10ed9a264b0ed` and `c68e8a9`; automatic and actual tree both equal `30a00e1fe49cb1c27b8bc004678a208236227307`. Exactly one OWNER_DIRECTIVES row was added; all prior content and product paths remain unchanged. The owner-authorised second Claude v1 session is now recorded on main. PR132 and PR138 were closed as superseded historical drafts, not merged; their history is retained. No deployment, live-data operation, migration, provider send or Drive activation occurred. F5 **OPEN**; official T1B-01/T1B-02 and unperformed runtime UAT **Not tested**.
 
 Additional synthetic compatibility check: the automatic combined tree of PR176 `de4d283` and PR178 `530a7ad`, `97701d7ce8f9bc0214cbc18e639cd5ddeac05278`, passed the actual built-browser/Worker/D1 probe in 22.944s: 397 bindings, 120 built script units, the same 29 allowed missing bindings and fifteen dynamic pins. This was an unpublished temporary tree, not an implementation commit, full combined-suite run or hosted UAT. No further compatibility edit was required.
+
+
+## Part C completed — 16 November 2026, 06:15 SGT
+
+Owner authorised the exact reviewed heads in [Claude's recheck](../review/v1-pr176-178-180-claude-recheck.md) at `2e77d3c8598fc1edb053e62280fb6cf7c92f167e`. Merged **#180, then #178, then #176**, as the three new inventory rows record. The inventory now has **27 reviewed heads, 17 distinct carrying merge commits**. Each new merge has the exact approved head as its second parent and its actual tree equals Git's automatic merge tree. No conflicts, hand edits, squash or branch-history changes. Earlier pending-review paragraphs and count/check scripts are historical checkpoints.
+
+Exact-head CI checked before merging: #180 full `43741872420` (1,192 Node); #178 full `43741065061` (1,193 Node) and product `43741069818` (94 programs, probe 17.435s); #176 full `43739472558` (1,198 Node) and product `43739481446` (97 programs). All completed successfully; full suites include 40 LORD checks on each shard. No new hosted acceptance follows from those results.
+
+Resulting application main is `71a7c5c040350b46d8332e5ba2e3b44665aebe5f`, tree `51105524b76f80b6528c3aaa7e2e14bbac47122d`. No open PR remained at refresh. Job 3 proceeds from accepted main claim `a1606c2` in [v1-roster-unblock](v1-roster-unblock.md); its implementation is separate from these approved merges.
+
+**Not deployed.** Owner confirmation of C-1 Memberships and C-2 immediate pre-deployment Contacts D1 backup is still required. No live data, migration or provider operation occurred. F5 OPEN; official T1B-01/T1B-02 and unperformed runtime UAT Not tested.

@@ -1,6 +1,6 @@
 # v1-operation-probe: built-browser operation coverage in existing CI
 
-- Status: rebased onto main; authorised N2 guard implemented. New-head checks, N1 timing and Claude recheck pending.
+- Status: merged as PR178, reviewed head `530a7add936a168184becaaacb82a24deaf5da18`, merge `439e9d973320b689bec0d25fdc683be2e5b899a0`. Not deployed; earlier pending statements are historical.
 - Owner/model: Codex. Coordinator: ChatGPT v1. Lane: tests/documentation only.
 - Reviewer/model: Claude; approved original `bf2067c`, new-head recheck pending.
 - Last updated (Asia/Singapore): 16 November 2026.
@@ -106,3 +106,9 @@ N2 now compares the complete set of exact file/line/kind identities with fifteen
 The worktree based on rebased `cd5c1b4` passed the canonical build (5.227s) and v1 build (3.290s) while this authorised test/documentation follow-up was in progress. Product inputs were unchanged and there was no generated drift; these are worktree checks, not clean final-head evidence. The final guard passes `TZ=Asia/Singapore node --check tests/v1-product-operation-probe.mjs` and `git diff --check`. Cached Prettier formatted only the test and JSON; no dependency was added. Focused real-path execution, discovery, N1 wall time and fresh full-suite/product CI at the published head remain pending, to be recorded in PR178 without a self-referential hash. The existing 45-second program limit is unchanged. A synthetic program pass does not close any missing-handler finding, F5 or hosted UAT.
 
 Reproducible focused command after a clean commit: `TZ=Asia/Singapore GSIS_BROWSER_EXECUTABLE=/usr/bin/chromium node tests/v1-product-operation-probe.mjs`. The unchanged product runner records each program's elapsed milliseconds and enforces 45 seconds; the focused wrapper uses that same bound and records the actual head/clean-tree state. Discovery commands remain `node scripts/v1/test.mjs --list` and `node tests/run.cjs --list`. Recheck exact scope with `git diff --name-only fa6666b3f846dfc10bebfe47e5a10ed9a264b0ed`; only the three claimed paths may differ. The owner-approved task conflict resolution is distinct from a conflict-free mechanical merge and must be described that way in the PR.
+
+## Reviewed integration — 16 November 2026
+
+[Claude's exact-head recheck](../review/v1-pr176-178-180-claude-recheck.md) at `2e77d3c` approved `530a7add936a168184becaaacb82a24deaf5da18`; owner authorised the #180 → #178 → #176 merge sequence. PR178 merged as [`439e9d973320b689bec0d25fdc683be2e5b899a0`](https://github.com/helper-gsps/gsis/commit/439e9d973320b689bec0d25fdc683be2e5b899a0) after green exact-head CI. Its second parent is the reviewed head and its tree exactly matches `git merge-tree --write-tree` on its parents. No hand edits or conflict occurred. [Merge inventory](v1-merge-records-20261115.md#verified-merge-inventory).
+
+The task is closed. Deployment remains blocked on owner C-1 Memberships and C-2 immediate pre-deployment Contacts D1 backup confirmation. F5 OPEN; official T1B-01/T1B-02 and hosted/runtime UAT Not tested. No migration, live data or provider operations.

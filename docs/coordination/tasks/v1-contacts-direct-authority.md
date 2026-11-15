@@ -1,6 +1,6 @@
 # v1-contacts-direct-authority: direct authoritative Contacts editing and coherent signatures
 
-- Status: implemented locally; final verification and exact-head publication in progress. Independent review and release remain separate gates.
+- Status: merged as PR176, reviewed head `de4d2834bbd6391db4a0df291c941770b3d9233f`, merge `71a7c5c040350b46d8332e5ba2e3b44665aebe5f`. Not deployed; earlier pending statements are historical.
 - Owner/model: Codex. Coordinator: ChatGPT v1.
 - Reviewer/model: Claude, independent exact-head reviewer; review pending.
 - Last updated (Asia/Singapore): 15 November 2026; final local verification checkpoint.
@@ -177,3 +177,9 @@ A local instrumented reproduction of the unchanged fixture reached teardown with
 The classification fixture now waits for the rendered ordinary-user view and completed teaching-information read, additionally checks that Edit Info is hidden, then navigates to a blank document before draining/removing the local Worker bridge. It preserves all12 groups, existing timeouts, strict route-error reporting and egress checks; there is no ignored-error mode, retry, sleep, product-source change or new build patch. The controlled probe passed all12 groups in26.461s; the committed test command `TZ=Asia/Singapore GSIS_BROWSER_EXECUTABLE=/usr/bin/chromium node tests/v1-product-contacts-classification-browser.mjs` passed all12 in27.533s. `TZ=Asia/Singapore npm run build` passed with no tracked generated drift. Fresh exact-head full Node/LORD and product/package CI are required and recorded in PR176 after publication.
 
 All remote heads and26 open PR file inventories were refreshed again before editing; main remains `d77408178f9e6adfb67914643add48a783e87f11`, with160–175 unmerged. This correction changes only the already-claimed classification fixture and this task record. The inherited classification path from PR174 is already incorporated in this branch and explicitly superseded by the existing Job1 scope; no new file ownership is claimed. Exact40-path scope and all release/UAT boundaries above remain unchanged.
+
+## Reviewed integration — 16 November 2026
+
+[Claude's exact-head recheck](../review/v1-pr176-178-180-claude-recheck.md) at `2e77d3c` approved `de4d2834bbd6391db4a0df291c941770b3d9233f`; owner authorised the #180 → #178 → #176 merge sequence. PR176 merged as [`71a7c5c040350b46d8332e5ba2e3b44665aebe5f`](https://github.com/helper-gsps/gsis/commit/71a7c5c040350b46d8332e5ba2e3b44665aebe5f) after green exact-head CI. Its second parent is the reviewed head and its tree exactly matches `git merge-tree --write-tree` on its parents. No hand edits or conflict occurred. [Merge inventory](v1-merge-records-20261115.md#verified-merge-inventory).
+
+The task is closed. Deployment remains blocked on owner C-1 Memberships and C-2 immediate pre-deployment Contacts D1 backup confirmation. F5 OPEN; official T1B-01/T1B-02 and hosted/runtime UAT Not tested. No migration, live data or provider operations.
