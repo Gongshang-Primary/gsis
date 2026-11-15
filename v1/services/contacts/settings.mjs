@@ -122,21 +122,31 @@ export async function recoverSave(ctx) {
     "CAPABILITY_DENIED",
     403,
   );
-  if (body.digest)
+  if (body.digest !== undefined)
     fail(body.digest === op.digest, "OPERATION_INTENT_CONFLICT", 409);
-  if (op.state === "committed")
+  // The original writer may commit between our read and the abort fence.
+  // Only the receipt returned by that atomic race can settle this request.
+  const receipt =
+    op.state === "prepared"
+      ? await abortOperation(env.DB, op, "OWNER_REQUESTED_SAVE_RECOVERY", now)
+      : op.receipt;
+  if (receipt?.state === "committed") {
+    await resolveAdmission(env, env.DB, op, null, receipt, now);
     return {
       saved: true,
-      receipt: op.receipt,
-      mapping: op.receipt.result?.mapping,
+      state: "committed",
+      receipt,
+      mapping: receipt.result?.mapping,
     };
-  if (op.state === "prepared")
-    await abortOperation(env.DB, op, "OWNER_REQUESTED_SAVE_RECOVERY", now);
-  await resolveAdmission(env, env.DB, op, null, null, now);
+  }
+  if (receipt?.state !== "terminal-not-committed")
+    return { saved: false, state: "unknown", operationId };
+  await resolveAdmission(env, env.DB, op, null, receipt, now);
   return {
     saved: false,
     state: "aborted",
     operationId,
+    receipt,
     message:
       "The original operation is fenced and cannot commit late. Review the preserved draft and submit a new operation.",
   };
