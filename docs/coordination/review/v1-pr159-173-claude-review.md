@@ -55,7 +55,7 @@ No permission was loosened.
 
 ### F-1 (medium, direction): v1 fixes increasingly patch v0.9 screens at build time
 
-Nine of these PRs fix behaviour by text-patching v0.9 source inside `scripts/v1/build-web.mjs` (about 930 added lines across the stack). Patches fail loudly if the v0.9 text changes, which is right. But every v0.9 screen change can now break the v1 build, and the patch layer grows with each fix. Recommend the v1 coordinator plan to move the most-patched screens (Deploy, Contacts, Roster settings) into v1-owned UI modules, so v1 stops depending on v0.9 markup.
+Eight of these PRs (#161, #163, #165, #166, #168, #171, #172, #173) fix behaviour by text-patching v0.9 source inside `scripts/v1/build-web.mjs` (823 added lines across the stack; corrected from my first figure of nine PRs and about 930 lines). Patches fail loudly if the v0.9 text changes, which is right. But every v0.9 screen change can now break the v1 build, and the patch layer grows with each fix. Recommend the v1 coordinator plan to move the most-patched screens (Deploy, Contacts, Roster settings) into v1-owned UI modules, so v1 stops depending on v0.9 markup.
 
 ### F-2 (low, process): very large single commits
 
@@ -72,3 +72,10 @@ Merge along the stack: #159 any time; #160 → #164; #161 → #163 → #165 → 
 ## Status that does not change
 
 F5 OPEN. Official T1B-01/T1B-02, hosted durable recovery, provider delivery and unperformed runtime UAT: Not tested.
+
+## Recheck (15 Nov 2026)
+
+- Heads of #160–#173 unchanged since review; each still merges cleanly with current main.
+- **#159 moved** to `1dca6e7` (one commit, "Record 49 UAT findings and current review queue"): the same two documentation files, +76/−4, `git diff --check` clean, no personal data (scan hits are commit-hash fragments). **Approve at `1dca6e7`.**
+- Correction above: the build-time patch layer is 8 PRs and 823 added lines, not 9 and ~930. The finding stands.
+- #159 now lists #174 as ready; #174 (`ba81883`) is not yet reviewed.
