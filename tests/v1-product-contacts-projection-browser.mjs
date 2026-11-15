@@ -48,6 +48,14 @@ const fields = [
   "GSPS Alias (@gsps.edu.sg)",
   "iCON Alias (@moe.edu.sg)",
   "CES Alias (@schools.gov.sg)",
+  "School Section",
+  "Personnel Category",
+  "Employment Arrangement",
+  "Employment Status",
+  "Memberships",
+  "General Aliases",
+  "Name Suffix",
+  "Profile Completion",
 ];
 async function test(name, run) {
   await run();
@@ -130,6 +138,14 @@ try {
     "School.Local",
     "Icon.Local",
     "Ces.Local",
+    "",
+    "",
+    "",
+    "",
+    "",
+    "Fallback@moe.edu.sg\nFallback@schools.gov.sg",
+    "",
+    "provisional",
   ];
   browser = await chromium.launch({
     headless: true,
@@ -269,7 +285,10 @@ try {
     await page.locator("#dataTab").click();
     await cell("EXT").waitFor();
     assert.equal(await cell("EXT").inputValue(), "1234");
-    assert.equal(await cell("Mobile No").inputValue(), "8765 4321");
+    assert.equal(
+      (await cell("Mobile No").inputValue()).replace(/\s/g, ""),
+      "87654321",
+    );
     assert.equal(await cell("iCON Alias (@moe.edu.sg)").inputValue(), "");
     await page.screenshot({
       path: join(evidence, "contacts-grid-desktop.png"),
@@ -278,64 +297,9 @@ try {
     await page.screenshot({ path: join(evidence, "contacts-grid-narrow.png") });
     await page.setViewportSize({ width: 1440, height: 960 });
   });
-  const flags = Object.fromEntries(
-    ["sl", "sc", "smc", "kp", "tl", "sdt", "cmt", "sat", "support", "mk"].map(
-      (key) => [key, false],
-    ),
-  );
-  const hr = {
-    catalogueId: "browser-hr",
-    revision: "1",
-    kind: "hr-term",
-    entries: [
-      ["PRIMARY", "schoolSection"],
-      ["MK", "schoolSection"],
-      ["Full-time", "employmentArrangement"],
-      ["EO", "eoAppointmentLevel"],
-      ["Confirmed", "appointmentStatus"],
-    ].map(([code, category]) => ({
-      code,
-      category,
-      label: code,
-      active: true,
-      definitionRevision: "definition-1",
-    })),
-  };
-  const roles = {
-    catalogueId: "browser-roles",
-    revision: "1",
-    kind: "membership-role",
-    entries: [
-      ...["Teacher", "P", "MK"].map((code) => ({
-        code,
-        label: code,
-        active: true,
-        definitionRevision: "definition-1",
-        flags,
-        eoAppointment: null,
-      })),
-    ],
-  };
-  const tags = {
-    catalogueId: "browser-tags",
-    revision: "1",
-    kind: "operational-tag",
-    entries: [
-      {
-        code: "FAJT",
-        category: "employmentTags",
-        label: "FAJT",
-        active: true,
-        definitionRevision: "definition-1",
-        ttbVisible: true,
-        order: 0,
-      },
-    ],
-  };
-  for (const catalogue of [hr, roles, tags])
-    await post("contacts", "/catalogues", { revision: 0, catalogue });
-  const ref = (catalogueId, code) => ({ catalogueId, code, revision: "1" }),
-    eligible = ["browser-twin-one", "browser-twin-two"],
+  // New ordinary setup uses direct values. Historical/orphan Deploy rows below
+  // still exercise preserved references; current catalogue CRUD is retired.
+  const eligible = ["browser-twin-one", "browser-twin-two"],
     inactive = "browser-inactive",
     nonEO = "browser-non-eo",
     mk = "browser-mk",
@@ -349,7 +313,7 @@ try {
   });
   await update(staffId, {
     employmentActive: true,
-    schoolSection: ref(hr.catalogueId, "PRIMARY"),
+    schoolSection: "Primary",
   });
   const choicesExpected = [...eligible, staffId];
   for (const [id, basicName, suffix] of [
@@ -368,15 +332,12 @@ try {
     });
     await update(id, {
       employmentActive: true,
-      schoolSection: ref(hr.catalogueId, id === mk ? "MK" : "PRIMARY"),
-      employmentArrangement: ref(hr.catalogueId, "Full-time"),
-      role: ref(roles.catalogueId, "Teacher"),
-      eoAppointmentLevel: ref(hr.catalogueId, "EO"),
-      appointmentStatus: ref(hr.catalogueId, "Confirmed"),
-      employmentTags:
-        id === eligible[1] || id === inactive
-          ? [ref(tags.catalogueId, "FAJT")]
-          : [],
+      schoolSection: id === mk ? "MK" : "Primary",
+      employmentArrangement: "Full-time",
+      role: "Teacher",
+      eoAppointmentLevel: "EO",
+      appointmentStatus: "Confirmed",
+      employmentTags: id === eligible[1] || id === inactive ? ["FAJT"] : [],
       subjectTags: [],
     });
     await update(id, { mkTags: [], memberships: [] });
@@ -466,6 +427,10 @@ try {
     revision: 1,
     ownerReviewReference: "synthetic-changed-authority",
   });
+  // These are real accepted direct labels, so reporting/options are derived
+  // from owner facts rather than pre-seeded catalogue definitions.
+  await update(mk, { role: "MK" });
+  await update(nonEO, { role: "P" });
   await save([
     { operation: "setTeacherNote", teacher: mk, expected: "", value: "" },
     {
@@ -643,6 +608,112 @@ try {
     await page
       .getByRole("button", { name: "HR Settings", exact: true })
       .click();
+    for (const [name, headers] of [
+      ["Membership", ["Staff ID", "TTb Name", "Role", "Memberships"]],
+      ["HR Terms", ["Staff ID", "TTb Name", "Field", "Value"]],
+    ]) {
+      const report = page.locator("#content table[data-contacts-reference]");
+      for (let render = 0; render < 2; render++) {
+        await page.getByRole("button", { name, exact: true }).click();
+        await page.waitForFunction(
+          () =>
+            document
+              .querySelector("#content table[data-contacts-reference]")
+              ?.querySelectorAll("thead .gsis-core-sort").length === 4,
+        );
+        const headerCells = report.locator("thead tr").first().locator("th");
+        assert.equal(await headerCells.count(), 4);
+        assert.deepEqual(
+          await headerCells.evaluateAll((nodes) =>
+            nodes.map((node) => {
+              const copy = node.cloneNode(true);
+              copy
+                .querySelectorAll(
+                  ".gsis-core-sort,[data-core-resize],.resize-grip",
+                )
+                .forEach((control) => control.remove());
+              return copy.textContent.trim();
+            }),
+          ),
+          headers,
+        );
+        assert.equal(
+          await report.locator(".sort-button,.member-sort").count(),
+          0,
+          "Only shared Core owns report sorting",
+        );
+        for (let column = 0; column < 4; column++) {
+          assert.equal(
+            await headerCells.nth(column).locator("button").count(),
+            1,
+            "One sort control per column after every render",
+          );
+          assert.equal(
+            await headerCells
+              .nth(column)
+              .locator(".gsis-core-sort")
+              .getAttribute("aria-label"),
+            "Sort " + headers[column],
+          );
+        }
+        assert.equal(
+          await report.locator("thead .gsis-core-filter").count(),
+          1,
+        );
+        assert.equal(
+          await report.locator("thead .gsis-core-filter input").count(),
+          4,
+        );
+      }
+      const sort = report.getByRole("button", {
+        name: "Sort Staff ID",
+        exact: true,
+      });
+      const readIds = () =>
+        report
+          .locator("tbody tr")
+          .evaluateAll((nodes) => nodes.map((row) => row.cells[0].textContent));
+      await sort.click();
+      const ascending = await readIds();
+      assert(ascending.length > 1);
+      assert.deepEqual(
+        ascending,
+        [...ascending].sort((a, b) =>
+          a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" }),
+        ),
+      );
+      await sort.click();
+      assert.deepEqual(
+        await readIds(),
+        ascending.slice().reverse(),
+        "The single Core sorter changes real report row order",
+      );
+      const reportRows = await page
+        .locator("#content table tbody tr")
+        .evaluateAll((nodes) =>
+          nodes.map((row) => [...row.cells].map((cell) => cell.textContent)),
+        );
+      assert(
+        reportRows.some(
+          (row) =>
+            row[0] === nonEO &&
+            (name === "Membership"
+              ? row[2] === "P"
+              : row[2] === "Role" && row[3] === "P"),
+        ),
+        name + " reports the current accepted fact by permanent Staff ID",
+      );
+      assert.equal(
+        await page
+          .locator("#content table tbody input,#content table tbody select")
+          .count(),
+        0,
+      );
+      assert.doesNotMatch(
+        await page.locator("#content").innerText(),
+        /add role|role flags|catalogue manager|create catalogue/i,
+      );
+    }
     await page.getByRole("button", { name: "Teachers", exact: true }).click();
     await page
       .getByRole("button", { name: "Add existing teacher", exact: true })
@@ -732,7 +803,7 @@ try {
       .locator('[data-prop="match"] option')
       .evaluateAll((nodes) => nodes.map((n) => n.value));
     if (!staffChoices.includes("Teacher"))
-      failures.push("Offload Staff tag lost Teacher catalogue option");
+      failures.push("Offload Staff tag lost accepted Teacher value");
     assert(!staffChoices.includes("P") && !staffChoices.includes("MK"));
     const roleChoices = await page
       .locator('[data-rule="role-hod-sm"][data-prop="match"] option')
@@ -770,7 +841,7 @@ try {
     await page.locator("#dataTab").click();
     await cell("EXT").waitFor();
     assert.equal(await cell("Mobile No").isEditable(), true);
-    assert.equal(await cell("EXT").isEditable(), false);
+    assert.equal(await cell("EXT").isEditable(), true);
     assert.equal(
       await page.evaluate(() => GSISV1.capable("core.admin")),
       false,

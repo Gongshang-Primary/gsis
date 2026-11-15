@@ -108,15 +108,23 @@ try {
         )
         .first()
     ).n;
-  await addDraft("Synthetic Recovery Teacher", "P");
-  await page.locator("#saveData").click();
+  await addDraft("Synthetic Recovery Teacher", "Invalid,role");
+  await page.evaluate(() => document.querySelector("#saveData").onclick());
   await settle();
-  const rejected = saves().at(-1).body;
-  const rejectedId = rejected.operationId || rejected.requestId;
-  assert.equal(
-    (await operationStatus(db, "synthetic-school", rejectedId)).state,
-    "aborted",
-  );
+  const rejected = saves().at(-1)?.body;
+  const rejectedId = rejected?.operationId || rejected?.requestId;
+  if (rejectedId) {
+    const state = await operationStatus(db, "synthetic-school", rejectedId);
+    assert(
+      !state || state.state === "aborted",
+      "A rejected direct value cannot leave a prepared write",
+    );
+  } else {
+    assert.match(
+      await page.locator("#toast").textContent(),
+      /role|comma|invalid|value|token/i,
+    );
+  }
   assert.equal(await staffCount(), 0);
   assert.equal(
     await field("Basic Name").inputValue(),
@@ -126,23 +134,27 @@ try {
     await field("Statutory Name").inputValue(),
     "Synthetic Recovery Teacher Full",
   );
-  assert.equal(await field("Mobile No").inputValue(), "8123 4567");
-  assert.equal(await field("Role").inputValue(), "P");
+  assert.equal(
+    (await field("Mobile No").inputValue()).replace(/\s/g, ""),
+    "81234567",
+  );
+  assert.equal(await field("Role").inputValue(), "Invalid,role");
   assert.equal(
     await field("Basic Name").isEditable(),
     true,
-    "A durably aborted save must retain and unlock its draft",
+    "A proven direct-value rejection must retain and unlock its draft",
   );
   assert(!/\bSaved\b/.test(await page.locator("#dataStatus").textContent()));
   done(
-    "catalogue rejection unlocks only after its durable abort and retains every entered value",
+    "direct-value rejection before prepare or after proven abort retains every entered value",
   );
   await field("Role").fill("");
   await page.locator("#saveData").click();
   await settle();
   assert.equal(await staffCount(), 1);
   const corrected = saves().at(-1).body;
-  assert.notEqual(corrected.operationId || corrected.requestId, rejectedId);
+  if (rejectedId)
+    assert.notEqual(corrected.operationId || corrected.requestId, rejectedId);
   assert.equal(
     (
       await operationStatus(
@@ -344,7 +356,7 @@ try {
         await import("/v1/shared/workbooks.mjs")
       ).encodeWorkbook({
         metadata: {
-          Schema: "gsis.contacts.grid.v1",
+          Schema: "gsis.contacts.grid.v2",
           "School ID": "synthetic-school",
           Scope: "manage",
         },
@@ -399,9 +411,10 @@ try {
     .getByRole("button", { name: "Check original import receipt", exact: true })
     .click();
   await page.waitForFunction(() =>
-    document
-      .querySelector("dialog.gsis-import-preview [role=status]")
-      ?.textContent.includes("unknown"),
+    /unconfirmed/.test(
+      document.querySelector("dialog.gsis-import-preview [role=status]")
+        ?.textContent || "",
+    ),
   );
   assert.equal(
     await page.locator('dialog input[type="file"]').isDisabled(),
@@ -470,7 +483,16 @@ try {
     window.contactsRecoveryBoundaryCleared = false;
     const observer = new MutationObserver(() => {
       observer.disconnect();
-      window.dispatchEvent(new CustomEvent("gsis:clear-protected-state"));
+      const databases = indexedDB.databases.bind(indexedDB);
+      indexedDB.databases = () =>
+        new Promise((resolve) => {
+          window.releaseRecoveryBoundaryDatabases = async () => {
+            indexedDB.databases = databases;
+            resolve(await databases());
+          };
+        });
+      window.contactsRecoveryBoundaryEpoch = GSISV1.saveStatus().contextEpoch;
+      window.contactsRecoveryBoundaryClear = GSISV1.clearProtectedState();
       window.contactsRecoveryBoundaryCleared = true;
     });
     observer.observe(document.querySelector("#recoveryRequests"), {
@@ -483,6 +505,13 @@ try {
   await page.evaluate(() => window.contactsRecoveryBoundaryCompletion);
   assert.equal(
     await page.evaluate(() => window.contactsRecoveryBoundaryCleared),
+    true,
+  );
+  assert.equal(
+    await page.evaluate(
+      () =>
+        GSISV1.saveStatus().contextEpoch > window.contactsRecoveryBoundaryEpoch,
+    ),
     true,
   );
   assert.equal(
@@ -499,8 +528,12 @@ try {
   done(
     "account clearance during the final recovery render cannot restore the original operation status",
   );
-  // The synthetic event clears browser state only. A fresh page must rebuild
-  // its state from the still-valid local session before the next scenario.
+  // Real context clearance must fence the recovery continuation before the
+  // asynchronous IDB cleanup finishes. The server session remains valid.
+  await page.evaluate(async () => {
+    await window.releaseRecoveryBoundaryDatabases();
+    await window.contactsRecoveryBoundaryClear;
+  });
   await page.reload();
   await page.locator("#dataTab").click();
   await page.waitForFunction(
