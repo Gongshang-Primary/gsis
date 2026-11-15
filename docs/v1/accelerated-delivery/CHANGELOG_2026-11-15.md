@@ -43,6 +43,12 @@ Leading hypothesis: missing venue revision evidence in the saved/prepared docume
 No application changes or runtime tests were performed by this documentation update. PR160 supplies the separately recorded implementation/test evidence above; no live publication retry, merge or deployment has been performed for this entry. The earlier deployment's successful CI does not close this bug. F5 remains OPEN; official T1B-01/T1B-02 and unperformed runtime UAT remain **Not tested**.
 
 
+## V1-20261115-02 — visible deployment versions
+
+**Owner decision, 15 November 2026:** “start incrementing version for all of us to keep track. next deploy is v1.01”. The next deployed v1 release is **v1.01**; subsequent releases increment to v1.02, v1.03 and so on. Record the release label with its exact source head, artifact digest and deployment result, and show it consistently across the v1 landing page, Toolbox and application headers. Contract/schema versions and v0.9 release labels remain independent.
+
+Status: queued for a separate bounded release-label implementation after the current shared-builder edits are frozen. Use one release value rather than independently changing each viewport. Verification must cover every viewport and generated release metadata, and distinguish a prepared release from a deployed one. This naming decision does not by itself request a deployment or mark queued fixes released.
+
 ## Imported ledger chronology
 
 The tables preserve the order of the source reports. “Reported” means evidence in the supplied ledger, not independently repeated here. “Source confirmed” means the cited code supports the failure mechanism; it does not establish the original live receipt or certify the affected production data. “Historical correction” records a reported earlier write/read-back without authorising another write or closing frontend UAT.
@@ -80,7 +86,7 @@ The source reports a subject-load correction followed by cloning two Deploy draf
 | ID | Reported observation | Current classification and closure evidence |
 | --- | --- | --- |
 | UAT013 | A Science fortnight-split row was omitted because its copied key retained the old subject spelling. | Historical correction reported, with read-back and a version revision increment; the original row was retained for recovery. Frontend refresh was not verified. Check the correct displayed row, value and absence of double counting; no repeat correction authorised. |
-| UAT014 | Editing a fortnight value gave no usable save action and navigation stayed blocked. | Reported frontend save/navigation defect; exact failing path needs synthetic reproduction. Third queued implementation after UAT019/UAT004. Verify draft entry, visible save/discard controls, successful save/reload, failed or unknown receipt handling and navigation without silent loss. |
+| UAT014 | Editing a fortnight value gave no usable save action and navigation stayed blocked. | Reproduced in synthetic Chromium: edit a numeric value or remark, restore its original text before blur, and no native change event fires; the dirty flag stays set with no queued change or visible Save/Discard. Native malformed numeric input also incorrectly stages blank. Normal valid blur stages correctly. Third queued implementation after UAT019/UAT004; no live save was performed. Verify draft entry, visible save/discard controls, successful save/reload, failed or unknown receipt handling and navigation without silent loss. |
 | UAT015 | Membership showed zero rows despite copied version membership data. | Source inspection showed an empty Contacts catalogue overriding copied Deploy data. The later reported 59 Contacts role definitions may already address the missing dependency; refreshed UI requires retest. Do not restore a competing Deploy-owned authority copy. |
 | UAT016 | School Leader positions were empty; copied reporting links appeared under Needs review. | Accepted authority dependency, not permission to infer leaders from copied appointments or links. Contacts must supply the required explicit accepted records and stable identities before refreshed display is certified. |
 | UAT017 | Relief inputs matched, but demand was unavailable and the qualifying teacher count was zero. | Contacts/EO evidence dependency. Test calculations with explicit accepted facts and truthful missing-evidence behaviour; never infer EO from teaching duties or force a numeric result. |
@@ -126,7 +132,8 @@ Read-only diagnosis uses [implementation snapshot ab247392](https://github.com/h
 3. **UAT004:** separate Contacts receipt/draft recovery fix; establish original terminal versus unknown outcomes, without coupling it to the redesign.
 4. **UAT014:** reproduce and repair the fortnight editor's save/navigation journey in a separate claim.
 5. **LORD UAT008/UAT021–023**, then **UAT009**, then **UAT010:** independent booking-group, reminder and monitor scopes. Preserve physical inventory, existing reservations, custody, audit, provider uncertainty and current authority. No migration, scheduler activation or sending follows from a code fix.
-6. **Contacts direct editing / UAT002–003, UAT018, UAT024, UAT026:** coordinate with PR158; do not duplicate or implicitly expand it. Export investigations UAT006/UAT025 and remaining ASC audit UAT020 require reproductions before code scope.
+6. **V1-20261115-02:** central release labels, starting with v1.01 for the next deployment; sequence after shared-builder work and keep protocol versions unchanged.
+7. **Contacts direct editing / UAT002–003, UAT018, UAT024, UAT026:** coordinate with PR158; do not duplicate or implicitly expand it. Export investigations UAT006/UAT025 and remaining ASC audit UAT020 require reproductions before code scope.
 
 Contacts owns accepted staff facts, role definitions and fresh projections; Core owns account-to-Staff-ID links and application grants. Deploy owns saved planning versions and publications, consuming accepted Contacts facts and canonical Venues metadata. LORD owns inventory, reservations, custody, local reference observations and notification intents. None may invent another owner's authoritative records to clear an unavailable state.
 
