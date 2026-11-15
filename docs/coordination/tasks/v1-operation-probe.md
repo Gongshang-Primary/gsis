@@ -1,6 +1,6 @@
 # v1-operation-probe: built-browser operation coverage in existing CI
 
-- Status: claimed; implementation not yet started.
+- Status: implemented; local checks passed; exact-head CI and Claude review pending.
 - Owner/model: Codex. Coordinator: ChatGPT v1. Lane: tests/documentation only.
 - Reviewer/model: Claude, independent exact-head review; pending.
 - Last updated (Asia/Singapore): 15 November 2026, 21:06.
@@ -48,7 +48,7 @@ Strict session, school, capability, revision, operation-identity, accepted-autho
 
 ## Verification
 
-Pending implementation. Required evidence at the published head: focused probe including expected red controls; existing runner discovery; canonical `TZ=Asia/Singapore npm run build` without tracked drift; full existing Node/LORD and product regressions; exact-head CI; exact three-file scope and zero overlap with176. Record actual commands, outcomes, failures, exclusions and omissions in this task/PR. Compare with the base's own passing evidence, never substitute that baseline for this head's checks.
+Implemented within the three paths. Required evidence at the published head: focused probe including expected red controls; existing runner discovery; canonical `TZ=Asia/Singapore npm run build` without tracked drift; full existing Node/LORD and product regressions; exact-head CI; exact three-file scope and zero overlap with176. Record actual commands, outcomes, failures, exclusions and omissions in this task/PR. Compare with the base's own passing evidence, never substitute that baseline for this head's checks.
 
 Approach: apply the repository's Superpowers/Ponytail principles manually for meaningful negative controls and existing-harness reuse. No optional skill package or independent model review is claimed as executed. Q01 is supported by the owner exception/claim; Q02–Q06 require implementation evidence; Q07 Claude review pending; Q08 release not applicable.
 
@@ -57,3 +57,35 @@ Approach: apply the repository's Superpowers/Ponytail principles manually for me
 Claude reviews the exact new head without editing this branch. PR must say: **rebase onto main and rerun after PR160–175 merge; never merge into the parent feature branch**. The builder has no merge, deployment, infrastructure, live migration/data or provider-send authority. Visible changes: none intended; tests only. Rollback is removal/revert of this test and its reasoned exceptions, with no production data effects.
 
 Only T07's engineering test infrastructure may be closed here. All known allowed gaps remain open; no first-ledger false alarm becomes a repair or unperformed browser pass. F5 remains **OPEN**. Official T1B-01/T1B-02, hosted/runtime UAT and provider integration remain **Not tested**. Next product work is Job3, gated on Claude's review of PR176 and a fresh base/scope check; this sibling exception cannot be reused for it.
+
+Accepted task-only main claim: `d4b72eb596c9d375c689bb4a7a80cfafe9a23499`. Re-read after publication; only this task record changed on main. This branch carries that record alone on77e30ee, as the owner-authorised pinned-base exception above requires. No176 ancestry or unrelated main code was incorporated.
+
+
+## Implementation evidence and limitations
+
+The probe parses 121 built script units (including inline HTML scripts), discovers 399 distinct domain/path/selector bindings, and sends GET and POST through the real local gateway and Workers. Four independent synthetic Admin sessions bound concurrency without sharing an ordering guard. A synthetic Deploy version permits planning-operation dispatch; saved-draft envelopes retain their edits-array shape. The actual built Roster page exercises the shared browser adapter against Core session, Roster operations and Contacts D1 reads. Foreign browser requests are blocked; provider, webhook and scheduler ownership are disabled. No credential or live account was used.
+
+The 29 narrowly keyed exceptions derive from follow-up Section 2. They include its explicitly replaced Contacts `kp` and OVERLORD background calls. Two additional concrete callers were confirmed in those same flagged panels: `archiveColdOutput` (F10) and `cancelPendingNotifications` (F04). Their individual reasons identify that extension of the trace; Claude must review these candidate exceptions at the exact head. No wildcard exception or handler fix is included. F05 is now confirmed by real requests. F13's `sysFields` references at this base are data/accessor references, not a resolved API call: no exception was silently added for them. F16 names remain model-only without a resolved caller; no exception or retirement decision was added.
+
+The scanner reports 15 unresolved runtime forwarding/audit/DOM-selector locations with file/line provenance. Stored retry payloads, user-selected values and arbitrary runtime code are not exhaustively evaluated. This is a conservative finite-string dispatch check, not proof of all reachable UI flows or business outcomes. It also reports server/prerequisite errors separately; those do not become passing functional UAT. Job9's browser workflow proof remains required.
+
+Negative controls reach the real Workers: newly extracted unknown routes in all eight domains, unknown named operations in five dispatchers, unrelated-domain allowances, and obsolete allowances all fail as required. A missing Calendar wipe receipt (`WIPE_NOT_FOUND`) is specifically shown to be a missing resource, not missing dispatch. Duplicate and undiscovered exceptions are rejected. The existing 45-second per-program timeout is unchanged.
+
+Local commands (all application/test commands with `TZ=Asia/Singapore`):
+
+```sh
+node --check tests/v1-product-operation-probe.mjs
+GSIS_BROWSER_EXECUTABLE=/usr/bin/chromium node tests/v1-product-operation-probe.mjs
+npm run build
+node scripts/v1/test.mjs --list
+node tests/run.cjs --list
+LORD_TEST_CHROMIUM=/usr/bin/chromium GSIS_BROWSER_EXECUTABLE=/usr/bin/chromium python3 lord-suite/tests/run_all_checks.py
+git diff --check
+git diff --name-only 77e30eece77cf2477384ecd4fdc901b828e47599
+```
+
+Focused probe passed (399 calls, 29 expected missing bindings), including Chromium/Workers/D1 and all negative controls; the final run took 33.1 seconds while other local browser checks ran. Canonical build passed with no tracked build drift. Both unchanged runners discover this program exactly once: 94 product programs and 1,193 Node programs. Full LORD passed 40/40 programs. The full Node/product suites are delegated to the existing exact-head CI, not claimed as locally run. The PR records final head SHA, run links, counts, failures and artifacts after CI completes, without creating a self-referential evidence commit.
+
+Development failures retained honestly: the first static evaluator followed unrelated graphics templates and was stopped; it now limits evaluation to API-bearing expressions and asserts finite bounds. An overly broad error phrase mistook a missing wipe receipt for a missing handler; the real-resource negative control prevents that regression. The first LORD invocation lacked its local Chromium environment variable and stopped at browser launch; rerunning the unchanged complete suite with `LORD_TEST_CHROMIUM` passed 40/40. No test, workflow, timeout, exclusion or product behavior was changed to suppress these failures.
+
+Q01 scope/claim and Q02 ownership: exact sibling base, three paths, zero overlap with176. Q03 security and Q04 recovery: real authenticated synthetic dispatch, retained security gates, missing-receipt distinction and no live effects. Q05 verification and Q06 maintainability: runner discovery, bounded AST extraction, per-entry reasons and stale-exception rejection; full exact-head CI still required. Q07 independent Claude review pending. Q08 release not applicable. Visible changes: none. All allowed product gaps remain open. F5 OPEN; official T1B-01/T1B-02 and hosted/runtime UAT **Not tested**.

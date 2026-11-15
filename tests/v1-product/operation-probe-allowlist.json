@@ -1,0 +1,238 @@
+{
+  "source": "PR177 follow-up ledger Section 2 at 429367ed23bf4edf8d10cbb575226c84c228474c",
+  "review": "Candidate seed for Claude's exact-head review; allowances do not close the findings.",
+  "entries": [
+    {
+      "domain": "calendar",
+      "path": "/calendar-changes",
+      "selector": "",
+      "name": "",
+      "ledger": "F14",
+      "reason": "The flag-gated Calendar change-awareness stream still names this absent route."
+    },
+    {
+      "domain": "calendar",
+      "path": "/calendar-changes/delta",
+      "selector": "",
+      "name": "",
+      "ledger": "F14",
+      "reason": "The flag-gated Calendar change-awareness poll still names this absent delta route."
+    },
+    {
+      "domain": "calendar",
+      "path": "/calendar-jobs",
+      "selector": "",
+      "name": "",
+      "ledger": "F14",
+      "reason": "The flag-gated Calendar job-status strip still names this absent route."
+    },
+    {
+      "domain": "contacts",
+      "path": "/kp",
+      "selector": "",
+      "name": "",
+      "ledger": "S2/replaced",
+      "reason": "Section 2 explicitly records Contacts kp as replaced by native Core access; its legacy function remains in the built file."
+    },
+    {
+      "domain": "deploy",
+      "path": "/campus-map",
+      "selector": "",
+      "name": "",
+      "ledger": "F12",
+      "reason": "The copied Deploy campus-map loader still fetches this absent route."
+    },
+    {
+      "domain": "deploy",
+      "path": "/commands",
+      "selector": "",
+      "name": "",
+      "ledger": "F12",
+      "reason": "The copied Deploy queued-command gateway still names this absent flag-gated route."
+    },
+    {
+      "domain": "deploy",
+      "path": "/layout-reference",
+      "selector": "",
+      "name": "",
+      "ledger": "F12",
+      "reason": "The copied Deploy Layout-reference loader still fetches this absent route."
+    },
+    {
+      "domain": "lord",
+      "path": "/auth/relief",
+      "selector": "",
+      "name": "",
+      "ledger": "F15",
+      "reason": "The copied LORD relief-sign-in flow still names this absent auth route."
+    },
+    {
+      "domain": "lord",
+      "path": "/transaction",
+      "selector": "action",
+      "name": "backgroundack",
+      "ledger": "S2/replaced",
+      "reason": "Section 2 explicitly records OVERLORD backgroundack as replaced by the native background panel; the legacy call remains in the built file."
+    },
+    {
+      "domain": "lord",
+      "path": "/transaction",
+      "selector": "action",
+      "name": "backgroundapply",
+      "ledger": "S2/replaced",
+      "reason": "Section 2 explicitly records OVERLORD backgroundapply as replaced by the native background panel; the legacy call remains in the built file."
+    },
+    {
+      "domain": "lord",
+      "path": "/transaction",
+      "selector": "action",
+      "name": "backgroundpreview",
+      "ledger": "S2/replaced",
+      "reason": "Section 2 explicitly records OVERLORD backgroundpreview as replaced by the native background panel; the legacy call remains in the built file."
+    },
+    {
+      "domain": "roster",
+      "path": "/backup-ledger",
+      "selector": "",
+      "name": "",
+      "ledger": "F09",
+      "reason": "The copied backup-ledger page call still targets the absent backup-ledger route."
+    },
+    {
+      "domain": "roster",
+      "path": "/backup-ledger",
+      "selector": "operation",
+      "name": "read",
+      "ledger": "F09",
+      "reason": "The copied backup-ledger read call still targets the absent backup-ledger route."
+    },
+    {
+      "domain": "roster",
+      "path": "/backup-ledger",
+      "selector": "operation",
+      "name": "restore",
+      "ledger": "F09",
+      "reason": "The copied backup-ledger restore call still targets the absent backup-ledger route."
+    },
+    {
+      "domain": "roster",
+      "path": "/backup-ledger",
+      "selector": "operation",
+      "name": "verify",
+      "ledger": "F09",
+      "reason": "The copied backup-ledger verify call still targets the absent backup-ledger route."
+    },
+    {
+      "domain": "roster",
+      "path": "/edge/archive",
+      "selector": "",
+      "name": "",
+      "ledger": "F10",
+      "reason": "The copied archive page and Roster archive loader fetch this absent route."
+    },
+    {
+      "domain": "roster",
+      "path": "/operations",
+      "selector": "operation",
+      "name": "acquireStaplerLock",
+      "ledger": "F01",
+      "reason": "Opening a copied Stapler editor still calls the absent lock-acquire operation."
+    },
+    {
+      "domain": "roster",
+      "path": "/operations",
+      "selector": "operation",
+      "name": "archiveColdOutput",
+      "ledger": "F10",
+      "reason": "Additional caller confirmed in the same archive feature: the copied archive-confirm button submits this absent operation; not named individually in the ledger."
+    },
+    {
+      "domain": "roster",
+      "path": "/operations",
+      "selector": "operation",
+      "name": "cancelPendingNotifications",
+      "ledger": "F04",
+      "reason": "Additional caller confirmed in the same delivery-review panel: its cancel-confirm button submits this absent operation; not named individually in the ledger."
+    },
+    {
+      "domain": "roster",
+      "path": "/operations",
+      "selector": "operation",
+      "name": "contactCreate",
+      "ledger": "F03",
+      "reason": "Roster and Stapler contact creation still call this absent Contacts bridge."
+    },
+    {
+      "domain": "roster",
+      "path": "/operations",
+      "selector": "operation",
+      "name": "deliveryReview",
+      "ledger": "F04",
+      "reason": "The copied delivery-review panel requests this absent Roster operation."
+    },
+    {
+      "domain": "roster",
+      "path": "/operations",
+      "selector": "operation",
+      "name": "dismissDeliveryIssues",
+      "ledger": "F05",
+      "reason": "The delivery-review clear button submits this absent operation; the ledger static finding is now request-confirmed."
+    },
+    {
+      "domain": "roster",
+      "path": "/operations",
+      "selector": "operation",
+      "name": "releaseStaplerLock",
+      "ledger": "F02",
+      "reason": "Leaving a copied Stapler editor still calls the absent lock-release operation."
+    },
+    {
+      "domain": "roster",
+      "path": "/operations",
+      "selector": "operation",
+      "name": "resolveAbsenceIntake",
+      "ledger": "F06",
+      "reason": "Resolving a queued absence-intake review calls this absent operation."
+    },
+    {
+      "domain": "roster",
+      "path": "/operations",
+      "selector": "operation",
+      "name": "retryAbsenceIntake",
+      "ledger": "F06",
+      "reason": "Retrying a queued absence-intake review calls this absent operation."
+    },
+    {
+      "domain": "roster",
+      "path": "/operations",
+      "selector": "operation",
+      "name": "statisticsRPercent",
+      "ledger": "F07",
+      "reason": "The copied statistics screen retains this absent R-percent operation despite a replacement being documented."
+    },
+    {
+      "domain": "roster",
+      "path": "/quiet-mode",
+      "selector": "",
+      "name": "",
+      "ledger": "F08",
+      "reason": "The copied quiet-mode switch requests this absent route."
+    },
+    {
+      "domain": "roster",
+      "path": "/whatsapp/media/synthetic-probe",
+      "selector": "",
+      "name": "",
+      "ledger": "F11",
+      "reason": "Inbox media links use this absent route family; only the synthetic object ID is substituted."
+    },
+    {
+      "domain": "roster",
+      "path": "/whatsapp/reports/synthetic-probe",
+      "selector": "",
+      "name": "",
+      "ledger": "F11",
+      "reason": "Delivery-report links use this absent route family; only the synthetic report ID is substituted."
+    }
+  ]
+}
