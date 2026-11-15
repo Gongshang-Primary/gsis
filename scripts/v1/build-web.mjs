@@ -223,6 +223,38 @@ function updateContactsRecovery(source) {
  source = replaceOnce(source, "$('refreshRecovery').onclick=()=>showContactRecovery();", "$('refreshRecovery').onclick=()=>{if(dataRequest)void recoverInterruptedContact(dataRequest,$('refreshRecovery'),false);};", 'Contacts recovery check preserves a prepared save');
  return source + '\n' + helpers.map(fn => fn.toString()).join('\n');
 }
+function updateContactsClassificationViews(source) {
+ const refresh = async function refreshClassificationViews({staffId,expectedRevision}={}) {
+  const outcome=(directory,grid,reason,revision=null)=>({directory,grid,revision,...(reason?{reason}: {})});
+  if(preview||!token||!state||!window.GSISV1.capable('contacts.manage'))return outcome('unavailable','unavailable','Current Contacts management access is required.');
+  if(staffId!==undefined&&(typeof staffId!=='string'||!Number.isSafeInteger(expectedRevision)))return outcome('unavailable','unavailable','The staff revision is not verified.');
+  const epoch=++classificationViewEpoch,credential=token,authAttempt=loginAttempt,owner=state.user.email,before=state,gridBefore=contactData;
+  const valid=()=>epoch===classificationViewEpoch&&credential===token&&authAttempt===loginAttempt&&state?.user.email===owner&&window.GSISV1.capable('contacts.manage');
+  const pending=()=>loading||dataSaving||dataRequest||dataLoading||dataFlight||recoveryBusy||contactViewPending()||Object.values(auxTables).some(entry=>entry.request||entry.saving||entry.flight);
+  if(pending())return outcome('deferred','deferred','A native Contacts read or save is in progress; its original draft and operation are retained.');
+  try{
+   const next=await api('bootstrap');
+   if(!valid())return outcome('unavailable','unavailable','The active Contacts account changed.');
+   if(state!==before||pending())return outcome('deferred','deferred','Native Contacts changed while refreshing; its current draft is retained.');
+   const fields=before.fields,id=record=>record?.staffId||record?.id,uniqueIds=records=>records.every(record=>typeof id(record)==='string'&&id(record)&&(!record.staffId||!record.id||record.staffId===record.id))&&new Set(records.map(id)).size===records.length;
+   if(!Array.isArray(fields)||fields.length!==17||new Set(fields).size!==fields.length||next.user?.email!==owner||!Array.isArray(next.people)||!uniqueIds(next.people)||!Array.isArray(next.rows)||!uniqueIds(next.rows)||!Array.isArray(next.fields)||next.fields.length!==fields.length||fields.some((field,index)=>next.fields[index]!==field)||!next.aliasDomains||!Number.isSafeInteger(next.revision)||next.rows.some(row=>!Number.isSafeInteger(row.revision)||!Array.isArray(row.values)||row.values.length!==fields.length||row.values.some(value=>typeof value!=='string')||!Array.isArray(row.computed)||row.computed.length!==fields.length||row.computed.some(value=>typeof value!=='boolean')))return outcome('unavailable','unavailable','Contacts returned an incomplete view.');
+   const person=staffId?next.people.find(person=>(person.staffId||person.id)===staffId):null,row=staffId?next.rows.find(row=>(row.staffId||row.id)===staffId):null;
+   if(staffId&&(!person||!row||person.revision!==row.revision||person.revision!==expectedRevision))return outcome('stale','stale','A newer or different staff view was read. Refresh the classifications to reconcile.',person?.revision??row?.revision??null);
+   const dirtyGrid=contactData!==gridBefore||dataEdits.size||newContactIds.size,
+    dirtyAux=Object.values(auxTables).some(entry=>entry.dirty||entry.edits?.size)||signatureSettingsDraft||signatureSettingsSaving;
+   if(dirtyAux)return outcome('deferred','deferred','A native Contacts form has unsaved changes; its draft is retained.',person?.revision??null);
+   state=next;
+   if(!dirtyGrid)contactData=sortContactData({...next});
+   noteCatalogueRevision(next.catalogueRevision);
+   show();loadDeployment(state);
+   if(dirtyGrid){notice('Contact list refreshed. Edit Info refresh deferred; your unsaved draft is retained.');return outcome('refreshed','deferred','Edit Info has unsaved changes; its original baseline and draft are retained.',person?.revision??null);}
+   window.GSISTableRefresh?.();
+   return outcome('refreshed','refreshed',null,person?.revision??null);
+  }catch(error){return outcome('unavailable','unavailable',valid()?error.message:'The active Contacts account changed.');}
+ };
+ return source+'\nlet classificationViewEpoch=0;\n'+refresh.toString()+"\nwindow.GSISV1ContactsViews=Object.freeze({refresh:refreshClassificationViews});\nwindow.addEventListener('gsis:clear-protected-state',()=>{classificationViewEpoch++;});\n";
+}
+
 function updateContacts(source){
  // EO and authority are accepted records. A display appointment must never create them.
  source=replaceOnce(source,"if(eo)eo.value=rule?.level||'';","if(eo)eo.value=r.values[eoIndex]??'';",'Contacts role-to-EO inference');
@@ -234,6 +266,7 @@ function updateContacts(source){
  source=replaceOnce(source,"$('addRole').onclick=()=>openRole();","$('addRole').onclick=()=>location.assign('/admin/');",'Contacts Core admin link');
  source=replaceOnce(source,"if(b)openRole(b.dataset.roleEmail);","if(b)location.assign('/admin/');",'Contacts Core access row');
  source=updateContactsRecovery(source);
+ source=updateContactsClassificationViews(source);
  source=source.replaceAll('Complete this saved change','Inspect or recover this save').replaceAll('Completing the original save…','Checking durable recovery…');
  source+=`\nwindow.addEventListener('gsis:clear-protected-state',()=>{loginAttempt++;loginAbort?.abort();clearContactsPersonalState();token='';state=null;visible=[];dataSaving=false;dataRequest=null;recoveryBusy=false;resetContactRecovery();$('dataGrid').inert=false;$('contactRows').replaceChildren();$('accessRows').replaceChildren();$('app').classList.add('hidden');});`;
  return source;
