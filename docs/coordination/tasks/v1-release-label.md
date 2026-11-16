@@ -1,6 +1,6 @@
 # v1.01 release label
 
-Model: Codex. Coordinator: ChatGPT. Reviewer: Muse at the exact head. Status: merged; deployment pending. Branch: `codex/v1-release-label`. Base: `252e88c7dd820c87fee1b445a697e7290b1ca1fb`. Updated: 16 November 2026 (Asia/Singapore).
+Model: Codex. Coordinator: ChatGPT. Reviewer: Muse at the exact head. Status: deployed as v1.01; runtime UAT pending. Branch: `codex/v1-release-label`. Base: `252e88c7dd820c87fee1b445a697e7290b1ca1fb`. Updated: 16 November 2026 (Asia/Singapore).
 
 Owner authority: the 15 November instruction to increment v1 releases, starting with v1.01, and the 16 November instruction "deploy v1.01". The visible label was still missing from current main. This bounded presentation change completes that release requirement; protocol/schema versions and v0.9 labels remain independent. Muse reviews the exact implementation head before it is merged. Release approval exists, but deployment still needs passing candidate checks, verified backups, resolution of the existing Contacts Memberships readiness condition and the protected GitHub environment approval.
 
@@ -72,3 +72,7 @@ Fresh full application-schema/data SQL exports for all eight D1 owners are retai
 [Deployment run 43843849886](https://github.com/helper-gsps/gsis/actions/runs/43843849886) was dispatched at `2026-11-16T09:53:31Z`, with `confirmation=DEPLOY ISOLATED V1` and `upload_provider_credentials=false`. Its resolved head is exactly the tested candidate above. The run is **waiting for the owner's GitHub environment approval**; no deployment or migration has started. No bypass or model self-approval was attempted. GitHub environment-variable reads return HTTP403 and browser tools are unavailable, so stored source configuration was not independently read; live settings and source defaults were checked, and the workflow will validate the owner-configured environment before applying it.
 
 Next: owner approves this specific protected run; monitor all migrations/uploads, verify nine Worker SHAs/labels/bindings/flags and public routing/authentication boundaries, then record actual completion in `docs/coordination/DEPLOYMENTS.md`. On partial failure, reconcile completed steps before considering retry. The owner's post-release Memberships entry/publication and all authenticated Run B checks remain pending. F5 **OPEN**; official T1B-01/T1B-02, hosted recovery and runtime UAT **Not tested**.
+
+### Deployment completion verified — 16 November 2026
+
+Protected run `43843849886` succeeded at 18:07:13 SGT on `8e85f3055b34b3262cde926efa7dc06c8fcf1a3b`. All nine Workers, three additive migrations, unchanged resource/service bindings and inactive integration flags were verified. Public smoke checks passed 16/16 at 22:57:57–22:58:01 SGT. See [the deployment record](../DEPLOYMENTS.md#16-nov-2026-180713-sgt-v101-deployed). No authenticated UAT, hosted restore or provider-send result is claimed. F5 OPEN; official T1B-01/T1B-02 and runtime UAT Not tested.
