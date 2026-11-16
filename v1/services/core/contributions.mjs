@@ -6,8 +6,10 @@ import {
   canonical,
   digest,
 } from "../../runtime/store.mjs";
-import { serviceCall } from "../../runtime/admission.mjs";
+import { serviceCall, inspectDecision } from "../../runtime/admission.mjs";
 import { createContactsReader } from "../../contacts/accepted-facts.mjs";
+import { createSessionPolicy } from "../../core/session-policy.mjs";
+import { isAuthorityPublication, authorityTuple } from "../contacts/authority-publication.mjs";
 const fail = (v, code = "CONTRIBUTION_UNVERIFIED", status = 403) => {
   if (!v)
     throw new ApiError(
@@ -25,8 +27,12 @@ export async function authorizeContribution(env, input, now) {
     "deploy",
     "/internal/publication/verify",
     { schoolId: env.SCHOOL_ID, ...input.source,
-      ...(input.contribution?.field === "memberships" && input.contribution.membershipPublicationVersion === 1
-        ? { membershipOnly: true, staffId: input.contribution.staffId } : {}) },
+      ...(isAuthorityPublication(input.contribution) || input.resumerIntent
+        ? { membershipOnly: true, offset: input.resumerIntent?.offset ?? 0, limit: input.resumerIntent?.limit ?? 8,
+          resumerOperationId: input.resumerOperationId, resumerDecisionId: input.resumerDecisionId,
+          resumerIntent: input.resumerIntent }
+        : input.contribution?.field === "memberships" && input.contribution.membershipPublicationVersion === 1
+          ? { membershipOnly: true, staffId: input.contribution.staffId } : {}) },
   );
   fail(proof.state === "committed");
   const match = proof.contributions?.find(
@@ -35,6 +41,13 @@ export async function authorizeContribution(env, input, now) {
       c.field === input.contribution.field,
   );
   fail(match && (await digest(match)) === (await digest(input.contribution)));
+  const authorityPublication = isAuthorityPublication(match);
+  const resumedPublication = proof.authorityPublicationVersion === 1 &&
+    (authorityPublication || (match.field === "memberships" && match.membershipPublicationVersion === 1));
+  if (authorityPublication) {
+    fail(proof.authorityPublicationVersion === 1, "PUBLICATION_UNVERIFIED");
+    authorityTuple(match.proposedValue);
+  }
   const original = await one(
     env.DB,
     "SELECT principal_json,descriptor_json FROM core_evidence WHERE school_id=? AND decision_id=?",
@@ -49,27 +62,68 @@ export async function authorizeContribution(env, input, now) {
       !old.impersonating &&
       d.operationId === input.source.sourceOperationId,
   );
+  // A committed publication proves the original proposal. Every application
+  // still requires a currently authorised operator; recovery may use a different
+  // publisher after the original publisher's own access has changed.
+  let actor = old, resumerSession = null;
+  if (resumedPublication) {
+    fail(typeof input.resumerDecisionId === "string" && typeof input.resumerOperationId === "string" &&
+      typeof input.versionId === "string");
+    const resumer = await inspectDecision(env, input.resumerDecisionId, {
+      schoolId: env.SCHOOL_ID, service: "deploy", actions: ["deploy.publish"],
+      operationId: input.resumerOperationId, now,
+    });
+    actor = resumer.principal;
+    const acknowledged = input.resumerIntent;
+    fail(acknowledged && acknowledged.operationId === input.resumerOperationId &&
+      acknowledged.publicationId === input.source.publicationId &&
+      acknowledged.sourceOperationId === input.source.sourceOperationId &&
+      acknowledged.versionId === input.versionId &&
+      resumer.descriptor.bodyDigest === await digest(acknowledged) &&
+      proof.resumerValidated === true && proof.resumerOperationId === input.resumerOperationId &&
+      proof.resumerActorId === actor.actorId, "PUBLICATION_ACKNOWLEDGEMENT_INVALID");
+    fail(proof.versionId === input.versionId && resumer.descriptor.write === true && resumer.descriptor.resourceId === input.versionId &&
+      actor.schoolId === env.SCHOOL_ID && !actor.impersonating &&
+      actor.subjectAccountId === actor.actorId && typeof actor.sessionId === "string");
+    resumerSession = await one(env.DB,
+      "SELECT * FROM core_sessions WHERE school_id=? AND session_id=? AND account_id=?",
+      [env.SCHOOL_ID, actor.sessionId, actor.actorId]);
+    fail(resumerSession, "SESSION_INVALID", 401);
+  }
   const account = await one(
     env.DB,
     "SELECT * FROM core_accounts WHERE school_id=? AND account_id=?",
-    [env.SCHOOL_ID, old.actorId],
+    [env.SCHOOL_ID, actor.actorId],
   );
   fail(
     account &&
       !account.suspended &&
       !account.pending_change &&
-      account.staff_id === old.actorStaffId,
+      account.staff_id === actor.actorStaffId,
     "AUTHORITY_CHANGED",
   );
+  if (resumerSession) {
+    const validation = createSessionPolicy({ clock: () => now }).validateSession({
+      schemaVersion: 1, schoolId: env.SCHOOL_ID, sessionId: resumerSession.session_id,
+      accountId: account.account_id, issuer: account.issuer, subject: account.subject,
+      authenticatedAt: resumerSession.authenticated_at, expiresAt: resumerSession.expires_at,
+      revoked: !!resumerSession.revoked,
+    }, { schoolId: env.SCHOOL_ID, accountId: account.account_id,
+      issuer: account.issuer, subject: account.subject, identityVerified: true,
+      suspended: !!account.suspended });
+    fail(validation.outcome === "allow", validation.reasonCode, 401);
+  }
   const grants = await query(
     env.DB,
     "SELECT * FROM core_grants WHERE school_id=? AND account_id=? AND valid_from<=? AND (valid_until IS NULL OR valid_until>?)",
-    [env.SCHOOL_ID, old.actorId, now, now],
+    [env.SCHOOL_ID, actor.actorId, now, now],
   );
   let observed = null,
     validated = null,
     validUntil = Math.min(
       now + 60000,
+      resumedPublication ? actor.validUntil : now + 60000,
+      resumerSession?.expires_at ?? now + 60000,
       ...grants.map((g) => g.valid_until ?? now + 60000),
     );
   if (!grants.some((g) => g.capability === "admin")) {
@@ -123,7 +177,7 @@ export async function authorizeContribution(env, input, now) {
     sourcePublicationId: input.source.publicationId,
     contributionId: input.contributionId,
   };
-  if (match.field === "memberships" && match.membershipPublicationVersion === 1) {
+  if ((match.field === "memberships" && match.membershipPublicationVersion === 1) || authorityPublication) {
     fail(Number.isSafeInteger(proof.sequence) && proof.sequence > 0 &&
       Number.isSafeInteger(match.validFrom), "PUBLICATION_UNVERIFIED");
     // The immutable publication deliberately overwrites earlier ordinary
@@ -133,8 +187,13 @@ export async function authorizeContribution(env, input, now) {
     intent.membershipPublicationVersion = 1;
     intent.membershipPublicationSequence = proof.sequence;
   }
+  if (authorityPublication) {
+    intent.changes = authorityTuple(match.proposedValue);
+    intent.authorityPublicationVersion = 1;
+    intent.publicationProposerId = old.actorId;
+  }
   fail(
-    [
+    authorityPublication || [
       "basicName",
       "role",
       "appointmentStatus",
@@ -150,7 +209,7 @@ export async function authorizeContribution(env, input, now) {
     dependencies = [
       {
         owner: "core",
-        scope: `account:${old.actorId}`,
+        scope: `account:${actor.actorId}`,
         revision: String(account.revision),
         validUntil,
       },
@@ -164,14 +223,16 @@ export async function authorizeContribution(env, input, now) {
     });
   const principal = {
     schoolId: env.SCHOOL_ID,
-    actorId: old.actorId,
+    actorId: actor.actorId,
     actorStaffId: account.staff_id,
     staffId: account.staff_id,
-    subjectAccountId: old.actorId,
-    sessionId: null,
+    subjectAccountId: actor.actorId,
+    sessionId: resumerSession?.session_id ?? null,
     impersonating: false,
-    capabilities: ["contacts.contribute"],
-    fieldScope: { staffId: match.staffId, fields: [match.field] },
+    capabilities: ["contacts.contribute", ...(authorityPublication ? ["contacts.authorityPublication"] : [])],
+    fieldScope: { staffId: match.staffId, fields: Object.keys(intent.changes) },
+    ...(authorityPublication ? { publicationProof: { publicationId: input.source.publicationId,
+      proposerId: old.actorId, sequence: proof.sequence } } : {}),
     action: "contacts.contribute",
     requestDigest,
     decisionId,
@@ -192,7 +253,7 @@ export async function authorizeContribution(env, input, now) {
     decisionId,
     evaluatedAt: now,
     actor: {
-      accountId: old.actorId,
+      accountId: actor.actorId,
       staffId: account.staff_id,
       linkageRevision: `link-${account.revision}`,
     },
@@ -200,6 +261,8 @@ export async function authorizeContribution(env, input, now) {
       ...input.source,
       originalDecisionId: proof.decisionId,
       contribution: match,
+      ...(resumedPublication ? { resumerDecisionId: input.resumerDecisionId,
+        resumerOperationId: input.resumerOperationId, originalPublisherId: old.actorId } : {}),
     },
     contacts: validated
       ? {

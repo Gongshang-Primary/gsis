@@ -39,8 +39,8 @@ export function replaceField(old, field, value, context, from, until) {
     valid_from: from,
     valid_until: until,
     revoked: 0,
-    proposer: actorId,
-    accepter: actorId,
+    proposer: context.proposerId ?? actorId,
+    accepter: context.accepterId ?? actorId,
     accepted_at: now,
     operation_id: operationId,
   };

@@ -2,12 +2,13 @@ import { ApiError } from "../../runtime/errors.mjs";
 import { canonical, digest, one, query, statement, operationStatus,
   prepareOperation, commitOperation, abortOperation } from "../../runtime/store.mjs";
 import { serviceCall, resolveAdmission } from "../../runtime/admission.mjs";
+import { isAuthorityPublication } from "./authority-publication.mjs";
 
 const fail = (value, code = "MEMBERSHIP_PUBLICATION_INVALID", status = 409) => {
   if (!value) throw new ApiError(code, status, "The Memberships publication cannot be applied.");
 };
 export const isMembershipPublication = (value) =>
-  value?.field === "memberships" && value.membershipPublicationVersion === 1;
+  (value?.field === "memberships" && value.membershipPublicationVersion === 1) || isAuthorityPublication(value);
 
 /** This named projection is granted only to Contacts. Its revision is pinned
  * by the ordinary admission protocol before any field/frontier commit. */
@@ -87,30 +88,45 @@ async function operationAttempt(env, prefix, now) {
 async function applicationAttempt(env, contributionId, now) {
   return operationAttempt(env, `membership-apply-${await digest(contributionId)}`, now);
 }
+function appliedReceipt(operationId, receipt) {
+  const result = receipt?.result;
+  return { state: "applied", operationId,
+    ...(result?.appliedFields ? { appliedFields: result.appliedFields, supersededFields: result.supersededFields } : {}) };
+}
 
-export async function processMembershipContribution(env, row, now = Date.now()) {
+export async function processMembershipContribution(env, row, now = Date.now(), resumer = {}) {
   if (["applied", "superseded"].includes(row.state)) return { state: row.state, ...JSON.parse(row.outcome_json || "{}") };
   const source = JSON.parse(row.source_json), contribution = JSON.parse(row.proposal_json);
   fail(isMembershipPublication(contribution));
   const attempt = await applicationAttempt(env, row.contribution_id, now);
-  if (attempt.receipt) return { state: "applied", operationId: attempt.operationId };
+  if (attempt.receipt) return appliedReceipt(attempt.operationId, attempt.receipt);
   try {
     const { principal, intent } = await serviceCall(env, "core", "/internal/contribution-authority", {
       schoolId: env.SCHOOL_ID, source, contribution, contributionId: row.contribution_id, operationId: attempt.operationId,
+      ...resumer,
     });
+    const previous = await operationStatus(env.DB, env.SCHOOL_ID, attempt.operationId);
+    if (resumer.resumerDecisionId && previous?.state === "prepared" && previous.actorId !== principal.actorId) {
+      // Do not reinterpret an uncertain attempt under another identity. Abort
+      // its durable fence first; a concurrently committed receipt wins instead.
+      const receipt = await abortOperation(env.DB, previous, "AUTHORITY_RESUMER_CHANGED", Date.now());
+      await resolveAdmission(env, env.DB, previous, null, receipt, Date.now());
+      if (receipt?.state === "committed") return appliedReceipt(attempt.operationId, receipt);
+      return processMembershipContribution(env, row, Date.now(), resumer);
+    }
     const { handle } = await import("./service.mjs");
     const receipt = await handle({ env, path: `/staff/${row.staff_id}/update`, method: "POST", body: intent,
       principal, now: Math.max(now, Date.now()), internal: false });
-    return receipt.state === "committed" ? { state: "applied", operationId: attempt.operationId } :
+    return receipt.state === "committed" ? appliedReceipt(attempt.operationId, receipt) :
       { state: "pending", operationId: attempt.operationId, code: receipt.reason ?? "MEMBERSHIP_PENDING" };
   } catch (error) {
     const op = await operationStatus(env.DB, env.SCHOOL_ID, attempt.operationId);
-    if (op?.state === "committed") return { state: "applied", operationId: attempt.operationId };
+    if (op?.state === "committed") return appliedReceipt(attempt.operationId, op.receipt);
     if (error.code === "MEMBERSHIP_PUBLICATION_SUPERSEDED") {
       if (op?.state === "prepared") {
         const receipt = await abortOperation(env.DB, op, error.code, Date.now());
         await resolveAdmission(env, env.DB, op, null, receipt, Date.now());
-        if (receipt?.state === "committed") return { state: "applied", operationId: attempt.operationId };
+        if (receipt?.state === "committed") return appliedReceipt(attempt.operationId, receipt);
       }
       return supersede(env, row, source, error.code, Date.now());
     }
@@ -124,7 +140,11 @@ export async function applyMembershipPublication(ctx) {
   const row = await one(ctx.env.DB, "SELECT * FROM contacts_contributions WHERE school_id=? AND contribution_id=?",
     [ctx.env.SCHOOL_ID, ctx.body.contributionId]);
   fail(row && isMembershipPublication(JSON.parse(row.proposal_json)), "MEMBERSHIP_PUBLICATION_INVALID", 404);
-  return processMembershipContribution(ctx.env, row, ctx.now);
+  return processMembershipContribution(ctx.env, row, ctx.now, {
+    ...(ctx.body.resumerDecisionId ? { resumerDecisionId: ctx.body.resumerDecisionId,
+      resumerOperationId: ctx.body.resumerOperationId, resumerIntent: ctx.body.resumerIntent,
+      versionId: ctx.body.versionId } : {}),
+  });
 }
 
 /** Bounded internal progress, deliberately independent of provider schedulers. */
@@ -145,13 +165,14 @@ export async function membershipPublication(ctx) {
   const contributions = proof.contributions;
   fail(Number.isSafeInteger(proof.total) && proof.total >= 0 && proof.total <= 512 &&
     contributions.length <= limit && contributions.every(isMembershipPublication) &&
+    (!contributions.some(isAuthorityPublication) || proof.authorityPublicationVersion === 1) &&
     new Set(contributions.map((c) => c.staffId)).size === contributions.length);
   const rows = [];
   for (const contribution of contributions) {
-    const contributionId = `contribution-${await digest([source.publicationId, contribution.staffId, "memberships"])}`;
+    const contributionId = `contribution-${await digest([source.publicationId, contribution.staffId, contribution.field])}`;
     await statement(env.DB,
       "INSERT OR IGNORE INTO contacts_contributions(school_id,contribution_id,staff_id,field,value_json,base_revision,source_publication,source_sequence,source_json,proposal_json,decision_id,proposer,state,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,'pending',?)",
-      [env.SCHOOL_ID, contributionId, contribution.staffId, "memberships", canonical(contribution.proposedValue),
+      [env.SCHOOL_ID, contributionId, contribution.staffId, contribution.field, canonical(contribution.proposedValue),
         contribution.acceptedBaseFieldRevision ?? 0, source.publicationId, proof.sequence, canonical(source), canonical(contribution), proof.decisionId, original.principal.actorId, now]).run();
     const row = await one(env.DB, "SELECT * FROM contacts_contributions WHERE school_id=? AND contribution_id=?", [env.SCHOOL_ID, contributionId]);
     fail(row && row.proposal_json === canonical(contribution) && row.source_json === canonical(source), "OPERATION_INTENT_CONFLICT");
@@ -165,12 +186,15 @@ export async function membershipPublication(ctx) {
     try {
       return { staffId: row.staff_id, ...await serviceCall(env, "contacts", "/internal/membership-apply", {
         schoolId: env.SCHOOL_ID, contributionId: row.contribution_id,
+        ...(body.resumerDecisionId ? { resumerDecisionId: body.resumerDecisionId,
+          resumerOperationId: body.resumerOperationId, resumerIntent: body.resumerIntent,
+          versionId: body.versionId } : {}),
       }) };
     } catch (error) {
       return { staffId: row.staff_id, state: "pending", code: error.code ?? "MEMBERSHIP_OUTCOME_UNKNOWN" };
     }
   }));
-  const settled = await one(env.DB, "SELECT COUNT(*) total,COALESCE(SUM(state='applied'),0) applied,COALESCE(SUM(state='superseded'),0) superseded FROM contacts_contributions WHERE school_id=? AND source_publication=? AND field='memberships' AND state IN('applied','superseded')", [env.SCHOOL_ID, source.publicationId]);
+  const settled = await one(env.DB, "SELECT COUNT(*) total,COALESCE(SUM(state='applied'),0) applied,COALESCE(SUM(state='superseded'),0) superseded FROM contacts_contributions WHERE school_id=? AND source_publication=? AND field IN('memberships','authority') AND state IN('applied','superseded')", [env.SCHOOL_ID, source.publicationId]);
   const nextOffset = offset + results.length;
   return { publicationId: source.publicationId, state: settled.total === proof.total ? "applied" : "pending",
     offset, nextOffset: nextOffset < proof.total ? nextOffset : 0, total: proof.total, completed: settled.total,

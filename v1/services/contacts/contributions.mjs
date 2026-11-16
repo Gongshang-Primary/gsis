@@ -103,7 +103,7 @@ export async function processContribution(job, env) {
 export async function listContributions(ctx) {
   const rows = await query(
     ctx.env.DB,
-    "SELECT c.*,f.field AS current_field,f.revision AS current_revision,f.state AS current_state,f.value_json AS current_value_json,f.valid_from AS current_valid_from,f.valid_until AS current_valid_until,f.revoked AS current_revoked FROM contacts_contributions c LEFT JOIN contacts_fields f ON f.school_id=c.school_id AND f.staff_id=c.staff_id AND f.field=c.field WHERE c.school_id=? AND NOT(c.field='memberships' AND COALESCE(json_extract(c.proposal_json,'$.membershipPublicationVersion'),0)=1) ORDER BY c.created_at DESC LIMIT 512",
+    "SELECT c.*,f.field AS current_field,f.revision AS current_revision,f.state AS current_state,f.value_json AS current_value_json,f.valid_from AS current_valid_from,f.valid_until AS current_valid_until,f.revoked AS current_revoked FROM contacts_contributions c LEFT JOIN contacts_fields f ON f.school_id=c.school_id AND f.staff_id=c.staff_id AND f.field=c.field WHERE c.school_id=? AND NOT((c.field='memberships' AND COALESCE(json_extract(c.proposal_json,'$.membershipPublicationVersion'),0)=1) OR (c.field='authority' AND COALESCE(json_extract(c.proposal_json,'$.authorityPublicationVersion'),0)=1)) ORDER BY c.created_at DESC LIMIT 512",
     [ctx.env.SCHOOL_ID],
   );
   return {

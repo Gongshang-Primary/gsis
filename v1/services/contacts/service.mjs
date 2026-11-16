@@ -11,9 +11,13 @@ import {
 } from "./settings.mjs";
 import { listContributions, resolveContribution } from "./contributions.mjs";
 import {
-  membershipPublication, applyMembershipPublication, readMembershipFrontier, membershipDependency,
+  membershipPublication, applyMembershipPublication, isMembershipPublication, readMembershipFrontier, membershipDependency,
   membershipFrontierWrite, membershipFrontierGuard, assertMembershipPublicationCurrent,
 } from "./membership-publication.mjs";
+import {
+  isAuthorityPublication, authorityTuple, assertAuthorityPublicationPrincipal, assertAuthorityPublicationCurrent, authorityPublicationFields,
+  authorityFrontierGuard, authorityFrontierWrite,
+} from "./authority-publication.mjs";
 import { validateMkeIntervals } from "./intervals.mjs";
 import {
   deriveDisplay,
@@ -1025,7 +1029,8 @@ export async function handle(ctx) {
         statuses = [];
       for (const item of proposed) {
         fail(
-          validId(item.staffId) && allowedFields.includes(item.field),
+          validId(item.staffId) && (allowedFields.includes(item.field) ||
+            (isAuthorityPublication(item) && proof.authorityPublicationVersion === 1)),
           "CONTRIBUTION_FIELD_DENIED",
           400,
         );
@@ -1035,10 +1040,8 @@ export async function handle(ctx) {
           [env.SCHOOL_ID, item.staffId],
         );
         fail(old, "STAFF_MISMATCH", 409);
-        fail(
-          Number.isSafeInteger(item.acceptedBaseFieldRevision) &&
-            item.acceptedBaseFieldRevision >= 0,
-        );
+        if (isAuthorityPublication(item)) authorityTuple(item.proposedValue);
+        else fail(Number.isSafeInteger(item.acceptedBaseFieldRevision) && item.acceptedBaseFieldRevision >= 0);
         const contributionId = `contribution-${await digest([intent.publicationId, item.staffId, item.field])}`;
         const source = {
           publicationId: intent.publicationId,
@@ -1058,14 +1061,14 @@ export async function handle(ctx) {
             ],
           ),
           w(
-            (item.field === "memberships" && item.membershipPublicationVersion === 1 ? "INSERT OR IGNORE" : "INSERT") + " INTO contacts_contributions(school_id,contribution_id,staff_id,field,value_json,base_revision,source_publication,source_sequence,source_json,proposal_json,decision_id,proposer,created_at,state) SELECT ?,?,?,?,?,?,?,?,?,?,?,?,?,CASE WHEN EXISTS(SELECT 1 FROM contacts_contributions WHERE school_id=? AND staff_id=? AND field=? AND source_sequence>?) THEN 'superseded' ELSE 'pending' END",
+            (isMembershipPublication(item) ? "INSERT OR IGNORE" : "INSERT") + " INTO contacts_contributions(school_id,contribution_id,staff_id,field,value_json,base_revision,source_publication,source_sequence,source_json,proposal_json,decision_id,proposer,created_at,state) SELECT ?,?,?,?,?,?,?,?,?,?,?,?,?,CASE WHEN EXISTS(SELECT 1 FROM contacts_contributions WHERE school_id=? AND staff_id=? AND field=? AND source_sequence>?) THEN 'superseded' ELSE 'pending' END",
             [
               env.SCHOOL_ID,
               contributionId,
               item.staffId,
               item.field,
               canonical(item.proposedValue),
-              item.acceptedBaseFieldRevision,
+              item.acceptedBaseFieldRevision ?? 0,
               intent.publicationId,
               proof.sequence,
               canonical(source),
@@ -1080,7 +1083,9 @@ export async function handle(ctx) {
             ],
           ),
         );
-        outbox.push({
+        // Authority recovery needs a fresh, interactive Deploy publish decision.
+        // Persist the proposal now; a scheduler cannot impersonate a resumer.
+        if (!isAuthorityPublication(item)) outbox.push({
           id: `process-${await digest(contributionId)}`,
           type: "contacts.contribution",
           payload: { contributionId },
@@ -1419,7 +1424,12 @@ export async function handle(ctx) {
       if (op.receipt) return op.receipt;
     }
     const accepted = match?.[2] === "accept",
+      publicationAuthority = body.authorityPublicationVersion === 1,
       propose = match?.[2] === "propose";
+    if (publicationAuthority) {
+      fail(match?.[2] === "update", "CAPABILITY_DENIED", 403);
+      assertAuthorityPublicationPrincipal(principal, body);
+    }
     if (create)
       fail(
         body.ttbName === undefined &&
@@ -1475,7 +1485,7 @@ export async function handle(ctx) {
         "CAPABILITY_DENIED",
         403,
       );
-    if (!accepted && !propose)
+    if (!accepted && !propose && !publicationAuthority)
       fail(
         !Object.keys(changes).some((f) => AUTHORITY.includes(f)),
         "AUTHORITY_ACCEPTANCE_REQUIRED",
@@ -1514,11 +1524,13 @@ export async function handle(ctx) {
     const publicationMembership = body.membershipPublicationVersion === 1;
     if (publicationMembership)
       fail(principal.capabilities.includes("contacts.contribute") &&
-        Object.keys(changes).length === 1 && Object.hasOwn(changes, "memberships"), "CAPABILITY_DENIED", 403);
-    const membershipFrontier = !propose && Object.hasOwn(changes, "memberships")
+        (publicationAuthority || Object.keys(changes).length === 1) && Object.hasOwn(changes, "memberships"), "CAPABILITY_DENIED", 403);
+    const membershipFrontier = !propose && (accepted || Object.hasOwn(changes, "memberships"))
       ? await readMembershipFrontier(env) : null;
-    if (publicationMembership)
+    if (publicationMembership && !publicationAuthority)
       await assertMembershipPublicationCurrent(env, body, membershipFrontier);
+    if (publicationAuthority)
+      assertAuthorityPublicationCurrent(body, membershipFrontier);
     const admission = await admit(env, env.DB, op, principal,
       membershipFrontier ? [membershipDependency(membershipFrontier, principal.validUntil)] : [], now);
     if (propose) {
@@ -1608,7 +1620,12 @@ export async function handle(ctx) {
           "Select the existing active, inactive or provisional person, or provide a distinct name tag.",
         );
       }
-      const nextFields = { ...current.fields },
+      const fieldOutcome = publicationAuthority
+          ? await authorityPublicationFields(env, body, membershipFrontier)
+          : { appliedFields: Object.keys(changes), supersededFields: [] },
+        applyChanges = Object.fromEntries(fieldOutcome.appliedFields.map(field => [field, changes[field]])),
+        authorityChanged = fieldOutcome.appliedFields.some(field => AUTHORITY.includes(field)),
+        nextFields = { ...current.fields },
         writes = [],
         guards = [
           sourceChangeGuard(
@@ -1626,7 +1643,7 @@ export async function handle(ctx) {
             [env.SCHOOL_ID, staffId, body.revision],
           ),
         );
-      for (const [field, value] of Object.entries(changes)) {
+      for (const [field, value] of Object.entries(applyChanges)) {
         const old = current.fields[field],
           expectedField = accepted
             ? expected
@@ -1646,6 +1663,7 @@ export async function handle(ctx) {
               schoolId: env.SCHOOL_ID,
               staffId,
               actorId: principal.actorId,
+              ...(publicationAuthority ? { proposerId: body.publicationProposerId } : {}),
               operationId: op.operationId,
               now,
             },
@@ -1660,7 +1678,12 @@ export async function handle(ctx) {
           writes.push(membershipFrontierWrite(env, staffId, membershipFrontier,
             op.operationId, row.revision, publicationMembership));
         }
-        if (accepted)
+        if ((accepted || publicationAuthority) && AUTHORITY.includes(field)) {
+          guards.push(authorityFrontierGuard(env, staffId, field, membershipFrontier.sequence, publicationAuthority));
+          writes.push(authorityFrontierWrite(env, staffId, field, membershipFrontier, op.operationId,
+            row.revision, publicationAuthority));
+        }
+        if (accepted || publicationAuthority)
           writes.push(
             w(
               "INSERT INTO contacts_acceptance_audit(school_id,event_id,staff_id,field,proposer,accepter,accepted_at,operation_id,before_json,after_json) VALUES(?,?,?,?,?,?,?,?,?,?)",
@@ -1669,15 +1692,19 @@ export async function handle(ctx) {
                 `${op.operationId}:${field}`,
                 staffId,
                 field,
-                principal.actorId,
+                publicationAuthority ? body.publicationProposerId : principal.actorId,
                 principal.actorId,
                 now,
                 op.operationId,
                 old ? canonical(record(old)) : null,
                 canonical({
                   ...record(row),
-                  ownerReviewReference: body.ownerReviewReference,
+                  ownerReviewReference: body.ownerReviewReference ?? null,
                   decisionId: principal.decisionId,
+                  ...(publicationAuthority ? { authorityPublicationVersion: 1,
+                    sourcePublicationId: body.sourcePublicationId,
+                    publicationSequence: body.membershipPublicationSequence,
+                    originalPublisherId: body.publicationProposerId } : {}),
                 }),
               ],
             ),
@@ -1753,7 +1780,7 @@ export async function handle(ctx) {
               active === null ? null : active ? 1 : 0,
               section ?? null,
               revision,
-              accepted ? 1 : 0,
+              authorityChanged ? 1 : 0,
               now,
               effectiveField(nextFields.profileState, now) ?? "provisional",
             ],
@@ -1769,7 +1796,7 @@ export async function handle(ctx) {
               active === null ? null : active ? 1 : 0,
               section ?? null,
               revision,
-              accepted ? 1 : 0,
+              authorityChanged ? 1 : 0,
               effectiveField(nextFields.profileState, now) ??
                 current.staff.profile_state,
               env.SCHOOL_ID,
@@ -1792,6 +1819,7 @@ export async function handle(ctx) {
                 accepter: principal.actorId,
                 operationId: op.operationId,
                 at: now,
+                ...(publicationAuthority ? fieldOutcome : {}),
               }),
               env.SCHOOL_ID,
               body.contributionId,
@@ -1826,19 +1854,24 @@ export async function handle(ctx) {
               Object.entries(nextFields).map(([k, v]) => [k, v.revision]),
             ),
             state: "applied",
+            ...(publicationAuthority ? fieldOutcome : {}),
           },
           outbox: birthdayIntents(
             env.SCHOOL_ID,
             op.operationId,
-            Object.keys(changes),
+            Object.keys(applyChanges),
             now,
             from,
             until,
           ),
           audit: {
             staffId,
-            fields: Object.keys(changes),
+            fields: Object.keys(applyChanges),
             ownerReviewReference: body.ownerReviewReference ?? null,
+            ...(publicationAuthority ? { authorityPublicationVersion: 1,
+              sourcePublicationId: body.sourcePublicationId, originalPublisherId: body.publicationProposerId,
+              accepterId: principal.actorId, publicationSequence: body.membershipPublicationSequence } : {}),
+            ...(publicationAuthority ? fieldOutcome : {}),
           },
         });
         await resolveAdmission(env, env.DB, op, admission, r, now);
