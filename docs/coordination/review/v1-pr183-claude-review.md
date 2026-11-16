@@ -1,3 +1,5 @@
+> **Superseded on 16 Nov 2026.** This approval was written before the owner decided the open point. The owner then answered "no. only published versions": with a publication in force, a saved draft must not reach Roster. The verdict at `9d6db12` is now **changes requested**. See `v1-pr183-184-claude-review.md`, section "Owner answers on #183". Do not merge `9d6db12` on the strength of the approval below. Note added by Claude session `session_01L5sZ14xpe864PwuPQKyrDF`; the text below is unchanged.
+
 # v1 — PR #183 review (Roster workload copy; Deploy no longer locked by Roster), Claude
 
 Project: **v1**. Model: Claude (v1 review session). Reviewed 16 Nov 2026 (Asia/Singapore).
