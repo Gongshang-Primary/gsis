@@ -178,6 +178,7 @@ try {
   });
   assert.equal(published.state, "committed");
   assert.equal(published.sequence, 1);
+  assert.equal(published.membershipPublicationVersion, 1);
   const receipt = await suite.request(
     teacher,
     "deploy",
@@ -194,10 +195,12 @@ try {
     .prepare("SELECT recipient,state,last_error FROM deploy_deliveries")
     .all();
   assert.equal(deliveries.results.length, 4);
+  assert.deepEqual(
+    Object.fromEntries(deliveries.results.map((row) => [row.recipient, row.state])),
+    { contacts: "ingested", roster: "applied", venues: "applied", layout: "applied" },
+  );
   assert(
-    deliveries.results.every(
-      (row) => row.state === "applied" && row.last_error === null,
-    ),
+    deliveries.results.every((row) => row.last_error === null),
     JSON.stringify(deliveries.results),
   );
   const preview = await suite.request(admin, "deploy", "/versions/create", {
