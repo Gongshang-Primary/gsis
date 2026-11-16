@@ -1301,7 +1301,7 @@ export function menuReply(reply,env){
   case 'urgent-confirm':return text('Your urgent message has been recorded for the Relief Team in Roster. WhatsApp forwarding is queued; delivery or action is not yet confirmed. Please call the school directly if immediate help is needed.');
   case 'inbox-urgent-confirm':return text('Your urgent message has been recorded in the school WhatsApp Inbox for the current duty SMC. Delivery or action is not yet confirmed. Please call the school directly if immediate help is needed.');
   case 'urgent-no-recipient':return text('Your message was recorded, but no eligible Relief Team recipients are configured. Please contact the school directly.');
-  case 'unknown':return text('This number could not be matched uniquely to an active staff or engaged relief teacher record. Contact the school directly; no staff records have been shared.');
+  case 'unknown':return text('Urgent Message is available only to staff or engaged relief teachers whose number matches one school record. Please call the school directly.');
   case 'unsupported':return text('Please type your urgent message as text. Voice notes, pictures and attachments are not forwarded.');
   case 'rate-limited':return text('Please wait a minute before sending another menu request. For urgent help, call the school directly.');
   case 'report-absence':return safeLink(env.WHATSAPP_CURRENT_RELIEF_URL,'Report Absence');
@@ -1313,7 +1313,7 @@ export function menuReply(reply,env){
    // A contact phone (without wa_id) exposes the ordinary telephone number, not a WhatsApp call endpoint.
    return {...base,type:'contacts',contacts:[{name:{formatted_name:'Gongshang Primary General Office',first_name:'General Office'},org:{company:'Gongshang Primary School'},phones:[{phone:number,type:'WORK'}]}]};
   }
-  default:return {...base,type:'interactive',interactive:{type:'list',body:{text:'Gongshang Primary · Choose an action.'},action:{button:'School contact menu',sections:[{title:'School services',rows:[{id:'gsis_report_absence',title:'Report Absence',description:'Open the current relief system'},{id:'gsis_urgent',title:'Urgent Message',description:'Type a message for the Relief Team'},{id:'gsis_layout',title:'School Layout'},{id:'gsis_devices',title:'Collect / Return ICT',description:'Open the LORD device portal'},{id:'gsis_office',title:'Call General Office',description:'Use the ordinary telephone number'}]}]}}};
+  default:return {...base,type:'interactive',interactive:{type:'list',body:{text:'*This number is no longer actively manned by staff member*\n\nGongshang Primary WhatsApp Notifier. Please select an action:'},action:{button:'School contact menu',sections:[{title:'School services',rows:[{id:'gsis_report_absence',title:'1. Report Absence',description:'Open the current relief system'},{id:'gsis_urgent',title:'2. Urgent Message',description:'Type a message for the Relief Team'},{id:'gsis_layout',title:'3. School Layout'},{id:'gsis_devices',title:'4. Collect / Return ICT',description:'Open the LORD device portal'},{id:'gsis_office',title:'5. Call General Office',description:'Use the ordinary telephone number'}]}]}}};
  }
 }
 const INBOX_ALERT_TEMPLATE={name:'gsis_inbox_new_message_v1',language:'en_GB',body:'*New School WhatsApp Message*\n\nHi {{1}}, a new message from {{2}} is waiting in the GSiS WhatsApp Inbox.\n\nOpen Roster to review and reply: {{3}}.'};

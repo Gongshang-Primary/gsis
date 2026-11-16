@@ -1,10 +1,12 @@
-# Absence clash hotfix on v0.9.9y
+# Absence clash and public WhatsApp menu hotfix on v0.9.9y
 
 Model: Codex. Owner-requested D1/frontend hotfix. The owner waived Claude review for v0.9 hotfixes; build, local tests and CI remain gates. The owner merges and deploys. Nothing in this record claims deployment or live verification.
 
 ## Behaviour
 
 Disjoint absence periods save without confirmation. Overlapping periods show the current reports and require acknowledgement before replacing only those reports. Replacement retains superseded rows, instruction history and completed duties. A stale confirmation requires a new review; a lost response uses the existing request receipt. No automatic allocation or publication is added.
+
+The owner also requested the WhatsApp notice and all five public menu actions for every sender. Urgent Message alone requires a unique Contacts roster record; both active and inactive staff/relief-teacher records qualify. Identity is checked again when the urgent text arrives. Unknown or ambiguous numbers cannot submit an urgent message. Existing active duty recipients, rate limits, expiry and duplicate suppression stay in place. This is a D1-path Worker change, not a D1 row edit, Apps Script change or Meta template change.
 
 ## Package and deployment order
 
@@ -23,6 +25,8 @@ No Apps Script files, Deploy frontend, migrations, secrets, authority flags, bin
 - Confirm replaces only overlapping records. Verify the applied receipt, not merely a received acknowledgement.
 - If another edit changes the conflict while the report waits, Review replacement must show the current entries before another confirmation.
 - Check completed duties and unrelated reports remain intact. Do not send duplicate test notifications or resubmit a request whose outcome is uncertain; check its receipt.
+
+- For an unknown number, verify the exact unmanned-number notice and five numbered choices. Public links and the General Office contact are available; Urgent Message is denied. For a unique active or inactive staff/relief record, the urgent prompt is available. Do not send a real urgent test message or replay notifications without owner authorization.
 
 ## Rollback
 

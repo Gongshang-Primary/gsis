@@ -1,3 +1,7 @@
+# Pending hotfix: public WhatsApp menu, 16 November 2026
+
+Model: Codex. The D1 WhatsApp handler displays the owner’s unmanned-number notice and five service choices to every sender. Only Urgent Message resolves staff identity; unique active and inactive Contacts roster records qualify. Unknown, ambiguous or changed identities cannot submit urgent text. Existing recipients, reply claims, duplicate suppression, rate limits and expiry remain. Worker-only behaviour; no Apps Script or Meta template/configuration change. See `docs/coordination/tasks/roster-whatsapp-public-menu.md`. Not deployed.
+
 # Pending hotfix: absence clash confirmation, 16 November 2026
 
 Model: Codex. The D1 Report Absence form accepts disjoint periods without a prompt. Overlapping reports show the current absence and require acknowledgement before an atomic replacement, retaining superseded records and completed work. Changed conflicts require fresh confirmation; request receipts prevent duplicate replacement after a lost response. D1/Pages and both Roster Workers only; no Apps Script change. See `docs/coordination/tasks/roster-absence-clash-confirm.md`. Not deployed.
