@@ -62,3 +62,28 @@ The owner withdrew Apps Script ("no appscript"). The plan now calls the Google D
 ## Evidence limits
 
 Documents only. No build, test, Drive access or hosted check. F5 remains open. Runtime UAT remains not tested.
+
+## Owner responses, 16 Nov 2026 (given to Claude in session `session_01L5sZ14xpe864PwuPQKyrDF`)
+
+Recorded so that builders do not reopen these points. The owner's words are quoted. They are decisions on the hazards above, not new implementation authority.
+
+### Contacts lifecycle design
+
+| Hazard | Owner response | Consequence for builders |
+|---|---|---|
+| H-1 publication can clear tags | "yes risk accepted. though the idea is to duplicate deploy-versions before editing drafts." | Risk accepted. The intended working method is: duplicate a version (which refreshes people from current Contacts), edit the duplicate, publish the duplicate. A publish preview is not required by the owner. Builders must make Duplicate refresh all eleven tag fields from Contacts, because that refresh is what makes the method safe. |
+| H-2 future plan changes current staff | "on publish. no future accomodation." | Decided. Publication applies at once. Do not build date-conditional application. |
+| H-3 old draft overwrites newer Contacts edits | "yes" | Accepted as designed. |
+| H-4 third Contacts design in a week | "this is as per my spec else v1 cannot run ... it is by design" | The sequential, circular flow between Contacts, Deploy and Roster is the owner's intended model. Treat `CONTACTS_LIFECYCLE_DESIGN.md` as the controlling Contacts design. |
+
+One operating note from me, not a new condition: the two Deploy versions migrated in Run B were not created by Duplicate under this design. Their eleven tag fields were never refreshed from Contacts. The first publication under the new design should be of a fresh duplicate, not of those versions directly.
+
+### Drive backup plan (#184)
+
+| Point | Owner response | Consequence |
+|---|---|---|
+| 1 long-lived credential | "yes long term key" | Accepted. |
+| 2 narrow scope may not see existing folders | "set setup permissions long before gsis" | Folder and account permissions are an owner setup step done ahead of activation. Builders must not widen scope or change sharing to work around a missing permission. |
+| 3 OAuth app must be internal, not testing | "ok guide me along then it comes to that juncture" | Claude guides the owner through the Google Cloud setup when implementation reaches it. |
+| 4 helper account ownership | "that is human processs outside of coding, yes" | Out of scope for builders. |
+| 5 not a restore plan | "yes. at best it is a front-end individual repopulation of data" | Decided. Recovery means re-entering or re-importing data through each application's own screens. Builders must not add a generic restore endpoint. It follows that each application's Excel import must work and be tested, because import is the recovery path. |
