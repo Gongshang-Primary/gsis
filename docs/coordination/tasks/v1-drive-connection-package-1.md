@@ -23,6 +23,10 @@
 12. `tests/v1-product-drive-connection.mjs`
 13. `tests/v1-product-drive-connection-browser.mjs`
 14. `tests/v1-product/drive-connection-fixtures.mjs`
+15. `v1/runtime/operations.mjs`
+16. `v1/services/calendar/service.mjs`
+17. `docs/coordination/OWNER_DIRECTIVES.md`
+18. `docs/v1/core/CENTRAL_GOOGLE_BACKUP_PLAN.md`
 
 The remaining open PR #182 is v0.9; #183 is now merged at its reviewed head `cca9f2146f382c97468f9bb8621eb8492ec1a2d3`. The quiet-mode implementation, C-1 ambiguity correction and deployment-checklist branch have disjoint actual files. The first claim push was rejected because Claude recorded #183 approval on main; no force push was used, and the unpublished claim was reapplied to refreshed main before acceptance. This branch starts from main, not #183 or another unreviewed implementation. Current claims and all remote heads were refreshed before this claim.
 
@@ -32,7 +36,7 @@ The Global Admin Toolbox's System Health page offers Connect Google Drive backup
 
 Core owns the credential and flow state in its own D1. A dedicated Worker secret encrypts the refresh token and pending PKCE/nonce using AES-GCM with school and purpose bound as authenticated data. Client secret, wrapping key and refresh token never reach public config, backups, logs or browser storage. Only one pending flow per school; flows expire after ten minutes. Operation identities, connection revision and an atomic flow-state guard govern retries/concurrency. A consumed code with an unknown exchange outcome requires reconnection, not blind replay. Completed retries return the recorded result without another exchange.
 
-The existing direct Drive adapter remains the sole file transport. Extend its credential source only for Core's explicit helper connection; do not distribute refresh tokens to other domains. Keep existing service-account behavior for existing integrations. Revoked refresh tokens yield a reconnect-required status; provider outages remain retryable and never claim connection/file success. Re-check current Admin authority at durable connection commit, after external calls.
+The existing direct Drive adapter remains the sole file transport. The owner subsequently directed all backend Google interactions to use helper@gsps.edu.sg primarily, including Calendar. Extend the connection to the existing Drive and Calendar scopes, with Core retaining the sole encrypted refresh token. Trusted owner Workers obtain short-lived access through the existing authenticated internal Core service path; no token is returned to a browser. Existing service-account configuration remains an explicit inactive/legacy mode, never a fallback after helper refresh failure. This reuses the existing shared-secret service trust boundary; it does not claim separate Google permissions per Worker. Revoked refresh tokens yield a reconnect-required status; provider outages remain retryable and never claim connection/file success. Re-check current Admin authority at durable connection commit, after external calls.
 
 Alternative rejected: a browser-managed access token expires and exposes a backend credential. Alternative rejected: copying the helper refresh token into all owner Workers multiplies secret holders and conflicts with Core coordination. Existing non-helper integrations remain unchanged. No generic backup orchestrator, restore endpoint, scheduler, owner data conversion or new Drive writer is included.
 
@@ -40,10 +44,14 @@ Alternative rejected: a browser-managed access token expires and exposes a backe
 
 Real built browser and Workers with local D1; synthetic Google signing keys, token and Drive endpoints only. Tests cover wrong/revoked actor/session/school, callback state/nonce/account/destination, expiry, replay/changed intent, concurrent completion, restart, lost response, encrypted storage, redaction, token refresh/revocation/provider failure and no automatic backup activation. Preserve existing backup/identity/authority tests; canonical build, discovery, full product and required Node/LORD exact-head CI remain mandatory. No schema change is applied to a hosted database.
 
-Visible addition: a connection/status card in Global Admin System Health, with no automatic consent or activation. Default configuration remains unconnected. The owner sets Google app, account and folder permissions; Claude will guide that separate browser setup. `drive.file` is not widened. Actual helper authorization, Shared Drive permission, conditional-write behavior and runtime UAT remain Not tested.
+Visible addition: a school Google connection/status card in Global Admin System Health, with no automatic consent or activation. Default configuration remains unconnected. The owner sets Google app, account and folder permissions; Claude will guide that separate browser setup. `drive.file` is not widened. Actual helper authorization, Shared Drive permission, conditional-write behavior and runtime UAT remain Not tested.
 
 Pstack architect/how principles applied from cloud `c12/architect` and `c12/how`, plus design-space/subtraction guidance: inspected current Core session/admission flow, `providers.mjs` token acquisition, direct `drive-backup.mjs` and Admin health. No skill source vendored. Q01–Q08 evidence will be recorded in the package handoff and PR.
 
 ## Handoff
 
 Implementation pending. No merge, deployment, credential provisioning, Drive activation, live reads/writes or provider sends. Ordinary owner writes remain independent of Drive. F5 OPEN; T1B-01/T1B-02 and hosted/runtime UAT Not tested.
+
+## Owner scope clarification before implementation
+
+16 November: "build all google interactions to be primarily through helper@gsps.edu.sg"; existing Google resource permissions are owner-reported, not independently checked. The inventory finds Calendar event reads/writes and Drive backup/export/receipt reads in the existing backend. Staff Google sign-in and public signing-key/font fetches are not automation and keep their existing identity behavior. Add the primary helper credential route and configuration detection for these existing callers in this package; no new Gmail/Sheets/provider capability, scheduler, file orchestration or live setup. Activation requires an explicit helper-mode setting and connection; no hosted variable or credential is changed here. Record the owner rule in the two listed policy/design documents. This bounded expansion was made before product editing and is authorised by the new owner instruction.
