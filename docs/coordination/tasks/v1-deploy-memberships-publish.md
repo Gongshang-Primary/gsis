@@ -1,6 +1,6 @@
 # Deploy Memberships editing and publish-back
 
-Model: Codex. Coordinator: ChatGPT. Independent reviewer: Muse at exact head. Status: claimed. Branch: `codex/v1-deploy-memberships-publish`. Base: main `67dff5202e3321237b8c5b17deed6f36888a3a6b`. Updated: 16 November 2026 (Asia/Singapore).
+Model: Codex. Coordinator: ChatGPT. Independent reviewer: Muse at exact head. Status: merged; deployment pending. Branch: `codex/v1-deploy-memberships-publish`. Base: main `67dff5202e3321237b8c5b17deed6f36888a3a6b`. Updated: 16 November 2026 (Asia/Singapore).
 
 Owner instruction: "Complete publish-back before deployment", after explaining that creating a Deploy version with Memberships and publishing it does not yet update Contacts. This is a prerequisite to the already authorised v1.01 deployment. Implement the complete Memberships path, not the rest of the Contacts lifecycle by implication. The approved Contacts lifecycle design controls immediate publication, preservation of later explicit edits, deliberate republication, retry/recovery and version ownership. Ordinary Memberships never grants accepted SMC/EO/School Leader authority.
 
@@ -73,3 +73,9 @@ Failures corrected while testing: obsolete Membership import-rejection expectati
 The first full product run at `38b28f1` found the existing integration test still equated Contacts ingestion with application. After accepting the additional test path on main at `a141328`, its assertion now checks the publication marker, exactly four recipients, Contacts `ingested`, the other three `applied`, and no delivery errors. Product behavior is unchanged by this correction. The original failed run is retained as evidence; final exact-head suites must pass before review.
 
 Q01–Q05: Pass — accepted scope, documented ownership/security/recovery/resource boundaries and the focused behavioral evidence above. Q06: focused checks pass, full suites pending. Q07: exact-head PR/Muse review pending. Q08: deployment held for this prerequisite, review, CI and fresh backups. No Memberships are fabricated or entered for the school. Owner-entered data/publication and hosted runtime UAT remain unperformed; F5 OPEN and T1B-01/T1B-02 Not tested.
+
+## Claim closure and integration — 16 November 2026
+
+[Merged PR #192](https://github.com/helper-gsps/gsis/pull/192) by merge commit [0b51ad2](https://github.com/helper-gsps/gsis/commit/0b51ad288422861efea9e8b55241fe243c2bf995), preserving reviewed head `a29c861203ee045f2a2c40028688a43602f4a522`. Muse approval is in [the review record](../review/pr192-muse-review.md), published on main at `fc881ca060cdd3099035f8d20428cc117fcaf0a2`. [Full Node/LORD CI](https://github.com/helper-gsps/gsis/actions/runs/43812331057) and [product/package CI](https://github.com/helper-gsps/gsis/actions/runs/43813648937) passed at that exact head. Earlier failures and their disposition remain in the review and PR; this closure does not erase them.
+
+Clean mechanical merge; no hand edits to reviewed product/test files. Q06–Q07 complete for this implementation. The implementation claim is closed. Deployment remains pending final combined-source CI, fresh private backups and the existing protected GitHub environment approval. No deployment, hosted migration, staff-data write, credential change or provider activation has occurred in this integration. F5 OPEN; official T1B-01/T1B-02 and hosted/runtime UAT Not tested.
