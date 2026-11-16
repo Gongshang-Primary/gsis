@@ -1,8 +1,8 @@
 # v1 Deploy role Membership matrix and publication authority
 
-- Status: implemented; final verification and independent exact-head review pending. See the implementation PR for its final head and CI results.
+- Status: merged at reviewed head; deployment pending the separately claimed v1.02 release.
 - Model/owner: Codex. Coordinator: ChatGPT. Independent exact-head reviewer: Muse (owner role directive `12b06eb43cb0a6f1a6eca7c787b22100c6a57875` on `claude/zealous-archimedes-4i2lv1`).
-- Updated: 16 November 2026, Asia/Singapore.
+- Updated: 17 November 2026, Asia/Singapore.
 - Branch: `codex/v1-deploy-role-membership-matrix`.
 - Base: main `9b86b4bd955857d83fb09f41eaaf5bb730e1e4dc`.
 - Authority: owner requests the v0.9 role Membership page in v1, then explicitly states SMC/EO/SL values must grant existing application permissions on publication through Contacts. Owner permits publication to update the publisher's own permissions; promotion and accidental self-removal risks are accepted because changes are audited and another authorised publisher/Global Admin can correct them. Global Admin is never granted by this mechanism. This exception is specific to verified Deploy publications; direct Contacts self-acceptance controls remain unchanged.
@@ -98,3 +98,9 @@ Visible changes: HR Settings → Membership now opens the role matrix, with the 
 Changed deploy components, if later approved: Core, Contacts and Deploy Workers plus the Deploy frontend; additive Contacts migration 0006 requires a fresh private D1 backup first. No configuration, credentials, providers, Google activation, allocation policy or live data changes. Retain the new frontiers/history on rollback; reconcile new marked publications before reverting to an older implementation. Appointment-grade/catalogue and all remaining ordinary deployment-tag publish-back rules are not claimed complete by this slice.
 
 Q01–Q05 **Pass**: scope/authority, existing domain owners, negative boundary checks, durable local recovery and bounded 300-row/512-person/eight-person batches evidenced above. Q06 **Pending** until exact-head full Node/LORD/product/build/package CI is linked in the PR. Q07 **Pending** Muse review. Q08 **Not applicable — no release in this task**; hosted migration and runtime UAT **Not tested**. F5 **OPEN**; official T1B-01/T1B-02 **Not tested**. No additional owner policy decision is outstanding; the next gate is independent exact-head review, followed by the owner's merge/release decision.
+
+## Claim closure — 17 November 2026
+
+Owner instruction: "merge and deploy". [PR194](https://github.com/helper-gsps/gsis/pull/194) merged by merge commit `37dbdd438017156e8f2455aef453c5ded5406fbc`, retaining exact reviewed head `9b3e90c48d8820933fa3866ccce8d003bfc9d5ab`. [Muse's approval](../review/pr194-muse-review.md) is on main at `92c591cc57b46a7ec8790f4d0723da0232596e56`. Node/LORD `43903146794`, product/package `43903210291` and PR repeat `43905830050` are all successful at that head. The merged tree differs from it only by the added review document; no product, test or build file changed during integration. Q06–Q07 pass and this implementation claim is closed.
+
+The [v1.02 release task](v1-release-v102.md) owns the separate version increment, final-candidate checks, fresh backups and protected workflow handoff. This record does not claim deployment. Contacts 0006 must follow a fresh private backup. No live staff edit, provider activation or Google integration activation occurred during this merge. F5 OPEN; official T1B-01/T1B-02 and hosted/runtime UAT Not tested.
