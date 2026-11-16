@@ -196,14 +196,6 @@
     },
     {
       "domain": "roster",
-      "path": "/quiet-mode",
-      "selector": "",
-      "name": "",
-      "ledger": "F08",
-      "reason": "The copied quiet-mode switch requests this absent route."
-    },
-    {
-      "domain": "roster",
       "path": "/whatsapp/media/synthetic-probe",
       "selector": "",
       "name": "",
