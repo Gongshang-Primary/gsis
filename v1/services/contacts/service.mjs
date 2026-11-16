@@ -191,6 +191,8 @@ const DEPLOY_FIELDS = [
   "employmentActive",
   "schoolSection",
   "employmentArrangement",
+  "employmentStatus",
+  "personnelCategory",
   "employmentTags",
   "subjectTags",
   "mkTags",
@@ -200,6 +202,15 @@ const DEPLOY_FIELDS = [
   "schoolLeader",
 ];
 function deployField(row, now) {
+  // Ordinary null writes are explicit superseding clears, not missing authority.
+  // Preserve only a current owner-written clear; never invent one from absence.
+  if (row && isDirectField(row.field) && row.state === "superseded" &&
+      row.value_json === null && row.revoked === 0 && Number.isSafeInteger(row.revision) && row.revision > 0 &&
+      typeof row.operation_id === "string" && row.operation_id &&
+      Number.isSafeInteger(row.valid_from) && row.valid_from <= now &&
+      (row.valid_until === null || (Number.isSafeInteger(row.valid_until) && row.valid_until > now)))
+    return { state: "superseded", effective: false, cleared: true, value: null,
+      revision: `${row.field}-${row.revision}`, validFrom: row.valid_from, validUntil: row.valid_until };
   const selected = choose(records(row), now),
     r = selected.record ?? record(row);
   return {
@@ -462,6 +473,8 @@ async function projection(env, body, principal, now, internal = false) {
             "appointmentStatus",
             "schoolSection",
             "employmentArrangement",
+            "employmentStatus",
+            "personnelCategory",
             "employmentTags",
             "subjectTags",
             "mkTags",
