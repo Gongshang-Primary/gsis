@@ -60,5 +60,5 @@ try {
     assert.equal(config.vars.GSIS_RELEASE_LABEL, RELEASE_LABEL);
     assert.equal(config.vars.GSIS_BUILD_COMMIT, manifest.sourceCommit);
   }
-  console.log("PASS v1.01: built home, Toolbox and nine application labels/titles; desktop/narrow browser; exact build SHA and all Worker labels; real local Workers/D1");
+  console.log(`PASS ${RELEASE_LABEL}: built home, Toolbox and nine application labels/titles; desktop/narrow browser; exact build SHA and all Worker labels; real local Workers/D1`);
 } finally { await context?.unrouteAll({ behavior: "wait" }); await browser?.close(); await suite.close(); }
