@@ -1,11 +1,13 @@
 # Queued v1 changes: native Roster and central Google backup adapter
 
-- Status: queued; owner requirements recorded, no implementation or activation.
+- Status: Q1 queued; Q2 documentation design claimed. No product implementation or activation.
 - Owner/model: Codex. Coordinator: ChatGPT v1. Independent reviewer: Claude, exact head.
 - Updated: 16 November 2026, Asia/Singapore.
-- Refreshed main: `7198f193ff6936b8f8b5b84737eb1310a9b429df`.
+- Refreshed main: `404fe6d043e7c22eba2a3070cbfdbedb544112cd`.
 - Source: owner's latest changelog instruction, after the independent Roster workload-copy correction and absence acceptance simplification.
-- Current scope: this task record only. No branch/product ownership is claimed over either current implementation.
+- Branch for Q2: `codex/v1-central-google-backup-plan`.
+- Exact Q2 documentation scope: this task record and `docs/v1/core/CENTRAL_GOOGLE_BACKUP_PLAN.md`. No product ownership is claimed over either current implementation.
+- Coordination: the owner's new planning request is independent of PR183's running verification. This separate documentation task does not start another implementation PR, change the save-lock/absence implementation order, or depend on an unreviewed product branch. Actual file inventories for open PR182 and PR183 have no overlap with these two paths.
 
 ## Q1 — Native D1 Roster does not require migration quiet mode
 
@@ -30,6 +32,6 @@ The plan must reconcile the existing Core backup contract and adapters, then spe
 
 ## Next task boundaries
 
-After the current authorised correction pipeline, refresh main, instructions, active claims and actual PR files. Publish separate exact-path claims for Q1 implementation and Q2 design; do not add them to PR183 or the absence PR. Initial candidate documentation for Q2 is `docs/v1/core/CENTRAL_GOOGLE_BACKUP_PLAN.md` plus this task; confirm it against repository sources before editing. Questions to the owner are reserved for genuine policy, retention, account authority or deployment choices, not routine interface naming.
+Q2 now produces the bounded design in `docs/v1/core/CENTRAL_GOOGLE_BACKUP_PLAN.md`, with exact source references, interfaces, recovery and proposed acceptance tests. Publish it through its own documentation PR for Claude's exact-head review. Q1 implementation remains queued after the current correction pipeline and needs a separate exact-path claim; neither item is added to PR183 or the absence PR. Questions to the owner are reserved for genuine policy, retention, account authority or deployment choices, not routine interface naming.
 
 No tests run: requirements record only. No live Drive/Cloudflare reads or writes, notification sends, infrastructure, credential changes, merge or deployment. F5 remains OPEN. Official T1B-01/T1B-02 and unperformed hosted/runtime UAT remain **Not tested**.
