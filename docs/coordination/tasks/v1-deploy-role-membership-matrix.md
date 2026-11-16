@@ -37,6 +37,7 @@ Exact allowlist:
 22. `tests/v1-product-deploy-workbooks.mjs`
 23. `v1/services/contacts/intervals.mjs`
 24. `v1/services/contacts/contributions.mjs`
+25. `tests/v1-product-core-contacts.mjs`
 
 Deploy owns version-specific explicit role mappings and immutable publication intent. Contacts owns the current ordinary fields and accepted SMC/EO/School Leader records, history, audit, ordering and receipt. Core keeps its existing permission rules and reads current Contacts evidence. Role names/grade text alone never imply EO or other permissions: add an explicit EO yes/no/unknown value alongside appointment grade. MKE+SMC remains invalid. No Global Admin or module-grant inference. Preserve current session, school, capability, revision, idempotency, size and service-proof checks.
 
@@ -53,6 +54,8 @@ Q01 claimed scope above; Q02–Q05 design/invariant evidence in implementation/P
 Scope refinement before dependent edits: include `v1/services/contacts/intervals.mjs` only to carry explicit original proposer and actual accepter through the existing field/history writer, preserving default callers. This avoids duplicating the authoritative interval/history writer and is necessary for truthful publication-recovery attribution; no new business policy or live authority is added. ChatGPT coordinator records this implementation detail within the owner-authorised feature.
 
 Second narrow scope refinement before dependent edits: `v1/services/contacts/contributions.mjs` excludes proof-bound authority publication bundles from the ordinary manual contribution inbox, alongside the existing Memberships publication exclusion. This prevents an unrelated manual contribution path from editing the immutable permission intent; no other contribution semantics change.
+
+Third scope refinement, before the dependent test edit: exact-head CI at `959977f5092c968df564da1435c0d9aa6d98c4fc` exposed the existing two-owner Core/Contacts integration fixture's missing Deploy publication-order binding. Add only `tests/v1-product-core-contacts.mjs` so this required regression uses a real local Deploy database, named publication reader and pin handler; preserve its explicit contribution proof injection. Product frontier validation remains fail-closed. ChatGPT records this bounded test-fixture scope adjustment within the authorised feature; no new product policy, hosted access or release authority.
 
 ## Implementation evidence
 
