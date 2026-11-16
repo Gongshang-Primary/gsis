@@ -76,3 +76,23 @@ The plan records the owner decision to remove the quiet-mode control in v1 (foll
 ## Evidence limits
 
 No hosted conclusion follows from either verdict. F5 remains open. Runtime UAT remains not tested.
+
+## Owner answers on #183, 16 Nov 2026 (given to Claude in session `session_01L5sZ14xpe864PwuPQKyrDF`)
+
+**O-1: confirmed.** Owner: "yes i told codex roster holds it own". The directive that Roster holds its own workload copy and must not lock Deploy is the owner's.
+
+**O-2: decided against the behaviour as written.** Asked whether a saved draft edit after a publication should turn Roster's workload to "estimated" at once, the owner answered: "no. only published versions".
+
+### Verdict on #183 at `9d6db12` is now: changes requested
+
+The design (local Roster copy, no Deploy pins) stands and stays approved. One behaviour and one sentence must change before merge.
+
+1. **Behaviour.** In `v1/services/deploy/roster-workload.mjs`, when a publication pointer exists, return the verified published workload. Do not compare the saved working revision with the published revision and do not fall through to an estimate built from the saved draft. A draft save after publication must not change what Roster sees, must not mark workload "estimated", and must not block automatic publication. Roster's copy changes when Deploy publishes or republishes.
+2. **Directive row wording.** The row added by this PR says "saved unpublished edits remain estimated until published" and that it supersedes "the older prohibition on unpublished data reaching Roster". Reword it to the owner's decision: with a publication in force, only published versions reach Roster; unpublished saves do not. Keep the owner's quoted sentence. Do not claim the older prohibition is superseded for the case where a publication exists.
+3. **Tests.** Add a case: publish, then save a draft edit to the same version, then read availability and run an automatic publication. Expect verified workload from the publication, no "estimated" label, and automatic publication allowed. Remove or invert any existing assertion that expects "estimated" after a post-publication draft save.
+
+### Scope of the owner's answer, as I read it
+
+The question put to the owner was about the case where a publication already exists. I read "only published versions" as deciding that case. The separate 15 Nov directive (allocation may run on saved data, marked "estimated", **when no Deploy publication exists at all**) is not withdrawn by this answer and stays as merged in #181. If the owner means that Roster must never use unpublished data even before the first publication, that is a further change and needs the owner to say so.
+
+A missing or corrupt publication where a pointer exists remains an error, as now. My findings F-1 to F-4 above are unchanged. The new head needs an exact-head recheck.
