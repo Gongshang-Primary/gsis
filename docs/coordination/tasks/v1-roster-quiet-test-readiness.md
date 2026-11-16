@@ -20,3 +20,9 @@ Wait for the exact publish/send toolbar controls to become visible before counti
 ## Checks and boundaries
 
 Run the real browser/Workers/D1 test, canonical build/no drift, runner discovery and required exact-head Node/LORD and product CI. Record the failed evidence and final outcomes in the PR. No visible product change, schema/configuration change, hosted access or provider send. No skill package invoked; the repository's systematic-debugging and verification principles apply directly. F5 OPEN; T1B-01/T1B-02 and hosted runtime UAT Not tested. Deployment remains subject to review, final candidate checks, fresh backups and the existing GitHub approval gate.
+
+## Implementation and evidence
+
+Accepted claim: main `5310ce9`. The change adds two exact-locator visibility waits inside `openAllocation`, before the unchanged assertions, so first load and reload both wait for their real UI dependency. Three test lines added; no production, workflow, timeout, retry or dependency changes.
+
+`TZ=Asia/Singapore npm run build` passed with no generated drift. `TZ=Asia/Singapore GSIS_BROWSER_EXECUTABLE=/usr/bin/chromium node tests/v1-product-roster-native-quiet.mjs` passed all existing real browser/Worker/D1 checks. The unchanged test immediately before this correction failed at line 24 with `0 !== 1`, matching PR185 F1 and PR191 CI. Runner discovery and `git diff --check` pass. Required full Node/LORD and product CI evidence will be recorded against the pushed head in the PR; those gates and Muse review are pending. Q01–Q05 pass; Q06 full suites pending, Q07 review pending, Q08 no deployment from this test-only work.
