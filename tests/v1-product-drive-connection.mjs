@@ -99,7 +99,8 @@ try {
   assert.equal((await post('complete', { ...pending, operationId: 'synthetic-race' })).status, 200);
   // Each failed reconnect leaves the previously connected credential intact.
   for (const overrides of [
-    { claims: { email: 'other@example.invalid' } }, { claims: { sub: '123450000000000000002' } },
+    { claims: { email: 'other@example.invalid' } }, { claims: { hd: 'other.invalid' } },
+    { claims: { aud: 'other.apps.googleusercontent.com' } }, { claims: { sub: '123450000000000000002' } },
     { claims: { nonce: 'wrong-nonce' } }, { claims: { email_verified: false } },
     { token: { scope: 'openid email https://www.googleapis.com/auth/drive' } }, { token: { refresh_token: '' } },
   ]) {
@@ -119,6 +120,10 @@ try {
   const expired = consent((await start()).authorizationUrl);
   await db.prepare('UPDATE core_google_flows SET expires_at=0').run();
   assert.equal((await post('complete', expired)).status, 403);
+  const late = consent((await start()).authorizationUrl);
+  controls.onExchange = async () => { await db.prepare('UPDATE core_google_flows SET expires_at=0').run(); };
+  assert.equal((await post('complete', late)).status,409,'consent expiring during the exchange cannot commit');
+  controls.onExchange = null;
   const changing = consent((await start()).authorizationUrl);
   controls.onExchange = async () => { await db.prepare("UPDATE core_grants SET valid_until=? WHERE account_id=? AND capability='admin'").bind(Date.now()-1000, admin.id).run(); };
   const denied = await post('complete', changing);

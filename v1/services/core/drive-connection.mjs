@@ -88,7 +88,10 @@ export async function driveConnection(ctx) {
     const row = await readConnection(env);
     const token = await helperAccessToken(env, [HELPER_SCOPES[0]], fetchProvider);
     await verifyDriveRoot({ ...env, GOOGLE_HELPER_ENABLED: "false", GOOGLE_ACCESS_TOKEN: token.accessToken }, cfg);
-    return commit(ctx, op, [], { state: "connected", revision: row.revision, checkedAt: Date.now(), activationChanged: false }, [revisionGuard(env, row.revision)]);
+    return commit(ctx, op, [], { state: "connected", revision: row.revision, checkedAt: Date.now(), activationChanged: false }, [revisionGuard(env, row.revision), {
+      sql: "SELECT EXISTS(SELECT 1 FROM core_google_connections WHERE school_id=? AND state='connected' AND config_digest=?) AS ok",
+      args: [env.SCHOOL_ID, cfg.digest],
+    }]);
   }
   requireValue(path === "/admin/google-connection/complete", "NOT_FOUND", 404);
   requireValue(typeof body.state === "string" && /^[A-Za-z0-9_-]{43}$/.test(body.state) &&
@@ -102,7 +105,7 @@ export async function driveConnection(ctx) {
     flow.config_digest === cfg.digest && flow.expires_at > Date.now(), "GOOGLE_HELPER_CALLBACK_INVALID", 403);
   requireValue(flow.status === "pending", "GOOGLE_HELPER_OUTCOME_UNKNOWN", 503);
   const guard = adminGuard(ctx), claim = await statement(env.DB,
-    `UPDATE core_google_flows SET status='exchanging' WHERE school_id=? AND state_hash=? AND status='pending' AND expires_at>? AND (SELECT ok FROM (${guard.sql}))=1`,
+    `UPDATE core_google_flows SET status='exchanging' WHERE school_id=? AND state_hash=? AND status='pending' AND expires_at>MAX(?,CAST((julianday('now')-2440587.5)*86400000 AS INTEGER)) AND (SELECT ok FROM (${guard.sql}))=1`,
     [env.SCHOOL_ID, stateHash, Date.now(), ...guard.args]).run();
   requireValue(claim.meta.changes === 1, "GOOGLE_HELPER_OUTCOME_UNKNOWN", 503);
   try {
@@ -121,7 +124,7 @@ export async function driveConnection(ctx) {
         args: [env.SCHOOL_ID, flow.connection_revision + 1, identity.identity.subject, identity.email, cfg.digest, encrypted, principal.actorId, Date.now(), Date.now()] },
       { sql: "UPDATE core_google_flows SET status='completed',flow_cipher='' WHERE school_id=? AND state_hash=?", args: [env.SCHOOL_ID, stateHash] },
     ], { state: "connected", revision: flow.connection_revision + 1, activationChanged: false }, [revisionGuard(env, flow.connection_revision),
-      { sql: "SELECT EXISTS(SELECT 1 FROM core_google_flows WHERE school_id=? AND state_hash=? AND status='exchanging' AND expires_at>?) AS ok", args: [env.SCHOOL_ID, stateHash, Date.now()] }]);
+      { sql: "SELECT EXISTS(SELECT 1 FROM core_google_flows WHERE school_id=? AND state_hash=? AND status='exchanging' AND expires_at>MAX(?,CAST((julianday('now')-2440587.5)*86400000 AS INTEGER))) AS ok", args: [env.SCHOOL_ID, stateHash, Date.now()] }]);
   } catch (error) {
     await statement(env.DB, "UPDATE core_google_flows SET status='failed',flow_cipher='' WHERE school_id=? AND state_hash=? AND status='exchanging'", [env.SCHOOL_ID, stateHash]).run();
     throw error;
