@@ -7,6 +7,8 @@ export const providerSecretOwners = Object.freeze({
   TELEGRAM_BOT_TOKEN: ['lord'],
   TELEGRAM_WEBHOOK_SECRET: ['roster'],
   GOOGLE_SERVICE_ACCOUNT: ['core','contacts','deploy','roster','calendar','lord','venues','layout'],
+  GOOGLE_HELPER_CLIENT_SECRET: ['core'],
+  GOOGLE_HELPER_WRAP_KEY: ['core'],
   EMAIL_API_TOKEN: ['roster','lord','venues'],
 });
 export function secretBindings(owner, env) {

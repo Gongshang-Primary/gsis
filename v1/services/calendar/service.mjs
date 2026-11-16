@@ -1,4 +1,5 @@
 import defaults from "./defaults.mjs";
+import { googleConfigured } from "../../runtime/google-drive-credential.mjs";
 import { tableWorkbook, previewTableImport, applyTableImport } from "./table-import.mjs";
 import {
   acquireSourcePin,
@@ -2128,12 +2129,10 @@ export async function handle(ctx) {
       [ctx.principal.schoolId],
     );
     const providers = {
-      googleCalendar: !!(
-        ctx.env.GOOGLE_ACCESS_TOKEN || ctx.env.GOOGLE_SERVICE_ACCOUNT
-      ),
+      googleCalendar: googleConfigured(ctx.env),
       drive: !!(
         ctx.env.GOOGLE_DRIVE_FOLDER_ID &&
-        (ctx.env.GOOGLE_ACCESS_TOKEN || ctx.env.GOOGLE_SERVICE_ACCOUNT)
+        googleConfigured(ctx.env)
       ),
     };
     const issues = [];
@@ -2546,6 +2545,9 @@ async function expandSyncYear(env, job) {
       p.target && p.target !== "both" ? [p.target] : ["staff", "parent"],
     );
     for (const next of jobs) {
+      // Children still belong to the original committed request. Core renews
+      // its authority when they run; a renewed descriptor is not that receipt.
+      next.payload.decisionId = p.decisionId;
       if (p.runId)
         writes.push({
           sql: "INSERT OR IGNORE INTO calendar_sync_run_items VALUES(?,?,?,?,?,?)",

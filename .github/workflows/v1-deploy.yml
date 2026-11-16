@@ -46,5 +46,7 @@ jobs:
           TELEGRAM_BOT_TOKEN: ${{ inputs.upload_provider_credentials && secrets.TELEGRAM_BOT_TOKEN || '' }}
           TELEGRAM_WEBHOOK_SECRET: ${{ inputs.upload_provider_credentials && secrets.TELEGRAM_WEBHOOK_SECRET || '' }}
           GOOGLE_SERVICE_ACCOUNT: ${{ inputs.upload_provider_credentials && secrets.GOOGLE_SERVICE_ACCOUNT || '' }}
+          GOOGLE_HELPER_CLIENT_SECRET: ${{ inputs.upload_provider_credentials && secrets.GOOGLE_HELPER_CLIENT_SECRET || '' }}
+          GOOGLE_HELPER_WRAP_KEY: ${{ inputs.upload_provider_credentials && secrets.GOOGLE_HELPER_WRAP_KEY || '' }}
           EMAIL_API_TOKEN: ${{ inputs.upload_provider_credentials && secrets.EMAIL_API_TOKEN || '' }}
         run: node scripts/v1/deploy.mjs

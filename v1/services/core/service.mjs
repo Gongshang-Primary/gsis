@@ -1,4 +1,5 @@
 import {sealDecisionEvidence,recoverDecisionEvidence} from "./evidence.mjs";
+import { driveConnection, internalHelperToken } from "./drive-connection.mjs";
 import { authorizeContribution } from "./contributions.mjs";
 import { ApiError } from "../../runtime/errors.mjs";
 import {
@@ -716,6 +717,8 @@ async function sessionResponse(env, principal) {
 export async function handle(ctx) {
   const { env, path, method, body = {}, request, principal, now } = ctx;
   env.SERVICE_NAME ??= "core";
+  if (ctx.internal && path === "/internal/google-helper-access") return internalHelperToken(ctx);
+  if (!ctx.internal && path.startsWith("/admin/google-connection")) return driveConnection(ctx);
   if (ctx.internal) {
     if (path === "/internal/contribution-authority")
       return authorizeContribution(env, body, now);

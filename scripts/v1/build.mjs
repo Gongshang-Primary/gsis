@@ -73,6 +73,11 @@ export async function buildProduct({
     "DRIVE_BACKUP_ENABLED",
     "DRIVE_BACKUP_ROOT_ID",
     "DRIVE_BACKUP_FOLDERS_JSON",
+    "GOOGLE_HELPER_ENABLED",
+    "GOOGLE_HELPER_CLIENT_ID",
+    "GOOGLE_HELPER_EMAIL",
+    "GOOGLE_HELPER_ROOT_ID",
+    "GOOGLE_HELPER_DRIVE_ID",
   ];
   for (const key of Object.keys(config.settings ?? {}))
     if (!allowedSettings.includes(key))

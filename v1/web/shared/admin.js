@@ -1,3 +1,4 @@
+import { completeGoogleConnection, renderGoogleConnection } from "./drive-connection.js";
 const api = window.GSISV1,
   $ = (id) => document.getElementById(id);
 let accounts = [],
@@ -192,6 +193,7 @@ async function health() {
     "layout",
   ];
   $("healthRows").replaceChildren();
+  await renderGoogleConnection($("healthRows"));
   await Promise.all(
     domains.map(async (domain) => {
       const section = document.createElement("section");
@@ -342,6 +344,7 @@ try {
     $("adminContent").hidden = false;
     status("Current Core permissions govern every action.");
     await loadAccounts();
+    await completeGoogleConnection();
     openSection(location.hash.slice(1));
     window.addEventListener("hashchange",()=>openSection(location.hash.slice(1)));
   }
