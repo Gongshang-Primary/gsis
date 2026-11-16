@@ -1,6 +1,6 @@
 # Queued v1 changes: native Roster and central Google backup adapter
 
-- Status: Q1 queued; Q2 documentation design claimed. No product implementation or activation.
+- Status: Q1 queued; Q2 design written, documentation checks passed, exact-head CI and Claude review pending. No product implementation or activation.
 - Owner/model: Codex. Coordinator: ChatGPT v1. Independent reviewer: Claude, exact head.
 - Updated: 16 November 2026, Asia/Singapore.
 - Refreshed main: `404fe6d043e7c22eba2a3070cbfdbedb544112cd`.
@@ -34,4 +34,14 @@ The plan must reconcile the existing Core backup contract and adapters, then spe
 
 Q2 now produces the bounded design in `docs/v1/core/CENTRAL_GOOGLE_BACKUP_PLAN.md`, with exact source references, interfaces, recovery and proposed acceptance tests. Publish it through its own documentation PR for Claude's exact-head review. Q1 implementation remains queued after the current correction pipeline and needs a separate exact-path claim; neither item is added to PR183 or the absence PR. Questions to the owner are reserved for genuine policy, retention, account authority or deployment choices, not routine interface naming.
 
-No tests run: requirements record only. No live Drive/Cloudflare reads or writes, notification sends, infrastructure, credential changes, merge or deployment. F5 remains OPEN. Official T1B-01/T1B-02 and unperformed hosted/runtime UAT remain **Not tested**.
+## Q2 design handoff
+
+Accepted documentation claim: `2f9095e9ac0ada32c548ea9f922c7a6a3859c3fa`. The [central backup plan](../../v1/core/CENTRAL_GOOGLE_BACKUP_PLAN.md) records the narrow exception to direct-Google-API transport, authoritative owner export boundaries, folder mapping, one current file per dataset/day, Core/Apps Script authentication, durable intent and readback, bounded catch-up, the 23:50 content-based check, transition and rollback, no automatic retention deletion, and concrete future acceptance tests. Current exports are distinguished from unsupported imports and private full owner backups.
+
+Read-only Q1 finding: the inherited Roster UI renders the switch and calls `/quiet-mode`; the current probe allowlist identifies that absent route as F08. Removing the v1 caller is queued; no native handler or pause is added. Notification quiet hours and storage/recovery guards remain separate.
+
+Verification: `git diff --check` passed; a Python check resolved all 12 relative Markdown links across the two documentation files; exact changed-path/type inspection confirms documentation only. The reproducible link-check command is in the PR evidence. No application tests were invented for prose. Local build/Node/LORD/product suites were not rerun for this documentation-only change; automatic exact-head regression CI and its build result are recorded in the PR when complete. No hosted/provider or Apps Script tests have run. Repository ownership, simplicity, recovery and verification principles were applied; no skill package was executed or vendored.
+
+Q01: accepted two-path claim and disjoint open-PR inventories. Q02-Q05: proposed ownership, error states, security/recovery and limits documented, not implemented guarantees. Q06: documentation links/scope/whitespace pass; exact-head CI pending. Q07: Claude exact-head review pending. Q08: implementation/activation not authorised by this plan. Next: review the plan, then claim small implementation packages separately; Q1 follows the existing correction pipeline.
+
+No live Drive/Cloudflare reads or writes, notification sends, infrastructure, credential changes, merge or deployment. F5 remains OPEN. Official T1B-01/T1B-02 and unperformed hosted/runtime UAT remain **Not tested**.
