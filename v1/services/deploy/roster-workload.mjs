@@ -1,4 +1,4 @@
-import { one, query } from "../../runtime/store.mjs";
+import { one, query, canonical } from "../../runtime/store.mjs";
 import { requireValue } from "../../runtime/errors.mjs";
 import { calculate } from "./model.mjs";
 
@@ -8,26 +8,43 @@ import { calculate } from "./model.mjs";
  */
 export async function rosterWorkload(ctx, { loadVersion, currentPublication }) {
   const schoolId = ctx.principal.schoolId;
-  const pointer = await one(ctx.env.DB, "SELECT publication_id FROM deploy_pointer WHERE school_id=?", [schoolId]);
-  if (pointer) return currentPublication(); // Missing/corrupt publication is still an error.
   const date = ctx.body.date;
   requireValue(/^20\d\d-\d\d-\d\d$/.test(date || ""), "INVALID_DATE");
-  const candidates = await query(ctx.env.DB,
+  const readPointer = () => one(ctx.env.DB, "SELECT publication_id,revision FROM deploy_pointer WHERE school_id=?", [schoolId]);
+  const candidatesForDate = () => query(ctx.env.DB,
     "SELECT id FROM deploy_versions WHERE school_id=? AND deleted=0 AND (COALESCE(json_extract(metadata,'$.from'),'')='' OR json_extract(metadata,'$.from')<=?) AND (COALESCE(json_extract(metadata,'$.to'),'')='' OR json_extract(metadata,'$.to')>=?) ORDER BY created_at DESC,id DESC LIMIT 1",
     [schoolId, date, date]);
-  const dependencies = [{ owner: "deploy", scope: "publication", revision: "absent", validUntil: ctx.principal.validUntil }];
+  const pointer = await readPointer();
+  const dependencies = []; // Roster copies this projection; it never pins Deploy.
+  // Always verify a present immutable publication. Corruption/outage cannot be
+  // disguised as permission to fall back to an unpublished estimate. Saved
+  // draft revisions do not change the published workload Roster is using.
+  if (pointer) {
+    const published = await currentPublication();
+    requireValue(canonical(pointer) === canonical(await readPointer()), "WORKLOAD_SOURCE_CHANGED", 409);
+    return { ...published, dependencies };
+  }
+  const candidates = await candidatesForDate();
+  const unchanged = async (version = null) => {
+    requireValue(canonical(pointer) === canonical(await readPointer()), "WORKLOAD_SOURCE_CHANGED", 409);
+    requireValue(canonical(candidates) === canonical(await candidatesForDate()), "WORKLOAD_SOURCE_CHANGED", 409);
+    if (version) {
+      const current = await one(ctx.env.DB, "SELECT revision,deleted FROM deploy_versions WHERE school_id=? AND id=?", [schoolId, version.id]);
+      requireValue(current && !current.deleted && current.revision === version.revision, "WORKLOAD_SOURCE_CHANGED", 409);
+    }
+  };
+  if (!candidates.length) await unchanged();
   if (!candidates.length) return { schoolId, rows: [], calculationVersion: "deploy-workload/1",
     workloadEvidence: { quality: "estimated", sourceKind: "unavailable", sourceId: null, sourceRevision: null,
       reason: "No saved Deploy planning version covers this date. Unknown R is not zero." }, dependencies };
   const { doc, version } = await loadVersion(ctx.env.DB, schoolId, candidates[0].id);
+  await unchanged(version);
   // These are the accepted projections already retained by this saved version.
   // Current Roster authority is separate; cached names/tags never grant access.
   // Zero is the calculator's legacy projected-row sentinel here, not a
   // Contacts read observation. This adapter never emits Contacts as-of proof.
   const calculation = calculate(doc, { schoolId, asOf: 0, revision: "planning:" + version.id + ":" + version.revision,
     staff: doc.teachers.map(t => ({ ...t, staffId: t.id, revision: t.contactsRevision })) });
-  dependencies.push({ owner: "deploy", scope: "planning:" + version.id,
-    revision: String(version.revision), validUntil: ctx.principal.validUntil });
   return { schoolId, schemaVersion: 1, calculationVersion: calculation.calculationVersion,
     settingsRevision: calculation.settingsRevision, subjectCategories: calculation.subjectCategories,
     rows: calculation.rows.map(row => ({ ...row,

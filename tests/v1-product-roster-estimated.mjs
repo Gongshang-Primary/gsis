@@ -56,8 +56,9 @@ try {
   const deploy = await f.db("deploy");
   const pins = (await deploy.prepare("SELECT scope,revision,state FROM source_pins WHERE school_id=? AND operation_id=?")
     .bind(schoolId, input.operationId).all()).results;
-  assert(pins.some(p => p.scope === "planning:" + version.versionId && p.revision === "0" && p.state === "released"));
-  assert(pins.some(p => p.scope === "publication" && p.revision === "absent" && p.state === "released"));
+  assert.equal(pins.length, 0, "Roster never locks Deploy while using its own workload copy");
+  const snapshot = JSON.parse((await db.prepare("SELECT snapshot_json FROM roster_runs WHERE run_id=?").bind(input.operationId).first()).snapshot_json);
+  assert(snapshot.revisions.workloadSnapshot.digest, "run retains the exact local workload identity");
   await deploy.prepare("INSERT INTO deploy_pointer VALUES(?,1,'synthetic-missing-publication','1')").bind(schoolId).run();
   const corrupt = await send(f.admin, { operation: "availability", date: s.date, complete: true });
   assert.equal(corrupt.status, 404, "preserve the existing missing-publication denial; never fall back to estimates");

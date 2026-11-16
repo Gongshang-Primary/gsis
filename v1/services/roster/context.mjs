@@ -1,6 +1,7 @@
 import Operations from "../../../shared/roster-operations.js";
 import Allocation from "../../../shared/roster-allocation.js";
 import { effectiveWeeklyCaps } from "./capacity.mjs";
+import { workloadSnapshot } from "./workload-snapshot.mjs";
 import Roster from "../../../shared/roster.js";
 import { query } from "../../runtime/store.mjs";
 import { serviceCall } from "../../runtime/security.mjs";
@@ -124,24 +125,14 @@ export async function context(ctx, loaded, range, { needsQuota = false } = {}) {
   const calendarByDate = Object.fromEntries(
     calendar.rows.map((r) => [r.date, r]),
   );
-  let publication = null,
+  let publication = null, workloadCopy = null,
     dependencies = [
       ...(projection.dependencies || []),
       ...(calendar.dependencies || []),
     ];
   if (needsQuota) {
-    publication = await serviceCall(
-      env,
-      "deploy",
-      "/internal/roster-workload",
-      { schoolId, decisionId: principal.decisionId, date: range.from },
-    );
-    requireValue(
-      publication && publication.schoolId === schoolId,
-      "WORKLOAD_UNVERIFIED",
-      503,
-    );
-    dependencies.push(...(publication.dependencies || []));
+    workloadCopy = await workloadSnapshot(ctx, range.from);
+    publication = workloadCopy.payload;
   }
   // Service aliases are projections of the verified frozen envelope. Preserve
   // TV05 native fields too; an envelope wrapper must not hide its row evidence.
@@ -495,6 +486,7 @@ export async function context(ctx, loaded, range, { needsQuota = false } = {}) {
       sql: "SELECT revision=? AND pruned=0 AS ok FROM roster_baselines WHERE school_id=? AND baseline_id=?",
       args: [e.revision, schoolId, e.id],
     }));
+  if (workloadCopy) localGuards.push(workloadCopy.guard);
   if (
     localGuards.length ||
     capEvidence.sourceDays.some((d) => d.kind === "baseline")
@@ -520,6 +512,7 @@ export async function context(ctx, loaded, range, { needsQuota = false } = {}) {
     calendarByDate,
     projection,
     publication: payload,
+    workloadSnapshot: workloadCopy?.identity || null,
     workloadEvidence: !needsQuota ? null : payload?.workloadEvidence || {
       quality: payload?.rows?.every(row => row.quality === "verified") ? "verified" : "unavailable",
       sourceKind: "publication", sourceId: payload?.publicationId || null,

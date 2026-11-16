@@ -1,6 +1,6 @@
 # v1-roster-unblock: Job 3 after reviewed Contacts and operation probe
 
-- Status: implemented; full verification and independent exact-head review pending. See the implementation PR for final verification/CI outcomes.
+- Status: merged by owner direction as PR181 at `1754c535738adb1cad8dd328f45dd60ea6580f03`; exact head `8b15cb2d3c79717828ab66a8359e30522f82b901`. Not deployed. Historical pending statements below are superseded by the integration note.
 - Owner/model: Codex; v1 coordinator ChatGPT.
 - Reviewer/model: Claude, independent exact-head review.
 - Last updated (Asia/Singapore): 16 November 2026, 06:15.
@@ -84,6 +84,10 @@ No merge of the new implementation PR, deployment, hosted reads/writes, migratio
 Deployment remains explicitly NOT authorised: owner must confirm C-1 Memberships and C-2 Contacts D1 backup immediately before deployment. F5 OPEN; official T1B-01/T1B-02 and hosted/runtime UAT Not tested. Green CI is not hosted proof.
 
 ## Handoff
+
+Owner directed “merge all available first” on 16 November. #181 was the only open PR; exact-head CI was green (product 104/104, Node 1205/1205, LORD 40/40 per shard, canonical build and nine Worker dry runs). Merge/result tree `41757cc2e03977b740137a6edb0da5bfc0cde1cd` equals the automatic merge tree. No published Claude verdict covering that exact head was found; this is an owner-directed merge, not a claimed Claude approval. Owner requires a separate [workload-snapshot correction](v1-roster-workload-snapshot.md) because Roster's held Deploy source pins must not block ordinary Deploy writes. That task supersedes this task's planning-pin design; no other Job 3 behavior is retired.
+
+Subsequently, Claude published [approval of the same #181 head](../review/v1-pr181-claude-review.md) on main at `7198f193ff6936b8f8b5b84737eb1310a9b429df`, with 104/104 product evidence. Review C-1 requires appropriate saved-version date ranges before hosted estimated use; C-2 requires baseline export before rollback after a multi-room save. The merge-time evidence above is historical, not a claim that the later review was absent indefinitely.
 
 Claim accepted on main at `a1606c2af30ebbab3b5ceee5ab671694bc8a48c6`; branch begins there. [Implementation handoff](../../v1/roster/ROSTER_UNBLOCK_2026-11-16.md) records reproduction, ownership, visible changes, test commands, limitations and rollback. Merge records are updated on this branch; all three reviewed integrations are already on main.
 
