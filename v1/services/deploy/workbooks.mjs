@@ -9,6 +9,7 @@ import {
   isRecord,
   plain,
 } from "./validation.mjs";
+import { membershipValue, setMembershipValue } from "./model.mjs";
 export const SCHEMAS = Object.freeze({
   IP: {
     Classes: [
@@ -241,7 +242,8 @@ export function exportWorkbook(
     };
   if (scope === "Membership")
     sheets = {
-      Membership: (doc.contactsMemberships || []).map((row) => [...row]),
+      Membership: doc.teachers.map((teacher) => [teacher.id, display(teacher),
+        teacher.profile?.Role || "", (membershipValue(teacher) || []).join("\n")]),
     };
   if (scope === "Offload")
     sheets = {
@@ -314,6 +316,8 @@ export function exportWorkbook(
       "Table Scope": scope,
       "Schema Version": 1,
       mode: visible ? "reporting-only" : "importable",
+      ...(scope === "Membership" ? { Instructions:
+        "Use one membership per line. Blank clears an existing list; an untouched unknown blank remains unknown. Use the Memberships screen to explicitly save an unknown list as empty. Staff IDs identify existing rows; omitted rows remain unchanged." } : {}),
     },
     sheets: Object.fromEntries(
       Object.entries(sheets).map(([s, rows]) => [
@@ -402,7 +406,7 @@ export function validateWorkbook(
   const scope = m["Table Scope"];
   check(SCHEMAS[scope], "Unknown scope.");
   check(
-    !["Membership", "HR Terms"].includes(scope),
+    scope !== "HR Terms",
     "These Contacts facts are reporting-only in Deploy.",
     "REFERENCE_ONLY",
     403,
@@ -695,6 +699,21 @@ export function validateWorkbook(
         }
       }
     }
+  }
+  if (scope === "Membership") {
+    unique(r.Membership, (row) => row["Staff ID"], "staff");
+    for (const row of r.Membership) {
+      id(row["Staff ID"], "Staff ID");
+      const person = next.teachers.find((teacher) => teacher.id === staff(row)),
+        value = row.Memberships;
+      check(value === null || typeof value === "string", "Memberships must be text.");
+      const blank = value === null || !value.trim();
+      if (blank && (membershipValue(person) === undefined || membershipValue(person) === null))
+        continue;
+      setMembershipValue(person, blank ? [] : value.split(/\r?\n/).map((tag) => tag.trim()).filter(Boolean));
+    }
+    next.contactsMemberships = next.teachers.map((person) => [person.id, display(person),
+      person.profile?.Role || "", (membershipValue(person) || []).join("\n")]);
   }
   if (scope === "Exclusions") {
     unique(r.Exclusions, (x) => x["Staff ID"], "staff");

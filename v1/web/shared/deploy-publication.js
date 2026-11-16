@@ -15,7 +15,7 @@ const panel = document.createElement("details");
 panel.className = "gsis-panel";
 panel.dataset.panelId = "deploy-publication";
 panel.innerHTML =
-  '<summary>Canonical Excel and publication receipts</summary><p>Save changes a draft. Publish makes the selected saved revision active. Contacts proposals and recipient deliveries have independent outcomes.</p><div class="gsis-formrow"><label>Table scope<select data-scope></select></label><button data-export>Export All · importable</button><label>Import Export All workbook<input type="file" data-import accept=".xlsx"></label></div><p data-status role="status"></p><div data-preview></div><form data-receipt class="gsis-formrow"><label>Operation ID<input data-operation required></label><button>Check original receipt</button></form><div data-result></div>';
+  '<summary>Canonical Excel and publication receipts</summary><p>Save changes as a draft. Publish makes the selected saved revision active. Memberships update Contacts automatically; other proposals and recipient deliveries have independent outcomes.</p><div class="gsis-formrow"><label>Table scope<select data-scope></select></label><button data-export>Export All · importable</button><label>Import Export All workbook<input type="file" data-import accept=".xlsx"></label></div><p data-status role="status"></p><div data-preview></div><form data-receipt class="gsis-formrow"><label>Operation ID<input data-operation required></label><button>Check original receipt</button></form><div data-result></div>';
 for (const scope of scopes) {
   const option = document.createElement("option");
   option.value = option.textContent = scope;
@@ -80,7 +80,159 @@ function showReceipt(
     2,
   );
   host.append(info);
+  showMemberships(result, host);
 }
+// Each request is a bounded owner operation. Persist its original body before
+// sending so a lost response cannot allocate another identity on retry.
+const membershipFlights = new Map();
+const membershipSyncRunning = new Set();
+function membershipSource(result) {
+  const receipt = result.receipt || result;
+  const data = receipt.result || receipt;
+  if (data.membershipPublicationVersion !== 1) return null;
+  return {
+    publicationId: data.publicationId,
+    versionId: data.versionId,
+    sourceOperationId: receipt.operationId || data.operationId || data.requestId,
+    status: result.membershipsSync || data.membershipsSync,
+  };
+}
+async function syncMemberships(result, { active = () => true, onProgress = () => {} } = {}) {
+  const source = membershipSource(result);
+  if (!source?.publicationId || !source.sourceOperationId || membershipSyncRunning.has(source.publicationId)) return;
+  membershipSyncRunning.add(source.publicationId);
+  try {
+  const session = await api.getSession(), epoch = protectedEpoch;
+  const key = "gsis-memberships-sync:" + session.schoolId + ":" + session.user.accountId + ":" + source.publicationId;
+  let flight = membershipFlights.get(key);
+  if (!flight) {
+    const stored = sessionStorage.getItem(key);
+    if (stored) flight = JSON.parse(stored);
+  }
+  if (flight && (flight.publicationId !== source.publicationId ||
+    flight.versionId !== source.versionId || flight.sourceOperationId !== source.sourceOperationId))
+    throw Error("Stored Memberships request does not match the verified publication receipt.");
+  let offset = source.status?.nextOffset || 0, consecutiveAborts = 0;
+  // At most 512 people per interaction, eight in each owner request. Closing
+  // the dialog pauses between requests; unresolved outcomes stay recoverable.
+  for (let chunk = 0; chunk < 64; chunk++) {
+    if (epoch !== protectedEpoch || !active()) return;
+    flight ||= { publicationId: source.publicationId, versionId: source.versionId,
+      sourceOperationId: source.sourceOperationId, operationId: crypto.randomUUID(), offset, limit: 8 };
+    membershipFlights.set(key, flight);
+    sessionStorage.setItem(key, JSON.stringify(flight));
+    let outcome;
+    try {
+      outcome = await api.request("deploy", "/memberships/sync", { method: "POST", body: flight });
+    } catch (error) {
+      // Contacts may already have durably applied this batch even if Deploy's
+      // enclosing operation aborts. Only a terminal receipt permits a new
+      // progress request; per-person publication identities never change.
+      let receipt;
+      try {
+        receipt = await api.request("deploy", "/receipt", {
+          method: "POST", body: { operationId: flight.operationId, versionId: source.versionId },
+        });
+      } catch { /* Unknown outcome retains the original request. */ }
+      if (["aborted", "terminal-not-committed"].includes(receipt?.receipt?.state || receipt?.state)) {
+        membershipFlights.delete(key);
+        sessionStorage.removeItem(key);
+        offset = flight.offset;
+        flight = null;
+        if (++consecutiveAborts < 2) continue;
+        throw Error(error.message + " The batch receipt confirms it did not commit; Continue will resume the same publication.");
+      }
+      throw error;
+    }
+    if (epoch !== protectedEpoch) return;
+    consecutiveAborts = 0;
+    const progress = outcome.currentProgress || outcome;
+    result.membershipsSync = progress;
+    onProgress();
+    membershipFlights.delete(key);
+    sessionStorage.removeItem(key);
+    const previous = flight.offset;
+    flight = null;
+    offset = progress.nextOffset;
+    if (progress.state === "applied" || !Number.isSafeInteger(offset) || offset <= previous) return;
+  }
+  } finally { membershipSyncRunning.delete(source.publicationId); }
+}
+function showMemberships(result, host) {
+  const source = membershipSource(result);
+  if (!source) return;
+  const state = source.status || { state: "pending" };
+  const line = document.createElement("p");
+  line.dataset.membershipsStatus = "";
+  line.setAttribute("role", "status");
+  line.textContent = state.total === 0
+    ? "No known Memberships to apply."
+    : state.state === "applied"
+      ? Number.isSafeInteger(state.appliedCount) && Number.isSafeInteger(state.supersededCount)
+        ? "Memberships complete: " + state.appliedCount + " applied; " + state.supersededCount + " newer edits/publications preserved."
+        : "Memberships update complete. Check individual results below."
+      : "Publication is committed; Memberships are pending in Contacts.";
+  host.append(line);
+  if (state.results?.length) {
+    const details = document.createElement("details"), summary = document.createElement("summary");
+    summary.textContent = "Membership update results";
+    const text = document.createElement("pre");
+    text.style.cssText = "white-space:pre-wrap;overflow-wrap:anywhere";
+    text.textContent = JSON.stringify(state.results, null, 2);
+    details.append(summary, text); host.append(details);
+  }
+  if (state.state !== "applied") {
+    const retry = document.createElement("button");
+    retry.textContent = "Continue Memberships update";
+    retry.disabled = !api.capable("deploy.publish") || membershipSyncRunning.has(source.publicationId) || host.dataset.publicationBusy === "true";
+    retry.onclick = async () => {
+      retry.disabled = true;
+      try { await syncMemberships(result, { active: () => host.isConnected, onProgress: () => showReceipt(result, host) }); showReceipt(result, host); }
+      catch (error) {
+        line.textContent = "Memberships remain pending. " + error.message + " Continue resumes the original publication.";
+        retry.disabled = !api.capable("deploy.publish") || membershipSyncRunning.has(source.publicationId) || host.dataset.publicationBusy === "true";
+      }
+    };
+    host.append(retry);
+  }
+}
+
+let recoveryRead = false;
+async function offerMembershipRecovery() {
+  if (recoveryRead) return;
+  recoveryRead = true;
+  const epoch = protectedEpoch;
+  try {
+    const session = await api.getSession();
+    if (epoch !== protectedEpoch || !api.capable("deploy.publish")) return;
+    const prefix = "gsis-memberships-sync:" + session.schoolId + ":" + session.user.accountId + ":";
+    for (const key of Object.keys(sessionStorage).filter(key => key.startsWith(prefix)).slice(0, 64)) {
+      const flight = JSON.parse(sessionStorage.getItem(key));
+      if (!flight?.sourceOperationId || !flight.versionId ||
+        [...panel.querySelectorAll("[data-membership-recovery]")].some(button => button.dataset.membershipRecovery === key)) continue;
+      const button = document.createElement("button");
+      button.textContent = "Resume pending Memberships update";
+      button.dataset.membershipRecovery = key;
+      button.onclick = async () => {
+        button.disabled = true;
+        try {
+          const result = await api.request("deploy", "/receipt", { method: "POST", body: {
+            operationId: flight.sourceOperationId, versionId: flight.versionId,
+          } });
+          if (epoch !== protectedEpoch) return;
+          await syncMemberships(result);
+          if (epoch === protectedEpoch) showReceipt(result);
+        } catch (error) { message(error.message, true); button.disabled = false; }
+      };
+      panel.querySelector("[data-result]").append(button);
+    }
+  } catch { /* Sign-in or storage failure does not authorize a retry. */ }
+  finally { recoveryRead = false; }
+}
+window.addEventListener("gsis:session", offerMembershipRecovery);
+if (document.readyState === "complete") offerMembershipRecovery();
+else window.addEventListener("load", offerMembershipRecovery, { once: true });
+
 panel.querySelector("[data-export]").onclick = async () => {
   const epoch = protectedEpoch;
   try {
@@ -260,7 +412,7 @@ async function validateWorkbook() {
     message("Validating current scope, references and base revision…");
     const result = await api.request("deploy", "/imports/preview", {
       method: "POST",
-      body: { versionId: version(), workbook },
+      body: { operationId: crypto.randomUUID(), versionId: version(), workbook },
     });
     if (epoch !== validationEpoch) return;
     pendingPreview = result;
@@ -382,7 +534,7 @@ panel.querySelector("[data-import]").onchange = async (event) => {
     message("Reading workbook…");
     const candidate = await decodeWorkbook(await file.arrayBuffer());
     if (epoch !== importReadEpoch) return;
-    if (["Membership", "HR Terms"].includes(candidate.metadata["Table Scope"]))
+    if (candidate.metadata["Table Scope"] === "HR Terms")
       throw Error(
         "This catalogue is reference-only in Deploy. Manage it in Contacts.",
       );
@@ -441,7 +593,7 @@ window.GSISV1Publication = {
     heading.textContent = "Publish " + (name || versionId);
     const intro = document.createElement("p");
     intro.textContent =
-      "Publish this saved revision as the active version. Staff contributions stay pending until accepted in Contacts. Recipient delivery can retry independently.";
+      "Publish this saved revision as the active version. Memberships update Contacts automatically. Other staff contributions stay pending until accepted in Contacts. Recipient delivery can retry independently.";
     const progress = document.createElement("p");
     progress.setAttribute("role", "status");
     const resultHost = document.createElement("div"),
@@ -464,7 +616,7 @@ window.GSISV1Publication = {
     dialog.showModal();
     dialog.addEventListener("close", () => dialog.remove(), { once: true });
     dialog.addEventListener("cancel", (event) => {
-      if (state.busy) event.preventDefault();
+      if (state.busy && !state.membershipsSyncing) event.preventDefault();
     });
     function live() {
       if (epoch !== protectedEpoch)
@@ -512,12 +664,13 @@ window.GSISV1Publication = {
           ? "Check venue refresh receipt"
           : "Check original receipt";
       check.disabled = state.busy;
-      cancel.disabled = state.busy;
+      cancel.disabled = state.busy && !state.membershipsSyncing;
       progress.textContent = state.message || "Reviewing saved revision…";
       if (state.attempt)
         panel.querySelector("[data-operation]").value = state.attempt.sent
           ? state.attempt.operationId
           : state.attempt.leaseRequest.operationId;
+      resultHost.dataset.publicationBusy = String(!!state.busy);
       if (state.receiptDisplay)
         showReceipt(
           state.receiptDisplay.result,
@@ -631,6 +784,16 @@ window.GSISV1Publication = {
           state.review = null;
           state.message =
             "Publication committed. Delivery status is independent.";
+          state.membershipsSyncing = true;
+          controls();
+          try { await syncMemberships(result, {
+            active: () => dialog.isConnected,
+            onProgress: () => state.render?.(),
+          }); }
+          catch (error) {
+            result.membershipsSync = { state: "pending", results: [{ message: error.message, retry: "Continue the original publication" }] };
+          }
+          finally { state.membershipsSyncing = false; }
           // Receipt recovery must not replace drafts made since submission.
           if (version() === versionId && !publicationHasDraft())
             await onCommitted?.();
@@ -809,7 +972,7 @@ function registerTables() {
     },
   );
   window.GSISCoreTables?.register(
-    '#content[data-view="Membership"] table,#content[data-view="HR Terms"] table',
+    '#content[data-view="HR Terms"] table',
     { exportAll: () => openCanonical("export") },
   );
 }
@@ -821,6 +984,7 @@ window.addEventListener("gsis:clear-protected-state", () => {
   ++validationEpoch;
   ++protectedEpoch;
   publicationAttempts.clear();
+  membershipFlights.clear();
   document
     .querySelectorAll("dialog[data-publication-dialog]")
     .forEach((dialog) => {
@@ -834,6 +998,7 @@ window.addEventListener("gsis:clear-protected-state", () => {
   applyRequest = null;
   applyLease = null;
   previewHost.replaceChildren();
+  panel.querySelector("[data-result]").replaceChildren();
   panel.append(previewHost);
   importDialog?.remove();
   importDialog = null;

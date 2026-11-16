@@ -12,6 +12,7 @@ import {
   pinnedDefinitions,
 } from "./catalogues.mjs";
 import { birthdayIntents } from "./jobs.mjs";
+import { readMembershipFrontier, membershipDependency, membershipFrontierWrite } from "./membership-publication.mjs";
 import { ApiError } from "../../runtime/errors.mjs";
 import {
   canonical,
@@ -447,6 +448,8 @@ export async function saveGrid(ctx) {
   );
   const expected = [],
     changedNames = [];
+  const membershipFrontier = [...byStaff.values()].some((changes) =>
+    changes.some((c) => FIELD_MAP[c.field] === "memberships")) ? await readMembershipFrontier(env) : null;
   let writes = [];
   for (const [staffId, changes] of byStaff) {
     const added = Object.values(mapping).includes(staffId),
@@ -505,6 +508,8 @@ export async function saveGrid(ctx) {
       });
       next[field] = change.row;
       writes.push(...change.writes);
+      if (field === "memberships")
+        writes.push(membershipFrontierWrite(env, staffId, membershipFrontier, operationId, change.row.revision));
     }
     await validateAssignments(
       env.DB,
@@ -602,6 +607,10 @@ export async function saveGrid(ctx) {
       "Select the existing person or provide a distinct name suffix or modifier.",
     );
   const guards = [
+    ...(membershipFrontier ? [w(
+      "SELECT NOT EXISTS(SELECT 1 FROM contacts_membership_frontiers WHERE school_id=? AND staff_id IN(SELECT value FROM json_each(?)) AND publication_sequence>?) AS ok",
+      [env.SCHOOL_ID, canonical([...byStaff].filter(([, changes]) => changes.some(c => FIELD_MAP[c.field] === 'memberships')).map(([id]) => id)), membershipFrontier.sequence],
+    )] : []),
     w(
       "SELECT NOT EXISTS(SELECT 1 FROM json_each(?) j LEFT JOIN contacts_staff s ON s.school_id=? AND s.staff_id=json_extract(j.value,'$[0]') WHERE (json_type(j.value,'$[1]')='null' AND s.staff_id IS NOT NULL) OR (json_type(j.value,'$[1]')<>'null' AND (s.staff_id IS NULL OR s.revision<>json_extract(j.value,'$[1]')))) AS ok",
       [canonical(expected), env.SCHOOL_ID],
@@ -673,7 +682,8 @@ export async function saveGrid(ctx) {
       operationId,
       reason: "SOURCE_PIN_HELD",
     };
-  const admission = await admit(env, env.DB, op, principal, [], now);
+  const admission = await admit(env, env.DB, op, principal,
+    membershipFrontier ? [membershipDependency(membershipFrontier, principal.validUntil)] : [], now);
   writes.push(
     w(
       "INSERT INTO contacts_epoch(school_id,revision) VALUES(?,1) ON CONFLICT(school_id) DO UPDATE SET revision=revision+1",

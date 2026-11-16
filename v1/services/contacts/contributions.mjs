@@ -16,6 +16,7 @@ import {
   resolveAdmission,
 } from "../../runtime/admission.mjs";
 import { validateValue, record } from "./store.mjs";
+import { isMembershipPublication, processMembershipContribution } from "./membership-publication.mjs";
 const fail = (v, code = "INVALID_INPUT", status = 400) => {
   if (!v)
     throw new ApiError(code, status, "Review this Contacts contribution.");
@@ -29,6 +30,12 @@ export async function processContribution(job, env) {
     );
   if (!row || row.state !== "pending")
     return { state: "accepted", providerId: id };
+  if (isMembershipPublication(JSON.parse(row.proposal_json))) {
+    const result = await processMembershipContribution(env, row);
+    return ["applied", "superseded"].includes(result.state)
+      ? { state: "accepted", providerId: id }
+      : { state: "failed", code: result.code ?? "MEMBERSHIP_PENDING", retryable: true };
+  }
   const source = JSON.parse(row.source_json),
     contribution = JSON.parse(row.proposal_json),
     operationId = `apply-${await digest(id)}`;
@@ -96,7 +103,7 @@ export async function processContribution(job, env) {
 export async function listContributions(ctx) {
   const rows = await query(
     ctx.env.DB,
-    "SELECT c.*,f.field AS current_field,f.revision AS current_revision,f.state AS current_state,f.value_json AS current_value_json,f.valid_from AS current_valid_from,f.valid_until AS current_valid_until,f.revoked AS current_revoked FROM contacts_contributions c LEFT JOIN contacts_fields f ON f.school_id=c.school_id AND f.staff_id=c.staff_id AND f.field=c.field WHERE c.school_id=? ORDER BY c.created_at DESC LIMIT 512",
+    "SELECT c.*,f.field AS current_field,f.revision AS current_revision,f.state AS current_state,f.value_json AS current_value_json,f.valid_from AS current_valid_from,f.valid_until AS current_valid_until,f.revoked AS current_revoked FROM contacts_contributions c LEFT JOIN contacts_fields f ON f.school_id=c.school_id AND f.staff_id=c.staff_id AND f.field=c.field WHERE c.school_id=? AND NOT(c.field='memberships' AND COALESCE(json_extract(c.proposal_json,'$.membershipPublicationVersion'),0)=1) ORDER BY c.created_at DESC LIMIT 512",
     [ctx.env.SCHOOL_ID],
   );
   return {
@@ -150,6 +157,8 @@ export async function resolveContribution(ctx) {
     [env.SCHOOL_ID, body.contributionId],
   );
   fail(row, "NOT_FOUND", 404);
+  fail(!isMembershipPublication(row.proposal_json ? JSON.parse(row.proposal_json) : null),
+    "MEMBERSHIP_AUTOMATIC_PUBLICATION", 409);
   fail(["accept", "reject", "correct"].includes(body.resolution));
   if (body.resolution === "reject") {
     const op = await prepareOperation(env.DB, {

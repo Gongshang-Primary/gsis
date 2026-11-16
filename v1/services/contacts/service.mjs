@@ -10,6 +10,10 @@ import {
   recalculate,
 } from "./settings.mjs";
 import { listContributions, resolveContribution } from "./contributions.mjs";
+import {
+  membershipPublication, applyMembershipPublication, readMembershipFrontier, membershipDependency,
+  membershipFrontierWrite, membershipFrontierGuard, assertMembershipPublicationCurrent,
+} from "./membership-publication.mjs";
 import { validateMkeIntervals } from "./intervals.mjs";
 import {
   deriveDisplay,
@@ -788,6 +792,8 @@ export async function handle(ctx) {
   const { env, path, method, body = {}, principal, request, now } = ctx;
   env.SERVICE_NAME ??= "contacts";
   if (ctx.internal) {
+    if (path === "/internal/membership-publication") return membershipPublication(ctx);
+    if (path === "/internal/membership-apply") return applyMembershipPublication(ctx);
     if (path === "/internal/birthday-event") {
       fail(body.schoolId === env.SCHOOL_ID, "SCHOOL_MISMATCH", 403);
       const job = await one(
@@ -1052,7 +1058,7 @@ export async function handle(ctx) {
             ],
           ),
           w(
-            "INSERT INTO contacts_contributions(school_id,contribution_id,staff_id,field,value_json,base_revision,source_publication,source_sequence,source_json,proposal_json,decision_id,proposer,created_at,state) SELECT ?,?,?,?,?,?,?,?,?,?,?,?,?,CASE WHEN EXISTS(SELECT 1 FROM contacts_contributions WHERE school_id=? AND staff_id=? AND field=? AND source_sequence>?) THEN 'superseded' ELSE 'pending' END",
+            (item.field === "memberships" && item.membershipPublicationVersion === 1 ? "INSERT OR IGNORE" : "INSERT") + " INTO contacts_contributions(school_id,contribution_id,staff_id,field,value_json,base_revision,source_publication,source_sequence,source_json,proposal_json,decision_id,proposer,created_at,state) SELECT ?,?,?,?,?,?,?,?,?,?,?,?,?,CASE WHEN EXISTS(SELECT 1 FROM contacts_contributions WHERE school_id=? AND staff_id=? AND field=? AND source_sequence>?) THEN 'superseded' ELSE 'pending' END",
             [
               env.SCHOOL_ID,
               contributionId,
@@ -1505,7 +1511,16 @@ export async function handle(ctx) {
     );
     op ??= await prepare();
     if (op.receipt) return op.receipt;
-    const admission = await admit(env, env.DB, op, principal, [], now);
+    const publicationMembership = body.membershipPublicationVersion === 1;
+    if (publicationMembership)
+      fail(principal.capabilities.includes("contacts.contribute") &&
+        Object.keys(changes).length === 1 && Object.hasOwn(changes, "memberships"), "CAPABILITY_DENIED", 403);
+    const membershipFrontier = !propose && Object.hasOwn(changes, "memberships")
+      ? await readMembershipFrontier(env) : null;
+    if (publicationMembership)
+      await assertMembershipPublicationCurrent(env, body, membershipFrontier);
+    const admission = await admit(env, env.DB, op, principal,
+      membershipFrontier ? [membershipDependency(membershipFrontier, principal.validUntil)] : [], now);
     if (propose) {
       const old = await staffRecord(env.DB, env.SCHOOL_ID, staffId);
       const result = {
@@ -1640,6 +1655,11 @@ export async function handle(ctx) {
           row = change.row;
         nextFields[field] = row;
         writes.push(...change.writes);
+        if (field === "memberships" && membershipFrontier) {
+          guards.push(membershipFrontierGuard(env, staffId, membershipFrontier.sequence, publicationMembership));
+          writes.push(membershipFrontierWrite(env, staffId, membershipFrontier,
+            op.operationId, row.revision, publicationMembership));
+        }
         if (accepted)
           writes.push(
             w(

@@ -709,6 +709,11 @@ try {
           .count(),
         0,
       );
+      assert.equal(
+        await report.locator("tbody textarea").count(),
+        name === "Membership" ? await report.locator("tbody tr").count() : 0,
+        "Version-owned Memberships are editable; HR Terms remain a read-only Contacts report",
+      );
       assert.doesNotMatch(
         await page.locator("#content").innerText(),
         /add role|role flags|catalogue manager|create catalogue/i,

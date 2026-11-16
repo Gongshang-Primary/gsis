@@ -188,7 +188,13 @@ assert.throws(
   () => validateWorkbook(bad, d, "school", 1),
   (e) => e.code === "DEPENDENCY_CONFLICT",
 );
-const readonly = exportWorkbook(d, "Membership", "school", 1);
+const memberships = exportWorkbook(d, "Membership", "school", 1);
+assert.deepEqual(
+  validateWorkbook(memberships, d, "school", 1).document.teachers,
+  d.teachers,
+  "Membership workbook round trip preserves unknown values.",
+);
+const readonly = exportWorkbook(d, "HR Terms", "school", 1);
 assert.throws(
   () => validateWorkbook(readonly, d, "school", 1),
   (e) => e.code === "REFERENCE_ONLY",
