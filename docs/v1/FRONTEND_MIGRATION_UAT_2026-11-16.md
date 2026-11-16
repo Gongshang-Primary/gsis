@@ -50,3 +50,7 @@ Owner order: rebuild and publish 2026 Deploy from v0.9, rebuild Contacts in Edit
 The legacy 2026 source has an unpublished working draft and displays “Published r19 in force”. Use the selected draft as the clone source. The v1 2027 editor still reports that its earlier save did not commit and retains pending changes. These must be reviewed separately from the 2026 rebuild.
 
 The checked Deploy table import path requires existing row keys and directs the editor to use the owning UI for adding or removing records. The legacy IP export is scoped to the displayed table. A full frontend restore from an empty destination has yet to be demonstrated. Contacts permanent staff IDs also support downstream lookup and accepted authority. No data was cleared or published during preflight.
+
+## 2026-11-16 20:05:46 SGT baseline recovery
+
+Verified the earlier create action had produced a default 2026 saved draft. Renamed it through Versions to 2026 T4 post-PSLE and verified the persisted selector label. The legacy Versions page has no canonical workbook export. The v1 Versions import is table-scoped (including IP, TG and Teachers). Source data transfer and publication remain pending. Contacts and the 2027 draft were not edited during this checkpoint.
