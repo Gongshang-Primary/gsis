@@ -11,7 +11,8 @@ function overlaps(a,b,day){
 export function previewAbsenceClash(state,ctx,p){
  const staffIds=O.absenceStaffIds(ctx,p),dates=O.absenceDates(p),coverage=p.fullDay===true?{kind:'fullDay'}:p.coverage||null,requested={periods:p.periods||[],coverage};
  if(p.id)fail(400,'Use the existing absence editor for an edited report.','ABSENCE_REPLACEMENT_INPUT');
- if(dates.some(date=>date<ctx.today))fail(403,'Past absence entries are view only.','ABSENCE_REPLACEMENT_PAST');
+ const captured=Date.parse(ctx.reportedAt||''),reportDay=Number.isFinite(captured)&&captured<=ctx.now?new Date(captured+28800000).toISOString().slice(0,10):ctx.today;
+ if(dates.some(date=>date<reportDay))fail(403,'Past absence entries are view only.','ABSENCE_REPLACEMENT_PAST');
  const rows=state.absences.filter(a=>!a.deletedAt&&dates.includes(a.date)&&staffIds.some(id=>O.samePerson(ctx,id,a.staffId))&&overlaps(a,requested,ctx.days[a.date]||{periods:a.periodSnapshot||[]})).sort((a,b)=>a.id.localeCompare(b.id));
  if(rows.some(a=>!ctx.user.smc&&!ctx.user.admin&&a.staffId!==ctx.user.staffId))fail(403,'You can manage only your own absence records.','ABSENCE_REPLACEMENT_ACCESS');
  const request={staffIds,dates,periods:requested.periods,coverage,typeId:p.typeId,reasonDetail:p.reasonDetail||'',reliefRequired:p.reliefRequired!==false};

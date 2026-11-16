@@ -24,6 +24,15 @@ assert.equal(JSON.stringify(h.state.assignments.find(a=>a.id==='unrelated')),unr
 assert.equal(h.state.assignments.find(a=>a.id==='future').status,'cancelled');
 assert.equal(h.state.absences.find(a=>a.id===old).instructions.history,'Original note');
 assert(h.state.absences.some(a=>!a.deletedAt&&a.periods.includes(6)));
+// Delayed delivery uses the server-recorded capture date, just like the domain
+// save. The date changing overnight is not a new backdated user submission.
+const delayed=setup(),delayedCommand=delayed.command([2]),delayedPreview=delayed.preview(delayedCommand),capturedAt=delayed.ctx.iso;
+delayed.ctx.now+=86400000;delayed.ctx.iso=new Date(delayed.ctx.now).toISOString();delayed.ctx.today=new Date(delayed.ctx.now+28800000).toISOString().slice(0,10);delayed.ctx.attendanceOnly=true;
+assert.throws(()=>delayed.preview(delayedCommand),/Past absence/,'new backdated submissions remain blocked');
+for(const reportedAt of ['invalid',new Date(delayed.ctx.now+86400000).toISOString()])assert.throws(()=>previewAbsenceClash(delayed.state,{...delayed.ctx,reportedAt},delayedCommand),/Past absence/);
+delayed.ctx.reportedAt=capturedAt;
+applyAbsenceClash(delayed.state,delayed.ctx,{...delayedCommand,absenceClashToken:delayedPreview.token,confirmAbsenceReplacement:false});
+assert.equal(delayed.state.absences.length,1);assert.equal(delayed.state.absences[0].reportedAt,capturedAt);
 console.log('PASS disjoint reports, overlap confirmation, atomic replacement/history, stale consent, invalid input rollback and caller privacy');
 
 })().catch(error=>{console.error(error);process.exitCode=1;});

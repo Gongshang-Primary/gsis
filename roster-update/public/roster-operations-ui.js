@@ -566,10 +566,10 @@ var RosterOpsUI = (() => {
    const value=await s.ctx.api('operations',{operation:'read',view:'intake',...(s.page==='Assign Relief'?{date}:s.page==='Absences by Date'?{}:{scope:'mine'})},'POST',undefined,{background:true});
    if(!isLive(s)||ticket!==s.intakeTicket||date!==s.date)return;
    if(!Array.isArray(value?.entries))return;
-   s.intakeAuthDenied=false;s.intakeEntries=value.entries.map(entry=>entry.absenceApplied&&['pending','needsReview'].includes(entry.instructionState)&&!['pending','needsReview'].includes(entry.peerState)?{...entry,intakeState:'applied',instructionState:'retained',reasonCode:null}:entry.transportState==='needsReview'?{...entry,intakeState:'needsReview'}:entry);s.intakeTotal=value.total;s.intakeHasMore=value.hasMore;s.intakeError=false;const captured=s.intakeEntries.find(entry=>entry.requestId===s.acceptedIntakeId);if(captured&&s.formDraft?.submitted&&!s.dirty){const withdrawn=captured.intakeState==='withdrawn',message=withdrawn?intakeSummary(captured)+' Review the explanation below or contact SMC.':'Absence report received. You do not need to submit again. '+intakeSummary(captured);s.acceptedReportWithdrawn=withdrawn;if(message!==s.acceptedReportMessage){s.acceptedReportMessage=message;say(s,message,withdrawn,!withdrawn);}if(captured.absenceApplied&&captured.savedIds?.length&&JSON.stringify(s.savedIds)!==JSON.stringify(captured.savedIds)){s.savedIds=captured.savedIds;if(!s.busy&&!s.reading&&!modal)void reload(s,false,false,true);}}
-  }catch(error){if(isLive(s)&&ticket===s.intakeTicket&&date===s.date){s.intakeError=true;if(error.status===401||error.status===403){s.intakeAuthDenied=true;if(s.intakeBatch)s.intakeBatch.cancelled=true;s.intakeEntries=[];}}}
+   observeAppliedIntake(s,value.entries);s.intakeAuthDenied=false;s.intakeEntries=value.entries.map(entry=>entry.absenceApplied&&['pending','needsReview'].includes(entry.instructionState)&&!['pending','needsReview'].includes(entry.peerState)?{...entry,intakeState:'applied',instructionState:'retained',reasonCode:null}:entry.transportState==='needsReview'?{...entry,intakeState:'needsReview'}:entry);s.intakeTotal=value.total;s.intakeHasMore=value.hasMore;s.intakeError=false;const captured=s.intakeEntries.find(entry=>entry.requestId===s.acceptedIntakeId);if(captured&&s.formDraft?.submitted&&!s.dirty){const withdrawn=captured.intakeState==='withdrawn',message=withdrawn?intakeSummary(captured)+' Review the explanation below or contact SMC.':'Absence report received. You do not need to submit again. '+intakeSummary(captured);s.acceptedReportWithdrawn=withdrawn;if(message!==s.acceptedReportMessage){s.acceptedReportMessage=message;say(s,message,withdrawn,!withdrawn);}if(captured.absenceApplied&&captured.savedIds?.length&&JSON.stringify(s.savedIds)!==JSON.stringify(captured.savedIds)){s.savedIds=captured.savedIds;if(!s.busy&&!s.reading&&!modal)void reload(s,false,false,true);}}
+  }catch(error){if(isLive(s)&&ticket===s.intakeTicket&&date===s.date){s.intakeError=true;if(error.status===401||error.status===403){s.intakeAuthDenied=true;s.intakeRefreshDate=null;if(s.intakeBatch)s.intakeBatch.cancelled=true;s.intakeEntries=[];}}}
   finally{if(isLive(s)&&ticket===s.intakeTicket&&date===s.date){s.intakeLoading=false;drawIntake(s);const stalled=s.intakeEntries?.find(entry=>entry.requestId===s.acceptedIntakeId&&intakeReplaceable(s,entry));if(stalled&&!s.busy&&!modal&&s.clashPrompted!==stalled.requestId){s.clashPrompted=stalled.requestId;void reviewIntake(s,stalled);}// The all-dates review list is wider and less urgent than a single day's queue.
-  if(s.intakeEntries?.some(e=>e.intakeState==='pending'))s.intakeTimer=setTimeout(()=>refreshIntake(s),s.page==='Absences by Date'?60000:15000);}}
+  if(s.intakeEntries?.some(e=>e.intakeState==='pending')||s.intakeRefreshDate===s.date)s.intakeTimer=setTimeout(()=>refreshIntake(s),s.page==='Absences by Date'?60000:15000);void refreshAppliedIntake(s);}}
  }
  function acceptIntakeReceipt(s,task,receipt){
   if(receipt.accepted!==true||receipt.receiptOnly!==true||receipt.requestId!==task.payload.requestId||!Array.isArray(receipt.savedIds)||!['pending','applied','needsReview','withdrawn'].includes(receipt.intakeState))throw Error('Save confirmation is unavailable. Retry the same save.');
@@ -1852,6 +1852,19 @@ var RosterOpsUI = (() => {
      if(!isLive(s)||s.busy||pendingFor(s))return;
      const task={owner:s.owner,source:s,sourceDialog:el,page:s.page,date:s.date,rangeTo:s.rangeTo,tab:s.tab,ownReplacement:true,payload:{operation:'resolveAbsenceIntake',date:s.date,requestId:crypto.randomUUID(),intakeRequestId:entry.requestId,resolution,overlapToken:value.overlapToken,replacementToken:value.replacementToken,confirm:true,reason:resolution==='replace'?'Reporter acknowledged replacement of the current absence.':'Reporter kept the current absence.'},route:'operations'};trackPending(task);void sendPending(s,false,task);
     };
+ }
+ // Receipt polling may finish after an older allocation read. Retain the refresh
+ // request until a clean view can accept the saved attendance without losing work.
+ function observeAppliedIntake(s,entries){
+  if(s.page!=='Assign Relief')return;
+  const previous=new Map((s.intakeEntries||[]).map(entry=>[entry.requestId,entry]));
+  if(entries.some(entry=>entry.absenceApplied===true&&entry.dates?.includes(s.date)&&previous.has(entry.requestId)&&previous.get(entry.requestId).absenceApplied!==true&&(entry.command?.operation||previous.get(entry.requestId).command?.operation)==='saveAbsence')){s.intakeRefreshDate=s.date;s.intakeRefreshVersion=(s.intakeRefreshVersion||0)+1;}
+ }
+ async function refreshAppliedIntake(s){
+  if(!isLive(s)||s.page!=='Assign Relief'||s.intakeRefreshDate!==s.date||s.intakeRefreshRunning||s.busy||s.reading||s.cacheVerifying||s.dirty||s.cellSaving||modal||pendingFor(s)||draftWork(draftFor(s)))return;
+  const date=s.date,version=s.intakeRefreshVersion;s.intakeRefreshRunning=true;invalidateDates([date]);
+  try{if(await reload(s,false,false)&&isLive(s)&&s.date===date&&s.intakeRefreshVersion===version)s.intakeRefreshDate=null;}
+  finally{s.intakeRefreshRunning=false;}
  }
  return {pages,render,unmount,isDirty,needsLeaveWarning,flushPending,canRefreshLocal,dateText,range,teacherPicker,teacherMultiPicker,preload,seedReport,resetPreloads,invalidateDates,referencesChanged,refreshCurrent,persistentWarning,healthSummary,progress:{show:showProgress,hide:hideProgress}};
 })();

@@ -638,6 +638,16 @@ export async function dispatchPeerMail(env){
 }
 
 async function wakeAbsenceIntake(env){
+ if(edgeRosterEnabled(env)){
+  // A queued wake proves neither delivery nor that the consumer shares this
+  // capture namespace. Progress one retained command here as well. Both paths
+  // claim through the same durable lease; neither can double-apply a receipt.
+  const [wake,local]=await Promise.allSettled([enqueueNotificationWake(env),forwardAbsenceTransport(env,{limit:1,budgetMs:20000,concurrency:1})]);
+  if(local.status==='rejected')throw local.reason;
+  if(wake.status==='rejected')throw wake.reason;
+  if(!wake.value.queued)await serviceBackend(env,{operation:'processEdgePeerProposals',limit:1});
+  return;
+ }
  const wake=await enqueueNotificationWake(env);
  // HTTP work is only a best-effort accelerator. Cron/Queue owns continuation;
  // its durable D1/journal lease survives an interrupted waitUntil invocation.
@@ -729,7 +739,12 @@ export async function absenceTransportRoute(req,input,env,who,traceId,ctx){
    if(result&&!result.ok&&result.status<500)return json(result,result.status||403);
    if(!result?.ok&&input.scope!=='mine')return json({ok:false,error:'School-wide received reports require a current SMC permission check.'},503);
    const data=result?.data||{entries:[],user:{smc:false,admin:false},processingStatusUnavailable:true},all=data.user?.smc===true||data.user?.admin===true;
-   const transport=await readAbsenceTransport(env,who,{all,date:input.date,scope:input.scope,includeForwarded:!result?.ok});return json({ok:true,data:mergeAbsenceIntake(data,transport)});
+   const transport=await readAbsenceTransport(env,who,{all,date:input.date,scope:input.scope,includeForwarded:!result?.ok});
+   // The authenticated reader can resume a stranded capture in its original
+   // Worker context. Return the observed receipt; only a later confirmed read
+   // may describe it as applied. Existing leases and retry backoff still apply.
+   if(edgeRosterEnabled(env)&&result?.ok&&transport?.pendingCaptureCount>0)wake();
+   return json({ok:true,data:mergeAbsenceIntake(data,transport)});
   }
   if(edgeRosterEnabled(env)&&input.operation==='resolveAbsenceIntake'&&['merge','keep','replace'].includes(input.resolution))return null;
   if(['retryAbsenceIntake','resolveAbsenceIntake'].includes(input.operation)&&env.GSIS_JOBS){

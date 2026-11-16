@@ -1,3 +1,7 @@
+# Pending hotfix: received D1 report recovery, 16 November 2026
+
+Model: Codex. Resume captured absences in the capture Worker independently of remote notification wake acceptance, and retry retained work on authorized receipt checks. Existing leases and request receipts prevent duplicate application; delayed delivery uses the trusted capture date. Assign Relief refreshes after observed application when doing so preserves unsaved work. No live repair, configuration change, namespace migration or Apps Script change. See `docs/coordination/tasks/roster-received-report-recovery.md`. Not deployed.
+
 # Pending hotfix: public WhatsApp menu, 16 November 2026
 
 Model: Codex. The D1 WhatsApp handler displays the owner’s unmanned-number notice and five service choices to every sender. Only Urgent Message resolves staff identity; unique active and inactive Contacts roster records qualify. Unknown, ambiguous or changed identities cannot submit urgent text. Existing recipients, reply claims, duplicate suppression, rate limits and expiry remain. Worker-only behaviour; no Apps Script or Meta template/configuration change. See `docs/coordination/tasks/roster-whatsapp-public-menu.md`. Not deployed.
