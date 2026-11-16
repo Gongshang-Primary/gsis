@@ -40,6 +40,8 @@ const deployFields = [
   "employmentActive",
   "schoolSection",
   "employmentArrangement",
+  "employmentStatus",
+  "personnelCategory",
   "employmentTags",
   "subjectTags",
   "mkTags",

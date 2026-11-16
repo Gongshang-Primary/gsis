@@ -109,6 +109,19 @@ export function catalogueDisplay(catalogues) {
     }
   return { hrTerms, membership: [] };
 }
+const deploymentTagFields = {
+  "Employment Modifier": "employmentTags",
+  "Subject Modifier": "subjectTags",
+  "MK Modifier": "mkTags",
+  Role: "role",
+  "EO Appt Level": "eoAppointmentLevel",
+  "Appointment Status": "appointmentStatus",
+  Memberships: "memberships",
+  "Employment Arrangement": "employmentArrangement",
+  "Employment Status": "employmentStatus",
+  "School Section": "schoolSection",
+  "Personnel Category": "personnelCategory",
+};
 export function mergeContacts(doc, projection) {
   check(
     projection &&
@@ -133,6 +146,12 @@ export function mergeContacts(doc, projection) {
           (f.validUntil == null || f.validUntil > projection.asOf)
         );
       },
+      hasClear = (name) => {
+        const f = fields?.[name];
+        return f?.state === "superseded" && f.cleared === true && f.value === null &&
+          Number.isSafeInteger(f.validFrom) && f.validFrom <= projection.asOf &&
+          (f.validUntil === null || (Number.isSafeInteger(f.validUntil) && f.validUntil > projection.asOf));
+      },
       accepted = (name) => (hasFact(name) ? fields[name].value : null),
       active = fields ? accepted("employmentActive") : p.active,
       section = fields
@@ -141,21 +160,30 @@ export function mergeContacts(doc, projection) {
       sectionName = code(section).toLowerCase();
     const tokens = (value) =>
       Array.isArray(value) ? value.map(code).filter(Boolean) : [];
+    // Retain typed version inputs separately from the legacy display/calculation
+    // profile. Missing evidence is absent; a current explicit clear is null/[].
+    const deploymentTags = fields ? Object.fromEntries(
+      Object.entries(deploymentTagFields).filter(([, field]) => hasFact(field) || hasClear(field))
+        .map(([label, field]) => {
+          const value = accepted(field);
+          return [label, value === null ? null : Array.isArray(value) ? tokens(value) : code(value)];
+        }),
+    ) : null;
     const native = fields
       ? {
           "Basic Name": p.basicName || p.name,
           "TTb Name": p.ttbName || p.name,
-          Role: code(accepted("role")),
-          "EO Appt Level": code(accepted("eoAppointmentLevel")),
-          "Appointment Status": code(accepted("appointmentStatus")),
+          Role: deploymentTags.Role || "",
+          "EO Appt Level": deploymentTags["EO Appt Level"] || "",
+          "Appointment Status": deploymentTags["Appointment Status"] || "",
           "Employment Modifier": [
-            code(accepted("employmentArrangement")),
-            ...tokens(accepted("employmentTags")),
+            deploymentTags["Employment Arrangement"],
+            ...(deploymentTags["Employment Modifier"] || []),
           ]
             .filter(Boolean)
             .join(";"),
-          "Subject Modifier": tokens(accepted("subjectTags")).join(";"),
-          "MK Modifier": tokens(accepted("mkTags")).join(";"),
+          "Subject Modifier": (deploymentTags["Subject Modifier"] || []).join(";"),
+          "MK Modifier": (deploymentTags["MK Modifier"] || []).join(";"),
           Active: active === true ? "Y" : active === false ? "N" : "",
         }
       : p.profile || {};
@@ -204,6 +232,7 @@ export function mergeContacts(doc, projection) {
       schoolSection: sectionName || null,
       mk: ["mk", "mke"].includes(sectionName),
       profile: native,
+      ...(fields ? { deploymentTags } : {}),
       groups: tokens(fields ? accepted("memberships") : p.groups),
       authority,
       fieldRevisions: p.fieldRevisions || {},
