@@ -12,7 +12,7 @@ export async function rosterWorkload(ctx, { loadVersion, currentPublication }) {
   requireValue(/^20\d\d-\d\d-\d\d$/.test(date || ""), "INVALID_DATE");
   const readPointer = () => one(ctx.env.DB, "SELECT publication_id,revision FROM deploy_pointer WHERE school_id=?", [schoolId]);
   const candidatesForDate = () => query(ctx.env.DB,
-    "SELECT id FROM deploy_versions WHERE school_id=? AND deleted=0 AND (COALESCE(json_extract(metadata,'$.from'),'')='' OR json_extract(metadata,'$.from')<=?) AND (COALESCE(json_extract(metadata,'$.to'),'')='' OR json_extract(metadata,'$.to')>=?) ORDER BY created_at DESC,id DESC LIMIT 1",
+    "SELECT id FROM deploy_versions WHERE school_id=? AND deleted=0 AND (COALESCE(json_extract(metadata,'$.from'),'')='' OR json_extract(metadata,'$.from')<=?) AND (COALESCE(json_extract(metadata,'$.to'),'')='' OR json_extract(metadata,'$.to')>=?) ORDER BY created_at DESC,id DESC LIMIT 2",
     [schoolId, date, date]);
   const pointer = await readPointer();
   const dependencies = []; // Roster copies this projection; it never pins Deploy.
@@ -33,10 +33,11 @@ export async function rosterWorkload(ctx, { loadVersion, currentPublication }) {
       requireValue(current && !current.deleted && current.revision === version.revision, "WORKLOAD_SOURCE_CHANGED", 409);
     }
   };
-  if (!candidates.length) await unchanged();
-  if (!candidates.length) return { schoolId, rows: [], calculationVersion: "deploy-workload/1",
+  if (candidates.length !== 1) await unchanged();
+  if (candidates.length !== 1) return { schoolId, rows: [], calculationVersion: "deploy-workload/1",
     workloadEvidence: { quality: "estimated", sourceKind: "unavailable", sourceId: null, sourceRevision: null,
-      reason: "No saved Deploy planning version covers this date. Unknown R is not zero." }, dependencies };
+      reason: candidates.length ? "Multiple saved Deploy planning versions cover this date. Set unambiguous version dates before using estimated workload. Unknown R is not zero."
+        : "No saved Deploy planning version covers this date. Unknown R is not zero." }, dependencies };
   const { doc, version } = await loadVersion(ctx.env.DB, schoolId, candidates[0].id);
   await unchanged(version);
   // These are the accepted projections already retained by this saved version.
