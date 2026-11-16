@@ -1,6 +1,6 @@
 # v1-roster-workload-snapshot: Roster copies must not lock Deploy
 
-- Status: claimed; implementation and verification pending.
+- Status: implemented; focused checks passed, full exact-head regression/CI and independent review pending at this checkpoint. Final outcomes are recorded in the implementation PR.
 - Owner/model: Codex. Coordinator: ChatGPT v1. Reviewer: Claude, independent exact head.
 - Updated: 16 November 2026, Asia/Singapore.
 - Branch: `codex/v1-roster-workload-snapshot`.
@@ -48,3 +48,7 @@ Run canonical build with no tracked drift, focused checks, runner discovery, ful
 ## Handoff
 
 Implementation branch starts from the accepted claim commit. Final evidence will be in `docs/v1/roster/WORKLOAD_SNAPSHOT_HANDOFF.md` and the bounded PR. Absence replacement remains a separate follow-up; the provisional v0.9 reference is not treated as reviewed final work.
+
+Accepted claim/base: `511269b778f6d948ecedde8ea63deb4c095a44f4`. [Implementation handoff](../../v1/roster/WORKLOAD_SNAPSHOT_HANDOFF.md) records ownership, visible changes, command list and rollback. All three new behavioural programs and the updated estimated-allocation program pass locally. Unchanged migration packaging, Roster accounting, Roster service, Deploy storage and admission-batch programs pass. Canonical `TZ=Asia/Singapore npm run build` passes without tracked build drift; runner discovery includes all three new files (107 product / 1,208 Node). Scope/whitespace checks pass. Full required suites and CI remain pending until the PR records their actual exact-head result. Q07 awaits Claude; Q08 remains not authorised for deployment.
+
+During verification, main advanced to `7198f193ff6936b8f8b5b84737eb1310a9b429df` solely by adding [Claude's #181 review](../review/v1-pr181-claude-review.md), approving the merged exact head. Its C-1 (ambiguous saved-version date ranges) and C-2 (multi-room baseline rollback) remain release conditions; this PR addresses F-1 using the owner's independent-copy direction. A separate v0.9 draft PR182 appeared at `592fac9982b8935b1d14b8bbff500a1af78aa2c7`; its seventeen actual paths do not overlap this claim. It is not merged by this v1 task. Refresh it for the following absence task.

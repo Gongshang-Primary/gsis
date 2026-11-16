@@ -32,6 +32,10 @@ No deployment, migration, provider send or live-data access. Documentation rollb
 
 ## Verified merge inventory
 
+Later owner-directed integration, 16 November 2026: [#181](https://github.com/helper-gsps/gsis/pull/181), exact head `8b15cb2d3c79717828ab66a8359e30522f82b901`, merge `1754c535738adb1cad8dd328f45dd60ea6580f03`, first parent `281e5f36782cea7706ae19abbc39a65d0286aff1`. The exact head was unchanged, mergeable and CI green: product 104/104, Node 1205/1205, LORD 40/40 in each shard, clean canonical build and nine Worker dry runs. Automatic/result tree `41757cc2e03977b740137a6edb0da5bfc0cde1cd`; no conflict or hand edit. No published Claude exact-head verdict was found; the owner explicitly ordered the merge and a following correction for the Roster-held Deploy pins. This row is kept separate from the reviewed-head inventory below to avoid implying review evidence that is absent. No other PR was open after this merge. No deployment.
+
+Post-merge evidence: [Claude's #181 approval](../review/v1-pr181-claude-review.md) subsequently landed at `7198f193ff6936b8f8b5b84737eb1310a9b429df`, covering that exact merged head with 104/104 product programs. C-1 saved-version range selection and C-2 multi-room rollback remain release conditions. This does not rewrite the earlier merge-time evidence.
+
 | PR | Reviewed head | Merge commit |
 | --- | --- | --- |
 | [#160](https://github.com/helper-gsps/gsis/pull/160) | `ab24739203f3bcc03c5b7e6c96f8fa2144a84654` | `2d264b4fac63641218f15f922edcc8a8437b6d31` |

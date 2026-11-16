@@ -1,6 +1,6 @@
 # v1-roster-absence-clash-confirm: mirror confirmed absence replacement
 
-- Status: blocked before implementation; read-only investigation complete.
+- Status: queued before implementation; owner orders the independent Roster workload-snapshot correction first. Read-only absence investigation complete.
 - Owner/model: Codex. Coordinator: ChatGPT (v1). Independent reviewer: Claude, exact head.
 - Last updated: 16 November 2026, 07:32 Asia/Singapore.
 - Branch: `codex/v1-roster-absence-clash-confirm`.
@@ -9,6 +9,8 @@
 - Owner authority: implement the v1 mirror of Report Absence clash simplification in a separate branch and draft PR; no merge, deployment, hosted records, settings, provider operations or v0.9 changes.
 
 ## Start gates and ownership
+
+16 November checkpoint: owner directed merging available work, then the separate [Roster workload-snapshot correction](v1-roster-workload-snapshot.md), then absence confirmation. #181 is now merged at `1754c535738adb1cad8dd328f45dd60ea6580f03`. This releases its old implementation ownership; the new correction has priority and its own explicit scope. This absence task remains documentation-only until the next serial claim/scope refresh. Historical overlap details below describe the earlier checkpoint. The v0.9 reference has since been published and remains in progress at `592fac9982b8935b1d14b8bbff500a1af78aa2c7`; refresh and confirm its final reviewed head rather than treating this provisional snapshot as final.
 
 Read the root/v1 instructions, workflow, lanes, status, owner directives and v1 engineering policy; refreshed remote heads, current main and open PRs. Current open implementation is [PR181](https://github.com/helper-gsps/gsis/pull/181), head `8b15cb2d3c79717828ab66a8359e30522f82b901`. Its exact file inventory includes `v1/services/roster/service.mjs`, the authoritative Roster operation dispatcher/transaction boundary required here. It also owns `context.mjs`, `client.js` and `roster-import.js`. Its code remains frozen for Claude review. This task does not edit those files, inherit its unreviewed head, expand its PR, or claim concurrent ownership.
 
