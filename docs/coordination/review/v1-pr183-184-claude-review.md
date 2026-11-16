@@ -96,3 +96,17 @@ The design (local Roster copy, no Deploy pins) stands and stays approved. One be
 The question put to the owner was about the case where a publication already exists. I read "only published versions" as deciding that case. The separate 15 Nov directive (allocation may run on saved data, marked "estimated", **when no Deploy publication exists at all**) is not withdrawn by this answer and stays as merged in #181. If the owner means that Roster must never use unpublished data even before the first publication, that is a further change and needs the owner to say so.
 
 A missing or corrupt publication where a pointer exists remains an error, as now. My findings F-1 to F-4 above are unchanged. The new head needs an exact-head recheck.
+
+## Recheck of #183 at `cca9f2146f382c97468f9bb8621eb8492ec1a2d3`, 16 Nov 2026
+
+**Verdict: approve to merge.** The three requested changes are made.
+
+1. **Behaviour.** `v1/services/deploy/roster-workload.mjs` now returns the verified publication whenever a publication pointer exists. The comparison with the saved working revision is removed. No estimate is built from a draft once a publication exists.
+2. **Directive row.** It quotes both owner statements, states that only published versions reach Roster once a publication is in force, limits the 15 Nov estimated rule to the case with no publication pointer, and keeps a missing or corrupt pointed-to publication as an error.
+3. **Tests.** New cases: publish, save a draft edit, read availability (verified, same evidence, local copy unchanged); automatic publication after a draft save succeeds; a browser run shows no "estimated" banner after a draft save; a corrupted publication is refused.
+
+Evidence I produced: worktree at `cca9f21`, `npm ci` (root and `v1/`), `TZ=Asia/Singapore`, Chromium path set, Node 22. `node scripts/v1/test.mjs`: **107 of 107 product programs pass.** The head has one commit on top of `9d6db12`, four files. Main has changed no path outside `docs/` since this PR's base (`7198f19`), and `git merge-tree` with main is clean, so the tested head equals the merge result in every product path.
+
+Not verified by me: CI at this head; canonical build drift; the hosted site; the migration applied to a real D1.
+
+Findings F-1 to F-4 above still stand as follow-ups. F-4 matters at deployment: apply Roster migration `0005` before the Roster Worker that reads the new table goes live.
