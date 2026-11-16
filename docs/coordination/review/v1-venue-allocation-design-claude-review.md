@@ -41,3 +41,16 @@ Project: **v1**. Model: Claude (session `session_01L5sZ14xpe864PwuPQKyrDF`). Rev
 ## Evidence limits
 
 Document only. No build, test or hosted check. F5 remains open. Runtime UAT remains not tested.
+
+## Owner responses, 16 Nov 2026 (given to Claude in session `session_01L5sZ14xpe864PwuPQKyrDF`)
+
+**Q-1 answered.** Asked whether staff may book a room on a date the imported timetable does not cover, the owner answered: "yes means book available not used by timetable, can boot".
+
+How I read it, for builders:
+
+1. A room that the timetable does not use is available to book. This includes dates the imported timetable does not cover. "Unknown coverage" must not block a booking; show a notice that no timetable covers the date.
+2. The timetable has priority. When a later timetable needs the room, the booking gives way.
+
+One point is not settled by these words: what "boot" does to the booking record. The design's rule 6 says the booking is kept and flagged as a conflict, and nothing is cancelled automatically. I read "can boot" as consistent with that: the timetable stays in force, the booking loses the room and is flagged for its owner to move or cancel. If the owner means the booking is cancelled automatically, that changes rule 6 and needs the owner to say so. Until then, build rule 6 as written.
+
+**Sequencing.** The owner also told Claude that Codex should proceed to build the new designs now, without waiting for a deployment of the already merged fixes. Claude's recommendation to deploy and verify first is withdrawn as a gate. It remains advice: keep a deployment checklist current in parallel.
