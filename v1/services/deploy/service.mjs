@@ -17,7 +17,6 @@ import {
 import {
   queueSourceChange,
   requestSourceCancellations,
-  sourceChangeGuard,
   sourceChangeDone,
   acquireSourcePin,
   releaseSourcePin,
@@ -1223,8 +1222,6 @@ async function save(
     throw error;
   }
   const guards = [...delta.guards, leaseGuard(ctx, scope)];
-  const planning = await protectPlanningChange(ctx, op, b.versionId);
-  guards.push(planning.guard);
   // A binding also reads its class/TG scope. Fence changes to those unchanged
   // rows between comparison and commit, even without a caller revision.
   if (bindingChanged)
@@ -1269,7 +1266,7 @@ async function save(
         sql: "UPDATE deploy_versions SET revision=revision+1 WHERE school_id=? AND id=?",
         args: [school, b.versionId],
       };
-  const writes = [...delta.writes, versionWrite, expiredLeaseWrite(ctx, scope), planning.done];
+  const writes = [...delta.writes, versionWrite, expiredLeaseWrite(ctx, scope)];
   return finish(
     ctx,
     op,
@@ -1759,24 +1756,24 @@ async function publish(ctx) {
         },
   ];
   // Admission-owner pin guards are added through the shared source-change helper below.
-  let held = await queueSourceChange(
+  let held = (await queueSourceChange(
     ctx.env.DB,
     school,
     "publication",
     op.operationId,
     ctx.now,
     "deploy",
-  );
+  )).filter(pin => pin.destination !== "roster");
   if (held.length) {
     await requestSourceCancellations(ctx.env, held);
-    held = await queueSourceChange(
+    held = (await queueSourceChange(
       ctx.env.DB,
       school,
       "publication",
       op.operationId,
       ctx.now,
       "deploy",
-    );
+    )).filter(pin => pin.destination !== "roster");
   }
   check(
     !held.length,
@@ -1785,7 +1782,12 @@ async function publish(ctx) {
     409,
   );
   guards.push(
-    sourceChangeGuard(school, "publication", op.operationId, "deploy"),
+    {
+      // Roster owns a temporary workload copy. Even pre-upgrade stranded
+      // Roster pins cannot lock Deploy; other consumers retain their fences.
+      sql: "SELECT NOT EXISTS(SELECT 1 FROM source_pins WHERE school_id=? AND scope='publication' AND state='held' AND destination<>'roster' AND NOT(operation_id=? AND destination='deploy')) AS ok",
+      args: [school, op.operationId],
+    },
   );
   const result = {
     saved: true,
@@ -2413,7 +2415,6 @@ export async function handle(ctx) {
         if (outcome?.state === "committed") return outcome.result;
         throw error;
       }
-      const planning = await protectPlanningChange(ctx, op, b.versionId);
       return finish(
         ctx,
         op,
@@ -2424,9 +2425,8 @@ export async function handle(ctx) {
             args: [school, b.versionId],
           },
           expiredLeaseWrite(ctx, b.scope || b.key || "meta"),
-          planning.done,
         ],
-        [...delta.guards, leaseGuard(ctx, b.scope || b.key || "meta"), planning.guard],
+        [...delta.guards, leaseGuard(ctx, b.scope || b.key || "meta")],
         {
           saved: true,
           versionId: b.versionId,
@@ -2442,7 +2442,6 @@ export async function handle(ctx) {
       const op = await prepare(ctx);
       if (op.receipt) return op.receipt.result;
       const loaded = await loadVersion(ctx.env.DB, school, b.versionId);
-      const planning = await protectPlanningChange(ctx, op, b.versionId);
       return finish(
         ctx,
         op,
@@ -2451,10 +2450,8 @@ export async function handle(ctx) {
             sql: "UPDATE deploy_versions SET deleted=1,revision=revision+1 WHERE school_id=? AND id=?",
             args: [school, b.versionId],
           },
-          planning.done,
         ],
         [
-          planning.guard,
           scopeGuard(
             school,
             b.versionId,
@@ -2479,23 +2476,13 @@ export async function handle(ctx) {
   check(false, "Unsupported Deploy operation.", "NOT_FOUND", 404);
 }
 
-async function protectPlanningChange(ctx, op, versionId) {
-  const schoolId = ctx.principal.schoolId, scope = "planning:" + id(versionId, "version");
-  let held = await queueSourceChange(ctx.env.DB, schoolId, scope, op.operationId, ctx.now, "deploy");
-  if (held.length) {
-    await requestSourceCancellations(ctx.env, held);
-    held = await queueSourceChange(ctx.env.DB, schoolId, scope, op.operationId, ctx.now, "deploy");
-  }
-  check(!held.length, "Roster is using this saved workload. Resolve its original receipt before changing it.", "SOURCE_CHANGE_PENDING", 409);
-  return { guard: sourceChangeGuard(schoolId, scope, op.operationId, "deploy"),
-    done: sourceChangeDone(schoolId, scope, op.operationId) };
-}
 export async function internal(ctx) {
   await requireMembership(ctx.env, ctx.request);
   const b = ctx.body,
     school = ctx.env.SCHOOL_ID;
   check(b.schoolId === school, "Foreign school.", "SCHOOL_MISMATCH", 403);
   if (ctx.path === "/internal/pins/acquire") {
+    check(b.destination !== "roster", "Roster must use its own workload snapshot.", "WORKLOAD_SNAPSHOT_REQUIRED", 409);
     const planning = b.scope?.startsWith("planning:") ? id(b.scope.slice(9), "version") : null;
     check(b.scope === "publication" || planning, "Invalid workload pin scope.");
     return acquireSourcePin(

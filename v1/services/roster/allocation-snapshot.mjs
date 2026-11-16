@@ -205,6 +205,7 @@ export async function allocationSnapshot(ctx, loaded, c, date, revision, runId) 
       day: revision,
       config: policyRevision,
       publication: c.publication.publicationSequence ?? null,
+      workloadSnapshot: c.workloadSnapshot || null,
       ...(c.workloadEvidence?.quality === "estimated" ? { planning: c.workloadEvidence } : {}),
       accounting: loaded.accountingRevisions,
     },
