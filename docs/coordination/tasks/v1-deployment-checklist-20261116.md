@@ -1,6 +1,6 @@
 # v1 deployment checklist after the 26bbccd release
 
-- Status: claimed; preparation only.
+- Status: review preparation; documentation only.
 - Owner/model: Codex. Coordinator: ChatGPT (v1). Independent reviewer: Claude, exact head.
 - Updated: 16 November 2026, 11:36 SGT.
 - Branch: `codex/v1-deployment-checklist-20261116`.
@@ -24,4 +24,8 @@ G03 investigation: on this base an actual built local Worker request to `current
 
 ## Handoff
 
-Checklist and validation pending on this claim. No release operation executed. Claude reviews the resulting documentation PR; the owner decides the actual deployment separately.
+Claim accepted on main at `49ceb9b`; the branch starts from that claim. The checklist is prepared. Local canonical build and existing G03 browser/Worker/D1 regression passed; scope, links and whitespace are checked before commit. Required exact-head Node/LORD CI is pending the branch push; the PR will record its result. Q01–Q05 pass by the pinned inventory, ownership, retained release boundaries and no product change. Q06 is pending CI; Q07 is pending Claude exact-head review. Q08: no deployment authority exercised, hosted UAT Not tested. No release operation executed. Claude reviews the resulting documentation PR; the owner decides the actual deployment separately.
+
+## #183 merge checkpoint
+
+Claude's recheck landed at `00a5e6d6a205c3ed132e9b401cf1b6cef12e1e1b`. #183 merged at `056e003fc5da4c770fa14c80073ec82f296e5b33`, second parent exactly approved `cca9f2146f382c97468f9bb8621eb8492ec1a2d3`; tree `1fd9545fda2f4530e6f94070ba9011cd9e82f4c8` matches the clean simulated merge. Exact-head CI runs 43795959570 and 43795964452 passed. The checklist now includes Roster 0005 as merged, unapplied hosted. The first documentation head `7aadb7ea371d7e9da2c6c9a882df60b958ebf90d` passed required Node/LORD CI run 43799342782. This two-file documentation follow-up needs its own exact-head CI and Claude review. No deployment or live-data operation occurred.
