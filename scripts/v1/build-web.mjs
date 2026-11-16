@@ -9,6 +9,7 @@ import { parse } from 'acorn';
 import { JSDOM } from 'jsdom';
 import { CONTACT_GRID_SCHEMA } from '../../v1/services/contacts/grid-projection.mjs';
 import { previewTTb } from '../../v1/contacts/direct-fields.mjs';
+import { removeRosterQuietMode } from './remove-roster-quiet-mode.mjs';
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'../..');
 const modules=JSON.parse(await readFile(path.join(root,'v1/web/modules.json'),'utf8'));
 const {gsisBuildLabel}=JSON.parse(await readFile(path.join(root,'package.json'),'utf8'));
@@ -1105,7 +1106,7 @@ function transform(module,rel,text){
    text=text.replaceAll('<h4>Business preferences</h4>','<h4>Allocation layers</h4><p>Use Allocation layers and duties done below for the current per-layer limits, subject continuity and preference order. These settings replace the older annual-utilisation preferences.</p>');
    text=updateRosterAdminSettings(text,true);
   }
-  if(module.id==='roster'&&rel==='roster-operations-ui.js')text=updateRosterAdminSettings(updateRosterCapacity(text),false);
+  if(module.id==='roster'&&rel==='roster-operations-ui.js')text=removeRosterQuietMode(updateRosterAdminSettings(updateRosterCapacity(text),false));
   if(module.id==='deploy'&&rel==='app.js')text=updateDeploy(text);
   if(module.id==='deploy'&&rel==='app.js')text=updateAscSubjectIdentity(text);
   if(module.id==='deploy'&&(rel==='app.js'||rel==='teaching-rules.js'))text=updateDeployTeachingEligibility(text);
