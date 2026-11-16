@@ -11,6 +11,7 @@ Authority: owner 16 November work order 3(f), first Contacts lifecycle claim onl
 3. `v1/services/contacts/service.mjs`
 4. `v1/services/deploy/model.mjs`
 5. `tests/v1-product-deploy-duplicate-contacts.mjs`
+6. `tests/v1-product-contacts-projection.mjs`
 
 Main, all remote heads and open PRs #182/#185–#188 were refreshed. Those PR files, the completed venue-demand claim and this scope are disjoint. This branch starts from its accepted main claim, never another unreviewed product branch. The earlier jobs are implemented and awaiting CI/review; no additional chained implementation base is introduced.
 
@@ -29,3 +30,9 @@ Explicitly deferred: automatic publication reconciliation, namespace reservation
 Actual built Deploy browser plus real local Workers/D1: first fail on missing tag snapshot; update all eleven fields, invoke Duplicate, verify exact stored values and stable IDs, assignments/notes/source-version preservation, inactive and partial records, explicit clears versus missing values, exact retry/changed intent, school/capability denial and restart replay. Check legacy employment/R calculation compatibility through existing regressions. Synthetic data only; no hosted reads/writes or provider operations.
 
 Run canonical build, focused and existing Core/Contacts/Deploy regressions, runner discovery and required exact-head Node/LORD plus PR product CI. Record omissions honestly, visible changes and each quality gate in this record/PR. One bounded PR; Muse exact-head review before merge. No deployment, migration, Google activation or live UAT. F5 OPEN; official T1B-01/T1B-02 and hosted/runtime UAT Not tested.
+
+## Verification-driven scope clarification, before editing the existing test
+
+The existing Contacts projection test asserts its exact public field allowlist. The authorised two-field extension requires updating that expectation, while retaining every privacy and authority assertion. Add only that existing test as the sixth path; it has no overlapping open PR owner. This does not expand the eleven-field product behavior.
+
+The real owner clear writer represents an explicit optional null as a `superseded` row with an operation/revision and interval, not an accepted null record. Preserve that narrowly identified ordinary-field clear in the deployment projection and typed snapshot. Do not relabel it as accepted authority or treat generic missing/superseded/out-of-interval evidence as a clear. Tests must distinguish a current explicit clear from a never-set field.
