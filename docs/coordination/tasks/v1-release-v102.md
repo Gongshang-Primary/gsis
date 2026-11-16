@@ -1,6 +1,6 @@
 # v1.02 release label and deployment handoff
 
-- Status: implemented; exact-head CI and Muse review pending.
+- Status: deployed as v1.02; authenticated runtime UAT remains Not tested.
 - Model/owner: Codex. Coordinator: ChatGPT. Reviewer: Muse at the exact head.
 - Updated: 17 November 2026, Asia/Singapore.
 - Branch: `codex/v1-release-v102`.
@@ -22,7 +22,7 @@ PR194 merged unchanged at `37dbdd438017156e8f2455aef453c5ded5406fbc`. Comparing 
 
 ## Acceptance and gates
 
-Run the existing actual-built-browser release-label test, frontend parity test and canonical build without generated drift. Verify that the final PR contains exactly the four claimed files and that every other product path matches merged PR194. Run required exact-head Node/LORD and product/package CI; record commands, results, failures and omissions. Q01–Q05 are a bounded presentation/metadata change using the existing release mechanism. Q06 and Q07 remain pending until checks and Muse's new-head review complete. The feature review is not claimed to cover this subsequent label change.
+Run the existing actual-built-browser release-label test, frontend parity test and canonical build without generated drift. Verify that the final PR contains exactly the four claimed files and that every other product path matches merged PR194. Run required exact-head Node/LORD and product/package CI; record commands, results, failures and omissions. Q01–Q05 are a bounded presentation/metadata change using the existing release mechanism. Q06 and Q07 completed through the checks and Muse review recorded below. The feature review is not claimed to cover this subsequent label change.
 
 ## Deployment preparation
 
@@ -34,7 +34,7 @@ After review, merge the label PR, run both required suites at the actual combine
 
 On partial failure, reconcile completed migrations/uploads before considering another attempt. After success, verify all nine Worker SHAs and v1.02 labels, bindings/flags, Contacts migration ledger and public routing/authentication boundaries, then publish deployment evidence. Deployment is not atomic. Retain new authority history/frontiers and reconcile marked publications before reverting older application code; no destructive schema rollback.
 
-## Current result
+## Pre-release implementation evidence
 
 Claim published on main at `05370d2953c19501116db81bec2255bb0505f667`; this branch starts at that accepted claim. The implementation changes only the central constant from v1.01 to v1.02 and the existing test's success message to interpolate that constant. The two documentation records describe the release and close PR194. Every other product/test/build path matches merge `37dbdd438017156e8f2455aef453c5ded5406fbc` byte for byte. Visible change: existing release labels become v1.02; no new control or application behavior.
 
@@ -43,6 +43,14 @@ Local verification on this branch's implementation tree:
 - `TZ=Asia/Singapore GSIS_BROWSER_EXECUTABLE=/usr/bin/chromium node tests/v1-product-release-label.mjs`: **Pass**, actual built home, Toolbox and all nine application chrome labels/titles at desktop/narrow widths; real local Workers/D1; manifest source SHA and every Worker label.
 - `TZ=Asia/Singapore node tests/v1-product-v09-frontend-parity.mjs`: **Pass**, including future legacy label variants and preservation of scripts, asset versions and historical text.
 - `TZ=Asia/Singapore npm run build`: **Pass**, all canonical components; no generated file changed.
-- `git diff --check`: **Pass**. Exact-path and unchanged-product comparisons pass. Full Node/LORD and product/package suites will be recorded at the final PR head through CI; they have not been rerun locally for this two-line change. No new test or assertion was needed.
+- `git diff --check`: **Pass**. Exact-path and unchanged-product comparisons pass. Full Node/LORD and product/package suites passed through exact-head CI and again on final main, as recorded below; they were not rerun locally for this two-line change. No new test or assertion was needed.
 
-PR194 is merged. The v1.02 label is implemented but not yet independently reviewed, merged or deployed. No fresh export, hosted migration, configuration change or deployment has been performed by this task. Hosted recovery, authenticated Run B workflows, N-1 Roster save latency and runtime UAT remain **Not tested**. Official T1B-01/T1B-02 remain **Not tested**; **F5 OPEN**.
+At the initial implementation handoff, PR194 was merged and the v1.02 label was implemented but not yet independently reviewed, merged or deployed. No fresh export, hosted migration, configuration change or deployment had occurred at that point. Hosted recovery, authenticated Run B workflows, N-1 Roster save latency and runtime UAT remain **Not tested**. Official T1B-01/T1B-02 remain **Not tested**; **F5 OPEN**.
+
+## Deployment completion — 17 November 2026
+
+PR195 was approved by Muse at `bb43c9344cc58dd6b48a7ca2d1ac45eb4387068e`; review main commit `6a0763b68a81553d83f24757a9552b78569cc7bd`. It merged unchanged as `d5c8899aeb867448ad7399f9925f46ac11371380`. Final-main Node/LORD run `43967338294` and product/package run `43967343394` both passed. The protected deployment `43971528994` succeeded at **06:40:10 SGT**, following fresh verified private backups and the owner's recorded GitHub approval. This implementation/release claim is closed.
+
+All nine live Workers report v1.02 and the exact deployed SHA. Contacts0006 is applied; all other schemas/ledgers and resource/service bindings are unchanged. Sixteen public checks and three released frontend asset comparisons passed. The full merge, CI, backup, workflow, metadata and public-check evidence is in [the deployment record](../DEPLOYMENTS.md#17-nov-2026-064010-sgt-v102-deployed). The [documentation claim](v1-release-v102-record.md) owns publication of this factual handoff; its review does not gate the already completed deployment.
+
+No provider/Google activation, retention deletion, live staff edit or permission publication was performed. Public checks do not establish authenticated runtime behavior. F5 **OPEN**; official T1B-01/T1B-02, runtime UAT and hosted restore **Not tested**.
