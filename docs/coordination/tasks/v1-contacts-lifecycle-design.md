@@ -1,11 +1,12 @@
 # v1-contacts-lifecycle-design
 
-- Status: owner specification complete, all six clarification questions answered; documentation published with this commit under the owner's direct-main instruction. Claude exact-head review pending; no product implementation.
+- Status: final edge-case review claimed on 16 November after the owner's follow-up; initial design is published at `ad9d756b62bc60a999a01a61187e2e53f6fcaeec`. Same two-file documentation scope and direct-main instruction; no product implementation. Claude exact-head review remains pending.
 - Owner/model: Codex. Coordinator: ChatGPT v1. Independent reviewer: Claude, exact document head; review not yet performed.
 - Updated: 16 November 2026, Asia/Singapore.
 - Refreshed main/base: `08791559faf91aeb3307f655a199ed0b2d420580`.
 - Publication parent after a documentation-only main refresh: `8bfd315f9cb7b1893e73cc24c7d2a70ea3f14b2d`.
 - Working branch: `codex/v1-contacts-lifecycle-design`.
+- Final edge-case review base: `ad9d756b62bc60a999a01a61187e2e53f6fcaeec`. Main and all remote heads refreshed; open PR182/183/184 remain at the exact heads already inventoried below, with no overlap.
 - Owner instruction: define Contacts as sequentially updated records and partial working drafts; record the clarified Contacts/Deploy/Roster lifecycle in a Markdown document **on main**, and ask remaining policy questions. This explicitly authorises publishing this documentation to main; it does not authorise product changes, merging unrelated PRs, deployment, migration, live data or provider activity.
 
 ## Exact documentation scope
@@ -34,6 +35,8 @@ All clarification questions are settled by the owner on 16 November:
 - New Roster ad hoc people default to long-term Active = No, with selected-day/period activation. New Deploy teachers default to Active = Yes.
 
 No remaining owner questions for this design. No product implementation scope is opened by the documentation.
+
+Final-round owner clarification: **Duplicate version refreshes existing teachers from current Contacts too**, while retaining planning assignments and teachers that exist only in the selected version with their stable IDs. The follow-up will specify this, inspect publication/retry ordering, draft-only identity reuse, namespace lifetime, stored blanks versus derived tags, and import/timestamp behavior. Recommendations remain distinct from owner policy; no hosted behavior or fix will be claimed.
 
 ## Verification and handoff
 
