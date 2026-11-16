@@ -10,6 +10,7 @@ export async function startProduct({
   persistPath,
   port = 0,
   bindings = {},
+  providerFetch,
   migrateSchemas = true,
 } = {}) {
   const progress = (step) => {
@@ -80,6 +81,7 @@ export async function startProduct({
       script: await localScript("web"),
       compatibilityDate,
       bindings: common,
+      ...(providerFetch ? { outboundService: providerFetch } : {}),
       serviceBindings: { ...services, ASSETS: assets },
     },
     ...(await Promise.all(
@@ -89,6 +91,7 @@ export async function startProduct({
         script: await localScript(d),
         compatibilityDate,
         bindings: common,
+        ...(providerFetch ? { outboundService: providerFetch } : {}),
         serviceBindings:
           d === "roster"
             ? {
