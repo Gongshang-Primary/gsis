@@ -42,3 +42,11 @@ Verify that the free-text controls provide equivalent validation, permitted valu
 Entered the four 2027 SIUE values through the destination frontend and clicked Apply settings. Save to online stayed disabled because Deploy found a duplicate timetable name involving an inactive teacher in the existing dataset. The blocker prevents saving unrelated relief settings. No save succeeded. Discard was attempted and its result could not be verified because browser control timed out while checking the confirmation. Check for that pending dialog or unsaved draft before the next edit.
 
 Version switch UX: the selected label updated before its grid did during the 2026 switch. Wait for matching grid contents before comparing or editing. Matching IP counts do not establish cell-by-cell parity. Remaining Deploy panels, exact assignments and later viewports still need frontend checks. Roster remains last.
+
+## 2026-11-16 19:59:09 SGT rebuild preflight
+
+Owner order: rebuild and publish 2026 Deploy from v0.9, rebuild Contacts in Edit Info, then rebuild 2027 and leave it unpublished. D1 deletion is authorised. Rebuild writes use the frontend.
+
+The legacy 2026 source has an unpublished working draft and displays “Published r19 in force”. Use the selected draft as the clone source. The v1 2027 editor still reports that its earlier save did not commit and retains pending changes. These must be reviewed separately from the 2026 rebuild.
+
+The checked Deploy table import path requires existing row keys and directs the editor to use the owning UI for adding or removing records. The legacy IP export is scoped to the displayed table. A full frontend restore from an empty destination has yet to be demonstrated. Contacts permanent staff IDs also support downstream lookup and accepted authority. No data was cleared or published during preflight.
