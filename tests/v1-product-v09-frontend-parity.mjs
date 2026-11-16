@@ -5,6 +5,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { JSDOM } from 'jsdom';
 import * as builder from '../scripts/v1/build-web.mjs';
+import { RELEASE_LABEL } from '../v1/release.mjs';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 const modules = JSON.parse(await readFile(path.join(root, 'v1/web/modules.json'), 'utf8'));
@@ -51,7 +52,7 @@ try {
     const source = sources.get(module.id);
     const built = await readFile(path.join(output, module.id, 'index.html'), 'utf8');
     const labels = readChrome(built, module.id);
-    assert(labels.some(text => /\bv1\b/.test(text)), `${module.id}: built application chrome identifies v1; received ${JSON.stringify(labels)}`);
+    assert(labels.some(text => text.includes(RELEASE_LABEL)), `${module.id}: built application chrome identifies v1; received ${JSON.stringify(labels)}`);
     assert(labels.every(text => !text.includes('v' + gsisBuildLabel)), `${module.id}: source release must not identify the v1 application`);
     assert.deepEqual(assetQueries(built), assetQueries(source), `${module.id}: preserve all asset query versions, including suffixes`);
     assert.equal(await readFile(sourcePath, 'utf8'), source, `${module.id}: building does not rewrite legacy source`);
@@ -61,7 +62,7 @@ try {
     const futureLabel = '0.9.9zz';
     const futureSource = source.replaceAll(gsisBuildLabel, futureLabel);
     const futureBuilt = builder.normaliseReleaseChrome(futureSource, futureLabel);
-    assert(readChrome(futureBuilt, module.id).some(text => /\bv1\b/.test(text)), `${module.id}: future source label is not hardcoded`);
+    assert(readChrome(futureBuilt, module.id).some(text => text.includes(RELEASE_LABEL)), `${module.id}: future source label is not hardcoded`);
     assert.deepEqual(assetQueries(futureBuilt), assetQueries(futureSource), `${module.id}: future asset cache stamps remain intact`);
   }
 
@@ -77,11 +78,11 @@ try {
 <script src="/app.js?v=${label}">/* v${label} */</script><!-- v${label} -->
 </body></html>`;
   const expected = fixture
-    .replace(`<title>GSiS &amp; test v${label}</title>`, '<title>GSiS &amp; test v1</title>')
-    .replace(`<span>v${label}</span>`, '<span>v1</span>')
-    .replace(`>Contacts v${label}</small>`, '>Contacts v1</small>')
-    .replace(`class="release-label">v${label}</span>`, 'class="release-label">v1</span>')
-    .replace(`class="app-footer">GSiS v${label}</footer>`, 'class="app-footer">GSiS v1</footer>');
+    .replace(`<title>GSiS &amp; test v${label}</title>`, `<title>GSiS &amp; test ${RELEASE_LABEL}</title>`)
+    .replace(`<span>v${label}</span>`, `<span>${RELEASE_LABEL}</span>`)
+    .replace(`>Contacts v${label}</small>`, `>Contacts ${RELEASE_LABEL}</small>`)
+    .replace(`class="release-label">v${label}</span>`, `class="release-label">${RELEASE_LABEL}</span>`)
+    .replace(`class="app-footer">GSiS v${label}</footer>`, `class="app-footer">GSiS ${RELEASE_LABEL}</footer>`);
   assert.equal(builder.normaliseReleaseChrome(fixture, label), expected,
     'patch only current chrome text bytes; retain attributes, entities, scripts, comments and historical versions exactly');
 
@@ -89,8 +90,8 @@ try {
   const landmarkBuilt = await readFile(path.join(output, 'layout/landmark.html'), 'utf8');
   const before = new JSDOM(landmarkSource), after = new JSDOM(landmarkBuilt);
   try {
-    assert(after.window.document.title.includes('v1'));
-    assert(after.window.document.querySelector('header').textContent.includes('Landmark v1'));
+    assert(after.window.document.title.includes(RELEASE_LABEL));
+    assert(after.window.document.querySelector('header').textContent.includes('Landmark '+RELEASE_LABEL));
     for (const selector of ['.sidebar-footer', '#infoPanel']) {
       assert.equal(after.window.document.querySelector(selector).textContent,
         before.window.document.querySelector(selector).textContent, `${selector}: retain historical Landmark notes`);

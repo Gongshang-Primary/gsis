@@ -10,6 +10,7 @@ import { JSDOM } from 'jsdom';
 import { CONTACT_GRID_SCHEMA } from '../../v1/services/contacts/grid-projection.mjs';
 import { previewTTb } from '../../v1/contacts/direct-fields.mjs';
 import { removeRosterQuietMode } from './remove-roster-quiet-mode.mjs';
+import { RELEASE_LABEL } from '../../v1/release.mjs';
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'../..');
 const modules=JSON.parse(await readFile(path.join(root,'v1/web/modules.json'),'utf8'));
 const {gsisBuildLabel}=JSON.parse(await readFile(path.join(root,'package.json'),'utf8'));
@@ -18,14 +19,15 @@ const omitted=/^(?:_worker\.js|_routes\.json|edge-.*|timetable-preparation\..*|t
 const forbidden=/https?:\/\/(?:script\.google\.com|script\.googleusercontent\.com)(?:\/|\b)/i;
 const productionHosts={ 'gsps-gsis.pages.dev':'contacts','gsps-deploy.pages.dev':'deploy','gsps-layout.pages.dev':'layout','gsps-roster.pages.dev':'roster','gsps-calendar.pages.dev':'calendar','gsps-venues.pages.dev':'venues','gsps-lord.pages.dev':'lord','gsps-overlord.pages.dev':'overlord','gsps-starlord.pages.dev':'starlord'};
 const textExtensions=new Set(['.js','.mjs','.html','.css','.json','.svg','.txt','.md']);
-export function normaliseReleaseChrome(source, sourceLabel) {
+export function normaliseReleaseChrome(source, sourceLabel, {ensureHeaderLabel = false, labelTitle = false} = {}) {
  if(typeof sourceLabel !== 'string' || !/^\d+\.\d+\.\d+[a-z]*$/i.test(sourceLabel)) throw Error('Invalid source build label');
- if(!source.includes('v'+sourceLabel)) return source;
+ if(!source.includes('v'+sourceLabel) && !source.includes('data-gsis-release') && !ensureHeaderLabel && !labelTitle) return source;
  // Locate current application chrome, then patch only its original text bytes.
  // Serializing the DOM would also rewrite unrelated markup, scripts and URLs.
  const dom=new JSDOM(source,{includeNodeLocations:true});
  try {
   const {document,NodeFilter}=dom.window,edits=[];
+  const markers=[...document.querySelectorAll('[data-gsis-release]')];
   const token=new RegExp('(?<![\\w.-])v'+sourceLabel.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'(?![\\w.-])','g');
   const walker=document.createTreeWalker(document,NodeFilter.SHOW_TEXT);
   for(let node=walker.nextNode();node;node=walker.nextNode()) {
@@ -33,8 +35,22 @@ export function normaliseReleaseChrome(source, sourceLabel) {
    if(!parent?.closest('title,header,.suite-release,.release-label,.release-version,.app-footer') || parent.closest('script,style,template')) continue;
    const location=dom.nodeLocation(node);
    if(!location) continue;
-   const old=source.slice(location.startOffset,location.endOffset),value=old.replace(token,'v1');
+   const old=source.slice(location.startOffset,location.endOffset);
+   let value=old.replace(token,RELEASE_LABEL);
+   if((markers.length || labelTitle) && parent.tagName==='TITLE' && !value.includes(RELEASE_LABEL)) value+=' · '+RELEASE_LABEL;
    if(value!==old) edits.push([location.startOffset,location.endOffset,value]);
+  }
+  for(const marker of markers) {
+   const location=dom.nodeLocation(marker);
+   if(!location?.startTag || !location.endTag || marker.childNodes.length) throw Error('Release marker must be an empty source element');
+   edits.push([location.startTag.endOffset,location.endTag.startOffset,RELEASE_LABEL]);
+  }
+  if(ensureHeaderLabel) {
+   const anchor=document.querySelector('header .product, header .product-name, header h1');
+   const location=anchor && dom.nodeLocation(anchor);
+   if(!location?.endTag) throw Error('Application release header is missing');
+   edits.push([location.endTag.startOffset,location.endTag.startOffset,
+    ' <small data-gsis-release style="font-size:0.55em;font-weight:400;white-space:nowrap">'+RELEASE_LABEL+'</small>']);
   }
   for(const [start,end,value] of edits.sort((a,b)=>b[0]-a[0])) source=source.slice(0,start)+value+source.slice(end);
   return source;
@@ -1049,7 +1065,7 @@ function transform(module,rel,text){
  if(rel.endsWith('.html')){
   text=text.replace(/\b(src|href|action)=(['"])\/(?!\/|api\/)([^'"]*)\2/g,(_m,key,q,value)=>`${key}=${q}/${module.id}/${value}${q}`);
   text=text.replace('</head>',`<meta name="gsis-module" content="${module.id}"><link rel="stylesheet" href="/v1/shared/suite.css"><script src="/v1/shared/client.js"></script><script defer src="/v1/shared/module-shell.js"></script><link rel="stylesheet" href="/v1/shared/core-table.css"><script type="module" src="/v1/shared/core-table.js"></script></head>`);
-  text=normaliseReleaseChrome(text,gsisBuildLabel).replaceAll('Dropdown choices are managed in Deploy.','Dropdown choices and accepted staff facts are managed in Contacts.').replaceAll('Admin access is managed in the backend sheet. Admins can assign or remove SMC access here.','Application access is managed in Core. Accepted SMC, EO and School Leader records are managed separately in Contacts.');
+  text=normaliseReleaseChrome(text,gsisBuildLabel,{ensureHeaderLabel:['lord','starlord','overlord'].includes(module.id)&&rel==='index.html',labelTitle:rel==='index.html'}).replaceAll('Dropdown choices are managed in Deploy.','Dropdown choices and accepted staff facts are managed in Contacts.').replaceAll('Admin access is managed in the backend sheet. Admins can assign or remove SMC access here.','Application access is managed in Core. Accepted SMC, EO and School Leader records are managed separately in Contacts.');
   if(module.id==='contacts'&&rel==='index.html')text=text.replace('</head>','<link rel="stylesheet" href="/v1/shared/contacts-ui.css"><script defer src="/v1/shared/contacts-ui.js"></script></head>');
   if(module.id==='deploy'&&rel==='index.html')text=text.replace('</head>','<script defer src="/v1/shared/deploy-ui.js"></script><script defer src="/v1/shared/deploy-ui-tables.js"></script></head>');
   if(module.id==='roster'&&rel==='index.html')text=text.replace('</head>','<link rel="stylesheet" href="/v1/shared/roster-capacity.css"><script src="/v1/shared/roster-capacity.js"></script><link rel="stylesheet" href="/v1/shared/roster-stapler-resize.css"><script defer src="/v1/shared/roster-stapler-resize.js"></script><script defer src="/v1/shared/roster-table-ui.js"></script></head>');
@@ -1127,7 +1143,7 @@ export async function buildWeb(output=defaultOutput){
   async function walk(dir,relative=''){for(const entry of await readdir(dir,{withFileTypes:true})){const rel=path.join(relative,entry.name);if(omitted.test(entry.name)||entry.name.startsWith('.'))continue;const src=path.join(dir,entry.name),dest=path.join(output,module.id,rel);if(entry.isDirectory()){await walk(src,rel);continue;}if(!entry.isFile())continue;await mkdir(path.dirname(dest),{recursive:true});const bytes=await readFile(src);let content=bytes;if(textExtensions.has(path.extname(rel)))content=Buffer.from(transform(module,rel.replaceAll(path.sep,'/'),bytes.toString('utf8')));await writeFile(dest,content);inventory.push({path:module.id+'/'+rel.replaceAll(path.sep,'/'),source:path.relative(root,src),sha256:createHash('sha256').update(content).digest('hex'),bytes:content.length});}}
   await walk(path.join(root,module.source));
  }
- async function overlay(source,relative=''){for(const entry of await readdir(source,{withFileTypes:true})){const rel=path.join(relative,entry.name),src=path.join(source,entry.name);if(entry.isDirectory()){await overlay(src,rel);continue;}const dest=path.join(output,rel);await mkdir(path.dirname(dest),{recursive:true});await copyFile(src,dest);}}
+ async function overlay(source,relative=''){for(const entry of await readdir(source,{withFileTypes:true})){const rel=path.join(relative,entry.name),src=path.join(source,entry.name);if(entry.isDirectory()){await overlay(src,rel);continue;}const dest=path.join(output,rel);await mkdir(path.dirname(dest),{recursive:true});if(rel.endsWith('.html'))await writeFile(dest,normaliseReleaseChrome(await readFile(src,'utf8'),gsisBuildLabel));else await copyFile(src,dest);}}
  await overlay(path.join(root,'v1/web/overlays'));
  await mkdir(path.join(output,'v1/shared'),{recursive:true});
  for(const entry of await readdir(path.join(root,'v1/web/shared'),{withFileTypes:true})){if(!entry.isFile())continue;await copyFile(path.join(root,'v1/web/shared',entry.name),path.join(output,'v1/shared',entry.name));}
@@ -1135,7 +1151,7 @@ export async function buildWeb(output=defaultOutput){
  const finalAssets=[];const sources=new Map(inventory.map(item=>[item.path,item.source]));
  async function finalWalk(dir,relative=''){for(const entry of await readdir(dir,{withFileTypes:true})){const rel=path.join(relative,entry.name),file=path.join(dir,entry.name);if(entry.isDirectory()){await finalWalk(file,rel);continue;}const bytes=await readFile(file);const relpath=rel.replaceAll(path.sep,'/');finalAssets.push({path:relpath,source:sources.get(relpath)||'v1/web/',sha256:createHash('sha256').update(bytes).digest('hex'),bytes:bytes.length});}}
  await finalWalk(output);finalAssets.sort((a,b)=>a.path.localeCompare(b.path));
- await writeFile(path.join(output,'asset-manifest.json'),JSON.stringify({schemaVersion:1,sourceBaseline:'27fa498657965169b9d971a9caabc33c8b19bc69',modules:modules.map(x=>x.id),assets:finalAssets},null,2)+'\n');
+ await writeFile(path.join(output,'asset-manifest.json'),JSON.stringify({schemaVersion:1,releaseLabel:RELEASE_LABEL,sourceBaseline:'27fa498657965169b9d971a9caabc33c8b19bc69',modules:modules.map(x=>x.id),assets:finalAssets},null,2)+'\n');
  return {output,assets:finalAssets.length,modules:modules.length};
 }
 if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url))console.log(JSON.stringify(await buildWeb(process.argv[2])));
