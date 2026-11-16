@@ -1070,9 +1070,9 @@ function mappedVenues(venueMapping, label) {
     new Set(ids).size === ids.length, "VENUE_MAPPING_INVALID", 409);
   return ids;
 }
-function occupancyRows(day, date, venueMapping, validIds, { allowUnmapped = false } = {}) {
+async function occupancyRows(day, date, venueMapping, validIds, { allowUnmapped = false } = {}) {
   const result = new Map();
-  for (const teacher of day.teachers || [])
+  for (const [teacherIndex, teacher] of (day.teachers || []).entries())
     for (let period = 0; period < (teacher.cells || []).length; period++) {
       const cell = teacher.cells[period],
         timing = day.periods.find((p) => p.period === period);
@@ -1086,23 +1086,39 @@ function occupancyRows(day, date, venueMapping, validIds, { allowUnmapped = fals
         { label: cell[2] },
       );
       for (const venueId of ids) {
-      const start =
+        const start =
           Date.parse(date + "T00:00:00+08:00") + timing.startMinutes * 60000,
-        end = Date.parse(date + "T00:00:00+08:00") + timing.endMinutes * 60000,
-        key = venueId + ":" + start + ":" + end;
-      result.set(key, {
-        venueId,
-        start,
-        end,
-        sourceId: date + ":" + venueId + ":" + period,
-        period,
-        displayName: cell[1] || cell[3] || cell[0],
-      });
+          end = Date.parse(date + "T00:00:00+08:00") + timing.endMinutes * 60000,
+          lesson = {
+            classOrTeachingGroup: String(cell[1] || "").trim(),
+            group: String(cell[3] || "").trim(),
+            subject: String(cell[0] || "").trim(),
+          },
+          identified = !!(lesson.classOrTeachingGroup || lesson.group),
+          key = canonical({ venueId, start, end, lesson,
+            // Without a target, equal subjects do not prove a shared lesson.
+            ...(!identified ? { row: [teacher.staffId || null,
+              teacher.sourceRow || teacher.timetableName || teacher.staffId || String(teacherIndex)] } : {}),
+          });
+        let row = result.get(key);
+        if (!row) {
+          row = { venueId, start, end, period, displayName: cell[1] || cell[3] || cell[0],
+            lesson, demandEvidence: identified ? "identified" : "unresolved", sourceLabels: [], staffIds: [] };
+          result.set(key, row);
+        }
+        if (!row.sourceLabels.includes(cell[2])) row.sourceLabels.push(cell[2]);
+        if (teacher.staffId && !row.staffIds.includes(teacher.staffId)) row.staffIds.push(teacher.staffId);
       }
     }
+  for (const [key, row] of result) {
+    row.sourceId = "lesson:" + await digest(key);
+    row.sourceLabels.sort();
+    row.staffIds.sort();
+  }
   return [...result.values()].sort(
     (a, b) =>
-      a.venueId.localeCompare(b.venueId) || a.start - b.start || a.end - b.end,
+      a.venueId.localeCompare(b.venueId) || a.start - b.start || a.end - b.end ||
+      a.sourceId.localeCompare(b.sourceId),
   );
 }
 async function baselineWrite(ctx) {
@@ -1298,10 +1314,12 @@ async function baselineWrite(ctx) {
     );
     periods = declared;
     chunkRows.push(
-      ...occupancyRows(
+      ...await occupancyRows(
         {
           periods: timing,
           teachers: week.blocks.map((b) => ({
+            staffId: entry.mapping[b.name],
+            sourceRow: b.name,
             cells: b.cells.slice(
               weekday * week.perDay,
               (weekday + 1) * week.perDay,
@@ -2129,7 +2147,7 @@ async function preparePublication(ctx, op, state, c, date, revision) {
     entry = Roster.active(c.entries, date),
     mapping = { ...(entry?.venueMapping || {}), ...(day.venueMapping || {}) };
   for (const id of venueIds) mapping[id] = id;
-  const occupancy = occupancyRows(day, date, mapping, venueIds),
+  const occupancy = await occupancyRows(day, date, mapping, venueIds),
     periods = day.periods.map((p) => ({
       id: String(p.period),
       start: p.startMinutes,
