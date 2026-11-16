@@ -17,6 +17,9 @@ try {
     await page.locator("[data-ops-date]").fill(s.date);
     await page.locator("[data-ops-date]").dispatchEvent("change");
     await page.locator("[data-roster-workload]").getByText(/Estimated workload/).waitFor();
+    // The workload event precedes the asynchronous toolbar render.
+    await page.getByRole("button", { name: "Let teachers see", exact: true }).waitFor({ state: "visible" });
+    await page.getByRole("button", { name: "Send WhatsApp to all affected", exact: true }).waitFor({ state: "visible" });
   }
   await openAllocation();
   assert.equal(await page.locator("[data-quiet-toggle], [data-quiet-note]").count(), 0,
