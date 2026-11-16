@@ -16,6 +16,7 @@ import {
   isRecord,
 } from "./validation.mjs";
 import { ApiError } from "../../runtime/errors.mjs";
+import { normalizeDirectValue } from "../../contacts/direct-fields.mjs";
 function validated(fn, ...args) {
   try {
     return fn(...args);
@@ -122,7 +123,17 @@ const deploymentTagFields = {
   "School Section": "schoolSection",
   "Personnel Category": "personnelCategory",
 };
-export function mergeContacts(doc, projection) {
+// Absence is unknown; null is an explicit Contacts clear; [] is a known empty list.
+export function membershipValue(teacher) {
+  if (!Object.hasOwn(teacher.deploymentTags || {}, "Memberships")) return undefined;
+  return validated(normalizeDirectValue, "memberships", teacher.deploymentTags.Memberships);
+}
+export function setMembershipValue(teacher, value) {
+  const normalized = validated(normalizeDirectValue, "memberships", value);
+  teacher.deploymentTags = { ...teacher.deploymentTags, Memberships: normalized };
+  teacher.groups = normalized === null ? [] : [...normalized];
+}
+export function mergeContacts(doc, projection, { refreshMemberships = false } = {}) {
   check(
     projection &&
       Array.isArray(projection.staff) &&
@@ -134,6 +145,7 @@ export function mergeContacts(doc, projection) {
   );
   const code = (v) =>
     typeof v === "string" ? v : typeof v?.code === "string" ? v.code : "";
+  const previous = new Map(doc.teachers.map((teacher) => [teacher.id, teacher]));
   const people = projection.staff.map((p) => {
     const fields = p.fields || null,
       hasFact = (name) => {
@@ -257,6 +269,16 @@ export function mergeContacts(doc, projection) {
       : missing.length
         ? { state: "unavailable", reasons: missing }
         : { state: "eligible", reasons: [] };
+    // Eligibility always uses current Contacts evidence. Only the ordinary
+    // planning list, including its unknown state, belongs to this saved version.
+    const saved = previous.get(teacher.id);
+    if (!refreshMemberships && saved) {
+      const value = membershipValue(saved);
+      if (value === undefined) {
+        if (teacher.deploymentTags) delete teacher.deploymentTags.Memberships;
+        teacher.groups = [];
+      } else setMembershipValue(teacher, value);
+    }
     return teacher;
   });
   const hrTerms = {},
@@ -716,6 +738,20 @@ export function applyEdits(doc, edits) {
       d.teacherNotes ??= {};
       expect(d.teacherNotes[e.teacher] || "");
       d.teacherNotes[e.teacher] = text(e.value, 4000, true);
+      continue;
+    }
+    if (op === "setTeacherMemberships") {
+      id(e.teacher, "Staff ID");
+      const t = teacher();
+      check(Array.isArray(e.value), "Supply an explicit Memberships list.");
+      check(Object.hasOwn(e, "expected") && (e.expected === null || Array.isArray(e.expected)),
+        "Supply the previous Memberships value.");
+      const expected = e.expected === null ? null : validated(normalizeDirectValue, "memberships", e.expected);
+      check(JSON.stringify(membershipValue(t) ?? null) === JSON.stringify(expected),
+        "Memberships changed; review your retained draft.", "REVISION_CONFLICT", 409);
+      setMembershipValue(t, e.value);
+      d.contactsMemberships = d.teachers.map((person) => [person.id, person.ttbName || person.name,
+        person.profile?.Role || "", (membershipValue(person) || []).join("\n")]);
       continue;
     }
     if (op === "setTeacherField" || op === "upsertTeacherProfile") {

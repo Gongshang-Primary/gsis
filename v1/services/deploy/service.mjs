@@ -73,6 +73,7 @@ const WRITE = new Set([
   "/staff/register",
   "/exports/reconcile",
   "/operations/withdraw",
+  "/memberships/sync",
 ]);
 export function policy(method, path, body = {}) {
   check(
@@ -81,10 +82,10 @@ export function policy(method, path, body = {}) {
     "METHOD_NOT_ALLOWED",
     405,
   );
-  if (path === "/operations/withdraw")
+  if (["/operations/withdraw", "/memberships/sync"].includes(path))
     check(
       method === "POST",
-      "Withdrawal requires POST.",
+      "This operation requires POST.",
       "METHOD_NOT_ALLOWED",
       405,
     );
@@ -103,7 +104,7 @@ export function policy(method, path, body = {}) {
   );
   const write = WRITE.has(path),
     publishing =
-      path === "/publish" ||
+      path === "/publish" || path === "/memberships/sync" ||
       (path === "/change" &&
         ["publish", "retryContactsSync"].includes(body.operation));
   return {
@@ -914,6 +915,7 @@ async function create(ctx) {
       revision: 0,
     },
     p,
+    { refreshMemberships: true },
   );
   validateDocument(doc);
   const metadata = canonical({
@@ -1174,7 +1176,7 @@ async function save(
     (explicitStaffIds.length ||
       edits.some(
         (e) =>
-          ["addTeacher", "initReporting", "setReportingOfficer"].includes(
+          ["addTeacher", "initReporting", "setReportingOfficer", "setTeacherMemberships"].includes(
             e.operation,
           ) ||
           (e.operation === "upsertTeacherProfile" &&
@@ -1606,6 +1608,8 @@ async function publish(ctx) {
       calculated = calculate(document, ref);
     referenceVenues(document);
     validateDocument(document);
+    check(document.teachers.filter(t => Object.hasOwn(t.deploymentTags || {}, "Memberships")).length <= 512,
+      "Memberships publication exceeds the supported 512 staff records.", "PAYLOAD_TOO_LARGE", 413);
     check(
       Number.isInteger(document.year) &&
         document.year >= 2000 &&
@@ -1622,6 +1626,7 @@ async function publish(ctx) {
       sequence = (pointer?.sequence || 0) + 1;
     const envelope = {
       schemaVersion: 1,
+      membershipPublicationVersion: 1,
       calculationVersion: calculated.calculationVersion,
       schoolId: school,
       publicationId,
@@ -1797,6 +1802,8 @@ async function publish(ctx) {
     publicationId: prepared.publication_id,
     sequence: prepared.sequence,
     workingRevision: expected,
+    membershipPublicationVersion: envelope.membershipPublicationVersion,
+    membershipsSync: { state: "pending", publicationId: prepared.publication_id },
     contactsSync: {
       status: "pending",
       publicationCommit: prepared.publication_id,
@@ -1895,6 +1902,63 @@ async function publish(ctx) {
     },
   });
 }
+
+async function membershipProgress(ctx, publicationId) {
+  const row = await one(ctx.env.DB,
+    "SELECT d.state,d.acknowledgement,p.envelope FROM deploy_publications p LEFT JOIN deploy_deliveries d ON d.school_id=p.school_id AND d.publication_id=p.id AND d.recipient='contacts-memberships' WHERE p.school_id=? AND p.id=?",
+    [ctx.principal.schoolId, publicationId]);
+  return row && JSON.parse(row.envelope).membershipPublicationVersion === 1
+    ? { ...(row.acknowledgement ? JSON.parse(row.acknowledgement) : {}),
+      publicationId, state: row.state || "pending" } : null;
+}
+
+/** Each chunk has its own retryable request; every Contacts write retains the
+ * immutable publication identity. No scheduler, external delivery or activation. */
+async function syncMemberships(ctx) {
+  const op = await prepare(ctx, "deploy.publish");
+  if (op.receipt) return { ...op.receipt.result,
+    currentProgress: await membershipProgress(ctx, op.receipt.result.publicationId) };
+  const b = ctx.body, school = ctx.principal.schoolId;
+  const offset = b.offset ?? 0, limit = b.limit ?? 8;
+  check(Number.isSafeInteger(offset) && offset >= 0 && offset <= 512 &&
+    Number.isSafeInteger(limit) && limit >= 1 && limit <= 8, "Invalid Memberships batch.");
+  const pub = await one(ctx.env.DB,
+    "SELECT * FROM deploy_publications WHERE school_id=? AND id=? AND operation_id=? AND version_id=?",
+    [school, id(b.publicationId), id(b.sourceOperationId), id(b.versionId)]);
+  check(pub, "Original publication was not found.", "NOT_FOUND", 404);
+  const source = await operationStatus(ctx.env.DB, school, pub.operation_id);
+  check(source?.state === "committed" && source.action === "deploy.publish",
+    "Original publication is not committed.", "SOURCE_RECEIPT_INVALID", 409);
+  const publication = await publicationById(ctx, pub.id);
+  check(publication.envelope.membershipPublicationVersion === 1,
+    "This historical publication has no Memberships publish-back contract. Publish a new revision.",
+    "MEMBERSHIP_PUBLICATION_UNSUPPORTED", 409);
+  const progress = await serviceCall(ctx.env, "contacts", "/internal/membership-publication", {
+    schoolId: school, publicationId: pub.id, sourceOperationId: source.operationId,
+    sourceDigest: source.digest, sourceFence: source.fence, decisionId: pub.decision_id,
+    offset, limit,
+  });
+  check(progress?.publicationId === pub.id && ["applied", "pending"].includes(progress.state) &&
+    Number.isSafeInteger(progress.total) && progress.total >= 0 && progress.total <= 512 &&
+    Number.isSafeInteger(progress.completed) && progress.completed >= 0 && progress.completed <= progress.total &&
+    Number.isSafeInteger(progress.appliedCount) && progress.appliedCount >= 0 &&
+    Number.isSafeInteger(progress.supersededCount) && progress.supersededCount >= 0 &&
+    progress.appliedCount + progress.supersededCount === progress.completed &&
+    (progress.state !== "applied" || progress.completed === progress.total) &&
+    Number.isSafeInteger(progress.nextOffset) && progress.nextOffset >= 0 && progress.nextOffset <= progress.total &&
+    Array.isArray(progress.results) && progress.results.length <= limit,
+    "Memberships application has not been confirmed.", "DELIVERY_UNCONFIRMED", 503);
+  const result = { ...progress, saved: true, sourceOperationId: source.operationId,
+    versionId: pub.version_id, operationId: op.operationId };
+  const saved = await finish(ctx, op, [{
+    sql: "INSERT INTO deploy_deliveries(school_id,publication_id,recipient,state,attempts,acknowledgement) VALUES(?,?,'contacts-memberships',?,1,?) ON CONFLICT(school_id,publication_id,recipient) DO UPDATE SET state=CASE WHEN deploy_deliveries.state='applied' THEN 'applied' ELSE excluded.state END,attempts=deploy_deliveries.attempts+1,acknowledgement=CASE WHEN deploy_deliveries.state='applied' THEN deploy_deliveries.acknowledgement ELSE excluded.acknowledgement END,last_error=NULL",
+    args: [school, pub.id, progress.state, canonical(progress)],
+  }], [], result, { audit: { publicationId: pub.id, membershipsBatch: offset,
+    membershipState: progress.state, sourceOperationId: source.operationId } });
+  // The receipt records this request's observation; a concurrently completed
+  // request may already have advanced the durable aggregate beyond it.
+  return { ...saved, currentProgress: await membershipProgress(ctx, pub.id) };
+}
 export async function handle(ctx) {
   ctx.body = plain(ctx.body || {});
   const p = ctx.path,
@@ -1907,6 +1971,7 @@ export async function handle(ctx) {
     401,
   );
   if (p === "/operations/withdraw") return withdrawOperation(ctx);
+  if (p === "/memberships/sync") return syncMemberships(ctx);
   if (p.startsWith("/internal/pins/")) {
     await requireMembership(ctx.env, ctx.request);
     if (p.endsWith("/acquire")) {
@@ -2224,7 +2289,7 @@ export async function handle(ctx) {
       const payload = pub
         ? await publicationById(ctx, pub.id)
         : prepared
-          ? { document: JSON.parse(prepared.document) }
+          ? { document: JSON.parse(prepared.document), envelope: JSON.parse(prepared.envelope) }
           : null;
       return {
         state: op.state,
@@ -2238,6 +2303,8 @@ export async function handle(ctx) {
         decisionId: op.decisionId,
         publicationId: pub?.id || prepared?.publication_id || null,
         sequence: pub?.sequence || prepared?.sequence || null,
+        membershipPublicationVersion: payload?.envelope?.membershipPublicationVersion,
+        membershipsSync: pub ? await membershipProgress(ctx, pub.id) : null,
         contributions: payload
           ? contributions(
               payload.document,
@@ -2267,6 +2334,9 @@ export async function handle(ctx) {
       receipt: op.receipt,
       operationId,
       currentPointer: current,
+      ...(op.receipt?.result?.publicationId ? {
+        membershipsSync: await membershipProgress(ctx, op.receipt.result.publicationId),
+      } : {}),
     };
   }
   if (p === "/auditPage") {
@@ -2562,7 +2632,7 @@ export async function internal(ctx) {
   return value;
 }
 
-function contributions(doc, publicationId, operationId, actorId) {
+function contributions(doc, publicationId, operationId, actorId, envelope = {}) {
   const fields = {
     "Basic Name": "basicName",
     Role: "role",
@@ -2571,7 +2641,7 @@ function contributions(doc, publicationId, operationId, actorId) {
     "Subject Modifier": "subjectTags",
     Active: "employmentActive",
   };
-  return Object.entries(doc.teacherDrafts || {}).flatMap(([staffId, values]) =>
+  const ordinary = Object.entries(doc.teacherDrafts || {}).flatMap(([staffId, values]) =>
     Object.entries(values)
       .filter(([field]) => Object.hasOwn(fields, field))
       .map(([field, value]) => ({
@@ -2589,6 +2659,22 @@ function contributions(doc, publicationId, operationId, actorId) {
         originalActorId: actorId,
       })),
   );
+  // This marker is part of the immutable payload. Never reinterpret historical
+  // publications after a code upgrade, or turn unknown facts into empty lists.
+  if (envelope.membershipPublicationVersion !== 1) return ordinary;
+  return ordinary.concat(doc.teachers
+    .filter(t => Object.hasOwn(t.deploymentTags || {}, "Memberships"))
+    .map(t => ({
+      staffId: t.id,
+      field: "memberships",
+      proposedValue: t.deploymentTags.Memberships ?? [],
+      acceptedBaseFieldRevision: t.fieldRevisions?.memberships ?? 0,
+      validFrom: envelope.publishedAt,
+      sourcePublicationId: publicationId,
+      sourceOperationId: operationId,
+      originalActorId: actorId,
+      membershipPublicationVersion: 1,
+    })));
 }
 async function verifyDelivery(ctx) {
   const b = ctx.body,
@@ -2627,6 +2713,24 @@ async function verifyDelivery(ctx) {
       "SELECT * FROM deploy_pointer WHERE school_id=?",
       [school],
     );
+  if (b.membershipOnly === true) {
+    const members = contributions(view.document, pub.id, op.operationId, op.actorId, view.envelope)
+      .filter(c => c.field === "memberships" && c.membershipPublicationVersion === 1);
+    const offset = b.offset ?? 0, limit = b.limit ?? 8;
+    check(Number.isSafeInteger(offset) && offset >= 0 && offset <= members.length &&
+      Number.isSafeInteger(limit) && limit >= 1 && limit <= 8, "Invalid Memberships proof page.");
+    const selected = b.staffId === undefined ? members.slice(offset, offset + limit)
+      : members.filter(c => c.staffId === id(b.staffId, "staff"));
+    return {
+      schoolId: school, publicationId: pub.id, sourceOperationId: op.operationId,
+      sourceDigest: op.digest, sourceFence: op.fence, decisionId: pub.decision_id,
+      state: "committed", sequence: pub.sequence, publishedAt: view.envelope.publishedAt,
+      membershipPublicationVersion: view.envelope.membershipPublicationVersion,
+      payloadDigest: view.digest, currentPublicationId: pointer?.publication_id || null,
+      currentSequence: pointer?.sequence || 0, current: pub.id === pointer?.publication_id,
+      total: members.length, contributions: selected,
+    };
+  }
   return {
     schoolId: school,
     publicationId: pub.id,
@@ -2870,7 +2974,7 @@ export async function scheduled({ env, now = Date.now() }) {
   });
   await statement(
     env.DB,
-    "UPDATE deploy_deliveries SET state='applied',last_error=NULL WHERE school_id=? AND recipient='contacts' AND EXISTS(SELECT 1 FROM product_outbox j WHERE j.school_id=deploy_deliveries.school_id AND j.job_id LIKE deploy_deliveries.publication_id||'.contacts.%') AND NOT EXISTS(SELECT 1 FROM product_outbox j WHERE j.school_id=deploy_deliveries.school_id AND j.job_id LIKE deploy_deliveries.publication_id||'.contacts.%' AND j.state<>'delivered')",
+    "UPDATE deploy_deliveries SET state=CASE WHEN EXISTS(SELECT 1 FROM deploy_publications p WHERE p.school_id=deploy_deliveries.school_id AND p.id=deploy_deliveries.publication_id AND json_extract(p.envelope,'$.membershipPublicationVersion')=1) THEN 'ingested' ELSE 'applied' END,last_error=NULL WHERE school_id=? AND recipient='contacts' AND EXISTS(SELECT 1 FROM product_outbox j WHERE j.school_id=deploy_deliveries.school_id AND j.job_id LIKE deploy_deliveries.publication_id||'.contacts.%') AND NOT EXISTS(SELECT 1 FROM product_outbox j WHERE j.school_id=deploy_deliveries.school_id AND j.job_id LIKE deploy_deliveries.publication_id||'.contacts.%' AND j.state<>'delivered')",
     [env.SCHOOL_ID],
   ).run();
   await statement(
@@ -2894,6 +2998,21 @@ export async function readContactsDeployment(env, input, now = Date.now()) {
     "SELECT * FROM deploy_pointer WHERE school_id=?",
     [env.SCHOOL_ID],
   );
+  if (input.purpose === "memberships-order") {
+    if (!pointer) return { schoolId: env.SCHOOL_ID, sequence: 0,
+      revision: "absent", publicationId: null };
+    const publication = await publicationById(
+      { env, principal: { schoolId: env.SCHOOL_ID } }, pointer.publication_id);
+    check(Number.isSafeInteger(pointer.sequence) && pointer.sequence > 0 &&
+      pointer.revision === String(pointer.sequence) &&
+      publication.sequence === pointer.sequence &&
+      publication.envelope.publicationSequence === pointer.sequence &&
+      publication.envelope.publicationId === pointer.publication_id &&
+      publication.envelope.schoolId === env.SCHOOL_ID,
+      "Publication frontier could not be verified.", "PAYLOAD_INTEGRITY", 503);
+    return { schoolId: env.SCHOOL_ID, sequence: pointer.sequence,
+      revision: pointer.revision, publicationId: pointer.publication_id };
+  }
   if (!pointer)
     return {
       available: false,

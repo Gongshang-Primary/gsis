@@ -24,7 +24,9 @@ export async function authorizeContribution(env, input, now) {
     env,
     "deploy",
     "/internal/publication/verify",
-    { schoolId: env.SCHOOL_ID, ...input.source },
+    { schoolId: env.SCHOOL_ID, ...input.source,
+      ...(input.contribution?.field === "memberships" && input.contribution.membershipPublicationVersion === 1
+        ? { membershipOnly: true, staffId: input.contribution.staffId } : {}) },
   );
   fail(proof.state === "committed");
   const match = proof.contributions?.find(
@@ -121,6 +123,16 @@ export async function authorizeContribution(env, input, now) {
     sourcePublicationId: input.source.publicationId,
     contributionId: input.contributionId,
   };
+  if (match.field === "memberships" && match.membershipPublicationVersion === 1) {
+    fail(Number.isSafeInteger(proof.sequence) && proof.sequence > 0 &&
+      Number.isSafeInteger(match.validFrom), "PUBLICATION_UNVERIFIED");
+    // The immutable publication deliberately overwrites earlier ordinary
+    // Memberships. Contacts still guards its current field revision and the
+    // pinned publication frontier; the old draft-copy revision is not a veto.
+    delete intent.fieldRevisions;
+    intent.membershipPublicationVersion = 1;
+    intent.membershipPublicationSequence = proof.sequence;
+  }
   fail(
     [
       "basicName",
