@@ -54,3 +54,18 @@ How I read it, for builders:
 One point is not settled by these words: what "boot" does to the booking record. The design's rule 6 says the booking is kept and flagged as a conflict, and nothing is cancelled automatically. I read "can boot" as consistent with that: the timetable stays in force, the booking loses the room and is flagged for its owner to move or cancel. If the owner means the booking is cancelled automatically, that changes rule 6 and needs the owner to say so. Until then, build rule 6 as written.
 
 **Sequencing.** The owner also told Claude that Codex should proceed to build the new designs now, without waiting for a deployment of the already merged fixes. Claude's recommendation to deploy and verify first is withdrawn as a gate. It remains advice: keep a deployment checklist current in parallel.
+
+## Owner responses, 16 Nov 2026 (given to Claude in session `session_01L5sZ14xpe864PwuPQKyrDF`)
+
+**Q-1, booking on dates the timetable does not cover.** Owner: "yes means book available not used by timetable, can boot".
+
+What is decided: a room that the imported timetable does not show as used may be booked. This includes dates outside the timetable's coverage. "Unknown" must not be treated as "blocked". Show the booker that no timetable covers the date.
+
+What is **not** yet clear: the words "can boot". Two readings exist and they lead to different code.
+
+1. A typing slip for "can book". Then nothing more follows, and design decision 6 stands: a later timetable that clashes keeps the booking and flags the conflict.
+2. "Can be booted": a later timetable may remove (displace) such a booking. That would reverse design decision 6 for bookings made without timetable coverage.
+
+Builders: implement the decided part. Do not implement displacement. Decision 6 stands until the owner says otherwise in plain words.
+
+**R-4, sequencing.** I recommended that the three new designs wait for one deployment and one hosted check. Owner: "wish for codex to work". The owner has decided that Codex may start implementing the new designs now. My recommendation is withdrawn as a gate. The attribution risk it described remains and is the owner's accepted risk. Each implementation still needs its own bounded claim and exact-head review.
