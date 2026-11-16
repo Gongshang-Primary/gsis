@@ -69,3 +69,15 @@ What is **not** yet clear: the words "can boot". Two readings exist and they lea
 Builders: implement the decided part. Do not implement displacement. Decision 6 stands until the owner says otherwise in plain words.
 
 **R-4, sequencing.** I recommended that the three new designs wait for one deployment and one hosted check. Owner: "wish for codex to work". The owner has decided that Codex may start implementing the new designs now. My recommendation is withdrawn as a gate. The attribution risk it described remains and is the owner's accepted risk. Each implementation still needs its own bounded claim and exact-head review.
+
+### Clarification from the owner, 16 Nov 2026
+
+Asked what "can boot" meant, the owner answered: "if timetbale for a venue is blank, means venue unused, user can book it".
+
+This settles Q-1:
+
+1. A venue with no timetable entry for the requested time is treated as unused. The user can book it.
+2. That holds whether the blank is inside the timetable's covered dates or on a date no timetable covers. Do not block a booking because coverage is missing. A notice that no timetable covers the date is still useful, but it is information, not a gate.
+3. The earlier words were about booking. The owner has given no instruction to remove or displace a booking. **Design decision 6 stands:** when a later timetable clashes with an existing booking, the timetable is accepted, the booking is kept, and the conflict is flagged.
+
+This narrows one sentence of the design. Section 4 says availability outside verified coverage is "unknown rather than proven free". For booking admission, the owner's rule is now: blank means bookable. Keep "unknown" only as a display distinction, never as a refusal. Capacity, closures, buffers, other bookings and permission checks still apply as designed.
