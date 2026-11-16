@@ -1,6 +1,6 @@
 # v1 baseline venue demand preservation — first implementation
 
-Model: Codex. Status: claimed. Coordinator: ChatGPT v1. Reviewer: Muse, exact head (owner role directive `claude/zealous-archimedes-4i2lv1` at `12b06eb43cb0a6f1a6eca7c787b22100c6a57875`). Branch: `codex/v1-roster-venue-demands`. Base: main `30559ad8ceefe8eb79126713d1892ec2a7189b11`. Updated: 16 November 2026.
+Model: Codex. Status: implemented; verification/CI and review in progress. Coordinator: ChatGPT v1. Reviewer: Muse, exact head (owner role directive `claude/zealous-archimedes-4i2lv1` at `12b06eb43cb0a6f1a6eca7c787b22100c6a57875`). Branch: `codex/v1-roster-venue-demands`. Base: main `30559ad8ceefe8eb79126713d1892ec2a7189b11`; accepted claim `963ea2dcbd0388286ad4240b58bb6142e761c02f`. Updated: 16 November 2026.
 
 Authority: owner 16 November work order 3(e), first claim only; `docs/v1/venues/VENUE_ALLOCATION_LIFECYCLE_DESIGN.md` and controlling owner answers in `docs/coordination/review/v1-venue-allocation-design-claude-review.md`, most recent `dc68df083cd905b8527813ee4b89dc9ac2a99c49`. No displacement is authorised. Blank timetable time remains bookable subject to ordinary checks; this package does not change booking admission or coverage policy.
 
@@ -29,3 +29,13 @@ The staged projection already retains distinct source IDs and keys per row. Pres
 One real built-browser/Worker/D1 regression must first fail on main, then pass with two distinct simultaneous classes; repeated same-lesson co-teacher rows do not double-count; raw split labels remain recoverable; multi-room mapping preserves each physical demand; empty target evidence is retained and flagged; foreign venue, stale revision and unauthorized import still fail. Exact retry/restart retain source identity and do not create another import. Run canonical build, existing Roster mapping/Venues regressions, runner discovery and required exact-head CI; record all omissions. Changed display: existing source lists can retain both class demands; no layout/control removal.
 
 No new migration, shared v0.9 edit, allocation policy, provider operation, live data, deployment or activation. No security guard is weakened. F5 OPEN; official T1B-01/T1B-02 and runtime UAT Not tested. Pending PR and Muse review; no completion claim yet.
+
+## Verification checkpoint
+
+- Q01: exact five paths above; no overlapping implementation files in the refreshed open PRs or Google connection claim. No probe allow-list entry is removed: this fixes import data loss, not an unsupported operation name.
+- Q02: the [handoff](../../v1/venues/BASELINE_DEMAND_HANDOFF.md) identifies Roster's immutable evidence and Venues' narrower SQL projection. Existing per-owner transactions and physical fences remain intact.
+- Q03/Q04: new real built-browser/Worker/D1-R2 regression failed on main (1 demand, expected 2), then passed with distinct classes, co-teachers, raw aliases, unresolved targets, multi-room mappings, authorization/revision denial, receipt retry and restart recovery. Non-staged adoption has a supplementary actual-D1 test with synthetic proof adapters.
+- Q05: no dependency, migration, new catalogue inference or permission change. Original fence digest/SQL budget is preserved; existing source-artifact and projection bounds remain. Cell tuples are not aSc activity UUIDs; exact capacity admission is deferred explicitly.
+- Q06: `TZ=Asia/Singapore GSIS_BROWSER_EXECUTABLE=/usr/bin/chromium node tests/v1-product-roster-venue-demands.mjs` passed. Existing baseline mapping, Roster/Venues and Venues programs passed. The unchanged source-fence budget regression passes all eight groups after the compatibility fix; staged projection passes 40,800 intervals / 160 chunks with restart and atomic adoption. `TZ=Asia/Singapore npm run build` completed without generated drift; discovery is 108 product / 1209 Node programs including the new test. Required exact-head CI and the complete product suite remain pending and will be linked in the PR.
+- Q07: Muse exact-head review pending. Visible change and deferred venue capabilities are stated in the handoff.
+- Q08: no deployment, migration, provider operation, live read/write or activation. F5 OPEN; T1B-01/T1B-02 and hosted/runtime UAT Not tested.

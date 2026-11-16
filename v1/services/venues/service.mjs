@@ -864,7 +864,7 @@ async function command(ctx, input) {
   await resolveAdmission(ctx.env, ctx.env.DB, op, admission, receipt, ctx.now);
   return receipt.result;
 }
-function scopeRows(projection) {
+function scopeRows(projection, { preserveDemands = false } = {}) {
   const rows = projection?.occupancies || projection?.occupancy;
   need(
     Array.isArray(rows) && rows.length <= 10000,
@@ -897,15 +897,23 @@ function scopeRows(projection) {
       (a, b) =>
         a.venueId.localeCompare(b.venueId) ||
         a.start - b.start ||
-        a.end - b.end,
+        a.end - b.end ||
+        (preserveDemands ? a.sourceId.localeCompare(b.sourceId) : 0),
     );
   return mapped.filter(
     (r, i) =>
       !i ||
       r.venueId !== mapped[i - 1].venueId ||
       r.start !== mapped[i - 1].start ||
-      r.end !== mapped[i - 1].end,
+      r.end !== mapped[i - 1].end ||
+      (preserveDemands && r.sourceId !== mapped[i - 1].sourceId),
   );
+}
+function physicalScopes(rows) {
+  // Fences reserve physical intervals; adoption retains each lesson demand.
+  return [...new Map(rows.map(({ venueId, start, end }) =>
+    [canonical([venueId, start, end]), { venueId, start, end }])).values()]
+    .sort((a, b) => a.venueId.localeCompare(b.venueId) || a.start - b.start || a.end - b.end);
 }
 async function sourceProof(ctx, input) {
   const s = input.schoolId;
@@ -1308,7 +1316,8 @@ export async function sourceComplete(ctx) {
     [x.schoolId, x.sourceDomain, x.sourceOperationId],
   );
   const sourceCommitted = proof.state === "committed",
-    scopes = sourceCommitted && !stagedRow ? scopeRows(proof.projection) : [],
+    scopes = sourceCommitted && !stagedRow
+      ? scopeRows(proof.projection, { preserveDemands: true }) : [],
     stored = await query(
       ctx.env.DB,
       "SELECT venue_id AS venueId,start_at AS start,end_at AS end FROM venues_fence_scopes WHERE school_id=? AND source_domain=? AND source_operation_id=? AND end_at>start_at ORDER BY venue_id,start_at,end_at",
@@ -1332,9 +1341,7 @@ export async function sourceComplete(ctx) {
       );
     else
       need(
-        canonical(
-          scopes.map(({ venueId, start, end }) => ({ venueId, start, end })),
-        ) === canonical(stored),
+        canonical(physicalScopes(scopes)) === canonical(stored),
         "SOURCE_SCOPE_MISMATCH",
         "Committed projection differs from fenced scope.",
         409,
