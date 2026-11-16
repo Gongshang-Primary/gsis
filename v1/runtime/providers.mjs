@@ -1,4 +1,6 @@
 import { ApiError, requireValue, readJson } from "./errors.mjs";
+import { helperEnabled, helperAccessToken } from "./google-drive-credential.mjs";
+import { serviceCall } from "./admission.mjs";
 const encoder = new TextEncoder();
 export async function secretEquals(expected, provided) {
   if (typeof expected !== "string" || !expected || typeof provided !== "string")
@@ -30,7 +32,7 @@ const b64url = (bytes) =>
     .replaceAll("+", "-")
     .replaceAll("/", "_")
     .replace(/=+$/, "");
-async function fetchProvider(env, url, init = {}) {
+export async function fetchProvider(env, url, init = {}) {
   const host = new URL(url).hostname;
   requireValue(
     [
@@ -112,6 +114,13 @@ async function jsonResponse(response, maxBytes = 1048576) {
   return data;
 }
 export async function googleAccessToken(env, scopes) {
+  if (helperEnabled(env)) {
+    const token = env.SERVICE_NAME === "core"
+      ? await helperAccessToken(env, scopes, fetchProvider)
+      : await serviceCall(env, "core", "/internal/google-helper-access", { schoolId: env.SCHOOL_ID, service: env.SERVICE_NAME, scopes });
+    requireValue(typeof token.accessToken === "string" && token.accessToken.length <= 8192 && token.expiresAt > Date.now(), "GOOGLE_HELPER_TOKEN_INVALID", 502);
+    return token.accessToken;
+  }
   if (env.GOOGLE_ACCESS_TOKEN) return env.GOOGLE_ACCESS_TOKEN;
   requireValue(env.GOOGLE_SERVICE_ACCOUNT, "GOOGLE_NOT_CONFIGURED", 503);
   let account;
@@ -308,7 +317,7 @@ export async function dispatchProvider(env, job) {
       );
       if (job.fileId) {
         requireValue(/^[A-Za-z0-9_-]+$/.test(job.fileId), "FILE_ID_INVALID");
-        url = `https://www.googleapis.com/upload/drive/v3/files/${job.fileId}?uploadType=media`;
+        url = `https://www.googleapis.com/upload/drive/v3/files/${job.fileId}?uploadType=media&supportsAllDrives=true`;
         init = {
           method: "PATCH",
           headers: {
@@ -341,7 +350,7 @@ export async function dispatchProvider(env, job) {
         multipart.set(content, first.length);
         multipart.set(last, first.length + content.length);
         url =
-          "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart";
+          "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&supportsAllDrives=true";
         init = {
           method: "POST",
           headers: {

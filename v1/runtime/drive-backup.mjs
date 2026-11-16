@@ -1,6 +1,7 @@
 /** Google archive transport. Callers persist generated identities before any write. */
 import { ApiError, requireValue } from "./errors.mjs";
 import { googleAccessToken } from "./providers.mjs";
+import { googleConfigured } from "./google-drive-credential.mjs";
 const MAX_BYTES = 8 * 1024 * 1024;
 export async function sha256Bytes(bytes) {
   return [...new Uint8Array(await crypto.subtle.digest("SHA-256", bytes))]
@@ -27,6 +28,7 @@ async function request(env, path, init = {}) {
           "https://www.googleapis.com" + path,
           {
             ...init,
+            redirect: "manual",
             signal: controller.signal,
             headers: { authorization: `Bearer ${token}`, ...init.headers },
           },
@@ -100,6 +102,15 @@ export async function verifyDriveFolder(env, { folderId, parentId }) {
     "DRIVE_FOLDER_SCOPE",
     409,
   );
+}
+export async function verifyDriveRoot(env, { rootId, driveId }) {
+  const r = await request(env, `/drive/v3/files/${id(rootId)}?supportsAllDrives=true&fields=id,mimeType,driveId,trashed,capabilities(canAddChildren)`);
+  requireValue(r.status === 200, "DRIVE_FOLDER_UNAVAILABLE", 503);
+  const data = parse(r);
+  requireValue(data.id === rootId && data.driveId === driveId && !data.trashed &&
+    data.mimeType === "application/vnd.google-apps.folder" && data.capabilities?.canAddChildren === true,
+    "DRIVE_FOLDER_SCOPE", 409);
+  return { rootId, driveId, verifiedAt: Date.now() };
 }
 export async function verifyDriveFile(env, { fileId, folderId, sha256, size }) {
   requireValue(
@@ -310,7 +321,7 @@ export function driveBackupConfig(env) {
     ? "NO_VIEWPORT"
     : !valid(rootId) || !valid(folderId)
       ? "FOLDER_NOT_CONFIGURED"
-      : !(env.GOOGLE_SERVICE_ACCOUNT || env.GOOGLE_ACCESS_TOKEN)
+      : !googleConfigured(env)
         ? "PROVIDER_NOT_CONFIGURED"
         : null;
   return {

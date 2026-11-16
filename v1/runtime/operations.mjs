@@ -5,6 +5,7 @@ import { admit, resolveAdmission } from "./security.mjs";
 import { backupOwner } from "./backup.mjs";
 import { outboxHealth } from "./jobs.mjs";
 import { driveBackupHealth } from "./drive-backup-jobs.mjs";
+import { googleConfigured } from "./google-drive-credential.mjs";
 export function systemPolicy(method, path) {
   if (method === "GET" && path === "/system/storage") return {action:"core.admin",write:false,resourceId:"storage"};
   if (method === "POST" && ["/system/storage/preview","/system/storage/confirm","/system/storage/finish"].includes(path))
@@ -65,9 +66,7 @@ export async function systemHandle(ctx) {
       },
       configured: {
         googleIdentity: !!env.GOOGLE_CLIENT_ID,
-        googleProvider: !!(
-          env.GOOGLE_SERVICE_ACCOUNT || env.GOOGLE_ACCESS_TOKEN
-        ),
+        googleProvider: googleConfigured(env),
         whatsapp: !!(env.WHATSAPP_ACCESS_TOKEN && env.WHATSAPP_PHONE_NUMBER_ID),
         telegram: !!env.TELEGRAM_BOT_TOKEN,
         email: !!(env.EMAIL_API_TOKEN && env.EMAIL_FROM),
