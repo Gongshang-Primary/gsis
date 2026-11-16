@@ -161,7 +161,7 @@ export async function encodeWorkbook(workbook, { Zip } = {}) {
 }
 export async function decodeWorkbook(
   bytes,
-  { Zip, XMLParser = globalThis.DOMParser } = {},
+  { Zip, XMLParser = globalThis.DOMParser, legacyRoleMembership = false } = {},
 ) {
   // CRC preflight inflates every archive entry; inspect declared sizes before reading any part.
   if (bytes.byteLength > MAX_BYTES) throw Error("The workbook exceeds 8 MiB.");
@@ -310,6 +310,31 @@ export async function decodeWorkbook(
     };
   }
   const metadataSheet = sheets.Metadata;
+  // Explicit opt-in for the v0.9 Membership export only. A workbook carrying
+  // Metadata is always canonical and can never be rebound to another school/version.
+  if (!metadataSheet && legacyRoleMembership) {
+    const names = Object.keys(sheets), source = sheets[names[0]];
+    const columns = ["Role Shortform", "Formal Role Name", "SL", "SC", "SMC", "KP", "TL", "SDT", "CMT", "SAT", "Support", "MK", "EO Appt Level", "EO"];
+    if (names.length !== 1 || !["Membership", "Role Membership"].includes(names[0]) ||
+        ![13, 14].includes(source.columns.length) ||
+        source.columns.some((name, i) => name !== columns[i]))
+      throw Error("Use the complete v0.9 Membership table: Role Shortform through EO Appt Level, with optional explicit EO. Unhide all data columns before exporting.");
+    if (source.rows.length > 300) throw Error("Use at most 300 role mappings.");
+    const flag = value => {
+      if (value === true || value === 1 || ["1", "yes", "true"].includes(String(value ?? "").trim().toLowerCase())) return "1";
+      if (value === false || value === 0 || ["", "0", "no", "false"].includes(String(value ?? "").trim().toLowerCase())) return "";
+      throw Error("Role membership flags must be Yes/No, true/false or 1/0.");
+    };
+    const eo = value => {
+      if (value === null || value === undefined || ["", "not set"].includes(String(value).trim().toLowerCase())) return null;
+      return flag(value) === "1";
+    };
+    const rows = source.rows.filter(row => row.some(value => value !== null && String(value).trim() !== ""))
+      .map(row => [String(row[0] ?? "").trim(), String(row[1] ?? "").trim(),
+        ...row.slice(2, 12).map(flag), String(row[12] ?? "").trim(), source.columns.length === 14 ? eo(row[13]) : null]);
+    return { schemaVersion: 1, legacyRoleMembership: true,
+      sheets: { "Role Membership": { columns, rows } } };
+  }
   if (!metadataSheet || metadataSheet.columns.join("|") !== "Field|Value")
     throw Error("Use an Export All workbook with visible Metadata.");
   delete sheets.Metadata;

@@ -29,6 +29,7 @@ try {
   await page.goto(origin + "/deploy/");
   await page.getByRole("button", { name: "HR Settings", exact: true }).click();
   await page.getByRole("button", { name: "Membership", exact: true }).click();
+  await page.locator("[data-staff-memberships] > summary").click();
   const input = index => page.locator('[data-memberships-teacher="' + s.staff[index] + '"] textarea');
   assert.equal(await input(0).inputValue(), "Original synthetic team");
   await input(1).focus(); await input(1).blur();
@@ -44,6 +45,7 @@ try {
   await page.reload();
   await page.getByRole("button", { name: "HR Settings", exact: true }).click();
   await page.getByRole("button", { name: "Membership", exact: true }).click();
+  await page.locator("[data-staff-memberships] > summary").click();
   assert.equal(await input(0).inputValue(), "Synthetic Alpha\nResearch & Support");
   await page.locator('[data-memberships-teacher="' + s.staff[1] + '"]').getByRole("button", { name: /Clear memberships/ }).click();
   await page.locator("#saveQueue").getByRole("button", { name: "Save to online", exact: true }).click();

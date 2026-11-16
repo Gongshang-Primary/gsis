@@ -612,13 +612,18 @@ try {
       ["Membership", ["Staff ID", "TTb Name", "Role", "Memberships"]],
       ["HR Terms", ["Staff ID", "TTb Name", "Field", "Value"]],
     ]) {
-      const report = page.locator("#content table[data-contacts-reference]");
+      const report = page.locator("#content table[data-contacts-reference]:not([data-role-membership])");
       for (let render = 0; render < 2; render++) {
         await page.getByRole("button", { name, exact: true }).click();
+        if (name === "Membership") {
+          const section = page.locator("[data-staff-memberships]");
+          if (!(await section.evaluate(node => node.open))) await section.locator(":scope > summary").click();
+          assert.equal(await page.locator("table[data-role-membership]").count(), 1, "The editable role matrix is separate from individual staff memberships");
+        }
         await page.waitForFunction(
           () =>
             document
-              .querySelector("#content table[data-contacts-reference]")
+              .querySelector("#content table[data-contacts-reference]:not([data-role-membership])")
               ?.querySelectorAll("thead .gsis-core-sort").length === 4,
         );
         const headerCells = report.locator("thead tr").first().locator("th");
@@ -688,8 +693,8 @@ try {
         ascending.slice().reverse(),
         "The single Core sorter changes real report row order",
       );
-      const reportRows = await page
-        .locator("#content table tbody tr")
+      const reportRows = await report
+        .locator("tbody tr")
         .evaluateAll((nodes) =>
           nodes.map((row) => [...row.cells].map((cell) => cell.textContent)),
         );
@@ -704,8 +709,8 @@ try {
         name + " reports the current accepted fact by permanent Staff ID",
       );
       assert.equal(
-        await page
-          .locator("#content table tbody input,#content table tbody select")
+        await report
+          .locator("tbody input,tbody select")
           .count(),
         0,
       );
@@ -715,7 +720,7 @@ try {
         "Version-owned Memberships are editable; HR Terms remain a read-only Contacts report",
       );
       assert.doesNotMatch(
-        await page.locator("#content").innerText(),
+        await report.innerText(),
         /add role|role flags|catalogue manager|create catalogue/i,
       );
     }

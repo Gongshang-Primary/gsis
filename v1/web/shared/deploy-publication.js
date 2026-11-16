@@ -7,6 +7,7 @@ const scopes = [
   "Teachers",
   "Exclusions",
   "Membership",
+  "Role Membership",
   "Offload",
   "HR Terms",
   "Span of Control",
@@ -15,7 +16,7 @@ const panel = document.createElement("details");
 panel.className = "gsis-panel";
 panel.dataset.panelId = "deploy-publication";
 panel.innerHTML =
-  '<summary>Canonical Excel and publication receipts</summary><p>Save changes as a draft. Publish makes the selected saved revision active. Memberships update Contacts automatically; other proposals and recipient deliveries have independent outcomes.</p><div class="gsis-formrow"><label>Table scope<select data-scope></select></label><button data-export>Export All · importable</button><label>Import Export All workbook<input type="file" data-import accept=".xlsx"></label></div><p data-status role="status"></p><div data-preview></div><form data-receipt class="gsis-formrow"><label>Operation ID<input data-operation required></label><button>Check original receipt</button></form><div data-result></div>';
+  '<summary>Canonical Excel and publication receipts</summary><p>Save changes as a draft. Publish makes the selected saved revision active. Memberships and configured role authority update Contacts automatically; other proposals and recipient deliveries have independent outcomes.</p><div class="gsis-formrow"><label>Table scope<select data-scope></select></label><button data-export>Export All · importable</button><label>Import Export All workbook<input type="file" data-import accept=".xlsx"></label></div><p data-status role="status"></p><div data-preview></div><form data-receipt class="gsis-formrow"><label>Operation ID<input data-operation required></label><button>Check original receipt</button></form><div data-result></div>';
 for (const scope of scopes) {
   const option = document.createElement("option");
   option.value = option.textContent = scope;
@@ -86,6 +87,25 @@ function showReceipt(
 // sending so a lost response cannot allocate another identity on retry.
 const membershipFlights = new Map();
 const membershipSyncRunning = new Set();
+let deniedPublicationRecovery = null;
+window.addEventListener("gsis:denied", async () => {
+  const recovery = deniedPublicationRecovery;
+  if (!recovery) return;
+  const current = await api.getSession().catch(() => null);
+  if (deniedPublicationRecovery !== recovery || current?.user?.accountId !== recovery.actorId || current?.schoolId !== recovery.schoolId) return;
+  document.querySelector("[data-publication-recovery]")?.remove();
+  const notice = document.createElement("section");
+  notice.className = "gsis-panel"; notice.dataset.publicationRecovery = "";
+  notice.setAttribute("role", "status");
+  // Permission loss still clears protected staff/draft data. Retain only the
+  // committed operation references this publisher needs to hand off recovery.
+  notice.textContent = "Publication committed. Completion bookkeeping remains pending after a permission change. Ask another authorised publisher to check the original receipt and continue this publication. Publication: " + recovery.publicationId + ". Version: " + recovery.versionId + ". Original operation: " + recovery.sourceOperationId + ".";
+  document.body.append(notice);
+});
+window.addEventListener("gsis:session-ended", () => {
+  deniedPublicationRecovery = null;
+  document.querySelector("[data-publication-recovery]")?.remove();
+});
 function membershipSource(result) {
   const receipt = result.receipt || result;
   const data = receipt.result || receipt;
@@ -148,6 +168,24 @@ async function syncMemberships(result, { active = () => true, onProgress = () =>
     consecutiveAborts = 0;
     const progress = outcome.currentProgress || outcome;
     result.membershipsSync = progress;
+    if (outcome.recoveryRequired) {
+      deniedPublicationRecovery = { schoolId: session.schoolId, actorId: session.user.accountId,
+        publicationId: source.publicationId, versionId: source.versionId, sourceOperationId: source.sourceOperationId };
+      result.membershipBookkeeping = { state: "pending", operationId: flight.operationId };
+      // Publication can revoke this publisher's access after Contacts commits.
+      // Show those durable results independently of Deploy's outer receipt and
+      // never continue automatically under the changed authority.
+      const terminal = outcome.terminalReceipt?.receipt || outcome.terminalReceipt;
+      if (["aborted", "terminal-not-committed"].includes(terminal?.state)) {
+        membershipFlights.delete(key);
+        sessionStorage.removeItem(key);
+      }
+      onProgress();
+      return;
+    }
+    delete result.membershipBookkeeping;
+    deniedPublicationRecovery = null;
+    document.querySelector("[data-publication-recovery]")?.remove();
     onProgress();
     membershipFlights.delete(key);
     sessionStorage.removeItem(key);
@@ -173,15 +211,24 @@ function showMemberships(result, host) {
         : "Memberships update complete. Check individual results below."
       : "Publication is committed; Memberships are pending in Contacts.";
   host.append(line);
+  if (result.membershipBookkeeping?.state === "pending") {
+    const pending = document.createElement("p");
+    pending.dataset.membershipBookkeeping = "pending";
+    pending.setAttribute("role", "status");
+    pending.textContent = "The Contacts results above are recorded. Publication bookkeeping is pending because your account needs a fresh permission check. Another authorised publisher can check this publication's original receipt and resume the same publication.";
+    host.append(pending);
+  }
   if (state.results?.length) {
     const details = document.createElement("details"), summary = document.createElement("summary");
-    summary.textContent = "Membership update results";
+    const fieldResults = state.results.some(result => Array.isArray(result.appliedFields));
+    if (fieldResults) line.textContent += " Staff totals do not mean every field changed; see the individual field outcomes.";
+    summary.textContent = fieldResults ? "Membership and authority field results" : "Membership update results";
     const text = document.createElement("pre");
     text.style.cssText = "white-space:pre-wrap;overflow-wrap:anywhere";
     text.textContent = JSON.stringify(state.results, null, 2);
     details.append(summary, text); host.append(details);
   }
-  if (state.state !== "applied") {
+  if (state.state !== "applied" && result.membershipBookkeeping?.state !== "pending") {
     const retry = document.createElement("button");
     retry.textContent = "Continue Memberships update";
     retry.disabled = !api.capable("deploy.publish") || membershipSyncRunning.has(source.publicationId) || host.dataset.publicationBusy === "true";
@@ -344,6 +391,11 @@ function renderWorkbook() {
     " · " +
     workbook.metadata["Table Scope"];
   previewHost.append(metadata);
+  if (workbook.legacyRoleMembership) {
+    const warning = document.createElement("p");
+    warning.textContent = "Legacy Membership import: this replaces the selected version’s role matrix after confirmation. EO is Not set where the source has no explicit EO column; appointment grades never infer it.";
+    previewHost.append(warning);
+  }
   for (const [name, sheet] of Object.entries(workbook.sheets)) {
     const heading = document.createElement("h3");
     heading.textContent = name;
@@ -532,7 +584,16 @@ panel.querySelector("[data-import]").onchange = async (event) => {
   previewHost.replaceChildren();
   try {
     message("Reading workbook…");
-    const candidate = await decodeWorkbook(await file.arrayBuffer());
+    const targetVersion = version();
+    const candidate = await decodeWorkbook(await file.arrayBuffer(), {
+      legacyRoleMembership: panel.querySelector("[data-scope]").value === "Role Membership",
+    });
+    if (candidate.legacyRoleMembership) {
+      const target = await api.request("deploy", "/export", { method: "POST",
+        body: { versionId: targetVersion, scope: "Role Membership" } });
+      if (epoch !== importReadEpoch || targetVersion !== version()) return;
+      candidate.metadata = { ...target.metadata };
+    }
     if (epoch !== importReadEpoch) return;
     if (candidate.metadata["Table Scope"] === "HR Terms")
       throw Error(
@@ -543,6 +604,7 @@ panel.querySelector("[data-import]").onchange = async (event) => {
       body: { versionId: version() },
     });
     if (epoch !== importReadEpoch) return;
+    if (targetVersion !== version()) throw Error("The selected version changed. Reopen the import for the intended version.");
     workbook = candidate;
     matchStaff = snapshot.staffCatalog || snapshot.current?.teachers || [];
     pendingPreview = null;
@@ -593,7 +655,7 @@ window.GSISV1Publication = {
     heading.textContent = "Publish " + (name || versionId);
     const intro = document.createElement("p");
     intro.textContent =
-      "Publish this saved revision as the active version. Memberships update Contacts automatically. Other staff contributions stay pending until accepted in Contacts. Recipient delivery can retry independently.";
+      "Publish this saved revision as the active version. Memberships update Contacts automatically. Configured role mappings also update SMC, EO and School Leader permissions, including your own. Other staff contributions stay pending until accepted in Contacts. Recipient delivery can retry independently.";
     const progress = document.createElement("p");
     progress.setAttribute("role", "status");
     const resultHost = document.createElement("div"),
@@ -934,7 +996,7 @@ window.GSISV1Publication = {
 };
 
 // The shared toolbar delegates canonical operations to this existing owner flow.
-const scopeForTable = () =>
+const scopeForTable = (table) => table?.dataset.workbookScope ||
   ({
     "IP Deploy": "IP",
     "Classes & TGs": "TG",
@@ -948,8 +1010,8 @@ const scopeForTable = () =>
     "HR Terms": "HR Terms",
     "Span of Control": "Span of Control",
   })[document.getElementById("content")?.dataset.view];
-function openCanonical(kind) {
-  const scope = scopeForTable();
+function openCanonical(kind, table) {
+  const scope = scopeForTable(table);
   if (!scope)
     throw Error("This view does not have a canonical workbook contract.");
   panel.querySelector("[data-scope]").value = scope;
@@ -967,8 +1029,8 @@ function registerTables() {
   window.GSISCoreTables?.register(
     '#content[data-view="IP Deploy"] table,#content[data-view="Classes & TGs"] table,#content[data-view="Classes"] table,#content[data-view="Dept Settings"] table,#content[data-view="Dept"] table,#content[data-view="Teachers"] table,#content[data-view="Level Exclusions"] table,#content[data-view="Membership"] table,#content[data-view="Offload"] table,#content[data-view="HR Terms"] table,#content[data-view="Span of Control"] table',
     {
-      exportAll: () => openCanonical("export"),
-      importAll: () => openCanonical("import"),
+      exportAll: (table) => openCanonical("export", table),
+      importAll: (table) => openCanonical("import", table),
     },
   );
   window.GSISCoreTables?.register(
@@ -980,6 +1042,7 @@ registerTables();
 window.addEventListener("load", registerTables);
 
 window.addEventListener("gsis:clear-protected-state", () => {
+  document.querySelector("[data-publication-recovery]")?.remove();
   ++importReadEpoch;
   ++validationEpoch;
   ++protectedEpoch;

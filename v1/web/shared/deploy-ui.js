@@ -112,6 +112,11 @@
 (function () {
   "use strict";
   const api = window.GSISV1;
+  const managedGroups = ["SL", "SC", "SMC", "KP", "TL", "SDT", "CMT", "SAT", "Support", "MK"];
+  const mappingFor = (doc, teacher) => doc.roleMembershipSchema === 1
+    ? (doc.membership || []).find(row => String(row[0]).trim().toLowerCase() ===
+        String(doc.teacherDrafts?.[teacher.id]?.Role ?? teacher.profile?.Role ?? teacher.role ?? "").trim().toLowerCase()) : null;
+  const groupsFor = row => managedGroups.filter((_, index) => row[index + 2] === "1");
   const valueOf = (doc, id) => {
     const value = doc.teachers?.find((t) => t.id === id)?.deploymentTags?.Memberships;
     return Array.isArray(value) ? value : null;
@@ -126,11 +131,48 @@
   }
   function install() {
     if (!api || typeof window.membershipPage !== "function") return;
+    const matrixStyle = document.createElement("style");
+    matrixStyle.textContent = 'html body #content table[data-role-membership] .gsis-core-filter input{width:50px!important;min-width:0!important;max-width:100%!important}html body #content table[data-role-membership] input[data-member-col="0"],html body #content table[data-role-membership] .gsis-core-filter th:first-child input{width:140px!important;max-width:140px!important}html body #content table[data-role-membership] input[data-member-col="1"],html body #content table[data-role-membership] .gsis-core-filter th:nth-child(2) input{width:280px!important;max-width:280px!important}html body #content table[data-role-membership] input[data-member-col="12"]{width:130px!important;max-width:130px!important}table[data-role-membership] thead tr:first-child th:first-child{background:#1e4a5c;color:#fff}';
+    document.head.append(matrixStyle);
+    // The copied v0.9 resolver infers managed groups from appointment grades.
+    // An explicit v1 matrix owns those groups, including unchecked flags and
+    // unmatched staff's existing labels, both during snapshot load and preview.
+    let incomingDocument = null;
+    const originalAccept = window.acceptSnapshot;
+    window.acceptSnapshot = data => {
+      const previous = incomingDocument;
+      incomingDocument = data.current || (data.unchanged ? v() : null);
+      try { return originalAccept(data); } finally { incomingDocument = previous; }
+    };
+    const originalResolve = window.GSISTeachingRules.resolve;
+    window.GSISTeachingRules.resolve = (teacher, catalogue, live, draft) => {
+      const doc = incomingDocument || v();
+      if (doc?.roleMembershipSchema !== 1) return originalResolve(teacher, catalogue, live, draft);
+      const result = originalResolve(teacher, undefined, live, draft);
+      const mapping = mappingFor(doc, result);
+      const existing = teacher.deploymentTags?.Memberships || teacher.groups || [];
+      result.groups = mapping ? [...existing.filter(label => !managedGroups.includes(label)), ...groupsFor(mapping)] : [...existing];
+      if (mapping) result.profile["EO Appt Level"] = mapping[12] || "";
+      return result;
+    };
     const originalKey = window.queueKey;
-    window.queueKey = (edit) => edit.operation === "setTeacherMemberships"
-      ? "memberships:" + edit.teacher : originalKey(edit);
+    window.queueKey = (edit) => edit.operation === "setRoleMemberships" ? "role-memberships"
+      : edit.operation === "setTeacherMemberships" ? "memberships:" + edit.teacher : originalKey(edit);
     const originalProject = window.projectEditBase;
     window.projectEditBase = (doc, edit) => {
+      if (edit.operation === "setRoleMemberships") {
+        doc.membership = structuredClone(edit.value); doc.roleMembershipSchema = 1;
+        for (const teacher of doc.teachers || []) {
+          const mapping = mappingFor(doc, teacher);
+          if (!mapping) continue;
+          const custom = (teacher.deploymentTags?.Memberships ?? teacher.groups ?? []).filter(value => !managedGroups.includes(value));
+          teacher.deploymentTags = { ...teacher.deploymentTags, Memberships: [...custom, ...groupsFor(mapping)], "EO Appt Level": mapping[12] || null };
+          teacher.groups = [...teacher.deploymentTags.Memberships];
+          teacher.profile = { ...teacher.profile, "EO Appt Level": mapping[12] || "" };
+        }
+        if (doc.reliefResults) doc.reliefResults.pending = true;
+        return;
+      }
       if (edit.operation !== "setTeacherMemberships") return originalProject(doc, edit);
       const teacher = doc.teachers.find((t) => t.id === edit.teacher);
       if (!teacher) throw Error("This teacher is no longer in the selected version.");
@@ -139,21 +181,24 @@
       teacher.groups = [...edit.value];
     };
     const originalDisplay = window.draftDisplayValue;
-    window.draftDisplayValue = (doc, edit) => edit.operation === "setTeacherMemberships"
-      ? valueOf(doc, edit.teacher) : originalDisplay(doc, edit);
+    window.draftDisplayValue = (doc, edit) => edit.operation === "setRoleMemberships"
+      ? (doc.membership || []) : edit.operation === "setTeacherMemberships"
+        ? valueOf(doc, edit.teacher) : originalDisplay(doc, edit);
     const originalStatus = window.drawQueueStatus;
     window.drawQueueStatus = () => {
       originalStatus();
       if (document.getElementById("content")?.dataset.view === "Membership" && api.capable("deploy.edit"))
         document.getElementById("saveQueue").hidden = false;
     };
-    window.membershipPage = (root) => {
+    function staffMembershipPage(root) {
       const doc = v();
       const note = document.createElement("p");
       note.className = "hint";
       note.textContent = "Memberships belong to this planning version. Enter one label per line; save the draft, then publish to update Contacts. These labels do not grant access.";
       const table = document.createElement("table");
       table.dataset.contactsReference = "";
+      table.dataset.workbookScope = "Membership";
+      table.dataset.controlsWired = "true"; // Core owns this table's controls.
       const header = table.createTHead().insertRow();
       for (const label of ["Staff ID", "TTb Name", "Role", "Memberships"]) {
         const th = document.createElement("th");
@@ -165,7 +210,9 @@
         row.dataset.membershipsTeacher = teacher.id;
         for (const text of [teacher.id, teacher.ttbName || teacher.name, teacher.profile?.Role || teacher.role || ""])
           row.insertCell().textContent = text;
-        const cell = row.insertCell(), value = valueOf(doc, teacher.id);
+        const cell = row.insertCell(), value = valueOf(doc, teacher.id), mapping = mappingFor(doc, teacher);
+        const managed = mapping ? groupsFor(mapping) : null;
+        const editableValue = managed ? (value || []).filter(label => !managedGroups.includes(label)) : value;
         if (!api.capable("deploy.edit")) {
           cell.textContent = value === null ? "Not recorded" : value.join("\n");
           continue;
@@ -173,13 +220,22 @@
         const input = document.createElement("textarea");
         input.rows = Math.max(2, Math.min(5, value?.length || 2));
         input.style.cssText = "min-width:15rem;width:100%;box-sizing:border-box";
-        input.value = value?.join("\n") || "";
+        input.value = editableValue?.join("\n") || "";
+        if (managed) {
+          const fixed = document.createElement("p"); fixed.dataset.managedMemberships = "";
+          fixed.textContent = "From role mapping: " + (managed.join(", ") || "None") + ". Edit these checkboxes above; use the box below for other memberships.";
+          cell.append(fixed);
+        }
         input.placeholder = value === null ? "Not recorded" : "No memberships";
         input.setAttribute("aria-label", "Memberships for " + (teacher.ttbName || teacher.name));
         const error = document.createElement("span");
         error.className = "error"; error.setAttribute("role", "status");
         function queue(next, explicit = false) {
           if (!api.capable("deploy.edit")) return;
+          if (managed) {
+            if (next.some(label => managedGroups.includes(label))) throw Error("Change managed memberships in the role matrix above.");
+            next = [...next, ...managed];
+          }
           // Merely focusing an unknown blank is never an explicit clear.
           if (!explicit && JSON.stringify(next) === JSON.stringify(value || [])) return;
           try {
@@ -191,8 +247,8 @@
           try { queue(labels(input.value)); } catch (failure) { error.textContent = failure.message; }
         };
         const clear = document.createElement("button");
-        clear.type = "button"; clear.textContent = "Clear memberships";
-        clear.setAttribute("aria-label", "Clear memberships for " + (teacher.ttbName || teacher.name));
+        clear.type = "button"; clear.textContent = managed ? "Clear other memberships" : "Clear memberships";
+        clear.setAttribute("aria-label", (managed ? "Clear other memberships for " : "Clear memberships for ") + (teacher.ttbName || teacher.name));
         clear.onclick = () => queue([], true);
         cell.append(input, clear, error);
       }
@@ -203,6 +259,95 @@
       const scroll = document.createElement("div");
       scroll.className = "scroll"; scroll.append(table);
       root.replaceChildren(note, scroll);
+    }
+    const fields = ["Role Shortform", "Formal Role Name", "SL", "SC", "SMC", "KP", "TL", "SDT", "CMT", "SAT", "Support", "MK", "EO Appt Level", "EO"];
+    let staffOpen = false;
+    window.membershipPage = (root) => {
+      const doc = v(), rows = doc.membership || [], editable = api.capable("deploy.edit");
+      let draftRows = structuredClone(rows);
+      const note = document.createElement("p");
+      note.className = "hint";
+      note.textContent = "Save this version, then publish to update Contacts memberships and SMC, EO and School Leader permissions. EO is separate from appointment level. A blank shortform with a formal name explicitly maps staff with no Role.";
+      const error = document.createElement("p");
+      error.className = "error"; error.setAttribute("role", "status");
+      const stage = (next) => {
+        if (!editable) return;
+        draftRows = next;
+        try {
+          if (next.length > 300) throw Error("Use at most 300 role mappings.");
+          const names = next.map(row => String(row[0]).trim().toLocaleLowerCase());
+          if (next.some(row => !String(row[0]).trim() && !String(row[1]).trim()) || new Set(names).size !== names.length)
+            throw Error("Use unique role shortforms. A No role mapping needs a formal name.");
+          unsavedDraft = false;
+          window.queueCell({ operation: "setRoleMemberships", value: next, expected: structuredClone(v().membership || []) });
+        } catch (failure) { unsavedDraft = true; error.textContent = failure.message; }
+      };
+      const add = document.createElement("button");
+      add.type = "button"; add.textContent = "Add role"; add.disabled = !editable || rows.length >= 300;
+      add.onclick = () => {
+        const next = structuredClone(draftRows);
+        let number = 1;
+        while (next.some(row => String(row[0]).toLowerCase() === "new role " + number)) number++;
+        next.push(["New role " + number, "", ...Array(10).fill(""), "", null]);
+        stage(next);
+      };
+      const table = document.createElement("table");
+      table.dataset.roleMembership = ""; table.dataset.workbookScope = "Role Membership";
+      table.dataset.contactsReference = "role-matrix";
+      table.dataset.controlsWired = "true"; // Skip the copied v0.9 column picker; use Core.
+      const header = table.createTHead().insertRow();
+      for (const [index, label] of [...fields, "Delete"].entries()) {
+        const cell = document.createElement("th"); cell.scope = "col"; cell.textContent = label;
+        cell.style.width = (index === 0 ? 140 : index === 1 ? 330 : index === 10 ? 90 : index === 12 ? 150 : index === 13 ? 86 : index === 14 ? 76 : 54) + "px";
+        header.append(cell);
+      }
+      const body = table.createTBody();
+      rows.forEach((row, index) => {
+        const tr = body.insertRow(); tr.dataset.roleMembershipRow = String(index);
+        fields.forEach((field, column) => {
+          const cell = tr.insertCell();
+          const control = document.createElement(column === 13 ? "select" : "input");
+          control.dataset.memberRow = String(index); control.dataset.memberCol = String(column);
+          control.setAttribute("aria-label", field + " for " + (row[0] || "No role"));
+          if (column > 1 && column < 12) {
+            control.type = "checkbox"; control.checked = row[column] === "1" || row[column] === true;
+            control.disabled = !editable;
+          } else if (column === 13) {
+            control.dataset.native = "";
+            for (const [value, label] of [["", "Not set"], ["true", "Yes"], ["false", "No"]])
+              control.add(new Option(label, value));
+            control.value = row[13] === true ? "true" : row[13] === false ? "false" : "";
+            control.disabled = !editable;
+          } else {
+            control.type = "text"; control.value = row[column] || "";
+            control.maxLength = column === 1 ? 240 : 160; control.readOnly = !editable;
+            control.style.minWidth = column === 1 ? "18rem" : "7rem";
+            if (column === 0) control.placeholder = "(No role)";
+          }
+          control.onchange = () => {
+            const next = structuredClone(draftRows);
+            next[index][column] = control.type === "checkbox" ? (control.checked ? "1" : "")
+              : column === 13 ? (control.value === "" ? null : control.value === "true") : control.value.trim();
+            stage(next);
+          };
+          cell.append(control);
+        });
+        const remove = document.createElement("button");
+        remove.type = "button"; remove.textContent = "×"; remove.disabled = !editable;
+        remove.setAttribute("aria-label", "Delete role " + (row[0] || "No role"));
+        remove.onclick = () => { if (confirm("Remove this role mapping?")) stage(draftRows.filter((_, i) => i !== index)); };
+        tr.insertCell().append(remove);
+      });
+      if (!body.rows.length) {
+        const cell = body.insertRow().insertCell(); cell.colSpan = fields.length + 1;
+        cell.textContent = "No role mappings yet. Add a role or import the v0.9 Membership workbook.";
+      }
+      const scroll = document.createElement("div"); scroll.className = "scroll"; scroll.append(table);
+      const people = document.createElement("details"); people.dataset.staffMemberships = ""; people.open = staffOpen;
+      const summary = document.createElement("summary"); summary.textContent = "Individual staff memberships";
+      const content = document.createElement("div"); staffMembershipPage(content);
+      people.append(summary, content); people.ontoggle = () => { if (people.isConnected) staffOpen = people.open; };
+      root.replaceChildren(note, add, error, scroll, people);
     };
   }
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", install, { once: true });
