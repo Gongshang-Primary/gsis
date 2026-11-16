@@ -25,10 +25,13 @@ Owner instruction: "Complete publish-back before deployment", after explaining t
 17. `tests/v1-product-membership-publication.mjs`
 18. `tests/v1-product-contacts-projection-browser.mjs`
 19. `tests/v1-product-deploy-workbooks.mjs`
+20. `tests/v1-product-integration.mjs`
 
 Scope clarification, 16 November: ChatGPT adds only the existing Contacts-projection browser regression above. It asserts that the Memberships screen has no editable inputs, which directly conflicts with the owner's newly authorised editing workflow. Update that expectation while retaining its authority, filtering, sorting and HR Terms checks. No additional product path is authorised; current PR182 and the release-label claim are disjoint. This is a necessary test update, not a relaxation of verification.
 
 The existing workbook regression is also in scope: its unconditional Membership import rejection must become a successful Membership round trip while retaining HR Terms rejection and all other validation. The first unchanged run failed at that obsolete rejection assertion. No other product scope changes.
+
+Full-suite scope clarification, 16 November: ChatGPT adds only `tests/v1-product-integration.mjs`. Its scheduler-only delivery assertion must distinguish Contacts ingestion from actual field application under the new publication marker; retain exact recipient count, states and error checks. No product or workflow changes are added. This preserves the requirement that ingestion is never reported as applied.
 
 Main and remote branches refreshed. PR182 is v0.9, disjoint. The separate v1.01 label implementation owns eight disjoint paths and is frozen for CI/review. ChatGPT authorises this independent bounded group alongside that label work, based on its accepted main claim, not the unreviewed label branch. No extra implementation stacking or edits to v0.9/build text patches.
 
