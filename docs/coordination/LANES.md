@@ -8,7 +8,7 @@ The coordinator assigns each job to a lane and a model, keeps this file and the 
 | Model | Role | Branch prefix | Commit/PR label |
 |---|---|---|---|
 | Codex | Builder, Roster core and D1 path | `codex/<task-id>` | `Model: Codex` |
-| Muse | **Review only from 16 Nov 2026** (owner role switch; retirement of 14 Nov no longer applies to review). Writes no code, merges or coordination. Branches `muse/*` and records kept as history. | `muse/<task-id>` (history) | `Model: Muse` |
+| Muse | **v1 reviewer from 16 Nov 2026** until Claude returns (owner). Writes no code, merges or coordination. Branches `muse/*` and records kept as history. | `muse/<task-id>` (history) | `Model: Muse` |
 | Claude | Coordinator, architect, reviewer; small fixes | `claude/<task-id>` | `Model: Claude` |
 
 All three share one GitHub identity, so the label is the only attribution.
@@ -46,7 +46,7 @@ Kept for the record. Gemini/Jules no longer receives jobs; its branches no longe
 - After the pilot the coordinator reports quality (correctness, rule-following, test discipline) and the owner decides whether lanes K, L and Y open to Gemini.
 
 ## Current assignments (update on every change)
-**ROLE SWITCH (owner 16 Nov, usage limit reached; see OWNER_DIRECTIVES.md):** Muse reviews only, at the exact head SHA. GPT builds, merges and coordinates: Codex builds, ChatGPT coordinates jobs and lanes, and GPT merges. Claude is not the coordinator, builder or merger while this stands. Owner still decides releases and deployments. The sections below predate this switch; where they name Claude as coordinator or reviewer, the switch governs.
+**v1 ROLE SWITCH (owner 16 Nov; see OWNER_DIRECTIVES.md):** For v1, Muse replaces Claude as reviewer at the exact head SHA until Claude returns. ChatGPT coordinates, Codex builds, and GPT merges. Muse writes no code, merges or coordination. The owner still decides v1 releases and deployments.
 **v0.9 HOTFIX (owner exception, 16 Nov):** `tasks/roster-intake-clash-stuck-claim.md` (Codex; Claude reviews; mirror in v1).
 **v0.9 DEVELOPMENT STOPPED (owner 15 Nov: "school ends 20 nov, lets push last version for v0.9 out (build and deploy) then stop development on v0.9 already").** v0.9.9y (deployed, bundle `deploy/2026-11-15-v0.9.9y`, source d9d180c) is the **final v0.9 release**: main has no v0.9 product change since y (checked 15 Nov), so no further build is needed. No new v0.9 tasks, PRs, rebases or releases. Only exception until Fri 20 Nov (widened by owner 15 Nov for flexibility): **any fault the owner raises**, not restricted to relief allocation, saving, publishing or messaging. Built by Codex as one hotfix PR, reviewed by Claude, released as a one-change hotfix and mirrored in v1. After 20 Nov: frozen; all work goes to v1.
 **v0.9 state (15 Nov, owner):** v0.9.9y is live (x + #153 ad hoc hotfix; release record #156 merged). Owner is planning the move to v1. Closed on owner's word: Muse release PRs #110, #113, #117, #122, #126, #135, #141; #103; backlog #72, #40. Full D1 backup still fails live after #127 (lease expiry during the timetable-cache stage); owner chose to ignore it pending v1. Employment email confirmed received (13 Nov).
