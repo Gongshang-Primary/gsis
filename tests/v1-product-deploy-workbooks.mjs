@@ -194,6 +194,30 @@ assert.deepEqual(
   d.teachers,
   "Membership workbook round trip preserves unknown values.",
 );
+// A distinct canonical scope prevents role matrices from being confused with
+// the existing per-person Membership import contract.
+const roleBook = exportWorkbook(d, "Role Membership", "school", 1);
+assert.deepEqual(roleBook.sheets["Role Membership"].columns, SCHEMAS["Role Membership"]["Role Membership"]);
+assert.equal(roleBook.sheets["Role Membership"].columns.length, 14);
+roleBook.sheets["Role Membership"].rows = [["", "No role", "", "", "1", "", "", "", "", "", "", "", "ST", null]];
+const roleDoc = validateWorkbook(roleBook, d, "school", 1).document;
+assert.equal(roleDoc.roleMembershipSchema, 1);
+assert.equal(roleDoc.membership[0][13], null, "appointment grade never implies an EO grant");
+assert.deepEqual(roleDoc.teachers[0].groups, ["SMC"]);
+assert.equal(roleDoc.teachers[0].authority.smc.value, false, "import is only a planning edit");
+assert.deepEqual(validateWorkbook(exportWorkbook(roleDoc, "Role Membership", "school", 1), roleDoc, "school", 1).document.membership, roleDoc.membership);
+const wrongScope = structuredClone(roleBook);
+wrongScope.metadata["Table Scope"] = "Membership";
+assert.throws(() => validateWorkbook(wrongScope, d, "school", 1), /sheet|columns|scope/i);
+const wrongWidth = structuredClone(roleBook);
+wrongWidth.sheets["Role Membership"].rows[0].pop();
+assert.throws(() => validateWorkbook(wrongWidth, d, "school", 1), /width|columns|cells/i);
+const managedImport = exportWorkbook(roleDoc, "Membership", "school", 1);
+managedImport.sheets.Membership.rows[0][3] = "Custom only";
+assert.throws(() => validateWorkbook(managedImport, roleDoc, "school", 1), (error) => error.code === "USE_ROLE_MATRIX");
+const legacyRow = [...roleDoc.membership[0].slice(0, 13)];
+const legacyEdit = applyEdits(d, [{ operation: "setRoleMemberships", expected: [], value: [legacyRow] }]);
+assert.equal(legacyEdit.membership[0][13], null);
 const readonly = exportWorkbook(d, "HR Terms", "school", 1);
 assert.throws(
   () => validateWorkbook(readonly, d, "school", 1),

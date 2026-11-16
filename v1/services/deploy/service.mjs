@@ -40,6 +40,7 @@ import {
   can,
 } from "./model.mjs";
 import { exportWorkbook, validateWorkbook, PROPOSABLE } from "./workbooks.mjs";
+import { ROLE_GROUPS, roleMapping, authorityValue } from "./role-memberships.mjs";
 const READ = new Set([
   "/bootstrap",
   "/sync",
@@ -852,23 +853,11 @@ async function bootstrap(ctx) {
         )
       : [],
     sysFields: doc?.hrTerms || projection?.hrTerms || {},
-    roleCatalogue:
-      projection?.roleCatalogue ||
-      (doc?.membership || []).map((r) => ({
+    roleCatalogue: doc?.roleMembershipSchema !== 1 ? (projection?.roleCatalogue || []) :
+      (doc.membership || []).map((r) => ({
         role: r[0],
         level: r[12],
-        groups: [
-          "SL",
-          "SC",
-          "SMC",
-          "KP",
-          "TL",
-          "SDT",
-          "CMT",
-          "SAT",
-          "Support",
-          "MK",
-        ].filter((k, i) => r[i + 2] === "1"),
+        groups: ROLE_GROUPS.filter((k, i) => r[i + 2] === "1"),
       })),
     staffCatalog: doc?.teachers || [],
     currentPublication: pointer
@@ -1176,7 +1165,7 @@ async function save(
     (explicitStaffIds.length ||
       edits.some(
         (e) =>
-          ["addTeacher", "initReporting", "setReportingOfficer", "setTeacherMemberships"].includes(
+          ["addTeacher", "initReporting", "setReportingOfficer", "setTeacherMemberships", "setRoleMemberships"].includes(
             e.operation,
           ) ||
           (e.operation === "upsertTeacherProfile" &&
@@ -1608,7 +1597,8 @@ async function publish(ctx) {
       calculated = calculate(document, ref);
     referenceVenues(document);
     validateDocument(document);
-    check(document.teachers.filter(t => Object.hasOwn(t.deploymentTags || {}, "Memberships")).length <= 512,
+    for (const teacher of document.teachers) authorityValue(document, teacher);
+    check(document.teachers.filter(t => roleMapping(document, t) || Object.hasOwn(t.deploymentTags || {}, "Memberships")).length <= 512,
       "Memberships publication exceeds the supported 512 staff records.", "PAYLOAD_TOO_LARGE", 413);
     check(
       Number.isInteger(document.year) &&
@@ -1627,6 +1617,7 @@ async function publish(ctx) {
     const envelope = {
       schemaVersion: 1,
       membershipPublicationVersion: 1,
+      ...(document.roleMembershipSchema === 1 ? { authorityPublicationVersion: 1 } : {}),
       calculationVersion: calculated.calculationVersion,
       schoolId: school,
       publicationId,
@@ -1933,9 +1924,16 @@ async function syncMemberships(ctx) {
   check(publication.envelope.membershipPublicationVersion === 1,
     "This historical publication has no Memberships publish-back contract. Publish a new revision.",
     "MEMBERSHIP_PUBLICATION_UNSUPPORTED", 409);
+  // Core hashes the complete request except the transport requestId. Keep
+  // operationId and the authorised batch coordinates in this acknowledgement.
+  const resumerIntent = structuredClone(ctx.body);
+  delete resumerIntent.requestId;
   const progress = await serviceCall(ctx.env, "contacts", "/internal/membership-publication", {
     schoolId: school, publicationId: pub.id, sourceOperationId: source.operationId,
     sourceDigest: source.digest, sourceFence: source.fence, decisionId: pub.decision_id,
+    ...(publication.envelope.authorityPublicationVersion === 1 ? { authorityPublicationVersion: 1 } : {}),
+    resumerDecisionId: ctx.principal.decisionId, resumerOperationId: ctx.body.operationId,
+    resumerIntent, versionId: pub.version_id,
     offset, limit,
   });
   check(progress?.publicationId === pub.id && ["applied", "pending"].includes(progress.state) &&
@@ -1950,11 +1948,27 @@ async function syncMemberships(ctx) {
     "Memberships application has not been confirmed.", "DELIVERY_UNCONFIRMED", 503);
   const result = { ...progress, saved: true, sourceOperationId: source.operationId,
     versionId: pub.version_id, operationId: op.operationId };
-  const saved = await finish(ctx, op, [{
+  let saved;
+  try {
+    saved = await finish(ctx, op, [{
     sql: "INSERT INTO deploy_deliveries(school_id,publication_id,recipient,state,attempts,acknowledgement) VALUES(?,?,'contacts-memberships',?,1,?) ON CONFLICT(school_id,publication_id,recipient) DO UPDATE SET state=CASE WHEN deploy_deliveries.state='applied' THEN 'applied' ELSE excluded.state END,attempts=deploy_deliveries.attempts+1,acknowledgement=CASE WHEN deploy_deliveries.state='applied' THEN deploy_deliveries.acknowledgement ELSE excluded.acknowledgement END,last_error=NULL",
     args: [school, pub.id, progress.state, canonical(progress)],
   }], [], result, { audit: { publicationId: pub.id, membershipsBatch: offset,
     membershipState: progress.state, sourceOperationId: source.operationId } });
+  } catch (error) {
+    // A proved authority publication can change the resumer's own authority.
+    // Contacts' durable outcome survives, but it is not a Deploy batch receipt.
+    // Keep normal admission unchanged and conclusively fence this bookkeeping
+    // attempt before offering recovery to a currently authorised publisher.
+    if (publication.envelope.authorityPublicationVersion !== 1 || error.code !== "AUTHORITY_CHANGED") throw error;
+    const terminalReceipt = await abortOperation(ctx.env.DB, op, "AUTHORITY_CHANGED_AFTER_PUBLICATION", Date.now());
+    const resolution = await resolveAdmission(ctx.env, ctx.env.DB, op, null, terminalReceipt, Date.now());
+    if (terminalReceipt.state === "committed") return terminalReceipt.result;
+    return { publicationCommitted: true, receiptRecorded: false, recoveryRequired: true,
+      state: "pending", saved: false, bookkeeping: "pending", currentProgress: progress,
+      operationId: op.operationId, versionId: pub.version_id, publicationId: pub.id,
+      sourceOperationId: source.operationId, terminalReceipt, admissionResolution: resolution.state };
+  }
   // The receipt records this request's observation; a concurrently completed
   // request may already have advanced the durable aggregate beyond it.
   return { ...saved, currentProgress: await membershipProgress(ctx, pub.id) };
@@ -2662,19 +2676,22 @@ function contributions(doc, publicationId, operationId, actorId, envelope = {}) 
   // This marker is part of the immutable payload. Never reinterpret historical
   // publications after a code upgrade, or turn unknown facts into empty lists.
   if (envelope.membershipPublicationVersion !== 1) return ordinary;
-  return ordinary.concat(doc.teachers
-    .filter(t => Object.hasOwn(t.deploymentTags || {}, "Memberships"))
-    .map(t => ({
+  return ordinary.concat(doc.teachers.flatMap(t => {
+    const authority = envelope.authorityPublicationVersion === 1 ? authorityValue(doc, t) : null;
+    if (!authority && !Object.hasOwn(t.deploymentTags || {}, "Memberships")) return [];
+    return [{
       staffId: t.id,
-      field: "memberships",
-      proposedValue: t.deploymentTags.Memberships ?? [],
-      acceptedBaseFieldRevision: t.fieldRevisions?.memberships ?? 0,
+      field: authority ? "authority" : "memberships",
+      proposedValue: authority || (t.deploymentTags.Memberships ?? []),
+      ...(authority ? { authorityPublicationVersion: 1 } : {
+        membershipPublicationVersion: 1, acceptedBaseFieldRevision: t.fieldRevisions?.memberships ?? 0,
+      }),
       validFrom: envelope.publishedAt,
       sourcePublicationId: publicationId,
       sourceOperationId: operationId,
       originalActorId: actorId,
-      membershipPublicationVersion: 1,
-    })));
+    }];
+  }));
 }
 async function verifyDelivery(ctx) {
   const b = ctx.body,
@@ -2713,22 +2730,36 @@ async function verifyDelivery(ctx) {
       "SELECT * FROM deploy_pointer WHERE school_id=?",
       [school],
     );
+  let resumerProof = {};
+  if (b.resumerOperationId !== undefined) {
+    const intent = plain(b.resumerIntent), resumer = await operationStatus(ctx.env.DB, school, id(b.resumerOperationId));
+    check(resumer && ["prepared", "committed"].includes(resumer.state) && resumer.action === "deploy.publish" &&
+      resumer.requestDigest === await digest(intent) &&
+      intent.operationId === resumer.operationId && intent.publicationId === pub.id &&
+      intent.sourceOperationId === op.operationId && intent.versionId === pub.version_id &&
+      (intent.offset ?? 0) === (b.offset ?? 0) && (intent.limit ?? 8) === (b.limit ?? 8),
+      "Current publication continuation does not match its authorised operation.", "SOURCE_RECEIPT_INVALID", 409);
+    resumerProof = { resumerValidated: true, resumerActorId: resumer.actorId,
+      resumerOperationId: resumer.operationId };
+  }
   if (b.membershipOnly === true) {
     const members = contributions(view.document, pub.id, op.operationId, op.actorId, view.envelope)
-      .filter(c => c.field === "memberships" && c.membershipPublicationVersion === 1);
+      .filter(c => (c.field === "memberships" && c.membershipPublicationVersion === 1) ||
+        (c.field === "authority" && c.authorityPublicationVersion === 1));
     const offset = b.offset ?? 0, limit = b.limit ?? 8;
     check(Number.isSafeInteger(offset) && offset >= 0 && offset <= members.length &&
       Number.isSafeInteger(limit) && limit >= 1 && limit <= 8, "Invalid Memberships proof page.");
     const selected = b.staffId === undefined ? members.slice(offset, offset + limit)
       : members.filter(c => c.staffId === id(b.staffId, "staff"));
     return {
-      schoolId: school, publicationId: pub.id, sourceOperationId: op.operationId,
+      schoolId: school, publicationId: pub.id, versionId: pub.version_id, sourceOperationId: op.operationId,
       sourceDigest: op.digest, sourceFence: op.fence, decisionId: pub.decision_id,
       state: "committed", sequence: pub.sequence, publishedAt: view.envelope.publishedAt,
       membershipPublicationVersion: view.envelope.membershipPublicationVersion,
+      ...(view.envelope.authorityPublicationVersion === 1 ? { authorityPublicationVersion: 1 } : {}),
       payloadDigest: view.digest, currentPublicationId: pointer?.publication_id || null,
       currentSequence: pointer?.sequence || 0, current: pub.id === pointer?.publication_id,
-      total: members.length, contributions: selected,
+      total: members.length, contributions: selected, ...resumerProof,
     };
   }
   return {

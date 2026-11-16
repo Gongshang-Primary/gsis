@@ -6,6 +6,10 @@ import {
   readAuthorityProjection,
 } from "../v1/services/contacts/service.mjs";
 import {
+  internal as deployInternal,
+  readContactsDeployment,
+} from "../v1/services/deploy/service.mjs";
+import {
   digest,
   query,
   one,
@@ -31,7 +35,8 @@ import {
 import { replaceField } from "../v1/services/contacts/intervals.mjs";
 import { deriveDisplay } from "../v1/services/contacts/catalogues.mjs";
 const c = await createDatabase("core"),
-  p = await createDatabase("contacts");
+  p = await createDatabase("contacts"),
+  d = await createDatabase("deploy");
 let now = Date.now();
 const base = {
   SCHOOL_ID: "synthetic-school",
@@ -41,8 +46,9 @@ const base = {
   GSIS_SECRET: "local-test-only-integration-secret",
 };
 const ce = { ...base, DB: c.db, SERVICE_NAME: "core" },
-  pe = { ...base, DB: p.db, SERVICE_NAME: "contacts" };
-const envs = { core: ce, contacts: pe };
+  pe = { ...base, DB: p.db, SERVICE_NAME: "contacts" },
+  de = { ...base, DB: d.db, ARTIFACTS: d.bucket, SERVICE_NAME: "deploy" };
+const envs = { core: ce, contacts: pe, deploy: de };
 function binding(service) {
   return {
     fetch: async (request) => {
@@ -55,7 +61,7 @@ function binding(service) {
         if (path === "/internal/operation-status")
           data = await operationStatus(env.DB, body.schoolId, body.operationId);
         else
-          data = await (service === "core" ? core : contacts)({
+          data = await ({ core, contacts, deploy: deployInternal }[service])({
             env,
             path,
             body,
@@ -77,7 +83,11 @@ function binding(service) {
 for (const env of Object.values(envs)) {
   env.CORE = binding("core");
   env.CONTACTS = binding("contacts");
+  env.DEPLOY = binding("deploy");
 }
+// Direct acceptance orders itself against the actual publication frontier and
+// holds a real Deploy D1 pin even when no publication has been created yet.
+pe.DEPLOY_CONTACTS = { read: input => readContactsDeployment(de, input) };
 async function seedAccount(id, staffId, caps = ["admin"]) {
   const token = `opaque-${id}`,
     csrf = `csrf-${id}`;
@@ -229,6 +239,11 @@ try {
   assert.equal(
     (await one(pe.DB, "SELECT COUNT(*) n FROM contacts_acceptance_audit")).n,
     3,
+  );
+  assert.equal(
+    (await one(de.DB, "SELECT COUNT(*) n FROM source_pins WHERE scope='publication' AND destination='contacts' AND state='released'")).n,
+    3,
+    "each accepted authority field uses and releases the real publication-order pin",
   );
   const teacher = await seedAccount("teacher-account", "teacher-a", []);
   const allowed = await authorize(teacher, "deploy", "deploy.publish", {
@@ -632,6 +647,8 @@ try {
   ];
   const deployProof = {
     fetch: async (request) => {
+      if (new URL(request.url).pathname !== "/internal/publication/verify")
+        return binding("deploy").fetch(request);
       await requireMembership(ce, request);
       const b = await request.json();
       assert.equal(b.sourceDigest, source.sourceDigest);
@@ -1168,4 +1185,5 @@ try {
 } finally {
   await c.close();
   await p.close();
+  await d.close();
 }

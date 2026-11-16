@@ -1,3 +1,4 @@
+import { normalizeRoleMemberships, applyRoleMemberships, checkManagedMemberships } from "./role-memberships.mjs";
 import Workload from "../../../shared/workload.js";
 import Relief from "../../../shared/relief.js";
 import Rules from "../../../shared/teaching-rules.js";
@@ -311,7 +312,7 @@ export function mergeContacts(doc, projection, { refreshMemberships = false } = 
   }
   const map = new Map(people.map((p) => [p.id, p]));
   const oldIds = new Set(doc.teachers.map((t) => t.id));
-  return {
+  return applyRoleMemberships({
     ...doc,
     teachers: [
       ...doc.teachers.map((t) =>
@@ -330,11 +331,11 @@ export function mergeContacts(doc, projection, { refreshMemberships = false } = 
       ...people.filter((p) => !oldIds.has(p.id)),
     ],
     catalogues: projection.catalogues || doc.catalogues || [],
-    membership: [],
+    membership: structuredClone(doc.membership || []),
     contactsMemberships,
     hrTerms,
     contactsFacts,
-  };
+  });
 }
 // This canonicalization is private to comparison/import; reading never rewrites history.
 export function canonicalTeachingDocument(document, original = document) {
@@ -592,6 +593,10 @@ export function calculate(doc, contacts) {
 }
 export function validateDocument(doc) {
   plain(doc);
+  if (doc.roleMembershipSchema !== undefined) {
+    check(doc.roleMembershipSchema === 1, "Unsupported role mapping schema.");
+    normalizeRoleMemberships(doc.membership);
+  }
   if (doc.year !== undefined)
     check(
       Number.isInteger(doc.year) && doc.year >= 2000 && doc.year <= 2099,
@@ -740,6 +745,15 @@ export function applyEdits(doc, edits) {
       d.teacherNotes[e.teacher] = text(e.value, 4000, true);
       continue;
     }
+    if (op === "setRoleMemberships") {
+      check(Object.hasOwn(e, "expected") && Array.isArray(e.expected), "Supply the previous role matrix.");
+      check(JSON.stringify(normalizeRoleMemberships(d.membership || [])) === JSON.stringify(normalizeRoleMemberships(e.expected)),
+        "Role mappings changed; review your retained draft.", "REVISION_CONFLICT", 409);
+      d.membership = normalizeRoleMemberships(e.value);
+      d.roleMembershipSchema = 1;
+      applyRoleMemberships(d);
+      continue;
+    }
     if (op === "setTeacherMemberships") {
       id(e.teacher, "Staff ID");
       const t = teacher();
@@ -749,6 +763,7 @@ export function applyEdits(doc, edits) {
       const expected = e.expected === null ? null : validated(normalizeDirectValue, "memberships", e.expected);
       check(JSON.stringify(membershipValue(t) ?? null) === JSON.stringify(expected),
         "Memberships changed; review your retained draft.", "REVISION_CONFLICT", 409);
+      checkManagedMemberships(d, t, e.value);
       setMembershipValue(t, e.value);
       d.contactsMemberships = d.teachers.map((person) => [person.id, person.ttbName || person.name,
         person.profile?.Role || "", (membershipValue(person) || []).join("\n")]);
@@ -1268,5 +1283,5 @@ export function applyEdits(doc, edits) {
       400,
     );
   }
-  return validateDocument(d);
+  return validateDocument(applyRoleMemberships(d));
 }
