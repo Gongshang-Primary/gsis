@@ -1,7 +1,7 @@
 # D1 Worker memory hotfix
 
 - Model: Codex
-- Status: implementing
+- Status: implemented; final-head full-suite and CI verification pending
 - Updated (Asia/Singapore): 2026-11-17
 - Branch: codex/roster-absence-clash-confirm; existing owner hotfix PR #182
 - Base: 7bf22b5fe7811ae415224b49f5dd477160bee44f
@@ -26,4 +26,9 @@ Actual D1 code with SQLite and synthetic 6.07 MiB audit history retains 40.32 Mi
 
 ## Verification
 
-Implementation and final verification pending. Historical baseline results do not approve this new head. Live execution recovery, provider delivery and production memory limits are not tested locally.
+- Canonical build regenerated all 18 components. Seventeen targeted programs passed, including 7 state-memory/isolation groups, 9 admission groups, 5 health-diagnostic cases and the existing 21 allocation single-flight groups.
+- Old code fails the copy-budget regression and the actual D1 admission regression (three snapshot loads instead of one). The health regression fails old code because SKIPPED_BUSY becomes UNKNOWN_ERROR.
+- Identical three-request benchmark (`TZ=Asia/Singapore NODE_NO_WARNINGS=1 node --expose-gc tests/performance/roster-d1-mutation-memory.mjs [checkout]`): old 7bf22b5 retained peak 65.45 MiB; fixed 34.15 MiB. Sampled heap 71.98 to 41.21 MiB; concurrent apply callbacks 3 to 1. Both completed three commands with three receipts and retained all 2,000 synthetic audit and 666 inbox rows. Node/SQLite measurements are not Cloudflare measurements or a proof of production capacity.
+- Admission is internal to verified-D1 notification scheduled/queue entrypoints: one materialized mutation, at most 16 waiting callbacks, 30-second waiting deadline. No active-operation expiry. Browser/operations foreground cancellation remains concurrent, and D1 CAS retries preserve its committed cancellation.
+- Parity refresh retains all 273 operations and every outcome, behavior, Google-only exception, risk and proposed action; only source references move.
+- Exact-head full local-suite and all-five-job CI results belong in PR #182 and the package verification record. Historical approvals do not cover this head. Live execution recovery, provider delivery, Google fallback and production memory limits are not tested. Wide read-only exports and timetable model cache are not bounded by the mutation gate; owner checks must verify the actual live outcome.

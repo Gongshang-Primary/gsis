@@ -13,6 +13,7 @@ function gsisApiSecret(env){
 /* GSIS_API_SECRET_END */
 // Roster operational authority. D1 owns mutable records; R2 owns immutable models.
 import {GSiSEdgeStore,GSiSRosterImport,GSiSRosterMirror} from './edge-store.js';
+import {runRosterMutation} from './edge-roster-admission.js';
 import {GSISRoster,GSISRosterOperations,GSISRosterAllocation,GSISRosterStapler,GSISRosterStatistics} from './edge-roster-domain.js';
 import {edgeRosterContextFromReferences,edgeRosterNeedsQuota} from './edge-roster-context.js';
 import {rosterOperationsPreparedCheck_,rosterOperationsDeletionCheck_,rosterOperationsAttachDayToken_,rosterOperationsBatchMerge_,rosterOperationsBatchAudit_,rosterOperationsDayToken_} from './edge-roster-policy.js';
@@ -65,9 +66,35 @@ async function objectRead(env,reference){if(!reference?.key||!reference.digest)f
 async function objectWrite(env,kind,id,value){const json=JSON.stringify(value),digest=sha256Hex(json),key='gsis/roster/'+kind+'/'+encodeURIComponent(id)+'/'+digest+'.json.gz';const stream=new Blob([json]).stream().pipeThrough(new CompressionStream('gzip'));await bucket(env).put(key,await new Response(stream).arrayBuffer(),{httpMetadata:{contentType:'application/gzip'},customMetadata:{digest,kind,schema:'1'}});return {key,digest,encoding:'gzip-json-v1'};}
 export async function readEdgeRosterModel(env,entry){if(!entry)return null;const ref=entry.modelObject||{key:entry.modelObjectKey,digest:entry.modelDigest,encoding:'gzip-json-v1'},key=JSON.stringify([entry.id,ref.key,ref.digest]);if(modelFlights.has(key))return modelFlights.get(key);const flight=objectRead(env,ref).then(GSISRoster.validate).catch(error=>{modelFlights.delete(key);throw error;});modelFlights.set(key,flight);if(modelFlights.size>24)modelFlights.delete(modelFlights.keys().next().value);return flight;}
 export async function readEdgeRosterRegister(env){return open(env,'roster-register');}
-async function hydrate(env,state,dates){const out=clone(storedAuditState(state)),wanted=dates?new Set(dates):null;await Promise.all([...(out.staplerPlans||[]),...(out.staplerArchives||[])].filter(row=>!wanted||wanted.has(row.date)).map(async row=>{for(const key of ['draft','published','confirmedPlan'])if(row[key]?.edgeObject===true)row[key]=await objectRead(env,row[key]);}));return out;}
-async function pack(env,state,original){const out=clone(storedAuditState(state)),prior=new Map([...(original?.staplerPlans||[]),...(original?.staplerArchives||[])].map(row=>[row.id||row.date,row]));for(const row of [...(out.staplerPlans||[]),...(out.staplerArchives||[])])for(const field of ['draft','published','confirmedPlan'])if(row[field]&&!row[field].edgeObject){const digest=sha256Hex(JSON.stringify(row[field])),ref=prior.get(row.id||row.date)?.[field];if(ref?.edgeObject&&ref.digest===digest)row[field]=ref;else row[field]={edgeObject:true,...await objectWrite(env,'stapler',(row.id||row.date)+'/'+field,row[field])};}return out;}
-export async function loadEdgeRoster(env,{hydrate:expand=false,dates,includeInbox=false}={}){const loaded=await open(env,'roster',true,includeInbox?undefined:{excludeCollections:['inboxThreads','inboxMessages','inboxAudit','inboxReceipts','inboxDeliveryEvents','inboxAlerts']});if(!loaded.state)fail(503,'ROSTER_STATE_MISSING','Roster migration has no operational records.');return {...loaded,rawState:loaded.state,state:expand?await hydrateAuditEvidence(await hydrate(env,loaded.state,dates),dates):clone(loaded.state)};}
+// Callers own their working state. Expanding or packing plan fields needs only
+// replacement rows, not another copy of every retained audit and receipt.
+async function hydrate(env,state,dates){
+ const out=storedAuditState(state),wanted=dates?new Set(dates):null;
+ await Promise.all(['staplerPlans','staplerArchives'].map(async collection=>{
+  if(!out[collection])return;
+  out[collection]=await Promise.all(out[collection].map(async row=>{
+   if(wanted&&!wanted.has(row.date))return row;
+   const fields=['draft','published','confirmedPlan'].filter(key=>row[key]?.edgeObject===true);if(!fields.length)return row;
+   const next={...row};for(const key of fields)next[key]=await objectRead(env,row[key]);return next;
+  }));
+ }));return out;
+}
+async function pack(env,state,original){
+ const out=storedAuditState(state),prior=new Map([...(original?.staplerPlans||[]),...(original?.staplerArchives||[])].map(row=>[row.id||row.date,row]));
+ for(const collection of ['staplerPlans','staplerArchives']){
+  const rows=out[collection]||[];let replacements;
+  for(let i=0;i<rows.length;i++){
+   const row=rows[i];let next;
+   for(const field of ['draft','published','confirmedPlan'])if(row[field]&&!row[field].edgeObject){
+    const digest=sha256Hex(JSON.stringify(row[field])),ref=prior.get(row.id||row.date)?.[field];next||={...row};
+    next[field]=ref?.edgeObject&&ref.digest===digest?ref:{edgeObject:true,...await objectWrite(env,'stapler',(row.id||row.date)+'/'+field,row[field])};
+   }
+   if(next){replacements||=rows.slice();replacements[i]=next;}
+  }
+  if(replacements)out[collection]=replacements;
+ }return out;
+}
+export async function loadEdgeRoster(env,{hydrate:expand=false,dates,includeInbox=false}={}){const loaded=await open(env,'roster',true,includeInbox?undefined:{excludeCollections:['inboxThreads','inboxMessages','inboxAudit','inboxReceipts','inboxDeliveryEvents','inboxAlerts']});if(!loaded.state)fail(503,'ROSTER_STATE_MISSING','Roster migration has no operational records.');const state=clone(loaded.state);return {...loaded,rawState:loaded.state,state:expand?await hydrateAuditEvidence(await hydrate(env,state,dates),dates):state};}
 function actorContacts(refs,who){const contacts=clone(refs.contacts),people=contacts?.rosterPeople;if(!Array.isArray(people)||!Array.isArray(contacts.rosterSMCIds)||!Array.isArray(contacts.rosterAdminIds))fail(503,'ROSTER_AUTHORITY_MISSING','Refresh the trusted Contacts directory.');if(who?.service===true){contacts.user={rosterStaffId:null,rosterSMC:true,rosterAdmin:true};return contacts;}const email=String(who?.email||'').toLowerCase(),matches=people.filter(p=>[p.email,...(p.emails||[])].some(value=>String(value||'').toLowerCase()===email));if(matches.length!==1)fail(403,'ROSTER_PERSON_UNVERIFIED','Your school account is not uniquely linked in Contacts.');const person=matches[0];contacts.user={rosterStaffId:person.id,rosterSMC:contacts.rosterSMCIds.includes(person.id),rosterAdmin:contacts.rosterAdminIds.includes(person.id)};return contacts;}
 export async function readEdgeRosterReferences(env,{allowExpired=false}={}){const loaded=await open(env,'roster-references'),refs=loaded.state;if(!refs?.contacts)fail(503,'ROSTER_REFERENCES_MISSING','Refresh the trusted Roster references.');const maxAge=Math.min(3600000,Math.max(60000,Number(env.ROSTER_AUTHORITY_MAX_AGE_SECONDS||900)*1000));if(!allowExpired&&(!Number.isFinite(refs.contactsCheckedAt)||Date.now()-refs.contactsCheckedAt>maxAge))fail(503,'ROSTER_AUTHORITY_STALE','Contacts permissions need a background refresh. Your retained report can be retried safely.');return {...refs,headRevision:loaded.revision};}
 function inputDates(input,state,today){const values=[input.date||today,...(input.dates||[])];if(input.from&&input.to){let from=GSISRoster.date(input.from),to=GSISRoster.date(input.to);if(to<from||Date.parse(to)-Date.parse(from)>365*86400000)fail(400,'ROSTER_DATE_RANGE','Select no more than one full school year.');for(let n=Date.parse(from);n<=Date.parse(to);n+=86400000)values.push(new Date(n).toISOString().slice(0,10));}for(const key of ['actualDate','newDate'])if(input[key])values.push(input[key]);for(const id of [input.id,input.absenceId,...(input.ids||[]),...(input.absenceIds||[])]){const row=state.absences?.find(x=>x.id===id)||state.requests?.find(x=>x.id===id);if(row)values.push(row.date);}return [...new Set(values.map(GSISRoster.date))];}
@@ -90,7 +117,12 @@ export async function buildEdgeRosterContext(env,state,input={},who={service:tru
 function legacyCommandDigest(command){const value=clone(command);for(const key of ['calendarByDate','trustedNow','notificationsReady','lseNoticeEnabled','schedulerAvailable'])delete value[key];return sha256Hex(JSON.stringify(value));}
 function canonicalCommand(command){const value=clone(command);for(const key of ['calendarByDate','calendarCache','trustedNow','trustedIntakeAt','notificationsReady','lseNoticeEnabled','schedulerAvailable'])delete value[key];return value;}
 function validRequest(id){if(typeof id!=='string'||! /^[A-Za-z0-9_-]{8,160}$/.test(id))fail(400,'ROSTER_REQUEST_ID','A stable save request ID is required.');}
-export async function mutateEdgeRoster(env,{actor,requestId,command,who,apply,needsContext=true,domainChanged=needsContext,beforeCommit,allowDuringQuiesce=false,contextInput}){
+export async function mutateEdgeRoster(env,options){
+ const work=()=>mutateEdgeRosterState(env,options);
+ // Reduced domain harnesses omit module imports; deployed modules always bind admission.
+ return typeof runRosterMutation==='function'?runRosterMutation(env,work):work();
+}
+async function mutateEdgeRosterState(env,{actor,requestId,command,who,apply,needsContext=true,domainChanged=needsContext,beforeCommit,allowDuringQuiesce=false,contextInput}){
  validRequest(requestId);const digest=await GSiSEdgeStore.digest(canonicalCommand(command)),identity=who||{service:true,email:actor||'roster-service'};actor=actor||identity.email;
  const allocating=['autoAllocate','optimise','scheduledRoster'].includes(command.operation);
  let clockRetries=0,preparationMs=0;
@@ -711,7 +743,7 @@ export async function dailyOutputsEdgeRoster(env,options={}){
    const refs=await readEdgeRosterReferences(env),calendar=refs.calendarByDate?.[date];if(calendar?.available!==true)fail(503,'DAILY_OUTPUT_CALENDAR','The school date is not verified.');
    ctx={edgeGuards:[{scope:'roster-references',revision:refs.headRevision,mode:'active'}]};
    if(calendar.schoolDay===true){
-    const workbookState=await hydrate(env,state,[date]);ctx=await buildEdgeRosterContext(env,workbookState,{operation:'exportDaily',date,fullTeachers:true,dailyDrive:true});
+    const workbookState=await hydrate(env,clone(storedAuditState(state)),[date]);ctx=await buildEdgeRosterContext(env,workbookState,{operation:'exportDaily',date,fullTeachers:true,dailyDrive:true});
     const daily=await sanitizeBackup(GSISRosterOperations.read(workbookState,{...ctx,iso:new Date(now).toISOString()},{operation:'exportDaily',date,fullTeachers:true,dailyDrive:true}));daily.timetableName=daily.teacherSummary.staplerStatus==='baseline'?(ctx.timetableEntries.find(e=>e.id===ctx.days[date]?.id)?.name||'Baseline timetable'):'Stapler plan';
     const book=RosterExport.dailyTeacherWorkbook(daily,{final,packageFiles:GSISExcel.packageFiles}),bytes=new Uint8Array(await book.blob.arrayBuffer());files.unshift({kind:'excel',bytes,records:book.records});
    }else if(!text)return {schoolDay:false};

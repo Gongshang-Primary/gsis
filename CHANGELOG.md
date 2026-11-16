@@ -1,3 +1,7 @@
+# Pending hotfix: D1 background Worker memory, 17 November 2026
+
+Model: Codex. Bound simultaneous materialized Roster mutations in the notification Worker with FIFO admission, retain independent provider sends and foreground cancellation, and remove redundant state copies during plan hydration/packing. Refused-before-start allocation work releases its cycle lease. System Health preserves busy/backoff/memory diagnostics and lease counters. Existing receipts, CAS guards, allocation rules, history and uncertain-send handling remain. See `docs/coordination/tasks/roster-d1-worker-memory-hotfix.md`. No deployment or live settings/data change performed by Codex.
+
 # Pending hotfix: received D1 report recovery, 16 November 2026
 
 Model: Codex. Resume captured absences in the capture Worker independently of remote notification wake acceptance, and retry retained work on authorized receipt checks. Existing leases and request receipts prevent duplicate application; delayed delivery uses the trusted capture date. Assign Relief refreshes after observed application when doing so preserves unsaved work. No live repair, configuration change, namespace migration or Apps Script change. See `docs/coordination/tasks/roster-received-report-recovery.md`. Not deployed.
