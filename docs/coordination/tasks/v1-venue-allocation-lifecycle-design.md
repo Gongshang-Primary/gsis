@@ -1,10 +1,11 @@
 # v1-venue-allocation-lifecycle-design
 
-- Status: claimed; documentation and read-only investigation. Five owner answers and the aSc pipeline correction received; no implementation claim.
+- Status: owner design documented; publication to main uses the owner's explicit instruction. Five owner answers and the aSc pipeline correction incorporated; no implementation claim. Claude exact-head review pending.
 - Owner/model: Codex. Coordinator: ChatGPT v1. Independent reviewer: Claude, exact document head.
-- Updated: 16 November 2026, 10:46 Asia/Singapore.
+- Updated: 16 November 2026, Asia/Singapore.
 - Initial refreshed main: `d84a38ce907e7866f9331003ef4f26bb5a08851f`. Expected-head check detected an intervening documentation-only review update before any claim commit. Inspected it and fast-forwarded to claim base `47b2d2c5da3d2cbb551259b44e2aa7536a2f79f9`.
 - Branch after the accepted claim: `codex/v1-venue-allocation-lifecycle-design`.
+- Accepted claim: `df5335b732e9d97cb47d93b447f8b674ee1a6115`; published alone to main, then reread before authoring. Document head: the commit containing this update, to avoid a self-referential hash.
 - Owner instruction: specify the split-timetable-room and Deploy/Venues/Layout allocation lifecycle in a Markdown document **on main**, asking genuine workflow/policy questions. This authorises this design record on main, not implementation, unrelated merges, deployment, migration or live-data operations.
 
 ## Exact documentation scope
@@ -30,4 +31,55 @@ Acceptance checks: exact two-path documentation inventory; relative links; white
 
 ## Handoff
 
-Claim publication first, then author the design and incorporate owner answers when received. Claude's exact-head design review remains pending. No skill package executed or vendored; apply the repository's ownership, simplicity and evidence principles directly. No product behavior, active claims, provider credentials or live school data are changed.
+The [venue allocation lifecycle design](../../v1/venues/VENUE_ALLOCATION_LIFECYCLE_DESIGN.md) records the owner's answers and final correction. Deploy informs aSc; imported aSc timetable data reaches Roster, Venues and Layout without a matching Deploy publication, Deploy availability or a subsequent republish. Consumers retain separate planning and timed snapshots plus local overlays. ISH-1 has two interchangeable class slots; offer one-slot/whole-venue bookings, default whole. Keep existing bookings and flag new conflicts. Deploy's active planning copy changes immediately regardless of its term label, without erasing independent imported occupancy.
+
+Source inspection identified the existing room/start/end occupancy deduplication and Boolean venue conflict/displacement logic as implementation work to reproduce and change. These are static findings, not executed behavioural reproductions. The document supplies V01–V22, all **Not tested**. No owner question remains; future implementation still requires bounded claims and Claude review.
+
+No skill package executed or vendored; applied the repository's ownership, simplicity and evidence principles directly. No product behavior, other active claims, provider credentials or live school data are changed. Revert this documentation commit to withdraw the design text; doing so would not undo an owner decision or change runtime data.
+
+## Verification
+
+Actual documentation checks: five local links resolve; exactly the two approved files differ from the accepted claim; V01–V22 occur once each and remain **Not tested**; whitespace check passes. Read the final wording against all owner answers, including the correction that baseline import must not be gated on Deploy. No application, test, workflow, build, configuration, dependency or generated path changed.
+
+Reproduce from the repository root at the document commit:
+
+```bash
+TZ=Asia/Singapore python3 - <<'PY'
+from pathlib import Path
+import re, subprocess
+paths = ['docs/coordination/tasks/v1-venue-allocation-lifecycle-design.md',
+         'docs/v1/venues/VENUE_ALLOCATION_LIFECYCLE_DESIGN.md']
+links = 0
+for name in paths:
+    source = Path(name)
+    for target in re.findall(r'\]\(([^)]+)\)', source.read_text()):
+        if '://' in target or target.startswith('#'):
+            continue
+        assert (source.parent / target.split('#', 1)[0]).resolve().is_file(), target
+        links += 1
+changed = subprocess.check_output(['git', 'diff', '--name-only',
+    'df5335b732e9d97cb47d93b447f8b674ee1a6115'], text=True).splitlines()
+assert set(changed) == set(paths), changed
+spec = Path(paths[1]).read_text()
+assert re.findall(r'^\| (V\d{2}) \|', spec, re.M) == [f'V{i:02d}' for i in range(1, 23)]
+for row in spec.splitlines():
+    if re.match(r'^\| V\d{2} \|', row):
+        assert row.endswith('| Not tested |'), row
+print(f'PASS: {links} relative links; two approved paths; V01-V22 all Not tested.')
+PY
+TZ=Asia/Singapore git diff --check df5335b732e9d97cb47d93b447f8b674ee1a6115
+TZ=Asia/Singapore git diff --name-status df5335b732e9d97cb47d93b447f8b674ee1a6115
+```
+
+Run against the staged working tree and committed head; staging is needed for the new document to appear in the working-tree diff. No build, Node/LORD/product suite, browser/Worker/D1 test, provider activity, live read or hosted check ran for this documentation-only task. CI, if triggered, does not prove the proposed behaviour. No implementation or deployment is claimed.
+
+| Gate | Documentation evidence |
+| --- | --- |
+| Q01 | Pass: owner-authorised main documentation, accepted claim, refreshed disjoint open-PR file inventories, exact two-path scope. |
+| Q02 | Pass for design: independent planning/timed source ownership, local copies, immutable editions and overlays. |
+| Q03 | Pass for documented boundaries: no authority weakening, staff records, credentials or live data; runtime not tested. |
+| Q04 | Pass for design: capacity-aware serialisation, idempotent adoption, retained conflicts and explicit cross-D1 delivery limits; implementation tests pending. |
+| Q05 | Pass for design: reuse existing owner stores/import receipts; bounded projections and future measurement; no added dependency/framework. |
+| Q06 | Pass for documentation checks; all proposed behaviour, build/regressions and hosted UAT untested by this task. |
+| Q07 | Pending: Claude independent review of the exact document head. Owner's direct-main instruction permits publishing this record before that review. |
+| Q08 | Not applicable to deployment: no implementation, migration, activation or release; runtime UAT remains Not tested. |
