@@ -1,0 +1,138 @@
+# Central Google backup service: direct Drive API
+
+Model: Codex. Design only, revised 16 November 2026. Claude must review the updated exact documentation head; approval at `688e2aef42f3c552645cd7e1d65df1b5b410d9fa` covered the earlier transport design only. [Claim](../../coordination/tasks/v1-quiet-mode-central-google-backup.md); original source baseline `404fe6d043e7c22eba2a3070cbfdbedb544112cd`, accepted design claim `2f9095e9ac0ada32c548ea9f922c7a6a3859c3fa`, refreshed main `f22f730f5da243baf16d14834289652ef1425c3a`. No implementation, Drive access, credential/configuration change, backup activation or storage deletion is performed by this plan.
+
+## Decision and boundaries
+
+The owner explicitly changed the transport decision: **“no appscript”**. Use one Core-managed backup pipeline calling the **Google Drive API directly** for all GSiS Google backups. Each application still owns its D1/R2 records, consistent export and import rules. Core coordinates export jobs, destination mappings, file identities, retries and System Health, and performs bounded authenticated Drive I/O.
+
+The owner confirms that [the provided destination](https://drive.google.com/drive/folders/1HJDMM-_88cuKwL7-HyQO08pgeAdEtb3k) is in a **private Shared Drive, not publicly shared**, and names **helper@gsps.edu.sg** as the backup account. These are owner statements, not an independently verified permission inventory. Do not make the drive, folders or files public, create anyone-with-link permissions, or change existing sharing as part of this design.
+
+This supersedes this plan's earlier Apps Script proposal and withdraws its exception to the direct-Google-API requirement in E07 and section 11 of the [accelerated implementation specification](../accelerated-delivery/GSIS_V1_ACCELERATED_IMPLEMENTATION_SPEC_2026-11-13.md). There is no `Code.gs`, Apps Script project, web-app endpoint, Script Properties, script trigger or script fallback to build. The path is **application export → Core backup service → Google Drive API → private Shared Drive**. Normal application reads, saves, allocation and publication remain native Workers/D1/R2 operations; a Drive/authentication outage must never stop an ordinary operational save. Google login, Google Calendar synchronization, provider delivery and v0.9 remain separate.
+
+## Existing contracts to retain
+
+References were inspected at the source baseline and rechecked against refreshed main. The listed runtime backup/provider sources have not changed between those commits. No hosted data or Google folder contents were inspected.
+
+| Existing source | Consequence for this design |
+| --- | --- |
+| [`drive-backup.mjs`](../../../v1/runtime/drive-backup.mjs) | Existing direct Drive API adapter: approved root, Singapore dates, stable file IDs, byte verification, conditional same-day replacement and an 8 MiB file bound. Reuse it behind Core orchestration; verify its provider assumptions before activation. |
+| [`providers.mjs`](../../../v1/runtime/providers.mjs) | Current Google authentication accepts a short-lived access token or Google Cloud service-account JSON. It does not implement the named Workspace account's offline OAuth connection. Add that bounded authentication path in a separately claimed implementation; do not mislabel a Workspace user as service-account JSON. |
+| [`drive-backup-jobs.mjs`](../../../v1/runtime/drive-backup-jobs.mjs) | Each owner currently schedules its own two-dataset batch, retains pending file identity and detects the 23:50 check. Replace transport/orchestration deliberately; do not let both schedulers write the same dataset. |
+| [`drive-backup-data.mjs`](../../../v1/runtime/drive-backup-data.mjs) | Existing owner projections distinguish importable workbooks from recovery-only files. Preserve explicit schemas, source bounds and privacy exclusions. Core currently has no readable dataset; declaring a central service does not fill that gap. |
+| [`backup.mjs`](../../../v1/runtime/backup.mjs) | Full owner backups and isolated restore are different from readable exports. They retain schema, object hashes, receipts and recovery uncertainty; suite snapshots are not cross-database atomic. |
+| [`reign.mjs`](../../../v1/services/lord/reign.mjs) and [Storage Toolbox](../accelerated-delivery/STORAGE_TOOLBOX.md) | Verified archives and exact cleanup controls remain required. A daily spreadsheet is not permission to delete authoritative D1/R2 records. |
+
+Reuse the existing owner export builders and importer schemas. Introduce a Core job catalogue and a transport interface, not a second spreadsheet serializer or a new operational store. Existing per-owner pending rows remain recoverable during transition.
+
+This routes every registered **Google-bound** backup through the central adapter. It does not automatically upload every full R2 database snapshot to Drive: those snapshots can contain security/recovery records excluded from readable exports and have larger size contracts. A new Google dataset for such material needs an explicit owner-approved export/privacy contract and bounded recovery format. Existing Google-bound REIGN archives retain their current approved content and verification rules.
+
+## Folder and file organization
+
+Persist the approved root folder ID, its actual Shared Drive ID and child folder IDs after verified setup. The folder ID in the URL must not be assumed to be the Shared Drive ID. Names are display labels, never authority. Core must verify the registered destination's Shared Drive identity and ancestry under the approved root before each operation. Ambiguous duplicate folders require repair instead of choosing the first name match. Do not recreate or traverse arbitrary caller-supplied paths. Use Shared Drive support parameters for applicable API requests and bounded, drive-scoped listing when recovery needs it; a global filename search is not identity verification.
+
+| Logical application | Planned directory below the approved root | Contents |
+| --- | --- | --- |
+| Core / Global Admin Toolbox | `Core/<dataset>/<year>/` | Safe account/access configuration reports and backup manifests. No session tokens, credentials, bearer links or raw authentication evidence. A Core report is not an account/grant import endpoint. |
+| Contacts | `Contacts/<dataset>/<year>/` | Staff workbook using the current Contacts grid/import contract; separately labelled recovery records. |
+| Deploy | `Deploy/<year>/<version-label-and-stable-id>/<dataset>/` | Current canonical planning workbooks and a separate version recovery file. Preserve per-sheet import limitations. |
+| Roster | `Roster/<year>/<dataset>/` | Baselines, saved/confirmed timetable exports, absence/duty/history reports and recovery artifacts. Reuse existing exports; unsupported imports stay explicitly unavailable. |
+| Calendar | `Calendar/<year>/<dataset>/` | Events/setup exports, supported metadata imports and separate recovery records. |
+| LORD, OVERLORD, STARLORD | `LORD/<year>/<dataset>/` | One LORD owner's inventory, reference lists, bookings and event history. The two additional viewports do not create duplicate authorities. REIGN archives and Wrapped outputs use a distinct archive dataset keyed by the REIGN operation. |
+| Layout | `Layout and Venues/Layout/<year>/<dataset>/` | Existing year workbook and recovery artifacts. |
+| Venues | `Layout and Venues/Venues/<year>/<dataset>/` | Venue catalogue, bookings and recovery artifacts, with importability stated accurately. |
+
+Use the six existing top-level viewport folders shown by the owner; add `Core` for its own safe reports/manifests. Further subdirectories are deterministic registered mappings. No current child-folder IDs are guessed or claimed verified.
+
+Default name: `2026 11Nov 16 — Contacts — Staff.xlsx`. Keep the Singapore date first. Add `hhmmss` only where an event-specific archive needs it; fix that timestamp when the operation is created so retries cannot create a different name. Display labels are sanitized and stable IDs disambiguate duplicate labels.
+
+The logical file key is `(school, owner, dataset, format/part, Singapore day)`. There is at most one current file for that key; same-day changes replace its bytes at the same Drive file ID. XLSX and a necessary JSON manifest are different named files, not duplicate backups. Larger datasets may use explicit, stable partitions only when their export/import contract supports that partition; never silently truncate a workbook or invent an incompatible split.
+
+Use XLSX for human-readable data wherever an existing useful schema exists. Retain JSON/binary artifacts needed for complete recovery and distinguish them in the manifest and UI. Every manifest records owner, schema/exporter version, source content identity, source observation time, creation/verification times, stable file IDs, MIME types, sizes and SHA-256 values. An unchanged read does not create a new source revision or backup.
+
+Completed REIGN archives are immutable recovery evidence. A later daily export cannot overwrite an archive referenced by a cleanup receipt. Its event-specific dataset ID preserves the one-file-per-key/day rule while keeping that archive separate from the changing daily report.
+
+## Ownership and service contract
+
+| Boundary | Responsibilities |
+| --- | --- |
+| Application Worker | Produce a bounded consistent owner snapshot/projection; validate its schema; create and retain an immutable R2 export artifact and manifest; expose it only to authorized Core requests. Never write another owner's database. |
+| Core Worker | Register datasets/folder mappings; schedule fair work; persist operation intent, current file ID and expected prior hash before an external write; authorize downloads; reconcile outcomes; aggregate System Health. Its direct Drive adapter enforces school/drive/root/file/MIME/size restrictions and uses the dedicated account's Google access token. |
+| Google Drive API | Store/read the specified files under the account's actual Shared Drive permissions. Core validates provider responses and reads back bytes; a successful HTTP response alone is not proof of a verified backup. No public sharing or arbitrary destinations. |
+| Existing frontend import | Preview and validate the downloaded file through its owning application's current capability, revision and operation-ID checks. Reading a backup cannot grant acceptance or silently restore accounts. |
+
+Use a versioned internal job contract: `schemaVersion`, `schoolId`, `operationId`, `action`, `datasetId`, `fileId`, registered destination key, expected previous hash/generation, target hash/size/MIME/name and source identity. Existing authenticated service boundaries bind the request to its owning application and current Core authority. Core obtains bounded export bytes from the owner artifact and makes standard HTTPS Drive API requests with Google bearer authorization. Do not introduce an Apps Script-specific signed envelope or base64 relay. Bind durable job intent to the exact destination, bytes and operation; changed intent under one ID is rejected.
+
+Actions are limited to `inspect`, `read`, `reserveFileId` and `put`. Folder creation belongs to a separately approved initial setup operation; there is no ordinary `delete`, `move`, sharing or arbitrary query action. ID reservation may return a different unused ID after a lost response, but **Core must persist exactly one chosen ID before any upload**. Retrying an upload never reserves another ID. Preserve binary XLSX/JSON identities; conversion into native Google Docs/Sheets is not part of this plan and must not invalidate the file-ID recovery contract.
+
+### Dedicated Workspace account and browser-only setup
+
+Use **helper@gsps.edu.sg** as the dedicated school automation identity. In this plan, “service account” describes its purpose: a Google Workspace user is different from a Google Cloud IAM service-account principal ending in `iam.gserviceaccount.com`. Do not put this email/password into `GOOGLE_SERVICE_ACCOUNT`, create an impersonation key or introduce domain-wide delegation. The selected route is Google's server-side OAuth authorization with **offline access**, so Core can renew access tokens while the user is absent.
+
+The proposed setup is a Global Admin-only **Connect Google Drive backups** flow. After a current GSiS Admin initiates it, Google consent must be completed as helper@gsps.edu.sg. Bind the callback to the initiating Admin/session, registered destination, OAuth state and approved client; verify the returned Google identity and persist its stable subject, rather than trusting an email hint. Use current Google authorization-code protections. A different Google account cannot silently become the backup identity. Ordinary GSiS sign-in does not grant Drive access, and school staff do not each connect their own Drive.
+
+Securely retain the refresh token server-side using a reviewed encrypted Core credential-storage path with its encryption key in a Worker secret binding. OAuth client secrets also stay in protected backend secret bindings. Neither credentials nor encryption keys belong in public Git, browser bundles, downloadable backups, URLs or logs. Do not store a Workspace password, manually maintained expiring bearer token or plaintext refresh token in D1. The v1 `GSIS_SECRET` is not Google authorization. Missing/revoked authorization shows a reconnect-required/blocked backup status; renewal failures cannot fabricate success or block native saves.
+
+Use the least Drive scope and actual Shared Drive permissions that support the registered datasets. Start by validating the existing `drive.file` scope for the chosen root, existing subfolders and historical files; adopt/select existing destinations through a supported authorization path. Scope alone is not a folder ACL and pasting a folder ID grants no access. Do not silently broaden to all-Drive access or change sharing to bypass a failure. An unmet access requirement must be resolved through a separately approved setup, with synthetic evidence before activation. Shared Drive files remain organization-owned, and access remains private.
+
+Google Cloud OAuth/client setup, account consent, protected GitHub configuration and deployment can all be performed through browsers; no school-machine CLI or Wrangler installation is required. Verify that helper@gsps.edu.sg is a sign-in-capable Workspace account with the necessary existing drive access, that school OAuth policy permits this connection, and that the app is configured for durable offline use rather than an expiring external-test authorization. These are later setup checks, not claims of access already verified. No live credential, sharing or OAuth setting is changed by this documentation task.
+
+Provider references: [Shared Drive support](https://developers.google.com/workspace/drive/api/guides/enable-shareddrives), [Drive scopes and secure refresh-token storage](https://developers.google.com/workspace/drive/api/guides/api-specific-auth), [offline OAuth access](https://developers.google.com/identity/protocols/oauth2/web-server#offline) and [Google token-expiration conditions](https://developers.google.com/identity/protocols/oauth2#expiration). Use these as implementation references, not evidence that the school configuration has been tested.
+
+## Durable writes, concurrency and restart
+
+Core uses explicit job states: `queued → exporting → prepared → writing → verifying → verified`; failures distinguish `retryable`, `unknown`, `conflict`, `missing` and `blocked`. A write acknowledgement is not a verified backup. The per-file active job is fenced in Core D1, with immutable operation intent and no concurrent replacement while a prior outcome is unknown. Source changes coalesce into a later target without changing the active operation's intent.
+
+Before `put`, retain the exported bytes in owner R2, exact target digest, file ID, prior verified digest and destination. Core's durable per-file job ownership serializes its own mutations; an isolate-local lock is insufficient. Recheck the job generation before sending and reject changed intent for an existing operation identity. Use Drive conditional replacement with the actual previous version/ETag where supported; prove this against the real API and selected file type before activation. A local D1 lease cannot fence a delayed remote request or a manual Drive edit. If the required remote precondition cannot be enforced, report a conflict/blocked setup instead of silently overwriting. Do not start a newer replacement while an older write is unresolved.
+
+Persist file identity, operation ID, generation and digest as remote metadata together with the content where the Drive API supports it. Exact retries inspect that fixed file ID. Matching bytes/metadata recover the outcome; wrong content, Shared Drive, parent, MIME or generation becomes a conflict. An already completed operation returns its recorded result after required reconciliation and performs no new file write. A timeout after upload is `unknown`: reconcile first, without creating another file or replaying application writes. Drive may complete a request after the Worker stops waiting; the same identity and remote conditional-write protections still apply. Test termination after content is stored but before the response, and before Core stores its verified receipt.
+
+Core records success only after the remote identity, location, size and content checksum are verified and the job's current local fence still matches. If remote metadata is insufficient to prove content identity, read and hash the bounded bytes. A delayed result cannot overwrite a newer Core status. Multi-file backups are complete only when all parts and the manifest are verified; partial sets are visible and never qualify for pruning/restore readiness. Neither multiple Drive files nor different D1 databases commit atomically.
+
+On restart, read durable Core intent and existing owner artifact, reconcile the same Drive ID, then resume. Preserve the old per-owner pending job IDs/file IDs when adopting existing jobs. Never silently retarget a pending job to a new folder or turn a missing historical file into a new upload. Deleted historical backups remain deleted unless the owner explicitly requests regeneration. A missing latest backup is reported; the operator may explicitly create a current-day replacement after inspecting status.
+
+## Freshness, bounds and visibility
+
+At **23:50 Asia/Singapore**, Core schedules one persisted check cycle. A missed trigger is caught up from the last completed cycle; it does not enqueue repeated identical checks. This is the due time for bounded work, not a promise that every file finishes uploading at that instant.
+
+For each dataset, compare the owner's current content identity with the last remotely verified content identity, and verify that the remote artifact still exists with the expected integrity. Record `sourceObservedAt`, `remoteVerifiedAt`, `lastCheckedAt` and `lastChangedAt` separately. A months-old file is **current** when source and remote evidence still agree. Age alone never forces a rewrite. An unchanged source with a deleted/corrupt remote file is **missing/failed**, not current. If the owner cannot be read, report **unknown**, not unchanged. A source change after the check belongs to a later observation and cannot be hidden by a falsely advanced check time.
+
+Reuse the present 8 MiB file limit and 4 MiB/2,000-row source projection bounds until a measured, explicit dataset contract justifies a change. Stream the authenticated owner artifact to Core with a dedicated bounded interface; the existing generic 1 MiB service JSON limit must not be silently raised. At most one upload is materialized at a time. Bound metadata and multipart overhead, reject oversize payloads before provider I/O, and verify byte count/hash before upload and during readback. No base64 relay or unbounded in-memory whole-suite export.
+
+Start with two dataset actions per scheduler invocation, a persisted fair cursor across owners, a five-minute Core lease and a 15-second timeout per provider RPC. Timeout is uncertainty, not cancellation of a remote write. Busy per-file jobs are deferred; there is no script lock to acquire. Use capped retries (1, 5, 15, then 60 minutes; at most eight attempts per operation before manual recovery), with reconciliation before each write retry. Renew Google access tokens server-side as needed without changing job intent. Separate rate-limit/transient errors from revoked authorization, missing permission and content conflicts; use bounded retry/backoff, not repeated unauthorized writes. Provider quotas and the largest supported XLSX round trip are acceptance gates, not assumed production capacity.
+
+Only Global Admin Toolbox → **System Health and backups** reports current, pending, stale, unknown, missing, failed or disabled; it shows source/check times and remaining work. No WhatsApp, Telegram, email or Admin notification is added. Permission checks still control export/download access; a shared Drive folder does not expand application permissions.
+
+## Cutover and retention
+
+1. Test the direct API adapter and helper-account authorization with synthetic files in an independently authorized private Shared Drive test folder; prove access boundaries, token renewal, bounds, conditional replacement and restart recovery.
+2. Inventory registered datasets, pending jobs and exact file/folder IDs using authorized metadata access only. Preserve existing formats and mark unsupported imports honestly.
+3. Introduce the Core coordinator while old jobs remain readable. Transfer each dataset's writer ownership with an explicit epoch: stop only its backup scheduler, reconcile any unknown write, then adopt its IDs. Operational application writes continue.
+4. Route new backup jobs through Core's direct Drive API adapter. Prove that no old owner job can still write the dataset. Rollback drains/reconciles the current writer before returning the same file IDs to a compatible authorized old transport; never run two writers as a fallback. Do not enable an old service-account-only path if it cannot access the adopted private destinations.
+5. Enable the daily check only after independent review and owner setup/activation authorization. Keep pending manifests/artifacts and outcomes through rollback.
+
+Sharing remains owner-managed. Drive retention remains an open owner choice: manual deletion only, no automatic pruning. Do not add a retention question as a prerequisite to this plan. D1/R2 cleanup keeps [its existing restricted contracts](../accelerated-delivery/STORAGE_TOOLBOX.md); readable exports do not authorize a general history purge. REIGN still requires its specific durable archive/recovery evidence before cleanup. F5 remains **OPEN** until the separate durable decision-evidence recovery requirement is demonstrated.
+
+## Implementation packages and acceptance evidence
+
+This plan is not a product file claim. The implementation coordinator must refresh actual PR overlaps and issue small exact-path claims before code. Split work into (1) the helper-account offline OAuth connection/credential handling and reused direct Drive transport with synthetic provider tests, (2) Core orchestration and one-owner pilot using the existing export contract, then (3) remaining registered owners and migration/recovery. Keep each owner's schema changes explicit. Do not add speculative generic restore/import endpoints or modify operational save paths.
+
+| Test group | Required proof before activation |
+| --- | --- |
+| Ordinary saves | Drive/OAuth unavailable, revoked, timed out or over quota while native saves still commit and return their real receipts; no backup provider request on the save path. |
+| Scope/authentication | Wrong school/Shared Drive/root/file, traversed path, arbitrary URL, missing/revoked permission, changed bytes and wrong MIME rejected without file effects; credentials absent from browser bundles, backups, logs and Git. No public/anyone-with-link permission is created. |
+| Helper-account connection | Only a current Global Admin can initiate/manage the connection; wrong Google identity, forged callback/state, expired flow and revoked initiator access fail. Valid offline authorization renews tokens while no user is signed in; revoked refresh tokens require reconnection and do not lose pending jobs. Test only synthetic equivalents locally; real helper-account authorization needs separate setup authority. |
+| Daily identity | Same-day changed content updates one file ID; exact retry and two competing requests create one intended result; next-day changed content creates a new day's file; unchanged content creates none. |
+| Concurrency/recovery | Lost response before/after file write, crash before Core receipt, lease expiry, old response after newer generation, remote/manual change and Core/owner restart; reconcile existing IDs without duplicate files or false success. A completed-operation retry performs no new file action. |
+| Freshness | Months-old unchanged valid file is current; changed source is stale/pending; missing/corrupt file is not current; unreadable source is unknown; 23:50 Singapore boundary, missed scheduler and unfinished cycle remain accurate. |
+| Import/export | Open real XLSX output and exercise each supported frontend's preview/import against synthetic Worker/D1 records. Unsupported schemas remain report/recovery-only. Check stable source IDs, timestamps, formulas/text, duplicate labels and size limits. |
+| Cutover/rollback | Old/new writers cannot both mutate a dataset; pending jobs retain identities; no move of unknown writes; multi-part failure preserves previous valid evidence; rollback is recoverable without deleting history. |
+| Destructive consumers | Changing daily exports cannot satisfy an immutable REIGN archive reference; incomplete/tampered/missing archive blocks cleanup; no automatic Drive deletion; unchanged D1/R2 prune limits. |
+
+Tests above are proposed, **not run**. A Node simulation cannot prove actual helper-account permission, private Shared Drive scope, Google conditional-write behavior/quotas or hosted recovery. Those require separately authorized provider/runtime evidence. The owner has confirmed the drive's private status; this document does not claim an independent ACL audit. No hosted/runtime UAT or official T1B-01/T1B-02 result changes here.
+
+## Related quiet-mode changelog
+
+The inherited [`roster-operations-ui.js`](../../../roster-update/public/roster-operations-ui.js) renders a quiet-mode button and calls `/quiet-mode`; the v1 [probe allowlist](../../../tests/v1-product/operation-probe-allowlist.json) already records the absent route as F08. The owner's decision is to remove that obsolete control/request from v1, not implement its Google-era background-job pause. A separate bounded UI change must prove native saves/allocations keep working and remove the matching probe exception only when the actual built caller is gone. Preserve notification quiet hours, authorization, revisions, idempotency, lease fencing and uncertain-outcome recovery. This document changes no code or v0.9 behavior.
+
+Transport, account and destination privacy are settled: **direct Drive API, helper@gsps.edu.sg, private Shared Drive, no Apps Script**. Next steps are Claude's updated exact-head design review, bounded implementation scope, then browser-only OAuth/permission setup and activation under separate authority. Do not re-ask which account to use. No new owner decision on retention, field names or routine folder labels is needed to finish this plan.
