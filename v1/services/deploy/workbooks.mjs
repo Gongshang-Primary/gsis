@@ -10,6 +10,7 @@ import {
   plain,
 } from "./validation.mjs";
 import { membershipValue, setMembershipValue } from "./model.mjs";
+import { ROLE_COLUMNS, normalizeRoleMemberships, applyRoleMemberships, checkManagedMemberships } from "./role-memberships.mjs";
 export const SCHEMAS = Object.freeze({
   IP: {
     Classes: [
@@ -70,6 +71,7 @@ export const SCHEMAS = Object.freeze({
   Exclusions: {
     Exclusions: ["Staff ID", "TTb Name", "P1", "P2", "P3", "P4", "P5", "P6"],
   },
+  "Role Membership": { "Role Membership": ROLE_COLUMNS },
   Membership: { Membership: ["Staff ID", "TTb Name", "Role", "Memberships"] },
   Offload: {
     Offload: [
@@ -240,6 +242,8 @@ export function exportWorkbook(
         ),
       ]),
     };
+  if (scope === "Role Membership")
+    sheets = { "Role Membership": normalizeRoleMemberships(doc.membership || []) };
   if (scope === "Membership")
     sheets = {
       Membership: doc.teachers.map((teacher) => [teacher.id, display(teacher),
@@ -700,6 +704,11 @@ export function validateWorkbook(
       }
     }
   }
+  if (scope === "Role Membership") {
+    next.membership = normalizeRoleMemberships(wb.sheets["Role Membership"].rows);
+    next.roleMembershipSchema = 1;
+    applyRoleMemberships(next);
+  }
   if (scope === "Membership") {
     unique(r.Membership, (row) => row["Staff ID"], "staff");
     for (const row of r.Membership) {
@@ -710,7 +719,9 @@ export function validateWorkbook(
       const blank = value === null || !value.trim();
       if (blank && (membershipValue(person) === undefined || membershipValue(person) === null))
         continue;
-      setMembershipValue(person, blank ? [] : value.split(/\r?\n/).map((tag) => tag.trim()).filter(Boolean));
+      const groups = blank ? [] : value.split(/\r?\n/).map((tag) => tag.trim()).filter(Boolean);
+      checkManagedMemberships(next, person, groups);
+      setMembershipValue(person, groups);
     }
     next.contactsMemberships = next.teachers.map((person) => [person.id, display(person),
       person.profile?.Role || "", (membershipValue(person) || []).join("\n")]);
@@ -879,5 +890,5 @@ export function validateWorkbook(
       staff: doc.teachers.map((t) => ({ id: t.id, ro: parents[t.id] || "" })),
     };
   }
-  return { scope, document: next, proposals };
+  return { scope, document: applyRoleMemberships(next), proposals };
 }
