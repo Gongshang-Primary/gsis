@@ -11,6 +11,7 @@ import { resolve, join } from "node:path";
 import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
 import { buildWeb } from "./build-web.mjs";
+import { RELEASE_LABEL } from "../../v1/release.mjs";
 export const root = resolve(import.meta.dirname, "../..");
 export const domains = [
   "core",
@@ -42,6 +43,7 @@ export async function buildProduct({
   );
   const manifest = {
     schemaVersion: 1,
+    releaseLabel: RELEASE_LABEL,
     workingTreeDirty: !!execFileSync("git", ["status", "--porcelain"], {
       cwd: root,
       encoding: "utf8",
@@ -84,6 +86,7 @@ export async function buildProduct({
       throw Error("Unrecognised or secret setting: " + key);
   const vars = {
     GSIS_BUILD_COMMIT: manifest.sourceCommit,
+    GSIS_RELEASE_LABEL: RELEASE_LABEL,
     ...(config.settings ?? {}),
     SCHOOL_ID: config.schoolId,
     SCHOOL_NAME: config.schoolName,
