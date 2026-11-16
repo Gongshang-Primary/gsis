@@ -36,6 +36,7 @@ Exact allowlist:
 21. `tests/v1-product-contacts-projection-browser.mjs`
 22. `tests/v1-product-deploy-workbooks.mjs`
 23. `v1/services/contacts/intervals.mjs`
+24. `v1/services/contacts/contributions.mjs`
 
 Deploy owns version-specific explicit role mappings and immutable publication intent. Contacts owns the current ordinary fields and accepted SMC/EO/School Leader records, history, audit, ordering and receipt. Core keeps its existing permission rules and reads current Contacts evidence. Role names/grade text alone never imply EO or other permissions: add an explicit EO yes/no/unknown value alongside appointment grade. MKE+SMC remains invalid. No Global Admin or module-grant inference. Preserve current session, school, capability, revision, idempotency, size and service-proof checks.
 
@@ -50,3 +51,5 @@ Meaningful synthetic tests through actual built browser, Workers and local D1: e
 Q01 claimed scope above; Q02–Q05 design/invariant evidence in implementation/PR; Q06 tests/CI pending; Q07 Muse review pending; Q08 no merge, deployment, hosted migration, live staff/configuration change, provider send, Google activation or prune in this task. The previous v1.01 release is separately recorded. F5 OPEN; official T1B-01/T1B-02 and unperformed runtime UAT Not tested. Repository engineering principles applied; no optional skill package executed or copied.
 
 Scope refinement before dependent edits: include `v1/services/contacts/intervals.mjs` only to carry explicit original proposer and actual accepter through the existing field/history writer, preserving default callers. This avoids duplicating the authoritative interval/history writer and is necessary for truthful publication-recovery attribution; no new business policy or live authority is added. ChatGPT coordinator records this implementation detail within the owner-authorised feature.
+
+Second narrow scope refinement before dependent edits: `v1/services/contacts/contributions.mjs` excludes proof-bound authority publication bundles from the ordinary manual contribution inbox, alongside the existing Memberships publication exclusion. This prevents an unrelated manual contribution path from editing the immutable permission intent; no other contribution semantics change.
