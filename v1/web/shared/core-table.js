@@ -8,6 +8,7 @@
     securityEpoch = 0;
   window.addEventListener("gsis:clear-protected-state", () => {
     securityEpoch++;
+    for (const state of states.values()) clearWidths(state);
     preferences.clear();
   });
   function text(node, header = false) {
