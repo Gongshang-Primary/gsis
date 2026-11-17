@@ -1,6 +1,6 @@
 # v1 normal New planning version inheritance (PAR-03)
 
-- Status: claimed on the isolated task branch; implementation pending.
+- Status: implemented on the isolated task branch; focused verification passes, full CI and exact-head review pending.
 - Model/owner: Codex. Coordinator: ChatGPT v1. Reviewer: Muse at the exact functional head under the current owner assignment.
 - Updated: 18 November 2026, Asia/Singapore.
 - Branch: `codex/v1-deploy-new-version-inheritance`.
@@ -43,10 +43,30 @@ GitHub refresh on 18 November SGT: PR205 remains open at `456f264796ea24ed03a51d
 
 ## Decisions and current evidence
 
-No implementation yet. Existing audit evidence is historical, not this task's red/green result. Skill selection: a narrow existing-contract repair uses manual boundary, ownership, simplicity and verification principles; no third-party skill execution or code redistribution claimed.
+The service now honours the selected source for normal New. A pure model helper retains definitions/settings/room placements and resets the specified assignment families before the unchanged current-Contacts merge. `copyFrom` and `sourceId` retain their historical full-copy semantics even with `duplicate:false`; Duplicate without a source still creates the existing default form. Normal New uses current v1 relief defaults (including SIUE190), not obsolete v0.9 numeric defaults. No new Contacts inclusion/exclusion policy is introduced.
+
+Skill selection: a narrow existing-contract repair uses manual boundary, ownership, simplicity and verification principles; no third-party skill execution or code redistribution claimed. A separate Codex agent inspected the small model/service diff read-only and found no concrete counterexample. That internal inspection is not Muse's independent review.
+
+Local commands ran from the accepted task-only commit `d2fb042bc22eae769fad18df0b3461916245da60` plus the implementation/test changes, before the implementation commit. These working-tree results are not represented as exact-head CI:
+
+- `TZ=Asia/Singapore GSIS_BROWSER_EXECUTABLE=/usr/bin/chromium node tests/v1-product-deploy-new-version-inheritance.mjs`: tracked red at the inherited-class assertion (`[]` instead of the selected class/ref/venue), after the actual built control's source ID and `duplicate:false` were verified. After the fix, all five groups pass in18.483 seconds, below the unchanged45-second limit. Coverage includes current inactive Contacts/BT refresh, every reset family, unchanged source rows and a synthetic immutable publication fixture, pure independence, aliases/Duplicate/no-source, negative authorization/source cases, a real browser response dropped after owner commit and original-operation restart replay after source deletion and Contacts changes. The publication fixture is not an R2 or hosted-publication proof.
+- An intermediate green attempt passed the three positive groups, then its unlinked synthetic reader returned503 before the intended403 access-denial check. Correcting the fixture to a real linked person with three explicitly accepted synthetic authority records retained the403 assertion. This was a test setup correction, not a product or permission change. `/usr/bin/time` was unavailable before one launch; Python measured the same test command instead.
+- `TZ=Asia/Singapore npm run build`: base and final canonical builds pass all18 components; zero tracked generated-output drift.
+- `TZ=Asia/Singapore node tests/v1-product-deploy-workbooks.mjs`: both existing groups pass unchanged.
+- `node scripts/v1/test.mjs --list` and `node tests/run.cjs --list`: the new program is discovered in both runners (129 product/1230 Node programs). Source/test syntax and `git diff --check` pass. Only the four claimed paths are changed relative to the base.
+
+Raw synthetic logs are `/tmp/gsis-par03-red.log`, `/tmp/gsis-par03-green-2.log`, `/tmp/gsis-par03-base-build.log`, `/tmp/gsis-par03-final-build.log` and `/tmp/gsis-par03-workbooks.log`. The tracked test is the repeatable evidence; private logs are not the sole regression artifact.
+
+Unchanged regressions, using `TZ=Asia/Singapore GSIS_BROWSER_EXECUTABLE=/usr/bin/chromium node tests/<program>`:
+
+- `v1-product-deploy-duplicate-contacts.mjs` passes in30.235 seconds: actual built Duplicate, all eleven Contacts fields, explicit clears, assignments/stable IDs, source isolation and restart replay.
+- `v1-product-deploy-planning-eligibility.mjs` passes both groups on its isolated rerun in32.566 seconds. Its initial run passed the first group but hit the existing45-second ceiling while other local suites were active. Retain `/tmp/gsis-par03-planning-eligibility.log` as failed evidence alongside `/tmp/gsis-par03-planning-eligibility-isolated.log`; the test and its timeout were unchanged.
+- `v1-product-deploy-storage.mjs` passes in29.898 seconds, including actual D1/R2, dependency/interval/race fences, bounded512-person paging, immutable publication, original receipts, import/restart recovery and venue refresh. Its Core/Venues adapters are synthetic, as the existing test states. Measured dependent-save owner cost remains34 statements, maximum11 binds and3,932 JSON bytes. Log: `/tmp/gsis-par03-storage-isolated.log`.
+
+The implementation/test sources stayed frozen throughout these final checks. The coordinator will record the implementation commit and full exact-head CI results with the handoff; no precommit local result is relabelled as remote CI.
 
 ## Review, release and handoff
 
-Q01 scope/overlap recorded; Q02-Q05 contract stated; Q06-Q07 pending implementation and verification. Q08 deployment not authorised. No hosted reads/writes, migration, provider sends or live configuration. F5 remains OPEN; official T1B-01/T1B-02 and unperformed hosted/runtime UAT remain Not tested.
+Q01 scope/overlap and Q02-Q05 local implementation evidence recorded; Q06 focused checks pass, required full Node/LORD/product exact-head CI pending; Q07 Muse review pending. Q08 deployment not authorised. Full suites are reserved for CI at the coordinator's instruction rather than blocking this verified local commit. No hosted reads/writes, migration, provider sends or live configuration. F5 remains OPEN; official T1B-01/T1B-02 and unperformed hosted/runtime UAT remain Not tested.
 
 After local implementation and commits, return exact head and commands/results to the coordinator. Do not push/open a PR until instructed. Rollback is a source revert; it does not delete or rewrite versions already created. Review remains advisory and exact-head-specific.

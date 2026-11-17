@@ -398,6 +398,35 @@ export function canonicalTeachingDocument(document, original = document) {
   return next;
 }
 const fixedGroupSlots = { dept: 2, comm: 4, cca: 4, plt: 1, events: 2 };
+/** Normal New keeps the selected definitions and placements, without its staff assignments. */
+export function newPlanningVersion(source) {
+  const doc = structuredClone(source);
+  doc.teachers = [];
+  doc.teacherDrafts = {};
+  doc.teacherNotes = {};
+  doc.removedTeachers = {};
+  doc.assignments = [];
+  for (const [kind, groups] of Object.entries(doc.organisations || {}))
+    for (const group of groups) {
+      group.slots = Array(fixedGroupSlots[kind] ?? 0).fill("");
+      delete group.additionalDeputies;
+      delete group.tls;
+      delete group.legacyLeadership;
+    }
+  for (const duty of doc.duties || []) duty.teachers = {};
+  for (const activity of doc.workload?.nonTeachingActivities || [])
+    activity.teachers = [];
+  doc.reporting = null;
+  doc.relief = defaults().relief;
+  doc.pal = PAL.defaults();
+  doc.audit = [];
+  doc.fieldAuthors = {};
+  doc.saveReceipts = [];
+  delete doc.pendingUnitRename;
+  delete doc.conflictNotices;
+  delete doc.status;
+  return doc;
+}
 function memberOccurrence(values, index, start = 0) {
   return values.slice(start, index + 1).filter(value => value === values[index]).length;
 }

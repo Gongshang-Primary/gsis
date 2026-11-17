@@ -31,6 +31,7 @@ import { rosterWorkload } from "./roster-workload.mjs";
 import { check, id, text, finite, plain } from "./validation.mjs";
 import {
   defaults,
+  newPlanningVersion,
   applyEdits,
   validateDocument,
   mergeContacts,
@@ -878,14 +879,14 @@ async function create(ctx) {
       s.slice(0, 24),
     ));
   let doc = defaults();
-  if (b.copyFrom || b.sourceId || (b.duplicate && b.sourceVersionId))
-    doc = (
-      await loadVersion(
-        ctx.env.DB,
-        school,
-        b.copyFrom || b.sourceId || b.sourceVersionId,
-      )
-    ).doc;
+  const sourceId = b.copyFrom || b.sourceId || b.sourceVersionId;
+  if (sourceId) {
+    doc = (await loadVersion(ctx.env.DB, school, sourceId)).doc;
+    // The native New request carries the same source field as Duplicate.
+    // Historical copyFrom/sourceId callers retain their full-copy semantics.
+    if (!b.duplicate && !b.copyFrom && !b.sourceId)
+      doc = newPlanningVersion(doc);
+  }
   let p = await contacts(ctx);
   doc = mergeContacts(
     {
