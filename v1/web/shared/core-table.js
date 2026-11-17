@@ -8,6 +8,7 @@
     securityEpoch = 0;
   window.addEventListener("gsis:clear-protected-state", () => {
     securityEpoch++;
+    preferences.clear();
   });
   function text(node, header = false) {
     if (!node) return "";
@@ -106,6 +107,35 @@
           !(r.cells.length === 1 && r.cells[0].colSpan > 1),
       );
   }
+  function loadFingerprint(rows) {
+    return JSON.stringify(rows.map(row => JSON.stringify([
+      row.textContent,
+      [...row.querySelectorAll('input:not([type="hidden"],[type="password"]),select,textarea')]
+        .map(control => control.matches('[type="checkbox"],[type="radio"]') ? control.checked : control.value),
+    ])).sort());
+  }
+  function clearWidths(state) {
+    for (const [i, width] of state.widths.entries()) {
+      const cell = state.head.cells[i];
+      if (!cell || width === undefined) continue;
+      if (cell.style.width === width + "px") cell.style.removeProperty("width");
+      if (cell.style.minWidth === width + "px") cell.style.removeProperty("min-width");
+    }
+    state.widths = [];
+    state.sizedRows = null;
+    state.loadFingerprint = undefined;
+    preferences.delete(state.preferenceKey);
+  }
+  function compactAfterLoad(table) {
+    const state = states.get(table);
+    if (!state?.widths.length || !state.head.isConnected) return;
+    const rows = dataRows(table);
+    if (state.sizedRows?.size === rows.length && rows.every(row => state.sizedRows.has(row))) return;
+    // Sorting keeps the same nodes. An owner redraw can replace them without
+    // changing its data. Only check contents for tables with manual widths.
+    state.sizedRows = new Set(rows);
+    if (state.loadFingerprint !== loadFingerprint(rows)) clearWidths(state);
+  }
   function enhance(table) {
     if (
       table.matches(".weekly-grid,.timetable-grid,[data-schedule-matrix]") ||
@@ -164,6 +194,7 @@
       (table.id || table.parentElement?.id || "") +
       ":" +
       labels.join("|");
+    const savedWidths = preferences.get(preferenceKey);
     state = {
       bar,
       labels,
@@ -172,7 +203,10 @@
       filters: labels.map(() => ""),
       hidden: new Set(),
       sort: null,
-      widths: preferences.get(preferenceKey) || [],
+      preferenceKey,
+      widths: savedWidths?.widths.slice() || [],
+      loadFingerprint: savedWidths?.fingerprint,
+      sizedRows: null,
       ownedHidden: new WeakSet(),
       ownedCells: new WeakSet(),
       ownerHidden: new WeakSet(),
@@ -321,9 +355,17 @@
         handle.setAttribute("aria-label", "Resize " + label);
         handle.tabIndex = 0;
         function size(width) {
-          state.widths[i] = Math.max(65, Math.min(900, width));
-          cell.style.minWidth = cell.style.width = state.widths[i] + "px";
-          preferences.set(preferenceKey, state.widths.slice());
+          cell.style.minWidth = cell.style.width = Math.max(65, Math.min(900, width)) + "px";
+          state.widths[i] = Number.parseFloat(cell.style.width);
+          if (state.loadFingerprint === undefined) {
+            const rows = dataRows(table);
+            state.sizedRows = new Set(rows);
+            state.loadFingerprint = loadFingerprint(rows);
+          }
+          preferences.set(preferenceKey, {
+            widths: state.widths.slice(),
+            fingerprint: state.loadFingerprint,
+          });
         }
         handle.onpointerdown = (e) => {
           e.preventDefault();
@@ -367,13 +409,9 @@
     compact.type = "button";
     compact.textContent = "Compact";
     compact.onclick = () => {
-      state.widths = [];
-      preferences.delete(preferenceKey);
-      [...head.cells].forEach((c) => {
-        c.style.width = "";
-        c.style.minWidth = "";
-      });
-      window.GSISTableRefresh?.();
+      clearWidths(state);
+      if (table.classList.contains("gsis-compact")) window.GSISTableFit?.(table);
+      else window.GSISTableRefresh?.();
     };
     bar.append(compact);
     const mode = document.createElement("select");
@@ -496,6 +534,7 @@
   });
   window.GSISCoreTables = {
     report,
+    compactAfterLoad,
     register(selector, contract) {
       adapters.set(selector, contract);
       dispatchEvent(new Event("gsis:table-adapters"));

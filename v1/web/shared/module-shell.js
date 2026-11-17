@@ -94,8 +94,11 @@
   let pointerDown = false;
   function fitLoadedTables() {
     if (pointerDown) return;
+    const focused = document.activeElement;
     for (const table of document.querySelectorAll("table")) {
       if (!table.getClientRects().length || table.matches(scheduleGrids)) continue;
+      if (table.contains(focused) && focused.matches("input,select,textarea,[contenteditable],[data-core-resize],.member-resize")) continue;
+      if (table.matches(".gsis-core-table")) window.GSISCoreTables?.compactAfterLoad?.(table);
       if (table.matches(".gsis-compact") && typeof window.GSISTableFit === "function") {
         // Sorting moves the same nodes. New data or controls need measuring
         // once the owner has rendered them and wired its native table.
@@ -103,8 +106,6 @@
         const content = new Set([...table.rows, ...inputs]);
         const before = fittedTables.get(table);
         if (before?.size === content.size && [...content].every(node => before.has(node))) continue;
-        const focused = document.activeElement;
-        if (table.contains(focused) && focused.matches("input,select,textarea,[contenteditable],[data-core-resize],.member-resize")) continue;
         window.GSISTableFit(table);
         fittedTables.set(table, content);
       } else if (

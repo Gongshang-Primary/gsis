@@ -55,6 +55,35 @@ try {
     "compact spacing preserves the equal day columns");
   assert.equal(weekly.sortControls, 0);
 
+  await page.locator("#nav [data-page=glossary]").click();
+  const glossary = page.locator("#glossaryHost table");
+  const tagHeader = glossary.locator("thead tr").first().locator("th").first();
+  const resizeTag = tagHeader.getByRole("separator", { name: "Resize Tag" });
+  await resizeTag.waitFor();
+  const tagWidth = async () => (await tagHeader.boundingBox()).width;
+  const compactWidth = await tagWidth();
+  await resizeTag.focus();
+  for (let i = 0; i < 8; i++) await resizeTag.press("ArrowRight");
+  const resizedWidth = await tagWidth();
+  assert(resizedWidth > compactWidth + 40, "manual resizing changes measured width");
+  await tagHeader.getByRole("button", { name: "Sort Tag", exact: true }).click();
+  assert.equal(await tagWidth(), resizedWidth, "sorting keeps the current manual width");
+  await glossary.evaluate(table => table.tBodies[0].replaceWith(table.tBodies[0].cloneNode(true)));
+  await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+  assert.equal(await tagWidth(), resizedWidth, "a same-data redraw keeps the current manual width");
+
+  await f.call(f.admin, "calendar", "/action", {
+    action: "saveTag", operationId: "compact-fixture-calendar-tag",
+    payload: { Tag: "CT", Meaning: "Compact test data arrived", Active: "Yes", revision: 0 },
+  });
+  await page.locator("#refreshCalendarBtn").click();
+  await glossary.getByText("Compact test data arrived", { exact: true }).waitFor();
+  await page.waitForFunction(observed => {
+    const header = document.querySelector("#glossaryHost table thead tr th");
+    return header.getBoundingClientRect().width < observed - 40;
+  }, resizedWidth);
+  assert((await tagWidth()) <= compactWidth + 10, "newly loaded data restores the compact width");
+
   await f.call(f.admin, "deploy", "/versions/create", {
     operationId: "compact-fixture-deploy-version", name: "Synthetic compact planning", year,
   });
@@ -89,7 +118,7 @@ try {
   assert.deepEqual(await page.evaluate(() => structuredClone(queuedEdits())), draftBefore);
   assert.equal(f.requests.filter(request => request.url.endsWith("/api/deploy/change")).length, writesBefore);
   assert.deepEqual(errors, []);
-  console.log("PASS initial and refreshed Admin compaction, narrow scroll containment, Calendar day geometry, and legacy Deploy late-control fitting with its draft intact.");
+  console.log("PASS Admin compaction and narrow scrolling, Calendar geometry and resize reset on new data, and Deploy late-control fitting with its draft intact.");
 } finally {
   await f.close();
 }
