@@ -7,7 +7,7 @@ Model: Codex. Updated 17 November 2026 19:38:33 SGT.
 - Builder/coordinator: Codex / ChatGPT. Product reviewer: Muse at the two original exact heads. No claim that Muse reviewed an unseen integration head. The owner's current instruction authorises the mechanical script combination and routine label packaging through the deployment gate, subject to the checks below.
 - Base: main `13aac2adf40f4c018989ffe25629c69d753637ce`, the owner-authorised merge of #203 at `8ef3cd319ff070afcd3bcc951f162e9c05e5e4ff`.
 - Integration branch: existing `codex/v1-deploy-planning-eligibility` / PR #204, starting at Muse-approved `3802373188482a7af1f6555bca57c9ad6ba35dfb`.
-- Exact new hand-edit scope: this task; `docs/coordination/tasks/v1-deploy-planning-eligibility.md`; `scripts/v1/build-web.mjs`; `v1/release.mjs`. Other product differences must come unchanged from the two reviewed PR heads. No new product behaviour, tests, dependency, workflow, migration or settings change.
+- Exact new hand-edit scope: this task; `docs/coordination/tasks/v1-deploy-planning-eligibility.md`; `scripts/v1/build-web.mjs`; `v1/release.mjs`; existing `tests/v1-product-roster-tables.mjs` under the fixture clarification below. Other product differences must come unchanged from the two reviewed PR heads. No new product behaviour, test scenario, dependency, workflow, migration or settings change. The existing fixture-only browser fallback correction is bounded below.
 
 ## Integration and version
 
@@ -32,3 +32,12 @@ The Memberships publication mechanism is merged; do not claim the owner's data e
 ## Claim and handoff
 
 Publish only this task record first via the expected-head, non-force claim exception. Incorporate the accepted claim into the existing #204 branch, then perform the bounded integration. Every commit/PR description must contain Model: Codex. Post exact candidate and merge SHAs, checks, backup metadata and protected-run state in the PR/task evidence. Owner merge/deploy authorisation is task-specific; this does not authorise unrelated PRs or weaken platform controls.
+
+
+## Claim clarification: installed browser fallback
+
+Model: Codex. Coordinator-authorised 17 November 2026 20:08:31 SGT. Before editing the existing `tests/v1-product-roster-tables.mjs`, include that exact path in this release claim. At integration head `5aadad09dd0c6a65d3c5891223569be416ac5891`, Node/LORD run44076928898 passed1229/1229 and40/40 LORD per shard. Product run44076936138 passed127/128; only this unchanged fixture hit its45-second program cap, without stdout or a failing assertion. The unchanged fixture also passes locally on locked Chromium151 in12.534 seconds. These results do not prove the internal CI hang cause.
+
+Source inspection proves a portability mismatch: the Node workflow sets explicit browser overrides to Playwright's installed Chromium, while product CI installs that browser but this fixture instead falls back to `/usr/bin/chromium`. Change only that fallback expression to `chromium.executablePath()` when both existing overrides are absent. Keep both override precedences, every fixture action/assertion and the45-second cap unchanged. No test skip, forced click, timeout increase, workflow change or product edit is authorised by this clarification. Verify the fallback with both override variables absent and the existing locked browser cache, then rerun required full CI at the new exact head. Retain the original failed run and the unproven CI-hang limitation in handoff evidence.
+
+This is a necessary release-test portability correction under the owner's existing combine/deploy-through-gate instruction. Source ownership stays with the same Codex release builder. Incorporate this accepted task-only claim into #204, retaining all approved/integration evidence if the task append conflicts. The new hand-edit inventory is the four original files plus this one existing fixture. No fresh provider, live-data, credential or runtime authority is added.
