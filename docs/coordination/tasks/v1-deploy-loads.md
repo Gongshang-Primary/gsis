@@ -5,7 +5,7 @@
 - Updated: 17 November 2026, Asia/Singapore.
 - Branch: `codex/v1-deploy-loads`. Base: main `06d71e5852076903f708abda264c4e8682d815d8`.
 - Owner authority: after the Subject Load/LSP/FORM investigation, the owner explicitly instructed **“commit code changes”**. The later Versions radio-selection request is queued separately on disjoint paths. No merge, deployment, migration, live-data edit or provider send is authorised by this coding instruction.
-- Exact file scope: this task; `docs/v1/DEPLOY_SUBJECT_LOAD_UAT_2026-11-17.md`; `v1/web/shared/deploy-loads.mjs`; `v1/web/shared/deploy-loads-ui.js`; `v1/web/shared/deploy-ui-tables.js`; `v1/services/deploy/model.mjs`; `scripts/v1/build-web.mjs`; `tests/v1-product-deploy-loads.mjs`; `tests/v1-product-deploy-loads-browser.mjs`.
+- Exact file scope: this task; `docs/v1/DEPLOY_SUBJECT_LOAD_UAT_2026-11-17.md`; `v1/web/shared/deploy-loads.mjs`; `v1/web/shared/deploy-loads-ui.js`; `v1/web/shared/deploy-ui-tables.js`; `v1/services/deploy/model.mjs`; `scripts/v1/build-web.mjs`; `tests/v1-product-deploy-loads.mjs`; `tests/v1-product-deploy-loads-browser.mjs`; `tests/v1-product-table-deploy-settings.mjs`.
 - Overlap check: main is released v1.04; only PR182 is open, a v0.9 draft. The prior audit is a documentation-only branch `84e1f2882160cf9755be52c832f37a111073304f`. No v0.9 source or release workflow is owned here.
 
 ## Contract and bounded design
@@ -27,3 +27,7 @@ Run TZ=Asia/Singapore canonical build/no tracked drift, relevant local product c
 ## Gates and handoff
 
 Q01 claimed scope and fresh owner instruction recorded. Q02-Q05 preserve existing storage/authority/recovery owners and use a pure shared policy without dependencies. Q06 verification pending. Q07 exact-head PR/review pending. Q08 deployment not authorised by this task and not performed. Applied installed Pstack root-cause skill: reproduce the actual failure first and trace adjacent consumers. The read-only diagnostic and audit branch are evidence, not a fixed-product pass. Publish only this claim first using the workflow's expected-head non-force task-record exception; then start implementation from the accepted claim. If that update is rejected, preserve the branch and do not bypass the rejection.
+
+## Claim clarification: existing module-consumer fixture
+
+At implementation head `9d175e0516b3350df2fd6c141dbb9de6e8acfee4`, Node run44053547444 failed only `v1-product-table-deploy-settings.mjs`: it injects the now-ESM table adapter as a classic inline script, so its expected API is undefined. Actual browser/Worker/D1/XLSX tests passed locally. Add that exact existing test file to this task before editing it. Load the unchanged adapter and its real shared dependency as browser modules on an intercepted synthetic origin, retaining every existing domain/security assertion. No import stripping, assertion weakening, production behavior change or runner/workflow edit is permitted. New head must rerun the targeted test and required CI; disclose the first failed run. Shared product files remain frozen for the separate eligibility task; this correction touches only the fixture and task/verification evidence.
