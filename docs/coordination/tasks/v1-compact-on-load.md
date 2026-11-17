@@ -6,8 +6,8 @@ Model: Codex. Claimed 18 November 2026, 05:13 SGT.
 - Base: `066fcdda7a00242008938ad4aa67d14e83eab7fa`.
 - Reviewer: Muse, at the final commit.
 - Scope: PAR-05 in the [Deploy frontend parity audit](v1-deploy-v09-frontend-parity-audit.md). The owner asked for all GSiS tables to start compact after loading and has authorised committing the logged fixes.
-- Exact paths: this task, `v1/web/shared/module-shell.js`, `v1/web/shared/suite.css`, and `tests/v1-product-compact-on-load-browser.mjs`.
-- Coordination: the layout work owns shared `core-table.js` and `core-table.css`. This branch provides the common display default through the shell and suite stylesheet. PR 205 owns separate Versions logic. Neither open PR touches these four files.
+- Exact paths: this task, `v1/web/shared/module-shell.js`, `v1/web/shared/suite.css`, `v1/web/shared/core-table.js`, and `tests/v1-product-compact-on-load-browser.mjs`.
+- Coordination: the coordinator added shared core width reset to this branch after initial verification. Own only the Compact and load-width portions of `core-table.js` after the layout agent freezes the toolbar/sort work and hands off the file. PR 205 owns separate Versions logic. Neither open PR touches these five files.
 - Acceptance: verify actual rendered spacing and width in Admin and a native app. Cover fresh data and delayed tables. Keep filter and editing controls, merged headings, schedule axes, print styles, and the existing manual resizing behavior during edits. Compact presentation has no backend write.
 
 ## Verification
