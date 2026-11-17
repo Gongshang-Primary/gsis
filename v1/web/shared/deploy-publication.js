@@ -1081,6 +1081,15 @@ function installDuplicateSelection() {
     typeof window.createVersion !== "function"
   )
     return;
+  if (!document.getElementById("gsis-versions-filter-width")) {
+    const style = document.createElement("style");
+    style.id = "gsis-versions-filter-width";
+    // Legacy blur refitting measures these newly added filters. Keep their
+    // core-table width so changing measurement variables cannot move Save.
+    style.textContent =
+      '#content[data-view="Versions"] .gsis-core-filter input { width:100% !important; }';
+    document.head.append(style);
+  }
   const nativeVersions = window.versions;
   const nativeCreateVersion = window.createVersion;
   const nativeNoteControls = window.updateVersionNoteControls;

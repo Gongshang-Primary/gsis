@@ -541,6 +541,182 @@ try {
     "PASS dirty note defers pointer-time automatic refresh; explicit refresh and one native save remain available",
   );
 
+  // Reproduce newly inserted filters before legacy change/blur has measured
+  // them. The real blur handler still refits controls, but Save must not move.
+  const geometryRow = page.locator('[data-version-row="' + a.id + '"]');
+  await geometryRow
+    .locator("[data-note-input]")
+    .fill("Synthetic stable-click note");
+  await page.evaluate((id) => {
+    const row = document.querySelector('[data-version-row="' + id + '"]'),
+      table = row.closest("table");
+    const filters = [...table.querySelectorAll(".gsis-core-filter input")];
+    for (const filter of filters)
+      filter.style.removeProperty("--compact-control-width");
+    const save = row.querySelector("[data-note-save]");
+    const snapshot = () => {
+      const r = save.getBoundingClientRect();
+      return {
+        x: r.x,
+        y: r.y,
+        width: r.width,
+        height: r.height,
+        filters: filters.map((input) => ({
+          width: input.getBoundingClientRect().width,
+          measured: input.style.getPropertyValue("--compact-control-width"),
+        })),
+      };
+    };
+    window.__syntheticNoteGeometry = { before: snapshot() };
+    document.addEventListener(
+      "pointerdown",
+      () => {
+        window.__syntheticNoteGeometry.down = snapshot();
+      },
+      { capture: true, once: true },
+    );
+    document.addEventListener(
+      "pointerup",
+      (e) => {
+        window.__syntheticNoteGeometry.up = {
+          ...snapshot(),
+          targetSave: e.target === save,
+        };
+      },
+      { capture: true, once: true },
+    );
+  }, a.id);
+  await geometryRow.locator("[data-note-save]").click();
+  const geometry = await page.evaluate(() => window.__syntheticNoteGeometry);
+  assert(
+    geometry.before.filters.every((input) => input.measured === ""),
+    "fixture begins with real unmeasured core filters",
+  );
+  assert(
+    geometry.up.filters.every((input) => input.measured.endsWith("px")),
+    "native blur/change refit still runs",
+  );
+  assert(
+    Math.abs(geometry.down.x - geometry.up.x) < 0.5 &&
+      Math.abs(geometry.down.y - geometry.up.y) < 0.5,
+    "Save must remain at the same location through blur refitting",
+  );
+  assert.equal(
+    geometry.up.targetSave,
+    true,
+    "mouse-up stays on the original Save button",
+  );
+  assert.deepEqual(
+    geometry.down.filters.map((x) => x.width),
+    geometry.up.filters.map((x) => x.width),
+    "filter widths remain stable when measurement variables appear",
+  );
+  await page.waitForFunction(
+    (id) =>
+      !versionNoteDrafts.get(id)?.saving &&
+      !versionNoteDrafts.get(id)?.attempt &&
+      versionNoteDrafts.get(id)?.expected === "Synthetic stable-click note",
+    a.id,
+  );
+  assert.equal(
+    (await loadVersion(db, schoolId, a.id)).doc.notes,
+    "Synthetic stable-click note",
+  );
+  console.log(
+    "PASS real blur refit preserves filter width and Save geometry; original click commits one note",
+  );
+
+  // Filtering, manual sizing and narrow scrolling retain their native controls.
+  const nameFilter = page.locator("#content .gsis-core-filter input").nth(1);
+  await nameFilter.fill("Synthetic source B");
+  assert.equal(await geometryRow.isVisible(), false);
+  assert.equal(
+    await page.locator('[data-version-row="' + b.id + '"]').isVisible(),
+    true,
+  );
+  await nameFilter.fill("");
+  const resize = page.locator("#content [data-core-resize]").nth(1);
+  await resize.press("ArrowRight");
+  const manualWidth = await resize.evaluate((node) =>
+    parseFloat(node.parentElement.style.width),
+  );
+  assert(
+    manualWidth >= 65 && manualWidth <= 900,
+    "native manual width is retained",
+  );
+  await nameFilter.fill("Synthetic");
+  assert.equal(
+    await resize.evaluate((node) => parseFloat(node.parentElement.style.width)),
+    manualWidth,
+  );
+  await nameFilter.fill("");
+  await page
+    .locator(".gsis-core-tools")
+    .getByRole("button", { name: "Compact", exact: true })
+    .click();
+  assert.equal(
+    await resize.evaluate((node) => node.parentElement.style.minWidth),
+    "",
+  );
+  await page.setViewportSize({ width: 390, height: 844 });
+  const scrolling = await geometryRow.evaluate((row) => {
+    const table = row.closest("table"),
+      owner = table.closest(".table-window,.gsis-core-scroll");
+    const available = owner.scrollWidth - owner.clientWidth;
+    owner.scrollLeft = available;
+    return {
+      available,
+      moved: owner.scrollLeft,
+      ownerWidth: owner.getBoundingClientRect().width,
+      viewport: innerWidth,
+    };
+  });
+  assert(
+    scrolling.available > 0 && scrolling.moved > 0,
+    "narrow viewport keeps a horizontal scroll owner",
+  );
+  assert(scrolling.ownerWidth <= scrolling.viewport + 1);
+  await page.setViewportSize({ width: 1180, height: 820 });
+  const keyboardRow = page.locator('[data-version-row="' + b.id + '"]');
+  await keyboardRow
+    .locator("[data-note-input]")
+    .fill("Synthetic keyboard note");
+  const beforeKeyboard = f.requests.filter(
+    (r) => r.input?.operation === "saveVersionNote",
+  ).length;
+  await keyboardRow.locator("[data-note-input]").press("Tab");
+  assert.equal(
+    await keyboardRow
+      .locator("[data-note-save]")
+      .evaluate((node) => document.activeElement === node),
+    true,
+  );
+  assert.equal(
+    f.requests.filter((r) => r.input?.operation === "saveVersionNote").length,
+    beforeKeyboard,
+    "leaving the note does not auto-save",
+  );
+  await keyboardRow.locator("[data-note-save]").press("Enter");
+  await page.waitForFunction(
+    (id) =>
+      !versionNoteDrafts.get(id)?.saving &&
+      !versionNoteDrafts.get(id)?.attempt &&
+      versionNoteDrafts.get(id)?.expected === "Synthetic keyboard note",
+    b.id,
+  );
+  assert.equal(
+    f.requests.filter((r) => r.input?.operation === "saveVersionNote").length,
+    beforeKeyboard + 1,
+  );
+  assert.equal(
+    (await loadVersion(db, schoolId, b.id)).doc.notes,
+    "Synthetic keyboard note",
+  );
+  assert.equal(await selected(), b.id);
+  console.log(
+    "PASS filters, manual column sizing, Compact, mobile scrolling and keyboard note save remain available",
+  );
+
   // A protected-state boundary removes the old account's choice. The real
   // session/owner permission denial remains independently enforced by Core.
   await page.evaluate(() =>
