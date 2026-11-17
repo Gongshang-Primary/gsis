@@ -18,6 +18,9 @@ Owner authorises “fix and review deploy internal linkages taking reference fro
 10. `tests/v1-product-deploy-workbooks.mjs`
 11. `tests/v1-product-contacts-projection-browser.mjs`
 12. `v1/services/deploy/README.md`
+13. `v1/web/shared/deploy-publication.js`
+
+Scope clarification before the dependent edit: the existing canonical import controller explicitly rejects HR Terms and installs an export-only table registration. Remove those two obsolete restrictions for the new version-owned HR Terms contract, retaining ordinary workbook preview, identity/revision checks and confirmation. This exact controller path is necessary for the already claimed Excel acceptance case; no new publication or Contacts effect.
 
 Main, remote heads and open PRs refreshed. PR197 owns its two documentation paths; PR196 owns release records; PR182 is disjoint v0.9. Do not edit their files. Source reference v0.9 `d9d180ced16d32c836a94d67d9cff8d3030eb21d`; deployed v1 `d5c8899aeb867448ad7399f9925f46ac11371380`.
 
