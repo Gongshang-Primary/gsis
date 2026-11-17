@@ -1,9 +1,10 @@
 # v1 Deploy staff lists and Span of Control
 
-- Status: claimed; implementation pending.
+- Status: implemented; local verification passed; exact-head CI and Muse review pending.
 - Model/owner: Codex; coordinator: ChatGPT; reviewer: Muse at the exact head.
 - Updated: 17 November 2026, Asia/Singapore. Branch: `codex/v1-deploy-planning-eligibility`.
 - Base: main `9dc353d26d75496b2caaf8d450bb017c20715f77`.
+- Accepted documentation-only claim clarifications fast-forwarded through main `b9eb74e00f8fe8001509ccd16f442bfdf0f1d1ab`. No unreviewed product branch is included.
 - Owner request: Span must populate from the available active version teacher list, excluding MK but including SAT × MK. Other planning lists, including Dept/Committees/CCAs/PLT/Events/IP Deploy, exclude MK, SAT, Support and School Leaders. The owner asked to compare v0.9. This is an explicit new rule: v0.9 also excluded OSO from Span, which the new “all except MK” rule supersedes.
 - Exact scope: this task; `docs/v1/DEPLOY_PLANNING_ELIGIBILITY_2026-11-17.md`; `v1/web/shared/deploy-eligibility.mjs`; `v1/services/deploy/model.mjs`; `v1/services/deploy/workbooks.mjs`; `v1/services/deploy/role-memberships.mjs`; `v1/web/shared/deploy-ui.js`; `scripts/v1/build-web.mjs`; `tests/v1-product-deploy-planning-eligibility.mjs`; `tests/v1-product-deploy-planning-eligibility-browser.mjs`; `tests/v1-product-deploy-workbooks.mjs`; `tests/v1-product-deploy-storage.mjs`; `tests/v1-product-contacts-projection-browser.mjs`; `tests/v1-product-contacts-projection.mjs`; `tests/v1-product-tables.mjs`.
 - Coordination: all tasks use the same Codex implementer. The Subject Load model/build edits are frozen at `9d175e0516b3350df2fd6c141dbb9de6e8acfee4`; their shared paths are explicitly handed to this isolated eligibility worktree for the distinct policy regions. Do not change that load branch. If a load correction needs these shared paths, serialize the handoff again. The Duplicate radio task owns disjoint publication/test paths. Keep three bounded PRs and disclose/retest any integration conflict before merging; no stack on unreviewed product code.
@@ -36,3 +37,62 @@ Before editing it, include `v1/services/deploy/role-memberships.mjs`: roleMappin
 ## Claim clarification: version activity versus accepted capacity regression
 
 Before editing it, include the exact existing `tests/v1-product-contacts-projection.mjs` path. Its old planning assertion denies an assignment solely because accepted Contacts activity changed after this version saved explicit Active=Y. Under the owner's new version-owned choice rule, retain that accepted excluded/capacity metadata assertion while permitting the version's own active assignment. Then explicitly set version Active=N and preserve rejection of a new binding, plus all actor/school/current-authority/history checks. This updates the superseded target-person planning expectation, not the actor's current capability requirement or Roster's accepted capacity policy.
+
+## Implementation handoff, 17 November 2026
+
+Model: Codex. The [dated specification](../../v1/DEPLOY_PLANNING_ELIGIBILITY_2026-11-17.md) records the policy, v0.9 comparison, data ownership, visible changes and integration limit.
+
+One pure policy now serves native binding checks, UI choices and Span workbooks. `teacher.planningProfile` preserves only ordinary version Role and Active; explicit drafts win. Unknown activity remains unknown. Accepted Contacts authority/capacity properties and actual Core capabilities are unchanged by planning edits. Page reads and note-only saves do not migrate teacher rows. Duplicate refresh removes only Role/Active draft overrides for current Contacts IDs; all unrelated draft fields and draft-only people survive.
+
+Span reads the teacher inventory immediately and initializes missing reporting state only on the first explicit native save. Existing excluded links and allocations survive. Member compaction preserves identity and occurrence count; leadership roles remain positional. Expected-bound orphan clearing removes only that person's edge aliases, retaining history. Alias disagreements, including `staff.ro`, are flagged and reconciled only for the edited person. Canonical Teachers/Membership exports and matrix derivation use the displayed ordinary version Role/Active, without changing publication proof or authority-application rules.
+
+Same-Codex assistance edited disjoint claimed files: UI/new browser test, workbook/existing workbook test, and new native Worker test. A separate same-model read-only pass found member-compaction, orphan-clear and `staff.ro` alias cases, which were corrected within this preservation contract. These passes are builder checks, not independent Muse approval.
+
+### Local verification
+
+All commands use `TZ=Asia/Singapore`; browser commands additionally use `GSIS_BROWSER_EXECUTABLE=/usr/bin/chromium`. Wrangler checks use distinct temporary XDG/log paths. Tests use built local Workers, synthetic D1/R2 data and intercepted providers, with no hosted reads or writes.
+
+| Command | Result |
+| --- | --- |
+| `npm run build` and production-path `git diff --exit-code` | Pass; production source/generated files unchanged |
+| `node scripts/v1/build.mjs` | Pass; nine owner/web bundles |
+| `node scripts/v1/verify-build.mjs` | Pass; all nine Wrangler dry-runs and the local migration upgrade check |
+| `node tests/v1-product-deploy-planning-eligibility.mjs` | Pass; full native preservation/security matrix and actual synthetic publication/authority receipt application, 27.772 seconds |
+| `node tests/v1-product-deploy-planning-eligibility-browser.mjs` | Pass; seven real browser groups |
+| `node tests/v1-product-deploy-workbooks.mjs` | Pass; staff matrix, historical aliases/orphans, unknown activity, ordinary Role/Active and unchanged security assertions |
+| `node tests/v1-product-deploy-storage.mjs` | Pass; native storage, binding/import/recovery/interval gates |
+| `node tests/v1-product-contacts-projection-browser.mjs` | Pass; seven browser groups, accepted capacity metadata preserved |
+| `node tests/v1-product-contacts-projection.mjs` | Pass; nine native integration groups, explicit version Active negative and all accepted-capacity/privacy assertions retained |
+| `node tests/v1-product-deploy-duplicate-contacts.mjs` | Pass; existing duplicate/eleven-tag and recovery regression |
+| `node tests/v1-product-deploy-role-memberships.mjs` | Pass; existing native role-matrix/publication regression |
+| `node tests/v1-product-deploy-memberships-browser.mjs` | Pass; unchanged browser regression |
+| `node tests/v1-product-deploy-role-memberships-browser.mjs` | Pass; unchanged browser regression |
+| `node tests/v1-product-tables.mjs` | Pass; actual module fixture, all original assertions retained |
+| Syntax checks and `git diff --check` | Pass |
+
+Early local browser attempts without the executable override stopped before browser tests because Playwright's cached executable was absent. The reruns above use the installed Chromium. Old planning-only expectations were updated where the owner's version-owned rule superseded accepted-capacity gating. Accepted-fact, actor, identity, school, revision, fence and recovery assertions were retained. No test was skipped or weakened to bypass those checks.
+
+The initial built-browser regression observed an Initialize staff list button where the immediate read projection requires none. It passed after the UI change. The existing native Contacts projection test also reproduced its obsolete Contacts-inactive denial assertion before its claimed update. It now proves both version Active=Y acceptance and explicit version Active=N rejection while retaining accepted capacity exclusion.
+
+The unchanged classic planning codec rejects duplicate `legacyLeadership` record identities before sending a request. Native duplicate-occurrence guards are therefore tested with direct `setOrganisation`; ordinary member compaction is tested through the real browser `patchPlanning` codec. This task does not add support for editing that synthetic malformed historical duplicate array through the copied codec.
+
+Skill use: repository Pstack/Superpowers/Gstack principles guided the ownership trace, failing browser reproduction, synthetic native tests and internal counterexample review. Those full skill workflows were not executed. The available `pstack-plugin:unslop` skill, `c12/unslop`, was read and used for prose only. No third-party code or dependency was added.
+
+| Gate | Status |
+| --- | --- |
+| Q01 | Pass; owner request, accepted claim/extensions and exact inventory above |
+| Q02 | Pass; version planning fields separated from accepted authority/capacity |
+| Q03 | Pass locally; actor/school/security regressions retained and exercised |
+| Q04 | Pass locally; native atomic initialization, expected values, revision/fence and replay checks |
+| Q05 | Pass locally; existing bounded owner routes and payload limits reused; no dependency or migration |
+| Q06 | Local verification passed; required exact-head Node/LORD/product CI pending |
+| Q07 | Pending draft PR and Muse exact-head review; coordinator will post the committed head/base |
+| Q08 | No deployment authority exercised; hosted runtime UAT Not tested |
+
+The functional changes affect Deploy and its workbook output. The common Drive backup reader statically imports Deploy workbooks, so all eight owner bundles plus web can change; compare final artifacts before release. No backup is activated. No new owner decision is required for the stated rule. The separate Load PR also changes the existing Deploy script-inclusion line; disclose any merge conflict, combine both module inclusions and rerun integrated build/browser tests. No merge or deployment was performed. F5 remains OPEN; T1B-01/T1B-02 and hosted runtime UAT remain Not tested.
+
+## Owner-authorised v1.05 integration
+
+The owner subsequently authorised combining approved #203 and #204 and proceeding through the external protected deployment gate. The accepted [release claim](v1-release-v105.md) is main `df7d298b05b6d6c985acf1ce8287c5e40d96cf03`; it follows the #203 merge `13aac2adf40f4c018989ffe25629c69d753637ce` at approved source `8ef3cd319ff070afcd3bcc951f162e9c05e5e4ff`.
+
+This branch starts from approved #204 `3802373188482a7af1f6555bca57c9ad6ba35dfb` and merges that locked claim/main without squashing. The sole product conflict is the existing Deploy script-inclusion line. It retains `deploy-ui.js`, `deploy-loads-ui.js` and `deploy-ui-tables.js`, all modules in that order. The only other new application edit is the display label `v1.04` to `v1.05`. There is no claim that Muse reviewed this unseen integration head. Combined verification and remaining release state are recorded in the release task. Queued visual changes and #205 remain outside this integration.

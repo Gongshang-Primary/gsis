@@ -187,10 +187,18 @@ try {
     .click();
   assert.equal(await page.evaluate(() => window.nativeClicked), true);
   // Empty Deploy still exposes the full reviewed v0.9 taxonomy; creation remains Versions-owned.
-  await page.setContent(
-    '<select id="version"><option value="">No version</option></select><nav id="nav" hidden></nav><main id="content">No deployment version is available.<button onclick="window.created=true">Create initial baseline</button></main>',
-  );
-  await page.addScriptTag({ content: deploy });
+  const deployOrigin = "https://tables.example.invalid";
+  const eligibility = await read("v1/web/shared/deploy-eligibility.mjs");
+  await page.route(deployOrigin + "/**", route => {
+    const path = new URL(route.request().url()).pathname;
+    if (path === "/v1/shared/deploy-ui.js") return route.fulfill({ contentType: "text/javascript", body: deploy });
+    if (path === "/v1/shared/deploy-eligibility.mjs") return route.fulfill({ contentType: "text/javascript", body: eligibility });
+    if (path === "/empty-deploy") return route.fulfill({ contentType: "text/html", body:
+      '<script>window.GSISV1={module:"deploy"}</script><select id="version"><option value="">No version</option></select><nav id="nav" hidden></nav><main id="content">No deployment version is available.<button onclick="window.created=true">Create initial baseline</button></main>' });
+    return route.abort();
+  });
+  await page.goto(deployOrigin + "/empty-deploy");
+  await page.addScriptTag({ type: "module", url: deployOrigin + "/v1/shared/deploy-ui.js" });
   await page.waitForFunction(
     () => document.querySelectorAll("#nav button").length === 20,
   );

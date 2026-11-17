@@ -2,7 +2,7 @@
 
 Model: Codex. Updated 17 November 2026 19:38:33 SGT.
 
-- Status: owner-authorised integration/release claim; no v1.05 deployment yet.
+- Status: combined local checks passed on #204; final-head CI and coordinator release steps pending. No v1.05 deployment yet.
 - Owner instruction: “combine and deplay. approve through to the gate where i need to login to git outside of this chat”. This authorises the bounded combination, release merge and protected full deployment up to the external GitHub required-reviewer gate. Preserve that gate; do not bypass it.
 - Builder/coordinator: Codex / ChatGPT. Product reviewer: Muse at the two original exact heads. No claim that Muse reviewed an unseen integration head. The owner's current instruction authorises the mechanical script combination and routine label packaging through the deployment gate, subject to the checks below.
 - Base: main `13aac2adf40f4c018989ffe25629c69d753637ce`, the owner-authorised merge of #203 at `8ef3cd319ff070afcd3bcc951f162e9c05e5e4ff`.
@@ -33,6 +33,32 @@ The Memberships publication mechanism is merged; do not claim the owner's data e
 
 Publish only this task record first via the expected-head, non-force claim exception. Incorporate the accepted claim into the existing #204 branch, then perform the bounded integration. Every commit/PR description must contain Model: Codex. Post exact candidate and merge SHAs, checks, backup metadata and protected-run state in the PR/task evidence. Owner merge/deploy authorisation is task-specific; this does not authorise unrelated PRs or weaken platform controls.
 
+## Builder integration evidence
+
+The builder merged locked claim/main `df7d298b05b6d6c985acf1ce8287c5e40d96cf03` into the existing #204 branch from `3802373188482a7af1f6555bca57c9ad6ba35dfb`. Git reported only the anticipated builder-line product conflict. The model changes merged automatically. No task-record conflict occurred; #204's approved record was retained and this owner's later authority was appended. The only hand-edited product paths are the one existing builder inclusion and `v1/release.mjs` label, as claimed.
+
+Combined local verification passed on the merged working tree before its bounded merge commit. Every command used `TZ=Asia/Singapore`; browser commands used `GSIS_BROWSER_EXECUTABLE=/tmp/gsis-duplicate-locked-browser/chromium-1234/chrome-linux64/chrome`, confirmed Chrome for Testing 151.0.7922.34. Each program had its own temporary XDG/log paths, with at most two programs running concurrently. There was no browser installation or dependency change.
+
+| Command or test program, using `node tests/<name>.mjs` for programs | Result |
+| --- | --- |
+| `npm run build`; production-path `git diff --exit-code` | Pass, no production-generated drift |
+| `v1-product-deploy-loads` and `v1-product-deploy-loads-browser` | Pass, actual native/browser/XLSX paths |
+| `v1-product-table-deploy-settings` | Pass, unchanged real module fixture |
+| `v1-product-deploy-planning-eligibility` and its `-browser` program | Pass, including actual publication/authority receipt and seven browser groups; native program 35.804 seconds under concurrent local load |
+| `v1-product-deploy-workbooks` and `v1-product-deploy-storage` | Pass |
+| `v1-product-tables` | Pass |
+| `v1-product-deploy-memberships` and its `-browser` program | Pass |
+| `v1-product-deploy-role-memberships` and its `-browser` program | Pass |
+| `v1-product-deploy-duplicate-contacts` | Pass |
+| `v1-product-deploy-save-recovery` and its `-browser` program | Pass, including the locked-browser recovery regression |
+| `v1-product-release-label` and `v1-product-v09-frontend-parity` | Pass, v1.05 across home, Toolbox and nine applications, desktop/narrow labels and unchanged legacy source |
+| `node scripts/v1/build.mjs` | Pass, nine services and 373 artifacts |
+| `node scripts/v1/verify-build.mjs` | Pass, all nine Wrangler dry-runs and local additive migration upgrade |
+| Syntax, scope and `git diff --check` | Pass |
+
+All 17 targeted product programs passed. A same-Codex read-only comparison independently reconstructed the source union: the model is byte-for-byte the automatic merge; the other reviewed product/test paths retain their reviewed content, apart from the exact combined builder line and release label. This is builder evidence, not Muse review of the new head. Original Muse approvals remain limited to their recorded exact heads.
+
+Exact-head Node/LORD and full product/package CI, main merge/tree comparison, private backups and protected deployment are pending coordinator work. No builder merge into main, provider send or live operation has occurred. Queued visual features were not implemented.
 
 ## Claim clarification: installed browser fallback
 
@@ -41,3 +67,13 @@ Model: Codex. Coordinator-authorised 17 November 2026 20:08:31 SGT. Before editi
 Source inspection proves a portability mismatch: the Node workflow sets explicit browser overrides to Playwright's installed Chromium, while product CI installs that browser but this fixture instead falls back to `/usr/bin/chromium`. Change only that fallback expression to `chromium.executablePath()` when both existing overrides are absent. Keep both override precedences, every fixture action/assertion and the45-second cap unchanged. No test skip, forced click, timeout increase, workflow change or product edit is authorised by this clarification. Verify the fallback with both override variables absent and the existing locked browser cache, then rerun required full CI at the new exact head. Retain the original failed run and the unproven CI-hang limitation in handoff evidence.
 
 This is a necessary release-test portability correction under the owner's existing combine/deploy-through-gate instruction. Source ownership stays with the same Codex release builder. Incorporate this accepted task-only claim into #204, retaining all approved/integration evidence if the task append conflicts. The new hand-edit inventory is the four original files plus this one existing fixture. No fresh provider, live-data, credential or runtime authority is added.
+
+### Fixture correction evidence
+
+The accepted extension `ff237d09260637a31bf23e3b6e3fd0a6b51c1647` was merged into candidate `5aadad09dd0c6a65d3c5891223569be416ac5891`. The task-only append conflict retained both the full integration evidence and this new scope. The sole test edit replaces the fallback `/usr/bin/chromium` with `chromium.executablePath()`; both explicit override precedences, every action/assertion and the 45-second parent cap remain unchanged.
+
+The first product run remains failed, 127/128. Node's same fixture passed in roughly seven seconds between consecutive shard records. An unchanged local run with the explicit locked browser passed in 12.534 seconds, with normal startup, browser actions and cleanup. Neither observation identifies where the failed CI process hung.
+
+The corrected fixture passed once in 11.638 seconds using `env -u GSIS_BROWSER_EXECUTABLE -u ROSTER_TEST_CHROMIUM`, `TZ=Asia/Singapore` and `PLAYWRIGHT_BROWSERS_PATH=/tmp/gsis-duplicate-locked-browser`. A 45,000ms parent process limit was retained. Diagnostic output confirmed both overrides were absent and Playwright launched the installed Chrome for Testing 151.0.7922.34 from that cache. All original XLSX, native save/reason, lost-response/restart, stale, identity and permission checks completed. Syntax, canonical build/no production drift and whitespace checks passed. No test/workflow timeout, assertion, product behavior or dependency changed.
+
+This corrects a proven fixture portability mismatch. The original CI timeout's internal cause remains unproven. New exact-head Node/LORD and full product/package CI are required before release; the failed gate has not been waived.

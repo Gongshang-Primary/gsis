@@ -315,7 +315,9 @@ try {
     employmentActive: true,
     schoolSection: "Primary",
   });
-  const choicesExpected = [...eligible, staffId];
+  // Version-owned activity/role are planning choices. Missing or false accepted
+  // EO does not exclude ordinary version teachers; MK and unknown activity do.
+  const choicesExpected = [...eligible, staffId, inactive, nonEO, proposalOnly, unreferenced];
   for (const [id, basicName, suffix] of [
     [eligible[0], "Synthetic Twin", "One"],
     [eligible[1], "Synthetic Twin", "Two"],
@@ -427,8 +429,8 @@ try {
     revision: 1,
     ownerReviewReference: "synthetic-changed-authority",
   });
-  // These are real accepted direct labels, so reporting/options are derived
-  // from owner facts rather than pre-seeded catalogue definitions.
+  // Accepted labels change after the version was created. The version's
+  // Role/Active planning snapshot remains independent of accepted capacity.
   await update(mk, { role: "MK" });
   await update(nonEO, { role: "P" });
   await save([
@@ -537,7 +539,8 @@ try {
     );
     assert.equal(
       snapshot.teachers.find((row) => row.id === inactive).active,
-      false,
+      true,
+      "Explicit version Active=Y is displayed consistently with planning choices.",
     );
     for (const id of [inactive, nonEO, mk, unknown])
       assert.notEqual(
@@ -574,7 +577,7 @@ try {
       versionId,
     );
   });
-  await test("served IP, FT and TG pickers use only current eligibility while keeping historical chips", async () => {
+  await test("served IP, FT and TG pickers use version planning eligibility while keeping historical chips", async () => {
     assert.match(
       await page.locator("#content").innerText(),
       /Dated relief teacher/,
@@ -597,7 +600,9 @@ try {
         .evaluateAll((nodes) =>
           nodes.map((node) => node.value).filter(Boolean),
         );
-      assert.deepEqual(choices.sort(), choicesExpected.slice().sort());
+      const expectedChoices = target === "1A" && subject === "EL"
+        ? choicesExpected.filter(id => ![inactive, nonEO].includes(id)) : choicesExpected;
+      assert.deepEqual(choices.sort(), expectedChoices.slice().sort());
       await page.locator(".search-select[open] input").press("Escape");
       await page.locator("#refresh").click();
       await page.waitForFunction(() => !refreshing);
@@ -701,11 +706,9 @@ try {
         reportRows.some(
           (row) =>
             row[0] === nonEO &&
-            (name === "Membership"
-              ? row[2] === "P"
-              : row[2] === "Role" && row[3] === "P"),
+            row[2] === "Teacher",
         ),
-        name + " reports the current accepted fact by permanent Staff ID",
+        name + " reports this version's Role by permanent Staff ID",
       );
       assert.equal(
         await report
@@ -730,7 +733,8 @@ try {
     const choices = await page
       .locator("#existingTeacher option")
       .evaluateAll((nodes) => nodes.map((n) => n.value).filter(Boolean));
-    assert(!choices.some((id) => [inactive, nonEO, mk, unknown].includes(id)));
+    assert(!choices.some((id) => [inactive, nonEO, mk, unknown].includes(id)),
+      "Already present active version staff are not offered as Add existing; MK and unknown remain excluded.");
     await page.getByRole("button", { name: "Cancel", exact: true }).click();
     await page.locator(".show-inactive-toggle input").check();
     assert.match(
@@ -751,13 +755,13 @@ try {
     });
     await page.setViewportSize({ width: 1440, height: 960 });
   });
-  await test("HR retains historical references without granting choices and Offload preserves classification options", async () => {
+  await test("HR retains references, separates accepted capacity from planning choices, and preserves Offload classification", async () => {
     const failures = [];
     for (const [id, label] of [
-      [orphan, "Teaching eligibility unavailable"],
-      [nonEO, "Not currently eligible"],
-      [mk, "Not currently eligible"],
-      [proposalOnly, "Not currently eligible"],
+      [orphan, "Accepted capacity inputs unavailable"],
+      [nonEO, "Accepted capacity excludes teaching workload"],
+      [mk, "Accepted capacity excludes teaching workload"],
+      [proposalOnly, "Accepted capacity excludes teaching workload"],
     ]) {
       const row = page.locator('[data-roster-teacher="' + id + '"]');
       if ((await row.count()) !== 1)
@@ -769,12 +773,14 @@ try {
       await page
         .locator('[data-roster-teacher="' + unreferenced + '"]')
         .count(),
-      0,
+      1,
+      "An active version teacher is not hidden solely because accepted EO is false.",
     );
     await page.locator(".show-inactive-toggle input").uncheck();
     assert.equal(
       await page.locator('[data-roster-teacher="' + inactive + '"]').count(),
-      0,
+      1,
+      "The saved explicit version Active=Y remains visible with Show inactive off.",
     );
     if (
       (await page.locator('[data-roster-teacher="' + orphan + '"]').count()) !==
@@ -788,7 +794,8 @@ try {
           .map((t) => t.id),
       [orphan, nonEO, mk, proposalOnly, unreferenced],
     );
-    assert.deepEqual(absentChoices, []);
+    assert.deepEqual(absentChoices.sort(), [nonEO, proposalOnly, unreferenced].sort(),
+      "Historical orphan and MK are unavailable, while version-active ordinary teachers need no EO approval.");
     assert.equal(
       await page.evaluate(
         (id) =>

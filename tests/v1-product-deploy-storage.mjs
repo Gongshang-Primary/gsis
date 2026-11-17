@@ -821,41 +821,33 @@ try {
     selectedStaff.fields.schoolSection = accepted({ code: "primary" });
     alter();
     const before = await loadVersion(h.db, school, eligibilityVersion);
-    await assert.rejects(
-      edit(
-        eligibilityVersion,
-        "eligibility-" + label,
-        [
-          {
-            operation: "setTeacherNote",
-            teacher: "staff-a",
-            value: "Must not partly save",
-          },
-          {
-            operation: "addTeacher",
-            teacher: "staff-a",
-            target: "2B",
-            targetRef: "eligible-class-b",
-            subject: "Math",
-          },
-        ],
-        before.version.revision,
-      ),
-      (e) => e.code === "TEACHING_ELIGIBILITY_REQUIRED",
-    );
-    const after = await loadVersion(h.db, school, eligibilityVersion);
-    assert.deepEqual(after, before);
-    // Lease acquisition is separately audited; no failed business-save audit exists.
-    assert.equal(
-      (
-        await one(
-          h.db,
-          "SELECT COUNT(*) n FROM product_audit WHERE school_id=? AND operation_id=?",
-          [school, "eligibility-" + label],
-        )
-      ).n,
-      0,
-    );
+    const edits = [
+      { operation: "setTeacherNote", teacher: "staff-a", value: "Version planning remains available" },
+      { operation: "addTeacher", teacher: "staff-a", target: "2B", targetRef: "eligible-class-b", subject: "Math" },
+    ];
+    if (label === "mk") {
+      await assert.rejects(
+        edit(eligibilityVersion, "eligibility-" + label, edits, before.version.revision),
+        (e) => e.code === "TEACHING_ELIGIBILITY_REQUIRED",
+      );
+      assert.deepEqual(await loadVersion(h.db, school, eligibilityVersion), before);
+      // Lease acquisition is audited separately; no rejected business save exists.
+      assert.equal((await one(h.db,
+        "SELECT COUNT(*) n FROM product_audit WHERE school_id=? AND operation_id=?",
+        [school, "eligibility-" + label])).n, 0);
+    } else {
+      // The owner's new rule uses explicit version activity and negative tags;
+      // current optional EO/capacity facts remain independently unavailable.
+      await edit(eligibilityVersion, "eligibility-" + label, edits, before.version.revision);
+      const after = await loadVersion(h.db, school, eligibilityVersion);
+      assert(after.doc.assignments.some(a => a.targetRef === "eligible-class-b" && a.teacher === "staff-a"));
+      assert.equal(after.doc.teacherNotes["staff-a"], "Version planning remains available");
+      await edit(eligibilityVersion, "eligibility-cleanup-" + label, [
+        { operation: "removeTeacher", teacher: "staff-a", target: "2B", subject: "Math" },
+        { operation: "setTeacherNote", teacher: "staff-a", value: before.doc.teacherNotes["staff-a"] || "" },
+      ], after.version.revision);
+      assert.deepEqual((await loadVersion(h.db, school, eligibilityVersion)).doc.assignments, originalAssignments);
+    }
   }
   selectedStaff.fields.employmentActive = accepted(false);
   selectedStaff.fields.eo = accepted(true);
@@ -907,13 +899,12 @@ try {
     scope: "IP",
   });
   imported.sheets.TeachingAssignments.rows[0][2] = "Math";
-  await assert.rejects(
-    call("/imports/preview", {
-      versionId: eligibilityVersion,
-      workbook: imported,
-    }),
-    (e) => e.code === "TEACHING_ELIGIBILITY_REQUIRED",
-  );
+  const versionActivePreview = await call("/imports/preview", {
+    versionId: eligibilityVersion,
+    workbook: imported,
+  });
+  assert(versionActivePreview.previewId,
+    "The owner's explicit version Active remains a planning choice; accepted capacity stays separate.");
   selectedStaff.fields.employmentActive = {
     ...accepted(true),
     validUntil: now + 1,
@@ -923,6 +914,9 @@ try {
     workbook: imported,
   });
   contactsOverride.asOf = now + 2; // Same immutable facts/revisions, later observation.
+  // A newly MK classification still excludes new planning bindings. Optional
+  // accepted activity expiry alone no longer overrides explicit version Active.
+  selectedStaff.fields.schoolSection = accepted({ code: "MK" });
   const activeLease = await call("/lease", {
     operationId: "preview-race-lease",
     versionId: eligibilityVersion,
@@ -946,6 +940,7 @@ try {
     eligibleSaved.doc.assignments,
   );
   selectedStaff.fields.employmentActive = accepted(true);
+  selectedStaff.fields.schoolSection = accepted({ code: "primary" });
   contactsOverride.asOf = now;
   onContactsPin = async () => {
     onContactsPin = null;
@@ -1239,8 +1234,7 @@ try {
     proposed.doc.assignments.some((a) => a.teacher === "staff-provisional"),
     false,
   );
-  await assert.rejects(
-    edit(eligibilityVersion, "provisional-assignment", [
+  await edit(eligibilityVersion, "provisional-assignment", [
       {
         operation: "addTeacher",
         teacher: "staff-provisional",
@@ -1248,24 +1242,20 @@ try {
         targetRef: "eligible-class-b",
         subject: "Math",
       },
-    ]),
-    (e) => e.code === "TEACHING_ELIGIBILITY_REQUIRED",
-  );
-  await assert.rejects(
-    edit(eligibilityVersion, "provisional-add-existing", [
+    ]);
+  await edit(eligibilityVersion, "provisional-add-existing", [
       {
         operation: "upsertTeacherProfile",
         teacher: "staff-provisional",
         referenceAction: "add-existing",
         profile: { Active: "Y" },
       },
-    ]),
-    (e) => e.code === "TEACHING_ELIGIBILITY_REQUIRED",
-  );
-  assert.deepEqual(
-    (await loadVersion(h.db, school, eligibilityVersion)).doc,
-    proposed.doc,
-  );
+    ]);
+  const plannedProvisional = (await loadVersion(h.db, school, eligibilityVersion)).doc;
+  assert(plannedProvisional.assignments.some(a => a.teacher === "staff-provisional"),
+    "An explicit version Active=Y and a known identity suffice for new planning work without optional EO facts.");
+  assert.equal(plannedProvisional.teachers.find(t => t.id === "staff-provisional").teachingEligibility.state,
+    "unavailable", "Planning input never fabricates accepted Roster capacity evidence.");
   contactsOverride = null;
   console.log(
     "PASS bounded 512-staff/8-page collector and ten malformed/stale/expired page cases; max encoded page bytes=" +

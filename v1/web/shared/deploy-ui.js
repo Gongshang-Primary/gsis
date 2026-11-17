@@ -1,3 +1,5 @@
+import { planningSnapshot, planningPerson, planningEligible, reportingRoot, reportingStaff, reportingLinks, reportingConflicts, hasReportingEdge } from "./deploy-eligibility.mjs";
+
 /* Empty-data navigation mirrors the v0.9 taxonomy without pretending a draft exists. */
 (function () {
   "use strict";
@@ -177,19 +179,66 @@
     const originalResolve = window.GSISTeachingRules.resolve;
     window.GSISTeachingRules.resolve = (teacher, catalogue, live, draft) => {
       const doc = incomingDocument || v();
-      if (doc?.roleMembershipSchema !== 1) return originalResolve(teacher, catalogue, live, draft);
-      const result = originalResolve(teacher, undefined, live, draft);
-      const mapping = mappingFor(doc, result);
-      const existing = teacher.deploymentTags?.Memberships || teacher.groups || [];
-      result.groups = mapping ? [...existing.filter(label => !managedGroups.includes(label)), ...groupsFor(mapping)] : [...existing];
+      const result = originalResolve(teacher, doc?.roleMembershipSchema === 1 ? undefined : catalogue, live, draft);
+      const projected = planningPerson(doc, teacher), mapping = mappingFor(doc, projected);
+      result.profile = { ...result.profile, ...projected.profile };
+      if (!projected.activeKnown) delete result.profile.Active;
       if (mapping) result.profile["EO Appt Level"] = mapping[12] || "";
+      for (const field of ["active", "activeKnown", "role", "groups"]) result[field] = projected[field];
+      result.planningProfile = planningSnapshot(teacher);
       return result;
     };
+    window.eligibleTeacher = teacher => planningEligible(v(), teacher);
+    window.activeGroupTeachers = () => v().teachers.filter(teacher => planningEligible(v(), teacher))
+      .map(teacher => planningPerson(v(), teacher)).sort((a, b) => natural(a.name, b.name));
+    // This exported predicate serves Deploy selectors. The embedded calculation
+    // closure and accepted authority/capacity fields are deliberately unchanged.
+    window.GSISTeachingRules.eligible = teacher => planningEligible(incomingDocument || v(), teacher);
+    const originalTeacherNotes = window.teacherNotesPage;
+    window.teacherNotesPage = root => {
+      originalTeacherNotes(root);
+      // Accepted capacity remains visible, but is not the version's picker rule.
+      const labels = {
+        "Teaching eligibility unavailable": "Accepted capacity inputs unavailable",
+        "Not currently eligible": "Accepted capacity excludes teaching workload",
+      };
+      for (const status of root.querySelectorAll("[data-roster-teacher] small"))
+        if (labels[status.textContent]) status.textContent = labels[status.textContent];
+      for (const hint of root.querySelectorAll("p"))
+        if (hint.textContent.includes("Making a teacher inactive clears their deployment allocations when saved."))
+          hint.textContent = hint.textContent.replace(
+            "Making a teacher inactive clears their deployment allocations when saved.",
+            "Inactive staff are unavailable for new assignments; saved allocations are retained until explicitly removed.");
+    };
+    window.GSISReporting.staff = doc => reportingStaff(doc, { retainHistorical: true });
+    window.GSISReporting.snapshot = doc => reportingStaff(doc);
+    window.GSISReporting.value = (doc, edit) => edit.operation === "initReporting"
+      ? doc.reporting || null : reportingLinks(doc)[edit.officer] || "";
+    window.GSISReporting.assign = assignPlanningReporting;
+    window.reportingPage = planningReportingPage;
     const originalKey = window.queueKey;
     window.queueKey = (edit) => edit.operation === "setHRChoices" ? "hr-choices" : edit.operation === "setRoleMemberships" ? "role-memberships"
       : edit.operation === "setTeacherMemberships" ? "memberships:" + edit.teacher : originalKey(edit);
     const originalProject = window.projectEditBase;
     window.projectEditBase = (doc, edit) => {
+      if (["setTeacherField", "upsertTeacherProfile"].includes(edit.operation)) {
+        const person = doc.teachers.find(teacher => teacher.id === edit.teacher);
+        if (!person) throw Error("This teacher is no longer in the selected version.");
+        const profile = edit.operation === "setTeacherField"
+          ? { ...person.profile, ...doc.teacherDrafts?.[person.id], [edit.field]: edit.value }
+          : structuredClone(edit.profile);
+        doc.teacherDrafts ??= {};
+        doc.teacherDrafts[person.id] = profile;
+        const projected = planningPerson(doc, person), mapping = mappingFor(doc, projected);
+        person.profile = projected.profile;
+        for (const field of ["active", "activeKnown", "role", "groups"]) person[field] = projected[field];
+        if (mapping) {
+          person.deploymentTags = { ...person.deploymentTags, Memberships: [...person.groups], "EO Appt Level": mapping[12] || null };
+          person.profile["EO Appt Level"] = mapping[12] || "";
+        }
+        if (doc.reliefResults) doc.reliefResults.pending = true;
+        return;
+      }
       if (edit.operation === "setHRChoices") {
         doc.hrChoicesSchema = 1;
         doc.hrChoices = Object.fromEntries(hrFields.filter(field => !Object.hasOwn(fixedChoices, field) && field !== "Role")
@@ -213,16 +262,6 @@
       }
       if (edit.operation !== "setTeacherMemberships") {
         const result = originalProject(doc, edit);
-        if (["setTeacherField", "upsertTeacherProfile"].includes(edit.operation)) {
-          const person = doc.teachers.find(teacher => teacher.id === edit.teacher);
-          const mapping = person && mappingFor(doc, person);
-          if (mapping) {
-            const custom = (person.deploymentTags?.Memberships ?? person.groups ?? []).filter(value => !managedGroups.includes(value));
-            person.deploymentTags = { ...person.deploymentTags, Memberships: [...custom, ...groupsFor(mapping)], "EO Appt Level": mapping[12] || null };
-            person.groups = [...person.deploymentTags.Memberships];
-            person.profile = { ...person.profile, "EO Appt Level": mapping[12] || "" };
-          }
-        }
         return result;
       }
       const teacher = doc.teachers.find((t) => t.id === edit.teacher);
@@ -461,3 +500,379 @@
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", install, { once: true });
   else install();
 })();
+
+
+// A local draft projection only; the owner validates and persists this edit.
+function assignPlanningReporting(doc, id, ro) {
+  const people = reportingStaff(doc, { retainHistorical: true });
+  const person = people.find((row) => row.id === id),
+    links = reportingLinks(doc);
+  if (!person)
+    throw Error("This person is no longer in the version's reporting list.");
+  if (typeof ro !== "string") throw Error("Choose a reporting officer.");
+  if (
+    (!person.reportingAllowed || reportingRoot(doc, person)) &&
+    (ro || !hasReportingEdge(doc, id))
+  )
+    throw Error(
+      "This person cannot receive a new reporting link. An existing link may be cleared.",
+    );
+  if (ro && !people.some((row) => row.id === ro && row.reportingAllowed))
+    throw Error(
+      "Choose an active reporting officer who is available to this version.",
+    );
+  const next = { ...links, [id]: ro },
+    seen = new Set([id]);
+  for (let at = ro; at; at = next[at] || "") {
+    if (seen.has(at)) throw Error("This reporting link would create a cycle.");
+    seen.add(at);
+  }
+  const parents = { ...doc.reporting?.parents },
+    officers = { ...doc.reporting?.officers };
+  if (person.orphan) {
+    delete parents[id];
+    delete officers[id];
+  } else {
+    parents[id] = ro;
+    officers[id] = ro;
+  }
+  doc.reporting = {
+    ...doc.reporting,
+    staff: (doc.reporting?.staff || reportingStaff(doc)).map(person =>
+      person.id === id && Object.hasOwn(person, "ro") ? { ...person, ro } : person),
+    parents,
+    officers,
+  };
+}
+
+function planningReportingPage(root) {
+  const can = window.GSISV1.capable("deploy.edit");
+  if (!can) {
+    root.textContent = "Deploy access is required.";
+    return;
+  }
+  const toolbar = document.createElement("div");
+  toolbar.className = "tools reporting-toolbar";
+  for (const [key, label] of [
+    ["assignment", "Assignment"],
+    ["view", "View"],
+  ]) {
+    const b = button(label, () => {
+      reportingView = key;
+      render();
+    });
+    b.setAttribute("aria-pressed", String(reportingView === key));
+    toolbar.append(b);
+  }
+  if (reportingView === "assignment") {
+    const label = document.createElement("label");
+    label.textContent = "Number of layers ";
+    const input = document.createElement("input");
+    input.type = "number";
+    input.min = "1";
+    input.max = "12";
+    input.value = reportingLayers.get(current) || 3;
+    input.setAttribute("aria-label", "Number of layers");
+    input.onchange = () => {
+      const n = Number(input.value);
+      if (!Number.isInteger(n) || n < 1 || n > 12) {
+        input.value = reportingLayers.get(current) || 3;
+        return;
+      }
+      reportingLayers.set(current, n);
+      render();
+    };
+    label.append(input);
+    toolbar.append(label);
+  }
+  root.append(toolbar);
+  root.insertAdjacentHTML(
+    "beforeend",
+    '<p class="hint">Drag a name into a reporting box. Click a name to choose its RO. Each person has one RO. Active staff are included except MK without SAT. Existing excluded links are retained for review. Layers change the view; deeper links are kept. Save changes to store your edits.</p>',
+  );
+
+  const doc = v(),
+    links = reportingLinks(doc),
+    conflicts = reportingConflicts(doc),
+    people = reportingStaff(doc, { retainHistorical: true }),
+    by = new Map(people.map((p) => [p.id, p])),
+    officers = people.filter((p) => !reportingRoot(doc, p) || links[p.id]),
+    children = (id) =>
+      officers
+        .filter((p) => links[p.id] === id)
+        .sort((a, b) => natural(a.name, b.name)),
+    roots = people
+      .filter((p) => p.reportingAllowed && reportingRoot(doc, p))
+      .sort((a, b) => natural(a.name, b.name)),
+    unassigned = officers.filter((p) => !links[p.id] || !by.has(links[p.id])),
+    shown = new Set();
+  const conflicted = new Set(conflicts.map((item) => item.id));
+  if (conflicts.length) {
+    const note = document.createElement("p");
+    note.className = "warning-text";
+    note.setAttribute("role", "status");
+    note.textContent =
+      "Some saved reporting links disagree. Review the marked people; saving one person reconciles only that person’s link.";
+    root.append(note);
+  }
+  const warning = (p) =>
+    (p.historical
+      ? '<small class="warning-text">Excluded from new choices; retained link needs review.</small>'
+      : "") +
+    (conflicted.has(p.id)
+      ? '<small class="warning-text">Saved links disagree; review this person.</small>'
+      : "");
+  const matches = (p) =>
+    !query ||
+    [p.name, p.role, by.get(links[p.id])?.name]
+      .join(" ")
+      .toLowerCase()
+      .includes(query.toLowerCase());
+  const chip = (p) =>
+    '<button type="button" class="ro-chip" data-ro-person="' +
+    esc(p.id) +
+    '" data-ro-edit="' +
+    esc(p.id) +
+    '" draggable="' +
+    (can && p.reportingAllowed && !reportingRoot(doc, p)) +
+    '" ' +
+    (!p.reportingAllowed && !links[p.id] ? "disabled " : "") +
+    'aria-label="Reporting officer for ' +
+    esc(p.name) +
+    '">' +
+    esc(p.name) +
+    "</button>" +
+    warning(p);
+  const branch = (p, trail = new Set()) => {
+    if (trail.has(p.id))
+      return "<li>Cycle needs review: " + esc(p.name) + "</li>";
+    shown.add(p.id);
+    const nested = children(p.id),
+      closed = reportingCollapsed.has(p.id);
+    return (
+      '<li><div class="reporting-person">' +
+      (nested.length
+        ? '<button data-ro-toggle="' +
+          esc(p.id) +
+          '" aria-expanded="' +
+          !closed +
+          '" aria-label="' +
+          (closed ? "Expand " : "Collapse ") +
+          esc(p.name) +
+          '">' +
+          (closed ? "+" : "−") +
+          "</button>"
+        : '<span class="reporting-leaf">·</span>') +
+      "<span>" +
+      esc(p.name) +
+      " <small>" +
+      esc(p.role) +
+      "</small>" +
+      warning(p) +
+      "</span></div>" +
+      (nested.length
+        ? "<ul " +
+          (closed ? "hidden" : "") +
+          ">" +
+          nested.map((c) => branch(c, new Set([...trail, p.id]))).join("") +
+          "</ul>"
+        : "") +
+      "</li>"
+    );
+  };
+  let main = "";
+  if (reportingView === "assignment") {
+    let managers = roots;
+    const layers = reportingLayers.get(current) || 3;
+    for (let row = 0; row < layers; row++) {
+      const boxes = managers.map((p) => {
+        shown.add(p.id);
+        return (
+          '<section class="ro-box" ' +
+          (p.reportingAllowed ? 'data-ro-drop="' + esc(p.id) + '"' : "") +
+          "><h3>" +
+          esc(p.name) +
+          " <small>" +
+          esc(p.role) +
+          "</small></h3>" +
+          warning(p) +
+          "<p>" +
+          children(p.id).length +
+          " Job Holder(s)</p>" +
+          children(p.id).filter(matches).map(chip).join("") +
+          '<span class="muted">Drop a Job Holder here</span></section>'
+        );
+      });
+      if (row === 0)
+        while (boxes.length < 4)
+          boxes.push(
+            '<section class="ro-box ro-empty"><h3>SL position</h3><p>No active SL in this position.</p></section>',
+          );
+      main +=
+        '<section class="ro-layer"><h3>Layer ' +
+        (row + 1) +
+        '</h3><div class="ro-layer-scroll scroll" tabindex="0" aria-label="Layer ' +
+        (row + 1) +
+        ' reporting boxes">' +
+        (boxes.join("") ||
+          '<p class="muted">Assign Job Holders in the row above to create their boxes.</p>') +
+        "</div></section>";
+      managers = managers.flatMap((p) => children(p.id));
+    }
+  } else {
+    main =
+      '<div class="reporting-directory">' +
+      roots
+        .map((p) => "<section><ul>" + branch(p) + "</ul></section>")
+        .join("") +
+      "</div>";
+  }
+  const disconnected = officers.filter(
+    (p) =>
+      !unassigned.includes(p) &&
+      !shown.has(p.id) &&
+      !roots.some((r) => {
+        let next = p.id,
+          trail = new Set();
+        while (next && !trail.has(next)) {
+          if (next === r.id) return true;
+          trail.add(next);
+          next = links[next];
+        }
+        return false;
+      }),
+  );
+  if (disconnected.length)
+    main +=
+      '<section class="ro-review"><h3>Needs review</h3>' +
+      (reportingView === "view"
+        ? "<ul>" + disconnected.map((p) => branch(p)).join("") + "</ul>"
+        : disconnected.filter(matches).map(chip).join("")) +
+      "</section>";
+  root.insertAdjacentHTML(
+    "beforeend",
+    '<div class="reporting-workspace reporting-content-fit" data-reporting-view="' +
+      reportingView +
+      '"><div class="reporting-main scroll">' +
+      main +
+      '</div><aside class="unassigned-pane reporting-unassigned" ' +
+      (reportingView === "assignment" ? 'data-ro-drop=""' : "") +
+      '><div class="ro-unassigned-head"><h3>Unassigned <span>' +
+      unassigned.length +
+      '</span></h3><label>Find a name<input type="search" data-ro-search aria-label="Search unassigned names" value="' +
+      esc(reportingSearch.get(current) || "") +
+      '"></label></div><div class="ro-unassigned-list">' +
+      unassigned
+        .map(
+          (p) =>
+            '<div data-ro-unassigned-name="' +
+            esc(p.name.toLocaleLowerCase()) +
+            '">' +
+            (reportingView === "assignment"
+              ? chip(p) +
+                (links[p.id]
+                  ? '<small class="warning-text">Previous RO excluded or unavailable; review retained link.</small>'
+                  : "")
+              : "<ul>" + branch(p) + "</ul>") +
+            "</div>",
+        )
+        .join("") +
+      "</div></aside></div>",
+  );
+  const search = root.querySelector("[data-ro-search]"),
+    filter = () => {
+      reportingSearch.set(current, search.value);
+      const q = search.value.trim().toLocaleLowerCase();
+      root
+        .querySelectorAll("[data-ro-unassigned-name]")
+        .forEach((e) => (e.hidden = !e.dataset.roUnassignedName.includes(q)));
+    };
+  search.oninput = filter;
+  filter();
+  const assign = (id, ro) => {
+    try {
+      GSISReporting.assign(clone(v()), id, ro);
+      queueCell({
+        operation: "setReportingOfficer",
+        officer: id,
+        value: ro,
+        expected: links[id] || "",
+      });
+    } catch (e) {
+      alert(e.message);
+    }
+  };
+  root.querySelectorAll("[data-ro-toggle]").forEach(
+    (b) =>
+      (b.onclick = () => {
+        const id = b.dataset.roToggle;
+        reportingCollapsed.has(id)
+          ? reportingCollapsed.delete(id)
+          : reportingCollapsed.add(id);
+        render();
+      }),
+  );
+  root.querySelectorAll("[data-ro-edit]").forEach(
+    (b) =>
+      (b.onclick = () => {
+        const id = b.dataset.roEdit,
+          p = by.get(id);
+        modal(
+          "Reporting officer for " + p.name,
+          '<label>Reporting officer<select id="reportingChoice"><option value="">Unassigned</option>' +
+            options(
+              people
+                .filter(
+                  (r) =>
+                    r.id !== id &&
+                    r.reportingAllowed &&
+                    p.reportingAllowed &&
+                    !reportingRoot(doc, p),
+                )
+                .map((r) => [r.id, r.name + " · " + r.role]),
+              links[id] || "",
+            ) +
+            (links[id] &&
+            (!p.reportingAllowed ||
+              reportingRoot(doc, p) ||
+              !by.get(links[id])?.reportingAllowed)
+              ? '<option disabled selected value="' +
+                esc(links[id]) +
+                '">' +
+                esc(by.get(links[id])?.name || links[id]) +
+                " · retained link; clear to remove</option>"
+              : "") +
+            "</select></label>",
+          (d) => assign(id, d.querySelector("#reportingChoice").value),
+        );
+      }),
+  );
+  root.querySelectorAll("[data-ro-person]").forEach(
+    (e) =>
+      (e.ondragstart = (event) => {
+        event.dataTransfer.setData(
+          "application/x-gsis-officer",
+          e.dataset.roPerson,
+        );
+        event.dataTransfer.effectAllowed = "move";
+      }),
+  );
+  root.querySelectorAll("[data-ro-drop]").forEach((e) => {
+    e.ondragover = (event) => {
+      if (
+        [...event.dataTransfer.types].includes("application/x-gsis-officer")
+      ) {
+        event.preventDefault();
+        event.dataTransfer.dropEffect = "move";
+        e.classList.add("ro-drop-active");
+      }
+    };
+    e.ondragleave = () => e.classList.remove("ro-drop-active");
+    e.ondrop = (event) => {
+      event.preventDefault();
+      e.classList.remove("ro-drop-active");
+      const id = event.dataTransfer.getData("application/x-gsis-officer");
+      if (id && by.has(id)) assign(id, e.dataset.roDrop);
+    };
+  });
+}

@@ -12,6 +12,7 @@ import {
 import { membershipValue, setMembershipValue } from "./model.mjs";
 import { ROLE_COLUMNS, normalizeRoleMemberships, applyRoleMemberships, checkManagedMemberships, roleMapping } from "./role-memberships.mjs";
 import { HR_CHOICE_FIELDS, choiceLists, normalizeHRChoices, applyCatalogueLinks } from "./catalogue-links.mjs";
+import { planningPerson, reportingStaff, reportingLinks, reportingRoot, reportingConflicts } from "../../web/shared/deploy-eligibility.mjs";
 export const SCHEMAS = Object.freeze({
   IP: {
     Classes: [
@@ -127,7 +128,7 @@ export function exportWorkbook(
   const teachers = new Map(doc.teachers.map((t) => [t.id, t]));
   const classes = new Map(doc.classes.map((c) => [classCode(c), c]));
   const groups = new Set(doc.groups.map((g) => g.id));
-  let sheets = {};
+  let sheets = {}, historicalReportingIds = [], conflictingReportingIds = [];
   if (scope === "IP")
     sheets = {
       Classes: doc.classes.map((c) => [
@@ -211,25 +212,28 @@ export function exportWorkbook(
   }
   if (scope === "Teachers")
     sheets = {
-      Teachers: doc.teachers.map((t) => [
-        t.id,
-        display(t),
-        ...[
-          "Basic Name",
-          "Role",
-          "EO Appt Level",
-          "Appointment Status",
-          "Employment Modifier",
-          "Subject Modifier",
-        ].map(
-          (k) =>
-            doc.teacherDrafts?.[t.id]?.[k] ??
-            t.profile?.[k] ??
-            (k === "Basic Name" ? t.name : ""),
-        ),
-        t.active === true,
-        doc.teacherNotes?.[t.id] || "",
-      ]),
+      Teachers: doc.teachers.map((t) => {
+        const planned = planningPerson(doc, t);
+        return [
+          t.id,
+          display(t),
+          ...[
+            "Basic Name",
+            "Role",
+            "EO Appt Level",
+            "Appointment Status",
+            "Employment Modifier",
+            "Subject Modifier",
+          ].map(
+            (k) =>
+              doc.teacherDrafts?.[t.id]?.[k] ??
+              (k === "Role" ? planned.profile.Role : t.profile?.[k]) ??
+              (k === "Basic Name" ? t.name : ""),
+          ),
+          planned.activeKnown ? planned.active : null,
+          doc.teacherNotes?.[t.id] || "",
+        ];
+      }),
     };
   if (scope === "Exclusions")
     sheets = {
@@ -248,7 +252,7 @@ export function exportWorkbook(
   if (scope === "Membership")
     sheets = {
       Membership: doc.teachers.map((teacher) => [teacher.id, display(teacher),
-        teacher.profile?.Role || "", (membershipValue(teacher) || []).join("\n")]),
+        planningPerson(doc, teacher).profile.Role || "", (membershipValue(teacher) || []).join("\n")]),
     };
   if (scope === "Offload")
     sheets = {
@@ -268,21 +272,17 @@ export function exportWorkbook(
       "HR Terms": HR_CHOICE_FIELDS.map(field => [field, choiceLists(doc)[field].join("\n")]),
     };
   if (scope === "Span of Control") {
-    const parents =
-      doc.reporting?.parents ||
-      doc.reporting?.officers ||
-      Object.fromEntries(
-        (doc.reporting?.staff || []).map((t) => [t.id, t.ro || ""]),
-      );
-    const eligible = doc.teachers.filter(
-        (t) => t.active === true && !t.mk && t.profile?.Role !== "OSO",
-      ),
-      eligibleIds = new Set(eligible.map((t) => t.id));
+    const parents = reportingLinks(doc),
+      eligible = reportingStaff(doc, { retainHistorical: true }),
+      eligibleIds = new Set(eligible.map((t) => t.id)),
+      reportingPeople = new Map(eligible.map(t => [t.id, t]));
+    historicalReportingIds = eligible.filter(t => t.historical).map(t => t.id);
+    conflictingReportingIds = reportingConflicts(doc).map(t => t.id);
     const officers = [
       ...new Set([
         ...(doc.reporting?.roColumnIds || []),
         ...eligible
-          .filter((t) => t.authority?.schoolLeader?.value === true)
+          .filter((t) => reportingRoot(doc, t))
           .map((t) => t.id),
         ...Object.values(parents).filter(Boolean),
       ]),
@@ -291,14 +291,14 @@ export function exportWorkbook(
       t.id,
       display(t),
       parents[t.id] || "",
-      display(teachers.get(parents[t.id]) || { id: "" }),
+      display(reportingPeople.get(parents[t.id]) || { id: "" }),
       t.profile?.Role || "",
-      t.authority?.schoolLeader?.value === true,
+      reportingRoot(doc, t),
       t.profile?.Role === "OSO",
       t.active === true,
     ]);
     const columns = [
-      ...officers.map((o) => `${display(teachers.get(o) || { id: o })} [${o}]`),
+      ...officers.map((o) => `${display(reportingPeople.get(o) || { id: o })} [${o}]`),
       "Unassigned",
     ];
     const lists = [...officers, ""].map((o) =>
@@ -323,6 +323,11 @@ export function exportWorkbook(
       mode: visible ? "reporting-only" : "importable",
       ...(scope === "Membership" ? { Instructions:
         "Use one membership per line. Blank clears an existing list; an untouched unknown blank remains unknown. Use the Memberships screen to explicitly save an unknown list as empty. Staff IDs identify existing rows; omitted rows remain unchanged." } : {}),
+      ...(scope === "Span of Control" ? {
+        Instructions: "Available active version staff are included immediately. Retained historical reporting rows may keep their existing relationship or be explicitly cleared; they cannot form new relationships. Conflicting legacy aliases remain unchanged until that staff relationship is explicitly changed. Only Parent RO Staff ID is editable in Hierarchy.",
+        "Historical Reporting Staff IDs": historicalReportingIds.join("\n"),
+        "Conflicting Reporting Staff IDs": conflictingReportingIds.join("\n"),
+      } : {}),
     },
     sheets: Object.fromEntries(
       Object.entries(sheets).map(([s, rows]) => [
@@ -676,7 +681,8 @@ export function validateWorkbook(
     next.teacherDrafts ??= {};
     for (const row of r.Teachers) {
       const s = staff(row),
-        t = teacherMap.get(s);
+        t = teacherMap.get(s),
+        planned = planningPerson(doc, t);
       const mapping = roleMapping({ ...next, teacherDrafts: { ...next.teacherDrafts,
         [s]: { ...next.teacherDrafts[s], Role: row.Role || "" } } }, t);
       check(
@@ -685,14 +691,16 @@ export function validateWorkbook(
       );
       next.teacherNotes[s] = text(row["Planner Notes"] || "", 4000, true);
       for (const field of PROPOSABLE) {
+        if (field === "Active" && !planned.activeKnown && [null, undefined, ""].includes(row[field]))
+          continue;
         const v =
             field === "Active"
               ? bool(row[field])
               : text(row[field] || "", 160, true),
           base =
             field === "Active"
-              ? t.active === true
-              : (t.profile?.[field] ?? (field === "Basic Name" ? t.name : ""));
+              ? (planned.activeKnown ? planned.active : null)
+              : ((field === "Role" ? planned.profile.Role : t.profile?.[field]) ?? (field === "Basic Name" ? t.name : ""));
         if (v !== base) {
           next.teacherDrafts[s] ??= {};
           next.teacherDrafts[s][field] = v;
@@ -786,6 +794,8 @@ export function validateWorkbook(
   if (scope === "Span of Control") {
     const base = exportWorkbook(doc, scope, schoolId, revision),
       eligibleIds = new Set(base.sheets.Hierarchy.rows.map((r) => r[0])),
+      allowedIds = new Set(reportingStaff(doc).map(t => t.id)),
+      reportingPeople = new Map(reportingStaff(doc, { retainHistorical: true }).map(t => [t.id, t])),
       oldParents = Object.fromEntries(
         base.sheets.Hierarchy.rows.map((r) => [r[0], r[2]]),
       );
@@ -798,7 +808,6 @@ export function validateWorkbook(
     for (const row of r.Hierarchy) {
       const s = id(row["Staff ID"]);
       check(eligibleIds.has(s), "Unknown or ineligible reporting Staff ID.");
-      const t = teacherMap.get(s);
       const baseRow = base.sheets.Hierarchy.rows.find((r) => r[0] === s);
       for (let i = 1; i < SCHEMAS[scope].Hierarchy.length; i++)
         if (i !== 2)
@@ -829,7 +838,7 @@ export function validateWorkbook(
       if (parent) {
         const label = header.slice(0, header.lastIndexOf("[")).trim();
         check(
-          label === display(teacherMap.get(parent)) ||
+          label === display(reportingPeople.get(parent)) ||
             matches[label] === parent,
           "RO header name and Staff ID conflict.",
           "STAFF_NAME_CONFLICT",
@@ -846,7 +855,7 @@ export function validateWorkbook(
         );
         const label = value.slice(0, value.lastIndexOf("[")).trim();
         check(
-          label === display(teacherMap.get(m[1])) || matches[label] === m[1],
+          label === display(reportingPeople.get(m[1])) || matches[label] === m[1],
           "RO cell name and Staff ID conflict.",
           "STAFF_NAME_CONFLICT",
           409,
@@ -859,9 +868,8 @@ export function validateWorkbook(
       seen.size === eligibleIds.size,
       "RO Columns must preserve every staff member.",
     );
-    const parents = {
-      ...(doc.reporting?.parents || doc.reporting?.officers || {}),
-    };
+    const parents = reportingLinks(doc), originalLinks = { ...parents },
+      changedIds = new Set(), clearedOrphans = new Set();
     for (const s of eligibleIds) {
       const a = h[s],
         b = fromColumns[s],
@@ -873,15 +881,21 @@ export function validateWorkbook(
         409,
       );
       parents[s] = a === old ? b : a;
+      if (parents[s] !== old) changedIds.add(s);
       check(parents[s] !== s, "Self-parent is invalid.");
-      if (teacherMap.get(s).authority?.schoolLeader?.value === true)
-        check(parents[s] === old, "School Leader root is protected.");
-      if (parents[s]) {
-        const p = teacherMap.get(parents[s]);
+      if (reportingRoot(doc, reportingPeople.get(s)))
+        check(parents[s] === old || parents[s] === "", "School Leader root is protected.");
+      if (parents[s] && parents[s] !== old) {
         check(
-          p.active === true && !p.mk && p.profile?.Role !== "OSO",
-          "Ineligible reporting officer.",
+          allowedIds.has(s) && allowedIds.has(parents[s]),
+          "New reporting relationships require currently eligible staff.",
         );
+      }
+      if (!teacherMap.has(s) && !parents[s]) {
+        // An incoming historical reference may project a missing parent row.
+        // A blank projected row is not a new durable identity or graph edge.
+        if (changedIds.has(s)) clearedOrphans.add(s);
+        if (changedIds.has(s) || !Object.hasOwn(originalLinks, s)) delete parents[s];
       }
     }
     for (const s of Object.keys(parents)) {
@@ -893,12 +907,32 @@ export function validateWorkbook(
         p = parents[p];
       }
     }
+    const retainedStaff = new Map((doc.reporting?.staff || []).map(t => [t.id, t]));
+    for (const t of reportingPeople.values()) {
+      const prior = retainedStaff.get(t.id);
+      if (!teacherMap.has(t.id)) {
+        if (prior && changedIds.has(t.id) && Object.hasOwn(prior, "ro"))
+          retainedStaff.set(t.id, { ...prior, ro: "" });
+        continue;
+      }
+      retainedStaff.set(t.id, {
+        ...prior, id: t.id, name: t.name || t.id,
+        active: t.active, role: t.profile?.Role || "", groups: t.groups,
+        ...(!prior || changedIds.has(t.id) ? { ro: parents[t.id] || "" } : {}),
+      });
+    }
+    const officers = { ...doc.reporting?.officers };
+    for (const s of changedIds) {
+      if (clearedOrphans.has(s)) delete officers[s];
+      else officers[s] = parents[s];
+    }
+    const previousColumns = new Set(doc.reporting?.roColumnIds || []);
     next.reporting = {
       ...doc.reporting,
       parents,
-      officers: parents,
-      roColumnIds: [...columnIds].filter(Boolean),
-      staff: doc.teachers.map((t) => ({ id: t.id, ro: parents[t.id] || "" })),
+      officers,
+      roColumnIds: [...columnIds].filter(s => s && (teacherMap.has(s) || previousColumns.has(s))),
+      staff: [...retainedStaff.values()],
     };
   }
   return { scope, document: applyCatalogueLinks(applyRoleMemberships(next)), proposals };

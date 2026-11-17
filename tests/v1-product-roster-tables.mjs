@@ -36,7 +36,7 @@ try {
  for(const [key,value] of Object.entries({effectiveDate:year+'-01-01',fairnessMode:'opening-balances'}))await h.db.prepare('INSERT INTO roster_records(school_id,collection,record_id,revision,payload_json) VALUES(?,?,?,1,?)').bind(schoolId,'freshStart',key,canonical({kind:'map',data:value})).run();
  const profile=await owner('/profile');assert.equal(profile.historyCoverage.since,year+'-01-01');
  await buildWeb(folder);assert((await readFile(path.join(folder,'roster/index.html'),'utf8')).includes('/v1/shared/roster-table-ui.js'));
- browser=await chromium.launch({headless:true,args:['--no-sandbox','--disable-dev-shm-usage'],executablePath:process.env.GSIS_BROWSER_EXECUTABLE||process.env.ROSTER_TEST_CHROMIUM||'/usr/bin/chromium'});
+ browser=await chromium.launch({headless:true,args:['--no-sandbox','--disable-dev-shm-usage'],executablePath:process.env.GSIS_BROWSER_EXECUTABLE||process.env.ROSTER_TEST_CHROMIUM||chromium.executablePath()});
  const page=await browser.newPage({viewport:{width:1440,height:1000}}),errors=[];page.on('pageerror',error=>errors.push(error.message));
  await page.exposeFunction('ownerRequest',async(pathname,body)=>{try{return {ok:true,data:await owner(pathname,body)};}catch(error){return {ok:false,message:error.message,status:error.status||500};}});
  await page.route('https://test.invalid/**',async route=>{const pathname=new URL(route.request().url()).pathname;const file=path.join(folder,pathname.slice(1));try{await route.fulfill({body:await readFile(file),contentType:pathname.endsWith('.js')||pathname.endsWith('.mjs')?'text/javascript':pathname.endsWith('.css')?'text/css':'text/html'});}catch{await route.fulfill({body:'<!doctype html><main id="content"></main>',contentType:'text/html'});}});
