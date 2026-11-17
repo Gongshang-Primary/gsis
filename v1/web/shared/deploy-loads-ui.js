@@ -1,5 +1,15 @@
 import { parseLoad, planningView, loadRows, fortnightRows, legacyFormUsed } from "./deploy-loads.mjs";
 
+const subjectLoadOrder = [
+  "EL", "LSP", "FEL", "RRP", "SDR", "MATH", "LSM", "FMA", "CL", "ML", "TL",
+  "CCE", "HCL", "HML", "HTL", "MTSP", "FCL", "FML", "FTL", "SCIENCE", "FSC",
+  "SS", "PHE", "ART", "MUSIC", "PAL", "CCE EL", "E2K",
+];
+const subjectLoadRanks = new Map(subjectLoadOrder.map((subject, index) => [subject, index]));
+subjectLoadRanks.set("SCI", subjectLoadRanks.get("SCIENCE"));
+subjectLoadRanks.set("PE", subjectLoadRanks.get("PHE"));
+const subjectLoadRank = subject => subjectLoadRanks.get(subject.trim().toUpperCase()) ?? subjectLoadOrder.length;
+
 // Keep the existing Deploy queue and raw snapshot as the write authority.
 // These adapters only derive the displayed/calculated view of period inputs.
 function install() {
@@ -29,7 +39,9 @@ function install() {
     const doc = v(), rows = loadRows(doc), shown = view(doc);
     const subjects = [...new Set(rows.map(([, subject]) => subject))];
     const components = ["Assembly", "FTGP", "FTT"];
-    const columns = [...components, "FT", ...subjects.filter(subject => !components.includes(subject)), "PD"];
+    const teachingColumns = subjects.filter(subject => !components.includes(subject))
+      .sort((a, b) => subjectLoadRank(a) - subjectLoadRank(b));
+    const columns = [...components, "FT", ...teachingColumns, "PD"];
     const meaningfulLegacyForm = Object.values(doc.loads || {}).some(row => Object.entries(row).some(([subject, value]) => {
       if (subject.trim().toUpperCase() !== "FORM") return false;
       try { const parsed = parseLoad(value); return parsed !== null && parsed !== 0; }
