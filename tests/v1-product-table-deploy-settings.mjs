@@ -48,7 +48,23 @@ const browser = await chromium.launch({
 });
 try {
   const page = await browser.newPage();
-  await page.setContent('<main id="content"></main>');
+  // The production adapter is an ES module sharing the real period policy.
+  // Serve both unchanged files on one intercepted origin, rather than treating
+  // the adapter as a classic inline script or stripping its imports.
+  const origin = "https://deploy-settings.example.invalid";
+  const modules = new Map(await Promise.all([
+    "v1/web/shared/deploy-ui-tables.js",
+    "v1/web/shared/deploy-loads.mjs",
+  ].map(async path => ["/v1/shared/" + path.split("/").at(-1), await read(path)])));
+  await page.route("**/*", async route => {
+    const url = new URL(route.request().url());
+    if (url.origin !== origin) return route.abort();
+    if (url.pathname === "/") return route.fulfill({ contentType: "text/html", body: '<main id="content"></main>' });
+    const body = modules.get(url.pathname);
+    if (body === undefined) return route.abort();
+    return route.fulfill({ contentType: "application/javascript", body });
+  });
+  await page.goto(origin);
   await page.evaluate((d) => {
     window.doc = d;
     window.isAdmin = true;
@@ -61,9 +77,10 @@ try {
     "shared/workload.js",
     "shared/planning.js",
     "shared/asc-export.js",
-    "v1/web/shared/deploy-ui-tables.js",
   ])
     await page.addScriptTag({ content: await read(path) });
+  await page.addScriptTag({ type: "module", url: origin + "/v1/shared/deploy-ui-tables.js" });
+  await page.waitForFunction(() => !!window.GSISDeploySettingTables);
   const cases = await page.evaluate(() => {
     const a = GSISDeploySettingTables,
       make = (view) => a.workbook(doc, view, "school"),
@@ -205,7 +222,7 @@ try {
   // Exercise the actual dialog, XLSX parser and existing lease/change/receipt sequence.
   const ui = await browser.newPage(),
     files = new Map();
-  for (const name of ["deploy-ui-tables.js", "workbooks.mjs"])
+  for (const name of ["deploy-ui-tables.js", "deploy-loads.mjs", "workbooks.mjs"])
     files.set("/v1/shared/" + name, await read("v1/web/shared/" + name));
   files.set(
     "/roster/jszip.min.js",
@@ -241,7 +258,8 @@ try {
       },
     };
   }, doc);
-  await ui.addScriptTag({ url: "/v1/shared/deploy-ui-tables.js" });
+  await ui.addScriptTag({ type: "module", url: "/v1/shared/deploy-ui-tables.js" });
+  await ui.waitForFunction(() => !!window.GSISDeploySettingTables);
   const encoded = await ui.evaluate(async () => {
     const book = GSISDeploySettingTables.workbook(
       doc,
