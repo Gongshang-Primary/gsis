@@ -5,3 +5,14 @@
 .gsis-suitebar [hidden],[data-gsis-panel-parking]{display:none!important}.gsis-suitebar [aria-current="page"]{font-weight:600}.gsis-suitebar .gsis-preview{padding:2px 6px}.gsis-suitebar button{min-height:24px}.gsis-panel:not(body>*){margin:12px 0}
 
 html[data-gsis-module="roster"] #nav[aria-label="Breadcrumb"]{display:none}.gsis-lord-actions{display:contents}.gsis-lord-actions button{font:inherit;text-align:left;border:1px solid #c4d5e8;border-radius:12px;background:white;padding:12px 16px;color:#173c67;cursor:pointer}
+
+/* Fit screen tables without changing the owner's column or print geometry. */
+@media screen {
+  html[data-gsis-module] table > :is(thead,tbody,tfoot) > tr > :is(th,td) {
+    padding-block: 3px;
+  }
+  html[data-gsis-module] table.gsis-fit-content:not(.gsis-compact) {
+    width: max-content;
+    max-width: 100%;
+  }
+}

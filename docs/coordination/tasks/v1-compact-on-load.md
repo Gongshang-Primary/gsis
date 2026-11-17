@@ -12,7 +12,13 @@ Model: Codex. Claimed 18 November 2026, 05:13 SGT.
 
 ## Verification
 
-Pending. Use synthetic local built assets and Workers. Record actual browser checks, canonical build, CI results and any missing coverage.
+The shared stylesheet starts screen cells with compact vertical padding. The shell fits ordinary tables to their content inside an existing scroll frame. Fixed layouts and schedule columns keep their native dimensions. Legacy tables use their existing fitter after rows or controls load. Moving existing rows during sorting does not trigger that refit. The shell waits for the in-progress pointer gesture or focused editor.
+
+`TZ=Asia/Singapore npm run build` passed with no tracked generated drift. With the locked Chromium 151 path supplied as `GSIS_BROWSER_EXECUTABLE`, the new `tests/v1-product-compact-on-load-browser.mjs` passed on the built local Workers and synthetic D1. It measured the initial and refreshed Admin Accounts table, narrow scroll containment, Calendar's fixed and equal weekday columns, and a late-added table control in Deploy. The Deploy case retained the active draft, measured the new input after focus left, and sent no save. The existing `tests/v1-product-deploy-save-recovery-browser.mjs` passed all 15 groups on the same browser. Syntax and `git diff --check` passed. CI for the final branch is pending.
+
+This branch covers default compact presentation and native first-render fitting. Existing shared column widths can still carry across a renderer replacement within one browser document. If explicit refresh needs to reset those user widths, the table owner must expose a load signal distinct from sort, filter and edit redraws. The shared enhancer's manual-width policy and its current regression remain intact pending that coordination. The deployed site was not exercised.
+
+The test uses the existing synthetic product fixture and the repository's browser and build gates. No new dependency or skill tooling was used. Data authority, recovery, and publication stay in their owning modules. Restore the previous reviewed frontend assets to roll this display change back.
 
 ## Release
 
