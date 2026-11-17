@@ -1,6 +1,6 @@
 # Deploy frontend parity and Membership UAT ledger — 17 November 2026
 
-Model: Codex. Times are Asia/Singapore (UTC+08:00). This is a changelog and initial investigation, not an implementation or completed UAT report. Owner's latest instruction: “do not commit code, maintain change log”; compare the screenshot with v0.9 and investigate only. Documentation publication does not authorise a fix, migration, deployment or publication of live planning data.
+Model: Codex. Times are Asia/Singapore (UTC+08:00). This is a dated changelog and investigation, not a completed hosted UAT report. Earlier owner directions and evidence remain below. The latest item asks for TTb employment tags and a study of v0.9 behavior; this update changes documentation only. Documentation publication does not authorise a fix, migration, deployment or publication of live planning data.
 
 ## References and evidence limits
 
@@ -17,6 +17,7 @@ Model: Codex. Times are Asia/Singapore (UTC+08:00). This is a changelog and init
 | ENV-17-001 | 2026-11-17 07:55 | Computer control | Environment advertises desktop support, but no browser/desktop interaction tool was exposed. This blocks the requested row-by-row frontend copy; it is an environment limitation, not an application defect. | Blocked; no rows copied or verified |
 | DEP-17-001 | 2026-11-17 08:11 | HR Settings → HR Terms | v1 displays a read-only staff-facts report in place of v0.9's version-owned option catalogue editor. | OPEN — owner screenshot; source cause confirmed; fix deferred |
 | DEP-17-002 | 2026-11-17 08:14 | Membership → Teachers | The owner's screenshot shows 59 Membership roles but Add teacher's Role picker contains only its blank prompt. Internal role/HR tag links must work within Deploy before publication. | OPEN — source cause confirmed; authorised implementation under verification |
+| DEP-17-004 | 2026-11-17 13:43 | Teachers → TTb Name | Employment modifiers must appear in the derived name. v1 can retain an older Contacts-derived name beside saved draft modifiers. | OPEN; source and synthetic function trace confirmed; product fix not built |
 
 ## DEP-17-001 — HR Terms has a different function in v1
 
@@ -78,3 +79,66 @@ The implementation branch is `codex/v1-deploy-internal-links`, current head [`ae
 - Accepted Contacts authority is unchanged by draft/catalogue edits. EO yes/no remains distinct from grade. Wider employment-field editors and the external catalogue lifecycle are not silently added. School data and the owner's 59 actual role rows were not read or copied by these synthetic tests.
 
 Both product findings remain OPEN pending independent review and hosted verification. The computer-control blocker and unperformed row-by-row copy remain unchanged. No production code, live record or environment setting is changed by this ledger commit.
+
+## DEP-17-004: employment tags in the derived TTb Name
+
+### Owner observation and current source
+
+Recorded 17 November 2026, 13:43 SGT. Owner: "changelog: ttb name should include employment tags too ;study v0.9 behaviour". The screenshot shows modifier values in some rows that are absent from the adjacent TTb name, while another cached name already contains modifiers. No staff names, account identifiers or screenshot rows are copied into this public ledger. The screenshot capture time is unknown.
+
+Current comparison pins: live v1.03 source `d3bba194f0dc162d38f0899dc4e0b6e5e1351fa2`, main `afbe5205b07cf6d2b1c458f3c656a4d14a34f5ce` at investigation start, and v0.9.9y `d9d180ced16d32c836a94d67d9cff8d3030eb21d`. The later main commit is Muse's PR201 review, not a deployed name fix. Department finding DEP17-003 is in [its separate ledger](https://github.com/helper-gsps/gsis/blob/ac5575fe322dcbe08521288054f2c66e3e4defde/docs/v1/DEPLOY_DEPARTMENTS_UAT_2026-11-17.md); its approved PR201 remains a separate, unmerged implementation. Do not amend that reviewed head for this new discovery.
+
+Earlier HR Terms/Role notes above describe their historical checkpoints. The internal-link portion subsequently shipped in v1.03 through PR198 and reviewed label PR200. That does not establish hosted UAT completion or complete the separate external Contacts catalogue lifecycle. The row-copy task remains unperformed; no fresh computer-control availability check is claimed here.
+
+### v0.9 behavior to preserve
+
+The derived name is Basic Name, then each Employment Modifier, then each Subject Modifier, then the MK suffix, with each modifier wrapped as ` (label)`.
+
+| Synthetic inputs | Derived TTb Name |
+| --- | --- |
+| Basic Name = Synthetic Alpha; Employment Modifier = FAJT, 4/5; Subject Modifier = MTL | `Synthetic Alpha (FAJT) (4/5) (MTL)` |
+| Basic Name = Synthetic Beta; Employment Modifier = UT; Subject Modifier = PE | `Synthetic Beta (UT) (PE)` |
+| Basic Name = Synthetic Gamma; Employment Modifier = FAJT; Role = PE; Subject Modifier = Art | `Synthetic Gamma (FAJT) (PE) (Art)` |
+| Basic Name = Synthetic Delta; Role = HOD; Appointment Status = Acting | `Synthetic Delta` |
+
+Role, EO appointment level, Appointment Status, Active and membership flags do not directly become suffixes. The subject roles MTL, PE, Art and Music can supply a required subject modifier. A slash in 4/5 is part of the label, not a separator. v0.9 splits these modifiers on commas, trims individual tokens, preserves their order/case and generally does not deduplicate them. These legacy formatting details are evidence, not an instruction to revive duplicate labels or discard v1's existing typed tag presentation/visibility rules.
+
+Exact v0.9 references: [deriveContacts_](https://github.com/helper-gsps/gsis/blob/d9d180ced16d32c836a94d67d9cff8d3030eb21d/Contacts_Backend_v0.9.9.gs#L493), [saveTeacherProfile_](https://github.com/helper-gsps/gsis/blob/d9d180ced16d32c836a94d67d9cff8d3030eb21d/backend/Code.gs#L1237), [profileName_](https://github.com/helper-gsps/gsis/blob/d9d180ced16d32c836a94d67d9cff8d3030eb21d/backend/Code.gs#L1262), and [projectEditBase](https://github.com/helper-gsps/gsis/blob/d9d180ced16d32c836a94d67d9cff8d3030eb21d/public/app.js#L1066). Draft edits recalculate immediately; backend profile saves persist the derived name. Rename collision checks include the modifiers and inactive teachers. The owner's later all-draft namespace rule is broader than those legacy checks.
+
+### v1 cause and affected consumers
+
+This is not absence of employment-tag support in the current formatter. [previewTTb](https://github.com/helper-gsps/gsis/blob/d3bba194f0dc162d38f0899dc4e0b6e5e1351fa2/v1/contacts/direct-fields.mjs#L291) already reads employmentTags, subjectTags and mkTags, with existing visibility, deduplication and name-length rules.
+
+The Deploy flow has two competing display sources:
+
+1. [mergeContacts](https://github.com/helper-gsps/gsis/blob/d3bba194f0dc162d38f0899dc4e0b6e5e1351fa2/v1/services/deploy/model.mjs#L237) sets name/ttbName from the incoming Contacts-formatted string.
+2. [Teacher edits](https://github.com/helper-gsps/gsis/blob/d3bba194f0dc162d38f0899dc4e0b6e5e1351fa2/v1/services/deploy/model.mjs#L791) retain Basic Name and modifier edits in teacherDrafts without recalculating those displayed name fields.
+3. [Bootstrap](https://github.com/helper-gsps/gsis/blob/d3bba194f0dc162d38f0899dc4e0b6e5e1351fa2/v1/services/deploy/service.mjs#L767) refreshes the teacher rows from Contacts. [resolve](https://github.com/helper-gsps/gsis/blob/d3bba194f0dc162d38f0899dc4e0b6e5e1351fa2/shared/teaching-rules.js#L12) overlays the draft profile but keeps the previous name.
+4. The [Teachers renderer](https://github.com/helper-gsps/gsis/blob/d3bba194f0dc162d38f0899dc4e0b6e5e1351fa2/public/app.js#L1367) prints that name beside modifier fields from the effective profile. [Workbook display](https://github.com/helper-gsps/gsis/blob/d3bba194f0dc162d38f0899dc4e0b6e5e1351fa2/v1/services/deploy/workbooks.mjs#L117) also prefers the cached ttbName. A cell-only rendering patch would leave exports or selectors inconsistent.
+
+In-memory replay of the actual functions, using only synthetic data:
+
+| Stage | Displayed name | Employment / subject inputs |
+| --- | --- | --- |
+| Local edit projection | `Synthetic Teacher (FAJT) (MTL)` | FAJT / MTL |
+| Backend applyEdits result | `Synthetic Teacher` | Draft retains FAJT / MTL |
+| Contact merge and effective-profile resolution after reload | `Synthetic Teacher` | Draft still retains FAJT / MTL |
+
+Basic Name-only edits show the same precedence mismatch. This reproduces the derivation defect at the source-function boundary, not the full built browser/Worker/D1 or hosted path. The particular blank fields and accepted evidence in the owner's rows were not inspected; their individual data causes are not proven.
+
+The screenshot's Activity unknown and Teaching eligibility unavailable text is rendered as separate warning elements inside the name cell. Those warnings are not TTb suffixes. Do not fabricate activity/EO evidence or change permissions to make a name display correctly.
+
+### Required future correction and acceptance, not implemented
+
+Follow the already recorded [independent derivation contract](contacts/CONTACTS_LIFECYCLE_DESIGN.md#3-stable-identity-basic-name-and-independent-ttb-names): Deploy derives from its selected version's effective Basic Name and tags; Contacts derives separately from its own current inputs. Never use an already-formatted TTb string as Basic Name, append another copy of a suffix, restamp an untouched Basic Name, mint another Staff ID or overwrite another version to repair the display.
+
+Future bounded implementation must test:
+
+1. FAJT, UT, 4/5 and multiple employment tags, with subject/MK combinations, correct order and existing v1 presentation rules.
+2. Add/edit/clear one modifier; update immediately, save and reload without losing other tags. An omitted field is not a clear. Basic Name edits must derive the same way.
+3. Consistent names in the Teachers table, ordinary assignment selectors, filtering/sorting, workbook export/import, collision checks and new/duplicate version refresh. Existing formatted strings must not be double-suffixed.
+4. Current/future draft and Contacts namespace checks use the newly derived name, include inactive teachers and preserve stable identity. Preserve accepted authority, lease, revision and idempotency guards.
+5. Employment Arrangement remains distinct from Employment Modifier. Review the current semicolon-joined projection deliberately; do not accidentally turn Full-time, activity/eligibility warnings, appointment grade/status, memberships or planner notes into TTb tags.
+6. Partial records with enough name inputs display a derived name without invented optional facts. Historical immutable publications and prior captured records remain unchanged. No silent global rewrite of Contacts or drafts.
+
+These checks remain Not tested for a future fix. No product or test source changed in this investigation. No application build, Worker/D1 test, hosted record read/write, provider send, merge or deployment was performed. Skill method: source/root-cause tracing plus synthetic function replay; independent Codex comparison is internal evidence, not Muse approval. F5 OPEN; official T1B-01/T1B-02 and hosted/runtime UAT Not tested.
