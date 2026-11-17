@@ -1,2 +1,2 @@
 // Product display label only. API, storage and workbook schema versions are independent.
-export const RELEASE_LABEL = "v1.03";
+export const RELEASE_LABEL = "v1.04";
