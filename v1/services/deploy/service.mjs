@@ -1,3 +1,4 @@
+import { choiceLists } from "./catalogue-links.mjs";
 import {
   query,
   one,
@@ -852,7 +853,7 @@ async function bootstrap(ctx) {
           [school, requested, ctx.now],
         )
       : [],
-    sysFields: doc?.hrTerms || projection?.hrTerms || {},
+    sysFields: doc ? choiceLists(doc) : projection?.hrTerms || {},
     roleCatalogue: doc?.roleMembershipSchema !== 1 ? (projection?.roleCatalogue || []) :
       (doc.membership || []).map((r) => ({
         role: r[0],
@@ -1168,7 +1169,7 @@ async function save(
           ["addTeacher", "initReporting", "setReportingOfficer", "setTeacherMemberships", "setRoleMemberships"].includes(
             e.operation,
           ) ||
-          (e.operation === "upsertTeacherProfile" &&
+          (["upsertTeacherProfile", "setTeacherField"].includes(e.operation) &&
             !before.teachers.some((t) => t.id === e.teacher)),
       ))
   ) {
