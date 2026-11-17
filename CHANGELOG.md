@@ -1,3 +1,7 @@
+# Pending hotfix: local Excel export recovery, 17 November 2026
+
+Model: Codex. Export the loaded local timetable and current local assignments even when D1 response revisions differ or exportContext is missing. All three exports make no online read, retain snapshot labels and privacy, and refuse incomplete timetable data. Owner/date-scoped complete views survive cache invalidation for offline export recovery; online writes remain gated on current verification. See `docs/coordination/tasks/roster-local-export-recovery.md`. Frontend-only extension; no deployment or live settings/data changes by Codex.
+
 # Pending hotfix: Combine with occupied activity, 17 November 2026
 
 Model: Codex. A timetabled teaching activity with a subject but no class label is now a valid Combine base. Ordinary relief still requires a blank period; blocked duties, attendance and identity checks remain. Blank class labels cannot bypass the one-additional-class limit. Existing lesson contents, zero-R combinations and request receipts are preserved. Owner deployment needs both Roster Workers and the Roster frontend ZIP; no Apps Script upload. See `docs/coordination/tasks/roster-combine-occupied-lesson-hotfix.md`. Not deployed by Codex.

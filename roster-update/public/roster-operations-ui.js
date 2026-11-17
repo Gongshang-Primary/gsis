@@ -108,8 +108,8 @@ var RosterOpsUI = (() => {
   const owner=JSON.stringify([user.email.toLowerCase(),user.staffId||'',user.smc,user.admin]),version=document.querySelector('script[src*="roster-operations-ui.js"]')?.getAttribute('src')||'allocation-view-1';allocationCacheOwners.add(owner);
   return {owner,id:'allocation-view:'+JSON.stringify([version,s.ctx.profile.revision??'',s.date])};
  }
- function clearAllocationCache(dates){
-  allocationCacheGeneration++;for(const owner of allocationCacheOwners)window.RosterBaselineCache?.removeSnapshots?.(owner,'allocation-view:',dates&&[...dates]);
+ function clearAllocationCache(dates,denied=false){
+  allocationCacheGeneration++;for(const owner of allocationCacheOwners){window.RosterBaselineCache?.removeSnapshots?.(owner,'allocation-view:',dates&&[...dates]);if(denied)window.RosterBaselineCache?.removeSnapshots?.(owner,'local-export-view:');}
  }
  function allocationSourceChanged(s,data){
   const preload=s.ctx.timetablePreload,baseline=preload?.getBaseline?.(s.date),known=s.ctx.cachedTimetable?.(s.date),id=baseline?.entry?.id||known?.modelId||known?.selected?.id;
@@ -125,15 +125,21 @@ var RosterOpsUI = (() => {
   const s=session;if(s?.page==='Report Absence'&&s.data){if(s.busy)return;void localReport(s).then(changed=>{if(changed&&isLive(s)){if(!modal)draw(s);freshness(s);}else if(isLive(s)&&allocationSourceChanged(s,s.data)){s.reportSourceChanged=true;freshness(s);if(!s.reading)void reload(s,false,false,true);}}).catch(()=>{});return;}if(!s||s.page!=='Assign Relief'||!s.data||!allocationSourceChanged(s,draftFor(s)?.latest||s.data))return;
   invalidateDates([s.date]);s.allocationNeedsRefresh=true;s.allocationUnverified=true;s.referenceRefreshPending=true;pendingBanner(s);freshness(s);refreshKnownReference(s);
  }
- async function cachedAllocation(s){
+ async function cachedAllocation(s,exportOnly=false){
   const identity=allocationCacheIdentity(s),generation=allocationCacheGeneration;if(!identity)return null;
-  try{const envelope=await window.RosterBaselineCache?.getSnapshot(identity.owner,identity.id),saved=envelope&&JSON.parse(envelope.data);if(!isLive(s)||generation!==allocationCacheGeneration||saved?.schema!==1||saved.date!==s.date||!Number.isFinite(saved.checkedAt)||!saved.data?.allocationModel||!Array.isArray(saved.data.demands))return null;
+  try{const envelope=await window.RosterBaselineCache?.getSnapshot(identity.owner,exportOnly?'local-export-view:'+s.date:identity.id),saved=envelope&&JSON.parse(envelope.data);if(!isLive(s)||generation!==allocationCacheGeneration||saved?.schema!==1||saved.date!==s.date||!Number.isFinite(saved.checkedAt)||!saved.data?.allocationModel||!Array.isArray(saved.data.demands))return null;
    return {data:{...saved.data,user:s.ctx.profile.user},checkedAt:saved.checkedAt,persisted:true};
   }catch{return null;}
  }
  function rememberData(s,key=cacheKey(s),confirmed=false){
   viewCache.delete(key);viewCache.set(key,{data:s.data,checkedAt:s.checkedAt});while(viewCache.size>24)viewCache.delete(viewCache.keys().next().value);
-  const identity=confirmed&&s.page==='Assign Relief'&&allocationCacheIdentity(s);if(identity&&s.data?.allocationModel&&!s.allocationNeedsRefresh)try{window.RosterBaselineCache?.putSnapshot(identity.owner,identity.id,{data:JSON.stringify({schema:1,date:s.date,data:s.data,checkedAt:s.checkedAt})});}catch{}
+  const identity=s.page==='Assign Relief'&&allocationCacheIdentity(s);if(identity&&s.data?.allocationModel)try{
+   const envelope={data:JSON.stringify({schema:1,date:s.date,data:s.data,checkedAt:s.checkedAt})};
+   if(confirmed&&!s.allocationNeedsRefresh)window.RosterBaselineCache?.putSnapshot(identity.owner,identity.id,envelope);
+   // Invalidating online authority must not erase the last complete local export.
+   // Restored views remain unverified for writes, just like the allocation cache.
+   localExportContext(s);window.RosterBaselineCache?.putSnapshot(identity.owner,'local-export-view:'+s.date,envelope);
+  }catch{}
  }
  const viewKind=(page,tab)=>({'Absences by Date':tab==='relief'?'smc':'schoolAbsences','Daily Updates':'teacherDailyUpdate','Recess Regression':'recess','Custom Notifications':'custom','Assign Relief':'allocation','Daily Notify':'dailyNotify','Report Absence':'report','Manage reported absences':'mine','My Relief Duties':'duties','Manage Ad-hoc relief':'adhoc','Manage Absence Type':'types','Prune records':'prune'}[page]||'smc');
  const pageLabel=page=>({'Manage reported absences':'Manage my absences','Absences by Date':'Manage school-wide absences','Prune records':'Storage'}[page]||page);
@@ -766,7 +772,10 @@ var RosterOpsUI = (() => {
   body.inert=!['Daily Notify','Report Absence'].includes(s.page)&&(!keep&&!localForm||s.busy&&!s.cellSaving);s.root.setAttribute('aria-busy','true');freshness(s);if(s.page==='Assign Relief'&&keep)pendingBanner(s);
   if(s.page==='Report Absence')void localReport(s).then(ready=>{if(ready&&ticket===s.readTicket){if(!modal)draw(s);freshness(s);}}).catch(()=>{});
   try{const data=await readView(s,usePreload);if(!isLive(s)||ticket!==s.readTicket||!preserveEdits&&(keep&&s.dirty||modal))return false;if(generation!==(s.readGeneration||0))return reload(s,false,forceDraw,preserveEdits);const next=hydrateTimetable(s,cleanData(data)),changed=JSON.stringify(next)!==JSON.stringify(s.data);s.data=next;s.reportSourceChanged=false;s.previewPending=false;s.checkedAt=usePreload&&s.page==='Report Absence'&&preloads.get(cacheKey(s))?.checkedAt||Date.now();s.date=s.data.date||s.date;s.needsReviewRefresh=false;s.allocationNeedsRefresh=false;s.cachedPreview=false;s.allocationUnverified=false;s.referenceRefreshPending=false;acceptAllocationRun(s,s.data.allocatorRun);rememberData(s,cacheKey(s),true);warmTimetable(s);if((changed||forceDraw)&&!(s.page==='Assign Relief'&&draftWork(draftFor(s)))&&(!preserveEdits||!s.dirty&&!modal||s.formDraft&&!modal&&s.page==='Report Absence'))draw(s);attachDraft(s);return true;}
-  catch(e){if(isLive(s)&&ticket===s.readTicket){const denied=e.status===401||e.status===403;if(!denied&&generation!==(s.readGeneration||0))return reload(s,false,forceDraw,preserveEdits);s.refreshFailed=true;if(denied){clearAllocationCache();resetPreloads();delete s.ctx.profile.reportForm;s.data=null;closeDialog();}if(!keep&&!localForm||denied){body.innerHTML='<p>Records could not load.</p><button data-reload>Retry</button>';$(s,'[data-reload]').onclick=()=>reload(s);}if(!denied&&s.page==='Report Absence'&&s.formDraft?.submitted&&s.acceptedReportMessage)say(s,s.acceptedReportMessage+' Current records could not refresh. Use Refresh records.',s.acceptedReportWithdrawn===true,s.acceptedReportWithdrawn!==true);else say(s,failureText(e),true);}return false;}
+  catch(e){if(isLive(s)&&ticket===s.readTicket){const denied=e.status===401||e.status===403;if(!denied&&generation!==(s.readGeneration||0))return reload(s,false,forceDraw,preserveEdits);s.refreshFailed=true;if(!denied&&!keep&&s.page==='Assign Relief'){
+   const local=await cachedAllocation(s,true);if(!isLive(s)||ticket!==s.readTicket)return false;
+   if(local){s.data=hydrateTimetable(s,local.data);s.checkedAt=local.checkedAt;s.cachedPreview=true;s.allocationUnverified=true;draw(s);attachDraft(s);say(s,'Offline local copy loaded. Excel export is available; online verification is required before saving changes.',true);return false;}
+  }if(denied){clearAllocationCache(undefined,true);resetPreloads();delete s.ctx.profile.reportForm;s.data=null;closeDialog();}if(!keep&&!localForm||denied){body.innerHTML='<p>Records could not load.</p><button data-reload>Retry</button>';$(s,'[data-reload]').onclick=()=>reload(s);}if(!denied&&s.page==='Report Absence'&&s.formDraft?.submitted&&s.acceptedReportMessage)say(s,s.acceptedReportMessage+' Current records could not refresh. Use Refresh records.',s.acceptedReportWithdrawn===true,s.acceptedReportWithdrawn!==true);else say(s,failureText(e),true);}return false;}
   finally{if(isLive(s)&&ticket===s.readTicket){s.reading=false;s.cacheVerifying=false;if(!s.busy)hideProgress(s);body.inert=!['Daily Notify','Report Absence'].includes(s.page)&&s.busy&&!s.cellSaving;s.root.setAttribute('aria-busy',String(s.busy));freshness(s);if(s.page==='Report Absence'&&s.formDraft?.submitted&&s.acceptedReportMessage&&!pendingFor(s)&&!$(s,'[data-ops-message]')?.textContent)say(s,s.acceptedReportMessage,s.acceptedReportWithdrawn===true,s.acceptedReportWithdrawn!==true);if(s.page==='Assign Relief'){pendingBanner(s);refreshKnownReference(s);}}}
  }
  async function loadDate(s){
@@ -787,7 +796,7 @@ var RosterOpsUI = (() => {
    acceptAllocationRun(s,value.allocatorRun);
    if(!value.user||generation!==(s.readGeneration||0)||value.revision!==current.revision||value.dayToken!==current.dayToken||value.allocationReferenceKey!==current.allocationReferenceKey||value.allocationClock!==current.allocationClock||allocationSourceChanged(s,current)){s.allocationNeedsRefresh=true;cellSaveControls(s);return reload(s,false,false,true);}
    s.checkedAt=Date.now();s.cachedPreview=false;s.allocationUnverified=false;s.refreshFailed=false;rememberData({...s,data:{...current,user:value.user,allocatorRun:value.allocatorRun}},cacheKey(s),true);return true;
-  }catch(error){if(!isLive(s)||ticket!==s.readTicket)return false;if(error.status===401||error.status===403){clearAllocationCache();s.data=null;closeDialog();$(s,'[data-ops-body]').replaceChildren();}s.refreshFailed=true;say(s,failureText(error),true);return false;
+  }catch(error){if(!isLive(s)||ticket!==s.readTicket)return false;if(error.status===401||error.status===403){clearAllocationCache(undefined,true);s.data=null;closeDialog();$(s,'[data-ops-body]').replaceChildren();}s.refreshFailed=true;say(s,failureText(error),true);return false;
   }finally{if(isLive(s)&&ticket===s.readTicket){s.cacheVerifying=false;s.reading=false;freshness(s);pendingBanner(s);}}
  }
  const allocationRunning=run=>run&&['preparing','running','committing','cancelling'].includes(run.state);
@@ -853,7 +862,7 @@ var RosterOpsUI = (() => {
   const date=s.date,startingData=draftFor(s)?.latest||s.data,editing=()=>s.busy||s.reading||draftFor(s)?.running||modal||s.root.contains(document.activeElement)&&document.activeElement.matches('input,select,textarea,[contenteditable=true]'),statusOnly=!forceVersion&&(editing()||Date.now()-(s.lastAllocationVersionAt||0)<20000),wasRunning=allocationRunning(s.allocationRun);let checkCompletion=false;s.versionChecking=true;
   try{const value=await s.ctx.api('operations',{operation:'allocationVersion',date,...(statusOnly?{statusOnly:true}:{})},'POST',undefined,{background:true});if(!isLive(s)||s.date!==date||startingData!==(draftFor(s)?.latest||s.data))return;s.pollFailed=false;if(!statusOnly)s.lastAllocationVersionAt=Date.now();acceptAllocationRun(s,value.allocatorRun);const current=draftFor(s)?.latest||s.data,changed=s.allocationCompletionRefresh||!statusOnly&&allocationVersionChanged(s,current,value);s.allocationCompletionRefresh=false;
    checkCompletion=statusOnly&&wasRunning&&!allocationRunning(s.allocationRun)&&!editing();if(changed){if(!s.allocationNeedsRefresh){s.allocationNeedsRefresh=true;clearAllocationCache(new Set([date]));freshness(s);draftStatus(s);updatePublish(s);}if(!editing()&&!draftWork(draftFor(s)))await reload(s,false,true,true);}
-  }catch(error){s.pollFailed=true;if(isLive(s)&&s.date===date&&(error.status===401||error.status===403)){clearAllocationCache();s.data=null;closeDialog();$(s,'[data-ops-body]').replaceChildren();say(s,failureText(error),true);}}finally{s.versionChecking=false;}
+  }catch(error){s.pollFailed=true;if(isLive(s)&&s.date===date&&(error.status===401||error.status===403)){clearAllocationCache(undefined,true);s.data=null;closeDialog();$(s,'[data-ops-body]').replaceChildren();say(s,failureText(error),true);}}finally{s.versionChecking=false;}
   if(checkCompletion&&isLive(s)&&s.date===date)await refreshAllocationVersion(s,true);
  }
  function refreshCurrent(){const s=session;if(!s||s.bootstrapFailed||s.defaultDatePending||s.defaultDateFailed||s.dirty||s.busy||s.reading||viewPending(s)||modal||Date.now()-(s.checkedAt||0)<60000||s.root.contains(document.activeElement)&&document.activeElement.matches('input,select,textarea,[contenteditable=true]'))return Promise.resolve();return s.page==='Assign Relief'?refreshAllocationVersion(s):reload(s);}
@@ -1641,23 +1650,36 @@ var RosterOpsUI = (() => {
   const date=s.date,id=s.data.timetable.id;if(s.exportBaseline?.modelId===id||s.exportLoading===id||!s.ctx.localTimetable)return;
   s.exportLoading=id;s.ctx.localTimetable(date).then(value=>{if(!isLive(s)||s.date!==date||s.data?.timetable?.id!==id)return;s.exportBaseline=value;s.exportError=null;const q=draftFor(s);if(q){q.exportBaseline=value;if(draftWork(q))persistDraft(q);}freshness(s);}).catch(error=>{if(isLive(s)&&s.date===date)s.exportError=error.message;}).finally(()=>{if(s.exportLoading===id)s.exportLoading=null;});
  }
+ function localExportContext(s){
+  const view=s.data,day=view?.timetable,model=view?.allocationModel,periods=day?.periods||model?.periods;
+  if(view?.date!==s.date||!day?.id||!Array.isArray(periods)||!periods.length||!Array.isArray(day.teachers)||!day.teachers.length)throw Error('The local timetable for this date is incomplete. Load this date before exporting.');
+  const source=view.exportContext,plan=source?.teacherSummary?.plan,samePlan=source?.date===s.date&&plan?.date===s.date&&plan.parity===day.parity&&JSON.stringify(plan.periods)===JSON.stringify(periods)&&(day.staplerRevision?plan.id===day.id&&source.timetableSource?.revision===day.staplerRevision:plan.baselineId===day.id);
+  if(samePlan){GSISRosterStapler.validate(plan);return source;}
+  const byId=new Map((model?.teachers||[]).map(t=>[t.id,t])),teachers=day.teachers.map(t=>({...t,cells:t.cells||byId.get(t.staffId)?.t?.cells}));
+  if(teachers.some(t=>!Array.isArray(t.cells)||periods.some(p=>!Array.isArray(t.cells[p.period])||t.cells[p.period].length!==4||t.cells[p.period].some(value=>typeof value!=='string'))))throw Error('The local timetable for this date is incomplete. Missing teacher periods cannot be exported.');
+  const effective={...day,date:s.date,recesses:[],periods,teachers,formClasses:day.formClasses||model?.formClasses||[],teachingGroups:day.teachingGroups||model?.teachingGroups||[]},localPlan=GSISRosterStapler.create(effective,{date:s.date,endOfDayMinutes:day.endOfDayMinutes});
+  return {date:s.date,revision:view.revision,allocationRevision:view.allocationRevision||0,periods:draftCopy(periods),rows:[],teacherSummary:{plan:localPlan,staplerStatus:day.staplerRevision?'confirmed':'baseline'},timetableSource:{kind:day.staplerRevision?'stapler':'baseline',...(day.staplerRevision?{revision:day.staplerRevision}:{}),label:day.staplerRevision?'Local effective Stapler rev '+day.staplerRevision:'Local baseline '+day.id},legend:'Local timetable and relief assignments.'};
+ }
  function localExportSnapshot(s){
-  const source=s.data?.exportContext;if(!source||source.date!==s.date||source.revision!==s.data.revision||!source.teacherSummary?.plan)throw Error('The complete export data for this date has not loaded. Refresh records once while online, then export locally.');
-  const data=draftCopy(source),queue=draftFor(s),assignments=(s.data.allocationModel?.assignments||[]).filter(a=>!a.remove&&!a.invalidCover&&!['cancelled','invalidated'].includes(a.status)).map(a=>({...a,assignedBy:GSISRosterOperations.publicDuty({...a,createdBy:a.pending?s.ctx.profile.user.email:s.data.cellProvenance?.[a.demandId]?.actor||a.createdBy},null,{people:s.data.people||[]}).assignedBy})),byDemand=new Map(assignments.map(a=>[a.demandId,a])),rows=new Map(data.rows.map(row=>[row.id,row]));
+  const source=localExportContext(s),data=draftCopy(source),queue=draftFor(s),assignments=(s.data.allocationModel?.assignments||[]).filter(a=>(!a.date||a.date===s.date)&&!a.remove&&!a.invalidCover&&!['cancelled','invalidated'].includes(a.status)).map(a=>({...a,assignedBy:GSISRosterOperations.publicDuty({...a,createdBy:a.pending?s.ctx.profile.user.email:s.data.cellProvenance?.[a.demandId]?.actor||a.createdBy},null,{people:s.data.people||[]}).assignedBy})),byDemand=new Map(assignments.map(a=>[a.demandId,a])),rows=new Map((data.rows||[]).filter(row=>row.id?.startsWith('stapler:')).map(row=>[row.id,row]));
+  data.revision=s.data.revision;data.allocationRevision=s.data.allocationRevision||0;
+  data.teacherSummary.absences=(s.data.absences||[]).filter(a=>a.date===s.date&&!a.deletedAt).map(a=>({staffId:a.staffId,name:a.name,periods:draftCopy(a.periods||[]),...(a.coverage?{coverage:draftCopy(a.coverage)}:{}),reason:a.typeLabel||'Unspecified'}));
+  data.teacherSummary.demands=draftCopy(s.data.demands||[]);data.teacherSummary.addedTeachers=[];
+  for(const a of data.teacherSummary.absences)rows.set(a.staffId,{id:a.staffId,name:a.name||person(s,a.staffId).name,cells:data.periods.map(()=>({text:'',status:'blank'}))});
   const project=a=>Object.fromEntries(['id','demandId','staffId','absentId','absentIds','absentName','name','relieverName','period','subject','className','venue','groupName','status','noRelief','remove','combination','repurposedDuty','mutual','assignedBy'].filter(k=>a[k]!==undefined).map(k=>[k,draftCopy(a[k])]));
   // Relief cells read "Art (for Nisha)": name every absent teacher from the record, never an id.
   const demandStaff=new Map();for(const group of s.data.demands||[])for(const dem of group.members||[group])demandStaff.set(dem.id,dem.staffId);
   const known=id=>s.data.people?.find(p=>p.id===id)?.name,absentNameFor=a=>a.absentName||[...new Set([...(a.absentIds||[]),a.absentId,demandStaff.get(a.demandId)].filter(Boolean).map(known).filter(Boolean))].join(', ');
   // Only baseline-named teachers plus ad hoc relief teachers, relief assignees and absent teachers are listed. Every active teacher is not added here.
   data.teacherSummary.assignments=assignments.map(a=>{const absentName=absentNameFor(a);return {...project(a),relieverName:person(s,a.staffId).name,...(absentName?{absentName}:{})};});
-  for(const a of assignments)if(!data.teacherSummary.plan.teachers.some(t=>t.staffId===a.staffId)&&!(data.teacherSummary.addedTeachers||[]).some(t=>t.staffId===a.staffId)){data.teacherSummary.addedTeachers??=[];data.teacherSummary.addedTeachers.push({staffId:a.staffId,name:person(s,a.staffId).name,timetableName:person(s,a.staffId).name});}
+  for(const a of [...assignments,...data.teacherSummary.absences,...(s.data.adhoc||[]).filter(a=>a.date===s.date&&!a.deletedAt)])if(!data.teacherSummary.plan.teachers.some(t=>t.staffId===a.staffId)&&!data.teacherSummary.addedTeachers.some(t=>t.staffId===a.staffId))data.teacherSummary.addedTeachers.push({staffId:a.staffId,name:person(s,a.staffId).name,timetableName:person(s,a.staffId).name});
   for(const group of s.data.demands)for(const dem of group.members||[group]){
    const key=dem.recessActivationId?'recess:'+dem.className:dem.staffId;if(!rows.has(key))rows.set(key,{id:key,name:dem.recessActivationId?'Recess · '+dem.className:dem.name,cells:data.periods.map(()=>({text:'',status:'blank'}))});
    const a=byDemand.get(group.id),status=!a?(dem.noReliefRequired?'no-relief':'unassigned'):a.noRelief?'no-relief':a.status==='draft'?'draft':'published',text=!a?(dem.noReliefRequired?'No Relief Required':'UNASSIGNED'):a.noRelief?'No Relief Needed':[person(s,a.staffId).name,dem.className,dem.subject,dem.groupName,dem.venue,a.combination?'Combined':a.repurposedDuty?'Repurposed recess duty':a.mutual?'Mutual':''].filter(Boolean).join('\n');
    const index=data.periods.findIndex(p=>p.period===dem.period);if(index>=0)rows.get(key).cells[index]={text,status};
   }
   data.rows=[...rows.values()].sort((a,b)=>a.name.localeCompare(b.name,'en',{numeric:true}));data.exportedAt=new Date().toISOString();
-  data.localSnapshot={date:s.date,at:data.exportedAt,confirmedRevision:s.data.revision,state:queue?.uncertain?'Save unconfirmed':draftWork(queue)?'Local changes not saved':'Matches last confirmed online state'};
+  data.localSnapshot={date:s.date,at:data.exportedAt,confirmedRevision:s.data.revision,state:queue?.uncertain?'Save unconfirmed':draftWork(queue)?'Local changes not saved':s.cachedPreview||s.allocationUnverified?'Cached local copy; not checked online':'Matches last confirmed online state'};
   data.snapshotLabel='Local snapshot · '+dateText(s.date)+' · '+stamp(data.exportedAt)+' Singapore time · Last confirmed online revision '+data.localSnapshot.confirmedRevision+' · '+data.localSnapshot.state;
   data.legend=data.snapshotLabel+'. '+data.legend;return data;
  }
@@ -1667,11 +1689,11 @@ var RosterOpsUI = (() => {
   b.dataset.exporting='true';b.disabled=true;b.innerHTML='<span class="ops-spinner" aria-hidden="true"></span> Exporting…';
   try{
    if((full||classPov)&&!window.RosterStaplerExport)throw Error('The timetable workbook exporter could not load. Refresh and retry.');
-   // The Stapler layout needs the exact baseline the suspended plan was built from. It is warmed when the page loads; load it on demand if it has not arrived yet. Without a usable baseline the download falls back to the relief-workbook layout.
+   // The Stapler layout needs the exact baseline the suspended plan was built from. It is warmed when the page loads; export never starts a network read. Without a usable baseline the download falls back to the relief-workbook layout.
    let baseline=null;
    if(full){
     baseline=s.exportBaseline||null;
-    if(!baseline&&s.ctx.localTimetable){try{baseline=await s.ctx.localTimetable(date);}catch{baseline=null;}}
+    if(!baseline)baseline=s.ctx.cachedTimetable?.(date)||null;
     if(baseline&&!window.RosterStaplerExport.canUseBaseline(data.teacherSummary.plan,baseline))baseline=null;
    }
    const book=classPov?await window.RosterStaplerExport.makeClassWorkbook(data):full?await window.RosterStaplerExport.makeReliefWorkbook(data,baseline,{hideAbsenceReasons:true,includeClassPov:true}):await RosterExport.makeWorkbook([RosterExport.dailyRelief(data)]);

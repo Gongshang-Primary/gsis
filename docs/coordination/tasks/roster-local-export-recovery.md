@@ -1,8 +1,8 @@
 # Restore local Excel export
 
 - Model: Codex
-- Status: implementing
-- Updated: 2026-11-18, Asia/Singapore (owner incident screenshot)
+- Status: implemented; final-head full suite and CI pending
+- Updated: 2026-11-17, Asia/Singapore (screenshot selected date: 18 November)
 - Branch: codex/roster-absence-clash-confirm; PR #182
 - Base: 136ba17589abfe944ee04029874f1c085e6fa9de
 - Owner request: Export Excel, relief Excel and Class POV must use local copies; urgent hotfix. Earlier requirement: `roster-export-excel-local.md`. Owner waived Claude review for v0.9 hotfixes; owner merges and deploys.
@@ -25,4 +25,7 @@ Accept a complete context for the same timetable identity and rebuild its attend
 
 ## Verification
 
-Pending; earlier results apply only to the preceding Combine head.
+- Ten targeted regression programs passed, including the existing workbook renderer/privacy checks, allocation-cache checks and the new local export test. The new real Chromium/IndexedDB cache test also passes.
+- Six new XLSX cases cover missing context, stale revision, missing optional baseline, incomplete local data refusal, removed absences and a mismatched old plan. All three export actions make no API/timetable call and retain unsaved assignments, local labels and absence-reason privacy.
+- The browser cache test proves actual IndexedDB persistence/reload, isolation by owner/date, unverified write gates, all three offline exports and clearing after denied access. The original code fails with the owner's exact incomplete-export-context error.
+- Canonical build and full local v0.9/LORD plus exact-head CI remain final handoff gates. Earlier results apply only to the preceding Combine head. No live data/provider, deployment or cold offline site load is tested.
