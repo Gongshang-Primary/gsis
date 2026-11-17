@@ -601,7 +601,7 @@ try {
     assert(!Object.hasOwn(future, "timeline"));
   });
   let pagingVersionId;
-  await test("actual Contacts owner facts reach two Deploy versions, retain inactive references and deny new teaching targets", async () => {
+  await test("actual Contacts facts reach two Deploy versions while explicit version activity governs new planning", async () => {
     const versions = [];
     for (const name of ["Projection first", "Projection second"])
       versions.push(await post(admin, "deploy", "/versions/create", { name }));
@@ -700,7 +700,7 @@ try {
         .state,
       "excluded",
     );
-    const denied = await save(
+    await save(
       [
         {
           operation: "addTeacher",
@@ -711,13 +711,22 @@ try {
         },
       ],
       2,
-      true,
     );
+    current = (await boot()).current;
+    assert.equal(current.revision, 3);
+    assert.equal(current.assignments.length, 2,
+      "Contacts Active=N does not override the saved version Active=Y.");
+    assert.equal(current.teachers.find(row => row.id === teacher).teachingEligibility.state, "excluded");
+    await save([{ operation: "setTeacherField", teacher, field: "Active", value: "N" }], 3);
+    const denied = await save([{ operation: "addTeacher", teacher,
+      target: "1P", targetRef: "projection-class", subject: "PHE" }], 4, true);
     assert.equal(denied.status, 409);
     assert.equal(denied.body.error.code, "TEACHING_ELIGIBILITY_REQUIRED");
     current = (await boot()).current;
-    assert.equal(current.revision, 2);
-    assert.equal(current.assignments.length, 1);
+    assert.equal(current.revision, 4);
+    assert.equal(current.assignments.length, 2,
+      "An explicit version Active=N blocks new targets without deleting history.");
+    assert.deepEqual(current.assignments.find(row => row.id === assignment.id), assignment);
     const second = await post(admin, "deploy", "/bootstrap", {
       versionId: versions[1].versionId,
     });

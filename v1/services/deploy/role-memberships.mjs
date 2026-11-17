@@ -1,9 +1,11 @@
 import { check } from "./validation.mjs";
 import { normalizeDirectValue } from "../../contacts/direct-fields.mjs";
+import { planningSnapshot } from "../../web/shared/deploy-eligibility.mjs";
 
 export const ROLE_GROUPS = Object.freeze(["SL", "SC", "SMC", "KP", "TL", "SDT", "CMT", "SAT", "Support", "MK"]);
 export const ROLE_COLUMNS = Object.freeze(["Role Shortform", "Formal Role Name", ...ROLE_GROUPS, "EO Appt Level", "EO"]);
 const roleKey = (value) => String(value ?? "").trim().toLowerCase();
+const versionRole = (doc, teacher) => doc.teacherDrafts?.[teacher.id]?.Role ?? planningSnapshot(teacher).Role ?? "";
 function label(value, name, max = 160) {
   check(value === null || typeof value === "string", `${name} must be text.`);
   const result = (value ?? "").trim();
@@ -36,7 +38,7 @@ export function normalizeRoleMemberships(rows) {
 }
 export function roleMapping(doc, teacher) {
   if (doc.roleMembershipSchema !== 1) return null;
-  const role = doc.teacherDrafts?.[teacher.id]?.Role ?? teacher.profile?.Role ?? teacher.role ?? "";
+  const role = versionRole(doc, teacher);
   return (doc.membership || []).find((row) => roleKey(row[0]) === roleKey(role)) || null;
 }
 export function roleGroups(teacher, row) {
@@ -59,7 +61,7 @@ export function applyRoleMemberships(doc) {
     teacher.profile = { ...teacher.profile, "EO Appt Level": row[12] };
   }
   doc.contactsMemberships = (doc.teachers || []).map((teacher) => [teacher.id, teacher.ttbName || teacher.name,
-    teacher.profile?.Role || "", (teacher.deploymentTags?.Memberships || teacher.groups || []).join("\n")]);
+    versionRole(doc, teacher), (teacher.deploymentTags?.Memberships || teacher.groups || []).join("\n")]);
   return doc;
 }
 export function authorityValue(doc, teacher) {

@@ -19,6 +19,7 @@ import {
 } from "./validation.mjs";
 import { ApiError } from "../../runtime/errors.mjs";
 import { normalizeDirectValue } from "../../contacts/direct-fields.mjs";
+import { planningSnapshot, planningEligible, reportingEligible, reportingRoot, reportingStaff, reportingLinks, hasReportingEdge } from "../../web/shared/deploy-eligibility.mjs";
 function validated(fn, ...args) {
   try {
     return fn(...args);
@@ -253,6 +254,13 @@ export function mergeContacts(doc, projection, { refreshMemberships = false } = 
       contactsRevision: String(p.revision || projection.revision),
       quality,
     };
+    // Keep the version's actual ordinary planning choices separate from fresh
+    // accepted authority/capacity facts. A bootstrap is still only a read;
+    // note-only saves do not call mergeContacts or annotate unrelated rows.
+    const savedPlanning = previous.get(teacher.id);
+    teacher.planningProfile = planningSnapshot(
+      !refreshMemberships && savedPlanning ? savedPlanning : teacher,
+    );
     const excluded = [
       ...(active === false ? ["INACTIVE"] : []),
       ...(authority.eo?.value === false ? ["NON_EO"] : []),
@@ -313,8 +321,18 @@ export function mergeContacts(doc, projection, { refreshMemberships = false } = 
   }
   const map = new Map(people.map((p) => [p.id, p]));
   const oldIds = new Set(doc.teachers.map((t) => t.id));
+  const teacherDrafts = refreshMemberships ? Object.fromEntries(
+    Object.entries(doc.teacherDrafts || {}).map(([staffId, input]) => {
+      const value = { ...input };
+      // Duplication refreshes actual ordinary Role/Active for known Contacts
+      // identities. Keep draft-only people and every unrelated proposed field.
+      if (map.has(staffId)) { delete value.Role; delete value.Active; }
+      return [staffId, value];
+    }),
+  ) : doc.teacherDrafts;
   return applyCatalogueLinks(applyRoleMemberships({
     ...doc,
+    teacherDrafts,
     teachers: [
       ...doc.teachers.map((t) =>
         map.has(t.id)
@@ -377,9 +395,23 @@ export function canonicalTeachingDocument(document, original = document) {
   }
   return next;
 }
-function teachingBindings(document, original = document) {
+const fixedGroupSlots = { dept: 2, comm: 4, cca: 4, plt: 1, events: 2 };
+function memberOccurrence(values, index, start = 0) {
+  return values.slice(start, index + 1).filter(value => value === values[index]).length;
+}
+function retainedGroupReference(kind, before, after, field, index) {
+  const fixed = field === "slots" ? fixedGroupSlots[kind] || 0 : 0;
+  if (index < fixed) return before?.[field]?.[index] === after[field][index];
+  return memberOccurrence(after[field], index, fixed) <=
+    (before?.[field] || []).slice(fixed).filter(value => value === after[field][index]).length;
+}
+function legacyOccurrence(rows, index) {
+  const row = rows[index];
+  return rows.slice(0, index + 1).filter(value => value.role === row.role && value.teacher === row.teacher).length;
+}
+function planningBindings(document, original = document) {
   const doc = canonicalTeachingDocument(document, original);
-  return new Map(
+  const bindings = new Map(
     doc.assignments.map((a) => {
       const group = doc.groups.find((g) => g.id === a.target),
         cls = doc.classes.find((c) => c.ref === a.targetRef),
@@ -406,7 +438,7 @@ function teachingBindings(document, original = document) {
           }
         : { kind: "class", id: cls?.ref || a.targetRef || a.target, levels };
       return [
-        a.id,
+        JSON.stringify(["assignment", a.id]),
         {
           staffId: a.teacher,
           signature: JSON.stringify({
@@ -418,11 +450,35 @@ function teachingBindings(document, original = document) {
       ];
     }),
   );
+  for (const [kind, groups] of Object.entries(doc.organisations || {})) for (const group of groups || []) {
+    for (const field of ["slots", "additionalDeputies", "tls"])
+      for (const [index, staffId] of (group[field] || []).entries()) if (staffId) {
+        const fixed = field === "slots" ? fixedGroupSlots[kind] || 0 : 0;
+        // Member suffixes compact/reorder; identity and occurrence count are
+        // stable, unlike leadership roles which retain their fixed positions.
+        const position = index < fixed ? ["role", index]
+          : ["member", staffId, memberOccurrence(group[field], index, fixed)];
+        const target = ["organisation", kind, group.id, field, position];
+        bindings.set(JSON.stringify(target), { staffId, signature: JSON.stringify({ staffId, target }) });
+      }
+    for (const [index, row] of (group.legacyLeadership || []).entries()) if (row.teacher) {
+      const target = ["organisation", kind, group.id, "legacyLeadership", row.role, row.teacher,
+        legacyOccurrence(group.legacyLeadership, index)];
+      bindings.set(JSON.stringify(target), { staffId: row.teacher, signature: JSON.stringify({ staffId: row.teacher, target }) });
+    }
+  }
+  for (const duty of doc.duties || []) for (const [day, staffId] of Object.entries(duty.teachers || {})) if (staffId) {
+    const target = ["duty", duty.id, day];
+    bindings.set(JSON.stringify(target), { staffId, signature: JSON.stringify({ staffId, target }) });
+  }
+  return bindings;
 }
 export function changedTeachingStaff(before, after, explicitStaffIds = []) {
-  const old = teachingBindings(before),
+  // The existing owner admission path also fences new organisational/duty
+  // references against current Contacts identity, not just class assignments.
+  const old = planningBindings(before),
     changed = new Set(explicitStaffIds);
-  for (const [id, binding] of teachingBindings(after, before))
+  for (const [id, binding] of planningBindings(after, before))
     if (old.get(id)?.signature !== binding.signature)
       changed.add(binding.staffId);
   return [...changed].sort();
@@ -439,8 +495,8 @@ export function validateTeachingBindings(
     people = new Map(normalized.teachers.map((t) => [t.id, t]));
   for (const staffId of changed)
     check(
-      people.get(staffId)?.teachingEligibility?.state === "eligible",
-      "Choose staff with current accepted primary-school teaching eligibility. Existing historical assignments may be retained or removed.",
+      planningEligible(after, people.get(staffId)),
+      "Choose active staff outside MK, SAT, Support and School Leader groups. Existing planning assignments may be retained or removed.",
       "TEACHING_ELIGIBILITY_REQUIRED",
       409,
     );
@@ -937,8 +993,8 @@ export function applyEdits(doc, edits) {
         sub = text(e.subject || prior?.subject, 60);
       if (!e.teacher && prior) e.teacher = prior.teacher;
       const t = teacher();
-      // Owning saves validate new bindings against fresh accepted Contacts facts.
-      // Retained references and removals do not depend on a cached active flag.
+      // Owning saves verify current identity and version planning eligibility.
+      // Retained references/removals never depend on a cached capacity flag.
       if (op === "removeTeacher") {
         d.assignments = d.assignments.filter((a) =>
           e.assignmentId
@@ -1153,6 +1209,7 @@ export function applyEdits(doc, edits) {
         }, "group");
         for (const g of value) {
           text(g.name);
+          const previousGroup = old.find(row => row.id === g.id);
           for (const field of ["slots", "additionalDeputies", "tls"]) {
             if (field !== "slots" && !Object.hasOwn(g, field)) continue;
             check(
@@ -1161,6 +1218,22 @@ export function applyEdits(doc, edits) {
               g[field].every(s => typeof s === "string" && (!s || d.teachers.some(t => t.id === s))),
               "Unknown group member.",
             );
+            for (const [index, staffId] of g[field].entries()) {
+              if (!staffId) continue;
+              const retained = retainedGroupReference(e.kind, previousGroup, g, field, index);
+              check(retained || planningEligible(d, d.teachers.find(t => t.id === staffId)),
+                "Choose an active eligible teacher for a new group assignment.", "TEACHING_ELIGIBILITY_REQUIRED", 409);
+            }
+          }
+          if (Object.hasOwn(g, "legacyLeadership")) {
+            check(e.kind === "comm" && Array.isArray(g.legacyLeadership) && g.legacyLeadership.length <= 2 &&
+              g.legacyLeadership.every(row => isRecord(row) && ["Head", "Deputy"].includes(row.role) &&
+                typeof row.teacher === "string" && d.teachers.some(t => t.id === row.teacher)), "Invalid retained committee leadership.");
+            for (const [index, row] of g.legacyLeadership.entries()) check(
+              legacyOccurrence(g.legacyLeadership, index) <= (previousGroup?.legacyLeadership || [])
+                .filter(before => before.role === row.role && before.teacher === row.teacher).length ||
+                planningEligible(d, d.teachers.find(t => t.id === row.teacher)),
+              "Choose an active eligible teacher for a new group assignment.", "TEACHING_ELIGIBILITY_REQUIRED", 409);
           }
         }
         d.organisations[e.kind] = value;
@@ -1182,6 +1255,10 @@ export function applyEdits(doc, edits) {
               ),
             "Invalid duty assignment.",
           );
+          const previousDuty = old.find(row => row.id === x.id);
+          for (const [day, staffId] of Object.entries(x.teachers)) if (staffId)
+            check(previousDuty?.teachers?.[day] === staffId || planningEligible(d, d.teachers.find(t => t.id === staffId)),
+              "Choose an active eligible teacher for a new duty assignment.", "TEACHING_ELIGIBILITY_REQUIRED", 409);
         }
         d.duties = value;
       }
@@ -1192,7 +1269,7 @@ export function applyEdits(doc, edits) {
     if (op === "initReporting") {
       check(!d.reporting, "Reporting already initialized.");
       d.reporting = {
-        staff: d.teachers.map((t) => ({
+        staff: reportingStaff(d).map((t) => ({
           id: t.id,
           name: t.name,
           active: t.active,
@@ -1205,32 +1282,49 @@ export function applyEdits(doc, edits) {
       continue;
     }
     if (op === "setReportingOfficer") {
-      check(d.reporting, "Initialize reporting first.");
-      const eligible = (person) =>
-        person &&
-        person.active &&
-        !person.mk &&
-        !person.orphan &&
-        person.profile?.Role !== "OSO";
+      id(e.officer, "Staff ID");
       const person = d.teachers.find((t) => t.id === e.officer);
-      check(eligible(person), "Choose an active eligible officer.");
-      const old =
-        (d.reporting.parents || d.reporting.officers || {})[e.officer] || "";
+      const links = reportingLinks(d), old = links[e.officer] || "";
       expect(old);
+      if (!person) {
+        // Removing an existing orphan edge does not authorise a new identity.
+        // Require the observed link, then remove only this person's aliases;
+        // an empty staff.ro is no edge and cannot resurrect the orphan key.
+        check(d.reporting && hasReportingEdge(d, e.officer) &&
+          Object.hasOwn(e, "expected") && e.value === "", "Choose a known version Staff ID.");
+        d.reporting.parents = { ...d.reporting.parents };
+        d.reporting.officers = { ...d.reporting.officers };
+        delete d.reporting.parents[e.officer];
+        delete d.reporting.officers[e.officer];
+        if (Array.isArray(d.reporting.staff)) d.reporting.staff = d.reporting.staff.map(row =>
+          row.id === e.officer && Object.hasOwn(row, "ro") ? { ...row, ro: "" } : row);
+        continue;
+      }
+      check(reportingEligible(d, person) || (Object.hasOwn(links, e.officer) &&
+        (e.value === old || e.value === "")),
+        "Choose an active eligible officer, or clear an existing retained link.");
       check(
-        person.authority?.schoolLeader?.value !== true || e.value === old,
+        !reportingRoot(d, person) || e.value === old || e.value === "",
         "School Leader root is protected.",
       );
       check(
         typeof e.value === "string" &&
-          (!e.value || eligible(d.teachers.find((t) => t.id === e.value))),
+          (e.value === old || !e.value || reportingEligible(d, d.teachers.find((t) => t.id === e.value))),
         "Choose an active eligible reporting officer.",
       );
+      check(e.value === old || !e.value || reportingEligible(d, person),
+        "An excluded officer's retained link may only be kept or cleared.");
+      d.reporting ??= { staff: reportingStaff(d).map(t => ({ id: t.id, name: t.name,
+        active: t.active, role: t.profile?.Role || "", groups: t.groups })), officers: {}, parents: {} };
       d.reporting.parents = {
-        ...(d.reporting.parents || d.reporting.officers || {}),
+        ...links,
         [e.officer]: e.value,
       };
-      d.reporting.officers = { ...d.reporting.parents };
+      // Preserve contradictory legacy aliases for review. Only this explicitly
+      // edited person's aliases are reconciled; another officer's data stays.
+      d.reporting.officers = { ...(d.reporting.officers || links), [e.officer]: e.value };
+      if (Array.isArray(d.reporting.staff)) d.reporting.staff = d.reporting.staff.map(row =>
+        row.id === e.officer && Object.hasOwn(row, "ro") ? { ...row, ro: e.value } : row);
       continue;
     }
     if (op === "upsertClassNameSet") {
