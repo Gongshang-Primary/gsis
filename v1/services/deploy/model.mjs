@@ -1,4 +1,5 @@
-import { normalizeRoleMemberships, applyRoleMemberships, checkManagedMemberships } from "./role-memberships.mjs";
+import { normalizeRoleMemberships, applyRoleMemberships, checkManagedMemberships, roleMapping } from "./role-memberships.mjs";
+import { applyCatalogueLinks, choiceLists, normalizeHRChoices, EDITABLE_HR_CHOICE_FIELDS } from "./catalogue-links.mjs";
 import Workload from "../../../shared/workload.js";
 import Relief from "../../../shared/relief.js";
 import Rules from "../../../shared/teaching-rules.js";
@@ -312,7 +313,7 @@ export function mergeContacts(doc, projection, { refreshMemberships = false } = 
   }
   const map = new Map(people.map((p) => [p.id, p]));
   const oldIds = new Set(doc.teachers.map((t) => t.id));
-  return applyRoleMemberships({
+  return applyCatalogueLinks(applyRoleMemberships({
     ...doc,
     teachers: [
       ...doc.teachers.map((t) =>
@@ -335,7 +336,7 @@ export function mergeContacts(doc, projection, { refreshMemberships = false } = 
     contactsMemberships,
     hrTerms,
     contactsFacts,
-  });
+  }));
 }
 // This canonicalization is private to comparison/import; reading never rewrites history.
 export function canonicalTeachingDocument(document, original = document) {
@@ -593,6 +594,12 @@ export function calculate(doc, contacts) {
 }
 export function validateDocument(doc) {
   plain(doc);
+  if (doc.hrChoicesSchema !== undefined) {
+    check(doc.hrChoicesSchema === 1, "Unsupported HR choice schema.");
+    check(isRecord(doc.hrChoices) && Object.keys(doc.hrChoices).length === EDITABLE_HR_CHOICE_FIELDS.length &&
+      Object.keys(doc.hrChoices).every((field) => EDITABLE_HR_CHOICE_FIELDS.includes(field)), "Stored HR choice fields are invalid.");
+    normalizeHRChoices(choiceLists(doc), doc);
+  }
   if (doc.roleMembershipSchema !== undefined) {
     check(doc.roleMembershipSchema === 1, "Unsupported role mapping schema.");
     normalizeRoleMemberships(doc.membership);
@@ -751,7 +758,18 @@ export function applyEdits(doc, edits) {
         "Role mappings changed; review your retained draft.", "REVISION_CONFLICT", 409);
       d.membership = normalizeRoleMemberships(e.value);
       d.roleMembershipSchema = 1;
-      applyRoleMemberships(d);
+      applyCatalogueLinks(applyRoleMemberships(d));
+      continue;
+    }
+    if (op === "setHRChoices") {
+      check(Object.hasOwn(e, "expected"), "Supply the previous HR choices.");
+      const expected = normalizeHRChoices(e.expected, d, { derivedRole: true });
+      check(JSON.stringify(choiceLists(d)) === JSON.stringify(expected),
+        "HR choices changed; review your retained draft.", "REVISION_CONFLICT", 409);
+      const value = normalizeHRChoices(e.value, d, { derivedRole: true });
+      d.hrChoicesSchema = 1;
+      d.hrChoices = Object.fromEntries(EDITABLE_HR_CHOICE_FIELDS.map((field) => [field, value[field]]));
+      applyCatalogueLinks(d);
       continue;
     }
     if (op === "setTeacherMemberships") {
@@ -777,10 +795,13 @@ export function applyEdits(doc, edits) {
           ? { [e.field]: e.value }
           : e.value || e.profile;
       check(isRecord(supplied), "Invalid profile.");
+      const projectedRole = { ...d, teacherDrafts: { ...d.teacherDrafts,
+        [t.id]: { ...d.teacherDrafts[t.id], ...Object.fromEntries(Object.entries(supplied).filter(([key]) => proposalFields.includes(key))) } } };
+      const mapping = roleMapping(projectedRole, t);
       for (const [k, v] of Object.entries(supplied))
         if (!proposalFields.includes(k))
           check(
-            v === (t.profile?.[k] ?? ""),
+            v === (k === "EO Appt Level" && mapping ? mapping[12] : (t.profile?.[k] ?? "")),
             "Reference fields cannot be changed by Deploy.",
           );
       const values = Object.fromEntries(
@@ -1283,5 +1304,5 @@ export function applyEdits(doc, edits) {
       400,
     );
   }
-  return validateDocument(applyRoleMemberships(d));
+  return validateDocument(applyCatalogueLinks(applyRoleMemberships(d)));
 }

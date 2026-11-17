@@ -113,6 +113,25 @@
   "use strict";
   const api = window.GSISV1;
   const managedGroups = ["SL", "SC", "SMC", "KP", "TL", "SDT", "CMT", "SAT", "Support", "MK"];
+  const hrFields = ["Day of Birth", "Month of birth", "Role", "EO Appt Level", "Appointment Status", "Employment Modifier", "Subject Modifier", "Active", "MK Modifier"];
+  const fixedChoices = { "Day of Birth": Array.from({ length: 31 }, (_, i) => String(i + 1)),
+    "Month of birth": Array.from({ length: 12 }, (_, i) => String(i + 1)), Active: ["Y", "N"] };
+  function choiceLists(doc) {
+    const source = doc?.hrChoicesSchema === 1 ? doc.hrChoices : doc?.masterOptions || doc?.hrTerms || {};
+    const result = Object.fromEntries(hrFields.map(field => [field,
+      [...(Object.hasOwn(fixedChoices, field) ? fixedChoices[field]
+        : field === "Role" ? doc?.masterOptions?.Role || doc?.hrTerms?.Role || []
+        : Array.isArray(source?.[field]) ? source[field] : [])]]));
+    if (doc?.roleMembershipSchema === 1) result.Role = [...new Set((doc.membership || []).map(row => String(row[0]).trim()).filter(Boolean))];
+    return result;
+  }
+  function linkChoices(doc) {
+    const lists = choiceLists(doc);
+    doc.masterOptions = structuredClone(lists);
+    doc.hrTerms = structuredClone(lists);
+    return lists;
+  }
+
   const mappingFor = (doc, teacher) => doc.roleMembershipSchema === 1
     ? (doc.membership || []).find(row => String(row[0]).trim().toLowerCase() ===
         String(doc.teacherDrafts?.[teacher.id]?.Role ?? teacher.profile?.Role ?? teacher.role ?? "").trim().toLowerCase()) : null;
@@ -138,10 +157,13 @@
     // An explicit v1 matrix owns those groups, including unchecked flags and
     // unmatched staff's existing labels, both during snapshot load and preview.
     let incomingDocument = null;
+    window.hrTermLists = () => choiceLists(v());
+    window.teacherTermLists = () => choiceLists(v());
     const originalAccept = window.acceptSnapshot;
     window.acceptSnapshot = data => {
       const previous = incomingDocument;
       incomingDocument = data.current || (data.unchanged ? v() : null);
+      if (incomingDocument) linkChoices(incomingDocument);
       try { return originalAccept(data); } finally { incomingDocument = previous; }
     };
     const originalResolve = window.GSISTeachingRules.resolve;
@@ -156,12 +178,20 @@
       return result;
     };
     const originalKey = window.queueKey;
-    window.queueKey = (edit) => edit.operation === "setRoleMemberships" ? "role-memberships"
+    window.queueKey = (edit) => edit.operation === "setHRChoices" ? "hr-choices" : edit.operation === "setRoleMemberships" ? "role-memberships"
       : edit.operation === "setTeacherMemberships" ? "memberships:" + edit.teacher : originalKey(edit);
     const originalProject = window.projectEditBase;
     window.projectEditBase = (doc, edit) => {
+      if (edit.operation === "setHRChoices") {
+        doc.hrChoicesSchema = 1;
+        doc.hrChoices = Object.fromEntries(hrFields.filter(field => !Object.hasOwn(fixedChoices, field) && field !== "Role")
+          .map(field => [field, [...edit.value[field]]]));
+        linkChoices(doc);
+        return;
+      }
       if (edit.operation === "setRoleMemberships") {
         doc.membership = structuredClone(edit.value); doc.roleMembershipSchema = 1;
+        linkChoices(doc);
         for (const teacher of doc.teachers || []) {
           const mapping = mappingFor(doc, teacher);
           if (!mapping) continue;
@@ -173,7 +203,20 @@
         if (doc.reliefResults) doc.reliefResults.pending = true;
         return;
       }
-      if (edit.operation !== "setTeacherMemberships") return originalProject(doc, edit);
+      if (edit.operation !== "setTeacherMemberships") {
+        const result = originalProject(doc, edit);
+        if (["setTeacherField", "upsertTeacherProfile"].includes(edit.operation)) {
+          const person = doc.teachers.find(teacher => teacher.id === edit.teacher);
+          const mapping = person && mappingFor(doc, person);
+          if (mapping) {
+            const custom = (person.deploymentTags?.Memberships ?? person.groups ?? []).filter(value => !managedGroups.includes(value));
+            person.deploymentTags = { ...person.deploymentTags, Memberships: [...custom, ...groupsFor(mapping)], "EO Appt Level": mapping[12] || null };
+            person.groups = [...person.deploymentTags.Memberships];
+            person.profile = { ...person.profile, "EO Appt Level": mapping[12] || "" };
+          }
+        }
+        return result;
+      }
       const teacher = doc.teachers.find((t) => t.id === edit.teacher);
       if (!teacher) throw Error("This teacher is no longer in the selected version.");
       teacher.deploymentTags ??= {};
@@ -181,14 +224,68 @@
       teacher.groups = [...edit.value];
     };
     const originalDisplay = window.draftDisplayValue;
-    window.draftDisplayValue = (doc, edit) => edit.operation === "setRoleMemberships"
+    window.draftDisplayValue = (doc, edit) => edit.operation === "setHRChoices" ? choiceLists(doc) : edit.operation === "setRoleMemberships"
       ? (doc.membership || []) : edit.operation === "setTeacherMemberships"
         ? valueOf(doc, edit.teacher) : originalDisplay(doc, edit);
     const originalStatus = window.drawQueueStatus;
     window.drawQueueStatus = () => {
       originalStatus();
-      if (document.getElementById("content")?.dataset.view === "Membership" && api.capable("deploy.edit"))
+      if (["Membership", "HR Terms"].includes(document.getElementById("content")?.dataset.view) && api.capable("deploy.edit"))
         document.getElementById("saveQueue").hidden = false;
+    };
+    window.masterOptionsPage = (root) => {
+      const lists = choiceLists(v()), editable = api.capable("deploy.edit");
+      const note = document.createElement("p"); note.className = "hint";
+      note.textContent = "Choices belong to this planning version and feed its teacher and Membership selectors. Saving does not change Contacts catalogues. Existing staff values outside these choices are retained and flagged. Edit Role choices in Membership.";
+      const error = document.createElement("p"); error.className = "error"; error.setAttribute("role", "status");
+      const table = document.createElement("table"); table.dataset.hrChoices = "";
+      table.dataset.workbookScope = "HR Terms"; table.dataset.controlsWired = "true";
+      const header = table.createTHead().insertRow();
+      for (const title of ["Field", "Choices — one per line"]) { const th = document.createElement("th"); th.scope = "col"; th.textContent = title; header.append(th); }
+      const body = table.createTBody();
+      for (const field of hrFields) {
+        const row = body.insertRow(); row.insertCell().textContent = field;
+        const cell = row.insertCell(), fixed = field === "Role" || Object.hasOwn(fixedChoices, field);
+        if (fixed || !editable) {
+          const span = document.createElement("span"); span.dataset.hrChoiceField = field;
+          span.style.whiteSpace = "pre-line"; span.textContent = lists[field].join(", "); cell.append(span);
+          if (field === "Role") { const hint = document.createElement("small"); hint.textContent = "Defined in Membership"; cell.append(hint); }
+          continue;
+        }
+        const input = document.createElement("textarea"); input.dataset.hrChoiceField = field;
+        input.setAttribute("aria-label", field + " choices"); input.rows = Math.min(6, Math.max(2, lists[field].length));
+        input.style.cssText = "min-width:20rem;width:100%;box-sizing:border-box"; input.value = lists[field].join("\n");
+        input.oninput = () => { unsavedDraft = true; };
+        input.onchange = () => {
+          try {
+            const values = [...new Set(input.value.split(/\r?\n/).map(value => value.trim()).filter(Boolean))];
+            if (values.length > 150 || values.some(value => value.length > 160 || /[\x00-\x1f\x7f]/.test(value)))
+              throw Error("Use at most 150 choices, each up to 160 characters without control characters.");
+            const expected = choiceLists(v()), value = { ...expected, [field]: values };
+            unsavedDraft = false;
+            window.queueCell({ operation: "setHRChoices", value, expected });
+            error.textContent = "";
+          } catch (failure) { unsavedDraft = true; error.textContent = failure.message; }
+          window.drawQueueStatus();
+        };
+        cell.append(input);
+      }
+      const scroll = document.createElement("div"); scroll.className = "scroll"; scroll.append(table);
+      root.replaceChildren(note, error, scroll);
+    };
+    const originalTeacherEditor = window.editTeacherProfile;
+    window.editTeacherProfile = teacher => {
+      originalTeacherEditor(teacher);
+      const editor = document.querySelector('.inline-editor[aria-label="Add teacher"],.inline-editor[aria-label="Edit teacher"]');
+      if (!editor) return;
+      const role = editor.querySelector('[data-profile="1"]'), grade = editor.querySelector('[data-profile="2"]');
+      if (!role || !grade) return;
+      const update = () => {
+        if (v()?.roleMembershipSchema !== 1) return;
+        const mapping = (v().membership || []).find(row => String(row[0]).trim().toLowerCase() === role.value.trim().toLowerCase());
+        if (mapping) grade.value = mapping[12] || "";
+      };
+      role.addEventListener("change", update); update();
     };
     function staffMembershipPage(root) {
       const doc = v();
@@ -301,6 +398,8 @@
         cell.style.width = (index === 0 ? 140 : index === 1 ? 330 : index === 10 ? 90 : index === 12 ? 150 : index === 13 ? 86 : index === 14 ? 76 : 54) + "px";
         header.append(cell);
       }
+      const gradeChoices = document.createElement("datalist"); gradeChoices.id = "deploy-role-grade-choices";
+      for (const value of choiceLists(doc)["EO Appt Level"]) gradeChoices.append(new Option(value, value));
       const body = table.createTBody();
       rows.forEach((row, index) => {
         const tr = body.insertRow(); tr.dataset.roleMembershipRow = String(index);
@@ -323,6 +422,7 @@
             control.maxLength = column === 1 ? 240 : 160; control.readOnly = !editable;
             control.style.minWidth = column === 1 ? "18rem" : "7rem";
             if (column === 0) control.placeholder = "(No role)";
+            if (column === 12) control.setAttribute("list", gradeChoices.id);
           }
           control.onchange = () => {
             const next = structuredClone(draftRows);
@@ -347,7 +447,7 @@
       const summary = document.createElement("summary"); summary.textContent = "Individual staff memberships";
       const content = document.createElement("div"); staffMembershipPage(content);
       people.append(summary, content); people.ontoggle = () => { if (people.isConnected) staffOpen = people.open; };
-      root.replaceChildren(note, add, error, scroll, people);
+      root.replaceChildren(note, add, error, gradeChoices, scroll, people);
     };
   }
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", install, { once: true });
