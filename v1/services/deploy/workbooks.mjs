@@ -10,7 +10,8 @@ import {
   plain,
 } from "./validation.mjs";
 import { membershipValue, setMembershipValue } from "./model.mjs";
-import { ROLE_COLUMNS, normalizeRoleMemberships, applyRoleMemberships, checkManagedMemberships } from "./role-memberships.mjs";
+import { ROLE_COLUMNS, normalizeRoleMemberships, applyRoleMemberships, checkManagedMemberships, roleMapping } from "./role-memberships.mjs";
+import { HR_CHOICE_FIELDS, choiceLists, normalizeHRChoices, applyCatalogueLinks } from "./catalogue-links.mjs";
 export const SCHEMAS = Object.freeze({
   IP: {
     Classes: [
@@ -85,7 +86,7 @@ export const SCHEMAS = Object.freeze({
       "Notes",
     ],
   },
-  "HR Terms": { "HR Terms": ["Staff ID", "TTb Name", "Field", "Value"] },
+  "HR Terms": { "HR Terms": ["Field", "Choices — one per line"] },
   "Span of Control": {
     Hierarchy: [
       "Staff ID",
@@ -264,7 +265,7 @@ export function exportWorkbook(
     };
   if (scope === "HR Terms")
     sheets = {
-      "HR Terms": (doc.contactsFacts || []).map((row) => [...row]),
+      "HR Terms": HR_CHOICE_FIELDS.map(field => [field, choiceLists(doc)[field].join("\n")]),
     };
   if (scope === "Span of Control") {
     const parents =
@@ -409,12 +410,6 @@ export function validateWorkbook(
   );
   const scope = m["Table Scope"];
   check(SCHEMAS[scope], "Unknown scope.");
-  check(
-    scope !== "HR Terms",
-    "These Contacts facts are reporting-only in Deploy.",
-    "REFERENCE_ONLY",
-    403,
-  );
   const r = records(wb, scope),
     next = structuredClone(doc),
     teacherMap = new Map(doc.teachers.map((t) => [t.id, t])),
@@ -682,8 +677,10 @@ export function validateWorkbook(
     for (const row of r.Teachers) {
       const s = staff(row),
         t = teacherMap.get(s);
+      const mapping = roleMapping({ ...next, teacherDrafts: { ...next.teacherDrafts,
+        [s]: { ...next.teacherDrafts[s], Role: row.Role || "" } } }, t);
       check(
-        (row["EO Appt Level"] || "") === (t.profile?.["EO Appt Level"] || ""),
+        (row["EO Appt Level"] || "") === (mapping ? mapping[12] : (t.profile?.["EO Appt Level"] || "")),
         "EO appointment level is reference-only.",
       );
       next.teacherNotes[s] = text(row["Planner Notes"] || "", 4000, true);
@@ -703,6 +700,20 @@ export function validateWorkbook(
         }
       }
     }
+  }
+  if (scope === "HR Terms") {
+    unique(r["HR Terms"], row => row.Field, "HR field");
+    check(r["HR Terms"].length === HR_CHOICE_FIELDS.length &&
+      r["HR Terms"].every(row => HR_CHOICE_FIELDS.includes(row.Field)), "Supply each HR choice field exactly once.");
+    const choices = Object.fromEntries(r["HR Terms"].map(row => {
+      const value = row["Choices — one per line"];
+      check(value === null || typeof value === "string", "HR choices must be text.");
+      return [row.Field, (value || "").split(/\r?\n/).map(item => item.trim()).filter(Boolean)];
+    }));
+    const validatedChoices = normalizeHRChoices(choices, next);
+    next.hrChoices = Object.fromEntries(HR_CHOICE_FIELDS.filter(field =>
+      !["Day of Birth", "Month of birth", "Active", "Role"].includes(field)).map(field => [field, validatedChoices[field]]));
+    next.hrChoicesSchema = 1;
   }
   if (scope === "Role Membership") {
     next.membership = normalizeRoleMemberships(wb.sheets["Role Membership"].rows);
@@ -890,5 +901,5 @@ export function validateWorkbook(
       staff: doc.teachers.map((t) => ({ id: t.id, ro: parents[t.id] || "" })),
     };
   }
-  return { scope, document: applyRoleMemberships(next), proposals };
+  return { scope, document: applyCatalogueLinks(applyRoleMemberships(next)), proposals };
 }

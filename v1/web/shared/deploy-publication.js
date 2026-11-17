@@ -595,10 +595,6 @@ panel.querySelector("[data-import]").onchange = async (event) => {
       candidate.metadata = { ...target.metadata };
     }
     if (epoch !== importReadEpoch) return;
-    if (candidate.metadata["Table Scope"] === "HR Terms")
-      throw Error(
-        "This catalogue is reference-only in Deploy. Manage it in Contacts.",
-      );
     const snapshot = await api.request("deploy", "/bootstrap", {
       method: "POST",
       body: { versionId: version() },
@@ -1032,10 +1028,6 @@ function registerTables() {
       exportAll: (table) => openCanonical("export", table),
       importAll: (table) => openCanonical("import", table),
     },
-  );
-  window.GSISCoreTables?.register(
-    '#content[data-view="HR Terms"] table',
-    { exportAll: () => openCanonical("export") },
   );
 }
 registerTables();
