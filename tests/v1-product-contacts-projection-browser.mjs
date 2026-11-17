@@ -610,7 +610,6 @@ try {
       .click();
     for (const [name, headers] of [
       ["Membership", ["Staff ID", "TTb Name", "Role", "Memberships"]],
-      ["HR Terms", ["Staff ID", "TTb Name", "Field", "Value"]],
     ]) {
       const report = page.locator("#content table[data-contacts-reference]:not([data-role-membership])");
       for (let render = 0; render < 2; render++) {
@@ -717,7 +716,7 @@ try {
       assert.equal(
         await report.locator("tbody textarea").count(),
         name === "Membership" ? await report.locator("tbody tr").count() : 0,
-        "Version-owned Memberships are editable; HR Terms remain a read-only Contacts report",
+        "Version-owned Memberships are editable",
       );
       assert.doesNotMatch(
         await report.innerText(),

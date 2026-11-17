@@ -219,10 +219,10 @@ const legacyRow = [...roleDoc.membership[0].slice(0, 13)];
 const legacyEdit = applyEdits(d, [{ operation: "setRoleMemberships", expected: [], value: [legacyRow] }]);
 assert.equal(legacyEdit.membership[0][13], null);
 const readonly = exportWorkbook(d, "HR Terms", "school", 1);
-assert.throws(
-  () => validateWorkbook(readonly, d, "school", 1),
-  (e) => e.code === "REFERENCE_ONLY",
-);
+assert.equal(validateWorkbook(readonly, d, "school", 1).document.hrChoicesSchema, 1);
+const alteredRole = structuredClone(readonly);
+alteredRole.sheets["HR Terms"].rows.find(row => row[0] === "Role")[1] = "Unconfigured Role";
+assert.throws(() => validateWorkbook(alteredRole, d, "school", 1), /Edit roles in Membership/);
 const teachers = exportWorkbook(d, "Teachers", "school", 1);
 teachers.sheets.Teachers.rows[0][4] = "ST";
 assert.throws(
