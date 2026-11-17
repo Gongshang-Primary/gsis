@@ -39,3 +39,19 @@ Commands ran with `TZ=Asia/Singapore`, private `XDG_CONFIG_HOME=/tmp/gsis-duplic
 Skill entry: inspected the available catalog and repository skill policy; applied bounded red/green verification, owner-boundary analysis and reuse of the existing creation mechanism manually. No skill package was executed, installed or copied. No dependency changes.
 
 Q01–Q05: locally satisfied by the accepted three-path claim, separate stable UI identity, unchanged owner authority/commit/retry boundaries and bounded existing-catalogue rendering. Q06: the listed local checks pass; full exact-head Node/LORD/product CI is still pending. Q07: coordinator diff review and independent Muse review at the eventual exact head are pending. Q08: no release authority exercised; hosted UAT remains Not tested and F5 remains OPEN. Rollback is the bounded UI/test commit; no schema, resource or data migration is involved.
+
+## Follow-up: note Save readiness during refresh
+
+At implementation head `fe641919c4c1cad053967ea28e96edada0e44a41`, Node CI passed 1226/1226. [Product run 44053929262](https://github.com/helper-gsps/gsis/actions/runs/44053929262) passed 124/125 programs; only the unchanged save-recovery browser test timed out at line 527 while waiting for the second, historical version-note attempt. The unchanged test reproduced that timeout locally. A parent-source archive of claim `9dc353d26d75496b2caaf8d450bb017c20715f77` passed the unchanged test; its builder used read-only candidate Git metadata, so this was a source baseline comparison, not a clean-parent manifest verification.
+
+A deterministic local Worker probe held the background read response on both parent and candidate. Both showed an enabled Save note button while `refreshing` was true: the native save guard returned without a write or attempt. Releasing the read allowed the same retained note to save. This proves a pre-existing control-readiness mismatch. The original CI did not record click-time guard values, so the controlled reproduction does not establish which internal branch caused that exact timeout.
+
+The coordinator authorised this adjacent Versions correction within the same three files. The v1 module now disables note Save while the existing refresh guard refuses saving, including newly rendered rows and input updates, then restores the native control state when the read settles. The native guard, draft text, operation IDs, leases and receipt handling remain unchanged. Protected-epoch checks prevent a prior read from repainting a later context. No timeout increase, assertion relaxation, builder edit or new recovery mechanism is included.
+
+Follow-up evidence, with `TZ=Asia/Singapore`, Chromium `/usr/bin/chromium` and separate private XDG directories:
+
+- New deterministic regression failed before the correction because Save note remained enabled during the held read. After the correction, `node tests/v1-product-deploy-duplicate-selection-browser.mjs` passed all seven groups: no save while held, original draft retained, release followed by one native owner save, and unchanged Duplicate selection.
+- The **unchanged** `node tests/v1-product-deploy-save-recovery-browser.mjs` passed all fifteen groups, including historical note recovery, exact retries, lost responses, withdrawal and protected-context boundaries.
+- Private local logs: `/tmp/gsis-duplicate-note-ready-red.log`, `/tmp/gsis-duplicate-note-ready-green.log`, `/tmp/gsis-duplicate-recovery-corrected.log`. Baseline/candidate investigation: `/tmp/gsis-duplicate-note-readiness-findings.md` and the linked local probe logs.
+
+The previous failed CI remains recorded; it was not blindly rerun or waived. Follow-up exact-head CI and independent Muse review remain pending. The original duplicate/Contacts and memberships regressions above passed before this readiness-only follow-up. No live operation, merge or deployment occurred.

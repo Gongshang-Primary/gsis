@@ -344,6 +344,97 @@ try {
     "PASS native New planning version prompt/request remains unchanged",
   );
 
+  // Hold a real background read. Note Save must communicate the existing
+  // native guard instead of accepting a click which silently does nothing.
+  const noteRow = page.locator('[data-version-row="' + committedId + '"]');
+  await noteRow
+    .locator("[data-note-input]")
+    .fill("Synthetic retained note after read");
+  let releaseRead, signalRead;
+  const readReached = new Promise((resolve) => {
+    signalRead = resolve;
+  });
+  const readRelease = new Promise((resolve) => {
+    releaseRead = resolve;
+  });
+  let heldRead = false;
+  await page.route("**/api/deploy/sync", async (route) => {
+    if (heldRead) return route.fallback();
+    heldRead = true;
+    const response = await f.mf.dispatchFetch(route.request().url(), {
+      method: "POST",
+      headers: await route.request().allHeaders(),
+      body: route.request().postDataBuffer(),
+    });
+    const body = Buffer.from(await response.arrayBuffer());
+    signalRead();
+    await readRelease;
+    const headers = Object.fromEntries(response.headers);
+    delete headers["transfer-encoding"];
+    await route.fulfill({ status: response.status, headers, body });
+  });
+  await page.waitForFunction(() => !refreshing);
+  await page.evaluate(() => {
+    snapshotCache = null;
+    void refresh(false);
+  });
+  await readReached;
+  try {
+    assert.equal(
+      await noteRow.locator("[data-note-save]").isDisabled(),
+      true,
+      "Save note must be disabled while the native refresh guard refuses it",
+    );
+    const state = await page.evaluate(
+      (id) => ({
+        value: versionNoteDrafts.get(id).value,
+        attempt: versionNoteDrafts.get(id).attempt,
+      }),
+      committedId,
+    );
+    assert.deepEqual(state, {
+      value: "Synthetic retained note after read",
+      attempt: null,
+    });
+    assert.equal(
+      f.requests.filter((r) => r.input?.operation === "saveVersionNote").length,
+      0,
+    );
+  } finally {
+    releaseRead();
+  }
+  await page.waitForFunction(() => !refreshing);
+  await noteRow.locator("[data-note-save]").click();
+  await page.waitForFunction(
+    (id) =>
+      !versionNoteDrafts.get(id)?.saving &&
+      !versionNoteDrafts.get(id)?.attempt &&
+      versionNoteDrafts.get(id)?.expected ===
+        "Synthetic retained note after read",
+    committedId,
+  );
+  const noteWrites = f.requests.filter(
+    (r) => r.input?.operation === "saveVersionNote",
+  );
+  assert.equal(
+    noteWrites.length,
+    1,
+    "the released original note action sends one owner save",
+  );
+  assert.equal(noteWrites[0].input.versionId, committedId);
+  assert.equal(
+    (await loadVersion(db, schoolId, committedId)).doc.notes,
+    "Synthetic retained note after read",
+  );
+  assert.equal(
+    await selected(),
+    b.id,
+    "read/note readiness does not alter Duplicate selection",
+  );
+  console.log(
+    "PASS held refresh disables note Save without losing text; release enables one native save",
+  );
+
   // A protected-state boundary removes the old account's choice. The real
   // session/owner permission denial remains independently enforced by Core.
   await page.evaluate(() =>

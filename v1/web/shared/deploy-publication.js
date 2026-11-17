@@ -1083,8 +1083,40 @@ function installDuplicateSelection() {
     return;
   const nativeVersions = window.versions;
   const nativeCreateVersion = window.createVersion;
+  const nativeNoteControls = window.updateVersionNoteControls;
+  const nativeRefresh = window.refresh;
+  // A background read makes native Save note a guarded no-op. Reflect that
+  // existing guard in the control, including input events and fresh rows.
+  window.updateVersionNoteControls = function (id) {
+    nativeNoteControls(id);
+    if (refreshing) {
+      const row = [...document.querySelectorAll("[data-version-row]")].find(
+        (node) => node.dataset.versionRow === id,
+      );
+      const save = row?.querySelector("[data-note-save]");
+      if (save) save.disabled = true;
+    }
+  };
+  const refreshNoteControls = () => {
+    for (const row of document.querySelectorAll("[data-version-row]"))
+      window.updateVersionNoteControls(row.dataset.versionRow);
+  };
+  window.refresh = async function (...args) {
+    const epoch = protectedEpoch;
+    const completion = nativeRefresh.apply(this, args);
+    refreshNoteControls();
+    try {
+      return await completion;
+    } finally {
+      if (epoch === protectedEpoch) refreshNoteControls();
+    }
+  };
   window.versions = function (root) {
     nativeVersions(root);
+    if (refreshing)
+      root.querySelectorAll("[data-note-save]").forEach((save) => {
+        save.disabled = true;
+      });
     if (!duplicateSourceInitialized) {
       duplicateSourceInitialized = true;
       duplicateSourceId = state.versions.some((entry) => entry.id === current)
