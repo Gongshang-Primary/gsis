@@ -15,6 +15,11 @@ for(const edits of [
 }
 const legacy=mergeContacts({...defaults(),masterOptions:{'Appointment Status':['Retained']}},{staff:[],revision:'empty',asOf:Date.now()});
 assert.deepEqual(choiceLists(legacy)['Appointment Status'],['Retained']);
+const emptyProjection={staff:[],revision:'p0',asOf:Date.now()};
+const firstFallback=mergeContacts(defaults(),emptyProjection);
+assert(!Object.hasOwn(firstFallback,'masterOptions'),'an unconfigured legacy fallback must not become a configured catalogue');
+const laterFallback=mergeContacts(firstFallback,{...emptyProjection,revision:'p1',staff:[{id:'synthetic-fallback',active:true,profile:{Role:'Later role'}}]});
+assert.deepEqual(choiceLists(laterFallback).Role,['Later role']);
 const f=await fixture();let serial=0;
 try {
  const db=await f.db('deploy');

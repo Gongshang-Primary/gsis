@@ -127,7 +127,8 @@
   }
   function linkChoices(doc) {
     const lists = choiceLists(doc);
-    doc.masterOptions = structuredClone(lists);
+    if (doc.hrChoicesSchema === 1 || doc.roleMembershipSchema === 1 || Object.hasOwn(doc, "masterOptions"))
+      doc.masterOptions = structuredClone(lists);
     doc.hrTerms = structuredClone(lists);
     return lists;
   }

@@ -68,7 +68,8 @@ export function normalizeHRChoices(value, doc, { derivedRole = false } = {}) {
 /** Maintain the copied UI's compatibility aliases from one version-owned source. */
 export function applyCatalogueLinks(doc) {
   const choices = choiceLists(doc);
-  doc.masterOptions = structuredClone(choices);
+  if (doc.hrChoicesSchema === 1 || doc.roleMembershipSchema === 1 || Object.hasOwn(doc, "masterOptions"))
+    doc.masterOptions = structuredClone(choices);
   doc.hrTerms = structuredClone(choices);
   return doc;
 }
