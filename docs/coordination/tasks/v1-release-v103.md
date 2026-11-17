@@ -1,7 +1,7 @@
 # v1.03 release of Deploy internal link fixes
 
 - Model/owner: Codex. Coordinator: ChatGPT. Reviewer: Muse at the exact head.
-- Status: claimed; release-label implementation and review pending.
+- Status: implemented; exact-head CI and Muse review pending.
 - Updated: 17 November 2026, Asia/Singapore.
 - Branch: `codex/v1-release-v103`. Base: main `a638ed1d5cccdb9e5c8218dc0ff33a1fdccd501e`.
 - Exact allowlist: this task and `v1/release.mjs`.
@@ -24,3 +24,7 @@ Run the existing actual-built-browser release label check, frontend parity and c
 Dispatch existing protected main v1-deploy.yml with confirmation DEPLOY ISOLATED V1 and provider credential upload false, verify exact resolved source, and obey the GitHub owner approval gate. Preserve existing identities/bindings, v1 secret, SEND_OWNER/WEBHOOK_OWNER=v0.9, scheduler disabled, inactive Google/Drive integrations and retention deletion false. No real staff edit, import, permission publication or provider send as smoke testing. On partial failure inventory completed migrations/uploads before considering retry.
 
 Verify all nine live SHAs/v1.03 labels, bindings/flags, unchanged schemas/ledgers and public routing/assets, then record release evidence. Hosted/authenticated Run B, N-1 save latency, T1B-01/T1B-02 and unperformed runtime UAT remain Not tested. F5 OPEN. No deployment or hosted write has occurred in this task yet.
+
+## Label verification
+
+The claim was published on main at `83c7d42`; this branch starts from it. The sole product change is the existing RELEASE_LABEL constant, v1.02 → v1.03. Every other product/test/build/workflow path remains identical to merged PR198. Local checks passed with TZ=Asia/Singapore: `GSIS_BROWSER_EXECUTABLE=/usr/bin/chromium node tests/v1-product-release-label.mjs` (real built home, Toolbox, nine app labels/titles, narrow/desktop, local Workers/D1 and build manifest); `node tests/v1-product-v09-frontend-parity.mjs`; `npm run build` with no generated drift; exact two-path scope and whitespace. No new test or assertion was needed. Full Node/LORD and product/package CI will run at the final head; no full local rerun is claimed for the one-line increment. Independent review remains pending under Q07. No fresh backups have yet been taken; capture them after the actual final candidate passes its gates.
