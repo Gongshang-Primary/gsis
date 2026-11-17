@@ -1,7 +1,7 @@
 # v1 Deploy department add/save and related operations
 
 - Model/owner: Codex. Coordinator: ChatGPT. Reviewer: Muse at the exact head, under the owner's current v1 reviewer handoff.
-- Status: claimed; reproduction and implementation pending.
+- Status: failure reproduced; scoped implementation in progress.
 - Updated: 17 November 2026, 12:21 SGT.
 - Branch: `codex/v1-deploy-departments`.
 - Starting main: `6e041e6b51b3dac2b03d3f27c6ad4cb682aa8f07`. Deployed v1.03 product source: `d3bba194f0dc162d38f0899dc4e0b6e5e1351fa2`; later main is claim documentation only.
@@ -15,8 +15,15 @@
 4. `v1/web/shared/deploy-ui.js`
 5. `tests/v1-product-deploy-departments.mjs`
 6. `tests/v1-product-deploy-departments-browser.mjs`
+7. `v1/services/deploy/planning-fields.mjs`
 
-All v0.9 sources are read-only references. No workflow/build text patches, shared v0.9 source, generated production bundle, migration, provider, Core permission, Contacts writer or release-label change. Narrow the changed subset after reproduction. If another path is necessary, extend this claim before editing it.
+All v0.9 sources are read-only references. No workflow/build text patches, shared v0.9 source, generated production bundle, migration, provider, Core permission, Contacts writer or release-label change. Narrow the changed subset after reproduction. If another path is necessary, extend this claim before editing it. The seventh path is a claim clarification published before its implementation: a v1-owned ES module for the existing field-patch wire format, because adding CommonJS exports to shared v0.9 source would cross this task's boundary.
+
+## Reproduction and related-path clarification
+
+On the accepted claim `319ed2085a7b4f7281f3751eb8326bce500d701c`, the new real built browser/Worker/D1 test adds a synthetic department, stages it and submits Save. The actual /change response is HTTP503/SERVICE_UNAVAILABLE, and the draft/original save remain retained. Independent read-only tracing confirms model.mjs imports the classic shared/fields.js script as a module even though it exports nothing, so patchPlanning throws before committing. Use the v1 module for that established wire contract and keep current revision/lease/authority/idempotency guards. This shared correction also covers setOrganisation's other kinds, setDuties and setAscExportSettings; exercise them with synthetic owner requests, without changing their policy or UI.
+
+Related inspection found browser-only legacy committee defaults injected into otherwise empty v1 lists, which can produce patches against records absent from the server. The already claimed v1 UI module may prevent that implicit v0.9 initialization for v1-owned explicit lists, retaining actual saved definitions and legacy leadership data. Prove this through the same built browser/Worker/D1 path and disclose the visible absence of phantom committees. No catalogue retirement or loss of saved records is authorised.
 
 ## Coordination and intended contract
 
