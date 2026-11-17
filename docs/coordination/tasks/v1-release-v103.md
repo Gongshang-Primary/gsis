@@ -1,0 +1,26 @@
+# v1.03 release of Deploy internal link fixes
+
+- Model/owner: Codex. Coordinator: ChatGPT. Reviewer: Muse at the exact head.
+- Status: claimed; release-label implementation and review pending.
+- Updated: 17 November 2026, Asia/Singapore.
+- Branch: `codex/v1-release-v103`. Base: main `a638ed1d5cccdb9e5c8218dc0ff33a1fdccd501e`.
+- Exact allowlist: this task and `v1/release.mjs`.
+- Owner authorisation: deploy merged PR198; following the selective-default instruction the owner explicitly answered **“Authorise full deployment for #198 only”**. This is a one-off full-rollout exception. Future deployments retain the selective default. Existing protected GitHub environment approval remains required; no new release permission is requested.
+
+## Scope and release source
+
+PR198 was Muse-approved at `ae849721c87717068a6c0acb0c531555a4c5b084`, review main `b44553b`, and merged unchanged as `53f7e9850f0d1a20a0a37df4942c0aaed9e8b143`. Node/LORD43987740909, product43987741188 and automatic repeat43989627375 passed at that reviewed head. Main differs from the reviewed product tree only by documentation. Open PR199 owns the standing-directive record; PR197 owns the UAT ledger; PR196 owns v1.02 release records; PR182 is v0.9. No path overlap with this two-file claim.
+
+The owner's standing instruction increments each deployment after v1.01, so advance the existing central display constant from v1.02 to v1.03. This is the sole product-line change; no behavior, schema, workflow, dependency or provider change. The existing release-label test already interpolates the constant. Every other product path must remain byte-identical to merged PR198. Q07 requires review of this later source head; PR198's approval is not claimed to cover an unreviewed increment.
+
+## Dependency and preflight evidence
+
+Read-only builds using the same example configuration compare deployed `d5c8899aeb867448ad7399f9925f46ac11371380` against main `a638ed1`: all eight owner bundles differ, web Worker code is identical, and Deploy's two shared frontend files plus asset manifest differ. Shared runtime backup imports bring Deploy workbook/model code into every owner bundle. Raw bundle changes are not proof every owner has a reachable functional change; nevertheless the current workflow can only perform a full rollout and the owner has now explicitly authorised that scope once. There are no new migrations since deployed v1.02. All nine hosted Workers were read-only verified at v1.02/source d5c8899 with existing safety flags and only GSIS_SECRET secret names.
+
+## Verification and release sequence
+
+Run the existing actual-built-browser release label check, frontend parity and canonical build/no generated drift. Record exact scope and full required Node/LORD and product/package CI at the final head. After independent review and merge, test actual final main. Obtain fresh private exports of all eight owner D1 databases with Contacts last; verify local SQLite import, integrity, foreign keys, schema and migration ledgers. Prior release exports are historical evidence only. Preserve R2 objects and private recovery bookmarks; no cross-D1 atomic-backup or hosted-restore claim.
+
+Dispatch existing protected main v1-deploy.yml with confirmation DEPLOY ISOLATED V1 and provider credential upload false, verify exact resolved source, and obey the GitHub owner approval gate. Preserve existing identities/bindings, v1 secret, SEND_OWNER/WEBHOOK_OWNER=v0.9, scheduler disabled, inactive Google/Drive integrations and retention deletion false. No real staff edit, import, permission publication or provider send as smoke testing. On partial failure inventory completed migrations/uploads before considering retry.
+
+Verify all nine live SHAs/v1.03 labels, bindings/flags, unchanged schemas/ledgers and public routing/assets, then record release evidence. Hosted/authenticated Run B, N-1 save latency, T1B-01/T1B-02 and unperformed runtime UAT remain Not tested. F5 OPEN. No deployment or hosted write has occurred in this task yet.
