@@ -16,6 +16,7 @@ Model: Codex. Times are Asia/Singapore (UTC+08:00). This is a changelog and init
 | --- | --- | --- | --- | --- |
 | ENV-17-001 | 2026-11-17 07:55 | Computer control | Environment advertises desktop support, but no browser/desktop interaction tool was exposed. This blocks the requested row-by-row frontend copy; it is an environment limitation, not an application defect. | Blocked; no rows copied or verified |
 | DEP-17-001 | 2026-11-17 08:11 | HR Settings → HR Terms | v1 displays a read-only staff-facts report in place of v0.9's version-owned option catalogue editor. | OPEN — owner screenshot; source cause confirmed; fix deferred |
+| DEP-17-002 | 2026-11-17 08:14 | Membership → Teachers | The owner's screenshot shows 59 Membership roles but Add teacher's Role picker contains only its blank prompt. Internal role/HR tag links must work within Deploy before publication. | OPEN — source cause confirmed; authorised implementation under verification |
 
 ## DEP-17-001 — HR Terms has a different function in v1
 
@@ -62,3 +63,18 @@ No implementation, fix verification or closure is claimed. F5 remains OPEN; offi
 ## Changelog discipline
 
 Append further owner discoveries with stable IDs and Singapore recording timestamps. Keep environment blockers, screenshot observations, source-confirmed causes and executed runtime results distinct. No application changes are included in this ledger update. Skill methods: manual source/dependency tracing and independent read-only comparison; no named skill package was executed for this investigation.
+
+## DEP-17-002 and implementation follow-up — 17 November, 08:28 SGT
+
+The owner subsequently instructed “fix and review deploy internal linkages taking reference from v0.9 where necessary”, including these recent changelogs. That authorises a separate implementation; this PR remains documentation-only.
+
+Source cause: `applyRoleMemberships()` updates teacher grade/groups but did not populate the choice list consumed by Teachers. Bootstrap supplied observed Contacts `hrTerms`; `hrTermLists()` used that separate source. An empty school could therefore save a complete role matrix while offering no selectable Role. It was not necessary to publish or add a teacher to Contacts to establish this internal choice link.
+
+The implementation branch is `codex/v1-deploy-internal-links`, current head [`ae849721c87717068a6c0acb0c531555a4c5b084`](https://github.com/helper-gsps/gsis/commit/ae849721c87717068a6c0acb0c531555a4c5b084). [The task](../coordination/tasks/v1-deploy-internal-links.md) is on main; the [link map](https://github.com/helper-gsps/gsis/blob/ae849721c87717068a6c0acb0c531555a4c5b084/docs/v1/contacts/DEPLOY_INTERNAL_LINKS.md) records the exact consumers and limits. No merge or deployment is claimed.
+
+- DEP-17-002: a real built-browser/Worker/local-D1 regression first failed on the empty Role picker. It now passes for saved roles before any teachers exist, role-grade preview, existing teacher-grid Role save/reload and the current Appointment Status/Employment Modifier/Subject Modifier/Active selectors.
+- DEP-17-001: the internal HR Terms editor and canonical catalogue export/import are implemented on that branch. Version isolation, explicit empty lists, native save/reload and stale/foreign/fixed-field checks pass locally. The external Contacts catalogue overwrite portion of the v0.9 workflow remains separate; this item is therefore not closed as complete v0.9 parity.
+- Additional review found mixed queued HR/role edits, stale grid grade previews, teacher import grade checks and Contacts-only single-field saves. Those are addressed in the same internal-link implementation. The first full run exposed freezing of an unconfigured legacy choice fallback; the follow-up commit fixes it and its focused regressions pass. Full CI at the current head is pending.
+- Accepted Contacts authority is unchanged by draft/catalogue edits. EO yes/no remains distinct from grade. Wider employment-field editors and the external catalogue lifecycle are not silently added. School data and the owner's 59 actual role rows were not read or copied by these synthetic tests.
+
+Both product findings remain OPEN pending independent review and hosted verification. The computer-control blocker and unperformed row-by-row copy remain unchanged. No production code, live record or environment setting is changed by this ledger commit.
