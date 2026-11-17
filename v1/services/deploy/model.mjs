@@ -3,7 +3,7 @@ import { applyCatalogueLinks, choiceLists, normalizeHRChoices, EDITABLE_HR_CHOIC
 import Workload from "../../../shared/workload.js";
 import Relief from "../../../shared/relief.js";
 import Rules from "../../../shared/teaching-rules.js";
-import Fields from "../../../shared/fields.js";
+import Fields from "./planning-fields.mjs";
 import TGScope from "../../../shared/tg-scope.js";
 import PAL from "../../../shared/pal.js";
 import VenueGroups from "../../../shared/venue-groups.js";
@@ -1123,10 +1123,12 @@ export function applyEdits(doc, edits) {
               ? d.ascExport || {}
               : null;
       check(old !== null, "Unsupported planning table.");
-      const value =
-        op === "patchPlanning" ? Fields.apply(old, e.changes) : e.value;
       if (op === "patchPlanning") {
-        const flat = Fields.flat(old);
+        check(Array.isArray(e.changes) && e.changes.length <= 5000 && e.changes.every(c =>
+          isRecord(c) && typeof c.key === "string" &&
+          (c.old === null || typeof c.old === "string") &&
+          (c.value === null || typeof c.value === "string")), "Invalid planning changes.");
+        const flat = validated(Fields.flat, old);
         for (const c of e.changes)
           check(
             (flat[c.key] ?? null) === c.old ||
@@ -1136,6 +1138,8 @@ export function applyEdits(doc, edits) {
             409,
           );
       } else expect(old);
+      // Encoded fields cross the same shape/depth/key boundary as direct edits.
+      const value = op === "patchPlanning" ? plain(validated(Fields.apply, old, e.changes)) : e.value;
       if (source === "setOrganisation") {
         check(
           ["dept", "comm", "plt", "events", "cca"].includes(e.kind) &&
@@ -1143,14 +1147,21 @@ export function applyEdits(doc, edits) {
             value.length <= 100,
           "Invalid organisation.",
         );
-        unique(value, (g) => id(g.id), "group");
+        unique(value, (g) => {
+          check(isRecord(g), "Invalid group.");
+          return id(g.id);
+        }, "group");
         for (const g of value) {
           text(g.name);
-          check(
-            Array.isArray(g.slots) &&
-              g.slots.every((s) => !s || d.teachers.some((t) => t.id === s)),
-            "Unknown group member.",
-          );
+          for (const field of ["slots", "additionalDeputies", "tls"]) {
+            if (field !== "slots" && !Object.hasOwn(g, field)) continue;
+            check(
+              (field === "slots" || e.kind === "dept") &&
+              Array.isArray(g[field]) && g[field].length <= 300 &&
+              g[field].every(s => typeof s === "string" && (!s || d.teachers.some(t => t.id === s))),
+              "Unknown group member.",
+            );
+          }
         }
         d.organisations[e.kind] = value;
       }
