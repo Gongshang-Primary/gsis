@@ -1,4 +1,6 @@
 /* Additional Deploy workbook scopes use the existing atomic /change owner contract. */
+import { parseLoad, storedLoad, parseSplit, loadRows, fortnightRows } from "./deploy-loads.mjs";
+
 (function () {
   "use strict";
   const api = window.GSISV1;
@@ -101,11 +103,7 @@
       return {
         Loads: {
           columns: ["Level", "Subject", "Weekly Periods"],
-          rows: Object.entries(doc.loads).flatMap(([l, subjects]) =>
-            Object.entries(subjects)
-              .filter(([s]) => s !== "FT")
-              .map(([s, n]) => [l, s, n]),
-          ),
+          rows: loadRows(doc),
         },
       };
     if (view === "Subject Type")
@@ -133,20 +131,10 @@
             "FS",
             "Remarks",
           ],
-          rows: Object.entries(doc.loads).flatMap(([l, subjects]) =>
-            Object.keys(subjects)
-              .filter((s) => s !== "FT")
-              .map((s) => {
-                const row = doc.fortnight?.[JSON.stringify([l, s])] || {};
-                return [
-                  l,
-                  s,
-                  ...fields.map(
-                    (f) => row[f] ?? (f === "enabled" ? false : ""),
-                  ),
-                ];
-              }),
-          ),
+          rows: fortnightRows(doc, window.GSISWorkload).map(({ level, subject, key }) => {
+            const row = doc.fortnight?.[key] || {};
+            return [level, subject, ...fields.map(f => row[f] ?? (f === "enabled" ? false : ""))];
+          }),
         },
       };
     if (kinds[view]) {
@@ -258,10 +246,12 @@
       );
     }
     if (same(book.sheets, original)) return [];
+    const rowPairs = new Map();
     function rows(name, keys) {
+      if (rowPairs.has(name)) return rowPairs.get(name);
       const base = original[name].rows,
         seen = new Set();
-      return book.sheets[name].rows.map((row) => {
+      const paired = book.sheets[name].rows.map((row) => {
         const key = JSON.stringify(row.slice(0, keys).map(String));
         fail(!seen.has(key), "Duplicate row key in " + name);
         seen.add(key);
@@ -269,8 +259,10 @@
           (b) => JSON.stringify(b.slice(0, keys).map(String)) === key,
         );
         fail(old, "Unknown row key in " + name);
-        return { row, old };
+        return { name, row, old };
       });
+      rowPairs.set(name, paired);
+      return paired;
     }
     const paired = Object.keys(original).flatMap((name) =>
       rows(
@@ -282,7 +274,35 @@
           : 1,
       ),
     );
-    const changed = paired.filter(({ row, old }) => !same(row, old)).length;
+    const parseCell = (value, parser, name, row, column) => {
+      try { return parser(value); }
+      catch (error) {
+        error.location = { sheet: name, row: book.sheets[name].rows.indexOf(row), column };
+        throw error;
+      }
+    };
+    for (const pair of paired) {
+      const { name, row, old } = pair;
+      pair.changed = !same(row, old);
+      if (view === "Load Settings" && name === "Loads") {
+        pair.expected = storedLoad(old[2]);
+        // Retain an unchanged unknown legacy value. Explicit edits use the
+        // same parser as the editor and server, including n/a versus zero.
+        pair.value = same(row[2], old[2]) ? pair.expected : parseCell(row[2], parseLoad, name, row, 2);
+        pair.changed = !same(pair.value, pair.expected);
+      } else if (view === "Fortnight Split" && name === "Fortnight") {
+        pair.splitChanges = [];
+        fields.forEach((field, i) => {
+          if (same(row[i + 2], old[i + 2])) return;
+          const value = parseCell(row[i + 2], value => parseSplit(value, field), name, row, i + 2);
+          let expected = old[i + 2];
+          try { expected = parseSplit(expected, field); } catch { /* Retain unknown legacy input until explicitly corrected. */ }
+          if (!same(value, expected)) pair.splitChanges.push({ field, value, expected: old[i + 2] });
+        });
+        pair.changed = pair.splitChanges.length > 0;
+      }
+    }
+    const changed = paired.filter(pair => pair.changed).length;
     fail(
       changed <= 32,
       "At most 32 changed rows can save atomically. Reduce changes and reimport; no rows were saved.",
@@ -324,28 +344,14 @@
         expected: doc.ascExport || {},
       });
     } else if (view === "Load Settings")
-      for (const { row, old } of rows("Loads", 2)) {
-        if (same(row, old)) continue;
-        const value = row[2] === "" || row[2] === null ? null : Number(row[2]);
-        fail(
-          value === null ||
-            (Number.isFinite(value) &&
-              value >= 0 &&
-              value <= 100 &&
-              Number.isInteger(value * 2)),
-          "Weekly periods must be blank or a nonnegative half-period up to 100.",
-          {
-            sheet: "Loads",
-            row: book.sheets.Loads.rows.indexOf(row),
-            column: 2,
-          },
-        );
+      for (const { row, changed, value, expected } of rows("Loads", 2)) {
+        if (!changed) continue;
         edits.push({
           operation: "setLoad",
           level: String(row[0]),
           subject: row[1],
           value,
-          expected: old[2],
+          expected,
         });
       }
     else if (view === "Subject Type") {
@@ -369,43 +375,16 @@
         });
       }
     } else if (view === "Fortnight Split")
-      for (const { row, old } of rows("Fortnight", 2))
-        fields.forEach((field, i) => {
-          if (row[i + 2] === old[i + 2]) return;
-          const location = {
-            sheet: "Fortnight",
-            row: book.sheets.Fortnight.rows.indexOf(row),
-            column: i + 2,
-          };
-          let value = row[i + 2];
-          if (field === "enabled") {
-            fail(
-              typeof value === "boolean",
-              "Enabled must be an Excel boolean.",
-              location,
-            );
-          } else if (field !== "remarks") {
-            value = value === "" ? "" : Number(value);
-            fail(
-              value === "" ||
-                (Number.isInteger(value) && value >= 0 && value <= 200),
-              "Split blocks must be whole numbers from 0 to 200.",
-              location,
-            );
-          } else
-            fail(
-              typeof value === "string" && value.length <= 4000,
-              "Remarks must be text up to 4000 characters.",
-              location,
-            );
+      for (const { row, splitChanges } of rows("Fortnight", 2))
+        for (const { field, value, expected } of splitChanges) {
           edits.push({
             operation: "setFortnight",
             row: JSON.stringify([String(row[0]), row[1]]),
             field,
             value,
-            expected: old[i + 2],
+            expected,
           });
-        });
+        }
     else if (kinds[view]) {
       const kind = kinds[view],
         value = clone(doc.organisations[kind] || []);

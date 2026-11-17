@@ -1,6 +1,6 @@
 # v1 Deploy Subject Load, LSP and FORM save fixes
 
-- Status: claimed; implementation not started.
+- Status: implemented; local verification passed; exact-head CI and Muse review pending. Not deployed.
 - Owner/model: Codex. Coordinator: ChatGPT. Reviewer: Muse at the exact functional head.
 - Updated: 17 November 2026, Asia/Singapore.
 - Branch: `codex/v1-deploy-loads`. Base: main `06d71e5852076903f708abda264c4e8682d815d8`.

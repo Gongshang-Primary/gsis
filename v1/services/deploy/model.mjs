@@ -8,6 +8,8 @@ import TGScope from "../../../shared/tg-scope.js";
 import PAL from "../../../shared/pal.js";
 import VenueGroups from "../../../shared/venue-groups.js";
 import AscExport from "../../../shared/asc-export.js";
+import { STANDARD_SUBJECTS, parseLoad, storedLoad, knownLoadSubject, readLoad, isReferenceSubject,
+  validSubject, planningView, parseSplit, storedSplit } from "../../web/shared/deploy-loads.mjs";
 import {
   check,
   id,
@@ -39,6 +41,7 @@ export const defaults = () => ({
     ["1", "2", "3", "4", "5", "6"].map((l) => [
       l,
       {
+        ...Object.fromEntries(STANDARD_SUBJECTS.map(subject => [subject, null])),
         Assembly: 0,
         FTGP: 0,
         FTT: 0,
@@ -49,7 +52,6 @@ export const defaults = () => ({
         Art: 0,
         Music: 0,
         PAL: 0,
-        FORM: 0,
       },
     ]),
   ),
@@ -447,7 +449,7 @@ export function validateTeachingBindings(
   return normalized;
 }
 export function calculate(doc, contacts) {
-  const source = mergeContacts(doc, contacts);
+  const source = mergeContacts(planningView(doc), contacts);
   const accepted = {
     ...source,
     teachers: source.teachers.map((t) => ({ ...t, profile: { ...t.profile } })),
@@ -825,26 +827,22 @@ export function applyEdits(doc, edits) {
     }
     if (op === "setLoad") {
       const l = String(e.level);
+      check(!isReferenceSubject(e.subject), "FORM is calculated from Assembly, FTGP and FTT; PD is supplied by PLT membership.", "REFERENCE_ONLY", 400);
       check(
-        d.loads[l] &&
-          Object.hasOwn(d.loads[l], e.subject) &&
-          e.subject !== "FT",
+        isRecord(d.loads) && Object.hasOwn(d.loads, l) && isRecord(d.loads[l]) && knownLoadSubject(d, e.subject),
         "Unknown subject load.",
       );
-      expect(d.loads[l][e.subject]);
-      check(
-        e.value === null ||
-          (Number.isFinite(e.value) &&
-            e.value >= 0 &&
-            e.value <= 100 &&
-            (e.value * 2) % 1 === 0),
-        "Use nonnegative half periods.",
-      );
-      d.loads[l][e.subject] = e.value;
+      check(Object.hasOwn(e, "value"), "Supply an explicit subject load; omitted fields do not clear data.");
+      const value = validated(parseLoad, e.value), current = readLoad(d, l, e.subject);
+      if (Object.hasOwn(e, "expected")) check(
+        JSON.stringify(current) === JSON.stringify(storedLoad(e.expected)) || JSON.stringify(current) === JSON.stringify(value),
+        "This value changed; review your retained draft.", "REVISION_CONFLICT", 409);
+      d.loads[l][e.subject] = value;
       continue;
     }
     if (op === "addSubject") {
       const sub = text(e.subject, 60);
+      check(validSubject(sub) && !isReferenceSubject(sub), "Choose a subject code distinct from calculated FORM and reference PD.");
       for (const loads of Object.values(d.loads)) {
         check(!Object.hasOwn(loads, sub), "Subject already exists.");
         loads[sub] = null;
@@ -1086,7 +1084,7 @@ export function applyEdits(doc, edits) {
       d.subjectTypes ??= {};
       d.subjectTypes[e.subject] = validated(
         Workload.validateSubjectType,
-        d,
+        planningView(d),
         e.subject,
         e.value,
       );
@@ -1094,17 +1092,26 @@ export function applyEdits(doc, edits) {
     }
     if (op === "setFortnight") {
       d.fortnight ??= {};
-      const [level, subject] = JSON.parse(e.row);
+      check(typeof e.row === "string" && e.row.length <= 200, "Invalid split field.");
+      const row = validated(JSON.parse, e.row);
+      check(Array.isArray(row) && row.length === 2 && ["string", "number"].includes(typeof row[0]) && typeof row[1] === "string", "Invalid split field.");
+      const [level, subject] = row;
       check(
-        d.loads[level] &&
-          Object.hasOwn(d.loads[level], subject) &&
+        isRecord(d.loads) && Object.hasOwn(d.loads, level) && isRecord(d.loads[level]) && knownLoadSubject(d, subject) &&
           ["wt", "wd", "ws", "ft", "fd", "fs", "remarks", "enabled"].includes(
             e.field,
           ),
         "Invalid split field.",
       );
+      check(Object.hasOwn(e, "value"), "Supply an explicit split value; omitted fields do not clear data.");
+      const value = validated(parseSplit, e.value, e.field);
+      if (Object.hasOwn(e, "expected")) {
+        const current = storedSplit(d.fortnight[e.row]?.[e.field] ?? (e.field === "enabled" ? false : ""), e.field);
+        check(JSON.stringify(current) === JSON.stringify(storedSplit(e.expected, e.field)) || JSON.stringify(current) === JSON.stringify(value),
+          "This value changed; review your retained draft.", "REVISION_CONFLICT", 409);
+      }
       d.fortnight[e.row] ??= {};
-      d.fortnight[e.row][e.field] = e.value;
+      d.fortnight[e.row][e.field] = value;
       continue;
     }
     if (
