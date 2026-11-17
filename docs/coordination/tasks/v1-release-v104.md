@@ -1,6 +1,6 @@
 # v1.04: release merged department save fixes
 
-- Status: claimed; not deployed.
+- Status: release packaging verified locally; exact-head CI pending; not deployed.
 - Owner/model: Codex. Coordinator: ChatGPT. Product reviewer: Muse, PR201 exact head; no additional Muse round solely for this release label under the owner's latest instruction.
 - Updated: 17 November 2026, 14:22 SGT (Asia/Singapore).
 - Branch: `codex/v1-release-v104`. Base: main `9cc5cf0f64d0c15c633f168f7a81b12707f66ef9`.
@@ -26,3 +26,7 @@ Verify nine live source/label/settings inventories, unchanged eight schema/ledge
 ## Gates and handoff
 
 Q01 scope/authority: pass at claim. Q02-Q05: existing contracts reused; bounded label/directive change, no new persistence/concurrency/security boundary or dependency. Q06 verification: pending. Q07: product exact-head review already complete; owner requested no excess release-packaging review. Q08: deployment authorised, execution pending. Wrangler skill used for pinned local verification and existing protected workflow; no new installation or direct CLI production bypass. No source edit, fresh live export or deployment has occurred at claim publication.
+
+## Local packaging verification
+
+Claim `b53b2353fe6efc61ef3e725b0e2271f53df684a6` landed by non-force main push; implementation starts there. With TZ=Asia/Singapore, `GSIS_BROWSER_EXECUTABLE=/usr/bin/chromium node tests/v1-product-release-label.mjs` passed against the real built browser, local Workers and D1; `node tests/v1-product-v09-frontend-parity.mjs` passed; `npm run build` passed without tracked generated drift. `git diff --check` passed. Only this task, the one-line display label and one new directive row differ from the base. Existing directive rows are retained unchanged. Full Node/LORD and product/package CI will be recorded at the final commit before release; no new tests were needed for the existing display-label contract. Fresh backups and hosted checks have not run at this checkpoint.
