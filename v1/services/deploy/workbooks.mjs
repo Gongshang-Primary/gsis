@@ -13,6 +13,7 @@ import { membershipValue, setMembershipValue } from "./model.mjs";
 import { ROLE_COLUMNS, normalizeRoleMemberships, applyRoleMemberships, checkManagedMemberships, roleMapping } from "./role-memberships.mjs";
 import { HR_CHOICE_FIELDS, choiceLists, normalizeHRChoices, applyCatalogueLinks } from "./catalogue-links.mjs";
 import { planningPerson, reportingStaff, reportingLinks, reportingRoot, reportingConflicts } from "../../web/shared/deploy-eligibility.mjs";
+import { departmentChangeConflicts } from "../../web/shared/deploy-departments.mjs";
 export const SCHEMAS = Object.freeze({
   IP: {
     Classes: [
@@ -673,6 +674,12 @@ export function validateWorkbook(
         r.Departments.some((d) => d["Department ID"] === m["Department ID"]),
       ),
       "Unknown department.",
+    );
+    check(
+      departmentChangeConflicts(doc.organisations?.dept || [], next.organisations.dept).length === 0,
+      "A teacher cannot be added to another department. Move the teacher or review retained memberships.",
+      "DEPARTMENT_MEMBERSHIP_CONFLICT",
+      409,
     );
   }
   if (scope === "Teachers") {
