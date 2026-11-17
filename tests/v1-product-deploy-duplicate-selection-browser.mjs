@@ -347,9 +347,6 @@ try {
   // Hold a real background read. Note Save must communicate the existing
   // native guard instead of accepting a click which silently does nothing.
   const noteRow = page.locator('[data-version-row="' + committedId + '"]');
-  await noteRow
-    .locator("[data-note-input]")
-    .fill("Synthetic retained note after read");
   let releaseRead, signalRead;
   const readReached = new Promise((resolve) => {
     signalRead = resolve;
@@ -379,6 +376,9 @@ try {
     void refresh(false);
   });
   await readReached;
+  await noteRow
+    .locator("[data-note-input]")
+    .fill("Synthetic retained note after read");
   try {
     assert.equal(
       await noteRow.locator("[data-note-save]").isDisabled(),
@@ -433,6 +433,112 @@ try {
   );
   console.log(
     "PASS held refresh disables note Save without losing text; release enables one native save",
+  );
+
+  // Automatic refresh must not disable Save halfway through a real pointer
+  // click on an unresolved note. An explicit foreground refresh still works.
+  const pointerVersionId = await page.evaluate(() => current);
+  const pointerNoteRow = page.locator(
+    '[data-version-row="' + pointerVersionId + '"]',
+  );
+  await pointerNoteRow
+    .locator("[data-note-input]")
+    .fill("Synthetic pointer-safe note");
+  await page.evaluate(() => refresh(true));
+  assert.equal(
+    await pointerNoteRow.locator("[data-note-input]").inputValue(),
+    "Synthetic pointer-safe note",
+  );
+  assert.equal(
+    f.requests.filter((r) => r.input?.operation === "saveVersionNote").length,
+    1,
+    "explicit refresh does not save the draft",
+  );
+  let releasePointerRead;
+  const pointerReadRelease = new Promise((resolve) => {
+    releasePointerRead = resolve;
+  });
+  let pointerReads = 0;
+  await page.route("**/api/deploy/{sync,delta}", async (route) => {
+    pointerReads++;
+    await pointerReadRelease;
+    await route.fallback();
+  });
+  await page.evaluate(() => {
+    window.__syntheticNotePointer = null;
+    window.__syntheticNoteClick = false;
+    document.addEventListener(
+      "pointerdown",
+      (event) => {
+        if (!event.target.matches("[data-note-save]")) return;
+        window.__syntheticNotePointer = {
+          refreshing,
+          busy,
+          editing: !!editing,
+          acquiring,
+          queue: !!queueFlight,
+          direct: !!v1DirectSave,
+          otherSaving: noteSaving(),
+          unresolved: notesUnresolved(),
+        };
+        window.__syntheticNoteRead = refresh(false);
+      },
+      { once: true, capture: true },
+    );
+    document.addEventListener(
+      "click",
+      (event) => {
+        if (event.target.matches("[data-note-save]"))
+          window.__syntheticNoteClick = true;
+      },
+      { once: true, capture: true },
+    );
+  });
+  try {
+    await pointerNoteRow.locator("[data-note-save]").click();
+    const state = await page.evaluate(() => ({
+      pointer: window.__syntheticNotePointer,
+      clicked: window.__syntheticNoteClick,
+    }));
+    assert.deepEqual(state.pointer, {
+      refreshing: false,
+      busy: false,
+      editing: false,
+      acquiring: false,
+      queue: false,
+      direct: false,
+      otherSaving: false,
+      unresolved: true,
+    });
+    assert.equal(
+      state.clicked,
+      true,
+      "an automatic read must not swallow the original Save click",
+    );
+    assert.equal(pointerReads, 0, "an unresolved note defers automatic reads");
+  } finally {
+    releasePointerRead();
+  }
+  await page.evaluate(() => window.__syntheticNoteRead);
+  await page.waitForFunction(
+    (id) =>
+      !versionNoteDrafts.get(id)?.saving &&
+      !versionNoteDrafts.get(id)?.attempt &&
+      versionNoteDrafts.get(id)?.expected === "Synthetic pointer-safe note",
+    pointerVersionId,
+  );
+  assert.equal(
+    f.requests.filter((r) => r.input?.operation === "saveVersionNote").length,
+    2,
+    "one original note click adds one owner save",
+  );
+  assert.equal(
+    (await loadVersion(db, schoolId, pointerVersionId)).doc.notes,
+    "Synthetic pointer-safe note",
+  );
+  assert.equal(await selected(), b.id);
+  console.log(
+    "PASS dirty note defers pointer-time automatic refresh; explicit refresh and one native save remain available",
   );
 
   // A protected-state boundary removes the old account's choice. The real

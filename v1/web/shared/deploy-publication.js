@@ -1102,6 +1102,9 @@ function installDuplicateSelection() {
       window.updateVersionNoteControls(row.dataset.versionRow);
   };
   window.refresh = async function (...args) {
+    // Keep an automatic read from disabling Save between pointerdown and click.
+    // Explicit Refresh still reads current state while retaining the note draft.
+    if (!args[0] && notesUnresolved()) return;
     const epoch = protectedEpoch;
     const completion = nativeRefresh.apply(this, args);
     refreshNoteControls();
