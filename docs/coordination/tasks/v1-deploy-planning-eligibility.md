@@ -90,3 +90,9 @@ Skill use: repository Pstack/Superpowers/Gstack principles guided the ownership 
 | Q08 | No deployment authority exercised; hosted runtime UAT Not tested |
 
 The functional changes affect Deploy and its workbook output. The common Drive backup reader statically imports Deploy workbooks, so all eight owner bundles plus web can change; compare final artifacts before release. No backup is activated. No new owner decision is required for the stated rule. The separate Load PR also changes the existing Deploy script-inclusion line; disclose any merge conflict, combine both module inclusions and rerun integrated build/browser tests. No merge or deployment was performed. F5 remains OPEN; T1B-01/T1B-02 and hosted runtime UAT remain Not tested.
+
+## Owner-authorised v1.05 integration
+
+The owner subsequently authorised combining approved #203 and #204 and proceeding through the external protected deployment gate. The accepted [release claim](v1-release-v105.md) is main `df7d298b05b6d6c985acf1ce8287c5e40d96cf03`; it follows the #203 merge `13aac2adf40f4c018989ffe25629c69d753637ce` at approved source `8ef3cd319ff070afcd3bcc951f162e9c05e5e4ff`.
+
+This branch starts from approved #204 `3802373188482a7af1f6555bca57c9ad6ba35dfb` and merges that locked claim/main without squashing. The sole product conflict is the existing Deploy script-inclusion line. It retains `deploy-ui.js`, `deploy-loads-ui.js` and `deploy-ui-tables.js`, all modules in that order. The only other new application edit is the display label `v1.04` to `v1.05`. There is no claim that Muse reviewed this unseen integration head. Combined verification and remaining release state are recorded in the release task. Queued visual changes and #205 remain outside this integration.
