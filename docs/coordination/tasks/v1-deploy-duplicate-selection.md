@@ -1,6 +1,6 @@
 # v1 Versions: explicit radio selection for Duplicate
 
-- Status: claimed; implementation pending.
+- Status: implemented and locally verified; exact-head CI and independent Muse review pending. No PR, merge or deployment yet.
 - Owner/model: Codex; coordinator: ChatGPT; reviewer: Muse at the exact head.
 - Updated: 17 November 2026, Asia/Singapore.
 - Branch: `codex/v1-deploy-duplicate-selection`. Base: main `8e72c47809a61c0229bef3ae99b35e26f6736c04`.
@@ -21,3 +21,21 @@ Exercise actual built browser, native owner request and local Worker/D1: load A/
 Run TZ=Asia/Singapore canonical build/no drift, targeted browser/duplicate regression and required exact-head Node/LORD/product CI before draft PR; disclose unrun checks. Model: Codex on all commits and PR. Muse independently reviews the exact functional head; release-packaging review waiver does not apply. No live UAT, provider action, hosted write or deployment. F5 OPEN; T1B-01/T1B-02 and hosted runtime UAT remain Not tested.
 
 Publish this task-record-only claim with an expected-head, non-force update under WORKFLOW Start session4, then implement from the accepted claim. Preserve the separate load-fix and eligibility queues; no unclaimed shared file edit. Q01 scope recorded; Q02-Q05 preserve native identities/recovery; Q06/Q07 pending; Q08 no release authority.
+
+## Implementation and local evidence
+
+Accepted claim: `9dc353d26d75496b2caaf8d450bb017c20715f77`. The implementation adds a radio column and source guidance through the existing v1 module. The Version name column retains native name sorting. The selected ID is in-memory presentation state; the loaded version remains unchanged until the existing native creation succeeds. Equal display names remain separate identities. Filtering a row does not remove the source; removing it from the authorised catalogue clears the choice without selecting a substitute.
+
+The wrapper seeds the existing native creation attempt only after its ordinary draft/edit guards and the source/name choice pass. An existing attempt always keeps its source and request UUID; radios remain locked until the native flow resolves it. The native creation request, response handling, New planning version flow, server idempotency and current Contacts refresh are unchanged. This adds no persistence or reload-recovery contract. Protected-state clearing removes the choice, and a prior async completion cannot repaint its guidance in a later protected epoch. Native toolbar relocation and incremental DOM refresh are handled without editing the shared builder or v0.9 source.
+
+Commands ran with `TZ=Asia/Singapore`, private `XDG_CONFIG_HOME=/tmp/gsis-duplicate-selection-xdg` and Chromium `/usr/bin/chromium` for browser cases:
+
+- `npm run build`: PASS, no tracked generated drift.
+- `node tests/v1-product-deploy-duplicate-selection-browser.mjs`: meaningful pre-change failure, 0 radio controls where 2 were required; final PASS, six browser/Worker/D1 groups. Covers A loaded/B selected, equal names, sort/filter/full and incremental redraw, navigation, cancel/no write, invalid/deleted choice/no fallback, existing unsaved-input guard, lost committed response, locked source and identical retry wire/UUID, one resulting copy, source documents unchanged, native New planning version compatibility, protected-state reset and actual Core permission denial.
+- `node tests/v1-product-deploy-duplicate-contacts.mjs`: PASS unchanged. All eleven refreshed typed tags, inactive/partial staff, exact clears, assignments/notes/stable IDs, unchanged Contacts/source records, authority/isolation and restart receipt recovery.
+- `node tests/v1-product-deploy-memberships-browser.mjs`: PASS unchanged. Real native edits, canonical import and publish-to-Contacts receipts, including lost-acknowledgement recovery; no provider sends.
+- Both changed JavaScript files pass `node --check`; `git diff --check` passes. The existing `scripts/v1/test.mjs` filename discovery includes the new browser test without runner changes.
+
+Skill entry: inspected the available catalog and repository skill policy; applied bounded red/green verification, owner-boundary analysis and reuse of the existing creation mechanism manually. No skill package was executed, installed or copied. No dependency changes.
+
+Q01–Q05: locally satisfied by the accepted three-path claim, separate stable UI identity, unchanged owner authority/commit/retry boundaries and bounded existing-catalogue rendering. Q06: the listed local checks pass; full exact-head Node/LORD/product CI is still pending. Q07: coordinator diff review and independent Muse review at the eventual exact head are pending. Q08: no release authority exercised; hosted UAT remains Not tested and F5 remains OPEN. Rollback is the bounded UI/test commit; no schema, resource or data migration is involved.
