@@ -158,6 +158,13 @@
     // An explicit v1 matrix owns those groups, including unchecked flags and
     // unmatched staff's existing labels, both during snapshot load and preview.
     let incomingDocument = null;
+    const originalPlanningInit = window.GSISPlanning.init;
+    window.GSISPlanning.init = doc => {
+      // Explicit v1 lists belong to the saved version. The v0.9 one-time
+      // committee seed creates browser-only records which no v1 save owns.
+      if (doc?.schemaVersion === 1 && doc.organisations) doc.planning402 = 1;
+      return originalPlanningInit(doc);
+    };
     window.hrTermLists = () => choiceLists(v());
     window.teacherTermLists = () => choiceLists(v());
     const originalAccept = window.acceptSnapshot;
