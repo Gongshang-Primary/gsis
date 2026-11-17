@@ -187,7 +187,8 @@
         ?.previousElementSibling || table.previousElementSibling;
     if (old?.classList.contains("gsis-table-tools")) old.hidden = true;
     table.dataset.nativeTableTools = "";
-    const anchor = table.closest(".table-window,.gsis-core-scroll") || table;
+    const anchor = table.closest(".assignment-split") ||
+      table.closest(".table-window,.gsis-core-scroll") || table;
     anchor.before(bar);
     if (!table.closest(".table-window,.gsis-scroll,.gsis-core-scroll")) {
       const wrap = document.createElement("div");
@@ -279,42 +280,45 @@
         input.onclick = (e) => e.stopPropagation();
         th.append(input);
         filters.append(th);
-        const cell = head.cells[i],
-          sort = document.createElement("button");
-        sort.type = "button";
-        sort.className = "gsis-core-sort";
-        sort.textContent = "↕";
-        sort.setAttribute("aria-label", "Sort " + label);
-        if (
-          table.dataset.noSort === "true" ||
-          table.matches(
-            '[data-lord-reference="periods"],[data-preserve-row-order]',
-          )
-        ) {
-          sort.disabled = true;
-          sort.title = "This editor preserves its required row order.";
+        const cell = head.cells[i];
+        // Native sorts may own grouped rows and their saved presentation state.
+        if (!cell.querySelector(".sort-button")) {
+          const sort = document.createElement("button");
+          sort.type = "button";
+          sort.className = "gsis-core-sort";
+          sort.textContent = "↕";
+          sort.setAttribute("aria-label", "Sort " + label);
+          if (
+            table.dataset.noSort === "true" ||
+            table.matches(
+              '[data-lord-reference="periods"],[data-preserve-row-order]',
+            )
+          ) {
+            sort.disabled = true;
+            sort.title = "This editor preserves its required row order.";
+          }
+          sort.onclick = (e) => {
+            e.stopPropagation();
+            const direction =
+              state.sort?.column === i ? -state.sort.direction : 1;
+            state.sort = { column: i, direction };
+            const rows = dataRows(table);
+            rows.sort(
+              (a, b) =>
+                text(a.cells[i]).localeCompare(text(b.cells[i]), undefined, {
+                  numeric: true,
+                  sensitivity: "base",
+                }) * direction,
+            );
+            for (const row of rows) row.parentElement.append(row);
+            [...head.cells].forEach((c) => c.removeAttribute("aria-sort"));
+            cell.setAttribute(
+              "aria-sort",
+              direction === 1 ? "ascending" : "descending",
+            );
+          };
+          cell.append(sort);
         }
-        sort.onclick = (e) => {
-          e.stopPropagation();
-          const direction =
-            state.sort?.column === i ? -state.sort.direction : 1;
-          state.sort = { column: i, direction };
-          const rows = dataRows(table);
-          rows.sort(
-            (a, b) =>
-              text(a.cells[i]).localeCompare(text(b.cells[i]), undefined, {
-                numeric: true,
-                sensitivity: "base",
-              }) * direction,
-          );
-          for (const row of rows) row.parentElement.append(row);
-          [...head.cells].forEach((c) => c.removeAttribute("aria-sort"));
-          cell.setAttribute(
-            "aria-sort",
-            direction === 1 ? "ascending" : "descending",
-          );
-        };
-        cell.append(sort);
         const handle = document.createElement("span");
         handle.dataset.coreResize = "";
         handle.setAttribute("role", "separator");
