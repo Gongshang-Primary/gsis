@@ -22,7 +22,8 @@ try {
   const one = { ...initial.loads["1"], Assembly: "1", FTGP: 1, FTT: 2,
     EL: "0", Science: "n/a", PAL: "(n/a)", FORM: 9.5 };
   delete one.LSP;
-  const two = { ...initial.loads["2"], LSP: 2.5, "Synthetic support": 0 };
+  const two = { ...initial.loads["2"], LSP: 2.5, E2K: 0, "CCE EL": 0,
+    SS: 0, SDR: 0, RRP: 0, "Synthetic support": 0 };
   const three = { ...initial.loads["3"], PAL: "n/a" };
   for (const [level, value] of [["1", one], ["2", two], ["3", three]])
     await db.prepare("UPDATE deploy_rows SET value=? WHERE school_id=? AND version_id=? AND scope='loads' AND row_id=?")
@@ -57,8 +58,13 @@ try {
   assert.equal(await page.locator('[data-load-reference="PD"]').first().innerText(), "2");
   const subjectHeadings = async () => (await page.locator(".load-table thead tr").first().locator("th").allTextContents())
     .map(text => text.replace(/[↕↑↓▾▴]/g, "").trim());
-  assert((await subjectHeadings()).includes("FORM"));
-  assert(!(await subjectHeadings()).includes("Legacy FORM"), "computed FORM is not relabelled as legacy by table enhancement");
+  const expectedHeadings = [
+    "Level", "Assembly", "FTGP", "FTT", "FORM",
+    "EL", "LSP", "FEL", "RRP", "SDR", "Math", "LSM", "FMA", "CL", "ML", "TL",
+    "CCE", "HCL", "HML", "HTL", "MTSP", "FCL", "FML", "FTL", "Science", "FSC",
+    "SS", "PHE", "Art", "Music", "PAL", "CCE EL", "E2K", "Synthetic support", "PD",
+  ];
+  assert.deepEqual(await subjectHeadings(), expectedHeadings);
   const dialogField = await page.evaluate(async () => {
     const dialog = document.createElement("dialog");
     dialog.innerHTML = table(["FT"], ['<tr><td>2</td></tr>']);
@@ -179,8 +185,7 @@ try {
   await db.prepare("UPDATE deploy_versions SET revision=revision+1 WHERE school_id=? AND id=?")
     .bind(schoolId, versionId).run();
   await page.reload(); await openLoads();
-  assert((await subjectHeadings()).includes("FORM"));
-  assert((await subjectHeadings()).includes("Legacy FORM"));
+  assert.deepEqual(await subjectHeadings(), [...expectedHeadings, "Legacy FORM"]);
   assert.equal(await page.locator('[data-load-reference="FORM"]').first().innerText(), "9.5");
   await cell("1", "EL").fill("2"); await save();
   assert.deepEqual((await stored()).groups.find(group => group.id === legacyGroup.id), legacyGroup,
