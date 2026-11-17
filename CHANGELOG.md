@@ -1,3 +1,7 @@
+# Pending hotfix: Combine with occupied activity, 17 November 2026
+
+Model: Codex. A timetabled teaching activity with a subject but no class label is now a valid Combine base. Ordinary relief still requires a blank period; blocked duties, attendance and identity checks remain. Blank class labels cannot bypass the one-additional-class limit. Existing lesson contents, zero-R combinations and request receipts are preserved. Owner deployment needs both Roster Workers and the Roster frontend ZIP; no Apps Script upload. See `docs/coordination/tasks/roster-combine-occupied-lesson-hotfix.md`. Not deployed by Codex.
+
 # Pending hotfix: D1 background Worker memory, 17 November 2026
 
 Model: Codex. Bound simultaneous materialized Roster mutations in the notification Worker with FIFO admission, retain independent provider sends and foreground cancellation, and remove redundant state copies during plan hydration/packing. Refused-before-start allocation work releases its cycle lease. System Health preserves busy/backoff/memory diagnostics and lease counters. Existing receipts, CAS guards, allocation rules, history and uncertain-send handling remain. See `docs/coordination/tasks/roster-d1-worker-memory-hotfix.md`. No deployment or live settings/data change performed by Codex.

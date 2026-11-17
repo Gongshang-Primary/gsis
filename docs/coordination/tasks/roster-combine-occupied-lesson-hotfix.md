@@ -1,7 +1,7 @@
 # Combine an occupied teaching lesson
 
 - Model: Codex
-- Status: implementing
+- Status: implemented; full local suite and CI verification pending
 - Updated (Asia/Singapore): 2026-11-17
 - Branch: codex/roster-absence-clash-confirm; existing owner hotfix PR #182
 - Base: 412064dba00dab583cc8bb76b2ee04f489c297d8
@@ -26,4 +26,8 @@ Allow an occupied instructional subject without requiring a class label. Continu
 
 ## Verification
 
-Pending. Earlier CI and test counts cover the previous memory hotfix head only.
+- Eight domain groups, three real-DOM cases and two generated D1/SQLite cases pass. Twelve targeted regression programs pass, including existing manual Combine, colleague candidates, UI, ad hoc and D1 checks.
+- The new domain test fails on the previous predicate, the generated D1 test fails before regeneration, and the real-DOM test fails on previous head 412064d because Combine is disabled for the activity.
+- D1 test injects deterministic authority/timetable context while exercising the actual generated domain, prepared policy, broad state loading, atomic SQLite CAS, exact replay, stale-revision rejection and denied-access handling. It does not claim a live or full HTTP integration check.
+- Shared canonical allocation/operations sources feed both frontend and D1 and their generated Google bundles. Only generated parity/source references changed; all 273 operations and probe outcomes remain unchanged. The owner deploys only both Worker scripts and frontend ZIP. No Apps Script deployment is required.
+- Full local v0.9 Node/LORD and exact-head CI results belong in PR #182 and the package verification record. Earlier green results do not cover this extension. No live data, provider delivery, production deployment or v1 implementation is tested.
