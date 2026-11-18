@@ -22,6 +22,7 @@ import {
 import { ApiError } from "../../runtime/errors.mjs";
 import { normalizeDirectValue } from "../../contacts/direct-fields.mjs";
 import { planningSnapshot, planningEligible, reportingEligible, reportingRoot, reportingStaff, reportingLinks, hasReportingEdge, projectPlanningNames } from "../../web/shared/deploy-eligibility.mjs";
+import { departmentChangeConflicts } from "../../web/shared/deploy-departments.mjs";
 function validated(fn, ...args) {
   try {
     return fn(...args);
@@ -1244,6 +1245,9 @@ export function applyEdits(doc, edits) {
               "Choose an active eligible teacher for a new group assignment.", "TEACHING_ELIGIBILITY_REQUIRED", 409);
           }
         }
+        if (e.kind === "dept") check(departmentChangeConflicts(old, value).length === 0,
+          "A teacher cannot be added to another department. Move the teacher or review retained memberships.",
+          "DEPARTMENT_MEMBERSHIP_CONFLICT", 409);
         d.organisations[e.kind] = value;
       }
       if (source === "setDuties") {

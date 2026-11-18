@@ -2,7 +2,7 @@
 
 Model: Codex. Claimed 19 November 2026, Asia/Singapore. Reviewer: Muse at the new exact head.
 
-- Status: claim only; integration and checks pending. No merge, deployment or live operation authorised.
+- Status: reviewed source integrated and fresh-base focused checks passed; implementation push/CI and new exact-head Muse review pending. No merge, deployment or live operation authorised.
 - Branch: `codex/v1-deploy-department-move-v106`.
 - Base: deployed v1.06 `bd77b27deab417afce859cd80465d7c608ae0ab2`.
 - Reviewed source: `3895cb94207e852eafc52bd1fbfa434dccd6a3d4`, original branch `codex/v1-deploy-department-move`; [Muse's approval](../review/pr-department-move-muse-review.md) is recorded on main at `deb68287bd6b438939ec8fb23ac9a989923cc502`. That approval covers its original head, not this integration.
@@ -37,3 +37,28 @@ Run real built synthetic Worker/D1 and browser Dept programs, with locked Chromi
 Push progress with exact claim/implementation SHAs. Full Node/LORD and product/package CI must run at the new exact head. Open a separate draft PR for Muse only after Node/LORD is green; report any remaining product-CI state honestly. List visible changes (move dialog, history-review/repair actions and Dept instructions), original source review, integration differences and tests actually run. No merge or deployment. Hosted UAT, official T1B-01/T1B-02 and N-1 latency remain **Not tested**; F5 **OPEN**.
 
 Q01: this branch-only exact-scope claim precedes edits. Q02–Q05: reuse the reviewed pure policy and existing owner/queue/transaction contracts. Q06/Q07: pending new local checks, CI and Muse review. Q08: not applicable to release. Skill methods: repository boundary/recovery/red-green principles applied manually; no external skill package invoked or copied. Prior source-head passes are historical evidence and do not establish verification of this new base.
+
+## Integration evidence
+
+The branch-only claim was published first at `2bac2cab77144bab08a67e7630a83d6121c96fa6`. Applying only the seven product/test paths from `3895cb9` with Git's three-way patch exposed exactly the anticipated import/inclusion conflicts. The resolution keeps the v1.06 `projectPlanningNames` import and appends the Dept import, and keeps PR209's Roster local-export inclusion/adapter while adding only the Dept module to the existing Deploy inclusion. No other product conflict occurred.
+
+Local byte comparisons prove both new Dept modules, the canonical workbook module and both Dept test programs are identical to the original reviewed head. The model differs from the v1.06 base by only the original Dept import/final guard; the builder differs by only the one Deploy inclusion append. Independent New-version inheritance remains on its own branch; this branch adds none of its helper/create changes.
+
+Fresh-base verification uses `TZ=Asia/Singapore`, locked Chromium151.0.7922.34 and isolated temporary XDG/Wrangler logs. Dependencies reuse existing workspace installations; no installation or dependency edit.
+
+| Check | Result |
+| --- | --- |
+| `node tests/v1-product-deploy-departments.mjs` | Pass, 26.197 seconds under the unchanged 45-second cap. All three groups cover actual direct/encoded owner requests, native/canonical rule enforcement, retained historical subsets, atomic confirmed moves, strict actor/school/identity/revision/fence/reused-intent rejection, unchanged authority/other versions/history and receipt replay after a real Worker restart. `/tmp/gsis-par04-v106-native.log`. |
+| `node tests/v1-product-deploy-departments-browser.mjs` | Pass, 18.289 seconds under the same cap. Actual built browser/Workers/D1 cover ordinary assignment, source/target confirmation, Cancel preserving the prior draft, no write until Save, fixed role holes, repeated moves, coalesced rename retaining full original CAS, and inactive historical repair without reactivation. Original assertions are unchanged. `/tmp/gsis-par04-v106-browser.log`. |
+| Unchanged `node tests/v1-product-deploy-workbooks.mjs` | Pass; canonical scopes, selected-fact/retained identity rules, immutable drafts and workload semantics. `/tmp/gsis-par04-v106-workbooks.log`. |
+| `npm run build` | Pass, eighteen production components and no tracked generated drift. `/tmp/gsis-par04-v106-canonical.log`. |
+| `node scripts/v1/build.mjs` | Pass, nine services and 377 artifacts. `/tmp/gsis-par04-v106-build.log`. |
+| Source union, syntax and whitespace | Pass; exactly the original reviewed Dept behavior on the new base, preserving later TTb and Roster export work. |
+
+The coordinator explicitly directed pushing after the fresh native/browser, canonical no-drift and v1 build checks, leaving further unchanged integration regressions and nine dry-runs/local migration upgrade to the required full exact-head CI. This avoids contention between parallel synthetic fixtures; it does not skip a CI gate or claim those checks ran locally. Node/LORD runs on the implementation push; only after it is green may the draft PR open and trigger its product/package run. Report those exact run links/results in the PR without transferring the original source head's CI to this one.
+
+This is a fresh-base integration, not a new policy redesign. The original meaningful native/browser failures and their corrected tests are retained at the original reviewed head/task. No assertion or timeout was changed to obtain this result. Q01–Q05 pass locally; Q06 has the listed focused/build evidence with full CI pending; Q07 new exact-head Muse review remains pending; Q08 no release authority exercised.
+
+## Ledger disposition
+
+PAR-04 has a locally verified implementation on this new base; it is not merged, deployed or hosted-verified. The older DEP17-003 add/save field-codec repair already shipped separately and is not reopened. PAR-03 New inheritance, PAR-01/02/07 layout/presentation and PAR-05 Compact remain separate tasks. Multi-Committee behavior stays allowed; pending CCA/PLT/Event policy is not changed. The broader Contacts catalogue/namespace lifecycle and venue-maintenance gaps are outside this exact scope. Hosted UAT, T1B-01/T1B-02 and N-1 latency remain **Not tested**; F5 **OPEN**.
