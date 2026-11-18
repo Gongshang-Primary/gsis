@@ -13,7 +13,7 @@ Refreshed main, open PR files and active claims. The duty-save task is frozen at
 
 The only open PR at this checkpoint is v0.9 #182 at `57ab791db80c28f647f1ec03aee73e67cc981b90`. Its sole v1 path is the operation probe allowlist, changing the dynamic call-site line 988 to 997; the coordinator verified and authorises the disjoint removal of only the F07 entry here, after real probe evidence. Do not change its line-number entry or other unresolved allowances.
 
-Exact six-path allowlist:
+Exact seven-path allowlist:
 
 1. `docs/coordination/tasks/v1-roster-statistics-adapter.md`
 2. `v1/services/roster/service.mjs`
@@ -21,6 +21,7 @@ Exact six-path allowlist:
 4. `v1/web/shared/client.js`
 5. `tests/v1-product-roster-statistics-browser.mjs` (new)
 6. `tests/v1-product/operation-probe-allowlist.json` (F07 entry only)
+7. `v1/services/roster/repository.mjs` (bounded read batching only; preserve all mutation fences)
 
 ## Evidence and bounded design
 
@@ -29,6 +30,10 @@ The retained native Statistics page still calls `statisticsRPercent`, absent fro
 Reuse the existing Statistics projection and allocator accounting/ranking contracts through a v1-owned adapter. Roster owns durable relief duties, settled ledger/corrections, opening balances, retained commitments and frozen weekly entitlements. Contacts owns current identities/eligibility; Deploy owns current verified or explicitly estimated workload. Do not treat a current-week ledger read as annual history, infer missing historic quotas, rewrite captured R or invent teaching evidence. Preserve settled annual rules, SRE daily/weekly distinctions, unknown-history warnings and estimated labels on affected screen/export. Read-only reporting cannot publish, allocate or create authority records.
 
 Use bounded owner reads and current projection contracts; avoid annual baseline/Calendar fanout just to recover past settled totals. Preserve school/current-capability checks, response and row bounds, source observations and honest cache/revision identity. A missing or corrupt published source remains an error; a saved estimate never claims verified history. No new formula, database table, build-web text patch or schema migration.
+
+## Approved read-batching amendment
+
+Before product edits, inspection showed that existing `loadState` plus `accountingProjection` performs about 106 per-week scope reads for an annual report. The coordinator explicitly authorises the seventh repository path for bounded batching only, retaining every mutation fence and an equivalently consistent read. Annual reporting reuses the existing owner accounting projection, without annual Calendar/baseline fanout or a competing formula. This amendment is published before any product change. Honest quota coverage and unavailable-history warnings remain required.
 
 ## Acceptance and handoff
 
