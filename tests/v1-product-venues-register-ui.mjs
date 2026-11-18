@@ -28,8 +28,9 @@ try {
       await route.fulfill({status:response.status,headers,body:Buffer.from(await response.arrayBuffer())});
     });
     const page=await context.newPage();page.setDefaultTimeout(10000);page.on("pageerror",e=>errors.push(e.message));
+    const denial = user.id === reader.id ? page.waitForResponse(response => new URL(response.url()).pathname === "/api/venues/read" && response.request().postDataJSON()?.operation === "admin" && response.status() === 403) : null;
     await page.goto(origin+"/venues/?view=admin");
-    return {page,context};
+    return {page,context,denial};
   }
   const {page,context}=await pageFor(admin);
   const register=page.locator("#v1VenueRegister");
@@ -99,7 +100,8 @@ try {
   const narrow=await register.boundingBox();assert(narrow.width<=390);
 
   const denied=await pageFor(reader);
-  await denied.page.getByText("Room management access required",{exact:true}).waitFor();
+  await denied.denial;
+  assert.equal(await denied.page.locator('.main-nav [data-view="admin"]').isHidden(),true);
   assert.equal(await denied.page.locator("#v1VenueRegister").count(),0);
   const preview=await pageFor(admin,{"x-gsis-preview-account":admin.id});
   await preview.page.locator("#v1VenueRegister").waitFor();
