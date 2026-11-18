@@ -13,7 +13,7 @@ Refreshed main, open PR files and active claims. The duty-save task is frozen at
 
 The only open PR at this checkpoint is v0.9 #182 at `57ab791db80c28f647f1ec03aee73e67cc981b90`. Its sole v1 path is the operation probe allowlist, changing the dynamic call-site line 988 to 997; the coordinator verified and authorises the disjoint removal of only the F07 entry here, after real probe evidence. Do not change its line-number entry or other unresolved allowances.
 
-Exact seven-path allowlist:
+Exact eight-path allowlist:
 
 1. `docs/coordination/tasks/v1-roster-statistics-adapter.md`
 2. `v1/services/roster/service.mjs`
@@ -22,6 +22,7 @@ Exact seven-path allowlist:
 5. `tests/v1-product-roster-statistics-browser.mjs` (new)
 6. `tests/v1-product/operation-probe-allowlist.json` (F07 entry only)
 7. `v1/services/roster/repository.mjs` (bounded read batching only; preserve all mutation fences)
+8. `scripts/v1/build-web.mjs` (one same-line Roster Statistics explanatory-text replacement only)
 
 ## Evidence and bounded design
 
@@ -34,6 +35,10 @@ Use bounded owner reads and current projection contracts; avoid annual baseline/
 ## Approved read-batching amendment
 
 Before product edits, inspection showed that existing `loadState` plus `accountingProjection` performs about 106 per-week scope reads for an annual report. The coordinator explicitly authorises the seventh repository path for bounded batching only, retaining every mutation fence and an equivalently consistent read. Annual reporting reuses the existing owner accounting projection, without annual Calendar/baseline fanout or a competing formula. This amendment is published before any product change. Honest quota coverage and unavailable-history warnings remain required.
+
+## Approved explanatory-text amendment
+
+The preserved Statistics description calls R% the allocator's selection value, but v1's layered allocator uses its own weekly-capacity/rotation order. The coordinator explicitly authorises one same-line v1-only builder replacement to describe the unchanged report as recorded completed and committed relief against captured entitlement, keeping its weekly SRE basis and current allocation rules separate. No v0.9 source or allocation policy changes. This exception is smaller than adding a UI module solely for one sentence and is published before the builder edit.
 
 ## Acceptance and handoff
 
