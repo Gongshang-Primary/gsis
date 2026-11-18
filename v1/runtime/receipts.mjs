@@ -4,10 +4,12 @@ import { digest, one, query, statement } from "./store.mjs";
 const statuses = new Set(["sent", "failed", "delivered", "read"]);
 const eventOrder =
   "CASE status WHEN 'read' THEN 4 WHEN 'delivered' THEN 3 WHEN 'failed' THEN 2 ELSE 1 END DESC,event_at DESC,event_id DESC";
+// The two Roster types have always used WhatsApp, including historical payloads
+// without a channel field. Do not broaden this to email or receipt-fanout jobs.
 const whatsappJob =
-  "(json_extract(payload_json,'$.channel')='whatsapp' OR json_extract(payload_json,'$.provider')='whatsapp')";
+  "(type IN ('roster-notification','roster-inbox-reply') OR json_extract(payload_json,'$.channel')='whatsapp' OR json_extract(payload_json,'$.provider')='whatsapp')";
 
-/** Only a named Worker entrypoint bound to the verified webhook owner may call this. */
+/** Called by the verified webhook owner or its bound receipt-only entrypoints. */
 export async function recordProviderReceipt(env, input, now = Date.now()) {
   requireValue(
     input && typeof input === "object" && !Array.isArray(input),

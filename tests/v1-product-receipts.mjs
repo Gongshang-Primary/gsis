@@ -237,6 +237,37 @@ try {
     "PASS provider receipts: late provider identity is fenced, remains uncertain without callback, and can reconcile without a resend.",
   );
 
+  // These owner-defined types always dispatch through WhatsApp, including
+  // persisted payloads created before channel metadata existed.
+  for (const type of [
+    "roster-notification",
+    "roster-inbox-reply",
+    "roster-email",
+    "roster-provider-receipt",
+    "roster-unknown",
+  ]) {
+    const id = "legacy-" + type;
+    await job(id, "wamid." + id);
+    await h.db
+      .prepare(
+        "UPDATE product_outbox SET type=?,payload_json='{}' WHERE school_id=? AND job_id=?",
+      )
+      .bind(type, schoolId, id)
+      .run();
+    await recordProviderReceipt(env(), event("wamid." + id, "read"), now);
+    const whatsapp = ["roster-notification", "roster-inbox-reply"].includes(
+      type,
+    );
+    assert.equal(
+      (await get(id)).state,
+      whatsapp ? "delivered" : "accepted",
+      type + " must use its exact owner-defined channel",
+    );
+  }
+  console.log(
+    "PASS provider receipts: only the two WhatsApp Roster job types reconcile without channel metadata; email, fanout and unknown types stay untouched.",
+  );
+
   await job("email", "wamid.email", "accepted", "email");
   await recordProviderReceipt(env(), event("wamid.email", "delivered"), now);
   assert.equal(
