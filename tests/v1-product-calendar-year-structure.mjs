@@ -144,6 +144,62 @@ try {
   }
   assert.equal((await one(runtime.db, "SELECT COUNT(*) n FROM calendar_events WHERE year=2025")).n, 4544);
   assert.equal((await one(runtime.db, "SELECT COUNT(*) n FROM product_outbox")).n, 0);
+  // Generation must remain readable under the existing mapper bounds. Count
+  // global metadata too, and repeat the net-size check in the owner transaction.
+  await createYear(2026);
+  const nearEvents = Array.from({ length: 4957 }, (_, i) => ({ id: "cap-event-" + i,
+    data: canonical({ Year: 2026, EventID: "cap-event-" + i, StaffTitle: "Retained manual event", Status: "HIDDEN", StartDate: "2026-02-01", EndDate: "2026-02-01", StaffDescription: "", EventType: "ALL_DAY" }) }));
+  await runtime.db.prepare("INSERT INTO calendar_events(school_id,event_id,year,revision,status,start_date,end_date,data_json) SELECT ?,json_extract(value,'$.id'),2026,1,'HIDDEN','2026-02-01','2026-02-01',json_extract(value,'$.data') FROM json_each(?)").bind(principal.schoolId, canonical(nearEvents)).run();
+  const oversizedEvents = await payload(2026), beforeEventCap = await content();
+  await assert.rejects(() => mutate("generateYearStructure", oversizedEvents), e => e.code === "BOUNDS_EXCEEDED");
+  assert.deepEqual(await content(), beforeEventCap, "oversized generation preserves all existing records");
+  await runtime.db.prepare("DELETE FROM calendar_events WHERE event_id='cap-event-4956'").run();
+  const exactEvents = await payload(2026); let eventCapRaced = false;
+  const eventCapDb = new Proxy(runtime.db, { get(target, key) {
+    if (key === "batch") return async batch => {
+      if (!eventCapRaced && batch.length > 10) {
+        eventCapRaced = true;
+        await runtime.db.prepare("INSERT INTO calendar_events(school_id,event_id,year,revision,status,start_date,end_date,data_json) VALUES(?,'cap-concurrent-event',2026,1,'HIDDEN','2026-02-01','2026-02-01',?)").bind(principal.schoolId, nearEvents[0].data).run();
+      }
+      return target.batch(batch);
+    };
+    const v = target[key]; return typeof v === "function" ? v.bind(target) : v;
+  } });
+  await assert.rejects(() => mutate("generateYearStructure", exactEvents, eventCapDb), e => e.code === "REVISION_CONFLICT");
+  assert(eventCapRaced);
+  assert.equal((await one(runtime.db, "SELECT COUNT(*) n FROM calendar_events WHERE year=2026")).n, 4957);
+  assert.equal((await one(runtime.db, "SELECT COUNT(*) n FROM calendar_metadata WHERE year=2026")).n, 0);
+  await runtime.db.prepare("DELETE FROM calendar_events WHERE event_id='cap-concurrent-event'").run();
+  await mutate("generateYearStructure", await payload(2026));
+  assert.equal((await bootstrap(2026)).events.length, 5000, "the exact supported event bound remains readable");
+
+  await createYear(2032);
+  const globalCount = (await one(runtime.db, "SELECT COUNT(*) n FROM calendar_metadata WHERE school_id=? AND year=0", [principal.schoolId])).n;
+  const nearMetadata = Array.from({ length: 2000 - globalCount - 46 + 1 }, (_, i) => ({ id: "cap-note-" + i, data: canonical({ Label: "Retained note" }) }));
+  await runtime.db.prepare("INSERT INTO calendar_metadata(school_id,kind,record_id,year,revision,data_json) SELECT ?,'syntheticNote',json_extract(value,'$.id'),2032,1,json_extract(value,'$.data') FROM json_each(?)").bind(principal.schoolId, canonical(nearMetadata)).run();
+  const oversizedMetadata = await payload(2032), beforeMetadataCap = await content();
+  await assert.rejects(() => mutate("generateYearStructure", oversizedMetadata), e => e.code === "BOUNDS_EXCEEDED");
+  assert.deepEqual(await content(), beforeMetadataCap, "global plus year metadata must fit the reader's bound");
+  await runtime.db.prepare("DELETE FROM calendar_metadata WHERE kind='syntheticNote' AND record_id='cap-note-0'").run();
+  const exactMetadata = await payload(2032); let metadataCapRaced = false;
+  const metadataCapDb = new Proxy(runtime.db, { get(target, key) {
+    if (key === "batch") return async batch => {
+      if (!metadataCapRaced && batch.length > 10) {
+        metadataCapRaced = true;
+        await runtime.db.prepare("INSERT INTO calendar_metadata VALUES(?,'syntheticNote','cap-concurrent-global',0,1,?)").bind(principal.schoolId, canonical({ Label: "Concurrent global note" })).run();
+      }
+      return target.batch(batch);
+    };
+    const v = target[key]; return typeof v === "function" ? v.bind(target) : v;
+  } });
+  await assert.rejects(() => mutate("generateYearStructure", exactMetadata, metadataCapDb), e => e.code === "REVISION_CONFLICT");
+  assert(metadataCapRaced);
+  assert.equal((await one(runtime.db, "SELECT COUNT(*) n FROM calendar_events WHERE year=2032")).n, 0);
+  assert.equal((await one(runtime.db, "SELECT COUNT(*) n FROM calendar_metadata WHERE record_id='cap-concurrent-global'")).n, 1);
+  await runtime.db.prepare("DELETE FROM calendar_metadata WHERE record_id='cap-concurrent-global'").run();
+  await mutate("generateYearStructure", await payload(2032));
+  assert.equal((await one(runtime.db, "SELECT COUNT(*) n FROM calendar_metadata WHERE school_id=? AND (year=0 OR year=2032)", [principal.schoolId])).n, 2000);
+  assert.equal((await bootstrap(2032)).yearStructure.length, 45, "the exact supported metadata bound remains readable");
   console.log("GENERATION_BUDGET " + JSON.stringify(budgets));
   console.log("PASS Calendar year generation: native W0/40 full weeks/gaps/44 records, no jobs, ownership/import/manual preservation, stale token/CAS rollback, original receipt/restart and authority");
 } finally { await runtime.close(); }

@@ -60,3 +60,12 @@ Commands run on the implementation working tree based on the claim; final exact 
 - Unchanged focused regressions and required full Node/LORD/product CI remain pending here and will be recorded in the PR as performed. Full suites have not been run locally for this head. No earlier green run is transferred.
 
 Q01–Q05 pass for scoped local evidence; Q06 focused/build/discovery pass with full CI pending; Q07 independent exact-head review pending. Runtime and deployment statuses remain unchanged above. No skill package was executed. No migration, live-data adoption or provider activation occurred.
+
+
+## Final capacity correction before review
+
+Post-publication read-only scrutiny of the initial head `f24cab5bcf0f784a55eb339a86d9c2f7077f556f` found a reader-bound gap. Actual synthetic D1 reproduced 4,957 existing events +44 generated events committing 5,001, and 1,956 existing global/year metadata records +45 generated records committing 2,001; both made the existing bootstrap reader reject the year. Initial CI remains historical evidence for that head only.
+
+The same five-path scope now preflights the net post-generation count against the existing 5,000-event/2,000-metadata limits and repeats both bounds inside the guarded owner transaction. Metadata includes all global and selected-year kinds, matching bootstrap. No reader limit is raised. Added actual D1 cases prove whole-operation rejection above each limit, acceptance/readability exactly at each limit, and rollback when an unrelated event or global metadata insertion crosses the bound between observation and commit; the competing insertion is retained.
+
+`TZ=Asia/Singapore timeout 45s node tests/v1-product-calendar-year-structure.mjs` passed with these cases. The corrected cold budget is first generation40 SQL statements +3 service calls, rerun41+3, maximum batch22, maximum binds11; both remain below50 total calls. The native browser/lost-response test, canonical build/no drift and exact-head CI are rechecked for the corrected head and recorded in the PR. No review, merge, deployment or hosted UAT is claimed.

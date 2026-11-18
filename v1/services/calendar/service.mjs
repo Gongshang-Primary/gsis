@@ -1375,11 +1375,19 @@ async function structure(ctx, op, p) {
   }
   const next = { schemaVersion: 1, year: y, operationId: op.operationId, structureIds: records.map((record) => record.StructureID), entries };
   metadata.push({ id: String(y), kind: "yearStructureGenerator", revision: (provenance?.revision || 0) + 1, data: canonical(next) });
+  const addedEvents = eventWrites.filter((event) => !eventRows.has(event.id)).length;
+  const existingMetadata = new Set(previous.map((record) => `${record.kind}:${record.record_id}`));
+  const addedMetadata = metadata.filter((record) => !existingMetadata.has(`${record.kind}:${record.id}`)).length;
+  const metadataCount = await one(db,
+    "SELECT COUNT(*) AS n FROM calendar_metadata WHERE school_id=? AND (year=0 OR year=?)", [s, y]);
+  need(events.length + addedEvents <= MAX_EVENTS && metadataCount.n + addedMetadata <= MAX_METADATA,
+    "BOUNDS_EXCEEDED", "Generated records would exceed the Calendar view's supported bound.", 413);
   const expectedMetadata = boundedGenerationJson(previous.map((r) => ({ id: r.record_id, kind: r.kind, revision: r.revision, data: r.data_json })));
   const ids = boundedGenerationJson(entries.map((entry) => entry.eventId));
   const expectedEvents = boundedGenerationJson(events.filter((r) => ownedEventIds.has(r.event_id)).map((r) => ({ id: r.event_id, revision: r.revision, data: r.data_json })));
   const guards = [
     guardRow("calendar_years", "school_id=? AND year=?", [s, y], row.revision),
+    { sql: "SELECT (SELECT COUNT(*) FROM calendar_events WHERE school_id=? AND year=?)+?<=? AND (SELECT COUNT(*) FROM calendar_metadata WHERE school_id=? AND (year=0 OR year=?))+?<=? AS ok", args: [s, y, addedEvents, MAX_EVENTS, s, y, addedMetadata, MAX_METADATA] },
     { sql: `WITH observed AS (SELECT * FROM calendar_metadata WHERE school_id=? AND year=? AND kind IN ('yearStructure','yearStructureGenerator')), expected AS (SELECT value FROM json_each(?)) SELECT (SELECT COUNT(*) FROM observed)=(SELECT COUNT(*) FROM expected) AND NOT EXISTS(SELECT 1 FROM observed r WHERE NOT EXISTS(SELECT 1 FROM expected e WHERE json_extract(e.value,'$.id')=r.record_id AND json_extract(e.value,'$.kind')=r.kind AND json_extract(e.value,'$.revision')=r.revision AND json_extract(e.value,'$.data')=r.data_json)) AS ok`, args: [s, y, expectedMetadata] },
     { sql: `WITH observed AS (SELECT * FROM calendar_events WHERE school_id=? AND year=? AND event_id IN(SELECT value FROM json_each(?))), expected AS (SELECT value FROM json_each(?)) SELECT (SELECT COUNT(*) FROM observed)=(SELECT COUNT(*) FROM expected) AND NOT EXISTS(SELECT 1 FROM observed r WHERE NOT EXISTS(SELECT 1 FROM expected e WHERE json_extract(e.value,'$.id')=r.event_id AND json_extract(e.value,'$.revision')=r.revision AND json_extract(e.value,'$.data')=r.data_json)) AS ok`, args: [s, y, ids, expectedEvents] },
     { sql: "SELECT NOT EXISTS(SELECT 1 FROM calendar_events WHERE school_id=? AND year=? AND deleted_at IS NULL AND instr(COALESCE(json_extract(data_json,'$.StaffDescription'),''),'[[GSPS_YEAR_STRUCTURE:')>0 AND event_id NOT IN(SELECT value FROM json_each(?))) AND NOT EXISTS(SELECT 1 FROM calendar_dispatch_locks WHERE school_id=? AND event_id IN(SELECT value FROM json_each(?))) AS ok", args: [s, y, ids, s, ids] },
