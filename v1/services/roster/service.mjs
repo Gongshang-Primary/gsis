@@ -40,6 +40,7 @@ import {
 } from "../../runtime/security.mjs";
 import { outboxHealth, drainOutbox } from "../../runtime/jobs.mjs";
 import { dispatchProvider } from "../../runtime/providers.mjs";
+import { recordProviderReceipt } from "../../runtime/receipts.mjs";
 import {
   loadState,
   recordChanges,
@@ -3299,21 +3300,41 @@ export async function webhook(ctx) {
         "WEBHOOK_BODY_INVALID",
       );
     const eventId = await digest({
-        provider,
-        id: event.id,
-        kind: event.kind,
-        status: event.status || null,
-        at: event.at,
-      }),
-      op = await prepareOperation(env.DB, {
-        schoolId,
-        actorId: "provider:" + provider,
-        operationId: "event:" + eventId,
-        action: "internal.roster.webhook",
-        intent: { eventId },
+      provider,
+      id: event.id,
+      kind: event.kind,
+      status: event.status || null,
+      at: event.at,
+    });
+    // Persist verified provider truth before the fanout-operation replay check.
+    // An early receipt then survives a missing sender ID or interruption and
+    // reconciles through the same monotonic recovery used by other owners.
+    if (
+      provider === "whatsapp" &&
+      event.kind === "status" &&
+      ["sent", "delivered", "read", "failed"].includes(event.status)
+    )
+      await recordProviderReceipt(
+        env,
+        {
+          schoolId,
+          provider,
+          providerId: event.id,
+          eventId,
+          status: event.status,
+          occurredAt: event.at,
+        },
         now,
-        validUntil: now + 60000,
-      });
+      );
+    const op = await prepareOperation(env.DB, {
+      schoolId,
+      actorId: "provider:" + provider,
+      operationId: "event:" + eventId,
+      action: "internal.roster.webhook",
+      intent: { eventId },
+      now,
+      validUntil: now + 60000,
+    });
     if (op.receipt) continue;
     const writes = [
       {
@@ -3345,21 +3366,6 @@ export async function webhook(ctx) {
             actionState: "requires-verified-identity",
           }),
         ],
-      });
-    else if (["delivered", "read"].includes(event.status))
-      writes.push({
-        sql: "UPDATE product_outbox SET state='delivered',last_code=?,updated_at=? WHERE school_id=? AND provider_id=? AND state IN ('leased','accepted','uncertain','delivered')",
-        args: [
-          event.status === "read" ? "PROVIDER_READ" : "PROVIDER_DELIVERED",
-          now,
-          schoolId,
-          event.id,
-        ],
-      });
-    else if (event.status === "failed")
-      writes.push({
-        sql: "UPDATE product_outbox SET state='failed',last_code='PROVIDER_DELIVERY_FAILED',updated_at=? WHERE school_id=? AND provider_id=? AND state IN ('accepted','uncertain')",
-        args: [now, schoolId, event.id],
       });
     await commitOperation(env.DB, op, {
       now,

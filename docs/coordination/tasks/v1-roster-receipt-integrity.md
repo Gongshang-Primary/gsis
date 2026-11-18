@@ -1,7 +1,7 @@
 # v1-roster-receipt-integrity
 
-- Status: claimed before implementation.
-- Owner/model: Codex. Coordinator: ChatGPT (v1). Independent reviewer: Claude, exact head.
+- Status: implemented and locally verified; exact-head CI and independent review pending.
+- Owner/model: Codex. Coordinator: ChatGPT (v1). Independent reviewer: Muse, exact head.
 - Last updated: 18 November 2026, Asia/Singapore.
 - Branch: `codex/v1-roster-receipt-integrity`.
 - Refreshed main/base: `8c2ece8f6cabdb1956b4775c01a1364fd898a2ed`.
@@ -9,7 +9,7 @@
 
 ## Start gates and ownership
 
-Read current root/v1 instructions, coordination workflow, lanes, status, owner directives, deployments and engineering policy. Refreshed main and actual open PR inventories: #205 at `456f264796ea24ed03a51df9fe3eb96f9edf1cd5` and #182 at `57ab791db80c28f647f1ec03aee73e67cc981b90` have no overlap with this allowlist. The older queued v1 absence-confirmation task explicitly owns only its task record; it is not activated here. Re-read the accepted claim before product edits.
+Read current root/v1 instructions, coordination workflow, lanes, status, owner directives, deployments and engineering policy. Refreshed main and actual open PR inventories: #205 at `456f264796ea24ed03a51df9fe3eb96f9edf1cd5` and #182 at `57ab791db80c28f647f1ec03aee73e67cc981b90` have no overlap with this allowlist. The older queued v1 absence-confirmation task explicitly owns only its task record; it is not activated here. Accepted claim `badd6b3` was published and re-read before product edits; implementation starts from that claim. The coordinator's branch-only follow-up arrived after the non-force claim push had already succeeded; no further main push is made. Current owner-appointed reviewer for this batch is Muse (superseding the older repository reviewer wording for this task).
 
 Source report SHA-256: `80776f27ab1ee81d042c98da4103400cf8df07e1f87bda9d71f02ca1bd4761f7`, describing v0.9 head `57ab791db80c28f647f1ec03aee73e67cc981b90`. The v1 evidence is independently reproduced at the main/base above; historical report observations are not assumed to be v1 outcomes.
 
@@ -31,6 +31,24 @@ Add a discoverable regression through actual local signed gateway, Workers and D
 
 ## Verification and handoff
 
-Pending implementation and tracked red/green evidence. A prior read-only synthetic matrix reproduced failed→delivered/read, read→older-delivered and early callback defects; older sent, explicit retry, provider identity and signature negatives already remained protected. No provider dispatch was invoked; no outbound-fetch counter was instrumented. No cloud skill is claimed executed.
+The Roster webhook now records verified WhatsApp status through the existing common durable-receipt mechanism before checking the fanout operation receipt. This is independently idempotent provider evidence, not a new business mutation or cross-operation atomicity claim. The existing Roster event/audit/fanout transaction remains intact. Common recovery selects only known WhatsApp channel metadata or the two existing WhatsApp-only Roster job types; it ignores email, receipt fanout and unknown job types. Current queued retry and lease/fence behavior is preserved. A callback during a lease remains durable until the sender outcome/identity becomes eligible for reconciliation.
 
-Rollback reverts these bounded sources without schema migration, retaining durable provider event evidence. It reintroduces the identified ordering/recovery limitations. Claude reviews the exact implementation head; merge remains a separate decision.
+All commands use `TZ=Asia/Singapore`:
+
+| Command | Result |
+| --- | --- |
+| `node tests/v1-product-roster-receipts.mjs` on unchanged product source | Expected red: exit 1, 10.801s; matching failed→delivered remained failed. Older sent and explicitly queued retry protections passed first. |
+| `node tests/v1-product-roster-receipts.mjs` after correction | Pass: 11 actual signed gateway/Workers/D1 cases, final 12.384s. Includes failed→delivered/read, monotonic read, early callback/exact replay, uncertain claim, old provider ID, signature/phone rejection and false legacy flag with real scheduled receipt fanout. |
+| `node tests/v1-product-receipts.mjs` | Pass: 6 actual-D1 groups, 4.596s, including concurrent order, changed-event conflict, persistence/restart, late sender fencing and exact Roster type/channel selection. |
+| `node tests/v1-product-roster-service.mjs` (unchanged) | Pass: 15 groups, 13.861s, including durable fanout retry after restart. |
+| `node tests/run.cjs --list` | Pass: both receipt programs discovered among 1,230 current programs; no runner/CI change. |
+| `npm run build` | Pass: 18 canonical production components; no tracked generated drift. |
+| `git diff --check`, source/test syntax checks | Pass; exact five-path inventory. |
+
+Initial command invocation used unavailable `/usr/bin/time` and exited 127 before running a test; the recorded timings above use the shell timer. A prior read-only synthetic matrix independently reproduced all three defects. No provider dispatch was invoked; no outbound-fetch counter was instrumented. No cloud skill is claimed executed.
+
+Q01–Q05: Pass for bounded authorization, source ownership, signature/school/channel/identity negatives, durable ordering/recovery and unchanged resource limits. Q06: local focused verification/build/discovery pass; full Node/LORD and isolated-product exact-head CI pending. Q07: implementation branch will be pushed for exact-head Muse review; final tested commit is the PR head and its CI, not an invented self-referential task SHA. Q08: deployment not applicable; hosted/runtime UAT **Not tested**.
+
+Limitations: this corrects new or replayed authenticated callbacks; it does not bulk backfill old `roster_provider_events` that are never replayed. It neither retries uncertain sends nor makes a delivery callback equivalent to a staff acknowledgement. The historical dashboard count of 88 was not reproduced as a live incident and is not a v1 batching ceiling. No account, scheduler, send-owner, infrastructure or provider configuration changed.
+
+Rollback reverts these bounded sources without schema migration, retaining durable provider event evidence. It reintroduces the identified ordering/recovery limitations. Muse reviews the exact implementation head; merge remains a separate decision.
