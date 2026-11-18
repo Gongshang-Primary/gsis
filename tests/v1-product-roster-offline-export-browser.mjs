@@ -141,7 +141,7 @@ try {
     }).format(new Date(date + "T12:00:00+08:00"));
   async function exportAll(
     date,
-    { unsaved = false, excludeReliever = false } = {},
+    { unsaved = false, excludeReliever = false, captureBlobs = false } = {},
   ) {
     const apiBefore = f.requests.length,
       blockedBefore = blocked.length;
@@ -154,24 +154,45 @@ try {
       "[data-relief-excel]",
       "[data-class-excel]",
     ]) {
-      const pending = page.waitForEvent("download", { timeout: 3500 });
+      const capturedBefore = captureBlobs
+        ? await page.evaluate(() => __offlineWorkbookCapture.blobs.length)
+        : null;
+      const pending = captureBlobs
+        ? null
+        : page.waitForEvent("download", { timeout: 3500 });
       await page.locator(selector).click();
-      let file;
-      try {
-        file = await pending;
-      } catch (error) {
-        throw Error(
-          "No local workbook for " +
-            selector +
-            " after " +
-            downloads.length +
-            " downloads: " +
-            (await page.locator("[data-ops-message]").innerText()),
-          { cause: error },
+      let bytes;
+      if (captureBlobs) {
+        await page.waitForFunction(
+          (before) => __offlineWorkbookCapture.blobs.length === before + 1,
+          capturedBefore,
+          { timeout: 3500 },
         );
+        bytes = Buffer.from(
+          await page.evaluate(async (index) => {
+            const blob = __offlineWorkbookCapture.blobs[index];
+            return Array.from(new Uint8Array(await blob.arrayBuffer()));
+          }, capturedBefore),
+        );
+      } else {
+        let file;
+        try {
+          file = await pending;
+        } catch (error) {
+          throw Error(
+            "No local workbook for " +
+              selector +
+              " after " +
+              downloads.length +
+              " downloads: " +
+              (await page.locator("[data-ops-message]").innerText()),
+            { cause: error },
+          );
+        }
+        assert.match(file.suggestedFilename(), /\.xlsx$/);
+        bytes = await readFile(await file.path());
       }
-      assert.match(file.suggestedFilename(), /\.xlsx$/);
-      const zip = await JSZip.loadAsync(await readFile(await file.path()));
+      const zip = await JSZip.loadAsync(bytes);
       const xml = (
         await Promise.all(
           Object.values(zip.files)
@@ -424,7 +445,53 @@ try {
       getEffectiveDay: (date) => (date === data.date ? effective : null),
     };
   }, s.staff);
-  const staplerBooks = await exportAll(date2);
+  assert.equal(
+    downloads.length,
+    9,
+    "the first three groups use nine real downloads",
+  );
+  // Locked Chromium lost a download event after ten files despite UI success.
+  // The synthetic plan case clicks the real buttons and parses their XLSX Blobs;
+  // only this group's final generated download-anchor handoff is intercepted.
+  await page.evaluate(() => {
+    const original = URL.createObjectURL;
+    const state = { blobs: [], urls: new Set(), filenames: [] };
+    URL.createObjectURL = function (blob) {
+      const url = original.call(this, blob);
+      state.blobs.push(blob);
+      state.urls.add(url);
+      return url;
+    };
+    // The exporters click detached anchors, so their prototype entry is the
+    // narrow observation point; unrelated anchors keep their native behavior.
+    const click = HTMLAnchorElement.prototype.click;
+    HTMLAnchorElement.prototype.click = function () {
+      if (state.urls.has(this.href) && this.hasAttribute("download")) {
+        state.filenames.push(this.download);
+        return;
+      }
+      return click.call(this);
+    };
+    state.restore = () => {
+      URL.createObjectURL = original;
+      HTMLAnchorElement.prototype.click = click;
+    };
+    window.__offlineWorkbookCapture = state;
+  });
+  let staplerBooks;
+  try {
+    staplerBooks = await exportAll(date2, { captureBlobs: true });
+    const captured = await page.evaluate(() => ({
+      count: __offlineWorkbookCapture.blobs.length,
+      filenames: __offlineWorkbookCapture.filenames,
+    }));
+    assert.equal(captured.count, 3);
+    assert.equal(captured.filenames.length, 3);
+    captured.filenames.forEach((name) => assert.match(name, /\.xlsx$/));
+    assert.equal(downloads.length, 9);
+  } finally {
+    await page.evaluate(() => __offlineWorkbookCapture.restore());
+  }
   for (const xml of staplerBooks) assert.match(xml, /SYNTHETIC_MOVED_LESSON/);
   assert.match(
     staplerBooks[1],
@@ -443,38 +510,52 @@ try {
   );
   assert.deepEqual(await savedAssignments(), before);
   console.log(
-    "PASS 5/6: synthetic exact confirmed-plan cache restores moved lessons, change rows and class recess across real XLSX exports",
+    "PASS 5/6: synthetic confirmed-plan cache preserves moved lessons, change rows and class recess in three button-generated XLSX Blobs",
   );
 
   await page.evaluate(() => {
     window.__offlineExportSession.ctx.timetablePreload.getPlan = () => null;
+    const original = URL.createObjectURL;
+    window.__missingPlanBlobCount = 0;
+    URL.createObjectURL = function (blob) {
+      __missingPlanBlobCount++;
+      return original.call(this, blob);
+    };
+    window.__restoreMissingPlanBlobSpy = () => {
+      URL.createObjectURL = original;
+    };
   });
   const missingPlan = `The confirmed local Stapler plan for ${date2} (revision 7) is missing.`;
   const beforeMissingPlan = downloads.length,
     beforeMissingRequests = blocked.length;
-  for (const selector of [
-    "[data-daily-excel]",
-    "[data-relief-excel]",
-    "[data-class-excel]",
-  ]) {
-    await page.evaluate(() =>
-      document.querySelector("[data-ops-message]").replaceChildren(),
+  try {
+    for (const selector of [
+      "[data-daily-excel]",
+      "[data-relief-excel]",
+      "[data-class-excel]",
+    ]) {
+      await page.evaluate(() =>
+        document.querySelector("[data-ops-message]").replaceChildren(),
+      );
+      await page.locator(selector).click();
+      await page.waitForFunction(
+        (message) =>
+          document
+            .querySelector("[data-ops-message]")
+            ?.textContent.includes(message),
+        missingPlan,
+      );
+    }
+    assert.equal(
+      downloads.length,
+      beforeMissingPlan,
+      "teacher cells cannot substitute for a missing confirmed plan",
     );
-    await page.locator(selector).click();
-    await page.waitForFunction(
-      (message) =>
-        document
-          .querySelector("[data-ops-message]")
-          ?.textContent.includes(message),
-      missingPlan,
-    );
+    assert.equal(blocked.length, beforeMissingRequests);
+    assert.equal(await page.evaluate(() => __missingPlanBlobCount), 0);
+  } finally {
+    await page.evaluate(() => __restoreMissingPlanBlobSpy());
   }
-  assert.equal(
-    downloads.length,
-    beforeMissingPlan,
-    "teacher cells cannot substitute for a missing confirmed plan",
-  );
-  assert.equal(blocked.length, beforeMissingRequests);
   assert.deepEqual(await savedAssignments(), before);
   assert.deepEqual(errors, []);
   console.log(
