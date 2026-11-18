@@ -144,6 +144,17 @@ try {
       fieldRevisions: { role: contact.fields.role?.revision || 0, memberships: contact.fields.memberships?.revision || 0 },
     });
   }
+  // This version was deliberately empty for the matrix checks. Explicitly
+  // save its later Contacts members instead of relying on read-time seeding.
+  const refreshClient = await page.evaluate(() => clientId);
+  const refreshLease = await f.call(f.admin, "deploy", "/lease", {
+    operationId: "synthetic-matrix-refresh-lease", versionId, scope: "meta", clientId: refreshClient,
+  });
+  await f.call(f.admin, "deploy", "/change", {
+    operationId: "synthetic-matrix-refresh-members", operation: "acceptContacts", versionId,
+    scope: "meta", clientId: refreshClient, leaseFence: refreshLease.fence,
+  });
+  assert.deepEqual((await stored()).teachers.map(t => t.id).sort(), scenario.staff.slice().sort());
   await open();
   const explicit = await f.call(f.admin, "deploy", "/export", { versionId, scope: "Role Membership" });
   explicit.sheets["Role Membership"].rows = [
