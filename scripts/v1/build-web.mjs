@@ -905,6 +905,28 @@ function updateRosterCapacity(source){
  walk(ast);if(matches.length!==1)throw Error('Roster health renderer baseline changed');
  const node=matches[0];return source.slice(0,node.start)+'function healthSummary(s,h){return window.GSISV1RosterCapacity.render(s,h);}' +source.slice(node.end);
 }
+function updateRosterLocalExport(source) {
+ const repaired = 'const source=localExportContext(s),data=draftCopy(source),queue=draftFor(s),assignments=(s.data.allocationModel?.assignments||[]).filter(a=>(!a.date||a.date===s.date)&&!a.remove&&!a.invalidCover';
+ const original = "const source=s.data?.exportContext;if(!source||source.date!==s.date||source.revision!==s.data.revision||!source.teacherSummary?.plan)throw Error('The complete export data for this date has not loaded. Refresh records once while online, then export locally.');\n  const data=draftCopy(source),queue=draftFor(s),assignments=(s.data.allocationModel?.assignments||[]).filter(a=>!a.remove&&!a.invalidCover";
+ // v0.9's independent repair may land before this v1 adaptation.
+ const upstreamRepaired = source.includes(repaired);
+ source = replaceOnce(source, upstreamRepaired ? repaired : original,
+  'const data=window.GSISRosterLocalExport.context(s.date,hydrateTimetable(s,s.data),id=>person(s,id).name,()=>s.ctx.timetablePreload?.getPlan?.(s.date)),queue=draftFor(s),assignments=s.data.allocationModel.assignments.filter(a=>(!a.date||a.date===s.date)&&!a.remove&&!a.invalidCover',
+  'Roster Excel snapshots use the selected date and current local draft');
+ source = replaceOnce(source,
+  'data.legend=data.snapshotLabel+\'. \'+data.legend;return data;',
+  "if(data.workloadEvidence?.quality==='estimated')data.snapshotLabel+=' · Estimated workload';\n  data.legend=data.snapshotLabel+'. '+data.legend;return data;",
+  'Roster Excel flags estimated workload on every workbook');
+ if (upstreamRepaired) return source;
+ source = replaceOnce(source,
+  'It is warmed when the page loads; load it on demand if it has not arrived yet.',
+  'Use only the baseline already available locally.',
+  'Roster Excel baseline cache policy');
+ return replaceOnce(source,
+  'if(!baseline&&s.ctx.localTimetable){try{baseline=await s.ctx.localTimetable(date);}catch{baseline=null;}}',
+  'if(!baseline)baseline=s.ctx.cachedTimetable?.(date)||null;',
+  'Roster Excel never starts a timetable request');
+}
 // Native settings consume complete saved views. Check the original operation's
 // committed view before native cleanup; this is not a second receipt protocol.
 function updateRosterAdminSettings(source, settings) {
@@ -1068,7 +1090,7 @@ function transform(module,rel,text){
   text=normaliseReleaseChrome(text,gsisBuildLabel,{ensureHeaderLabel:['lord','starlord','overlord'].includes(module.id)&&rel==='index.html',labelTitle:rel==='index.html'}).replaceAll('Dropdown choices are managed in Deploy.','Dropdown choices and accepted staff facts are managed in Contacts.').replaceAll('Admin access is managed in the backend sheet. Admins can assign or remove SMC access here.','Application access is managed in Core. Accepted SMC, EO and School Leader records are managed separately in Contacts.');
   if(module.id==='contacts'&&rel==='index.html')text=text.replace('</head>','<link rel="stylesheet" href="/v1/shared/contacts-ui.css"><script defer src="/v1/shared/contacts-ui.js"></script></head>');
   if(module.id==='deploy'&&rel==='index.html')text=text.replace('</head>','<script type="module" src="/v1/shared/deploy-ui.js"></script><script type="module" src="/v1/shared/deploy-loads-ui.js"></script><script type="module" src="/v1/shared/deploy-ui-tables.js"></script></head>');
-  if(module.id==='roster'&&rel==='index.html')text=text.replace('</head>','<link rel="stylesheet" href="/v1/shared/roster-capacity.css"><script src="/v1/shared/roster-capacity.js"></script><link rel="stylesheet" href="/v1/shared/roster-stapler-resize.css"><script defer src="/v1/shared/roster-stapler-resize.js"></script><script defer src="/v1/shared/roster-table-ui.js"></script></head>');
+  if(module.id==='roster'&&rel==='index.html')text=text.replace('</head>','<link rel="stylesheet" href="/v1/shared/roster-capacity.css"><script src="/v1/shared/roster-capacity.js"></script><link rel="stylesheet" href="/v1/shared/roster-stapler-resize.css"><script defer src="/v1/shared/roster-stapler-resize.js"></script><script defer src="/v1/shared/roster-table-ui.js"></script><script defer src="/v1/shared/roster-local-export.js"></script></head>');
   if(module.id==='calendar'&&rel==='index.html')text=text.replace('</head>','<link rel="stylesheet" href="/v1/shared/calendar-ui.css"><script type="module" src="/v1/shared/calendar-ui.js"></script></head>');
   if(module.id==='contacts'&&rel==='index.html')text=text.replace('</body>','<script type="module" src="/v1/shared/contacts-authority.js"></script></body>');
   if(module.id==='roster'&&rel==='index.html')text=text.replaceAll('/roster/system-health.html','/admin/#health').replace('</body>','<script type="module" src="/v1/shared/roster-import.js"></script><script type="module" src="/v1/shared/roster-policy-ledger.js"></script><script type="module" src="/v1/shared/roster-continuity.js"></script></body>');
@@ -1122,7 +1144,7 @@ function transform(module,rel,text){
    text=text.replaceAll('<h4>Business preferences</h4>','<h4>Allocation layers</h4><p>Use Allocation layers and duties done below for the current per-layer limits, subject continuity and preference order. These settings replace the older annual-utilisation preferences.</p>');
    text=updateRosterAdminSettings(text,true);
   }
-  if(module.id==='roster'&&rel==='roster-operations-ui.js')text=removeRosterQuietMode(updateRosterAdminSettings(updateRosterCapacity(text),false));
+  if(module.id==='roster'&&rel==='roster-operations-ui.js')text=updateRosterLocalExport(removeRosterQuietMode(updateRosterAdminSettings(updateRosterCapacity(text),false)));
   if(module.id==='deploy'&&rel==='app.js')text=updateDeploy(text);
   if(module.id==='deploy'&&rel==='app.js')text=updateAscSubjectIdentity(text);
   if(module.id==='deploy'&&(rel==='app.js'||rel==='teaching-rules.js'))text=updateDeployTeachingEligibility(text);
