@@ -1,6 +1,6 @@
 # Restore Deploy's campus map
 
-- Status: claimed after baseline reproduction.
+- Status: locally verified, awaiting branch CI and exact-commit review.
 - Owner/model: Codex, with Muse reviewing the final commit.
 - Updated: 19 November 2026, 06:26 SGT.
 - Branch: `codex/v1-deploy-campus-map`.
@@ -23,3 +23,14 @@ On the exact base, locked Chromium drove the built Deploy viewport against isola
 ## Acceptance
 
 Change the v1 loader to read the existing same-origin SVG and keep the native overlay, map controls, workbook/PDF actions, data owner, and protected data boundary. Verify the built viewport opens a map with a synthetic saved classroom overlay, the static bytes are unchanged, sign-in still protects the Deploy document, and opening Layout writes no data. Run the operation probe, frontend parity and canonical build checks. Record any CI or runtime validation still pending. Rollback restores the previous reviewed v1 frontend.
+
+## Verification
+
+The build now points just the active Layout drawing fetch at the already served `/deploy/campus-base.svg`. It uses GET with credentials omitted. The current application still renders its authenticated version projection over that drawing. The gateway, assets, configuration, Deploy owner, retired Layout reference fetch and flag-gated commands are unchanged.
+
+- `TZ=Asia/Singapore npm run build` passed with zero tracked generated drift. `node tests/v1-product-v09-frontend-parity.mjs` passed all nine built release labels, source/asset queries and unchanged legacy sources.
+- `node tests/v1-product-deploy-campus-map-browser.mjs` passed with the locked Chromium 151 path supplied through `GSIS_BROWSER_EXECUTABLE`. The real built browser loaded the same SVG bytes without an Authorization or Cookie header, displayed the seeded saved class overlay, and applied native zoom and Fit. The anonymous Deploy sync request was denied. Layout sent no owner change and the saved D1 document was unchanged.
+- `node tests/v1-product-operation-probe.mjs` passed with the same local settings. The sentinel still returned 404. The probe parsed 127 scripts and retained the other 25 known missing-handler entries and 15 unresolved dynamic sites. It no longer needed the active Deploy campus-map allowance.
+- Syntax and `git diff --check` passed. Required branch and PR CI, review and hosted UAT are pending.
+
+These checks use synthetic local Worker/D1 fixtures. Hosted runtime UAT and T1B-01/T1B-02 remain Not tested. F5 stays OPEN.
