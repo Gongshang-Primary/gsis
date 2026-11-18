@@ -12,7 +12,7 @@
 
 The owner requested continuing the logged v1 defects. The coordinator authorised this bounded repair after a real synthetic reproduction of [issue 212](https://github.com/helper-gsps/gsis/issues/212), with a task-branch-only claim before product edits. The historical direct-main claim step is superseded for this job. No live database inspection, row population, migration, provider send, main write or deployment is permitted.
 
-Exact eight-path allowlist (coordinator refinement before editing the additional paths):
+Exact nine-path allowlist (coordinator refinement before editing the additional paths):
 
 1. `docs/coordination/tasks/v1-deploy-saved-teacher-membership.md`
 2. `v1/services/deploy/model.mjs`
@@ -22,12 +22,15 @@ Exact eight-path allowlist (coordinator refinement before editing the additional
 6. `tests/v1-product-deploy-storage.mjs`
 7. `tests/v1-product-contacts-projection.mjs`
 8. `tests/v1-product-deploy-internal-links-browser.mjs`
+9. `tests/v1-product-deploy-role-memberships-browser.mjs`
 
 No builder, Contacts writer, schema, shared runtime, settings, dependency or generated-output edits. The browser overlay change is limited to explicit `upsertTeacherProfile` creation of a missing Contacts candidate before applying the current v1 projection; `setTeacherField` stays strict. This hunk is disjoint from the active Compact-layout changes. The separately frozen New inheritance port at `a48b2d00966ccab1e93668b5a5992baabc9b490c` and department port own disjoint model/service hunks. Preserve current #207 TTb derivation and #210 Versions notes. Refresh actual overlapping branches before final handoff rather than replacing whole files from historical sources.
 
 The coordinator approved two existing-test additions because their 512-person pagination assertions conflated the Contacts inventory with saved membership. Retain every pagination, byte/count, duplicate/missing page, integrity and source-race assertion; assert the complete inventory on `staffCatalog` and independently assert that saved member IDs remain unchanged. The first corrected native run exposed the adjacent UI assumption: choosing a valid Contacts-only candidate reached `projectEditBase`, which rejected the missing saved row and left Save disabled. This is why the narrow seventh path is required; no general UI rewrite.
 
 The coordinator approved the eighth path after exact-head Node run `44412970952`, shard 1, failed at `78271d05e70f4d4aca6ec7e77fdc3ea101290e8c`: the existing internal-links browser fixture created an empty version, later created Contacts identities, and expected reload alone to make them saved Teachers. Its missing-row selector timed out; 308/309 shard programs passed. Keep all existing empty-school role choices, role-grade, HR import and selector checks, but explicitly save the selected member through the existing authorised owner operation before testing its row. This is a fixture dependency repair, not permission to restore implicit Contacts population or weaken the assertions. Publish this scope refinement before editing the eighth path. Other CI outcomes are still pending and must be inspected before the next implementation push.
+
+The same coordinator-authorised audit confirmed one further occurrence in the role-memberships browser fixture. An unchanged locked-browser run at `afedc3c` failed on its missing saved-member selector at line 163 after Contacts were created later than the empty version (`/tmp/gsis-212-role-red.log`). The ninth path may add only explicit successful membership setup using the existing authorised Contacts-refresh operation, preserving every empty-school, import, custom-group, authority and error assertion. Both fixtures must assert the resulting saved member IDs. No product changes are authorised by these two fixture corrections. The scope-refinement push superseded the earlier Node run's still-running shards; their cancellation is not a pass. Final CI must run at the corrected implementation head.
 
 ## Evidence and implementation contract
 
