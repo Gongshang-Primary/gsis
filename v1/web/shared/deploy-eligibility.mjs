@@ -1,5 +1,7 @@
 /** Version-owned planning choices. These functions never grant application access
  * or replace the accepted authority/eligibility used by Core and Roster. */
+import { previewTTb } from "./ttb-name.mjs";
+
 const own = (value, key) => Object.hasOwn(value || {}, key);
 const managed = ["SL", "SC", "SMC", "KP", "TL", "SDT", "CMT", "SAT", "Support", "MK"];
 const text = value => typeof value === "string" ? value : typeof value?.code === "string" ? value.code : "";
@@ -7,6 +9,40 @@ const key = value => text(value).trim().toLowerCase();
 const labels = value => Array.isArray(value) ? value.map(text).filter(Boolean) : [];
 const activity = value => value === true || value === "Y" ? true
   : value === false || value === "N" ? false : null;
+const nameFields = ["Basic Name", "Employment Modifier", "Subject Modifier", "MK Modifier", "Role"];
+const modifierList = value => text(value).split(/[,;]/).map(item => item.trim()).filter(Boolean);
+
+function planningName(teacher, profile, draft) {
+  const basicName = text(profile["Basic Name"]).trim();
+  const cachedName = teacher.ttbName || teacher.profile?.["TTb Name"] || teacher.name;
+  const inputs = teacher.ttbNameInputs;
+  const nameEdited = nameFields.some(field => own(draft, field));
+  if (!basicName || (!nameEdited && cachedName && (!inputs || cachedName !== basicName)))
+    return cachedName;
+  const acceptedTags = labels(teacher.deploymentTags?.["Employment Modifier"]);
+  const arrangement = key(teacher.deploymentTags?.["Employment Arrangement"]);
+  const employmentTags = modifierList(profile["Employment Modifier"])
+    .filter(tag => !arrangement || key(tag) !== arrangement || acceptedTags.some(accepted => key(accepted) === arrangement));
+  const result = previewTTb({
+    basicName,
+    employmentTags,
+    subjectTags: modifierList(profile["Subject Modifier"]),
+    mkTags: modifierList(profile["MK Modifier"]),
+    role: text(profile.Role).trim(),
+    nameSuffix: inputs?.nameSuffix,
+  }, inputs?.presentation, { retainBasicNameTags: true });
+  return result.available ? result.name : cachedName;
+}
+
+export function projectPlanningNames(doc) {
+  for (const teacher of doc.teachers || []) {
+    const draft = doc.teacherDrafts?.[teacher.id];
+    const profile = { ...teacher.profile, ...planningSnapshot(teacher), ...draft };
+    const name = planningName(teacher, profile, draft);
+    if (name && (name !== teacher.name || name !== teacher.ttbName)) Object.assign(teacher, { name, ttbName: name });
+  }
+  return doc;
+}
 
 /** Capture only actual ordinary version values, never a fabricated Active=true.
  * The explicit refresh flag is used by the existing create/duplicate contract. */
@@ -51,7 +87,9 @@ export function planningPerson(doc, teacher) {
     || (!mapping && /^(?:AE|AM(?: \(ICT\))?|Counsellor|CSO|DE|Dentist|ICT [AM]|Library|Librarian|Reception(?:ist)?|OM|OSO|Recep|SC|Sci Lab|SENO|Support(?: Staff)?)$/i.test(role));
   const sl = mapping ? has("SL") : has("SL") || teacher.authority?.schoolLeader?.value === true
     || /^(?:SLs?|School Leaders?|P|VP(?:\b.*)?)$/i.test(role);
-  return { ...teacher, profile, role, active: active === true, activeKnown: active !== null,
+  const name = planningName(teacher, profile, draft);
+  return { ...teacher, ...(name ? { name, ttbName: name } : {}), profile, role,
+    active: active === true, activeKnown: active !== null,
     groups, mk, sat, support, sl };
 }
 
