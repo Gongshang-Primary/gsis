@@ -1,7 +1,7 @@
 # Roster SMC duty saves return the accepted view
 
 - Model: Codex. Coordinator: ChatGPT v1. Independent reviewer: Muse, exact head.
-- Status: claimed, before implementation.
+- Status: implemented; focused checks passed; exact-head full CI and independent review pending.
 - Updated: 18 November 2026, Asia/Singapore.
 - Branch: `codex/v1-roster-duty-save-view`.
 - Base: `bd77b27deab417afce859cd80465d7c608ae0ab2`.
@@ -31,4 +31,31 @@ First demonstrate the failing immediate display using synthetic data through the
 
 Use `TZ=Asia/Singapore`. Run canonical build/no tracked drift, the focused browser test, relevant unchanged Roster regression, runner discovery and exact-head full Node/LORD and product CI. Record actual commands, failures, omissions and tested head. Publish a draft PR only after required full Node/LORD CI is green; Muse reviews its exact head. Visible change: a successfully saved duty list remains visible immediately, and subsequent edits use its accepted view.
 
-Repository ownership, systematic reproduction, simplicity and verification principles are applied; optional skill catalog inspected, no skill package executed. No tests run or implementation claimed at this claim checkpoint. Q01 scope is established; Q02–Q07 implementation/evidence/review remain pending; Q08 deployment is out of scope. F5 remains OPEN. Hosted/runtime UAT and official T1B-01/T1B-02 remain Not tested.
+Repository ownership, systematic reproduction, simplicity and verification principles are applied; optional skill catalog inspected, no skill package executed. At the claim checkpoint no product edit or test result was claimed. The implementation and evidence below supersede that checkpoint. Q01 scope, Q02 ownership/security, Q03 correctness/recovery, Q04 bounded implementation, Q05 local evidence and Q06 build/discovery are satisfied within the stated limits. Q07 exact-head CI and independent review remain pending; Q08 deployment is out of scope. F5 remains OPEN. Hosted/runtime UAT and official T1B-01/T1B-02 remain Not tested.
+
+
+## Implementation and verification
+
+The only product change is eight lines in the Roster owner: after `setDutySMC`, construct the existing `dutyRoster` view from a clone of the accepted next state and retain it in the same atomic commit receipt. The owner applies the accepted revision to the final response. Exact retries therefore return their original accepted snapshot, even after a later edit. No frontend/build patch, policy change, second write, database schema or provider action is added.
+
+The regression drives the built browser through the gateway and real local Core, Contacts and Roster Workers with persistent local D1. All names, identities and operation identifiers are synthetic. It verifies five groups:
+
+1. Create commits both the list and current-day membership; the saved list remains visible immediately and controls remain usable.
+2. Edit and reload show the accepted revision; replaying the original create returns its immutable original view without another write.
+3. Stale revision, changed intent on a reused operation ID and an ordinary staff account with accepted SMC=false are rejected without duty writes.
+4. A response deliberately lost after the Worker commits recovers through the native exact retry, with the same response and unchanged durable records.
+5. Delete updates the view immediately, retained history survives reload, current-day membership is removed and no notification outbox entry is created.
+
+Commands and actual outcomes on this branch's implementation tree:
+
+- `TZ=Asia/Singapore npm run build` — PASS before and after implementation; all 18 components regenerated with no tracked generated drift.
+- `TZ=Asia/Singapore node tests/v1-product-roster-duty-save-browser.mjs` — initial environment failure: the locked Playwright headless-shell binary was absent locally, before browser assertions. Subsequent local runs explicitly used installed `/usr/bin/chromium`; CI installs the locked browser.
+- `TZ=Asia/Singapore GSIS_BROWSER_EXECUTABLE=/usr/bin/chromium node tests/v1-product-roster-duty-save-browser.mjs` against unchanged base product — FAIL as intended: durable list and membership existed, but immediate displayed row count was 0 instead of 1.
+- First post-fix run — the create/edit/replay groups passed; the authorization fixture was incomplete and returned fail-closed `AUTHORITY_UNAVAILABLE`/503 instead of the intended 403. Corrected the synthetic ordinary account to link accepted Contacts records with explicit SMC=false; no product change was needed.
+- The same focused command with the complete fixture — PASS, all five groups. All local Workers and browser processes disposed.
+- `node --check tests/v1-product-roster-duty-save-browser.mjs` and `git diff --check` — PASS.
+- `node tests/run.cjs --list` — PASS; the new test is discovered among 1,235 programs, including 134 `v1-product-` programs.
+
+The source tree is frozen for one implementation commit and its exact-head CI. The unchanged Roster service regression and full Node/LORD/product suites are delegated to that CI run; they have not been claimed as locally run for this task. The PR will state the resulting tested commit SHA, run URLs and outcomes without a follow-up product edit.
+
+Limitations: this fixes responses for new saves; immutable sparse receipts written before this fix are not rewritten. The new test verifies browser reload and lost-response recovery, not process restart, future/multi-day duty membership policy or hosted behavior. Hosted/runtime UAT and official T1B-01/T1B-02 remain **Not tested**; F5 remains **OPEN**. No migration, deployment, provider send, Drive activation or live access occurred. Rollback is the single Roster response enrichment; existing saved records and receipts remain intact.
