@@ -41,6 +41,9 @@ try {
   await dialog.getByRole("button",{name:"Preview room changes"}).click();
   await dialog.getByText("1 new rooms; 0 existing rooms.",{exact:false}).waitFor();
   assert.equal(commands.length,0,"browser preview has no write");
+  await dialog.getByLabel("Short name",{exact:true}).fill("SYN");
+  assert.equal(await dialog.getByRole("button",{name:"Confirm register changes"}).count(),0,"editing invalidates the old preview");
+  await dialog.getByRole("button",{name:"Preview room changes"}).click();
   await dialog.getByRole("button",{name:"Confirm register changes"}).click();
   await register.getByText("Synthetic hall",{exact:true}).waitFor();
   const db=await suite.db("venues");

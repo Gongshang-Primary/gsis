@@ -50,7 +50,7 @@ async function confirmPreview(input, host) {
   const captured = epoch;
   lock(true); status("Validating the current register…");
   try {
-    const preview = await api.request("venues", "/read", {method: "POST", body: {operation: "registerPreview", ...input}});
+    const preview = await window.VenuesAPI.read({operation: "registerPreview", ...input});
     if (captured !== epoch || !host.isConnected) return;
     host.querySelector("[data-register-preview]")?.remove();
     const result = node("div"); result.dataset.registerPreview = "";
@@ -80,6 +80,7 @@ function editRoom(room) {
     wrapper.append(field); form.append(wrapper);
   }
   const preview = node("button", "Preview room changes"); preview.type = "submit"; form.append(preview);
+  form.addEventListener("input", () => host.querySelector("[data-register-preview]")?.remove());
   form.onsubmit = event => {
     event.preventDefault();
     const values = Object.fromEntries(new FormData(form));
@@ -93,15 +94,16 @@ function importRegister() {
   if (!host) return;
   host.append(node("p", "Use Export All from this register. Keep permanent IDs and the Metadata sheet. Blank capacity stays unknown. A missing row never deletes a room. Create new permanent IDs through Add physical room, then export them for bulk editing."));
   const label = node("label", "Register workbook"), file = node("input"); file.type = "file"; file.accept = ".xlsx"; file.dataset.registerFile = ""; label.append(file); host.append(label);
+  let selection = 0;
   file.onchange = async () => {
-    const captured = epoch;
+    const captured = epoch, selected = ++selection;
     try {
       host.querySelector("[data-register-preview]")?.remove();
       if (!file.files[0]) return;
       if (file.files[0].size > 8 * 1024 * 1024) throw Error("Choose a workbook no larger than 8 MiB.");
       const workbook = await decodeWorkbook(await file.files[0].arrayBuffer());
-      if (captured === epoch && host.isConnected) await confirmPreview({workbook}, host);
-    } catch (error) { if (captured === epoch) status(error.message); }
+      if (captured === epoch && selected === selection && host.isConnected) await confirmPreview({workbook}, host);
+    } catch (error) { if (captured === epoch && selected === selection) status(error.message); }
   };
 }
 async function save(body) {
@@ -134,7 +136,7 @@ async function recover(retry = true) {
       await context.refresh();
       if (captured === epoch) status("Physical room register saved. Other modules see these rooms on their next reference refresh.");
     } else if (result.state === "aborted") {
-      pending = null; sessionStorage.removeItem(storageKey); status("Confirmed not saved. Reload the register and preview your changes again.");
+      pending = null; sessionStorage.removeItem(storageKey); dialog?.querySelector("[data-register-preview]")?.remove(); status("Confirmed not saved. Reload the register and preview your changes again.");
     } else status("Save outcome is not confirmed. Check or retry this original save before editing again.");
   } catch (error) { if (captured === epoch) status(error.message + " Original save retained; check it again."); }
   finally { if (captured === epoch) {lock(false); recoveryControl();} }
