@@ -19,3 +19,5 @@ The browser and the Deploy Worker share the existing formatter. The Contacts pro
 - Full CI and Muse review are pending at the pushed commit. Hosted UAT remains Not tested.
 
 Added to the scope on 18 November 2026 SGT: `tests/v1-product-tables.mjs`. The first Node/LORD run (44216370127) reached the empty Deploy browser fixture. Its explicit asset route list omits the newly shared TTb module. Supply that module in the fixture and run the existing assertions unchanged.
+
+The corrected fixture passed `TZ=Asia/Singapore node tests/v1-product-tables.mjs` using locked Chromium. The fix loads the same module as the built site and preserves the empty Deploy navigation assertions. Fresh CI verifies the resulting head.
