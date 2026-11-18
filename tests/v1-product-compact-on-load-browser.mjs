@@ -80,9 +80,14 @@ try {
   await glossary.getByText("Compact test data arrived", { exact: true }).waitFor();
   await page.waitForFunction(observed => {
     const header = document.querySelector("#glossaryHost table thead tr th");
-    return header.getBoundingClientRect().width < observed - 40;
+    return !header.style.width && !header.style.minWidth &&
+      header.getBoundingClientRect().width < observed - 40;
   }, resizedWidth);
-  assert((await tagWidth()) <= compactWidth + 10, "newly loaded data restores the compact width");
+  const automaticWidth = await tagWidth();
+  await page.locator("#glossaryHost .gsis-core-tools")
+    .getByRole("button", { name: "Compact", exact: true }).click();
+  assert(Math.abs(await tagWidth() - automaticWidth) < 2,
+    "newly loaded data uses the same compact fit as the Compact button for that data");
 
   await f.call(f.admin, "deploy", "/versions/create", {
     operationId: "compact-fixture-deploy-version", name: "Synthetic compact planning", year,

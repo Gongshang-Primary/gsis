@@ -3,7 +3,7 @@
 - Status: locally verified, exact-head CI and review pending
 - Owner and model: Codex
 - Reviewer and model: Muse, on the combined exact head
-- Updated (Asia/Singapore): 19 November 2026, 06:18
+- Updated (Asia/Singapore): 19 November 2026, 06:38
 - Branch: `codex/v1-deploy-compact-table-loading`
 - Base: `bd77b27deab417afce859cd80465d7c608ae0ab2`
 - Scope: UAT PAR-01, PAR-02, PAR-05 and PAR-07, including the owner’s 19 November report on Compact after every load. Integrate the two related table-presentation branches and verify the successful-refresh path on v1.06.
@@ -40,6 +40,10 @@ Tests used Singapore time, locked Chromium 151 and the built frontend with isola
 - `tests/v1-product-compact-on-load-browser.mjs` passed. It covers Admin Accounts and narrow scrolling, Calendar weekday axes and resize on new data, and Deploy controls inserted during a draft.
 - `tests/v1-product-deploy-layout-and-teachers-browser.mjs` passed. It covers all five assignment grids at 1,440px and 390px, IP class/TG blocks, contrast, Teachers bands, HR navigation and unchanged stored data.
 - `npm run build`, `node scripts/v1/build.mjs`, `node scripts/v1/verify-build.mjs`, syntax and whitespace checks passed. No tracked generated drift. The first dry-run attempt needed a writable isolated Wrangler config directory.
+
+The first [Node/LORD run](https://github.com/helper-gsps/gsis/actions/runs/44410404483) passed three shards. Shard 4 failed the Calendar Glossary width assertion in the original Compact test. That assertion compared the new data's width with the previous data's width. The revised test waits for the same measured shrink and removal of both manual inline widths, then checks against the Compact button's fit for the same loaded rows. The revised test passed with locked Chromium and local owner Workers. This follow-up changes only the test and this record. Exact-head CI restarts for review.
+
+An additional local run measured the Deploy matrix after using the actual Refresh button on the table views that support it. All 41 rendered tables passed again, including the expanded ASC detail panels.
 
 Q01–Q05 are supported by the scoped inventory, real owner-read signal, unchanged mutation/capability paths, local recovery checks and bounded browser fitting. Q06 has local evidence above and awaits exact-head Node/LORD and product CI. Q07 awaits Muse at the integrated head. Q08 is outside this task. Runtime UAT is **Not tested**.
 
