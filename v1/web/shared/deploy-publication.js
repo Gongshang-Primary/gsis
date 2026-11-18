@@ -1033,7 +1033,215 @@ function registerTables() {
 registerTables();
 window.addEventListener("load", registerTables);
 
+// Duplicate's source is a UI choice, not the loaded planning version. The
+// native creation attempt remains the sole owner of an issued request/UUID.
+let duplicateSourceId = null;
+let duplicateSourceInitialized = false;
+function duplicateSource() {
+  return state.versions.find((entry) => entry.id === duplicateSourceId);
+}
+function updateDuplicateSelection(root) {
+  if (!root) return;
+  const attempt = versionCreateAttempt;
+  const source = attempt
+    ? state.versions.find((entry) => entry.id === attempt.sourceVersionId)
+    : duplicateSource();
+  const permitted = api.capable("deploy.edit");
+  for (const radio of root.querySelectorAll('[name="gsis-duplicate-source"]')) {
+    radio.checked =
+      radio.value === (attempt?.sourceVersionId || duplicateSourceId);
+    radio.disabled = !permitted || !!attempt || busy;
+  }
+  // The native toolbar moves action buttons out of #content after rendering.
+  const hint = root.querySelector("[data-duplicate-source-hint]");
+  const button =
+    root.querySelector("[data-duplicate-selected]") ||
+    (root.isConnected &&
+      document.querySelector("#viewActions [data-duplicate-selected]"));
+  if (!button || !hint) return;
+  button.disabled = !permitted || (!attempt && !source);
+  button.title = attempt
+    ? "Retry the original creation request" +
+      (source ? " from " + source.name : "")
+    : source
+      ? "Duplicate " + source.name
+      : "Select a version to duplicate";
+  hint.textContent = attempt
+    ? "Creation is unconfirmed. The original source and request are retained" +
+      (source ? ": " + source.name + "." : ".")
+    : source
+      ? "Duplicate source: " +
+        source.name +
+        ". Loading a version is a separate action."
+      : "Select a version to duplicate.";
+}
+function installDuplicateSelection() {
+  if (
+    typeof window.versions !== "function" ||
+    typeof window.createVersion !== "function"
+  )
+    return;
+  if (!document.getElementById("gsis-versions-filter-width")) {
+    const style = document.createElement("style");
+    style.id = "gsis-versions-filter-width";
+    // Legacy blur refitting measures these newly added filters. Keep their
+    // core-table width so changing measurement variables cannot move Save.
+    style.textContent =
+      '#content[data-view="Versions"] .gsis-core-filter input { width:100% !important; }';
+    document.head.append(style);
+  }
+  const nativeVersions = window.versions;
+  const nativeCreateVersion = window.createVersion;
+  const nativeNoteControls = window.updateVersionNoteControls;
+  const nativeRefresh = window.refresh;
+  // A background read makes native Save note a guarded no-op. Reflect that
+  // existing guard in the control, including input events and fresh rows.
+  window.updateVersionNoteControls = function (id) {
+    nativeNoteControls(id);
+    if (refreshing) {
+      const row = [...document.querySelectorAll("[data-version-row]")].find(
+        (node) => node.dataset.versionRow === id,
+      );
+      const save = row?.querySelector("[data-note-save]");
+      if (save) save.disabled = true;
+    }
+  };
+  const refreshNoteControls = () => {
+    for (const row of document.querySelectorAll("[data-version-row]"))
+      window.updateVersionNoteControls(row.dataset.versionRow);
+  };
+  window.refresh = async function (...args) {
+    // Keep an automatic read from disabling Save between pointerdown and click.
+    // Explicit Refresh still reads current state while retaining the note draft.
+    if (!args[0] && notesUnresolved()) return;
+    const epoch = protectedEpoch;
+    const completion = nativeRefresh.apply(this, args);
+    refreshNoteControls();
+    try {
+      return await completion;
+    } finally {
+      if (epoch === protectedEpoch) refreshNoteControls();
+    }
+  };
+  window.versions = function (root) {
+    nativeVersions(root);
+    if (refreshing)
+      root.querySelectorAll("[data-note-save]").forEach((save) => {
+        save.disabled = true;
+      });
+    if (!duplicateSourceInitialized) {
+      duplicateSourceInitialized = true;
+      duplicateSourceId = state.versions.some((entry) => entry.id === current)
+        ? current
+        : null;
+    } else if (!duplicateSource()) duplicateSourceId = null;
+    const rows = [...root.querySelectorAll("[data-version-row]")];
+    const table = rows[0]?.closest("table");
+    if (table) {
+      const heading = document.createElement("th");
+      heading.scope = "col";
+      heading.textContent = "Duplicate source";
+      table.tHead.rows[0].prepend(heading);
+    }
+    for (const row of rows) {
+      const source = state.versions.find(
+        (entry) => entry.id === row.dataset.versionRow,
+      );
+      const cell = row.insertCell(0);
+      const radio = document.createElement("input");
+      radio.type = "radio";
+      radio.name = "gsis-duplicate-source";
+      radio.value = source.id;
+      radio.setAttribute(
+        "aria-label",
+        "Duplicate source: " + source.name + " (" + source.id + ")",
+      );
+      radio.title = source.id;
+      radio.onchange = () => {
+        if (versionCreateAttempt || busy || !api.capable("deploy.edit")) {
+          updateDuplicateSelection(radio.closest("#content") || root);
+          return;
+        }
+        duplicateSourceId = state.versions.some(
+          (entry) => entry.id === radio.value,
+        )
+          ? radio.value
+          : null;
+        updateDuplicateSelection(radio.closest("#content") || root);
+      };
+      cell.append(radio);
+    }
+    const button = [...root.querySelectorAll("button")].find(
+      (node) => node.textContent === "Duplicate",
+    );
+    if (button) {
+      button.dataset.duplicateSelected = "";
+      const hint = document.createElement("p");
+      hint.dataset.duplicateSourceHint = "";
+      hint.setAttribute("role", "status");
+      button.insertAdjacentElement("afterend", hint);
+    }
+    updateDuplicateSelection(root);
+  };
+  window.createVersion = async function (duplicate = false) {
+    if (duplicate && !api.capable("deploy.edit")) return;
+    // Match the native pre-prompt guards. In particular, never allocate an
+    // attempt while a note, cell draft or another edit remains unresolved.
+    if (duplicate && !versionCreateAttempt) {
+      if (
+        notesUnresolved() ||
+        cellQueue.length ||
+        queueFlight ||
+        busy ||
+        editing ||
+        acquiring ||
+        unsavedDraft ||
+        exclusionEdits.size
+      )
+        return;
+      const source = duplicateSource();
+      if (!source) {
+        duplicateSourceId = null;
+        updateDuplicateSelection(document.getElementById("content"));
+        return;
+      }
+      const name = prompt(
+        'Name for duplicate of "' + source.name + '"',
+        source.name + " (copy)",
+      );
+      if (!name) return;
+      versionCreateAttempt = {
+        operation: "create",
+        name,
+        sourceVersionId: source.id,
+        duplicate: true,
+        requestId: crypto.randomUUID(),
+      };
+    }
+    const epoch = protectedEpoch;
+    const completion = nativeCreateVersion(duplicate);
+    updateDuplicateSelection(document.getElementById("content"));
+    try {
+      return await completion;
+    } finally {
+      if (epoch === protectedEpoch)
+        updateDuplicateSelection(document.getElementById("content"));
+    }
+  };
+}
+installDuplicateSelection();
+
 window.addEventListener("gsis:clear-protected-state", () => {
+  duplicateSourceId = null;
+  duplicateSourceInitialized = false;
+  document.querySelectorAll('[name="gsis-duplicate-source"]').forEach((radio) => {
+    radio.checked = false;
+    radio.disabled = true;
+  });
+  const duplicateButton = document.querySelector("[data-duplicate-selected]");
+  if (duplicateButton) duplicateButton.disabled = true;
+  const duplicateHint = document.querySelector("[data-duplicate-source-hint]");
+  if (duplicateHint) duplicateHint.textContent = "Sign in to select a version to duplicate.";
   document.querySelector("[data-publication-recovery]")?.remove();
   ++importReadEpoch;
   ++validationEpoch;

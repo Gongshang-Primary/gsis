@@ -1,6 +1,6 @@
 # v1 Versions: explicit radio selection for Duplicate
 
-- Status: claimed; implementation pending.
+- Status: implemented and locally verified; exact-head CI and independent Muse review pending. No PR, merge or deployment yet.
 - Owner/model: Codex; coordinator: ChatGPT; reviewer: Muse at the exact head.
 - Updated: 17 November 2026, Asia/Singapore.
 - Branch: `codex/v1-deploy-duplicate-selection`. Base: main `8e72c47809a61c0229bef3ae99b35e26f6736c04`.
@@ -22,6 +22,53 @@ Run TZ=Asia/Singapore canonical build/no drift, targeted browser/duplicate regre
 
 Publish this task-record-only claim with an expected-head, non-force update under WORKFLOW Start session4, then implement from the accepted claim. Preserve the separate load-fix and eligibility queues; no unclaimed shared file edit. Q01 scope recorded; Q02-Q05 preserve native identities/recovery; Q06/Q07 pending; Q08 no release authority.
 
+## Implementation and local evidence
+
+Accepted claim: `9dc353d26d75496b2caaf8d450bb017c20715f77`. The implementation adds a radio column and source guidance through the existing v1 module. The Version name column retains native name sorting. The selected ID is in-memory presentation state; the loaded version remains unchanged until the existing native creation succeeds. Equal display names remain separate identities. Filtering a row does not remove the source; removing it from the authorised catalogue clears the choice without selecting a substitute.
+
+The wrapper seeds the existing native creation attempt only after its ordinary draft/edit guards and the source/name choice pass. An existing attempt always keeps its source and request UUID; radios remain locked until the native flow resolves it. The native creation request, response handling, New planning version flow, server idempotency and current Contacts refresh are unchanged. This adds no persistence or reload-recovery contract. Protected-state clearing removes the choice, and a prior async completion cannot repaint its guidance in a later protected epoch. Native toolbar relocation and incremental DOM refresh are handled without editing the shared builder or v0.9 source.
+
+Commands ran with `TZ=Asia/Singapore`, private `XDG_CONFIG_HOME=/tmp/gsis-duplicate-selection-xdg` and Chromium `/usr/bin/chromium` for browser cases:
+
+- `npm run build`: PASS, no tracked generated drift.
+- `node tests/v1-product-deploy-duplicate-selection-browser.mjs`: meaningful pre-change failure, 0 radio controls where 2 were required; final PASS, six browser/Worker/D1 groups. Covers A loaded/B selected, equal names, sort/filter/full and incremental redraw, navigation, cancel/no write, invalid/deleted choice/no fallback, existing unsaved-input guard, lost committed response, locked source and identical retry wire/UUID, one resulting copy, source documents unchanged, native New planning version compatibility, protected-state reset and actual Core permission denial.
+- `node tests/v1-product-deploy-duplicate-contacts.mjs`: PASS unchanged. All eleven refreshed typed tags, inactive/partial staff, exact clears, assignments/notes/stable IDs, unchanged Contacts/source records, authority/isolation and restart receipt recovery.
+- `node tests/v1-product-deploy-memberships-browser.mjs`: PASS unchanged. Real native edits, canonical import and publish-to-Contacts receipts, including lost-acknowledgement recovery; no provider sends.
+- Both changed JavaScript files pass `node --check`; `git diff --check` passes. The existing `scripts/v1/test.mjs` filename discovery includes the new browser test without runner changes.
+
+Skill entry: inspected the available catalog and repository skill policy; applied bounded red/green verification, owner-boundary analysis and reuse of the existing creation mechanism manually. No skill package was executed, installed or copied. No dependency changes.
+
+Q01–Q05: locally satisfied by the accepted three-path claim, separate stable UI identity, unchanged owner authority/commit/retry boundaries and bounded existing-catalogue rendering. Q06: the listed local checks pass; full exact-head Node/LORD/product CI is still pending. Q07: coordinator diff review and independent Muse review at the eventual exact head are pending. Q08: no release authority exercised; hosted UAT remains Not tested and F5 remains OPEN. Rollback is the bounded UI/test commit; no schema, resource or data migration is involved.
+
+## Follow-up: note Save readiness during refresh
+
+At implementation head `fe641919c4c1cad053967ea28e96edada0e44a41`, Node CI passed 1226/1226. [Product run 44053929262](https://github.com/helper-gsps/gsis/actions/runs/44053929262) passed 124/125 programs; only the unchanged save-recovery browser test timed out at line 527 while waiting for the second, historical version-note attempt. The unchanged test reproduced that timeout locally. A parent-source archive of claim `9dc353d26d75496b2caaf8d450bb017c20715f77` passed the unchanged test; its builder used read-only candidate Git metadata, so this was a source baseline comparison, not a clean-parent manifest verification.
+
+A deterministic local Worker probe held the background read response on both parent and candidate. Both showed an enabled Save note button while `refreshing` was true: the native save guard returned without a write or attempt. Releasing the read allowed the same retained note to save. This proves a pre-existing control-readiness mismatch. The original CI did not record click-time guard values, so the controlled reproduction does not establish which internal branch caused that exact timeout.
+
+The coordinator authorised this adjacent Versions correction within the same three files. The v1 module now disables note Save while the existing refresh guard refuses saving, including newly rendered rows and input updates, then restores the native control state when the read settles. The native guard, draft text, operation IDs, leases and receipt handling remain unchanged. Protected-epoch checks prevent a prior read from repainting a later context. No timeout increase, assertion relaxation, builder edit or new recovery mechanism is included.
+
+Follow-up evidence, with `TZ=Asia/Singapore`, Chromium `/usr/bin/chromium` and separate private XDG directories:
+
+- New deterministic regression failed before the correction because Save note remained enabled during the held read. After the correction, `node tests/v1-product-deploy-duplicate-selection-browser.mjs` passed all seven groups: no save while held, original draft retained, release followed by one native owner save, and unchanged Duplicate selection.
+- The **unchanged** `node tests/v1-product-deploy-save-recovery-browser.mjs` passed all fifteen groups, including historical note recovery, exact retries, lost responses, withdrawal and protected-context boundaries.
+- Private local logs: `/tmp/gsis-duplicate-note-ready-red.log`, `/tmp/gsis-duplicate-note-ready-green.log`, `/tmp/gsis-duplicate-recovery-corrected.log`. Baseline/candidate investigation: `/tmp/gsis-duplicate-note-readiness-findings.md` and the linked local probe logs.
+
+The previous failed CI remains recorded; it was not blindly rerun or waived. Follow-up exact-head CI and independent Muse review remain pending. The original duplicate/Contacts and memberships regressions above passed before this readiness-only follow-up. No live operation, merge or deployment occurred.
+
+## Follow-up: preserve Save click during an automatic read
+
+[Node CI run 44059515022](https://github.com/helper-gsps/gsis/actions/runs/44059515022) at `173af619d9d5bff257e73ae5d2b2d40a12b76c15` failed only the same unchanged recovery browser program, this time at line 480 for the first/current version note. The unchanged local run and a temporary instrumented run both passed all fifteen groups. Those passes do not dismiss the CI failure or establish its cause.
+
+A second deterministic probe starts a real background read at Save pointer-down. The refresh-readiness wrapper disables the button before the browser dispatches click, so no click or native save invocation occurs. The read then completes with the exact draft retained, no attempt, and all save guards clear. This reproduces another real readiness race and the resulting wait failure; neither CI run recorded click-time state, so their exact internal causes remain unproven.
+
+The coordinator authorised a narrow correction in the same three files: automatic `refresh(false)` or default refresh now defers while the existing `notesUnresolved()` contract reports dirty text or a retained note attempt. Explicit `refresh(true)` remains available and preserves the draft. Existing original receipt/retry paths, UUIDs, revision/lease/capability checks and native save guards are unchanged. No read retry loop, queued save or automatic save is added. A deferred background signal may be consumed; explicit Refresh remains the way to request current data, and server revision checks still govern writes.
+
+The new browser regression retains both event orderings: a read begun while clean, followed by typing, still disables Save until that read settles; a read requested at pointer-down on an already dirty note is deferred, preserving the original click. It also verifies foreground refresh retains the text without saving, no automatic read is sent, the click sends one native owner save, the resulting D1 note matches, and Duplicate selection is unchanged. The new pointer case failed before the correction with `false !== true` for click delivery (`/tmp/gsis-duplicate-pointer-red.log`). Final local results are recorded below; the original recovery test remains unchanged.
+
+**OPEN follow-up — consecutive nonselected note saves:** in a synthetic local A/B scenario, with A loaded, save B's note from revision 0, explicitly Refresh, then save B's note again. The second native request can still carry cached revision 0 after B has committed revision 1. The owner returns `409 REVISION_CONFLICT`; the draft and original operation remain protected. This is not fixed by the radio/readiness change. The pointer regression uses the currently loaded version, matching the latest CI failure point; neither it nor the existing historical-note checks proves consecutive nonselected note saves. Diagnostic evidence: `/tmp/gsis-duplicate-pointer-save-diag.log`; no real school records or identities were used.
+
+Final local checks: the new browser test passed **8/8 groups** (`/tmp/gsis-duplicate-pointer-final.log`); the unchanged recovery browser passed **15/15 groups** (`/tmp/gsis-duplicate-pointer-recovery.log`). The final current-version pointer case also failed as expected in a temporary probe that removed only the served automatic-read guard (`/tmp/gsis-duplicate-pointer-final-red.log`). Syntax, whitespace, unchanged old-test and exact three-file scope checks pass. The source diff over `173af619` is three added lines, without unrelated formatting changes. Required follow-up exact-head CI and independent Muse review remain pending; no PR, merge, deployment or live UAT is claimed.
 
 ## Claim clarification: real recovery regression diagnostics
 
@@ -30,3 +77,22 @@ Model: Codex. Coordinator-authorised on 17 November 2026 18:25:37 SGT. Add the e
 Required CI at three Versions heads has failed this unchanged regression's five-second note-attempt wait while local runs pass. The controlled readiness/pointer reproductions establish real adjacent defects but do not prove the internal CI failure branch. Capture the actual click events, current native guards and intercepted request outcome in failure diagnostics. If a fixture starts the action before genuine native readiness, strengthen its setup to wait for that existing readiness and prove the real click reached the save. Preserve every existing fifteen-scenario behavioral/security assertion and timeout; no attempt synthesis, forced click, import stripping, skipped check, relaxed result or failure waiver. Keep diagnostic values synthetic and public-safe. A different product change needs a proven cause and a coordinator scope decision first.
 
 Publish only this task-record clarification on main through the normal expected-head claim exception. The builder then incorporates it into the existing branch, retaining both its implementation evidence and this clarification. This does not authorise a merge, deployment, live operation, provider send or separate stale-note-revision fix.
+
+## Follow-up: keep the note button stationary during blur refitting
+
+Accepted diagnostic scope claim `d487700f12f98c2ca0c28401f08f4c2e26f238e0` was incorporated before investigation. [Node run 44062884721](https://github.com/helper-gsps/gsis/actions/runs/44062884721) at `9ef19ad1d0e01949e8d33428d8c90169660bdfcf` again failed only the unchanged recovery program at its line 480 note-attempt wait. The previous refresh corrections therefore did not resolve that failure. Their controlled reproductions remain valid evidence of adjacent readiness defects, not proof of the original CI cause.
+
+The local browser had been Chromium 155.0.8059.79; CI uses the locked Playwright Chromium 151.0.7922.34. Installing that exact browser into a private `/tmp` cache, without changing dependencies, reproduced the unchanged test's five-second note-attempt timeout. Temporary failure-only diagnostics then captured an actual lost click in that browser: Save was enabled and every native save guard was clear; pointer-down landed on Save, but textarea blur triggered the existing `public/table-viewport.js` change/refit handler. Five newly inserted header filters changed from 174 px to 68 px. Table auto-layout moved Save from `(763, 432.78)` to `(654.66, 449.16)` before pointer-up, which landed on the textarea; click then targeted the table cell. No save handler, attempt or write occurred, and the draft remained intact. This is a captured matching-browser reproduction; the historical CI jobs did not record their internal event sequence.
+
+The coordinator approved one idempotent, Versions-only style in the existing v1 publication module: `.gsis-core-filter input` keeps `width:100% !important` under `#content[data-view="Versions"]`. Legacy refitting still measures controls, but its new measurement variable cannot change these filter widths during the gesture. The product follow-up is nine added lines. No event interception, pointer-down save, source/builder edit, timeout increase or recovery/authority change is included. Existing compact minimum/maximum rules remain as they were; this restores only the filter width. Manual resize coverage verifies retained controls and stored inline sizing preferences, not that every requested pixel width overrides legacy compact CSS.
+
+The new deterministic browser case removes only the filters' measurement variables to reproduce the newly inserted state, performs a real note-to-Save click, and verifies that native blur refitting runs while filter widths and Save's x/y stay fixed. The original click commits one note through the real local Worker/D1 path. It failed before the correction at the geometry assertion (`/tmp/gsis-duplicate-layout-red.log`). Additional checks retain filtering, keyboard column resizing/preferences, Compact, contained horizontal scrolling at 390 px, Tab/Enter note saving without blur auto-save, and the independent Duplicate choice.
+
+Final verification used `TZ=Asia/Singapore` and separate private XDG directories:
+
+- Canonical `npm run build`: PASS, 18 production components, no tracked generated drift (`/tmp/gsis-duplicate-layout-canonical.log`).
+- New Versions browser regression, locked Chromium 151: **10/10 groups**, **15.032 s**, below the runner's 45-second budget (`/tmp/gsis-duplicate-final-new151.log`).
+- Original recovery browser regression, locked Chromium 151: **15/15 groups**, **14.614 s** (`/tmp/gsis-duplicate-final-recovery151.log`).
+- Original recovery browser regression, system Chromium 155: **15/15 groups**, **15.289 s** (`/tmp/gsis-duplicate-final-recovery155.log`).
+
+The existing recovery test was restored byte-for-byte from `9ef19ad` before both final runs; all fifteen scenarios, waits and five-second timeouts are unchanged. Its temporary diagnostic patch is not shipped. Private evidence remains in `/tmp/gsis-duplicate-save-recovery-instrumented.source.mjs`, `/tmp/gsis-duplicate-locked-failure.json` and `/tmp/gsis-duplicate-locked-layout.log`. The authorised scope is four paths, but this final follow-up changes only the original three. The separate consecutive nonselected-note revision conflict remains OPEN as recorded above. Full exact-head CI and independent functional review are still required; no failed CI is waived, and no PR, merge, deployment or hosted UAT is claimed.
