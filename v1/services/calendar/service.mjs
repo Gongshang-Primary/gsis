@@ -497,6 +497,17 @@ async function eventMutation(ctx, op, action, p) {
   }
   delete e._revision;
   if (e.VenueID) {
+    // The native picker stores ordered IDs separately from display labels.
+    // Labels and custom locations can contain commas; only split VenueID.
+    const venueIds = e.VenueID.split(",").map((value) => value.trim());
+    need(
+      venueIds.length <= 6 &&
+        venueIds.every(Boolean) &&
+        new Set(venueIds).size === venueIds.length,
+      "INVALID_VENUE",
+      "Select up to six distinct current venues from the room directory.",
+      409,
+    );
     const { serviceCall } = await import("../../runtime/security.mjs");
     const catalogue = await serviceCall(
       ctx.env,
@@ -509,11 +520,14 @@ async function eventMutation(ctx, op, action, p) {
       },
     );
     need(
-      catalogue.venues?.some((v) => v.id === e.VenueID),
+      venueIds.every((venueId) =>
+        catalogue.venues?.some((v) => v.id === venueId),
+      ),
       "INVALID_VENUE",
       "Select a current venue from the room directory.",
       409,
     );
+    e.VenueID = venueIds.join(",");
   }
   const y = await one(
     db,
