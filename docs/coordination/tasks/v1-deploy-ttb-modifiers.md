@@ -17,3 +17,5 @@ The browser and the Deploy Worker share the existing formatter. The Contacts pro
 - `node tests/v1-contacts-direct-fields.mjs`, `node tests/v1-contacts-direct-compatibility.mjs`, `node tests/v1-contacts-catalogues.mjs` and `node tests/v1-product-deploy-workbooks.mjs` passed. The unchanged workbook regression also checks the old projection fallback.
 - `npm run build` passed without generated drift. `node scripts/v1/build.mjs` built nine Workers and 374 artifacts. `node scripts/v1/verify-build.mjs` passed nine dry runs and local migration upgrade verification.
 - Full CI and Muse review are pending at the pushed commit. Hosted UAT remains Not tested.
+
+Added to the scope on 18 November 2026 SGT: `tests/v1-product-tables.mjs`. The first Node/LORD run (44216370127) reached the empty Deploy browser fixture. Its explicit asset route list omits the newly shared TTb module. Supply that module in the fixture and run the existing assertions unchanged.
