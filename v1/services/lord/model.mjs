@@ -2,6 +2,38 @@ import { ApiError } from "../../runtime/errors.mjs";
 export const MAX_BATCH = 20,
   MAX_PHOTO_BYTES = 2 * 1024 * 1024,
   REFERENCE_MAX_AGE = 26 * 60 * 60 * 1000;
+
+/** Teacher reminders use the source's fixed five-minute window, not follow-ups. */
+export function reminderPhase(payload, type) {
+  if (payload?.kind === "collection-reminder") return "collection";
+  if (type === "lord.return-reminder" || payload?.reminderPhase === "return" ||
+      ["reminder", "overdue"].includes(payload?.kind)) return "return";
+  return null;
+}
+export function remindersEnabled(settings = {}) {
+  // Missing configuration preserves the existing scheduler default. Explicit
+  // false/legacy zero disables; an invalid enabled value never enables sends.
+  return settings.enabled === undefined || settings.enabled === true || settings.enabled === 1;
+}
+export function reminderEligibility(booking, phase, periods, settings, now, remaining = 0) {
+  if (!["collection", "return"].includes(phase) || !Number.isFinite(now))
+    return { state: "blocked", reason: "REMINDER_CONTEXT_INVALID" };
+  if (!remindersEnabled(settings)) return { state: "suppressed", reason: "REMINDERS_DISABLED" };
+  if (booking.status !== (phase === "collection" ? "BOOKED" : "COLLECTED"))
+    return { state: "suppressed", reason: "BOOKING_STATE_CHANGED" };
+  if (phase === "return" && !(remaining > 0))
+    return { state: "suppressed", reason: "NO_REMAINING_CUSTODY" };
+  const p = periods?.find(p => Number(p.code) ===
+    (phase === "collection" ? booking.start_period : booking.end_period - 1));
+  const at = p && Date.parse(booking.service_date + "T" +
+    (phase === "collection" ? p.start : p.end) + ":00+08:00");
+  if (!Number.isFinite(at)) return { state: "blocked", reason: "PERIOD_TIMINGS_REQUIRED" };
+  const window = { from: at - 5 * 60000, to: at,
+    key: booking.service_date + ":" + phase + ":" + at };
+  if (now < window.from) return { state: "suppressed", reason: "REMINDER_NOT_DUE", window };
+  if (now >= window.to) return { state: "suppressed", reason: "REMINDER_WINDOW_EXPIRED", window };
+  return { state: "ready", window };
+}
 export function fail(code, message, status = 400) {
   throw new ApiError(code, status, message, {
     retryable: status === 409 || status === 503,
