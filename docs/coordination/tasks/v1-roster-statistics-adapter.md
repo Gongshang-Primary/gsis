@@ -1,7 +1,7 @@
 # Roster Statistics and cumulative R% compatibility
 
 - Model: Codex. Coordinator: ChatGPT v1. Independent reviewer: Muse, exact head.
-- Status: claimed before implementation.
+- Status: implemented locally; exact-head CI and independent review pending.
 - Updated: 19 November 2026, Asia/Singapore.
 - Branch: `codex/v1-roster-statistics-adapter`.
 - Base: `1abe47d039befd685a02c03ef8116278a12a2711`.
@@ -30,7 +30,7 @@ The retained native Statistics page still calls `statisticsRPercent`, absent fro
 
 Reuse the existing Statistics projection and allocator accounting/ranking contracts through a v1-owned adapter. Roster owns durable relief duties, settled ledger/corrections, opening balances, retained commitments and frozen weekly entitlements. Contacts owns current identities/eligibility; Deploy owns current verified or explicitly estimated workload. Do not treat a current-week ledger read as annual history, infer missing historic quotas, rewrite captured R or invent teaching evidence. Preserve settled annual rules, SRE daily/weekly distinctions, unknown-history warnings and estimated labels on affected screen/export. Read-only reporting cannot publish, allocate or create authority records.
 
-Use bounded owner reads and current projection contracts; avoid annual baseline/Calendar fanout just to recover past settled totals. Preserve school/current-capability checks, response and row bounds, source observations and honest cache/revision identity. A missing or corrupt published source remains an error; a saved estimate never claims verified history. No new formula, database table, build-web text patch or schema migration.
+Use bounded owner reads and current projection contracts; avoid annual baseline/Calendar fanout just to recover past settled totals. Preserve school/current-capability checks, response and row bounds, source observations and honest cache/revision identity. A missing or corrupt published source remains an error; a saved estimate never claims verified history. No new formula, database table or schema migration. The later approved explanatory-text exception is recorded below.
 
 ## Approved read-batching amendment
 
@@ -46,4 +46,31 @@ Synthetic actual built-browser/gateway/Workers/D1 tests must prove report render
 
 Run canonical build/no drift, focused and relevant unchanged regressions, runner discovery, exact-head full Node/LORD and isolated-product CI. Record failures and omissions. Claim is published before code; draft PR follows green required Node/LORD CI. Muse independently reviews the exact head. Visible changes: the existing Statistics report and cumulative R% table load; appearance and allocation policy stay unchanged. Any necessary broader ownership/accounting dependency stops only dependent work and is reported before expansion.
 
-Q01 scope is established; Q02–Q07 implementation/evidence/review are pending. Q08 release is not authorised. Ownership, systematic reproduction and verification principles are applied; no optional skill package execution is claimed. F5 remains OPEN. Official T1B-01/T1B-02 and hosted/runtime UAT remain **Not tested**.
+## Implemented evidence
+
+Claim commits `9d03f83`, `7c50cf8` and `3530af2` were published on this branch before their corresponding edits. Latest main observed at final handoff preparation is `184b8d0a52fe215c7d122a247e89e9b0289a44a8`; base stays the recorded `1abe47d` without silently taking concurrent work. The refreshed overlapping open PRs are #182 (only its separate probe call-site line), #215 (the same implementer's frozen duty-save service hunk), and #216 (the coordinator-approved separate builder hunk). The eight-path claim remains exact.
+
+The real built screen reproduced `statistics` HTTP 200 with `schemaVersion: 1` instead of the required encoded `schema: 1`, plus `statisticsRPercent` HTTP 404. The v1-owned adapter now returns the native encoded snapshot and annual cumulative ranking using the existing settled accounting functions. Annual reads include prior weeks, openings, correction sums, retained commitments and frozen quotas. Historical ordinary reports use owner records without adding current Contacts/Calendar dependencies. Annual ranking still validates current eligibility and workload.
+
+Per-person teaching evidence requires a matching immutable publication identity plus that person's verified, finite, nonnegative teaching row. An unrelated row with unavailable weekly quota cannot hide another verified SRE's teaching basis. Aggregate workload quality stays unchanged; missing/estimated evidence never becomes verified or zero. The existing source currently reports daily SRE rows as unavailable for weekly quota, so those cannot be claimed to contain verified teaching solely from a numeric zero. No source contract is changed here.
+
+Read batching retains the same weekly mutation fences, loads annual fences in one bounded query, and keeps the old behavior for sparse callers spanning over 54 weeks. Report reads compare bounded owner scope revisions before and after projection and reject an observed concurrent owner change. No cross-database atomic snapshot is claimed. The source workload copy uses its existing observation/revision guards; the report does not write duties, openings, captured quotas, operation receipts or outbox rows.
+
+## Verification at implementation handoff
+
+All commands use `TZ=Asia/Singapore`; local browser commands explicitly use `GSIS_BROWSER_EXECUTABLE=/usr/bin/chromium`.
+
+- Baseline actual browser/Workers/D1: **expected failure**, missing native wire contract and HTTP 404 ranking recorded before product edits.
+- `node tests/v1-product-roster-statistics-browser.mjs`: **5/5 groups pass**, 15.850 seconds on final source. Real built browser, gateway, nine Workers and D1: older completed work/corrections, opening cutoff, commitment and captured entitlement; estimated/unknown-history labels; local partial filter and native downloaded Excel; current capability denial, date bounds, school isolation, reload and no business writes; verified weekly SRE alongside unavailable daily SRE; historical report availability during synthetic Contacts/Calendar table outage while current ranking returns 503.
+- `node tests/v1-product-operation-probe.mjs`: **pass**, 405 probes, 25 retained known-missing operations and 127 parsed scripts; the 15 dynamic call-sites are unchanged. Only F07 is removed; all other unresolved allowances remain.
+- `node tests/roster087-statistics.cjs`, `node tests/roster-statistics-r-percent.cjs`, `node tests/roster-statistics-r-percent-ui.cjs`: **pass**, unchanged canonical projection/math and UI checks.
+- `npm run build`: **pass**, all 18 canonical components; no generated drift. `node --check` for changed modules and `git diff --check`: **pass**.
+- `node scripts/v1/test.mjs --list`: new product fixture discovered; this branch contains 134 product programs. Required full Node/LORD and isolated product CI are **pending** until exact-head results appear in the PR.
+
+Retained failed local iterations: an ambiguous Excel button locator matched both native and common-table controls (fixed by targeting the native export attribute); an initial fixture incorrectly assumed a daily SRE's unavailable weekly quota meant verified aggregate workload; the added fixture's blank subject tag initially represented missing evidence rather than an accepted empty list. These failures led to precise fixture/source-evidence assertions, not weaker validators. No test pass is claimed for those iterations. A missing `/usr/bin/time` stopped one shell wrapper before Node; the successful timing uses the shell's timer.
+
+Visible changes: existing Statistics tables, cumulative R% and Excel output load with their retained appearance. One explanation now says recorded completed and committed relief are compared against captured entitlement, rather than claiming the separate layered allocator selects by that report. Missing-history/estimated warnings remain visible and exported.
+
+Deferred: the independent `statisticsCalendar` preset response still lacks the native term/semester shape; this task does not close that backlog. No hosted UAT, large-school maximum-data performance or new process-restart test ran. Current-source outages intentionally keep annual ranking unavailable. Review the eight paths at the exact PR head; rollback is a code revert without migration or data rewrite.
+
+Q01–Q05 **Pass** for the bounded implementation and local evidence, with the stated cross-source consistency limit. Q06 **Pending** required exact-head full suites; Q07 **Pending** Muse exact-head review. Q08 release **Not applicable — not authorised**. Ownership, systematic reproduction and verification principles are applied; no optional skill package execution is claimed. F5 remains OPEN. Official T1B-01/T1B-02 and hosted/runtime UAT remain **Not tested**.

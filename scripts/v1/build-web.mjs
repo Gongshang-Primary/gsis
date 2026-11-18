@@ -1145,6 +1145,7 @@ function transform(module,rel,text){
    text=updateRosterAdminSettings(text,true);
   }
   if(module.id==='roster'&&rel==='roster-operations-ui.js')text=updateRosterLocalExport(removeRosterQuietMode(updateRosterAdminSettings(updateRosterCapacity(text),false)));
+  if(module.id==='roster'&&rel==='roster-statistics-ui.js')text=replaceOnce(text,'R% uses the allocator’s fairness value, including committed work;','R% compares recorded completed and committed relief with captured entitlement;','Roster Statistics report description');
   if(module.id==='deploy'&&rel==='app.js')text=updateDeploy(text);
   if(module.id==='deploy'&&rel==='app.js')text=updateAscSubjectIdentity(text);
   if(module.id==='deploy'&&(rel==='app.js'||rel==='teaching-rules.js'))text=updateDeployTeachingEligibility(text);

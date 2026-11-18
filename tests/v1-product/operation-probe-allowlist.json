@@ -188,14 +188,6 @@
     },
     {
       "domain": "roster",
-      "path": "/operations",
-      "selector": "operation",
-      "name": "statisticsRPercent",
-      "ledger": "F07",
-      "reason": "The copied statistics screen retains this absent R-percent operation despite a replacement being documented."
-    },
-    {
-      "domain": "roster",
       "path": "/whatsapp/media/synthetic-probe",
       "selector": "",
       "name": "",

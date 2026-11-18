@@ -103,6 +103,28 @@ export function flatten(state) {
   }
   return rows;
 }
+/** Read the same weekly revision fences in one bounded owner query. */
+export async function weeklyScopeRevisions(db, schoolId, range) {
+  const from = weekOf(range.from), to = weekOf(range.to), revisions = {};
+  for (let t = Date.parse(from); t <= Date.parse(to); t += 7 * 86400000)
+    revisions[new Date(t).toISOString().slice(0, 10)] = 0;
+  // Existing sparse callers can span more than a year. Preserve their
+  // original read behavior; only bounded report ranges use this batch.
+  if (Object.keys(revisions).length > 54) {
+    for (const week of Object.keys(revisions))
+      revisions[week] = await scopeRevision(db, schoolId, "week:" + week);
+    return revisions;
+  }
+  const rows = await query(db,
+    "SELECT scope,revision FROM roster_scopes WHERE school_id=? AND scope BETWEEN ? AND ? ORDER BY scope LIMIT 55",
+    [schoolId, "week:" + from, "week:" + to]);
+  requireValue(rows.length <= 54, "ACCOUNTING_BOUNDS", 413);
+  for (const row of rows) {
+    const week = row.scope.slice(5);
+    if (Object.hasOwn(revisions, week)) revisions[week] = row.revision;
+  }
+  return revisions;
+}
 export async function loadState(
   db,
   schoolId,
@@ -111,19 +133,7 @@ export async function loadState(
 ) {
   requireValue(recordIds.length <= 100, "RECORD_BOUNDS");
   const sourceConfigRevision = await scopeRevision(db, schoolId, "config"),
-    accountingRevisions = {};
-  for (
-    let t = Date.parse(weekOf(range.from));
-    t <= Date.parse(weekOf(range.to));
-    t += 7 * 86400000
-  ) {
-    const week = new Date(t).toISOString().slice(0, 10);
-    accountingRevisions[week] = await scopeRevision(
-      db,
-      schoolId,
-      "week:" + week,
-    );
-  }
+    accountingRevisions = await weeklyScopeRevisions(db, schoolId, range);
   let sql =
     "SELECT * FROM roster_records WHERE school_id=? AND (collection='types' OR service_date IS NULL OR service_date BETWEEN ? AND ?)";
   const args = [schoolId, range.from, range.to];
@@ -267,7 +277,7 @@ export async function loadState(
         mode: "frozen-v1",
       })),
     );
-  const accounting = await accountingProjection(db, schoolId, range, state);
+  const accounting = await accountingProjection(db, schoolId, range, state, accountingRevisions);
   state.importedRelief.push(...accounting.imports);
   state.reliefCorrections.push(...accounting.corrections);
   if (state.systemConfig.consecutiveCountExclusions === undefined)
@@ -604,16 +614,12 @@ export function weekOf(date) {
     .slice(0, 10);
 }
 /** Read-only compatibility projection; these derived rows are never written back as authority. */
-export async function accountingProjection(db, schoolId, range, state) {
+export async function accountingProjection(db, schoolId, range, state, capturedRevisions = null) {
   const from = weekOf(range.from),
     to = new Date(Date.parse(weekOf(range.to)) + 6 * 86400000)
       .toISOString()
       .slice(0, 10),
-    revisions = {};
-  for (let t = Date.parse(from); t <= Date.parse(to); t += 7 * 86400000) {
-    const week = new Date(t).toISOString().slice(0, 10);
-    revisions[week] = await scopeRevision(db, schoolId, "week:" + week);
-  }
+    revisions = capturedRevisions || await weeklyScopeRevisions(db, schoolId, range);
   const ledger = await query(
     db,
     "SELECT duty_id,staff_id,service_date,period,SUM(charge) AS charge,SUM(period_count) AS periods,MAX(correction_revision) AS revision,assignment_json FROM roster_ledger WHERE school_id=? AND service_date BETWEEN ? AND ? GROUP BY duty_id,staff_id ORDER BY service_date,duty_id LIMIT 20001",
