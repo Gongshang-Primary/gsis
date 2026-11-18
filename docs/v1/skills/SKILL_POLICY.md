@@ -12,8 +12,14 @@ The following are the owner's requested approaches. This table does not assert t
 | Superpowers | Multi-step implementation, a behavioural defect or uncertain failure needs a disciplined process | Bounded plan; meaningful failing regression before a defect fix where practical; systematic reproduction and causal evidence; verification of the corrected behaviour. For documentation-only work, validate content/links instead of inventing code tests. |
 | Ponytail | A design introduces layers, duplication, configurable machinery or speculative flexibility | Remove unnecessary abstractions; reuse a suitable existing contract; justify each retained layer against current requirements. Simplicity never removes validation, audit or recovery. |
 | Gstack | Engineering/security review, changed browser flows or authorised release verification | Review findings with locations and impact; trust-boundary checks; browser evidence when UI behaviour changes; release checks only within existing authorisation. A skill name never permits shipping. |
-| Thermonuclear | Security-sensitive or structurally complex changes need an explicit correctness review | Separate correctness/invariant, security/privacy and structural-quality passes. Record counterexamples, severity and missing evidence. This describes the requested review approach, not a verified package identity or installation. |
+| Thermonuclear | Security-sensitive or structurally complex changes need an explicit correctness review | Review correctness and invariants, security and privacy, and structural quality in separate passes. Use the Cursor Team Kit rubric for the structural pass. Record counterexamples, severity and missing evidence. |
 | Improve | The owner requests assessment before committing to a change | Read-only inventory and prioritised improvement plan with evidence, risk, benefit and proposed scope. Assessment does not authorise edits or an unrelated cleanup. |
+
+### Cursor Team Kit
+
+Cursor Team Kit v1.2.0 is an optional source of working methods. Use its Thermo-Nuclear Code Quality Review for maintainability, module boundaries and opportunities to simplify the diff. Apply the GSiS quality gates to all three review passes. [Upstream kit](https://github.com/cursor/plugins/tree/35a90942a7f02e1ebbc2443643179815f2147954/cursor-team-kit) · [Review rubric](https://github.com/cursor/plugins/blob/35a90942a7f02e1ebbc2443643179815f2147954/cursor-team-kit/skills/thermo-nuclear-code-quality-review/SKILL.md) · [GSiS quality gates](../engineering/QUALITY_GATES.md)
+
+Use `verify-this` to test a claim and capture evidence, `run-smoke-tests` for changed browser flows with synthetic data, or `loop-on-ci` to monitor checks on the claimed branch. Follow the coordination workflow for edits, retries and review at the exact PR head. Merge, deployment and live-data actions require their existing authorisation. [Coordination workflow](../../coordination/WORKFLOW.md)
 
 ## Availability and truthful reporting
 
