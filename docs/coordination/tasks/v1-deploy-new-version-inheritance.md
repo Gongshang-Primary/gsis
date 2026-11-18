@@ -1,6 +1,6 @@
 # PAR-03: port approved normal New planning inheritance
 
-- Status: claimed; implementation and current-head verification pending.
+- Status: implemented; focused checks passed, unchanged integration regressions and exact-head CI pending.
 - Owner/model: Codex; v1 coordinator: ChatGPT/Codex.
 - Reviewer/model: Muse at the new exact head. Review is advisory.
 - Updated (Asia/Singapore): 19 November 2026, 06:02 SGT.
@@ -52,3 +52,17 @@ Skill: Pstack [Prove It Works](skill://plugins_6a85a87df50c8191bd7f010bb7b17794/
 Hosted/authenticated UAT remains **Not tested**. Official T1B-01/T1B-02 remain **Not tested** and F5 remains **OPEN**. The inherited publication fixture is not proof of an R2 or hosted publication. No hosted reads/writes, provider sends, migration, infrastructure or live-configuration operation.
 
 Rollback is a source revert; it does not delete or rewrite planning versions already created. Later handoff must provide exact branch/head/PR, tested commands, remaining CI/review gates and these limitations.
+
+## Current integration evidence
+
+Claim `371a799` was committed before product changes. The model and service changes were applied as the exact two-file approved diff from `066fcdda7a00242008938ad4aa67d14e83eab7fa..0bc58d5561f41c6d5d26fa7a1fb6b2d3ad4763b8`; both applied cleanly onto current main. The tracked test is byte-identical to the approved source (`SHA256 47530e46f7c4111f1ff32addfe08f577830e57896bcaea4a92721ae4865f42e1`). Current `projectPlanningNames` and the #210 note/revision response fields remain in place; no old complete source file replaced a current file.
+
+Local commands used `TZ=Asia/Singapore`, independent temporary/XDG/Wrangler paths and locked Chromium `/tmp/gsis-duplicate-locked-browser/chromium-1234/chrome-linux64/chrome`. Each browser/Worker program retains the existing 45-second ceiling.
+
+- Base and final `npm run build`: pass, all 18 canonical components, no tracked generated-output drift.
+- Meaningful baseline red: `timeout 45s node tests/v1-product-deploy-new-version-inheritance.mjs` at claim `371a799` plus the approved test fails in 11.501 s. Actual native New reaches the owner and creates a version, but its classes are `[]` instead of the selected source class. Log: `/tmp/gsis-inheritance-port-red.log`.
+- Same command after the approved source patch: all five groups pass in 16.583 s. Actual native browser/Workers/D1, retained definitions/room placements, cleared assignments, current Contacts, unchanged source, aliases/Duplicate/no-source, denied source/permissions, exact retry, changed intent and browser-response-loss/restart recovery. Log: `/tmp/gsis-inheritance-port-green.log`.
+- `node tests/v1-product-deploy-workbooks.mjs`: both unchanged groups pass.
+- `node scripts/v1/test.mjs --list` and `node tests/run.cjs --list`: discover the test among 134 product and 1,235 Node programs. Syntax and `git diff --check` pass.
+
+These are local checks of the frozen implementation tree; final commit SHA and exact-head CI evidence will be supplied in the PR. No local pass is described as hosted UAT or remote CI.
