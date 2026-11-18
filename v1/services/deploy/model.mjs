@@ -21,7 +21,7 @@ import {
 } from "./validation.mjs";
 import { ApiError } from "../../runtime/errors.mjs";
 import { normalizeDirectValue } from "../../contacts/direct-fields.mjs";
-import { planningSnapshot, planningEligible, reportingEligible, reportingRoot, reportingStaff, reportingLinks, hasReportingEdge } from "../../web/shared/deploy-eligibility.mjs";
+import { planningSnapshot, planningEligible, reportingEligible, reportingRoot, reportingStaff, reportingLinks, hasReportingEdge, projectPlanningNames } from "../../web/shared/deploy-eligibility.mjs";
 function validated(fn, ...args) {
   try {
     return fn(...args);
@@ -249,6 +249,7 @@ export function mergeContacts(doc, projection, { refreshMemberships = false } = 
       schoolSection: sectionName || null,
       mk: ["mk", "mke"].includes(sectionName),
       profile: native,
+      ...(p.ttbNameInputs ? { ttbNameInputs: p.ttbNameInputs } : {}),
       ...(fields ? { deploymentTags } : {}),
       groups: tokens(fields ? accepted("memberships") : p.groups),
       authority,
@@ -332,7 +333,7 @@ export function mergeContacts(doc, projection, { refreshMemberships = false } = 
       return [staffId, value];
     }),
   ) : doc.teacherDrafts;
-  return applyCatalogueLinks(applyRoleMemberships({
+  return projectPlanningNames(applyCatalogueLinks(applyRoleMemberships({
     ...doc,
     teacherDrafts,
     teachers: [
@@ -356,7 +357,7 @@ export function mergeContacts(doc, projection, { refreshMemberships = false } = 
     contactsMemberships,
     hrTerms,
     contactsFacts,
-  }));
+  })));
 }
 // This canonicalization is private to comparison/import; reading never rewrites history.
 export function canonicalTeachingDocument(document, original = document) {

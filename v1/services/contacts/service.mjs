@@ -88,6 +88,7 @@ import {
   currentSnapshot,
 } from "./store.mjs";
 import {
+  directPresentation,
   isDirectField,
   normalizeDirectValue,
 } from "../../contacts/direct-fields.mjs";
@@ -583,6 +584,13 @@ async function projection(env, body, principal, now, internal = false) {
       x.fields = Object.fromEntries(
         DEPLOY_FIELDS.map((name) => [name, deployField(r.fields[name], now)]),
       );
+      const presentation = {};
+      for (const name of ["employmentTags", "subjectTags", "mkTags"]) {
+        const selected = choose(records(r.fields[name]), now);
+        if (selected.state === "effective" && selected.record.valueSchema === 2 && selected.record.legacy)
+          presentation[name] = directPresentation(name, selected.record);
+      }
+      x.ttbNameInputs = { nameSuffix: value("nameSuffix"), presentation };
       x.fieldRevisions = Object.fromEntries(
         DEPLOY_FIELDS.filter((name) => r.fields[name]).map((name) => [
           name,
@@ -632,7 +640,7 @@ async function projection(env, body, principal, now, internal = false) {
   const transition = rows.flatMap((r) =>
     Object.entries(r.fields)
       .filter(
-        ([name]) => body.purpose !== "deploy" || DEPLOY_FIELDS.includes(name),
+        ([name]) => body.purpose !== "deploy" || DEPLOY_FIELDS.includes(name) || name === "nameSuffix",
       )
       .flatMap(([, f]) =>
         records(f)

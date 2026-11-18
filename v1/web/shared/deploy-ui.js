@@ -1,4 +1,4 @@
-import { planningSnapshot, planningPerson, planningEligible, reportingRoot, reportingStaff, reportingLinks, reportingConflicts, hasReportingEdge } from "./deploy-eligibility.mjs";
+import { planningSnapshot, planningPerson, planningEligible, reportingRoot, reportingStaff, reportingLinks, reportingConflicts, hasReportingEdge, projectPlanningNames } from "./deploy-eligibility.mjs";
 
 /* Empty-data navigation mirrors the v0.9 taxonomy without pretending a draft exists. */
 (function () {
@@ -184,9 +184,17 @@ import { planningSnapshot, planningPerson, planningEligible, reportingRoot, repo
       result.profile = { ...result.profile, ...projected.profile };
       if (!projected.activeKnown) delete result.profile.Active;
       if (mapping) result.profile["EO Appt Level"] = mapping[12] || "";
+      result.name = projected.name;
+      result.ttbName = projected.ttbName;
       for (const field of ["active", "activeKnown", "role", "groups"]) result[field] = projected[field];
       result.planningProfile = planningSnapshot(teacher);
       return result;
+    };
+    const originalRender = window.render;
+    if (typeof originalRender === "function") window.render = (...args) => {
+      const doc = v();
+      if (doc) projectPlanningNames(doc);
+      return originalRender(...args);
     };
     window.eligibleTeacher = teacher => planningEligible(v(), teacher);
     window.activeGroupTeachers = () => v().teachers.filter(teacher => planningEligible(v(), teacher))
@@ -231,6 +239,8 @@ import { planningSnapshot, planningPerson, planningEligible, reportingRoot, repo
         doc.teacherDrafts[person.id] = profile;
         const projected = planningPerson(doc, person), mapping = mappingFor(doc, projected);
         person.profile = projected.profile;
+        person.name = projected.name;
+        person.ttbName = projected.ttbName;
         for (const field of ["active", "activeKnown", "role", "groups"]) person[field] = projected[field];
         if (mapping) {
           person.deploymentTags = { ...person.deploymentTags, Memberships: [...person.groups], "EO Appt Level": mapping[12] || null };
