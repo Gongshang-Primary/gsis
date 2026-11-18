@@ -503,48 +503,82 @@ async function refreshReferenceJob(job, env) {
   return { state: "delivered", providerId: result.result.sourceRevision };
 }
 
-async function enqueueMonitor(env, now) {
-  if (!env.LORD_MONITOR_TELEGRAM_CHAT_ID) return { state: "not-configured" };
-  const reference = await one(
-    env.DB,
-    "SELECT payload_json FROM product_outbox WHERE school_id=? AND type='lord.reference-refresh' ORDER BY due_at DESC LIMIT 1",
-    [env.SCHOOL_ID],
-  );
-  if (!reference)
-    return { state: "blocked", code: "REFERENCE_REFRESH_AUTHORITY_REQUIRED" };
-  const originalDecisionId = JSON.parse(
-      reference.payload_json,
-    ).originalDecisionId,
-    bucket = Math.floor((now + 8 * 3600000) / 3600000),
-    jobId = "lord:monitor:" + bucket;
-  if (
-    await one(
-      env.DB,
-      "SELECT job_id FROM product_outbox WHERE school_id=? AND job_id=?",
-      [env.SCHOOL_ID, jobId],
-    )
-  )
-    return { state: "already-scheduled" };
-  await systemCommit(
-    env,
-    {
-      operationId: "monitor:" + bucket,
-      intent: { bucket },
-      outbox: [
-        {
-          id: jobId,
-          type: "lord.monitor",
-          dueAt: now,
-          payload: { schoolId: env.SCHOOL_ID, originalDecisionId },
-        },
-      ],
-      result: { jobId },
-    },
-    now,
-  );
-  return { state: "scheduled" };
+// This is the administrative per-booking overdue monitor, separate from
+// teacher reminder windows and the unchanged18:00 administrative closure.
+async function overdueContext(env, bookingId, now) {
+  const [booking, timings, custody, resources] = await Promise.all([
+    one(env.DB, "SELECT b.*,r.name AS borrower_name FROM lord_bookings b LEFT JOIN lord_references r ON r.school_id=b.school_id AND r.staff_id=b.staff_id WHERE b.school_id=? AND b.booking_id=?", [env.SCHOOL_ID, bookingId]),
+    one(env.DB, "SELECT revision,value_json FROM lord_settings WHERE school_id=? AND setting_key='periodTimings'", [env.SCHOOL_ID]),
+    one(env.DB, `SELECT COALESCE((SELECT SUM(collected_quantity-returned_quantity) FROM lord_booking_items WHERE school_id=? AND booking_id=?),0) AS devices,
+      COALESCE((SELECT SUM(collected_quantity-returned_quantity) FROM lord_accessories WHERE school_id=? AND booking_id=?),0) AS accessories`,
+      [env.SCHOOL_ID, bookingId, env.SCHOOL_ID, bookingId]),
+    query(env.DB, "SELECT r.name,i.collected_quantity-i.returned_quantity AS remaining FROM lord_booking_items i JOIN lord_resources r USING(school_id,resource_id) WHERE i.school_id=? AND i.booking_id=? AND i.collected_quantity>i.returned_quantity ORDER BY i.resource_id", [env.SCHOOL_ID, bookingId]),
+  ]);
+  if (!booking || booking.status !== "COLLECTED") return { state: "suppressed", reason: "CUSTODY_NOT_OPEN" };
+  if (!(custody.devices + custody.accessories > 0)) return { state: "suppressed", reason: "NO_REMAINING_CUSTODY" };
+  const period = timings && JSON.parse(timings.value_json).periods.find(p => Number(p.code) === booking.end_period - 1);
+  const end = period && Date.parse(booking.service_date + "T" + period.end + ":00+08:00");
+  if (!Number.isFinite(end)) return { state: "blocked", reason: "PERIOD_TIMINGS_REQUIRED" };
+  if (!(now > end + 30 * 60000)) return { state: "suppressed", reason: "OVERDUE_GRACE_NOT_ELAPSED" };
+  return { state: "ready", booking, end, period, custody, resources };
 }
-async function dispatchMonitor(job, env) {
+export async function enqueueMonitor(env, now) {
+  if (!env.LORD_MONITOR_TELEGRAM_CHAT_ID) return { state: "not-configured" };
+  const [reference, timings] = await Promise.all([
+    one(env.DB, "SELECT payload_json FROM product_outbox WHERE school_id=? AND type='lord.reference-refresh' ORDER BY due_at DESC LIMIT 1", [env.SCHOOL_ID]),
+    one(env.DB, "SELECT revision,value_json FROM lord_settings WHERE school_id=? AND setting_key='periodTimings'", [env.SCHOOL_ID]),
+  ]);
+  const originalDecisionId = reference && JSON.parse(reference.payload_json).originalDecisionId;
+  if (!originalDecisionId) return { state: "blocked", code: "REFERENCE_REFRESH_AUTHORITY_REQUIRED" };
+  if (!timings) return { state: "blocked", code: "PERIOD_TIMINGS_REQUIRED" };
+  const bucket = Math.floor(now / (5 * 60000)), scanKey = "lord:monitor-scan:" + bucket;
+  if (await one(env.DB, "SELECT job_key FROM lord_job_marks WHERE school_id=? AND job_key=?", [env.SCHOOL_ID, scanKey]))
+    return { state: "already-scanned" };
+  const remaining = `COALESCE((SELECT SUM(i.collected_quantity-i.returned_quantity) FROM lord_booking_items i WHERE i.school_id=b.school_id AND i.booking_id=b.booking_id),0)
+    +COALESCE((SELECT SUM(a.collected_quantity-a.returned_quantity) FROM lord_accessories a WHERE a.school_id=b.school_id AND a.booking_id=b.booking_id),0)`;
+  const endSql = "CAST(strftime('%s',b.service_date||'T'||json_extract(p.value,'$.end')||':00+08:00') AS INTEGER)*1000";
+  // Filter actual overdue/open custody and existing booking identities before
+  // the batch bound; quiet bookings and old alerts cannot starve a due one.
+  const rows = await query(env.DB, `SELECT b.*,(${endSql}) AS expected_end FROM lord_bookings b
+    JOIN json_each(?) p ON CAST(json_extract(p.value,'$.code') AS INTEGER)=b.end_period-1
+    WHERE b.school_id=? AND b.status='COLLECTED' AND (${remaining})>0 AND (${endSql})+1800000<?
+      AND NOT EXISTS(SELECT 1 FROM product_outbox o WHERE o.school_id=b.school_id AND o.job_id='lord:monitor:overdue:'||b.booking_id)
+    ORDER BY b.service_date,b.booking_id LIMIT 100`,
+    [canonical(JSON.parse(timings.value_json).periods), env.SCHOOL_ID, now]);
+  const results = [];
+  for (const b of rows) {
+    const jobId = "lord:monitor:overdue:" + b.booking_id;
+    try {
+      results.push(await systemCommit(env, {
+        operationId: "monitor-overdue:" + b.booking_id,
+        intent: { bookingId: b.booking_id, expectedEnd: b.expected_end, originalDecisionId },
+        guards: [
+          write("SELECT status='COLLECTED' AND revision=? AS ok FROM lord_bookings WHERE school_id=? AND booking_id=?", [b.revision, b.school_id, b.booking_id]),
+          write("SELECT revision=? AS ok FROM lord_settings WHERE school_id=? AND setting_key='periodTimings'", [timings.revision, env.SCHOOL_ID]),
+        ],
+        outbox: [{ id: jobId, type: "lord.monitor", dueAt: now,
+          payload: { schoolId: env.SCHOOL_ID, bookingId: b.booking_id, expectedEnd: b.expected_end, originalDecisionId } }],
+        result: { jobId },
+      }, now));
+    } catch (e) {
+      results.push({ jobId, state: "pending", code: e.code || "COMMIT_UNCONFIRMED" });
+    }
+  }
+  try {
+    await systemCommit(env, {
+      operationId: "monitor-scan:" + bucket, intent: { bucket },
+      writes: [write("INSERT INTO lord_job_marks(school_id,job_key,kind,state,created_at) VALUES(?,?,'overdue-scan','complete',?)", [env.SCHOOL_ID, scanKey, now])],
+      result: { scanKey },
+    }, now);
+  } catch (e) {
+    return { state: "pending", bounded: true, results, code: e.code || "COMMIT_UNCONFIRMED" };
+  }
+  return { state: "scanned", bounded: true, results };
+}
+export async function dispatchMonitor(job, env) {
+  // Legacy count summaries are recorded history, not overdue-session alerts.
+  if (!job.payload.bookingId || !Number.isFinite(job.payload.expectedEnd))
+    return { state: "cancelled", code: "LEGACY_MONITOR_SUPERSEDED" };
   let current;
   try {
     current = await serviceCall(env, "core", "/internal/dispatch-check", {
@@ -563,26 +597,26 @@ async function dispatchMonitor(job, env) {
     return { state: "cancelled", code: "ADMIN_AUTHORITY_REVOKED" };
   if (!env.LORD_MONITOR_TELEGRAM_CHAT_ID)
     return { state: "cancelled", code: "MONITOR_DISABLED" };
-  const rows = await query(
-      env.DB,
-      "SELECT status,COUNT(*) AS total FROM lord_bookings WHERE school_id=? AND service_date=? GROUP BY status",
-      [job.school_id, sgDay(Date.now())],
-    ),
-    incidents = await one(
-      env.DB,
-      "SELECT COUNT(*) AS total FROM lord_incidents WHERE school_id=? AND status<>'resolved'",
-      [job.school_id],
-    );
+  const state = await overdueContext(env, job.payload.bookingId, Date.now());
+  if (state.state !== "ready") return {
+    state: state.state === "suppressed" ? "cancelled" : "failed",
+    code: state.reason, retryable: state.state !== "suppressed",
+  };
+  if (state.end !== job.payload.expectedEnd)
+    return { state: "cancelled", code: "BOOKING_END_CHANGED" };
+  const b = state.booking, details = JSON.parse(b.details_json);
   return dispatchProvider(env, {
     provider: "telegram",
     chatId: env.LORD_MONITOR_TELEGRAM_CHAT_ID,
-    text:
-      "LORD " +
-      sgDay(Date.now()) +
-      "\n" +
-      rows.map((r) => r.status + ": " + r.total).join("\n") +
-      "\nUnresolved incidents: " +
-      incidents.total +
+    text: "OVERLORD: overdue physical custody\nBooking: " + b.booking_id +
+      "\nBorrower: " + (b.borrower_name || b.staff_id) +
+      "\nResources: " + (state.resources.map(r => r.name + " (" + r.remaining + ")").join(", ") || "Accessories only") +
+      "\nClass or activity: " + (details.classOrActivity || "Not recorded") +
+      "\nSubject: " + (details.subject || "Not recorded") +
+      "\nExpected end: " + b.service_date + " " + state.period.end +
+      "\nDevices remaining: " + state.custody.devices +
+      "\nAccessories remaining: " + state.custody.accessories +
+      "\nOverdue: " + Math.floor((Date.now() - state.end) / 60000) + " minutes" +
       "\nOpen OVERLORD for the current records.",
   });
 }
