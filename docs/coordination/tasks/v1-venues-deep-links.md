@@ -1,10 +1,11 @@
 # v1-venues-deep-links: B-V01d notification targets
 
-- Status: claimed before product edits.
+- Status: implemented; focused browser/build checks passed; exact-head CI and Muse review pending.
 - Owner/model: Codex; coordinator ChatGPT; independent exact-head reviewer Muse (current owner substitution).
 - Updated: 19 November 2026, Asia/Singapore.
 - Branch: `codex/v1-venues-deep-links`.
 - Refreshed main/base: `6835ed30677c7919fa63a58db8bb7dcd7d8c8daa`.
+- Accepted and re-read main claim: `184b8d0a52fe215c7d122a247e89e9b0289a44a8`; implementation starts from that commit.
 - Authority: owner-authorised v1 queue; coordinator selected this independent bounded B-V01d repair after actual synthetic baseline proof. No merge, deployment, migration, live access or real provider sends.
 
 ## Exact three-path scope
@@ -29,3 +30,16 @@ Adapt only the v1 copied-source parser to the existing module prefix. Keep the g
 - Q01–Q02 scope/design recorded. Q03–Q06 verification pending; Q07 Muse review pending. Q08 release not authorised. F5 OPEN; official T1B-01/T1B-02 and unperformed hosted/runtime UAT **Not tested**. Apply the repository's focused debugging and verification principles; no skill package is claimed executed for this small repair.
 
 Rollback is a reviewed builder-expression revert; no stored data, credentials or migration changes. Record actual commands, failures, final head and PR here before handoff.
+
+## Implementation and verification
+
+The implementation is one guarded `replaceOnce` in the existing v1 builder: the copied Venues parser matches `/venues/(b|r)/<id>` instead of the legacy root path. Both existing capture groups and the strict ID grammar remain identical. No backend, gateway, permission, source readiness, provider or legacy source changes. The committed browser test uses the real notification formatter and actual built frontend/Core/Venues paths; synthetic capture results are not evidence of provider delivery or notification authorization.
+
+Commands on the exact code/test contents committed with this task update (all `TZ=Asia/Singapore`):
+
+- `GSIS_BROWSER_EXECUTABLE=/usr/bin/chromium timeout 45s node tests/v1-product-venues-deep-links.mjs` — PASS on first corrected run, three groups: generated targets/reload/query/ordinary owner/manager; outsider/missing/foreign denial; malformed/root paths and no record changes, operation receipts, browser commands or network egress. Browser phase 4.458s after local Worker construction. Local log `/tmp/gsis-deep-links-focused.log`; the committed test is independently runnable.
+- `npm run build` — PASS, 18 canonical components; no tracked generated drift. Local log `/tmp/gsis-deep-links-canonical.log`.
+- `node --check scripts/v1/build-web.mjs`, `node --check tests/v1-product-venues-deep-links.mjs`, `git diff --check` — PASS.
+- `node tests/run.cjs --list` and `node scripts/v1/test.mjs --list` — new regression discovered: 1,235 Node / 134 product programs.
+
+No focused test failed after the one-line repair. The pre-change baseline above remains the failure evidence. Full Node/LORD, isolated product CI and unchanged navigation/notification/receipt regressions have not yet been rerun locally; exact-head CI remains required and will include them. Coordinator directed starting CI now while preserving local fixture priority for #212/F07/LORD. Do not infer a pass from another branch or prior head. Current head and CI links belong in the PR handoff, avoiding a self-referential task commit. Q03–Q05 focused evidence is complete; Q06 full CI and Q07 independent exact-head review remain pending. Unperformed runtime UAT remains Not tested; F5 OPEN.

@@ -1113,6 +1113,7 @@ function transform(module,rel,text){
   }
   if(module.id==='contacts'&&rel==='app.js')text=updateContacts(text);
   if(module.id==='venues'&&rel==='app.js'){
+   text=replaceOnce(text,String.raw`deepLink:location.pathname.match(/^\/(b|r)\/([A-Za-z0-9_-]+)$/)`,String.raw`deepLink:location.pathname.match(/^\/venues\/(b|r)\/([A-Za-z0-9_-]+)$/)`,'Venues notification targets retain their module subpath');
    text=replaceOnce(text,"history.replaceState(null,'','/?'+p);","history.replaceState(null,'','/venues/?'+p);",'Venues query navigation retains its module subpath');
    text=replaceOnce(text,"finally{location.assign('/cdn-cgi/access/logout');}","catch(error){setStatus(error.message,'warning');return;}location.assign('/');",'Venues confirms shared sign-out');
    text=replaceOnce(text,"setInterval(()=>{updateNow();","window.addEventListener('gsis:clear-protected-state',()=>{state.bootEpoch++;state.bookingEpoch++;state.actor=null;state.occurrences.clear();state.transfers.clear();state.snapshot=null;state.selection=null;state.note='';$('#main').replaceChildren();});setInterval(()=>{updateNow();",'Venues clears protected source responses');
