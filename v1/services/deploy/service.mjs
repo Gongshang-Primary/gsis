@@ -748,7 +748,7 @@ async function bootstrap(ctx) {
   const school = ctx.principal.schoolId;
   const versions = await query(
     ctx.env.DB,
-    "SELECT id,name,revision,created_at,metadata FROM deploy_versions WHERE school_id=? AND deleted=0 ORDER BY created_at DESC LIMIT 200",
+    "SELECT id,name,revision,CASE WHEN json_valid(metadata) THEN json_extract(metadata,'$.notes') END AS notes FROM deploy_versions WHERE school_id=? AND deleted=0 ORDER BY created_at DESC LIMIT 200",
     [school],
   );
   const pointer = await one(
@@ -807,6 +807,7 @@ async function bootstrap(ctx) {
     id: v.id,
     name: v.name,
     revision: v.revision,
+    notes: typeof v.notes === "string" ? v.notes : "",
     status: "draft",
     publication:
       activePublication?.version_id === v.id
@@ -2175,7 +2176,7 @@ export async function handle(ctx) {
     return publish(ctx);
   if (p === "/versionNote") {
     const { doc } = await loadVersion(ctx.env.DB, school, b.versionId);
-    return { versionId: doc.id, notes: doc.notes || "" };
+    return { versionId: doc.id, notes: doc.notes || "", revision: doc.revision };
   }
   if (p === "/internal/roster-workload") return rosterWorkload(ctx, {
     loadVersion, currentPublication: () => handle({ ...ctx, path: "/internal/publication/current" }),

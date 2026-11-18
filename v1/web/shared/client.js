@@ -385,24 +385,22 @@
     ]).has(name);
   }
   function captureRevision(url, body, data) {
-    const id =
-      data?.versionId ||
-      data?.currentId ||
-      data?.current?.id ||
-      body?.versionId;
-    if (
-      id &&
-      Number.isSafeInteger(
-        data?.current?.revision ?? data?.workingRevision ?? data?.revision,
-      )
-    )
-      revisions.set(
-        url.pathname.split("/")[2] + ":" + id,
-        Math.max(
-          revisions.get(url.pathname.split("/")[2] + ":" + id) ?? -1,
-          data.current?.revision ?? data.workingRevision ?? data.revision,
-        ),
-      );
+    const domain = url.pathname.split("/")[2];
+    const remember = (id, revision) => {
+      if (!id || !Number.isSafeInteger(revision)) return;
+      const key = domain + ":" + id;
+      revisions.set(key, Math.max(revisions.get(key) ?? -1, revision));
+    };
+    // A Deploy Versions row can be edited while a different version is loaded.
+    if (domain === "deploy" && Array.isArray(data?.versions)) {
+      for (const version of data.versions) {
+        if (typeof version?.id === "string") remember(version.id, version.revision);
+      }
+    }
+    remember(
+      data?.versionId || data?.currentId || data?.current?.id || body?.versionId,
+      data?.current?.revision ?? data?.workingRevision ?? data?.revision,
+    );
   }
   // The existing pending map owns preparation, dispatch and receipt recovery.
   // Persistent references contain identities/hashes only, never save payloads.
