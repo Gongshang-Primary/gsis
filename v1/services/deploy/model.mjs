@@ -138,7 +138,11 @@ export function setMembershipValue(teacher, value) {
   teacher.deploymentTags = { ...teacher.deploymentTags, Memberships: normalized };
   teacher.groups = normalized === null ? [] : [...normalized];
 }
-export function mergeContacts(doc, projection, { refreshMemberships = false } = {}) {
+export function mergeContacts(doc, projection, {
+  refreshMemberships = false,
+  includeUnlisted = true,
+  addStaffIds = [],
+} = {}) {
   check(
     projection &&
       Array.isArray(projection.staff) &&
@@ -350,7 +354,8 @@ export function mergeContacts(doc, projection, { refreshMemberships = false } = 
               },
             },
       ),
-      ...people.filter((p) => !oldIds.has(p.id)),
+      ...people.filter((p) => !oldIds.has(p.id) &&
+        (includeUnlisted || addStaffIds.includes(p.id))),
     ],
     catalogues: projection.catalogues || doc.catalogues || [],
     membership: structuredClone(doc.membership || []),
@@ -494,7 +499,7 @@ export function validateTeachingBindings(
 ) {
   const changed = changedTeachingStaff(before, after, explicitStaffIds);
   if (!changed.length) return after;
-  const normalized = mergeContacts(after, projection),
+  const normalized = mergeContacts(after, projection, { includeUnlisted: false }),
     people = new Map(normalized.teachers.map((t) => [t.id, t]));
   for (const staffId of changed)
     check(
@@ -506,7 +511,7 @@ export function validateTeachingBindings(
   return normalized;
 }
 export function calculate(doc, contacts) {
-  const source = mergeContacts(planningView(doc), contacts);
+  const source = mergeContacts(planningView(doc), contacts, { includeUnlisted: false });
   const accepted = {
     ...source,
     teachers: source.teachers.map((t) => ({ ...t, profile: { ...t.profile } })),
@@ -1398,7 +1403,7 @@ export function applyEdits(doc, edits) {
       continue;
     }
     if (op === "removeTeacherProfile") {
-      teacher();
+      const removed = teacher();
       check(
         !d.assignments.some((a) => a.teacher === e.teacher),
         "Remove assignments before removing a planning reference.",
@@ -1406,6 +1411,8 @@ export function applyEdits(doc, edits) {
         409,
       );
       d.teachers = d.teachers.filter((t) => t.id !== e.teacher);
+      d.removedTeachers ??= {};
+      d.removedTeachers[e.teacher] = removed;
       delete d.teacherDrafts[e.teacher];
       delete d.teacherNotes[e.teacher];
       continue;

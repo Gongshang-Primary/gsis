@@ -1,6 +1,6 @@
 # Issue 212: preserve saved Deploy teacher membership
 
-- Status: claimed; implementation and exact-head verification pending.
+- Status: implemented; native/owner regression passed, exact-head CI and review pending.
 - Owner/model: Codex; v1 coordinator: ChatGPT/Codex.
 - Reviewer/model: Muse, exact head; model review is advisory.
 - Updated (Asia/Singapore): 19 November 2026.
@@ -50,6 +50,21 @@ Use `TZ=Asia/Singapore`, locked Playwright Chromium, actual local Workers/D1 and
 
 ## Quality, recovery and handoff
 
-Q01 authority/scope: claimed. Q02 design: version owns its saved membership; Contacts owns facts and candidate identities. Q03 security and Q04 failure/recovery: preserve established capabilities, source pins, original-operation identities and owner CAS. Q05 bounds: no larger projections, queries or write limits. Q06 verification/Q07 review: pending. Q08 release: not authorised.
+Q01 authority/scope: pass, branch-only claims `5063eac` then published scope refinement `47c80dc` preceded their respective edits. Q02 design: version owns its saved membership; Contacts owns facts and candidate identities. Q03 security and Q04 failure/recovery: local checks pass for established capabilities, preview, original-operation replay and owner CAS; broader exact-head checks pending. Q05 bounds: no larger projections, queries or write limits. Q06 verification: focused local pass, paging regressions and full CI pending. Q07 review: pending. Q08 release: not authorised.
 
 Pstack Prove It Works was read and applied to actual owner-state/native-browser evidence; no third-party skill code copied. Root/v1 instructions, workflow, skill policy and quality gates were read. Hosted runtime UAT and T1B-01/T1B-02 remain **Not tested**; F5 **OPEN**. Source rollback does not restore previously removed rows or reverse intentional owner saves. Any hosted reconstruction requires a separate evidence-backed owner task.
+
+## Implementation and local evidence
+
+The model now supports hydrating only saved IDs or explicitly targeted added IDs. Loaded-version bootstrap, calculations, export, publication and unrelated import reconciliation preserve membership. Bootstrap supplies the full current candidate catalogue separately. Create/Duplicate and explicit Contacts refresh retain their existing seeding calls. Explicit profile/assignment actions admit only the specified identities. A saved removal records its existing snapshot; an explicit re-add supersedes only that person's removal marker. The native UI delegates creation of a missing explicit upsert to its existing mechanism and then reapplies current v1 name/profile logic. No implicit creation from `setTeacherField` is added to the UI.
+
+Commands use `TZ=Asia/Singapore`, independent local temporary paths and locked Chromium `/tmp/gsis-duplicate-locked-browser/chromium-1234/chrome-linux64/chrome`.
+
+- `npm run build`: all 18 components pass before and after the UI change; no tracked generated drift. Logs `/tmp/gsis-212-base-build.log`, `/tmp/gsis-212-ui-build.log`.
+- Meaningful completed-regression comparison against unchanged `a48b2d0`: expected failure, two rendered rows versus zero after cached Refresh. The separate original native probe also proves the failed Delete and original aborted receipt. Logs `/tmp/gsis-212-tracked-red.log`, `/tmp/gsis-212-baseline-probe.log`.
+- `timeout 45s node tests/v1-product-deploy-saved-teacher-membership.mjs`: five groups pass in 17.126s after the correction. Actual native cached/full Refresh, authoritative empty/legacy membership, targeted Add, Delete/Save/reload, original receipt replay, changed intent, unrelated import/note save, valid-lease stale-revision denial, read-only preview and no Contacts field writes. Log `/tmp/gsis-212-green6.log`.
+- Earlier focused attempts first hit fixture-only hidden/auto-open picker assumptions, then exposed the real missing-upsert UI guard. After that product correction, a fixture preview omitted its required operation ID; supplying it preserved the real authority check. No timeout or safety assertion was weakened. The final test additionally uses an exact `reliefResults.teachers=[]` assertion instead of an optional lookup of the wrong DTO key; its exact-head rerun is pending, not claimed by the earlier run.
+- `node tests/v1-product-deploy-workbooks.mjs`: both unchanged groups pass. Syntax and `git diff --check` pass. Both runners discover the new program (134 product / 1,235 Node programs on this base).
+- The two updated paging regressions, remaining related unchanged programs, full Node/LORD/product CI and Muse's exact-head review are pending. Final commands/outcomes and commit SHA will be recorded in the PR body without changing a reviewed head solely to record CI.
+
+An internal Codex peer read-only inspection found no concrete blocker in saved/candidate separation, targeted imports or the UI shim. It ran no tests and is not Muse approval. The removed-person marker does not repair historical dangling assignments; the task explicitly does not perform reconstruction.

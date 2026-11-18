@@ -858,14 +858,19 @@ try {
       totalBytes > 1024 * 1024,
       "Fixture must exercise more than one 1 MiB service response.",
     );
+    const savedMembers = (await (await suite.db("deploy")).prepare(
+      "SELECT value FROM deploy_rows WHERE school_id=? AND version_id=? AND scope='teachers' ORDER BY row_id",
+    ).bind(school, pagingVersionId).all()).results.map(row => JSON.parse(row.value).id).sort();
     const collected = await post(admin, "deploy", "/bootstrap", {
       versionId: pagingVersionId,
     });
-    assert.equal(collected.current.teachers.length, 512);
+    assert.equal(collected.staffCatalog.length, 512);
     assert.equal(
-      new Set(collected.current.teachers.map((row) => row.id)).size,
+      new Set(collected.staffCatalog.map((row) => row.id)).size,
       512,
     );
+    assert.deepEqual(collected.current.teachers.map(row => row.id).sort(), savedMembers,
+      "Collecting all Contacts pages cannot populate a saved version.");
     const tampered = await page(
       firstCursor.slice(0, -1) + (firstCursor.endsWith("0") ? "1" : "0"),
     );
