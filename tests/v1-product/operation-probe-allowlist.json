@@ -3,62 +3,6 @@
   "review": "Missing-handler entries approved by Claude at bf2067c52bf7390b8651194022eb32791e8c086f; runtime-site pins require the Part C exact-head recheck. Allowances do not close findings. Job 3 removes F01/F02 only after real built-browser and Worker/D1 lock/save coverage; unrelated allowances remain open.",
   "entries": [
     {
-      "domain": "calendar",
-      "path": "/calendar-changes",
-      "selector": "",
-      "name": "",
-      "ledger": "F14",
-      "reason": "The flag-gated Calendar change-awareness stream still names this absent route."
-    },
-    {
-      "domain": "calendar",
-      "path": "/calendar-changes/delta",
-      "selector": "",
-      "name": "",
-      "ledger": "F14",
-      "reason": "The flag-gated Calendar change-awareness poll still names this absent delta route."
-    },
-    {
-      "domain": "calendar",
-      "path": "/calendar-jobs",
-      "selector": "",
-      "name": "",
-      "ledger": "F14",
-      "reason": "The flag-gated Calendar job-status strip still names this absent route."
-    },
-    {
-      "domain": "contacts",
-      "path": "/kp",
-      "selector": "",
-      "name": "",
-      "ledger": "S2/replaced",
-      "reason": "Section 2 explicitly records Contacts kp as replaced by native Core access; its legacy function remains in the built file."
-    },
-    {
-      "domain": "lord",
-      "path": "/transaction",
-      "selector": "action",
-      "name": "backgroundack",
-      "ledger": "S2/replaced",
-      "reason": "Section 2 explicitly records OVERLORD backgroundack as replaced by the native background panel; the legacy call remains in the built file."
-    },
-    {
-      "domain": "lord",
-      "path": "/transaction",
-      "selector": "action",
-      "name": "backgroundapply",
-      "ledger": "S2/replaced",
-      "reason": "Section 2 explicitly records OVERLORD backgroundapply as replaced by the native background panel; the legacy call remains in the built file."
-    },
-    {
-      "domain": "lord",
-      "path": "/transaction",
-      "selector": "action",
-      "name": "backgroundpreview",
-      "ledger": "S2/replaced",
-      "reason": "Section 2 explicitly records OVERLORD backgroundpreview as replaced by the native background panel; the legacy call remains in the built file."
-    },
-    {
       "domain": "roster",
       "path": "/backup-ledger",
       "selector": "",
@@ -149,18 +93,6 @@
   ],
   "dynamicSource": "Claude PR178 note N2; exact built-source expression locations at reviewed bf2067c52bf7390b8651194022eb32791e8c086f, preserved on rebased main.",
   "dynamicCallSites": [
-    {
-      "file": "calendar/app.js",
-      "line": 6674,
-      "kind": "runtime action",
-      "reason": "Calendar job recovery forwards the retained job action and payload; their possible values depend on stored state."
-    },
-    {
-      "file": "calendar/app.js",
-      "line": 6684,
-      "kind": "runtime action",
-      "reason": "The retained Calendar proposal contains a runtime job action. This conservative expression report is not proof of a separate HTTP call."
-    },
     {
       "file": "calendar/app.js",
       "line": 6811,

@@ -1,7 +1,7 @@
 # v1 probe cleanup: remove replaced Contacts, OVERLORD and Calendar legacy callers
 
 - Model: Antigravity
-- Status: claimed on branch `antigravity/v1-probe-replaced-cleanup`
+- Status: implemented and locally verified; exact-head CI and Muse review pending
 - Updated (Asia/Singapore): 20 November 2026
 - Base: `origin/main` `7ee2418`
 - Coordinator / Merger: GPT
@@ -23,11 +23,12 @@
 - Contacts access stays routed to Core Admin (`/admin/`); OVERLORD background work stays routed to `GSISV1LordBackground`; Calendar saves stay direct synchronous v1 D1 operations.
 - No merge, deployment, live-data access, migration or provider activation.
 
-## Acceptance checks
+## Verification evidence (`TZ=Asia/Singapore`)
 
-- `TZ=Asia/Singapore GSIS_BROWSER_EXECUTABLE=/usr/bin/chromium node tests/v1-product-obsolete-callers.mjs`
-- `TZ=Asia/Singapore GSIS_BROWSER_EXECUTABLE=/usr/bin/chromium node tests/v1-product-operation-probe.mjs` (verifies `knownMissing` drops from 24 to 17 with zero stale/unallowed entries)
-- Existing Calendar, Contacts and OVERLORD browser/service regressions
-- `TZ=Asia/Singapore npm run build` with `git diff --exit-code` on production files
-- `TZ=Asia/Singapore node scripts/v1/build.mjs` and `node scripts/v1/verify-build.mjs`
-- `git diff --check`
+- `node tests/v1-product-obsolete-callers.mjs`: PASS (fail-closed anchor checks, line-count parity on unmodified v0.9 sources, built asset caller absence, native v1 Calendar `saveYear` + `saveEvent` pass).
+- `node tests/v1-product-operation-probe.mjs`: PASS (`knownMissing` reduced from 24 to 17; `unresolvedDynamic` reduced from 15 to 13 with zero stale/unallowed entries).
+- `node tests/v1-product-web-browser.mjs`: PASS (all nine built module screens).
+- `npm run build` + `git diff --exit-code` on all v0.9 production paths: PASS (zero tracked drift).
+- `node scripts/v1/build.mjs` + `node scripts/v1/verify-build.mjs`: PASS (9 services, 9 Wrangler dry-runs, local additive migration upgrade).
+- `git diff --check`: PASS.
+- Q01–Q06: pass locally; Q07: awaiting exact-head CI and Muse review; Q08: deployment not authorised; hosted UAT, F5 and official T1B-01/T1B-02 remain unchanged.
