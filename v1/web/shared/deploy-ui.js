@@ -260,7 +260,11 @@ import { planningSnapshot, planningPerson, planningEligible, reportingRoot, repo
     const originalProject = window.projectEditBase;
     window.projectEditBase = (doc, edit) => {
       if (["setTeacherField", "upsertTeacherProfile"].includes(edit.operation)) {
-        const person = doc.teachers.find(teacher => teacher.id === edit.teacher);
+        let person = doc.teachers.find(teacher => teacher.id === edit.teacher);
+        if (!person && edit.operation === "upsertTeacherProfile") {
+          originalProject(doc, edit);
+          person = doc.teachers.find(teacher => teacher.id === edit.teacher);
+        }
         if (!person) throw Error("This teacher is no longer in the selected version.");
         const profile = edit.operation === "setTeacherField"
           ? { ...person.profile, ...doc.teacherDrafts?.[person.id], [edit.field]: edit.value }

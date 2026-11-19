@@ -762,10 +762,18 @@ async function bootstrap(ctx) {
     ? (await loadVersion(ctx.env.DB, school, requested)).doc
     : null;
   let projection = null,
+    staffCatalog = doc?.teachers || [],
     referenceError = null;
   try {
     projection = await contacts(ctx);
-    if (doc) doc = mergeContacts(doc, projection);
+    // Contacts supplies choices and fresh facts, not saved version membership.
+    // A missing legacy order or an explicitly empty scope must stay empty.
+    const hydrated = mergeContacts(doc || defaults(), projection);
+    staffCatalog = hydrated.teachers;
+    if (doc) {
+      const savedIds = new Set(doc.teachers.map((t) => t.id));
+      doc = { ...hydrated, teachers: staffCatalog.filter((t) => savedIds.has(t.id)) };
+    }
   } catch (e) {
     if (doc)
       doc = {
@@ -862,7 +870,7 @@ async function bootstrap(ctx) {
         level: r[12],
         groups: ROLE_GROUPS.filter((k, i) => r[i + 2] === "1"),
       })),
-    staffCatalog: doc?.teachers || [],
+    staffCatalog,
     currentPublication: pointer
       ? { publicationId: pointer.publication_id, sequence: pointer.sequence }
       : null,
@@ -1176,7 +1184,12 @@ async function save(
       ))
   ) {
     ref ||= await contacts(ctx);
-    loaded.doc = mergeContacts(before, ref);
+    const additions = edits.flatMap((e) =>
+      ["addTeacher", "upsertTeacherProfile", "setTeacherField", "setTeacherMemberships"].includes(e.operation)
+        ? [e.teacher]
+        : e.operation === "setReportingOfficer" ? [e.officer, e.value] : [],
+    ).filter((staffId) => typeof staffId === "string" && staffId);
+    loaded.doc = mergeContacts(before, ref, { includeUnlisted: false, addStaffIds: additions });
     extraDependencies = contactsDependencies(ref);
   }
   if (!next) {
@@ -1198,6 +1211,11 @@ async function save(
         b.edits || [{ ...b, operation: b.operation }],
       );
   }
+  // Explicitly adding a person again supersedes only that person's removal
+  // marker; unrelated historical markers remain untouched.
+  for (const person of next.teachers)
+    if (!before.teachers.some((saved) => saved.id === person.id))
+      delete next.removedTeachers?.[person.id];
   const bindingChanged =
     changedTeachingStaff(before, next, explicitStaffIds).length > 0;
   if (bindingChanged) {
@@ -1289,12 +1307,27 @@ function workbookDocument(document, scope) {
     ? canonicalTeachingDocument(document)
     : document;
 }
+function importStaffIds(workbook, matches = {}) {
+  const ids = new Set();
+  for (const sheet of Object.values(workbook?.sheets || {})) {
+    if (!Array.isArray(sheet?.columns) || !Array.isArray(sheet.rows)) continue;
+    const staff = sheet.columns.indexOf("Staff ID"), name = sheet.columns.indexOf("TTb Name");
+    if (staff < 0) continue;
+    for (const row of sheet.rows) if (Array.isArray(row)) {
+      const staffId = row[staff] || (name >= 0 ? matches[row[name]] : null);
+      if (typeof staffId === "string" && staffId) ids.add(staffId);
+    }
+  }
+  return [...ids];
+}
 async function previewImport(ctx) {
   const b = ctx.body,
     loaded = await loadVersion(ctx.env.DB, ctx.principal.schoolId, b.versionId),
     ref = await contacts(ctx);
+  const saved = mergeContacts(loaded.doc, ref, { includeUnlisted: false });
   loaded.doc = workbookDocument(
-    mergeContacts(loaded.doc, ref),
+    mergeContacts(loaded.doc, ref, { includeUnlisted: false,
+      addStaffIds: importStaffIds(b.workbook, b.matches) }),
     b.workbook?.metadata?.["Table Scope"],
   );
   const dependencyDigest = await digest(ref.dependencies || []);
@@ -1310,7 +1343,7 @@ async function previewImport(ctx) {
     validated.document,
     ref,
   );
-  const before = flatten(loaded.doc),
+  const before = flatten(workbookDocument(saved, b.workbook?.metadata?.["Table Scope"])),
     after = flatten(validated.document),
     diff = { added: 0, removed: 0, changed: 0 };
   for (const k of new Set([...before.keys(), ...after.keys()]))
@@ -1386,7 +1419,8 @@ async function applyImport(ctx) {
     409,
   );
   loaded.doc = workbookDocument(
-    mergeContacts(loaded.doc, ref),
+    mergeContacts(loaded.doc, ref, { includeUnlisted: false,
+      addStaffIds: importStaffIds(input.workbook, input.matches) }),
     input.workbook?.metadata?.["Table Scope"],
   );
   const validated = validateWorkbook(
@@ -1596,7 +1630,7 @@ async function publish(ctx) {
   );
   if (!prepared) {
     const ref = await contacts(ctx),
-      document = mergeContacts(loaded.doc, ref),
+      document = mergeContacts(loaded.doc, ref, { includeUnlisted: false }),
       calculated = calculate(document, ref);
     referenceVenues(document);
     validateDocument(document);
@@ -2133,7 +2167,7 @@ export async function handle(ctx) {
   if (p === "/export") {
     const { doc, version } = await loadVersion(ctx.env.DB, school, b.versionId);
     return exportWorkbook(
-      workbookDocument(mergeContacts(doc, await contacts(ctx)), b.scope),
+      workbookDocument(mergeContacts(doc, await contacts(ctx), { includeUnlisted: false }), b.scope),
       b.scope,
       school,
       version.revision,

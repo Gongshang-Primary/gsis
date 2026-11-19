@@ -1102,8 +1102,11 @@ try {
   };
   const allStaff = await call("/bootstrap", { versionId: eligibilityVersion });
   assert.equal(allStaff.referenceError, null);
-  assert.equal(allStaff.current.teachers.length, 512);
-  assert.equal(new Set(allStaff.current.teachers.map((t) => t.id)).size, 512);
+  assert.equal(allStaff.staffCatalog.length, 512);
+  assert.equal(new Set(allStaff.staffCatalog.map((t) => t.id)).size, 512);
+  assert.deepEqual(allStaff.current.teachers.map((t) => t.id),
+    eligibleSaved.doc.teachers.map((t) => t.id),
+    "A complete Contacts candidate inventory does not add saved version members.");
   assert.equal(pageReads, 8);
   assert(maxPageBytes < 512 * 1024);
   const pageNegatives = [
