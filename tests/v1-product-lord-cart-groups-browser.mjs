@@ -71,7 +71,8 @@ reference.trolleys = reference.bookingResources.flatMap((g) =>
 let booking = {
   bookingId: "synthetic-booking",
   staffId: "synthetic-staff",
-  date: "2026-11-20",
+  // Keep the mocked booking off the native form's default day.
+  date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1_000).toISOString().slice(0, 10),
   startPeriod: "1",
   endPeriod: "2",
   status: "BOOKED",

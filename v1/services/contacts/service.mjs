@@ -91,6 +91,7 @@ import {
   directPresentation,
   isDirectField,
   normalizeDirectValue,
+  previewTTb,
 } from "../../contacts/direct-fields.mjs";
 import { decorateContacts } from "./formal-role-display.mjs";
 const validId = (v) =>
@@ -874,14 +875,11 @@ export async function handle(ctx) {
           403,
           "Deploy registration is name-only.",
         );
-      const existing = await query(
-        env.DB,
-        "SELECT staff_id,basic_name,ttb_name FROM contacts_staff WHERE school_id=? AND lower(basic_name)=lower(?) ORDER BY staff_id",
-        [env.SCHOOL_ID, body.basicName],
-      );
       if (body.existingStaffId) {
-        const selected = existing.find(
-          (x) => x.staff_id === body.existingStaffId,
+        const selected = await one(
+          env.DB,
+          "SELECT staff_id,basic_name FROM contacts_staff WHERE school_id=? AND staff_id=? AND lower(basic_name)=lower(?)",
+          [env.SCHOOL_ID, body.existingStaffId, body.basicName],
         );
         fail(selected, "IDENTITY_SELECTION_REQUIRED", 409);
         return {
@@ -890,14 +888,31 @@ export async function handle(ctx) {
           name: selected.basic_name,
         };
       }
-      if (existing.length && !body.nameSuffix && !body.tags?.length)
-        throw new ApiError(
-          "IDENTITY_SELECTION_REQUIRED",
-          409,
-          "Select the existing active, inactive or provisional person before creating another.",
-        );
       const tagChanges = {};
-      if (body.tags) {
+      const modifiers = body.nameModifiers;
+      let roleHint;
+      if (modifiers !== undefined) {
+        const tagFields = ["employmentTags", "subjectTags", "mkTags"];
+        fail(
+          proof.descriptor.service === "deploy" && body.tags === undefined &&
+            modifiers && typeof modifiers === "object" && !Array.isArray(modifiers) &&
+            modifiers.schemaVersion === 1 && Object.keys(modifiers).every(
+              (key) => ["schemaVersion", "role", ...tagFields].includes(key),
+            ),
+          "INVALID_INPUT",
+          400,
+          "Use the supported naming modifiers for this registration.",
+        );
+        for (const field of tagFields) {
+          if (!Object.hasOwn(modifiers, field)) continue;
+          fail(Array.isArray(modifiers[field]));
+          tagChanges[field] = validateOrdinaryValue(env, field, modifiers[field]);
+        }
+        if (Object.hasOwn(modifiers, "role")) {
+          fail(typeof modifiers.role === "string");
+          roleHint = validateOrdinaryValue(env, "role", modifiers.role);
+        }
+      } else if (body.tags) {
         fail(Array.isArray(body.tags) && body.tags.length <= 16);
         const employment = new Set([
             "BT",
@@ -926,17 +941,42 @@ export async function handle(ctx) {
         for (const [field, tags] of Object.entries(tagChanges))
           tagChanges[field] = normalizeDirectValue(field, tags);
       }
-      const operationId = `provisional-${await digest([proof.descriptor.service, body.operationId])}`,
-        intent = {
-          operationId,
-          ...tagChanges,
-          ...(body.nameSuffix ? { nameSuffix: body.nameSuffix } : {}),
-          staffId: `staff-${await digest([env.SCHOOL_ID, operationId])}`,
-          basicName: body.basicName,
-          ...(proof.descriptor.service === "roster"
-            ? { mobile: body.mobile }
-            : {}),
-        };
+      const operationId = `provisional-${await digest([proof.descriptor.service, body.operationId])}`;
+      const staffId = `staff-${await digest([env.SCHOOL_ID, operationId])}`;
+      const basicName = validateOrdinaryValue(env, "basicName", body.basicName);
+      const nameSuffix = body.nameSuffix
+        ? validateOrdinaryValue(env, "nameSuffix", body.nameSuffix)
+        : undefined;
+      const preview = previewTTb({ basicName, nameSuffix, ...tagChanges, role: roleHint });
+      fail(
+        preview.available,
+        preview.reason,
+        400,
+        "Shorten the Basic Name or modifiers so the derived TTb Name fits.",
+      );
+      if (preview.requiredSubjectTags.length)
+        tagChanges.subjectTags = validateOrdinaryValue(env, "subjectTags", [
+          ...(tagChanges.subjectTags ?? []),
+          ...preview.requiredSubjectTags,
+        ]);
+      // A known collision does not start an owner operation. Existing operation
+      // IDs still reach the durable intent check and exact receipt replay.
+      const duplicateName = await one(
+        env.DB,
+        `SELECT 1 FROM contacts_staff WHERE school_id=? AND staff_id<>? AND lower(ttb_name)=lower(?)
+          AND NOT EXISTS(SELECT 1 FROM product_operations WHERE school_id=? AND operation_id=?)`,
+        [env.SCHOOL_ID, staffId, preview.name, env.SCHOOL_ID, operationId],
+      );
+      fail(!duplicateName, "IDENTITY_SELECTION_REQUIRED", 409, "Use a distinct TTb Name or select the existing person.");
+      const intent = {
+        operationId,
+        ...tagChanges,
+        ...(nameSuffix ? { nameSuffix } : {}),
+        ...(modifiers !== undefined ? { registrationModifierDigest: await digest(modifiers) } : {}),
+        staffId,
+        basicName,
+        ...(proof.descriptor.service === "roster" ? { mobile: body.mobile } : {}),
+      };
       const p = await serviceCall(env, "core", "/internal/delegate", {
         sourceDecisionId,
         sourceOperationId: body.operationId,
@@ -946,13 +986,14 @@ export async function handle(ctx) {
         intent,
         resourceId: intent.staffId,
       });
-      return handle({
-        ...ctx,
+      // The Worker can fence a delegated 4xx rejection against the original
+      // owner intent, including a collision that wins after the read above.
+      return handle(Object.assign(ctx, {
         internal: false,
         path: "/staff/create",
         body: intent,
         principal: p,
-      });
+      }));
     }
     if (path === "/internal/contributions") {
       fail(
@@ -1625,7 +1666,7 @@ export async function handle(ctx) {
           !existing,
           "IDENTITY_SELECTION_REQUIRED",
           409,
-          "Select the existing active, inactive or provisional person, or provide a distinct name tag.",
+          "Use a distinct TTb Name or select the existing person.",
         );
       }
       const fieldOutcome = publicationAuthority
@@ -1756,7 +1797,7 @@ export async function handle(ctx) {
           )),
           "IDENTITY_SELECTION_REQUIRED",
           409,
-          "Use a distinct name suffix or select the existing person.",
+          "Use a distinct TTb Name or select the existing person.",
         );
         guards.push(
           w(
