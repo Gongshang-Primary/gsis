@@ -60,54 +60,6 @@
     },
     {
       "domain": "roster",
-      "path": "/backup-ledger",
-      "selector": "",
-      "name": "",
-      "ledger": "F09",
-      "reason": "The copied backup-ledger page call still targets the absent backup-ledger route."
-    },
-    {
-      "domain": "roster",
-      "path": "/backup-ledger",
-      "selector": "operation",
-      "name": "read",
-      "ledger": "F09",
-      "reason": "The copied backup-ledger read call still targets the absent backup-ledger route."
-    },
-    {
-      "domain": "roster",
-      "path": "/backup-ledger",
-      "selector": "operation",
-      "name": "restore",
-      "ledger": "F09",
-      "reason": "The copied backup-ledger restore call still targets the absent backup-ledger route."
-    },
-    {
-      "domain": "roster",
-      "path": "/backup-ledger",
-      "selector": "operation",
-      "name": "verify",
-      "ledger": "F09",
-      "reason": "The copied backup-ledger verify call still targets the absent backup-ledger route."
-    },
-    {
-      "domain": "roster",
-      "path": "/edge/archive",
-      "selector": "",
-      "name": "",
-      "ledger": "F10",
-      "reason": "The copied archive page and Roster archive loader fetch this absent route."
-    },
-    {
-      "domain": "roster",
-      "path": "/operations",
-      "selector": "operation",
-      "name": "archiveColdOutput",
-      "ledger": "F10",
-      "reason": "Additional caller confirmed in the same archive feature: the copied archive-confirm button submits this absent operation; not named individually in the ledger."
-    },
-    {
-      "domain": "roster",
       "path": "/operations",
       "selector": "operation",
       "name": "cancelPendingNotifications",

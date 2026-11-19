@@ -11,6 +11,8 @@ import {
   prepareSaveAbsenceClashCheck,
   queueAbsenceIntakeClash,
 } from "./absence-clash.mjs";
+import { handleBackupLedger } from "./backup-ledger.mjs";
+import { handleArchiveColdOutput, handleEdgeArchive } from "./archive.mjs";
 import Stapler from "../../../shared/roster-stapler.js";
 import {
   exportDrive,
@@ -129,6 +131,7 @@ const adminWrites = new Set([
   "deleteNameBridge",
   "saveDailyEmploymentSettings",
   "prune",
+  "archiveColdOutput",
 ]);
 const stapleWrites = new Set([
   "createStapler",
@@ -301,6 +304,23 @@ export function policy(method, path, body = {}) {
       action: "roster.read",
       write: false,
       resourceId: body.operationId,
+    };
+  if (path === "/backup-ledger")
+    return {
+      action: "roster.admin",
+      write: ["verify", "restore"].includes(body.operation),
+      resourceId: body.manifestFileId || "backup-ledger",
+    };
+  if (path === "/edge/archive")
+    return {
+      action:
+        body.view === "openingBalances"
+          ? "roster.admin"
+          : body.view === "statistics"
+            ? "roster.read"
+            : "roster.own",
+      write: false,
+      resourceId: body.view || "archive",
     };
   throw new ApiError("UNKNOWN_OPERATION", 404, "Unknown Roster operation.");
 }
@@ -778,6 +798,10 @@ export async function handle(ctx) {
       audit: { dutyId: ctx.body.dutyId, reason: ctx.body.reason },
     });
   }
+  if (ctx.path === "/backup-ledger")
+    return handleBackupLedger(ctx, { prepared, commit });
+  if (ctx.path === "/edge/archive")
+    return handleEdgeArchive(ctx, { recordContext });
   if (ctx.path === "/layers") return layerSettings(ctx);
   if (["/upload", "/update", "/remove"].includes(ctx.path))
     return baselineWrite(ctx);
@@ -1792,6 +1816,8 @@ async function operations(ctx) {
       captureObservedQuotas,
       safeLegacyError,
     });
+  if (opName === "archiveColdOutput")
+    return handleArchiveColdOutput(ctx, { prepared, commit });
   if (["statistics", "statisticsRPercent"].includes(opName)) return statisticsReport(ctx, opName, recordContext);
   const readonly = reads.has(opName) || opName === "read",
     range = requestedDates(opName === "capacityForecast" ? {...body, from: body.date || localDate(ctx.now), to: Allocation.addDays(Allocation.monday(body.date || localDate(ctx.now)), 6)} : body, ctx.now),
