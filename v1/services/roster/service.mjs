@@ -1,3 +1,4 @@
+import { statisticsReport } from "./statistics.mjs";
 import {updateCapacityWarnings,refreshCapacityMessage,refreshNewSummaries,capacityTemplateData} from "./capacity-notifications.mjs";
 import { forecastCapacity, layeredHealth } from "./capacity.mjs";
 import { allocationSnapshot } from "./allocation-snapshot.mjs";
@@ -90,6 +91,7 @@ const reads = new Set([
   ...ownReads,
   "allocationVersion",
   "statistics",
+  "statisticsRPercent",
   "statisticsCalendar",
   "calculations",
   "allocationLearning",
@@ -1753,8 +1755,9 @@ function settingsCompatibility(state, context, body) {
 async function operations(ctx) {
   const schoolId = ctx.principal.schoolId,
     body = ctx.body,
-    opName = operation(body, ctx.path),
-    readonly = reads.has(opName) || opName === "read",
+    opName = operation(body, ctx.path);
+  if (["statistics", "statisticsRPercent"].includes(opName)) return statisticsReport(ctx, opName, recordContext);
+  const readonly = reads.has(opName) || opName === "read",
     range = requestedDates(opName === "capacityForecast" ? {...body, from: body.date || localDate(ctx.now), to: Allocation.addDays(Allocation.monday(body.date || localDate(ctx.now)), 6)} : body, ctx.now),
     ids = [
       body.id,
@@ -1801,7 +1804,7 @@ async function operations(ctx) {
         [schoolId, range.from],
       ),
     };
-  if (["statistics", "statisticsCalendar"].includes(opName)) {
+  if (opName === "statisticsCalendar") {
     const report = await dutiesReport(
       ctx.env.DB,
       schoolId,

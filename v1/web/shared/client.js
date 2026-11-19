@@ -360,6 +360,7 @@
       "availability",
       "history",
       "statistics",
+      "statisticsRPercent",
       "statisticsCalendar",
       "timetableDay",
       "dailyTimetable",
