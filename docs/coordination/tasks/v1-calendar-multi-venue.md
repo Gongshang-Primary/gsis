@@ -1,8 +1,8 @@
 # v1-calendar-multi-venue: B-CA02 Calendar room selection
 
-- Status: claimed, before product edits.
+- Status: implemented; focused local verification passed; final regressions, CI and exact-head review pending.
 - Owner/model: Codex; coordinator ChatGPT; independent exact-head reviewer Muse (current owner substitution).
-- Last updated (Asia/Singapore): 19 November 2026, 06:09.
+- Last updated (Asia/Singapore): 19 November 2026, 06:20.
 - Branch: `codex/v1-calendar-multi-venue`.
 - Refreshed base: `360853c32ce5f0a07b5e385fea3647fea5c63b6e`.
 - Authority: owner-authorised v1 changelog work; coordinator selected the bounded remaining B-CA02 repair. No merge, deployment, migration, live access or provider send.
@@ -34,6 +34,18 @@ At the refreshed base, `eventMutation` in Calendar checks `catalogue.venues.some
 
 ## Gates, review and release
 
-Q01/Q02: claim and scoped ownership documented; Q03–Q07: pending implementation, tests and exact-head review. Q08: no merge/deployment authorised. F5 OPEN; official T1B-01/T1B-02 and unperformed hosted/runtime UAT remain **Not tested**.
+Claim published to main by non-force update at `1abe47d`; this implementation branch starts there. `eventMutation` now splits and trims only `VenueID`, requires at most six distinct nonempty IDs, checks every ID against the existing authenticated school catalogue and persists the selected order. It neither parses nor rewrites `Location`. No new call, table, dependency or provider behaviour is introduced.
+
+Pre-fix actual nine-Worker/D1 proof at the claim: one current school room saved HTTP 200; two current school rooms returned HTTP 409 `INVALID_VENUE`; exactly one event was durable. `/tmp/gsis-calendar-multi-venue-red.mjs` is a local diagnostic, not a reproducible repository prerequisite; the committed browser test exercises that same real multi-room path and fails against the original service predicate.
+
+Local verification on the implementation working tree based on the claim (the final exact tested commit and CI links are recorded in the PR to avoid self-reference):
+
+- `TZ=Asia/Singapore timeout 45s node tests/v1-product-calendar-venues.mjs` — pass. Actual D1 with injected directory; 1/2/6 ordered IDs, literal labels/custom text, malformed/unknown/foreign IDs, atomic rejection, partial edit, copy/move, stale revision, changed-intent refusal, idempotent replay/restart, capability/impersonation and provider failure.
+- `TZ=Asia/Singapore GSIS_BROWSER_EXECUTABLE=/usr/bin/chromium timeout 45s node tests/v1-product-calendar-venues-browser.mjs` — pass. Unchanged native picker, real local Core/Calendar/Venues and D1; two rooms plus custom text save/reload/reopen, comma-bearing labels preserved, foreign-school directory row refused, Venue records/occupancy unchanged. All external requests blocked except a locally served inert Google script.
+- `TZ=Asia/Singapore npm run build` — pass, all 18 canonical components; no tracked generated changes. `node --check` for the service and both new tests and `git diff --check` — pass.
+- `node scripts/v1/test.mjs --list` and `node tests/run.cjs --list` — both discover the two new programs (135 product / 1,236 canonical Node programs). Discovery is not a full-suite pass.
+- Unchanged boundary regressions and final-head CI: pending here; actual outcomes will be recorded in the PR. Full Node/LORD and full product suites have not been run locally for this head. No previously green run is transferred to this repair.
+
+Q01–Q05: pass for this bounded repair, supported by the claim, disjoint inventory and focused negative/recovery evidence. No skill package executed. Q06: focused/build/discovery pass; required regression/CI pending. Q07: independent exact-head review pending. Q08: no merge/deployment authorised. F5 OPEN; official T1B-01/T1B-02 and unperformed hosted/runtime UAT remain **Not tested**.
 
 Rollback is a reviewed code revert. Already stored ordered room IDs and operation/audit history must be retained; no live-data rewrite or reservation rollback is part of this repair. Final evidence and PR head will be recorded here/on the PR before handoff.

@@ -1,8 +1,11 @@
 # v1-venues-physical-register: B-V01 physical register administration
 
-- Status: claimed, before product edits.
+- Status: implemented on the task branch; local focused/regression checks passed; final exact-head CI and Muse review pending.
 - Owner/model: Codex; coordinator ChatGPT; independent exact-head reviewer Muse (current owner substitution).
 - Branch: `codex/v1-venues-physical-register`.
+- Updated: 19 November 2026, Asia/Singapore.
+- Accepted/re-read main claim: `360853c32ce5f0a07b5e385fea3647fea5c63b6e`.
+- Product/test source head: `ea270d2ee79869d21820e6be771fdf132fb4820c`; see the [handoff](../../v1/venues/PHYSICAL_REGISTER_HANDOFF.md) for exact commands, earlier failures and remaining checks.
 - Refreshed baseline: `bd77b27deab417afce859cd80465d7c608ae0ab2`, GitHub main read on 18 November 2026.
 - Authority: owner-authorised v1 work queue; coordinator selected the bounded missing physical-register frontend and import path. No merge, deployment, migration, live access or provider send.
 - Requirements: Run B B-V01 and PAR-06; `docs/v1/venues/VENUE_ALLOCATION_LIFECYCLE_DESIGN.md` at `25b6687` and its owner clarifications in `docs/coordination/review/v1-venue-allocation-design-claude-review.md`. This claim does not implement split slots, timetable adoption, uncovered-date booking or retained-conflict policy.
@@ -36,3 +39,9 @@ Real local nine-Worker/D1 synthetic probe at the baseline: admin `/read` has no 
 ## Release boundary
 
 Code rollback is a reviewed revert; preserve already created stable room IDs and their audit/receipt history. No deletion, migration or live rollback is part of this task. The approved future venue design is not claimed complete by this register repair.
+
+## Implemented boundary and handoff
+
+The owner-local service now supplies the admin register, validates canonical workbook previews, preserves null capacity and merges only explicitly allowed fields while keeping server-owned facts. The register's count/revision guard covers bulk import and ordinary alias changes, preventing cross-room identity/alias races. Existing per-room/source fences remain. The new Venues-only browser module reuses native read transport, the shared table/XLSX tools and durable receipts; no original v0.9 frontend is edited. The two new tests are discovered by both runners. Canonical 18-component build has no tracked drift. Eleven local programs passed at `a5f7dcc…`; the subsequent preview-wrapper/input-invalidation correction is isolated to browser source/test. Its final browser check passed in 14.299s, and the unchanged operation probe passed in 26.648s (408 operations, 128 parsed scripts; existing 26 known gaps and 15 dynamic sites remain). Full Node/LORD and product CI must be green at the final exact head before review/merge readiness.
+
+B-V01's whole hosted cross-module UAT and new lifecycle design are not closed here. Contextual Deploy/Roster empty-directory hints, split slots, uncovered-date booking, retained clashes, timed adoption and Layout display remain separately scoped. No owner policy question was needed.

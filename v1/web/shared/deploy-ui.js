@@ -109,6 +109,36 @@ import { planningSnapshot, planningPerson, planningEligible, reportingRoot, repo
   sync();
 })();
 
+// Preserve the owning Deploy colours and navigation beneath shared table tools.
+(function () {
+  const style = document.createElement("style");
+  style.textContent = `
+    html body #content:is([data-view="IP Deploy"],[data-view="Teachers"],[data-view="Dept"],[data-view="Committees"],[data-view="CCAs"],[data-view="PLT"],[data-view="Events"]) table.gsis-core-table thead > tr:first-child > th:first-child {
+      background:#19485e !important;color:#fff;
+    }
+    html body #content[data-view="Teachers"] tbody > tr[data-roster-teacher] {
+      --row-band:#fff;
+    }
+    html body #content[data-view="Teachers"] tbody > tr:nth-child(even of [data-roster-teacher]:not([hidden])) {
+      --row-band:#e8f0f5;
+    }
+    html body #content[data-view="Teachers"] tbody > tr[data-roster-teacher] > :is(td,th) {
+      background:var(--row-band) !important;color:#193448 !important;
+    }
+    html body #content[data-view="Teachers"] tbody > tr[data-roster-teacher] :is(input,select,textarea):not(.dirty) {
+      background:var(--row-band);color:inherit;
+    }
+  `;
+  document.head.append(style);
+  if (typeof settingsSections !== "undefined") {
+    const hr = settingsSections["HR Settings"];
+    if (Array.isArray(hr)) {
+      const span = hr.indexOf("Span of Control");
+      if (span >= 0) hr.push(...hr.splice(span, 1));
+    }
+  }
+})();
+
 // Own the Membership view in v1 while retaining the existing draft queue,
 // leases, revision checks and original-operation recovery of the Deploy shell.
 (function () {
@@ -230,7 +260,11 @@ import { planningSnapshot, planningPerson, planningEligible, reportingRoot, repo
     const originalProject = window.projectEditBase;
     window.projectEditBase = (doc, edit) => {
       if (["setTeacherField", "upsertTeacherProfile"].includes(edit.operation)) {
-        const person = doc.teachers.find(teacher => teacher.id === edit.teacher);
+        let person = doc.teachers.find(teacher => teacher.id === edit.teacher);
+        if (!person && edit.operation === "upsertTeacherProfile") {
+          originalProject(doc, edit);
+          person = doc.teachers.find(teacher => teacher.id === edit.teacher);
+        }
         if (!person) throw Error("This teacher is no longer in the selected version.");
         const profile = edit.operation === "setTeacherField"
           ? { ...person.profile, ...doc.teacherDrafts?.[person.id], [edit.field]: edit.value }

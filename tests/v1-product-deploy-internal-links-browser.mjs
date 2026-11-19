@@ -63,6 +63,17 @@ try {
   await importer.getByRole('button',{name:'Close',exact:true}).click();
   assert.deepEqual((await loadVersion(db,schoolId,versionId)).doc.hrChoices['Appointment Status'],['Acting','Confirmed','Temporary']);
   const scenario=await seedScenario(f),staff=scenario.staff[0];
+  // Contacts created after this version remain candidates until an explicit
+  // owner refresh saves membership; a read must not populate this fixture.
+  const refreshClient = await page.evaluate(() => clientId);
+  const refreshLease = await f.call(f.admin, "deploy", "/lease", {
+    operationId: "synthetic-links-refresh-lease", versionId, scope: "meta", clientId: refreshClient,
+  });
+  await f.call(f.admin, "deploy", "/change", {
+    operationId: "synthetic-links-refresh-members", operation: "acceptContacts", versionId,
+    scope: "meta", clientId: refreshClient, leaseFence: refreshLease.fence,
+  });
+  assert.deepEqual((await loadVersion(db, schoolId, versionId)).doc.teachers.map(t => t.id).sort(), scenario.staff.slice().sort());
   await page.reload();await page.getByRole('button',{name:'HR Settings',exact:true}).click();
   await page.getByRole('button',{name:'Teachers',exact:true}).click();
   const staffRow=page.locator('[data-roster-teacher="'+staff+'"]');

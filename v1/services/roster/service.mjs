@@ -1953,6 +1953,14 @@ async function operations(ctx) {
         periods: view.periods,
         ...result,
       };
+    } else if (opName === "setDutySMC") {
+      // The native duty editor consumes the accepted view immediately. Keep
+      // that exact snapshot in the receipt rather than rereading after commit.
+      const view = Operations.read(structuredClone(next), c, {
+        operation: "dutyRoster",
+        date: range.from,
+      });
+      result = { ...view, ...result };
     } else if (stapleWrites.has(opName)) {
       // The native planner consumes the accepted view, not just saved IDs.
       // Freeze it in the receipt so a replay cannot substitute a newer plan.

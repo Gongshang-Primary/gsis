@@ -1,4 +1,4 @@
-import {sealDecisionEvidence,recoverDecisionEvidence} from "./evidence.mjs";
+import {sealDecisionEvidence,recoverDecisionEvidence,recordFinalDenial} from "./evidence.mjs";
 import { driveConnection, internalHelperToken } from "./drive-connection.mjs";
 import { authorizeContribution } from "./contributions.mjs";
 import { ApiError } from "../../runtime/errors.mjs";
@@ -536,6 +536,16 @@ export async function authorizeCore(env, input, now = Date.now()) {
       sessionId: s.session_id,
       ...(impersonating ? { previewAccountId: target.account_id } : {}),
     });
+    if (decision.outcome !== "allow") {
+      const capture = await recordFinalDenial(env, {
+        decision, descriptor: d,
+        actor: {accountId: a.account_id, staffId: a.staff_id},
+        subject: {accountId: target.account_id, staffId: target.staff_id},
+        sessionId: s.session_id, authority,
+      }, Math.max(now, Date.now()));
+      if (!capture.persisted)
+        console.warn("Core final denial audit capture unconfirmed", {decisionId: decision.decisionId});
+    }
     fail(
       decision.outcome === "allow",
       decision.reasonCode,

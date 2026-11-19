@@ -1,3 +1,4 @@
+import { prepareRegisterImport, registerProjection } from "./register.mjs";
 import { reconcileProviderReceipts, deliveryAggregate } from "./receipts.mjs";
 export {
   recordProviderReceipt,
@@ -525,55 +526,15 @@ async function command(ctx, input) {
       "Venues administrator required.",
       403,
     );
-    need(
-      Array.isArray(input.venues) && input.venues.length <= 1000,
-      "INVALID_IMPORT",
-      "Provide a bounded venue table.",
-    );
+    const rooms = prepareRegisterImport(input, state.venues, s);
     after = structuredClone(state);
-    const seen = new Set();
-    for (const v of input.venues) {
-      id(v.id);
-      need(
-        !seen.has(v.id) &&
-          typeof v.name === "string" &&
-          v.name.trim() &&
-          v.name.length <= 300 &&
-          Number.isSafeInteger(v.capacity) &&
-          v.capacity >= 0 &&
-          v.capacity <= 100000,
-        "INVALID_VENUE",
-        "Provide stable IDs, names and valid capacities.",
-      );
-      seen.add(v.id);
-      const old = state.venues.find((r) => r.id === v.id);
-      need(
-        Number(v.revision || 0) === (old?.revision || 0),
-        "REVISION_CONFLICT",
-        "A venue changed since the preview.",
-        409,
-      );
-      const safe = {
-        id: v.id,
-        unit: v.unit || v.id,
-        name: v.name,
-        capacity: v.capacity,
-        bookable: v.bookable === true,
-        special: v.special === true,
-        approvalMode: v.approvalMode === "approval" ? "approval" : "immediate",
-        open: v.open || "07:00",
-        close: v.close || "18:00",
-        bufferMinutes: v.bufferMinutes || 0,
-        overlapGroup: v.overlapGroup || "",
-        features: v.features || [],
-        aliases: v.aliases || [],
-        revision: (old?.revision || 0) + 1,
-      };
-      if (old)
-        after.venues[after.venues.findIndex((r) => r.id === v.id)] = safe;
-      else after.venues.push(safe);
+    for (const room of rooms) {
+      const saved = {...room, revision: room.revision + 1};
+      const index = after.venues.findIndex(value => value.id === room.id);
+      if (index < 0) after.venues.push(saved);
+      else after.venues[index] = saved;
     }
-    result = { venues: after.venues, imported: input.venues.length };
+    result = {venues: after.venues, imported: rooms.length, message: "Physical room register saved."};
   } else if (input.operation === "saveRoomMetadata") {
     need(
       isAdmin(ctx.principal),
@@ -650,6 +611,11 @@ async function command(ctx, input) {
     writes = [],
     outbox = [],
     changedVenues = new Set();
+  if (input.operation === "importVenues" || (input.operation === "saveVenue" && input.venue?.aliases !== undefined && canonical(input.venue.aliases) !== canonical(state.venues.find(room => room.id === input.venue.id)?.aliases || []))) {
+    // Unit and alias uniqueness covers the whole physical register. Bind the
+    // validated snapshot to this same transaction; bookings remain independent.
+    guards.push({sql: "SELECT COUNT(*)=? AND COALESCE(SUM(revision),0)=? AS ok FROM venues_records WHERE school_id=? AND kind='venues'", args: [state.venues.length, state.venues.reduce((sum, room) => sum + room.revision, 0), s]});
+  }
   if (input.operation === "notificationDecision") {
     const updated = after.outbox.find((n) => n.id === input.id),
       old = persistent.get(`outbox:${input.id}`);
@@ -1593,6 +1559,11 @@ export async function handle(ctx) {
       ? { operation: "bootstrap" }
       : ctx.body || {};
   const { state, actor } = await load(ctx, input);
+  if (input.operation === "registerPreview") {
+    need(isAdmin(ctx.principal), "CAPABILITY_DENIED", "Venues administrator required.", 403);
+    const rooms = prepareRegisterImport(input, state.venues, ctx.principal.schoolId);
+    return {...registerProjection(rooms, ctx.principal.schoolId), created: rooms.filter(room => room.revision === 0).length, updated: rooms.filter(room => room.revision > 0).length};
+  }
   if (input.operation === "piece") {
     need(
       state.source.pieceFiles[input.key],
@@ -1623,6 +1594,7 @@ export async function handle(ctx) {
   try {
     const result = Domain.read(state, actor, input, clock(ctx));
     if (result.source) result.source.pendingScopes = state.source.pendingScopes;
+    if (input.operation === "admin" && isAdmin(ctx.principal)) result.register = registerProjection(state.venues, ctx.principal.schoolId);
     return result;
   } catch (e) {
     throw new ApiError(e.code || "INVALID_REQUEST", e.status || 400, e.message);

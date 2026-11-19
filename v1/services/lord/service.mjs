@@ -44,6 +44,8 @@ import {
   nextReferenceRefresh,
   capacityGuard,
   notificationJobs,
+  reminderPhase,
+  reminderEligibility,
 } from "./model.mjs";
 
 const adminActions = new Set([
@@ -1378,19 +1380,9 @@ async function collect(ctx, input) {
         status: "COLLECTED",
         revision: b.revision + 1,
       },
-      outbox: [
-        {
-          id: `lord:${b.booking_id}:return-reminder`,
-          type: "lord.return-reminder",
-          dueAt: Date.parse(b.service_date + "T16:00:00+08:00"),
-          payload: {
-            schoolId: b.school_id,
-            bookingId: b.booking_id,
-            staffId: b.staff_id,
-            revision: b.revision + 1,
-          },
-        },
-      ],
+      // The owner scheduler creates return reminders only in the actual
+      // five-minute booking window. Historical fixed-time jobs stay intact.
+      outbox: [],
     };
   });
 }
@@ -2870,6 +2862,22 @@ export async function notificationIntent(env, payload, now = Date.now()) {
     return { state: "suppressed", reason: "BOOKING_STATE_CHANGED" };
   if (payload.revision && payload.revision !== b.revision)
     return { state: "suppressed", reason: "BOOKING_REVISION_CHANGED" };
+  const phase = reminderPhase(payload);
+  if (phase) {
+    const [timings, settings, custody] = await Promise.all([
+      one(env.DB, "SELECT value_json FROM lord_settings WHERE school_id=? AND setting_key='periodTimings'", [payload.schoolId]),
+      one(env.DB, "SELECT value_json FROM lord_settings WHERE school_id=? AND setting_key='reminders'", [payload.schoolId]),
+      phase === "return" ? one(env.DB,
+        "SELECT COALESCE((SELECT SUM(collected_quantity-returned_quantity) FROM lord_booking_items WHERE school_id=? AND booking_id=?),0)+COALESCE((SELECT SUM(collected_quantity-returned_quantity) FROM lord_accessories WHERE school_id=? AND booking_id=?),0) AS remaining",
+        [payload.schoolId, b.booking_id, payload.schoolId, b.booking_id]) : null,
+    ]);
+    const eligibility = reminderEligibility(b, phase,
+      timings ? JSON.parse(timings.value_json).periods : [],
+      settings ? JSON.parse(settings.value_json) : {}, now, custody?.remaining);
+    if (eligibility.state !== "ready") return eligibility;
+    if (payload.reminderWindow && payload.reminderWindow !== eligibility.window.key)
+      return { state: "suppressed", reason: "REMINDER_WINDOW_CHANGED" };
+  }
   const ref = await one(
     env.DB,
     "SELECT * FROM lord_references WHERE school_id=? AND staff_id=?",
