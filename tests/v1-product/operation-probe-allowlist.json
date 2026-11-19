@@ -164,22 +164,6 @@
     },
     {
       "domain": "roster",
-      "path": "/operations",
-      "selector": "operation",
-      "name": "resolveAbsenceIntake",
-      "ledger": "F06",
-      "reason": "Resolving a queued absence-intake review calls this absent operation."
-    },
-    {
-      "domain": "roster",
-      "path": "/operations",
-      "selector": "operation",
-      "name": "retryAbsenceIntake",
-      "ledger": "F06",
-      "reason": "Retrying a queued absence-intake review calls this absent operation."
-    },
-    {
-      "domain": "roster",
       "path": "/whatsapp/media/synthetic-probe",
       "selector": "",
       "name": "",

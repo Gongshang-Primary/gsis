@@ -65,3 +65,22 @@ Reproduction command: `TZ=Asia/Singapore node /tmp/gsis-smc-duty-probe.mjs /work
 ## Next action
 
 Obtain the published final v0.9 reference and exact-head review, and release the PR181 file overlap. Refresh and activate the exact v1 claim, then implement and verify the nine cases before opening the separate draft PR. This record grants no permission to merge PR181 or deploy the current main.
+
+## Antigravity Implementation & Local Verification (`TZ=Asia/Singapore`)
+
+- **Branch:** `antigravity/v1-roster-absence-clash-confirm`
+- **Reviewer:** Muse (exact head commit) · **Coordinator / Merger:** GPT
+- **Implemented files:**
+  - `v1/services/roster/absence-clash.mjs`: v1-owned clash detection, conflict-token binding, authorized confirmed replacement (superseding only conflicting absences with retained history, cancelling only affected future unpublished relief, preserving completed duties/instructions/unrelated allocations), and durable `absenceIntake` resolution/retry (`resolveAbsenceIntake`, `retryAbsenceIntake`, clearing `F06`).
+  - `v1/services/roster/service.mjs`: wired explicit absence-clash check before `saveAbsence` preparation (disabling silent resubmission on v1 `saveAbsence`), plus `resolveAbsenceIntake` and `retryAbsenceIntake`.
+  - `v1/web/shared/roster-absence-clash.js` + `scripts/v1/build-web.mjs`: v1-owned confirmation dialog helper included in built Roster HTML (zero legacy JS text patches).
+  - `tests/v1-product/operation-probe-allowlist.json`: removed both `F06` entries (`resolveAbsenceIntake`, `retryAbsenceIntake`).
+  - `tests/v1-product-roster-absence-clash.mjs`: synthetic Workers/D1 regression covering all 9 required acceptance cases plus `resolveAbsenceIntake` and `retryAbsenceIntake`.
+- **Verification commands (`TZ=Asia/Singapore`):**
+  - `node tests/v1-product-roster-absence-clash.mjs` — PASS (all 9 cases + `F06`)
+  - `node tests/v1-product-operation-probe.mjs` — PASS
+  - `node tests/v1-product-roster-service.mjs` — PASS
+  - `npm run build` + `git diff --exit-code -- roster-update/ public/ shared/` — PASS (zero v0.9 drift; PR #182 untouched)
+  - `node scripts/v1/build.mjs` + `node scripts/v1/verify-build.mjs` — PASS (all 9 Wrangler dry-runs + local upgrade check)
+  - `git diff --check` — PASS
+- **Remaining gates:** Independent exact-head review by Muse; merge by GPT. Hosted runtime UAT, F5, and official T1B-01/T1B-02 remain Not tested / OPEN. No live deploy or provider activation performed.
