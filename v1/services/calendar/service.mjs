@@ -304,7 +304,7 @@ async function start(ctx, action, p) {
     authorization: ctx.principal,
   });
 }
-async function finish(ctx, op, guards, writes, result, outbox = []) {
+async function finish(ctx, op, guards, writes, result, outbox = [], includeReceipt = false) {
   await protectCalendarChanges(ctx.env, op, guards, writes, ctx.now);
   const admission = await admit(
     ctx.env,
@@ -325,7 +325,7 @@ async function finish(ctx, op, guards, writes, result, outbox = []) {
     admission,
   });
   await resolveAdmission(ctx.env, ctx.env.DB, op, admission, receipt, ctx.now);
-  return receipt.result ?? result;
+  return includeReceipt ? { ...receipt.result, receipt } : receipt.result ?? result;
 }
 function validateEvent(input, old, now, actor) {
   const e = { ...old };
@@ -912,10 +912,8 @@ async function bootstrap(ctx, p) {
     } catch {}
   }
   const yr = years.find((r) => r.year === y);
-  tokens.structure = await digest({
-    year: yr ? JSON.parse(yr.data_json) : null,
-    structure: group("yearStructure"),
-  });
+  tokens.structure = await structureToken(yr, group("yearStructure"),
+    parse(metadata.find((r) => r.kind === "yearStructureGenerator" && r.record_id === String(y))), rows);
   tokens.holidays = await digest({
     year: yr ? JSON.parse(yr.data_json) : null,
     holidays: events.filter((e) => e.OwnerTag === "hol"),
@@ -1254,7 +1252,7 @@ async function dates(ctx, p) {
       available,
       schoolDay:
         available && !!term && weekday !== 0 && weekday !== 6 && !holiday,
-      parity: term ? (Number(term.Week) % 2 ? "odd" : "even") : null,
+      parity: term && Number(term.Week) > 0 ? (Number(term.Week) % 2 ? "odd" : "even") : null,
       term: term ? Number(term.Term) : null,
       week: term ? Number(term.Week) : null,
       revision: yr?.revision || 0,
@@ -1276,127 +1274,151 @@ async function dates(ctx, p) {
     asOf: ctx.now,
   };
 }
-async function structure(ctx, op, p) {
-  const y = year(p.Year),
-    s = ctx.principal.schoolId,
-    row = await one(
-      ctx.env.DB,
-      "SELECT * FROM calendar_years WHERE school_id=? AND year=?",
-      [s, y],
-    );
-  need(row, "YEAR_UNAVAILABLE", "Create the year first.", 409);
-  const previous = await query(
-    ctx.env.DB,
-    "SELECT * FROM calendar_metadata WHERE school_id=? AND kind='yearStructure' AND year=? ORDER BY record_id",
-    [s, y],
-  );
-  need(
-    p.expectedMetadataRevision ===
-      (await digest({
-        year: JSON.parse(row.data_json),
-        structure: previous.map(parse),
-      })),
-    "METADATA_CONFLICT",
-    "Year structure changed. Reload the form.",
-    409,
-  );
+async function structureToken(row, structures, generation, events) {
+  const ids = new Set((Array.isArray(generation?.entries) ? generation.entries : [])
+    .map((entry) => entry?.eventId));
+  return digest({
+    year: row ? JSON.parse(row.data_json) : null,
+    revision: row?.revision || 0,
+    structure: structures,
+    generation: generation || null,
+    events: events.filter((event) => ids.has(event.event_id))
+      .sort((a, b) => a.event_id < b.event_id ? -1 : a.event_id > b.event_id ? 1 : 0).map((event) => ({
+      id: event.event_id, revision: event.revision, data: event.data_json,
+    })),
+  });
+}
+function structurePlan(y, p) {
+  const day = 86400000, key = (time) => new Date(time).toISOString().slice(0, 10);
+  const monday = (time) => time + ((8 - new Date(time).getUTCDay()) % 7) * day;
   const vacations = [];
   for (let n = 1; n <= 4; n++) {
-    const from = p[`Vacation${n}Start`],
-      to = p[`Vacation${n}End`];
-    need(
-      isoDate(from) &&
-        isoDate(to) &&
-        from <= to &&
-        from.startsWith(String(y)) &&
-        to.startsWith(String(y)) &&
-        (!vacations.length || from > vacations.at(-1).to),
-      "INVALID_VACATIONS",
-      "Set four ordered non-overlapping vacations.",
-    );
+    const from = p[`Vacation${n}Start`], to = p[`Vacation${n}End`];
+    need(isoDate(from) && isoDate(to) && from <= to && from.startsWith(String(y)) &&
+      to.startsWith(String(y)) && (!vacations.length || from > vacations.at(-1).to),
+    "INVALID_VACATIONS", "Set four ordered non-overlapping vacations.");
     vacations.push({ from, to });
   }
-  const records = [],
-    first = `${y}-01-01`;
-  let start = first;
+  const records = [], first = Date.parse(`${y}-01-01`), opening = monday(first);
+  const week = (term, number, start, end) => ({
+    StructureID: `${y}-T${term}-W${number}`, Year: y, Kind: "TERM_WEEK",
+    Term: term, Week: number, Label: `T${term}W${number}`,
+    StartDate: key(start), EndDate: key(end),
+  });
+  if (first < opening) records.push(week(1, 0, first, opening - day));
   for (let n = 1; n <= 4; n++) {
-    let a = Date.parse(start),
-      end = Date.parse(vacations[n - 1].from) - 86400000,
-      w = 1;
-    while (a <= end) {
-      const day = new Date(a).getUTCDay(),
-        nextMonday = a + ((8 - day) % 7 || 7) * 86400000,
-        b = Math.min(end, nextMonday - 86400000);
-      records.push({
-        StructureID: `${y}-T${n}-W${w}`,
-        Year: y,
-        Kind: "TERM_WEEK",
-        Term: n,
-        Week: w,
-        Label: `Term ${n} Week ${w}`,
-        StartDate: new Date(a).toISOString().slice(0, 10),
-        EndDate: new Date(b).toISOString().slice(0, 10),
-      });
-      a = b + 86400000;
-      w++;
+    const start = n === 1 ? opening : monday(Date.parse(vacations[n - 2].to) + day);
+    for (let w = 1; w <= 10; w++) {
+      const from = start + (w - 1) * 7 * day, to = from + 6 * day;
+      need(from < Date.parse(vacations[n - 1].from) && key(to).startsWith(String(y)),
+        "INVALID_VACATIONS", `Vacation after Term ${n} begins before its ten full weeks can be generated in this year.`);
+      records.push(week(n, w, from, to));
     }
-    records.push({
-      StructureID: `${y}-V${n}`,
-      Year: y,
-      Kind: "VACATION",
-      Term: n,
-      Week: 0,
-      Label: `Vacation ${n}`,
-      StartDate: vacations[n - 1].from,
-      EndDate: vacations[n - 1].to,
-    });
-    start = new Date(Date.parse(vacations[n - 1].to) + 86400000)
-      .toISOString()
-      .slice(0, 10);
+    records.push({ StructureID: `${y}-V${n}`, Year: y, Kind: "VACATION", Term: n,
+      Week: 0, Label: `VAC_T${n}`, StartDate: vacations[n - 1].from, EndDate: vacations[n - 1].to });
   }
-  need(
-    records.length <= 64,
-    "BOUNDS_EXCEEDED",
-    "Generated structure exceeds 64 records.",
-  );
+  return records;
+}
+function boundedGenerationJson(value) {
+  const encoded = canonical(value);
+  need(new TextEncoder().encode(encoded).length <= 1536 * 1024,
+    "BOUNDS_EXCEEDED", "Year generation evidence exceeds its supported bound.", 413);
+  return encoded;
+}
+async function structure(ctx, op, p) {
+  const y = year(p.Year), s = ctx.principal.schoolId, db = ctx.env.DB;
+  const row = await one(db, "SELECT * FROM calendar_years WHERE school_id=? AND year=?", [s, y]);
+  need(row && row.status !== "ARCHIVED", "YEAR_UNAVAILABLE", "Create an active or planning year first.", 409);
+  const previous = await query(db, "SELECT * FROM calendar_metadata WHERE school_id=? AND kind IN ('yearStructure','yearStructureGenerator') AND year=? ORDER BY kind,record_id LIMIT ?", [s, y, MAX_METADATA + 1]);
+  const events = await query(db, "SELECT * FROM calendar_events WHERE school_id=? AND year=? ORDER BY event_id LIMIT ?", [s, y, MAX_EVENTS + 1]);
+  need(previous.length <= MAX_METADATA && events.length <= MAX_EVENTS, "BOUNDS_EXCEEDED", "Year generation exceeds its supported bound.", 413);
+  const provenance = previous.find((r) => r.kind === "yearStructureGenerator" && r.record_id === String(y));
+  const generation = provenance ? JSON.parse(provenance.data_json) : null;
+  need(p.expectedMetadataRevision === await structureToken(row,
+    previous.filter((r) => r.kind === "yearStructure").map(parse), parse(provenance), events),
+  "METADATA_CONFLICT", "Year structure or generated events changed. Reload the form.", 409);
+  if (generation) {
+    need(generation.schemaVersion === 1 && generation.year === y &&
+      Array.isArray(generation.structureIds) && generation.structureIds.length <= 45 &&
+      Array.isArray(generation.entries) && generation.entries.length === 44,
+    "GENERATION_PROVENANCE_UNVERIFIED", "Existing generation ownership could not be verified.", 409);
+    const original = await operationStatus(db, s, generation.operationId);
+    need(original?.state === "committed" && original.action === "calendar.generateYearStructure" &&
+      canonical(original.receipt?.result?.generation) === canonical(generation),
+    "GENERATION_PROVENANCE_UNVERIFIED", "Existing generation ownership could not be verified.", 409);
+  }
+  const records = structurePlan(y, p), ownedStructures = new Set(generation?.structureIds || []);
+  const desiredIds = new Set(records.map((record) => record.StructureID));
+  const oldStructures = new Map(previous.filter((r) => r.kind === "yearStructure").map((r) => [r.record_id, r]));
+  need([...ownedStructures].every((key) => oldStructures.has(key)) &&
+    [...oldStructures].every(([key, value]) => ownedStructures.has(key) ||
+      (!desiredIds.has(key) && !["TERM_WEEK", "VACATION"].includes(String(JSON.parse(value.data_json).Kind).toUpperCase()))),
+  "GENERATION_CONTENT_CONFLICT", "Existing imported or manually maintained term/vacation structure is retained. Review it before generating this year.", 409);
+  const ownedEvents = new Map((generation?.entries || []).map((entry) => [entry.structureId, entry]));
+  const ownedEventIds = new Set([...ownedEvents.values()].map((entry) => entry.eventId));
+  need(ownedEventIds.size === ownedEvents.size && (!generation || ownedEvents.size === 44),
+    "GENERATION_PROVENANCE_UNVERIFIED", "Generation identities are ambiguous.", 409);
+  need(events.every((event) => ownedEventIds.has(event.event_id) || event.deleted_at ||
+    !String(JSON.parse(event.data_json).StaffDescription || "").includes("[[GSPS_YEAR_STRUCTURE:")),
+  "GENERATION_CONTENT_CONFLICT", "Imported or manually maintained generated-event markers are retained. Review their ownership before generation.", 409);
+  const eventRows = new Map(events.map((event) => [event.event_id, event]));
+  const metadata = [], eventWrites = [], entries = [];
+  for (const planned of records) {
+    const oldRow = oldStructures.get(planned.StructureID), old = oldRow && JSON.parse(oldRow.data_json);
+    const value = { ...old, ...planned, Label: old?.Label ?? planned.Label };
+    metadata.push({ id: planned.StructureID, kind: "yearStructure", revision: oldRow ? oldRow.revision + Number(canonical(old) !== canonical(value)) : 1, data: canonical(value) });
+    if (planned.Kind === "TERM_WEEK" && planned.Week === 0) continue;
+    const entry = ownedEvents.get(planned.StructureID), oldEventRow = entry && eventRows.get(entry.eventId);
+    need(!entry || (oldEventRow && !oldEventRow.deleted_at), "GENERATION_CONTENT_CONFLICT", "A generated event was removed. Its history is retained; review before regeneration.", 409);
+    const oldEvent = oldEventRow && JSON.parse(oldEventRow.data_json);
+    need(!oldEvent || (oldEvent.StartDate === entry.start && oldEvent.EndDate === entry.end),
+      "GENERATION_CONTENT_CONFLICT", "A generated event's dates were edited independently. The edit is retained; review before regeneration.", 409);
+    const marker = `[[GSPS_YEAR_STRUCTURE:${planned.Kind}:${planned.Label}]]`;
+    const title = planned.Kind === "VACATION" ? ["Mar Hols", "Jun Hols", "Sep Hols", "Dec Hols"][planned.Term - 1] : planned.Label;
+    const eventId = oldEventRow?.event_id || crypto.randomUUID();
+    const changed = !oldEvent || oldEvent.StartDate !== planned.StartDate || oldEvent.EndDate !== planned.EndDate;
+    const e = changed ? validateEvent({ ...(oldEvent || {
+      Year: y, Status: row.status === "ACTIVE" ? "PUBLISHED" : "HIDDEN", LaneID: "day", ShiftSpan: "NONE",
+      OwnerTag: planned.Kind === "VACATION" ? "hol" : "term", StaffTitle: title,
+      StaffDescription: marker + "\nGenerated from Year Setup.", Location: "", VenueID: "",
+      EventType: "MULTI_DAY", ParentEnabled: "No", ParentTitle: title, ParentDescription: "",
+    }), StartDate: planned.StartDate, EndDate: planned.EndDate }, oldEvent, ctx.now, ctx.principal.actorId) : oldEvent;
+    if (!oldEvent) Object.assign(e, { EventID: eventId, CreatedAt: new Date(ctx.now).toISOString(), CreatedBy: ctx.principal.actorId, DeletedAt: "" });
+    if (changed) eventWrites.push({ id: eventId, revision: (oldEventRow?.revision || 0) + 1, data: canonical(e) });
+    entries.push({ structureId: planned.StructureID, eventId, start: planned.StartDate, end: planned.EndDate });
+  }
+  const next = { schemaVersion: 1, year: y, operationId: op.operationId, structureIds: records.map((record) => record.StructureID), entries };
+  metadata.push({ id: String(y), kind: "yearStructureGenerator", revision: (provenance?.revision || 0) + 1, data: canonical(next) });
+  const addedEvents = eventWrites.filter((event) => !eventRows.has(event.id)).length;
+  const existingMetadata = new Set(previous.map((record) => `${record.kind}:${record.record_id}`));
+  const addedMetadata = metadata.filter((record) => !existingMetadata.has(`${record.kind}:${record.id}`)).length;
+  const metadataCount = await one(db,
+    "SELECT COUNT(*) AS n FROM calendar_metadata WHERE school_id=? AND (year=0 OR year=?)", [s, y]);
+  need(events.length + addedEvents <= MAX_EVENTS && metadataCount.n + addedMetadata <= MAX_METADATA,
+    "BOUNDS_EXCEEDED", "Generated records would exceed the Calendar view's supported bound.", 413);
+  const expectedMetadata = boundedGenerationJson(previous.map((r) => ({ id: r.record_id, kind: r.kind, revision: r.revision, data: r.data_json })));
+  const ids = boundedGenerationJson(entries.map((entry) => entry.eventId));
+  const expectedEvents = boundedGenerationJson(events.filter((r) => ownedEventIds.has(r.event_id)).map((r) => ({ id: r.event_id, revision: r.revision, data: r.data_json })));
   const guards = [
     guardRow("calendar_years", "school_id=? AND year=?", [s, y], row.revision),
-    ...previous.map((r) =>
-      guardRow(
-        "calendar_metadata",
-        "school_id=? AND kind=? AND record_id=?",
-        [s, r.kind, r.record_id],
-        r.revision,
-      ),
-    ),
+    { sql: "SELECT (SELECT COUNT(*) FROM calendar_events WHERE school_id=? AND year=?)+?<=? AND (SELECT COUNT(*) FROM calendar_metadata WHERE school_id=? AND (year=0 OR year=?))+?<=? AS ok", args: [s, y, addedEvents, MAX_EVENTS, s, y, addedMetadata, MAX_METADATA] },
+    { sql: `WITH observed AS (SELECT * FROM calendar_metadata WHERE school_id=? AND year=? AND kind IN ('yearStructure','yearStructureGenerator')), expected AS (SELECT value FROM json_each(?)) SELECT (SELECT COUNT(*) FROM observed)=(SELECT COUNT(*) FROM expected) AND NOT EXISTS(SELECT 1 FROM observed r WHERE NOT EXISTS(SELECT 1 FROM expected e WHERE json_extract(e.value,'$.id')=r.record_id AND json_extract(e.value,'$.kind')=r.kind AND json_extract(e.value,'$.revision')=r.revision AND json_extract(e.value,'$.data')=r.data_json)) AS ok`, args: [s, y, expectedMetadata] },
+    { sql: `WITH observed AS (SELECT * FROM calendar_events WHERE school_id=? AND year=? AND event_id IN(SELECT value FROM json_each(?))), expected AS (SELECT value FROM json_each(?)) SELECT (SELECT COUNT(*) FROM observed)=(SELECT COUNT(*) FROM expected) AND NOT EXISTS(SELECT 1 FROM observed r WHERE NOT EXISTS(SELECT 1 FROM expected e WHERE json_extract(e.value,'$.id')=r.event_id AND json_extract(e.value,'$.revision')=r.revision AND json_extract(e.value,'$.data')=r.data_json)) AS ok`, args: [s, y, ids, expectedEvents] },
+    { sql: "SELECT NOT EXISTS(SELECT 1 FROM calendar_events WHERE school_id=? AND year=? AND deleted_at IS NULL AND instr(COALESCE(json_extract(data_json,'$.StaffDescription'),''),'[[GSPS_YEAR_STRUCTURE:')>0 AND event_id NOT IN(SELECT value FROM json_each(?))) AND NOT EXISTS(SELECT 1 FROM calendar_dispatch_locks WHERE school_id=? AND event_id IN(SELECT value FROM json_each(?))) AS ok", args: [s, y, ids, s, ids] },
   ];
   const writes = [
-    {
-      sql: "DELETE FROM calendar_metadata WHERE school_id=? AND kind='yearStructure' AND year=?",
-      args: [s, y],
-    },
-    {
-      sql: "UPDATE calendar_years SET revision=revision+1 WHERE school_id=? AND year=?",
-      args: [s, y],
-    },
-    ...records.map((r) => ({
-      sql: "INSERT INTO calendar_metadata(school_id,kind,record_id,year,revision,data_json) VALUES(?,?,?,?,?,?)",
-      args: [
-        s,
-        "yearStructure",
-        r.StructureID,
-        y,
-        row.revision + 1,
-        canonical(r),
-      ],
-    })),
+    { sql: "INSERT INTO calendar_metadata(school_id,kind,record_id,year,revision,data_json) SELECT ?,json_extract(value,'$.kind'),json_extract(value,'$.id'),?,json_extract(value,'$.revision'),json_extract(value,'$.data') FROM json_each(?) WHERE true ON CONFLICT(school_id,kind,record_id) DO UPDATE SET revision=excluded.revision,data_json=excluded.data_json", args: [s, y, boundedGenerationJson(metadata)] },
+    { sql: "INSERT INTO calendar_events(school_id,event_id,year,revision,status,start_date,end_date,deleted_at,data_json) SELECT ?,json_extract(value,'$.id'),?,json_extract(value,'$.revision'),json_extract(value,'$.data.Status'),json_extract(value,'$.data.StartDate'),json_extract(value,'$.data.EndDate'),NULL,json_extract(value,'$.data') FROM json_each(?) WHERE true ON CONFLICT(school_id,event_id) DO UPDATE SET revision=excluded.revision,status=excluded.status,start_date=excluded.start_date,end_date=excluded.end_date,data_json=excluded.data_json", args: [s, y, boundedGenerationJson(eventWrites.map((event) => ({ ...event, data: JSON.parse(event.data) })))] },
+    { sql: "UPDATE calendar_years SET revision=revision+1 WHERE school_id=? AND year=?", args: [s, y] },
   ];
   return finish(ctx, op, guards, writes, {
-    year: y,
-    structures: records,
-    created: records.length,
-    revision: row.revision + 1,
-  });
+    year: y, structures: metadata.filter((r) => r.kind === "yearStructure").map((r) => JSON.parse(r.data)),
+    created: records.length, revision: row.revision + 1,
+    termWeeksGenerated: records.filter((r) => r.Kind === "TERM_WEEK").length,
+    vacationsGenerated: 4, multiDayEventsCreatedOrUpdated: eventWrites.length,
+    multiDayEventsRetained: 44 - eventWrites.length, materialisedEventCount: 44,
+    generation: next, externalSyncQueued: false,
+  }, [], true);
 }
 async function preview(ctx, kind, p) {
   const s = ctx.principal.schoolId,
@@ -2209,7 +2231,8 @@ export async function handle(ctx) {
   if (action === "archiveYearsPreview") return preview(ctx, "archive", p);
   need(WRITES.has(action), "NOT_FOUND", "Unknown Calendar operation.", 404);
   const op = await start(ctx, action, p);
-  if (op.state === "committed") return op.receipt.result;
+  if (op.state === "committed") return action === "generateYearStructure"
+    ? { ...op.receipt.result, receipt: op.receipt } : op.receipt.result;
   need(
     op.state === "prepared",
     "OPERATION_ABORTED",
