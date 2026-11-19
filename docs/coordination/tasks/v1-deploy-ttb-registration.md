@@ -12,6 +12,8 @@
 
 The exact paths are this task record, `scripts/v1/build-web.mjs`, `v1/services/deploy/service.mjs`, `v1/services/contacts/service.mjs` and `tests/v1-product-deploy-ttb-registration.mjs`. Current v1 PRs are clear of these paths. The open v0.9 hotfix #182 has no overlap. Live maintenance is separate from this code task.
 
+The 20 November 2026 SGT CI follow-up adds exactly `tests/v1-product-lord-cart-groups-browser.mjs` for a synthetic date correction. Exact-head CI exposed the same failure on the released v1.07 tree. When the fixed fixture date becomes the browser's default booking date, its mocked period 3–4 booking triggers the buffer warning and prevents the intended assertion. Keep the fixture on a different future date and preserve every product rule and test assertion. No active claim owns this file.
+
 Pinned v0.9 `d9d180c` already compares derived TTb names. v1.07 `Add teacher` sends Basic Name alone and Contacts performs an early Basic Name check. A synthetic built-browser reproduction returned `IDENTITY_SELECTION_REQUIRED` against a complete active contact in a version with zero teacher rows. The current guard also runs before recovery on an exact registration retry.
 
 Use the existing Contacts owner derivation, atomic TTb uniqueness checks and permanent Staff ID receipt. Send only the typed naming inputs needed for the display name. Keep authority, version-owned fields, existing-ID selection and legacy tag callers within their current bounds. A blocked creation must keep the form and explain a TTb Name collision. Existing duplicate Basic Names and historical presentations must remain readable. Cross-owner reservations for every future rename/import remain a separate design concern.
