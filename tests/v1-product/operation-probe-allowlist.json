@@ -105,46 +105,6 @@
       "name": "archiveColdOutput",
       "ledger": "F10",
       "reason": "Additional caller confirmed in the same archive feature: the copied archive-confirm button submits this absent operation; not named individually in the ledger."
-    },
-    {
-      "domain": "roster",
-      "path": "/operations",
-      "selector": "operation",
-      "name": "cancelPendingNotifications",
-      "ledger": "F04",
-      "reason": "Additional caller confirmed in the same delivery-review panel: its cancel-confirm button submits this absent operation; not named individually in the ledger."
-    },
-    {
-      "domain": "roster",
-      "path": "/operations",
-      "selector": "operation",
-      "name": "deliveryReview",
-      "ledger": "F04",
-      "reason": "The copied delivery-review panel requests this absent Roster operation."
-    },
-    {
-      "domain": "roster",
-      "path": "/operations",
-      "selector": "operation",
-      "name": "dismissDeliveryIssues",
-      "ledger": "F05",
-      "reason": "The delivery-review clear button submits this absent operation; the ledger static finding is now request-confirmed."
-    },
-    {
-      "domain": "roster",
-      "path": "/whatsapp/media/synthetic-probe",
-      "selector": "",
-      "name": "",
-      "ledger": "F11",
-      "reason": "Inbox media links use this absent route family; only the synthetic object ID is substituted."
-    },
-    {
-      "domain": "roster",
-      "path": "/whatsapp/reports/synthetic-probe",
-      "selector": "",
-      "name": "",
-      "ledger": "F11",
-      "reason": "Delivery-report links use this absent route family; only the synthetic report ID is substituted."
     }
   ],
   "dynamicSource": "Claude PR178 note N2; exact built-source expression locations at reviewed bf2067c52bf7390b8651194022eb32791e8c086f, preserved on rebased main.",

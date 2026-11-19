@@ -5,18 +5,25 @@
 - **Reviewer:** Muse (exact head commit)
 - **Coordinator / Merger:** GPT
 - **Branch:** `antigravity/v1-roster-delivery-review-and-media`
-- **Status:** Claimed (in progress)
+- **Status:** Locally verified (ready for Muse exact-head review)
 
 ## Scope
-Port the remaining Roster delivery-review operations and WhatsApp report/media routes to clear probe allowances `F04`, `F05`, and `F11` (5 allowances total):
-1. `POST /api/roster/operations` (`operation: "deliveryReview"`) — read-only SMC/Admin view over `product_outbox` notification rows and `deliveryReviewReceipts` in `roster_records`.
-2. `POST /api/roster/operations` (`operation: "dismissDeliveryIssues"`) — SMC/Admin guarded dismissal writing review receipts in `roster_records` without modifying `product_outbox` delivery history.
-3. `POST /api/roster/operations` (`operation: "cancelPendingNotifications"`) — Admin-only guarded cancellation of strictly `state = 'queued'` notification rows in `product_outbox` (never cancelling `leased`, `accepted`, `delivered`, `uncertain`, or `failed` rows).
-4. `GET`/`HEAD` `/whatsapp/reports/<YYYY-MM-DD>` (plus gateway `/api/whatsapp/reports/<YYYY-MM-DD>` alias) — authenticated privacy-safe plaintext report with redaction, integrity check for archived R2 reports, and strict security headers.
-5. `GET`/`HEAD` `/whatsapp/media/<messageId>` (plus gateway `/api/whatsapp/media/<messageId>` alias) — authenticated school-scoped R2 media proxy with `roster_inbox` verification, MIME allowlist, HTTP Range support, digest check, and `Content-Security-Policy: sandbox`.
-6. Remove the 5 `F04`/`F05`/`F11` entries from `tests/v1-product/operation-probe-allowlist.json` and add regression coverage in `tests/v1-product-roster-delivery-review.mjs`.
+Ported the Roster delivery-review operations and private WhatsApp report/media routes, clearing probe allowances `F04`, `F05`, and `F11` (5 allowances total):
+1. `deliveryReview` (`roster.read`) — reads `product_outbox` notification rows (`roster-notification`, `roster-inbox-reply`, WhatsApp-tagged) and `deliveryReviewReceipts` in `roster_records`; returns exact `roster-delivery-review-ui.js` view contract (`checkedAt`, `revision`, `issues`, `pending`, `canCancel`, `inFlight`, `uncertain`, `unresolvedUncertain`, `reviewedUncertain`, `reports`, `messagesSent: 0`).
+2. `dismissDeliveryIssues` (`roster.write`) — validates preview tokens and guards `product_outbox` state/attempts/fence/updated_at before recording review receipts in `roster_records`; preserves `product_outbox` history untouched and reopens alerts automatically if a row's fingerprint changes.
+3. `cancelPendingNotifications` (`roster.admin`) — Admin-only guarded cancellation strictly of `state = 'queued'` notification rows (`last_code = 'CANCELLED_BY_SMC'`), rejecting any `leased`, `accepted`, `delivered`, `uncertain`, or `failed` rows.
+4. `GET`/`HEAD` `/whatsapp/reports/<YYYY-MM-DD>` (plus gateway `/api/whatsapp/reports/<YYYY-MM-DD>` alias) — authenticated (`roster.read`), privacy-safe redacted plaintext report with R2 archive digest verification (`503` on tamper), `Cache-Control: private, no-store`, `X-Content-Type-Options: nosniff`, and same-origin enforcement.
+5. `GET`/`HEAD` `/whatsapp/media/<messageId>` (plus gateway `/api/whatsapp/media/<messageId>` alias) — authenticated (`roster.read`) school-scoped R2 media proxy verified against `roster_inbox`, with strict MIME allowlist, HTTP `Range` (`206`/`416`), SHA-256 verification, and `Content-Security-Policy: sandbox`.
+6. Removed all 5 `F04`/`F05`/`F11` entries from `tests/v1-product/operation-probe-allowlist.json` and added `tests/v1-product-roster-delivery-review.mjs`.
 
-## Guardrails
-- No v0.9 source or generated files modified (`npm run build` zero drift).
-- No provider sending, webhook enablement, live deployment, or live school data mutation.
-- Preserve all `product_outbox` history on dismissal; never claim dismissal proves WhatsApp delivery.
+## Local Verification (`TZ=Asia/Singapore`)
+- `node tests/v1-product-roster-delivery-review.mjs` — PASS
+- `node tests/v1-product-operation-probe.mjs` — PASS (`probe: 407`, `knownMissing: 19`)
+- `node tests/v1-product-roster-service.mjs` — PASS
+- `npm run build` + `git diff --exit-code -- roster-update/ public/ shared/` — PASS (zero v0.9 drift)
+- `node scripts/v1/build.mjs` + `node scripts/v1/verify-build.mjs` — PASS (all 9 Wrangler dry-runs + local upgrade check)
+- `git diff --check` — PASS
+
+## Remaining Gates
+- Independent exact-head review by Muse; merge & coordination by GPT.
+- Hosted runtime UAT, F5, and official T1B-01/T1B-02 remain Not tested / OPEN. No live deploy or provider activation performed.

@@ -52,8 +52,13 @@ export default {
         );
       }
       if (match) {
-        const service = match[1],
-          path = match[2] ?? "/";
+        const rawService = match[1],
+          rawPath = match[2] ?? "/";
+        const whatsappAlias =
+          rawService === "whatsapp" &&
+          /^\/(?:media|reports)\/[^/]+$/.test(rawPath);
+        const service = whatsappAlias ? "roster" : rawService,
+          path = whatsappAlias ? "/whatsapp" + rawPath : rawPath;
         if (
           !domains.has(service) ||
           path.startsWith("/internal") ||
@@ -63,6 +68,7 @@ export default {
         if (!env.GSIS_SECRET || !env[service.toUpperCase()]?.fetch)
           throw new ApiError("SERVICE_NOT_CONFIGURED", 503);
         if (!["GET", "HEAD"].includes(request.method)) {
+          if (whatsappAlias) throw new ApiError("METHOD_NOT_ALLOWED", 405);
           const origin = request.headers.get("origin");
           if (origin !== url.origin)
             throw new ApiError(
@@ -85,7 +91,9 @@ export default {
           "x-csrf-token",
           "if-none-match",
           "if-match",
+          "range",
           "origin",
+          "sec-fetch-site",
           "x-gsis-device-token",
           "x-gsis-external-token",
           "x-gsis-incident-token",
