@@ -220,11 +220,9 @@ try {
   monitor = true;
   await call("/reference/refresh");
   await scheduled({ env: env(), now: Date.now() + 5000 });
-  assert.equal(sends.length, 3);
-  assert.ok(sends[2].url.includes("telegram"));
-  assert.match(sends[2].body.text, /Unresolved incidents:/);
+  assert.equal(sends.length, 2, "Future bookings without overdue custody do not create an administrative alert");
   await scheduled({ env: env(), now: Date.now() + 6000 });
-  assert.equal(sends.length, 3, "Hourly monitor is idempotent");
+  assert.equal(sends.length, 2, "Repeated scans do not substitute hourly summaries for overdue alerts");
   console.log(
     "PASS LORD notifications: channel-specific durable jobs, school agreement preserved, final Core and Contacts checks, current recipient wins, provider uncertainty survives restart without duplicate, authority/recipient revocation suppress sends.",
   );
