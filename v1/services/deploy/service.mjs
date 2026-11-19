@@ -1,4 +1,5 @@
 import { choiceLists } from "./catalogue-links.mjs";
+import { buildHrTermsPublication } from "./hr-terms-publish.mjs";
 import {
   query,
   one,
@@ -77,6 +78,7 @@ const WRITE = new Set([
   "/exports/reconcile",
   "/operations/withdraw",
   "/memberships/sync",
+  "/hr-terms/sync",
 ]);
 export function policy(method, path, body = {}) {
   check(
@@ -85,7 +87,7 @@ export function policy(method, path, body = {}) {
     "METHOD_NOT_ALLOWED",
     405,
   );
-  if (["/operations/withdraw", "/memberships/sync"].includes(path))
+  if (["/operations/withdraw", "/memberships/sync", "/hr-terms/sync"].includes(path))
     check(
       method === "POST",
       "This operation requires POST.",
@@ -107,7 +109,7 @@ export function policy(method, path, body = {}) {
   );
   const write = WRITE.has(path),
     publishing =
-      path === "/publish" || path === "/memberships/sync" ||
+      path === "/publish" || path === "/memberships/sync" || path === "/hr-terms/sync" ||
       (path === "/change" &&
         ["publish", "retryContactsSync"].includes(body.operation));
   return {
@@ -1655,6 +1657,7 @@ async function publish(ctx) {
       schemaVersion: 1,
       membershipPublicationVersion: 1,
       ...(document.roleMembershipSchema === 1 ? { authorityPublicationVersion: 1 } : {}),
+      hrTermsPublication: buildHrTermsPublication(document),
       calculationVersion: calculated.calculationVersion,
       schoolId: school,
       publicationId,
@@ -2010,6 +2013,78 @@ async function syncMemberships(ctx) {
   // request may already have advanced the durable aggregate beyond it.
   return { ...saved, currentProgress: await membershipProgress(ctx, pub.id) };
 }
+async function syncHrTerms(ctx) {
+  const op = await prepare(ctx, "deploy.publish");
+  if (op.receipt) return op.receipt.result;
+  const b = ctx.body,
+    school = ctx.principal.schoolId;
+  const pub = await one(
+    ctx.env.DB,
+    "SELECT * FROM deploy_publications WHERE school_id=? AND id=? AND operation_id=? AND version_id=?",
+    [school, id(b.publicationId), id(b.sourceOperationId), id(b.versionId)],
+  );
+  check(pub, "Original publication was not found.", "NOT_FOUND", 404);
+  const source = await operationStatus(ctx.env.DB, school, pub.operation_id);
+  check(
+    source?.state === "committed" && source.action === "deploy.publish",
+    "Original publication is not committed.",
+    "SOURCE_RECEIPT_INVALID",
+    409,
+  );
+  const publication = await publicationById(ctx, pub.id);
+  check(
+    publication.envelope.hrTermsPublication?.schemaVersion === 1,
+    "This historical publication has no HR Terms publish-back contract. Publish a new revision.",
+    "HR_TERMS_PUBLICATION_UNSUPPORTED",
+    409,
+  );
+  const outcome = await serviceCall(
+    ctx.env,
+    "contacts",
+    "/internal/hr-terms-publication",
+    {
+      schoolId: school,
+      publicationId: pub.id,
+      sourceOperationId: source.operationId,
+      sourceDigest: source.digest,
+      sourceFence: source.fence,
+    },
+  );
+  check(
+    outcome?.publicationId === pub.id &&
+      ["applied", "partial", "superseded"].includes(outcome.state),
+    "HR Terms publication has not been confirmed.",
+    "DELIVERY_UNCONFIRMED",
+    503,
+  );
+  const result = {
+    ...outcome,
+    saved: true,
+    versionId: pub.version_id,
+    operationId: op.operationId,
+  };
+  return finish(
+    ctx,
+    op,
+    [
+      {
+        sql: "INSERT INTO deploy_deliveries(school_id,publication_id,recipient,state,attempts,acknowledgement) VALUES(?,?,'contacts-hr-terms',?,1,?) ON CONFLICT(school_id,publication_id,recipient) DO UPDATE SET state=excluded.state,attempts=deploy_deliveries.attempts+1,acknowledgement=excluded.acknowledgement,last_error=NULL",
+        args: [school, pub.id, outcome.state, canonical(outcome)],
+      },
+    ],
+    [],
+    result,
+    {
+      audit: {
+        publicationId: pub.id,
+        hrTermsState: outcome.state,
+        updatedFields: outcome.updatedFields || [],
+        flaggedCount: (outcome.flaggedStaffValues || []).length,
+        sourceOperationId: source.operationId,
+      },
+    },
+  );
+}
 export async function handle(ctx) {
   ctx.body = plain(ctx.body || {});
   const p = ctx.path,
@@ -2023,6 +2098,7 @@ export async function handle(ctx) {
   );
   if (p === "/operations/withdraw") return withdrawOperation(ctx);
   if (p === "/memberships/sync") return syncMemberships(ctx);
+  if (p === "/hr-terms/sync") return syncHrTerms(ctx);
   if (p.startsWith("/internal/pins/")) {
     await requireMembership(ctx.env, ctx.request);
     if (p.endsWith("/acquire")) {
