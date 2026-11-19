@@ -1,5 +1,14 @@
 import { ApiError } from "../../runtime/errors.mjs";
 import {
+  RELIEF_ALLOWED_ACTIONS,
+  normalizeReliefInput,
+  issueReliefSession,
+  clearReliefCookie,
+  verifyReliefCookie,
+  authorizeReliefRequest,
+} from "./relief-auth.mjs";
+export { authorizeReliefRequest as authorizeFallback };
+import {
   wrappedReport,
   prepareReignArchive,
   exportReignArchive,
@@ -166,12 +175,23 @@ function actionOf(method, path, body) {
     "/settings": "settings-save",
     "/background/retry": "background-retry",
   };
+  if (p === "/auth/relief") return "auth-relief";
   if (method === "GET" && p.startsWith("/photos/")) return "photos";
   if (method === "GET" && p === "/receipt") return "receipt";
   return (method === "GET" ? get : post)[p] || "";
 }
 export function policy(method, path, body = {}) {
   let action = actionOf(method, path, body);
+  if (action === "auth-relief") {
+    if (!["GET", "POST"].includes(method))
+      fail("METHOD_NOT_ALLOWED", "Unsupported method.", 405);
+    return {
+      action: "lord.relief.auth",
+      write: false,
+      resourceId: "relief-auth",
+      public: true,
+    };
+  }
   if (action === "notificationpreferences" && method !== "GET")
     action = "preferences-save";
   if (action === "incidentresolve") action = "incident-resolve";
@@ -199,6 +219,7 @@ export function policy(method, path, body = {}) {
       action: write ? "lord.borrow" : "lord.read",
       write,
       resourceId: body.bookingId || action,
+      allowRelief: RELIEF_ALLOWED_ACTIONS.has(action),
     };
   fail("NOT_FOUND", "Unknown LORD operation.", 404);
 }
@@ -541,14 +562,23 @@ function unarchivedGuard(row) {
   );
 }
 async function mutate(ctx, action, fn) {
+  const reliefAction = RELIEF_ALLOWED_ACTIONS.has(action);
   requireCapability(
     ctx.principal,
     adminActions.has(action) ? "lord.admin" : "lord.borrow",
     true,
+    { allowRelief: reliefAction },
   );
   const p = ctx.principal,
     body = ctx.body || {},
     now = ctx.now ?? Date.now();
+  const isRelief = p.identityType === "RELIEF";
+  if (isRelief && !reliefAction)
+    fail(
+      "CAPABILITY_DENIED",
+      "Relief teacher access is limited to loan and return functions.",
+      403,
+    );
   const intent = { ...body };
   delete intent.requestId;
   const op = await prepareOperation(ctx.env.DB, {
@@ -572,14 +602,39 @@ async function mutate(ctx, action, fn) {
   let admission;
   try {
     const plan = await fn({ ...ctx, op, now });
-    admission = await admit(
-      ctx.env,
-      ctx.env.DB,
-      op,
-      p,
-      plan.dependencies || [],
-      now,
-    );
+    if (isRelief) {
+      if (p.validUntil <= now)
+        fail("AUTHORITY_CHANGED", "Relief session expired. Sign in again.", 401);
+      await ctx.env.DB.prepare(
+        "INSERT OR REPLACE INTO product_admissions(school_id,operation_id,fence,digest,decision_id,valid_until,pins_json,state) VALUES(?,?,?,?,?,?,?,?)",
+      )
+        .bind(
+          op.schoolId,
+          op.operationId,
+          op.fence,
+          op.digest,
+          p.decisionId,
+          p.validUntil,
+          "[]",
+          "ready",
+        )
+        .run();
+      admission = {
+        kind: "relief",
+        decisionId: p.decisionId,
+        validUntil: p.validUntil,
+        pins: [],
+      };
+    } else {
+      admission = await admit(
+        ctx.env,
+        ctx.env.DB,
+        op,
+        p,
+        plan.dependencies || [],
+        now,
+      );
+    }
     const receipt = await commitOperation(ctx.env.DB, op, {
       ...plan,
       outbox: notificationJobs(plan.outbox),
@@ -591,11 +646,13 @@ async function mutate(ctx, action, fn) {
         action,
         actorId: p.actorId,
         staffId: p.staffId || null,
+        ...(isRelief ? { reliefName: p.name, reliefMobile: p.mobile } : {}),
         operationId: op.operationId,
         ...plan.audit,
       },
     });
-    await resolveAdmission(ctx.env, ctx.env.DB, op, admission, receipt, now);
+    if (!isRelief)
+      await resolveAdmission(ctx.env, ctx.env.DB, op, admission, receipt, now);
     return { ...receipt.result, receipt };
   } catch (error) {
     let outcome;
@@ -607,7 +664,7 @@ async function mutate(ctx, action, fn) {
         now,
       );
     } catch {}
-    if (admission && outcome)
+    if (!isRelief && admission && outcome)
       await resolveAdmission(
         ctx.env,
         ctx.env.DB,
@@ -621,11 +678,19 @@ async function mutate(ctx, action, fn) {
 }
 async function listBookings(ctx, input, mode = "mine") {
   const p = ctx.principal,
+    isRelief = p.identityType === "RELIEF" && has(p, "lord.relief"),
     where = ["school_id=?"],
     args = [p.schoolId];
-  if (mode === "mine" || (mode !== "day" && !has(p, "lord.admin"))) {
+  if (
+    !isRelief &&
+    (mode === "mine" || (mode !== "day" && !has(p, "lord.admin")))
+  ) {
     where.push("staff_id=?");
     args.push(p.staffId);
+  }
+  if (isRelief && !input.date && !input.from && !input.to) {
+    where.push("service_date=?");
+    args.push(sgDay(ctx.now ?? Date.now()));
   }
   if (input.date) {
     where.push("service_date=?");
@@ -1239,7 +1304,7 @@ async function collect(ctx, input) {
       ctx.principal.schoolId,
       input.bookingId,
     );
-    requireOwner(ctx.principal, b);
+    requireOwner(ctx.principal, b, { allowRelief: true });
     changed(b, input.revision);
     if (b.status !== "BOOKED")
       fail(
@@ -1393,7 +1458,7 @@ async function returnItems(ctx, input) {
       ctx.principal.schoolId,
       input.bookingId || input.sessionId,
     );
-    requireOwner(ctx.principal, b);
+    requireOwner(ctx.principal, b, { allowRelief: true });
     changed(b, input.revision);
     if (!["COLLECTED", "CLOSED"].includes(b.status))
       fail(
@@ -1561,7 +1626,7 @@ async function savePhoto(ctx, input) {
       ctx.principal.schoolId,
       input.bookingId,
     );
-    requireOwner(ctx.principal, b);
+    requireOwner(ctx.principal, b, { allowRelief: true });
     if (!["BOOKED", "COLLECTED", "CLOSED"].includes(b.status))
       fail(
         "BOOKING_STATE",
@@ -3438,9 +3503,61 @@ export async function handle(ctx) {
   const input = parameters(ctx),
     action = actionOf(ctx.method, ctx.path, input),
     descriptor = policy(ctx.method, ctx.path, input);
+  if (action === "auth-relief") {
+    if (ctx.method === "GET") {
+      const verified = await verifyReliefCookie(ctx.env, ctx.request, ctx.now);
+      if (!verified) return { authenticated: false };
+      return {
+        authenticated: true,
+        csrfToken: verified.csrf,
+        session: {
+          identityType: "RELIEF",
+          sub: verified.sub,
+          email: "",
+          ttbName: verified.name,
+          mobile: verified.mobile,
+          isAdmin: false,
+        },
+      };
+    }
+    if (ctx.body?.logout === true) {
+      return Response.json(
+        { ok: true, data: { signedOut: true } },
+        {
+          headers: {
+            "Set-Cookie": clearReliefCookie(),
+            "Cache-Control": "no-store",
+            "X-Content-Type-Options": "nosniff",
+          },
+        },
+      );
+    }
+    const { name, mobile } = normalizeReliefInput(ctx.body);
+    const issued = await issueReliefSession(ctx.env, {
+      name,
+      mobile,
+      now: ctx.now,
+    });
+    return Response.json(
+      {
+        ok: true,
+        data: { session: issued.session, csrfToken: issued.csrfToken },
+        session: issued.session,
+      },
+      {
+        headers: {
+          "Set-Cookie": issued.cookie,
+          "Cache-Control": "no-store",
+          "X-Content-Type-Options": "nosniff",
+        },
+      },
+    );
+  }
   if (descriptor.public)
     ctx = { ...ctx, principal: await devicePrincipal(ctx) };
-  requireCapability(ctx.principal, descriptor.action, descriptor.write);
+  requireCapability(ctx.principal, descriptor.action, descriptor.write, {
+    allowRelief: descriptor.allowRelief === true,
+  });
   switch (action) {
     case "resources":
     case "reference":
@@ -3478,7 +3595,7 @@ export async function handle(ctx) {
         ctx.principal.schoolId,
         input.bookingId || input.sessionId,
       );
-      requireOwner(ctx.principal, row);
+      requireOwner(ctx.principal, row, { allowRelief: action === "session" });
       return {
         [action === "session" ? "session" : "booking"]: await bookingView(
           ctx.env.DB,

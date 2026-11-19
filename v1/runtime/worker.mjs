@@ -194,6 +194,9 @@ export function domainWorker(service, module) {
                 method === "GET" &&
                 ["/public/campus", "/public-campus"].includes(path)) ||
               (service === "lord" && method === "GET" && path === "/board") ||
+              (service === "lord" &&
+                ["GET", "POST"].includes(method) &&
+                path === "/auth/relief") ||
               (service === "roster" &&
                 ["GET", "POST"].includes(method) &&
                 path === "/external")
@@ -211,7 +214,21 @@ export function domainWorker(service, module) {
               body.requestId,
             bodyDigest: await digest(intent),
           });
-          ctx.principal = await authorize(env, request, descriptor, now);
+          const rawCookie = request.headers.get("cookie") ?? "";
+          const hasCoreSession =
+            rawCookie
+              .split(";")
+              .some((s) => s.trim().startsWith("__Host-gsis_session=")) ||
+            Boolean(request.headers.get("authorization"));
+          const fallback =
+            !system &&
+            !descriptor.public &&
+            !hasCoreSession &&
+            typeof module.authorizeFallback === "function"
+              ? await module.authorizeFallback(ctx, descriptor)
+              : null;
+          ctx.principal =
+            fallback ?? (await authorize(env, request, descriptor, now));
           if (
             ctx.principal?.schoolId &&
             ctx.principal.schoolId !== env.SCHOOL_ID

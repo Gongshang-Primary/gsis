@@ -81,16 +81,28 @@ export function has(p, capability) {
     (p.capabilities.includes("admin") || p.capabilities.includes(capability))
   );
 }
-export function requireCapability(p, capability, write = false) {
-  if (!p || !p.schoolId || !p.actorId || !has(p, capability))
+export function requireCapability(
+  p,
+  capability,
+  write = false,
+  { allowRelief = false } = {},
+) {
+  const reliefPermitted =
+    allowRelief &&
+    p?.identityType === "RELIEF" &&
+    has(p, "lord.relief") &&
+    ["lord.read", "lord.borrow"].includes(capability);
+  if (!p || !p.schoolId || !p.actorId || (!has(p, capability) && !reliefPermitted))
     fail("CAPABILITY_DENIED", "This action is not permitted.", 403);
   if (write && p.impersonating)
     fail("IMPERSONATION_DENIED", "Preview is read-only.", 403);
 }
-export function requireOwner(p, row) {
+export function requireOwner(p, row, { allowRelief = false } = {}) {
+  const reliefPermitted =
+    allowRelief && p?.identityType === "RELIEF" && has(p, "lord.relief");
   if (
     row.school_id !== p.schoolId ||
-    (!has(p, "lord.admin") && row.staff_id !== p.staffId)
+    (!has(p, "lord.admin") && !reliefPermitted && row.staff_id !== p.staffId)
   )
     fail(
       "CAPABILITY_DENIED",

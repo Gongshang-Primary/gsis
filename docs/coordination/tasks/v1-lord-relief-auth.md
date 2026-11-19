@@ -1,7 +1,7 @@
 # v1 LORD relief-teacher restricted session (F15)
 
 - Model: Antigravity
-- Status: claimed on branch `antigravity/v1-lord-relief-auth`
+- Status: implemented and locally verified; exact-head CI and Muse review pending
 - Updated (Asia/Singapore): 20 November 2026
 - Base: `origin/main` `7ee2418`
 - Coordinator / Merger: GPT
@@ -25,5 +25,15 @@
 - Relief sessions NEVER create a Core staff session (`__Host-gsis_session`) and are rejected (401) by Core, Contacts, Deploy, Roster, Calendar, Venues and Layout.
 - Within LORD, relief sessions are strictly restricted to `reference`, `bookingeligible`, `opensessions`, `session`, `loan`, `return` and `photo-upload`. Booking creation/editing/cancellation, `mybookings`, preferences, incidents, REIGN and all OVERLORD admin actions return 403 `CAPABILITY_DENIED`.
 - Staff requests carrying `__Host-gsis_session` always authenticate through Core; relief fallback applies only when no Core session token is present.
-- Atomic D1 `prepareOperation` / `commitOperation` idempotency and custody/audit attribution (`actorId = "relief:<mobile>"`) remain intact.
+- Atomic D1 `prepareOperation` / `commitOperation` idempotency and custody/audit attribution (`actorId = "relief:<mobile>"`, `reliefName`, `reliefMobile`) remain intact.
 - Zero SQL migrations, zero v0.9 source edits, no merge or deployment.
+
+## Verification evidence (`TZ=Asia/Singapore`)
+
+- `node tests/v1-product-lord-relief-auth.mjs`: PASS (input validation, signed HttpOnly cookie, tampered cookie 401, cross-domain 401 across 5 domains, forbidden LORD 403s, CSRF denial, relief photo upload + loan + idempotent replay + opensessions + return + audit attribution, logout cookie clear).
+- `node tests/v1-product-operation-probe.mjs`: PASS (`F15` removed; zero stale/unallowed entries).
+- `node tests/v1-product-lord.mjs`: PASS (all existing LORD storage/race/return/reminder checks intact).
+- `npm run build` + production-path `git diff --exit-code`: PASS (zero tracked drift).
+- `node scripts/v1/build.mjs` + `node scripts/v1/verify-build.mjs`: PASS (9 Wrangler dry-runs + local additive migration upgrade).
+- `git diff --check`: PASS.
+- Q01–Q06: pass locally; Q07: awaiting exact-head CI and Muse review; Q08: deployment not authorised; hosted UAT, F5 and official T1B-01/T1B-02 remain unchanged.
