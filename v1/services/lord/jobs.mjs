@@ -9,7 +9,7 @@ import { drainOutbox } from "../../runtime/jobs.mjs";
 import { serviceCall } from "../../runtime/security.mjs";
 import { dispatchProvider } from "../../runtime/providers.mjs";
 import { notificationIntent } from "./service.mjs";
-import { sgDay, nextReferenceRefresh, notificationJobs } from "./model.mjs";
+import { sgDay, nextReferenceRefresh, notificationJobs, reminderPhase, reminderEligibility, remindersEnabled } from "./model.mjs";
 
 const write = (sql, args = []) => ({ sql, args });
 async function systemCommit(
@@ -125,57 +125,70 @@ export async function closeOverdueSessions(env, now) {
   return { state: "complete", bounded: true, results };
 }
 export async function enqueueReminders(env, now) {
-  const date = sgDay(now),
-    rows = await query(
-      env.DB,
-      "SELECT * FROM lord_bookings WHERE school_id=? AND service_date=? AND status IN ('BOOKED','COLLECTED') ORDER BY booking_id LIMIT 100",
-      [env.SCHOOL_ID, date],
-    );
-  const timings = await one(
-    env.DB,
-    "SELECT value_json FROM lord_settings WHERE school_id=? AND setting_key='periodTimings'",
-    [env.SCHOOL_ID],
-  );
+  const dates = [...new Set([sgDay(now), sgDay(now + 5 * 60000)])];
+  const [timings, setting] = await Promise.all([
+    one(env.DB, "SELECT revision,value_json FROM lord_settings WHERE school_id=? AND setting_key='periodTimings'", [env.SCHOOL_ID]),
+    one(env.DB, "SELECT revision,value_json FROM lord_settings WHERE school_id=? AND setting_key='reminders'", [env.SCHOOL_ID]),
+  ]);
   if (!timings) return { state: "blocked", code: "PERIOD_TIMINGS_REQUIRED" };
-  const periods = JSON.parse(timings.value_json).periods;
+  const settings = setting ? JSON.parse(setting.value_json) : {};
+  if (!remindersEnabled(settings)) return { state: "disabled", results: [] };
+  const periods = JSON.parse(timings.value_json).periods, windows = [];
+  for (const date of dates) for (const p of periods) for (const phase of ["collection", "return"]) {
+    const candidate = { service_date: date, start_period: Number(p.code),
+      end_period: Number(p.code) + 1, status: phase === "collection" ? "BOOKED" : "COLLECTED" };
+    const rule = reminderEligibility(candidate, phase, periods, settings, now, 1);
+    if (rule.state === "ready") windows.push({ date, phase, code: Number(p.code), window: rule.window.key });
+  }
+  if (!windows.length) return { state: "complete", results: [] };
+  const phaseSql = `CASE WHEN json_extract(o.payload_json,'$.kind')='collection-reminder' THEN 'collection'
+    WHEN o.type='lord.return-reminder' OR json_extract(o.payload_json,'$.kind') IN('reminder','overdue') OR json_extract(o.payload_json,'$.reminderPhase')='return' THEN 'return' END`;
+  const rootSql = "'lord:'||b.booking_id||':'||json_extract(w.value,'$.phase')||'-reminder:'||b.revision||':settings:'||?||':timings:'||?";
+  const remainingSql = `COALESCE((SELECT SUM(i.collected_quantity-i.returned_quantity) FROM lord_booking_items i WHERE i.school_id=b.school_id AND i.booking_id=b.booking_id),0)
+    +COALESCE((SELECT SUM(a.collected_quantity-a.returned_quantity) FROM lord_accessories a WHERE a.school_id=b.school_id AND a.booking_id=b.booking_id),0)`;
+  // Filter due windows and existing work before LIMIT, so non-due bookings or
+  // already-notified prefixes cannot starve another eligible booking.
+  const rows = await query(env.DB, `SELECT b.*,json_extract(w.value,'$.phase') AS reminder_phase,
+      json_extract(w.value,'$.window') AS reminder_window,(${remainingSql}) AS reminder_remaining
+    FROM lord_bookings b JOIN json_each(?) w ON
+      (json_extract(w.value,'$.phase')='collection' AND b.status='BOOKED' AND b.start_period=json_extract(w.value,'$.code')) OR
+      (json_extract(w.value,'$.phase')='return' AND b.status='COLLECTED' AND b.end_period-1=json_extract(w.value,'$.code'))
+    WHERE b.school_id=? AND b.service_date=json_extract(w.value,'$.date') AND (b.status='BOOKED' OR (${remainingSql})>0)
+      AND NOT EXISTS(SELECT 1 FROM product_outbox o WHERE o.school_id=b.school_id
+        AND json_extract(o.payload_json,'$.bookingId')=b.booking_id AND (${phaseSql})=json_extract(w.value,'$.phase')
+        AND (o.job_id=(${rootSql})||':email' OR o.job_id=(${rootSql})||':whatsapp'
+          OR (o.state IN('queued','leased','accepted','delivered','uncertain') AND
+            (json_extract(o.payload_json,'$.reminderWindow')=json_extract(w.value,'$.window') OR
+              (json_extract(o.payload_json,'$.reminderWindow') IS NULL AND (o.state<>'queued' OR o.due_at<=?))))))
+    ORDER BY b.booking_id LIMIT 100`,
+    [canonical(windows), env.SCHOOL_ID, setting?.revision || 0, timings.revision, setting?.revision || 0, timings.revision, now]);
   const results = [];
   for (const b of rows) {
-    const start = periods.find((p) => Number(p.code) === b.start_period),
-      end = periods.find((p) => Number(p.code) === b.end_period - 1);
-    if (!start || !end) continue;
-    const due =
-      b.status === "BOOKED"
-        ? Date.parse(date + "T" + start.start + ":00+08:00") - 15 * 60000
-        : Date.parse(date + "T" + end.end + ":00+08:00") + 30 * 60000;
-    if (!Number.isFinite(due) || due > now) continue;
-    const kind = b.status === "BOOKED" ? "collection-reminder" : "overdue",
-      jobId = `lord:${b.booking_id}:${kind}:${b.revision}`;
-    if (
-      await one(
-        env.DB,
-        "SELECT job_id FROM product_outbox WHERE school_id=? AND job_id=?",
-        [env.SCHOOL_ID, jobId + ":email"],
-      )
-    )
-      continue;
+    const phase = b.reminder_phase, kind = phase === "collection" ? "collection-reminder" : "reminder";
+    const rule = reminderEligibility(b, phase, periods, settings, now, b.reminder_remaining);
+    if (rule.state !== "ready") continue;
+    const jobId = `lord:${b.booking_id}:${phase}-reminder:${b.revision}:settings:${setting?.revision || 0}:timings:${timings.revision}`;
     try {
       results.push(
         await systemCommit(
           env,
           {
             operationId:
-              "schedule:" + b.booking_id + ":" + kind + ":" + b.revision,
-            intent: { bookingId: b.booking_id, kind, revision: b.revision },
+              "schedule:" + jobId,
+            intent: { bookingId: b.booking_id, kind, revision: b.revision,
+              reminderWindow: rule.window.key, settingRevision: setting?.revision || 0 },
             guards: [
               write(
                 "SELECT status=? AND revision=? AS ok FROM lord_bookings WHERE school_id=? AND booking_id=?",
                 [b.status, b.revision, b.school_id, b.booking_id],
               ),
+              write("SELECT revision=? AS ok FROM lord_settings WHERE school_id=? AND setting_key='periodTimings'", [timings.revision, env.SCHOOL_ID]),
+              write("SELECT COALESCE((SELECT revision FROM lord_settings WHERE school_id=? AND setting_key='reminders'),0)=? AS ok", [env.SCHOOL_ID, setting?.revision || 0]),
             ],
             outbox: [
               {
                 id: jobId,
-                type: "lord.booking-notification",
+                type: phase === "return" ? "lord.return-reminder" : "lord.booking-notification",
                 dueAt: now,
                 payload: {
                   schoolId: b.school_id,
@@ -183,6 +196,8 @@ export async function enqueueReminders(env, now) {
                   staffId: b.staff_id,
                   revision: b.revision,
                   kind,
+                  reminderPhase: phase,
+                  reminderWindow: rule.window.key,
                 },
               },
             ],
@@ -203,7 +218,9 @@ export async function enqueueReminders(env, now) {
 }
 async function dispatchNotification(job, env) {
   const now = Date.now();
-  let intent = await notificationIntent(env, job.payload, now);
+  const payload = { ...job.payload,
+    ...(reminderPhase(job.payload, job.type) ? { reminderPhase: reminderPhase(job.payload, job.type) } : {}) };
+  let intent = await notificationIntent(env, payload, now);
   if (intent.reason === "REFERENCE_REFRESH_REQUIRED") {
     const refresh = await one(
       env.DB,
@@ -216,7 +233,7 @@ async function dispatchNotification(job, env) {
           { ...refresh, payload: JSON.parse(refresh.payload_json) },
           env,
         );
-        intent = await notificationIntent(env, job.payload, Date.now());
+        intent = await notificationIntent(env, payload, Date.now());
       } catch {}
     }
   }
@@ -301,7 +318,7 @@ async function dispatchNotification(job, env) {
     email: preferences?.email !== 0 ? recipient.email : null,
     mobile: schoolAgreement || preferences?.whatsapp ? recipient.mobile : null,
   };
-  const latest = await notificationIntent(env, job.payload, Date.now());
+  const latest = await notificationIntent(env, payload, Date.now());
   if (latest.state !== "ready")
     return {
       state: latest.state === "suppressed" ? "cancelled" : "failed",
