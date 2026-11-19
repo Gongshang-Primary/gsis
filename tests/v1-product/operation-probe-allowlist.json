@@ -35,22 +35,6 @@
       "reason": "Section 2 explicitly records Contacts kp as replaced by native Core access; its legacy function remains in the built file."
     },
     {
-      "domain": "deploy",
-      "path": "/commands",
-      "selector": "",
-      "name": "",
-      "ledger": "F12",
-      "reason": "The copied Deploy queued-command gateway still names this absent flag-gated route."
-    },
-    {
-      "domain": "deploy",
-      "path": "/layout-reference",
-      "selector": "",
-      "name": "",
-      "ledger": "F12",
-      "reason": "The copied Deploy Layout-reference loader still fetches this absent route."
-    },
-    {
       "domain": "lord",
       "path": "/auth/relief",
       "selector": "",

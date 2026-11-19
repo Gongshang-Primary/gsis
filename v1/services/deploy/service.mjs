@@ -43,6 +43,7 @@ import {
 } from "./model.mjs";
 import { exportWorkbook, validateWorkbook, PROPOSABLE } from "./workbooks.mjs";
 import { ROLE_GROUPS, roleMapping, authorityValue } from "./role-memberships.mjs";
+import { layoutReferenceResponse } from "./layout-reference.mjs";
 const READ = new Set([
   "/bootstrap",
   "/sync",
@@ -65,6 +66,7 @@ const READ = new Set([
   "/auditPage",
   "/health",
   "/access",
+  "/layout-reference",
 ]);
 const WRITE = new Set([
   "/change",
@@ -2042,6 +2044,7 @@ export async function handle(ctx) {
   }
   if (["/bootstrap", "/sync", "/versions", "/tables", "/access"].includes(p))
     return bootstrap(ctx);
+  if (p === "/layout-reference") return layoutReferenceResponse();
   if (p === "/delta")
     return {
       resync: true,
