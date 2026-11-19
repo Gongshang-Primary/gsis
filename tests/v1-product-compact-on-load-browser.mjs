@@ -79,8 +79,10 @@ try {
   await page.locator("#refreshCalendarBtn").click();
   await glossary.getByText("Compact test data arrived", { exact: true }).waitFor();
   await page.waitForFunction(observed => {
-    const header = document.querySelector("#glossaryHost table thead tr th");
-    return !header.style.width && !header.style.minWidth &&
+    const table = document.querySelector("#glossaryHost table.gsis-core-table.gsis-fit-content");
+    const header = table?.tHead?.rows[0]?.cells[0];
+    return table?.querySelector(".gsis-core-filter input") && header &&
+      !header.style.width && !header.style.minWidth &&
       header.getBoundingClientRect().width < observed - 40;
   }, resizedWidth);
   const automaticWidth = await tagWidth();
