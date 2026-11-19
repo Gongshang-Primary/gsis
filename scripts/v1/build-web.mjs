@@ -821,6 +821,7 @@ function updateDeployContactsReports(source){
  return source;
 }
 function updateDeploy(source){
+ source=replaceOnce(source,"fetch('/api/campus-map',{method:'POST',headers:{'Content-Type':'application/json',...(token==='session'?{}:{Authorization:'Bearer '+token})},body:'{}',signal:AbortSignal.timeout(30000)})","fetch('/deploy/campus-base.svg',{credentials:'omit',signal:AbortSignal.timeout(30000)})",'Deploy Layout reads its existing static campus drawing');
  source=replaceOnce(source,'return [...byId.values()].filter(t=>!t.active||eligibleTeacher(t));','return [...byId.values()].filter(t=>!t.active||eligibleTeacher(t)||t.orphan||(v().assignments||[]).some(a=>a.teacher===t.id)||Object.hasOwn(v().teacherNotes||{},t.id)||Object.hasOwn(v().teacherDrafts||{},t.id));','Teachers inventory retains historical references independently of new choices');
  source=replaceOnce(source,'.filter(value=>eligibleTeacher({role:value}))','.filter(value=>GSISTeachingRules.classificationEligible(value,roleCatalogue.length?roleCatalogue:undefined))','Offload catalogue labels preserve their legacy negative classification filter');
  source=replaceOnce(source,"profile.Active='Y';queueCell({operation:'upsertTeacherProfile',teacher:t.id,profile,expected:","queueCell({operation:'upsertTeacherProfile',referenceAction:'add-existing',teacher:t.id,profile,expected:",'Deploy Add existing uses current accepted eligibility without activating staff');

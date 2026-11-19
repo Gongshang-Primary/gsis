@@ -36,14 +36,6 @@
     },
     {
       "domain": "deploy",
-      "path": "/campus-map",
-      "selector": "",
-      "name": "",
-      "ledger": "F12",
-      "reason": "The copied Deploy campus-map loader still fetches this absent route."
-    },
-    {
-      "domain": "deploy",
       "path": "/commands",
       "selector": "",
       "name": "",
