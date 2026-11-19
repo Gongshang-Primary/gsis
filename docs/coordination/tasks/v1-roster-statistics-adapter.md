@@ -74,3 +74,13 @@ Visible changes: existing Statistics tables, cumulative R% and Excel output load
 Deferred: the independent `statisticsCalendar` preset response still lacks the native term/semester shape; this task does not close that backlog. No hosted UAT, large-school maximum-data performance or new process-restart test ran. Current-source outages intentionally keep annual ranking unavailable. Review the eight paths at the exact PR head; rollback is a code revert without migration or data rewrite.
 
 Q01–Q05 **Pass** for the bounded implementation and local evidence, with the stated cross-source consistency limit. Q06 **Pending** required exact-head full suites; Q07 **Pending** Muse exact-head review. Q08 release **Not applicable — not authorised**. Ownership, systematic reproduction and verification principles are applied; no optional skill package execution is claimed. F5 remains OPEN. Official T1B-01/T1B-02 and hosted/runtime UAT remain **Not tested**.
+
+## Integration fixture update on 19 November 2026
+
+Muse approved Statistics at `cd75381d02ea3b8ef3714d01f23e31ee73b1958d`. The conflict-free sync of main `79cde0fcdfb17f0ded5f18f83534575e1bfbfcab` produced tree `a4f4c0958dc6647fcae30dbc61f7f9ae10a82ec7`. On that tree, the test expected a Contacts-only daily SRE to affect the publication. PR226 now requires explicit saved Deploy version membership, so the test saw verified workload instead of the unavailable daily SRE row it was intended to exercise.
+
+The fixture uses the existing Deploy `acceptContacts` operation, then reloads and publishes the resulting revision with a fresh lease. An initial attempt to reuse the membership edit lease returned `REVISION_CONFLICT`. The updated fixture follows normal owner revision checks. All assertions and product files match the mechanical merge tree.
+
+- `TZ=Asia/Singapore npm run build` passed for all 18 canonical components with no generated drift before the test-only edit.
+- With the locked Chromium browser, the Statistics browser program passed all five groups on the corrected combined tree. The operation probe passed with 407 operations, 24 retained known-missing entries and 130 parsed scripts.
+- Node syntax and `git diff --check` passed. Exact-head Node/LORD, isolated product CI and independent Muse recheck are pending. Hosted runtime UAT remains **Not tested**. Deployment is outside this task.

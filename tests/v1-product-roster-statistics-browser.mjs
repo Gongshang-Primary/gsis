@@ -155,6 +155,12 @@ try {
     operationId: "synthetic-statistics-daily-" + field, field, value: field === "eo", revision: 0,
     ownerReviewReference: "Synthetic owner review",
   });
+  // The daily SRE was added to Contacts after this version was created.
+  const membershipClient = "synthetic-statistics-membership-client";
+  const membershipLease = await f.call(f.admin, "deploy", "/lease", { operationId: "synthetic-statistics-membership-lease",
+    versionId: version.versionId, scope: "meta", clientId: membershipClient });
+  await f.call(f.admin, "deploy", "/change", { operationId: "synthetic-statistics-enroll-daily",
+    operation: "acceptContacts", versionId: version.versionId, scope: "meta", clientId: membershipClient, leaseFence: membershipLease.fence });
   // Seed a retained synthetic planning assignment. Publication, calculation
   // and the report still pass through the real owner Workers and databases.
   const deploy = await f.db("deploy"), initial = await loadVersion(deploy, schoolId, version.versionId);
@@ -168,7 +174,7 @@ try {
     versionId: version.versionId, scope: "meta", clientId: "synthetic-statistics-publisher" });
   await f.call(f.admin, "deploy", "/publish", { operationId: "synthetic-statistics-publish",
     versionId: version.versionId, scope: "meta", clientId: "synthetic-statistics-publisher", leaseFence: lease.fence,
-    revision: 0, expectedPointerSequence: 0 });
+    revision: initial.version.revision, expectedPointerSequence: 0 });
   const published = await f.call(f.admin, "roster", "/operations", { operation: "statisticsRPercent" });
   const workload = JSON.parse((await db.prepare("SELECT payload_json FROM roster_workload_snapshots WHERE school_id=? AND service_date=?")
     .bind(schoolId, today).first()).payload_json);
