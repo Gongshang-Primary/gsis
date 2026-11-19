@@ -1,7 +1,7 @@
 # Deploy teacher registration by derived TTb Name
 
 - Model: Codex
-- Status: claimed
+- Status: implemented and locally verified. Exact-head CI and review pending.
 - Updated: 20 November 2026 SGT
 - Branch: `codex/v1-deploy-ttb-registration`
 - Base: v1.07 `05eedeee3c364609f879734d47026d2c718e74d7`
@@ -19,3 +19,11 @@ Use the existing Contacts owner derivation, atomic TTb uniqueness checks and per
 ## Acceptance
 
 Exercise the actual built browser and Contacts/Deploy D1. Confirm same Basic Name with distinct TTb Names saves, exact TTb collisions leave the original identity intact, repeated operation IDs recover the same Staff ID, and the explicit existing-person option stays available. Retain legacy typed and untyped validation, authority boundaries, scope and draft ownership. Run the canonical build, verify no generated drift, run related product regressions and exact-head CI. Hosted UAT, merge and deployment are outside this claim.
+
+## Implementation evidence
+
+The exact v1.07 built-browser negative returned the Basic Name conflict when an eligible subject modifier produced a distinct TTb name. The corrected form sends only the versioned naming modifiers through the existing v1 permanent-ID registration hook in the builder. Contacts applies its existing atomic TTb check and receipt contract. A role can contribute a display tag without writing the Contacts role, activity or authority. The native v0.9 handler already validates derived TTb names and remains unchanged. [v0.9 Deploy validation](https://github.com/helper-gsps/gsis/blob/d9d180c/backend/Code.gs#L1262)
+
+- New built Teachers/browser/Workers/D1 program passed. It saved two distinct IDs under the same Basic Name, rejected exact duplicate TTb, recovered the same ID on exact retry, rejected changed intent and admitted one concurrent winner without a stranded preparation. A role-derived tag preserved the ordinary profile and authority boundaries.
+- Contacts direct authority (10 groups), Deploy saved-membership (5 groups), and the operation probe (407 operations, 24 remaining allowances) passed. All 152 product programs are discovered.
+- `TZ=Asia/Singapore npm run build`, no generated drift, v1 build, nine dry runs, local migration upgrade, syntax and whitespace passed. Exact-head CI and Muse review are recorded in the PR. Hosted UAT remains untested.

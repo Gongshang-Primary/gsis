@@ -845,7 +845,16 @@ function updateDeploy(source){
  source=source.replaceAll('Purge entire log for this version','Archive audit display').replaceAll('Permanently purge this version’s audit log?','Archive this version’s audit display? Immutable audit and recovery evidence are retained.');
  source=replaceOnce(source,"const id=t?.id||'new-'+crypto.randomUUID(),p=t?plannerProfile(t)","let id=t?.id||'new-'+crypto.randomUUID();const registrationId=crypto.randomUUID(),p=t?plannerProfile(t)",'Contacts owns new Staff IDs');
  source=replaceOnce(source,"selectionEditor(t?'Edit teacher':'Add teacher',body,d=>{const profile=read(d);","selectionEditor(t?'Edit teacher':'Add teacher',body,async d=>{const profile=read(d);",'Asynchronous permanent Staff ID registration');
- source=replaceOnce(source,"queueCell({operation:'upsertTeacherProfile',teacher:id,profile,expected:v().teacherDrafts?.[id]||v().teachers.find(r=>r.id===id)?.profile||null})","if(!t&&id.startsWith('new-')){const registered=await window.GSISV1.request('deploy','/staff/register',{method:'POST',body:{operationId:registrationId,basicName:profile['Basic Name']}});if(registered.state!=='committed'||!(registered.result?.staffId||registered.staffId))throw Error('The permanent staff identity is not yet confirmed. Retry this same registration.');id=registered.result?.staffId||registered.staffId;}queueCell({operation:'upsertTeacherProfile',teacher:id,profile,expected:v().teacherDrafts?.[id]||v().teachers.find(r=>r.id===id)?.profile||null})",'Use confirmed Contacts Staff ID');
+ source=replaceOnce(source,"queueCell({operation:'upsertTeacherProfile',teacher:id,profile,expected:v().teacherDrafts?.[id]||v().teachers.find(r=>r.id===id)?.profile||null})",`if(!t&&id.startsWith('new-')) {
+  const nameModifiers={schemaVersion:1};
+  for(const [field,label] of [['employmentTags','Employment Modifier'],['subjectTags','Subject Modifier'],['mkTags','MK Modifier']]) {
+    if(profile[label]) nameModifiers[field]=profile[label].split(/[,;]/).map(tag=>tag.trim()).filter(Boolean);
+  }
+  if(profile.Role) nameModifiers.role=profile.Role;
+  const registered=await window.GSISV1.request('deploy','/staff/register',{method:'POST',body:{operationId:registrationId,basicName:profile['Basic Name'],nameModifiers}});
+  if(registered.state!=='committed'||!(registered.result?.staffId||registered.staffId)) throw Error('The permanent staff identity is not yet confirmed. Retry this same registration.');
+  id=registered.result?.staffId||registered.staffId;
+ }queueCell({operation:'upsertTeacherProfile',teacher:id,profile,expected:v().teacherDrafts?.[id]||v().teachers.find(r=>r.id===id)?.profile||null})`,'Use confirmed Contacts Staff ID and TTb inputs');
  source=source.replaceAll('data-version-action="publish" \'+(!admin()?\'disabled\':\'\')','data-version-action="publish" \'+(!window.GSISV1.capable(\'deploy.publish\')?\'disabled\':\'\')');
  // PG01/PG02 govern version-owned Subject Type edits; legacy Admin-only UI is superseded.
  const subjectAst=parse(source,{ecmaVersion:'latest',sourceType:'script'}),subjectPage=subjectAst.body.find(node=>node.type==='FunctionDeclaration'&&node.id?.name==='subjectTypesPage');

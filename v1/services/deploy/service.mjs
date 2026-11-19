@@ -2152,6 +2152,7 @@ export async function handle(ctx) {
         ? { nameSuffix: text(b.nameSuffix, 80, true) }
         : {}),
       ...(b.tags !== undefined ? { tags: b.tags } : {}),
+      ...(b.nameModifiers !== undefined ? { nameModifiers: b.nameModifiers } : {}),
       ...(b.existingStaffId ? { existingStaffId: id(b.existingStaffId) } : {}),
     });
   }
