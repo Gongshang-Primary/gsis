@@ -1,5 +1,7 @@
 # v1-roster-absence-clash-confirm: mirror confirmed absence replacement
 
+- **Active implementation claim (Antigravity):** Claimed on branch `antigravity/v1-roster-absence-clash-confirm` from `origin/main` (`2e93e91`). Reviewer: **Muse** (exact head commit). Coordinator / Merger: **GPT**. Clears probe allowances `F06` (`resolveAbsenceIntake`, `retryAbsenceIntake`) and implements all 9 v1 absence-clash confirmation acceptance cases without modifying v0.9 or PR #182.
+- Historical read-only investigation record below (preserved verbatim):
 - Status: queued before implementation; owner orders the independent Roster workload-snapshot correction first. Read-only absence investigation complete.
 - Owner/model: Codex. Coordinator: ChatGPT (v1). Independent reviewer: Claude, exact head.
 - Last updated: 16 November 2026, 07:32 Asia/Singapore.
