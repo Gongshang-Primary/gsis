@@ -88,6 +88,43 @@
     if((kind === "lord-settings" || kind === "signage") && suite.module === "overlord") return document.getElementById("settingsBody");
     return null;
   }
+  const fittedTables = new WeakMap();
+  let tablesToReset = new WeakSet();
+  const scrollFrames = ".gsis-core-scroll,.gsis-scroll,.table-scroll,.data-table-wrap";
+  const scheduleGrids = ".weekly-grid,.timetable-grid,.booking-grid,[data-schedule-matrix]";
+  let pointerDown = false;
+  function fitLoadedTables() {
+    if (pointerDown) return;
+    const focused = document.activeElement;
+    for (const table of document.querySelectorAll("table")) {
+      if (!table.getClientRects().length || table.matches(scheduleGrids)) continue;
+      if (table.contains(focused) && focused.matches("input,select,textarea,[contenteditable],[data-core-resize],.member-resize,.resize-grip")) continue;
+      const resetWidths = tablesToReset.delete(table);
+      if (resetWidths || table.matches(".gsis-core-table")) {
+        window.GSISCoreTables?.compactAfterLoad?.(table, resetWidths);
+      }
+      const nativeFit = typeof window.GSISTableFit === "function" &&
+        (table.matches(".gsis-compact") || (resetWidths && !table.hasAttribute("data-plain-table")));
+      if (nativeFit) {
+        if (!resetWidths && table.classList.contains("gsis-compact-manual")) continue;
+        // Sorting moves the same nodes. New data or controls need measuring
+        // once the owner has rendered them and wired its native table.
+        const inputs = table.querySelectorAll("input,select,textarea");
+        const content = new Set([...table.rows, ...inputs]);
+        const before = fittedTables.get(table);
+        if (!resetWidths && before?.size === content.size && [...content].every(node => before.has(node))) continue;
+        window.GSISTableFit(table);
+        fittedTables.set(table, content);
+      } else if (
+        !table.classList.contains("gsis-fit-content") &&
+        table.parentElement?.matches(scrollFrames) &&
+        !table.querySelector(":scope > colgroup") &&
+        getComputedStyle(table).tableLayout === "auto"
+      ) {
+        table.classList.add("gsis-fit-content");
+      }
+    }
+  }
   let queued = false;
   function reconcile() {
     queued = false;
@@ -126,13 +163,24 @@
       // their entry points join the native Book group / Manage Bookings actions.
       if(lordUser.className !== 'gsis-lord-actions') lordUser.className = 'gsis-lord-actions';
     }
+    fitLoadedTables();
   }
   function schedule() { if(!queued) { queued=true; requestAnimationFrame(reconcile); } }
   new MutationObserver(schedule).observe(document.body,{childList:true,subtree:true,attributes:true,attributeFilter:["class","hidden","aria-current","open"]});
   document.addEventListener("click",schedule);
+  document.addEventListener("focusout",schedule);
+  document.addEventListener("pointerdown",event => { if (event.isPrimary) pointerDown = true; },true);
+  for (const event of ["pointerup","pointercancel"])
+    window.addEventListener(event,() => { pointerDown = false; schedule(); },true);
   window.addEventListener("hashchange",schedule);
   window.addEventListener("gsis:navigation",schedule);
-  window.GSISV1Navigation = {refresh:schedule};
+  window.GSISV1Navigation = {
+    refresh: schedule,
+    compactAfterLoad(root) {
+      for (const table of root.querySelectorAll("table")) tablesToReset.add(table);
+      schedule();
+    },
+  };
   schedule();
   const identity = document.createElement("span");
   identity.className = "gsis-identity";
@@ -210,6 +258,7 @@
       showStatus("", null);
     }
     panels.clear();
+    tablesToReset = new WeakSet();
     lordUser = null;
     document
       .querySelectorAll("details.gsis-panel")

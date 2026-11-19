@@ -1094,6 +1094,13 @@ function installDuplicateSelection() {
   const nativeCreateVersion = window.createVersion;
   const nativeNoteControls = window.updateVersionNoteControls;
   const nativeRefresh = window.refresh;
+  const nativeLoadVersion = window.loadVersionRow;
+  const nativeLoadAudit = window.loadAuditPage;
+  const nativeSelectTab = window.selectDeployTab;
+  const compactLoadedView = () => {
+    const root = document.getElementById("content");
+    if (root) window.GSISV1Navigation?.compactAfterLoad?.(root);
+  };
   // A background read makes native Save note a guarded no-op. Reflect that
   // existing guard in the control, including input events and fresh rows.
   window.updateVersionNoteControls = function (id) {
@@ -1115,14 +1122,57 @@ function installDuplicateSelection() {
     // Explicit Refresh still reads current state while retaining the note draft.
     if (!args[0] && notesUnresolved()) return;
     const epoch = protectedEpoch;
+    const session = sessionEpoch;
+    const view = tab;
+    const lastLoad = lastRefreshedAt;
     const completion = nativeRefresh.apply(this, args);
     refreshNoteControls();
     try {
-      return await completion;
+      const result = await completion;
+      // An accepted read can leave the table nodes and values unchanged.
+      if (args[0] === true && epoch === protectedEpoch &&
+          session === sessionEpoch && view === tab && lastLoad !== lastRefreshedAt) {
+        compactLoadedView();
+      }
+      return result;
     } finally {
       if (epoch === protectedEpoch) refreshNoteControls();
     }
   };
+  if (typeof nativeLoadVersion === "function") {
+    window.loadVersionRow = async function (id) {
+      const epoch = protectedEpoch;
+      const session = sessionEpoch;
+      const lastLoad = lastRefreshedAt;
+      const loaded = await nativeLoadVersion.call(this, id);
+      if (loaded && epoch === protectedEpoch && session === sessionEpoch &&
+          current === id && lastLoad !== lastRefreshedAt) {
+        compactLoadedView();
+      }
+      return loaded;
+    };
+  }
+  if (typeof nativeSelectTab === "function") {
+    window.selectDeployTab = function (next) {
+      const previous = tab;
+      nativeSelectTab.call(this, next);
+      if (previous !== tab) compactLoadedView();
+    };
+  }
+  if (typeof nativeLoadAudit === "function") {
+    window.loadAuditPage = async function (reset) {
+      const before = auditState;
+      const completion = nativeLoadAudit.call(this, reset);
+      const requested = auditState;
+      await completion;
+      if (reset && requested?.loaded && !requested.loading && !requested.error &&
+          before !== requested && requested === auditState &&
+          requested.versionId === current && requested.sessionEpoch === sessionEpoch &&
+          tab === "Audit") {
+        compactLoadedView();
+      }
+    };
+  }
   window.versions = function (root) {
     nativeVersions(root);
     if (refreshing)
