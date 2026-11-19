@@ -1094,6 +1094,7 @@ function transform(module,rel,text){
   if(module.id==='calendar'&&rel==='index.html')text=text.replace('</head>','<link rel="stylesheet" href="/v1/shared/calendar-ui.css"><script type="module" src="/v1/shared/calendar-ui.js"></script></head>');
   if(module.id==='contacts'&&rel==='index.html')text=text.replace('</body>','<script type="module" src="/v1/shared/contacts-authority.js"></script></body>');
   if(module.id==='roster'&&rel==='index.html')text=text.replaceAll('/roster/system-health.html','/admin/#health').replace('</body>','<script type="module" src="/v1/shared/roster-import.js"></script><script type="module" src="/v1/shared/roster-policy-ledger.js"></script><script type="module" src="/v1/shared/roster-continuity.js"></script></body>');
+  if(module.id==='venues'&&rel==='index.html')text=text.replace('</body>','<script type="module" src="/v1/shared/venues-register.js"></script></body>');
   if(module.id==='layout'&&rel==='index.html')text=text.replace('</body>','<script type="module" src="/v1/shared/layout-editor.js"></script></body>');
   if(module.id==='deploy'&&rel==='index.html')text=text.replace('</body>','<script type="module" src="/v1/shared/deploy-publication.js"></script></body>');
   if(module.id==='lord'&&rel==='index.html')text=text.replace('</body>','<script type="module" src="/v1/shared/lord-user.js"></script></body>');
@@ -1113,6 +1114,9 @@ function transform(module,rel,text){
   }
   if(module.id==='contacts'&&rel==='app.js')text=updateContacts(text);
   if(module.id==='venues'&&rel==='app.js'){
+   const register = text.match(/ function registerSection\(data\)\{[^\n]+\n/);
+   if(!register)throw Error('Venues physical register source changed');
+   text=text.replace(register[0], " function registerSection(data){if(!state.permissions.admin)return '';window.GSISV1VenueRegisterContext={register:data.register,refresh:async()=>{await boot();}};queueMicrotask(()=>window.GSISV1VenueRegisterMount?.(window.GSISV1VenueRegisterContext));return '<section class=\"card\" id=\"v1VenueRegister\"></section>';}\n");
    text=replaceOnce(text,"history.replaceState(null,'','/?'+p);","history.replaceState(null,'','/venues/?'+p);",'Venues query navigation retains its module subpath');
    text=replaceOnce(text,"finally{location.assign('/cdn-cgi/access/logout');}","catch(error){setStatus(error.message,'warning');return;}location.assign('/');",'Venues confirms shared sign-out');
    text=replaceOnce(text,"setInterval(()=>{updateNow();","window.addEventListener('gsis:clear-protected-state',()=>{state.bootEpoch++;state.bookingEpoch++;state.actor=null;state.occurrences.clear();state.transfers.clear();state.snapshot=null;state.selection=null;state.note='';$('#main').replaceChildren();});setInterval(()=>{updateNow();",'Venues clears protected source responses');
