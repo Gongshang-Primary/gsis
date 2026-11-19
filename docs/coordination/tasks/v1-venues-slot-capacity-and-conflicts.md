@@ -5,15 +5,24 @@
 - **Reviewer:** Muse (exact head commit)
 - **Coordinator / Merger:** GPT
 - **Branch:** `antigravity/v1-venues-slot-capacity-and-conflicts`
-- **Status:** Claimed (in progress)
+- **Status:** Locally verified (ready for Muse exact-head review)
 
 ## Scope
-Implement the Venues slot-capacity and retained-conflict adoption contract from `docs/v1/venues/VENUE_ALLOCATION_LIFECYCLE_DESIGN.md`:
-1. Separate `classSlotCapacity` (`null` = explicitly unknown, integer `1..20`, default `1` when omitted) from pupil seating `capacity` across `v1/services/venues/register.mjs`, `v1/services/venues/domain.mjs`, and `v1/services/venues/service.mjs`. Unknown `classSlotCapacity: null` is never treated as free.
-2. Add one-slot (`slotMode: "slot"`) vs whole-venue (`slotMode: "whole"`, default) booking admission with sweep-line per-segment concurrent demand checking across multi-period intervals, matching SQL concurrency guards, and venue epoch fencing.
-3. On timetable source activation (`domain.mjs` `activate` and `service.mjs` timed-source baseline adoption), retain conflicting held bookings with explicit unresolved `sourceConflict` status instead of calling `displace`; keep unresolved held bookings counting toward occupancy until authorized resolution (`resolveConflict` / `amend` / `cancel`) rechecks current occupancy.
-4. Add comprehensive regression test `tests/v1-product-venues-slot-capacity.mjs` covering ISH-1 2-slot admission, whole-venue default, unknown capacity, multi-period per-segment checks, concurrent booking serialization, and retained-conflict timetable adoption + authorized resolution.
+Implemented the Venues slot-capacity and retained-conflict adoption contract from `docs/v1/venues/VENUE_ALLOCATION_LIFECYCLE_DESIGN.md`:
+1. Separated `classSlotCapacity` (`null` = explicitly unknown, integer `1..20`, default `1` when unspecified) from pupil seating `capacity` across `v1/services/venues/register.mjs`, `v1/services/venues/domain.mjs`, and `v1/services/venues/service.mjs`. Unknown `classSlotCapacity: null` fails closed (`409 UNKNOWN_SLOT_CAPACITY`) in both domain and SQL guards.
+2. Implemented one-slot (`slotMode: "slot"`) vs whole-venue (`slotMode: "whole"`, default) booking admission with sweep-line per-segment concurrent demand checking across multi-period intervals, multi-slot SQL guards, and `venues_epochs` serialization.
+3. On timetable source activation (`domain.mjs` `activate`) and baseline/`retainConflicts` adoption (`service.mjs` `sourceBegin` + `sourceComplete`), retained conflicting held bookings (`confirmed`/`pending`) with explicit unresolved `sourceConflict` status instead of calling `displace`; unresolved bookings continue to consume capacity until authorized resolution (`resolveConflict` / `amend` / `cancel`) rechecks current occupancy.
+4. Added regression coverage in `tests/v1-product-venues-slot-capacity.mjs`.
 
-## Guardrails
-- Preserve all existing v1 Venues regressions (`v1-product-venues`, `v1-product-venues-register`, `v1-product-venues-staged`, `v1-product-venues-source-fence-budget`).
-- Zero v0.9 source or generated files modified (`npm run build` zero drift).
+## Local Verification (`TZ=Asia/Singapore`)
+- `node tests/v1-product-venues-slot-capacity.mjs` — PASS
+- `node tests/v1-product-venues.mjs` — PASS
+- `node tests/v1-product-venues-register.mjs` — PASS
+- `node tests/v1-product-venues-staged.mjs` — PASS
+- `npm run build` + `git diff --exit-code -- roster-update/ public/ shared/` — PASS (zero v0.9 drift)
+- `node scripts/v1/build.mjs` + `node scripts/v1/verify-build.mjs` — PASS (all 9 Wrangler dry-runs + local upgrade check)
+- `git diff --check` — PASS
+
+## Remaining Gates
+- Independent exact-head review by Muse; merge & coordination by GPT.
+- Hosted runtime UAT, F5, and official T1B-01/T1B-02 remain Not tested / OPEN. No live deploy or provider activation performed.
