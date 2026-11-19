@@ -1,7 +1,7 @@
 # v1 Roster contactCreate via Contacts provisional registration (F03)
 
 - Model: Antigravity
-- Status: claimed on branch `antigravity/v1-roster-contact-create`
+- Status: implemented and locally verified; exact-head CI and Muse review pending
 - Updated (Asia/Singapore): 20 November 2026
 - Base: `origin/main` `7ee2418`
 - Coordinator / Merger: GPT
@@ -19,8 +19,18 @@
 ## Ownership and recovery invariants
 
 - Contacts remains the sole write owner of staff identities (`R01`); Roster never writes to Contacts D1 directly and delegates through authenticated `/internal/register-provisional` + Core `/internal/delegate`.
-- Requires `roster.write` (SMC/Admin); unprivileged staff (`roster.own`) and read-only preview sessions are denied (403).
+- Requires `roster.write` (SMC/Admin); unprivileged staff (`roster.own`) and read-only preview sessions fail closed (403/503).
 - Exact mobile or derived TTb Name collisions return `{ saved: false, blocked: true, duplicates }` without creating duplicate records; similar names require `confirmDistinct: true`.
 - Exact retry with the same `operationId` / `requestId` recovers the original permanent Staff ID without falsely flagging itself as a duplicate (`R09`).
 - Created relief contacts stay inactive with zero inferred SMC/EO/School Leader authority.
 - Zero SQL migrations, zero v0.9 edits, no merge or deployment.
+
+## Verification evidence (`TZ=Asia/Singapore`)
+
+- `node tests/v1-product-roster-contact-create.mjs`: PASS (fail-closed unprivileged denial, invalid mobile 400, Contacts provisional creation + Contacts D1 verification, exact `operationId` retry recovery, duplicate mobile block, duplicate TTb Name block, similar-name warning and `confirmDistinct: true` creation).
+- `node tests/v1-product-operation-probe.mjs`: PASS (`F03` removed; zero stale/unallowed entries).
+- `node tests/v1-product-roster-service.mjs`: PASS (all existing Roster service regressions intact).
+- `npm run build` + production-path `git diff --exit-code`: PASS (zero tracked drift).
+- `node scripts/v1/build.mjs` + `node scripts/v1/verify-build.mjs`: PASS (9 Wrangler dry-runs + local additive migration upgrade).
+- `git diff --check`: PASS.
+- Q01–Q06: pass locally; Q07: awaiting exact-head CI and Muse review; Q08: deployment not authorised; hosted UAT, F5 and official T1B-01/T1B-02 remain unchanged.

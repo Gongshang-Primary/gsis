@@ -142,14 +142,6 @@
       "domain": "roster",
       "path": "/operations",
       "selector": "operation",
-      "name": "contactCreate",
-      "ledger": "F03",
-      "reason": "Roster and Stapler contact creation still call this absent Contacts bridge."
-    },
-    {
-      "domain": "roster",
-      "path": "/operations",
-      "selector": "operation",
       "name": "deliveryReview",
       "ledger": "F04",
       "reason": "The copied delivery-review panel requests this absent Roster operation."
