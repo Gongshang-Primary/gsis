@@ -5,6 +5,12 @@ import { forecastCapacity, layeredHealth } from "./capacity.mjs";
 import { allocationSnapshot } from "./allocation-snapshot.mjs";
 import { hasDatedReliefActivation, isReliefNotificationKind } from "./eligibility.mjs";
 import { compactOpeningSave } from './opening-save.mjs';
+import {
+  applyConfirmedReplacementToState,
+  handleAbsenceIntakeOperation,
+  prepareSaveAbsenceClashCheck,
+  queueAbsenceIntakeClash,
+} from "./absence-clash.mjs";
 import Stapler from "../../../shared/roster-stapler.js";
 import {
   exportDrive,
@@ -110,6 +116,8 @@ const ownWrites = new Set([
   "respondMutual",
   "acknowledge",
   "requestStapler",
+  "resolveAbsenceIntake",
+  "retryAbsenceIntake",
 ]);
 const adminWrites = new Set([
   "saveSystemConfig",
@@ -1758,6 +1766,14 @@ async function operations(ctx) {
   const schoolId = ctx.principal.schoolId,
     body = ctx.body,
     opName = operation(body, ctx.path);
+  if (["resolveAbsenceIntake", "retryAbsenceIntake"].includes(opName))
+    return handleAbsenceIntakeOperation(ctx, opName, {
+      context,
+      prepared,
+      commit,
+      captureObservedQuotas,
+      safeLegacyError,
+    });
   if (["statistics", "statisticsRPercent"].includes(opName)) return statisticsReport(ctx, opName, recordContext);
   const readonly = reads.has(opName) || opName === "read",
     range = requestedDates(opName === "capacityForecast" ? {...body, from: body.date || localDate(ctx.now), to: Allocation.addDays(Allocation.monday(body.date || localDate(ctx.now)), 6)} : body, ctx.now),
@@ -1882,6 +1898,31 @@ async function operations(ctx) {
       throw safeLegacyError(e);
     }
   }
+  let absenceClash = null;
+  if (opName === "saveAbsence") {
+    const existingOpId = body.operationId || body.requestId;
+    const priorOp = existingOpId
+      ? await operationStatus(ctx.env.DB, schoolId, existingOpId)
+      : null;
+    if (priorOp?.state === "committed") {
+      const replayed = await prepared(ctx, "roster." + opName, body);
+      if (replayed.receipt)
+        return { ...replayed.receipt.result, receipt: replayed.receipt };
+    }
+    requireValue(
+      Number.isSafeInteger(body.revision) && body.revision === revision,
+      "REVISION_CONFLICT",
+      409,
+    );
+    absenceClash = await prepareSaveAbsenceClashCheck(
+      ctx,
+      loaded,
+      c,
+      body,
+      safeLegacyError,
+    );
+    if (absenceClash instanceof Response) return absenceClash;
+  }
   const op = await prepared(ctx, "roster." + opName, body);
   if (op.receipt) return { ...op.receipt.result, receipt: op.receipt };
   requireValue(
@@ -1889,6 +1930,19 @@ async function operations(ctx) {
     "REVISION_CONFLICT",
     409,
   );
+  if (absenceClash?.mode === "queueIntake") {
+    return queueAbsenceIntakeClash(
+      ctx,
+      loaded,
+      c,
+      range,
+      scope,
+      revision,
+      op,
+      absenceClash,
+      { commit },
+    );
+  }
   if (["optimise", "autoAllocate"].includes(opName))
     return allocationRun(ctx, loaded, c, range, scope, revision, op);
   if (opName === "publish") assertPublicationWorkload(ctx, c);
@@ -1899,12 +1953,25 @@ async function operations(ctx) {
     const compatible =
       opName === "saveSystemConfig"
         ? settingsCompatibility(next, c, body)
-        : { input: body, context: c };
-    result = Operations.apply(next, compatible.context, {
-      ...compatible.input,
-      operation: opName,
-      requestId: op.operationId,
-    });
+        : opName === "saveAbsence"
+          ? { input: body, context: { ...c, resubmission: false } }
+          : { input: body, context: c };
+    result =
+      absenceClash?.mode === "replace"
+        ? applyConfirmedReplacementToState(
+            next,
+            c,
+            body,
+            absenceClash.conflicts,
+            op.operationId,
+            absenceClash.conflictToken,
+            safeLegacyError,
+          )
+        : Operations.apply(next, compatible.context, {
+            ...compatible.input,
+            operation: opName,
+            requestId: op.operationId,
+          });
     if (opName === "saveSystemConfig") {
       const retainedRules = compatible.retainedRules;
       if (
