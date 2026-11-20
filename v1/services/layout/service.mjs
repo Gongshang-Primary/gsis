@@ -1,5 +1,6 @@
 import layoutData from "../../../shared/layout-data.js";
 import { publishedSnapshot } from "./publication.mjs";
+import { adoptTimedSource, readTimedTimetable } from "./timed-source.mjs";
 import { ApiError } from "../../runtime/errors.mjs";
 import {
   canonical,
@@ -187,6 +188,7 @@ export function policy(method, path, body = {}) {
         "/history",
         "/profile",
         "/receipt",
+        "/timetable",
       ].includes(p)) ||
     (method === "POST" && p === "/profile")
   )
@@ -914,6 +916,8 @@ export async function handle(ctx) {
         roles: ctx.principal.capabilities,
       },
     };
+  if (path === "/timetable")
+    return readTimedTimetable(ctx, input, { current });
   if (path === "/receipt") {
     const row = await operationStatus(
       ctx.env.DB,
@@ -976,6 +980,8 @@ export async function handle(ctx) {
 
 /** Immutable source delivery: fetch the committed publication from its owning service. */
 export async function internal(ctx) {
+  if (ctx.path === "/internal/adopt-timed-source")
+    return adoptTimedSource(ctx);
   if (ctx.path !== "/internal/adopt-publication")
     fail("NOT_FOUND", "Unknown Layout integration operation.", 404);
   const school = ctx.env.SCHOOL_ID,

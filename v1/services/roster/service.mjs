@@ -1424,7 +1424,25 @@ async function baselineWrite(ctx) {
       confirmedDailyPlansPreserved: true,
     },
     audit: { baselineId: id, sourceDigest: artifact.digest },
-    outbox: [held.outbox],
+    outbox: [
+      held.outbox,
+      {
+        id: "layout-timed:" + op.operationId,
+        type: "roster-layout-timed",
+        payload: {
+          schoolId,
+          decisionId: ctx.principal.decisionId,
+          sourceDomain: "roster",
+          sourceOperationId: op.operationId,
+          sourceDigest: op.digest,
+          year: Number(from.slice(0, 4)),
+          from,
+          to,
+          sequence: revision + 1,
+        },
+        dueAt: ctx.now,
+      },
+    ],
   });
 }
 async function offlineEdits(ctx) {
@@ -2763,6 +2781,7 @@ export async function scheduled(ctx) {
       "roster-notification",
       "roster-inbox-reply",
       "roster-venues-complete",
+      "roster-layout-timed",
       "roster-burrows",
       "roster-email",
       "roster-inbound",
@@ -3088,6 +3107,29 @@ export async function dispatchRosterJob(job, env, now = Date.now()) {
       code: result.state === "pending" ? "SOURCE_RECOVERY_PENDING" : undefined,
       retryable: result.state === "pending",
     };
+  }
+  if (job.type === "roster-layout-timed") {
+    try {
+      const result = await serviceCall(
+        env,
+        "layout",
+        "/internal/adopt-timed-source",
+        payload,
+      );
+      return {
+        state: ["adopted", "ignored"].includes(result?.state)
+          ? "delivered"
+          : "failed",
+        providerId: payload.sourceOperationId,
+        retryable: !["adopted", "ignored"].includes(result?.state),
+      };
+    } catch (error) {
+      return {
+        state: "failed",
+        code: error.code || "LAYOUT_TIMED_ADOPTION_FAILED",
+        retryable: true,
+      };
+    }
   }
   if (job.type === "roster-burrows") return burrowsPackage(env, job, now);
   if (job.type === "roster-drive-export") {
