@@ -13,6 +13,16 @@
   constructor({actor,storage,send,paint=()=>{}}){this.actor=actor.toLowerCase();this.storage=storage;this.send=send;this.paint=paint;this.key='gsis.deploy.commands.v1:'+this.actor;this.rows=[];try{const saved=JSON.parse(storage.getItem(this.key)||'[]');if(!Array.isArray(saved)||saved.some(x=>!x.requestId||!x.receipt))throw Error();this.rows=saved;}catch(e){if(storage.getItem(this.key))throw Error('Pending command recovery is unreadable. Keep browser storage and ask Admin to review.');}this.update();}
   update(){this.paint(this.rows.map(x=>x.receipt),this);}
   save(){this.storage.setItem(this.key,JSON.stringify(this.rows));this.update();}
+  pending(exceptId){return this.rows.filter(x=>x.requestId!==exceptId&&open(x.receipt));}
+  blocked(rows,message='An earlier save is still being checked. Your new edits are retained and can still be edited. Retry save to check again.'){
+   return Object.assign(Error(message),{code:'EDGE_COMMAND_BLOCKED',notSubmitted:true,blockingRequestIds:rows.map(x=>x.requestId)});
+  }
+  async reconcile(exceptId){
+   const rows=this.pending(exceptId);if(!rows.length)return false;
+   try{for(const row of rows)await this.check(row.requestId);}catch{throw this.blocked(rows,'The earlier save could not be checked. Your new edits are retained and can still be edited. Retry save when connected.');}
+   const pending=this.pending(exceptId);if(pending.length)throw this.blocked(pending);
+   return true;
+  }
   record(row,result){if(result.queueReceipt){if(result.queueReceipt.requestId!==row.requestId)throw Error('Receipt identity differs. Keep the original proposal.');row.receipt=result.queueReceipt;}if(row.receipt.state==='APPLIED'){row.versionId=row.payload?.versionId||row.versionId;delete row.payload;}this.save();return result;}
   outcome(row,result={}){
    if(row.receipt.state!=='APPLIED'){const error=Error(label(row.receipt)+'. Keep this proposal and use Check status.');error.code='EDGE_COMMAND_PENDING';error.status=row.receipt.state==='REJECTED'?409:202;error.queueReceipt=row.receipt;throw error;}
@@ -23,7 +33,7 @@
   async submit(payload,expectedRevision){
    let row=this.rows.find(x=>x.requestId===payload.requestId);
    if(row){const original=row.proposalDigest||(row.payload?await proposalDigest(row.payload):null);if(!original||original!==await proposalDigest(payload))throw Error('This request ID belongs to another proposal. Use Check status to inspect the original outcome before making a new decision.');row.proposalDigest=original;const result=await this.check(row.requestId);return this.outcome(row,result);}
-   if(this.rows.some(x=>open(x.receipt)))throw Error('Confirm the pending command and refresh its applied revision before submitting a dependent edit.');
+   const pending=this.pending(payload.requestId);if(pending.length)throw this.blocked(pending);
    if(this.rows.length>=100){this.rows=this.rows.filter(x=>x.receipt.state!=='APPLIED'||(x.receipt.steps||[]).some(unresolved));if(this.rows.length>=100)throw Error('Resolve pending command evidence before submitting another save.');}
    if(new Blob([canonical(payload)]).size>262144){const error=Error('This atomic save exceeds 256 KiB. Keep the draft and review its size.');error.status=413;throw error;}
    row={requestId:payload.requestId,action:payload.operation,proposalDigest:await proposalDigest(payload),payload:JSON.parse(JSON.stringify(payload)),expectedRevision:JSON.parse(JSON.stringify(expectedRevision)),issuedAt:Date.now(),receipt:{app:'deploy',requestId:payload.requestId,state:'CHECKING',saved:false,submittedAt:Date.now(),steps:[]}};this.rows.push(row);this.save();
