@@ -10,7 +10,7 @@
 
 ## Reviewed release contents
 
-Includes the eleven merged PRs #230–232 and #234–241. Muse approved the exact implementation heads and the corrected #230 and #235 heads. The owner authorised #237's reviewed handoff head `be6d09516e611921436156186dcb5be943379229` after its reconciliation against #235. All 163 product programs passed at that head. Its six-file diff, canonical build, four local Roster checks and operation probe passed, and the merge preserves its exact tree. [Merged #237](https://github.com/Gongshang-Primary/gsis/pull/237) · [Exact-head product CI](https://github.com/Gongshang-Primary/gsis/actions/runs/44742807269)
+Includes the eleven merged PRs #230–232 and #234–241. Muse approved the merged heads for #230–232, #234–236 and #238–241. The owner authorised merging #237 at handoff head `be6d09516e611921436156186dcb5be943379229` after its reconciliation against #235. All 163 product programs passed at that head. Its six-file diff, canonical build, four local Roster checks and operation probe passed, and the merge preserves its exact tree. [Merged #237](https://github.com/Gongshang-Primary/gsis/pull/237) · [Exact-head product CI](https://github.com/Gongshang-Primary/gsis/actions/runs/44742807269)
 
 The only new migration since v1.08 is the reviewed additive Core `0006_central_drive_orchestrator.sql` from #241. Its SHA-256 is `305e9f5cdb764df6b8c9b8ff682e818fcaa01ee8ff6c4797a5444e939f2cbbc4`. The two orchestrator activation switches remain off in the approved configuration. The release adds no provider credential upload or workflow changes. The standing 17 November directive covers the routine version label.
 
