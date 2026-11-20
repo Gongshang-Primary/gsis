@@ -457,19 +457,59 @@ function overlapGuard(
   end,
   ignoreId = "",
   waivedSource = false,
+  slotMode = "whole",
 ) {
+  if (venue.classSlotCapacity === null) {
+    return { sql: "SELECT 0 AS ok", args: [] };
+  }
+  const cap =
+    Number.isInteger(venue.classSlotCapacity) && venue.classSlotCapacity >= 1
+      ? venue.classSlotCapacity
+      : 1;
   const buffer = (venue.bufferMinutes || 0) * 60000;
+  if (cap === 1 || slotMode !== "slot") {
+    return {
+      sql: `SELECT NOT EXISTS(SELECT 1 FROM venues_occupancy WHERE school_id=? AND (venue_id=? OR (?<>'' AND overlap_group=?)) AND record_id<>? AND (?=0 OR kind<>'source') AND status IN ('confirmed','pending','active') AND start_at-buffer_ms<? AND end_at+buffer_ms>?) AS ok`,
+      args: [
+        s,
+        venue.id,
+        venue.overlapGroup || "",
+        venue.overlapGroup || "",
+        ignoreId,
+        Number(waivedSource),
+        end + buffer,
+        start - buffer,
+      ],
+    };
+  }
+  // Multi-slot one-slot request: reject closures, cross-venue overlapGroup uses,
+  // and any overlapping whole-venue booking on the same venue. Exact per-segment
+  // slot capacity is serialized by the venue epoch guard in the same transaction.
   return {
-    sql: `SELECT NOT EXISTS(SELECT 1 FROM venues_occupancy WHERE school_id=? AND (venue_id=? OR (?<>'' AND overlap_group=?)) AND record_id<>? AND (?=0 OR kind<>'source') AND status IN ('confirmed','pending','active') AND start_at-buffer_ms<? AND end_at+buffer_ms>?) AS ok`,
+    sql: `SELECT NOT EXISTS(
+      SELECT 1 FROM venues_occupancy o
+      LEFT JOIN venues_records r ON r.school_id=o.school_id AND r.kind='occurrences' AND r.record_id=o.record_id
+      WHERE o.school_id=?
+        AND (o.venue_id=? OR (?<>'' AND o.overlap_group=?))
+        AND o.record_id<>?
+        AND o.status IN ('confirmed','pending','active')
+        AND o.start_at-o.buffer_ms<?
+        AND o.end_at+o.buffer_ms>?
+        AND (
+          o.kind='closure'
+          OR o.venue_id<>?
+          OR (o.kind='booking' AND COALESCE(json_extract(r.data_json,'$.slotMode'),'whole')<>'slot')
+        )
+    ) AS ok`,
     args: [
       s,
       venue.id,
       venue.overlapGroup || "",
       venue.overlapGroup || "",
       ignoreId,
-      Number(waivedSource),
       end + buffer,
       start - buffer,
+      venue.id,
     ],
   };
 }
@@ -557,9 +597,14 @@ async function command(ctx, input) {
     need(
       Object.keys(fields).length &&
         Object.keys(fields).every((k) =>
-          ["name", "shortName", "capacity", "capacityBasis", "notes"].includes(
-            k,
-          ),
+          [
+            "name",
+            "shortName",
+            "capacity",
+            "capacityBasis",
+            "classSlotCapacity",
+            "notes",
+          ].includes(k),
         ),
       "FIELD_DENIED",
       "Only physical room metadata can be changed here.",
@@ -572,6 +617,13 @@ async function command(ctx, input) {
             (Number.isSafeInteger(value) && value >= 0 && value <= 100000),
           "INVALID_CAPACITY",
           "Capacity must be a non-negative integer or blank.",
+        );
+      else if (k === "classSlotCapacity")
+        need(
+          value === null ||
+            (Number.isSafeInteger(value) && value >= 1 && value <= 20),
+          "INVALID_SLOT_CAPACITY",
+          "Class slot capacity must be blank (unknown) or a whole number from 1 to 20.",
         );
       else
         need(
@@ -693,7 +745,36 @@ async function command(ctx, input) {
             const waiver = after.waivers.find(
               (w) => w.bookingId === r.id && w.active,
             );
-            guards.push(overlapGuard(s, venue, start, end, r.id, !!waiver));
+            guards.push(
+              overlapGuard(
+                s,
+                venue,
+                start,
+                end,
+                r.id,
+                !!waiver,
+                r.slotMode || "whole",
+              ),
+            );
+          }
+          if (
+            Number.isInteger(venue.classSlotCapacity) &&
+            venue.classSlotCapacity >= 2
+          ) {
+            const epochRow = await one(
+              ctx.env.DB,
+              "SELECT revision FROM venues_epochs WHERE school_id=? AND venue_id=?",
+              [s, venue.id],
+            );
+            const epoch = epochRow?.revision || 0;
+            guards.push({
+              sql: "SELECT COALESCE((SELECT revision FROM venues_epochs WHERE school_id=? AND venue_id=?),0)=? AS ok",
+              args: [s, venue.id, epoch],
+            });
+            writes.push({
+              sql: "INSERT INTO venues_epochs(school_id,venue_id,revision) VALUES(?,?,1) ON CONFLICT(school_id,venue_id) DO UPDATE SET revision=revision+1",
+              args: [s, venue.id],
+            });
           }
         }
         writes.push({
@@ -1129,39 +1210,45 @@ export async function sourceBegin(ctx) {
     ) AS ok`,
     args: [revisionsJson, x.schoolId],
   });
+  const retainConflicts =
+    proof.projection?.sourceKind === "baseline" || x.retainConflicts === true;
   if (scopes.length) {
     // Separate indexed lookups retain the original direct-or-linked rule without
     // a room-by-interval Cartesian scan. Revision guards above bind this captured
     // metadata to the same owner transaction as both conflict checks and writes.
-    guards.push(
-      {
-        sql: `SELECT NOT EXISTS(
-          SELECT 1 FROM json_each(?) AS scope
-          CROSS JOIN venues_intervals AS occupied INDEXED BY venues_intervals_overlap
-          WHERE occupied.school_id=?
-            AND occupied.venue_id=json_extract(scope.value,'$[0]')
-            AND occupied.kind IN ('booking','closure')
-            AND occupied.status IN ('confirmed','pending','active')
-            AND occupied.start_at-occupied.buffer_ms<json_extract(scope.value,'$[4]')
-            AND occupied.end_at+occupied.buffer_ms>json_extract(scope.value,'$[5]')
-        ) AS ok`,
-        args: [occupiedJson, x.schoolId],
-      },
-      {
-        sql: `SELECT NOT EXISTS(
-          SELECT 1 FROM json_each(?) AS scope
-          CROSS JOIN venues_intervals AS occupied INDEXED BY venues_intervals_linked
-          WHERE occupied.school_id=?
-            AND json_extract(scope.value,'$[3]')<>''
-            AND occupied.overlap_group=json_extract(scope.value,'$[3]')
-            AND occupied.kind IN ('booking','closure')
-            AND occupied.status IN ('confirmed','pending','active')
-            AND occupied.start_at-occupied.buffer_ms<json_extract(scope.value,'$[4]')
-            AND occupied.end_at+occupied.buffer_ms>json_extract(scope.value,'$[5]')
-        ) AS ok`,
-        args: [occupiedJson, x.schoolId],
-      },
-    );
+    // For baseline/retainConflicts timetable adoption (Owner Decision #6), held
+    // bookings are retained and flagged on completion rather than blocking import.
+    if (!retainConflicts) {
+      guards.push(
+        {
+          sql: `SELECT NOT EXISTS(
+            SELECT 1 FROM json_each(?) AS scope
+            CROSS JOIN venues_intervals AS occupied INDEXED BY venues_intervals_overlap
+            WHERE occupied.school_id=?
+              AND occupied.venue_id=json_extract(scope.value,'$[0]')
+              AND occupied.kind IN ('booking','closure')
+              AND occupied.status IN ('confirmed','pending','active')
+              AND occupied.start_at-occupied.buffer_ms<json_extract(scope.value,'$[4]')
+              AND occupied.end_at+occupied.buffer_ms>json_extract(scope.value,'$[5]')
+          ) AS ok`,
+          args: [occupiedJson, x.schoolId],
+        },
+        {
+          sql: `SELECT NOT EXISTS(
+            SELECT 1 FROM json_each(?) AS scope
+            CROSS JOIN venues_intervals AS occupied INDEXED BY venues_intervals_linked
+            WHERE occupied.school_id=?
+              AND json_extract(scope.value,'$[3]')<>''
+              AND occupied.overlap_group=json_extract(scope.value,'$[3]')
+              AND occupied.kind IN ('booking','closure')
+              AND occupied.status IN ('confirmed','pending','active')
+              AND occupied.start_at-occupied.buffer_ms<json_extract(scope.value,'$[4]')
+              AND occupied.end_at+occupied.buffer_ms>json_extract(scope.value,'$[5]')
+          ) AS ok`,
+          args: [occupiedJson, x.schoolId],
+        },
+      );
+    }
   }
   // Reference markers precede occupancies exactly as before. Explicit array
   // order preserves INSERT OR IGNORE's winner for equal room/start identities.
@@ -1421,10 +1508,86 @@ export async function sourceComplete(ctx) {
       ],
     });
   }
+  const conflictedBookingIds = [];
+  if (
+    sourceCommitted &&
+    scopes.length &&
+    (proof.projection?.sourceKind === "baseline" || x.retainConflicts === true)
+  ) {
+    const affectedVenueIds = [...new Set(scopes.map((r) => r.venueId))];
+    const [venueRows, bookingRows] = await Promise.all([
+      query(
+        ctx.env.DB,
+        "SELECT record_id, data_json FROM venues_records WHERE school_id=? AND kind='venues' AND record_id IN (SELECT value FROM json_each(?))",
+        [x.schoolId, JSON.stringify(affectedVenueIds)],
+      ),
+      query(
+        ctx.env.DB,
+        "SELECT record_id, revision, service_date, venue_id, status, data_json FROM venues_records WHERE school_id=? AND kind='occurrences' AND status IN ('confirmed','pending') AND venue_id IN (SELECT value FROM json_each(?))",
+        [x.schoolId, JSON.stringify(affectedVenueIds)],
+      ),
+    ]);
+    const venuesById = new Map(
+      venueRows.map((row) => [row.record_id, parse(row)]),
+    );
+    for (const bRow of bookingRows) {
+      const booking = parse(bRow);
+      const v = venuesById.get(bRow.venue_id);
+      if (!v) continue;
+      const cap =
+        v.classSlotCapacity === null
+          ? null
+          : Number.isInteger(v.classSlotCapacity) && v.classSlotCapacity >= 1
+            ? v.classSlotCapacity
+            : 1;
+      const buf = (v.bufferMinutes || 0) * 60000;
+      const slotMode = booking.slotMode === "slot" ? "slot" : "whole";
+      const reqDemand = cap === null ? 1 : slotMode === "slot" ? 1 : cap;
+      const overlappingScopes = scopes.filter(
+        (sc) =>
+          sc.venueId === bRow.venue_id &&
+          (booking.intervals || []).some((iv) => {
+            const bStart = absolute(booking.date, iv.start) - buf;
+            const bEnd = absolute(booking.date, iv.end) + buf;
+            return bStart < sc.end + buf && sc.start - buf < bEnd;
+          }),
+      );
+      if (!overlappingScopes.length) continue;
+      // Check whether incoming timetable demand + booking demand exceeds classSlotCapacity
+      const exceeds =
+        cap === null ||
+        overlappingScopes.length + reqDemand > cap;
+      if (!exceeds) continue;
+      const updated = {
+        ...booking,
+        revision: (booking.revision || bRow.revision) + 1,
+        updatedAt: ctx.now,
+        sourceConflict: {
+          status: "unresolved",
+          reason: "timetable",
+          sourceDomain: x.sourceDomain,
+          sourceOperationId: x.sourceOperationId,
+          generation: String(sequence),
+          flaggedAt: ctx.now,
+          conflicts: overlappingScopes.map((sc) => ({
+            kind: "timetable",
+            sourceId: sc.sourceId,
+          })),
+        },
+      };
+      guards.push(rowGuard(x.schoolId, "occurrences", bRow.record_id, bRow));
+      writes.push({
+        sql: "UPDATE venues_records SET revision=?, data_json=? WHERE school_id=? AND kind='occurrences' AND record_id=?",
+        args: [updated.revision, canonical(updated), x.schoolId, bRow.record_id],
+      });
+      conflictedBookingIds.push(bRow.record_id);
+    }
+  }
   const result = {
     state: sourceCommitted ? "adopted" : "aborted",
     sourceOperationId: x.sourceOperationId,
     revision: sourceCommitted ? String(sequence) : head?.revision || null,
+    ...(conflictedBookingIds.length ? { conflictedBookingIds } : {}),
   };
   writes.push({
     sql: "UPDATE venues_source_fences SET state=?,resolved_at=?,receipt_json=? WHERE school_id=? AND source_domain=? AND source_operation_id=?",

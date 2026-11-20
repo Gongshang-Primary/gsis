@@ -1,7 +1,7 @@
 import { ApiError } from "../../runtime/errors.mjs";
 
 export const REGISTER_COLUMNS = [
-  "id", "unit", "name", "shortName", "capacity", "capacityBasis", "notes", "revision",
+  "id", "unit", "name", "shortName", "capacity", "capacityBasis", "classSlotCapacity", "notes", "revision",
   "bookable", "special", "approvalMode", "open", "close", "bufferMinutes", "overlapGroup", "features", "aliases",
 ];
 const own = (value, key) => Object.prototype.hasOwnProperty.call(value, key);
@@ -12,7 +12,7 @@ const text = (value, field, max = 300, required = false) => {
   check(typeof value === "string" && value.length <= max && (!required || value.trim()), `${field} must be ${required ? "nonempty " : ""}text, at most ${max} characters.`);
   return value;
 };
-const defaults = {shortName: "", capacity: null, capacityBasis: "", notes: "", bookable: false, special: false, approvalMode: "immediate", open: "07:00", close: "18:00", bufferMinutes: 0, overlapGroup: "", features: [], aliases: []};
+const defaults = {shortName: "", capacity: null, capacityBasis: "", classSlotCapacity: 1, notes: "", bookable: false, special: false, approvalMode: "immediate", open: "07:00", close: "18:00", bufferMinutes: 0, overlapGroup: "", features: [], aliases: []};
 
 function workbookRows(workbook, schoolId) {
   check(workbook?.schemaVersion === 1 && workbook.metadata?.schemaVersion === 1 && workbook.metadata?.module === "venues-register" && workbook.metadata?.mode === "editable", "Use the physical room register workbook exported by Venues.");
@@ -25,6 +25,7 @@ function workbookRows(workbook, schoolId) {
     check(row.length === REGISTER_COLUMNS.length, "A room row has the wrong number of cells.");
     const result = Object.fromEntries(REGISTER_COLUMNS.map((key, i) => [key, row[i]]));
     for (const key of ["shortName", "capacityBasis", "notes", "overlapGroup"]) result[key] ??= "";
+    if (result.classSlotCapacity === "") result.classSlotCapacity = null;
     for (const key of ["features", "aliases"]) {
       check(result[key] === null || typeof result[key] === "string", `${key} must contain one value per line.`);
       result[key] = String(result[key] || "").split(/\r?\n/).map(value => value.trim()).filter(Boolean);
@@ -55,6 +56,7 @@ export function prepareRegisterImport(input, current, schoolId) {
     text(value.overlapGroup, "overlapGroup", 100);
     text(value.notes, "Notes", 2000);
     check(value.capacity === null || Number.isSafeInteger(value.capacity) && value.capacity >= 0 && value.capacity <= 100000, "Capacity must be blank or a whole number from 0 to 100000.", "INVALID_CAPACITY");
+    check(value.classSlotCapacity === null || Number.isSafeInteger(value.classSlotCapacity) && value.classSlotCapacity >= 1 && value.classSlotCapacity <= 20, "Class slot capacity must be blank (unknown) or a whole number from 1 to 20.", "INVALID_SLOT_CAPACITY");
     check(typeof value.bookable === "boolean" && typeof value.special === "boolean", "Bookable and special must be true or false.");
     check(["immediate", "approval"].includes(value.approvalMode), "Approval mode must be immediate or approval.");
     check([value.open, value.close].every(t => typeof t === "string" && /^(?:[01]\d|2[0-3]):[0-5]\d$/.test(t)) && value.open < value.close, "Opening and closing times must be ordered HH:MM values.");

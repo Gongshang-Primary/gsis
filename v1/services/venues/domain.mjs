@@ -33,6 +33,7 @@ export const VenuesDomain = (() => {
     "saveClosure",
     "sync",
     "notificationDecision",
+    "resolveConflict",
   ];
   const copy = (x) => JSON.parse(JSON.stringify(x));
   const fail = (code, message, status = 409, conflicts) => {
@@ -303,44 +304,141 @@ export const VenuesDomain = (() => {
       });
     });
   }
-  function conflicts(s, v, d, ints, ignore, waiver) {
-    const hits = timetableConflicts(s, v, d, ints, waiver).map((t) => ({
-      kind: "timetable",
-      sourceId: t.sourceId,
-    }));
-    for (const o of s.occurrences)
-      if (
-        o.id !== ignore &&
-        held(o) &&
-        o.date === d &&
-        related(s, v.id, o.venueId) &&
-        ints.some((i) =>
-          o.intervals.some((j) =>
-            intersects(
-              i,
-              j,
-              v.bufferMinutes || 0,
-              (s.venues.find((x) => x.id === o.venueId) || {}).bufferMinutes ||
-                0,
-            ),
-          ),
-        )
-      )
-        hits.push({ kind: "booking", id: o.id, status: o.status });
+  function resolveSlotCapacity(v) {
+    if (!v) return null;
+    if (v.classSlotCapacity === null) return null;
+    if (Number.isInteger(v.classSlotCapacity) && v.classSlotCapacity >= 1) {
+      return v.classSlotCapacity;
+    }
+    return 1;
+  }
+  function normalizeSlotMode(value) {
+    if (value === undefined || value === null || value === "") return "whole";
+    assert(
+      value === "whole" || value === "slot",
+      "INVALID_SLOT_MODE",
+      "Slot mode must be whole or slot.",
+      400,
+    );
+    return value;
+  }
+  function segmentPeakDemand(interval, buffer, uses) {
+    const reqStart = interval.start - buffer;
+    const reqEnd = interval.end + buffer;
+    const events = [];
+    for (const u of uses) {
+      const s = Math.max(reqStart, u.start - u.buffer);
+      const e = Math.min(reqEnd, u.end + u.buffer);
+      if (s < e) {
+        events.push([s, u.demand], [e, -u.demand]);
+      }
+    }
+    if (!events.length) return 0;
+    // Process interval ends (-demand) before starts (+demand) at identical timestamps
+    // so adjacent intervals do not falsely add up.
+    events.sort((a, b) => (a[0] !== b[0] ? a[0] - b[0] : a[1] - b[1]));
+    let activeDemand = 0;
+    let peak = 0;
+    for (const [, delta] of events) {
+      activeDemand += delta;
+      if (activeDemand > peak) peak = activeDemand;
+    }
+    return peak;
+  }
+  function conflicts(s, v, d, ints, ignore, waiver, requestedSlotMode = "whole") {
+    const cap = resolveSlotCapacity(v);
+    const hits = [];
+    const buffer = v.bufferMinutes || 0;
+    const slotMode = normalizeSlotMode(requestedSlotMode);
+
+    // Closures always block regardless of slot capacity.
     for (const q of s.closures)
       if (
         q.active &&
         q.from <= d &&
         q.to >= d &&
         related(s, v.id, q.venueId) &&
-        ints.some((i) => intersects(i, q, v.bufferMinutes || 0, 0))
+        ints.some((i) => intersects(i, q, buffer, 0))
       )
         hits.push({ kind: "closure", id: q.id });
+
+    // Unknown class-slot capacity is never represented as free.
+    if (cap === null) {
+      hits.push({ kind: "capacityUnknown", venueId: v.id });
+      return hits;
+    }
+
+    const reqDemand = slotMode === "slot" ? 1 : cap;
+    const ttHits = timetableConflicts(s, v, d, ints, waiver);
+    const sameVenueUses = [];
+    const sameVenueTimetable = [];
+    const sameVenueBookings = [];
+
+    for (const t of ttHits) {
+      if (t.venueId !== v.id) {
+        hits.push({ kind: "timetable", sourceId: t.sourceId });
+      } else {
+        sameVenueTimetable.push(t);
+        sameVenueUses.push({
+          start: t.start,
+          end: t.end,
+          buffer,
+          demand: Number.isInteger(t.slotDemand) && t.slotDemand >= 1 ? t.slotDemand : 1,
+        });
+      }
+    }
+
+    for (const o of s.occurrences) {
+      if (
+        o.id !== ignore &&
+        held(o) &&
+        o.date === d &&
+        related(s, v.id, o.venueId)
+      ) {
+        const otherBuffer =
+          (s.venues.find((x) => x.id === o.venueId) || {}).bufferMinutes || 0;
+        const overlaps = ints.some((i) =>
+          o.intervals.some((j) => intersects(i, j, buffer, otherBuffer)),
+        );
+        if (!overlaps) continue;
+        if (o.venueId !== v.id) {
+          hits.push({ kind: "booking", id: o.id, status: o.status });
+        } else {
+          sameVenueBookings.push(o);
+          const bookingDemand = o.slotMode === "slot" ? 1 : cap;
+          for (const j of o.intervals) {
+            sameVenueUses.push({
+              start: j.start,
+              end: j.end,
+              buffer: otherBuffer,
+              demand: bookingDemand,
+            });
+          }
+        }
+      }
+    }
+
+    const exceedsCapacity = ints.some(
+      (i) => segmentPeakDemand(i, buffer, sameVenueUses) + reqDemand > cap,
+    );
+    if (exceedsCapacity) {
+      for (const t of sameVenueTimetable)
+        hits.push({ kind: "timetable", sourceId: t.sourceId });
+      for (const o of sameVenueBookings)
+        hits.push({ kind: "booking", id: o.id, status: o.status });
+    }
     return hits;
   }
-  function available(s, v, d, ints, c, ignore, waiver) {
+  function available(s, v, d, ints, c, ignore, waiver, requestedSlotMode = "whole") {
     validateSlot(s, v, d, ints, c);
-    const hits = conflicts(s, v, d, ints, ignore, waiver);
+    const hits = conflicts(s, v, d, ints, ignore, waiver, requestedSlotMode);
+    if (hits.some((h) => h.kind === "capacityUnknown"))
+      fail(
+        "UNKNOWN_SLOT_CAPACITY",
+        "Room class-slot capacity is unknown; configure it before booking.",
+        409,
+        hits,
+      );
     if (hits.length)
       fail("CONFLICT", "The requested room is occupied or closed.", 409, hits);
   }
@@ -409,7 +507,19 @@ export const VenuesDomain = (() => {
     r.revision++;
     r.updatedAt = c.now;
   }
-  function occurrence(s, c, a, v, d, ids, ints, status, note, seriesId) {
+  function occurrence(
+    s,
+    c,
+    a,
+    v,
+    d,
+    ids,
+    ints,
+    status,
+    note,
+    seriesId,
+    slotMode = "whole",
+  ) {
     return {
       id: c.uuid(),
       seriesId: seriesId || "",
@@ -417,6 +527,7 @@ export const VenuesDomain = (() => {
       date: d,
       periodIds: ids.slice(),
       intervals: copy(ints),
+      slotMode: normalizeSlotMode(slotMode),
       requesterId: a.id,
       ownerId: a.id,
       requesterName: a.name,
@@ -445,9 +556,15 @@ export const VenuesDomain = (() => {
       const v = s.venues.find((v) => v.id === o.venueId);
       const waiver = s.waivers.find((w) => w.bookingId === o.id && w.active);
       const hits = v
-        ? conflicts(s, v, o.date, o.intervals, o.id, waiver).filter(
-            (x) => x.kind !== "booking",
-          )
+        ? conflicts(
+            s,
+            v,
+            o.date,
+            o.intervals,
+            o.id,
+            waiver,
+            o.slotMode || "whole",
+          ).filter((x) => x.kind !== "booking")
         : [{ kind: "venue" }];
       if (hits.length) {
         o.status = "displaced";
@@ -476,6 +593,53 @@ export const VenuesDomain = (() => {
             ]);
           }
         for (const w of s.waivers) if (w.bookingId === o.id) w.active = false;
+      }
+    }
+    return changed;
+  }
+  function flagTimetableConflicts(s, c, a) {
+    // Owner Decision #6: retain conflicting held bookings with explicit unresolved
+    // conflict status rather than silently displacing, cancelling or moving them.
+    const changed = [];
+    for (const o of s.occurrences) {
+      if (!held(o)) continue;
+      const v = s.venues.find((v) => v.id === o.venueId);
+      const waiver = s.waivers.find((w) => w.bookingId === o.id && w.active);
+      const hits = v
+        ? conflicts(
+            s,
+            v,
+            o.date,
+            o.intervals,
+            o.id,
+            waiver,
+            o.slotMode || "whole",
+          ).filter(
+            (x) => x.kind === "timetable" || x.kind === "capacityUnknown",
+          )
+        : [{ kind: "venue" }];
+      if (hits.length) {
+        o.sourceConflict = {
+          status: "unresolved",
+          reason: "timetable",
+          generation: s.source.generation,
+          flaggedAt: c.now,
+          conflicts: hits,
+        };
+        mutate(o, c);
+        changed.push(o);
+        audit(s, c, a, "sourceConflictFlagged", o.id, {
+          reason: "timetable",
+          sourceGeneration: s.source.generation,
+          conflictCount: hits.length,
+        });
+      } else if (o.sourceConflict) {
+        delete o.sourceConflict;
+        mutate(o, c);
+        changed.push(o);
+        audit(s, c, a, "sourceConflictCleared", o.id, {
+          sourceGeneration: s.source.generation,
+        });
       }
     }
     return changed;
@@ -532,7 +696,8 @@ export const VenuesDomain = (() => {
       ready(s, c);
     if (op === "book") {
       const v = row(s.venues, x.venueId),
-        ints = intervals(s, x.periodIds);
+        ints = intervals(s, x.periodIds),
+        slotMode = normalizeSlotMode(x.slotMode);
       text(x.note === undefined ? "" : x.note);
       assert(
         Array.isArray(x.dates) &&
@@ -548,7 +713,15 @@ export const VenuesDomain = (() => {
       const skip = [],
         admit = [];
       for (const d of dates) {
-        const hits = conflicts(s, v, d, ints);
+        const hits = conflicts(s, v, d, ints, undefined, undefined, slotMode);
+        if (hits.some((h) => h.kind === "capacityUnknown")) {
+          fail(
+            "UNKNOWN_SLOT_CAPACITY",
+            "Room class-slot capacity is unknown; configure it before booking.",
+            409,
+            [{ date: d, conflicts: hits }],
+          );
+        }
         if (hits.length) {
           if (x.availableOnly === true) skip.push({ date: d, conflicts: hits });
           else
@@ -575,6 +748,7 @@ export const VenuesDomain = (() => {
           to: dates[dates.length - 1],
           dates: admit,
           periodIds: x.periodIds.slice(),
+          slotMode,
           note: x.note || "",
           createdAt: c.now,
           revision: 1,
@@ -596,10 +770,11 @@ export const VenuesDomain = (() => {
           status,
           x.note || "",
           seriesId,
+          slotMode,
         );
         s.occurrences.push(o);
         changed.push(o);
-        audit(s, c, a, "book", o.id, { status });
+        audit(s, c, a, "book", o.id, { status, slotMode });
         notify(s, c, "booked", o);
       });
       s._skipped = skip;
@@ -644,16 +819,26 @@ export const VenuesDomain = (() => {
       );
       const old = copy(o);
       if (x.note !== undefined) o.note = text(x.note);
-      if (x.date !== undefined || x.periodIds !== undefined) {
+      if (
+        x.date !== undefined ||
+        x.periodIds !== undefined ||
+        x.slotMode !== undefined
+      ) {
         const v = row(s.venues, o.venueId),
           d = x.date === undefined ? o.date : x.date,
           ids = x.periodIds === undefined ? o.periodIds : x.periodIds,
-          ints = intervals(s, ids);
-        available(s, v, d, ints, c, o.id);
+          ints = intervals(s, ids),
+          nextSlotMode =
+            x.slotMode === undefined
+              ? o.slotMode || "whole"
+              : normalizeSlotMode(x.slotMode);
+        available(s, v, d, ints, c, o.id, undefined, nextSlotMode);
         o.date = d;
         o.periodIds = ids.slice();
         o.intervals = ints;
+        o.slotMode = nextSlotMode;
         o.sourceGeneration = s.source.generation;
+        if (o.sourceConflict) delete o.sourceConflict;
         if (
           v.approvalMode === "approval" ||
           (o.seriesId &&
@@ -667,6 +852,48 @@ export const VenuesDomain = (() => {
       changed.push(o);
       audit(s, c, a, "amend", o.id, { before: old });
       notify(s, c, "amended", o);
+    } else if (op === "resolveConflict") {
+      const o = row(s.occurrences, x.id);
+      revision(o, x.revision);
+      own(s, a, o, c);
+      assert(
+        held(o),
+        "INVALID_STATE",
+        "Only a held booking conflict can be resolved.",
+      );
+      const v = row(s.venues, o.venueId);
+      const waiver = s.waivers.find((w) => w.bookingId === o.id && w.active);
+      const hits = conflicts(
+        s,
+        v,
+        o.date,
+        o.intervals,
+        o.id,
+        waiver,
+        o.slotMode || "whole",
+      );
+      if (hits.some((h) => h.kind === "capacityUnknown")) {
+        fail(
+          "UNKNOWN_SLOT_CAPACITY",
+          "Room class-slot capacity is unknown; conflict cannot be resolved as free.",
+          409,
+          hits,
+        );
+      }
+      if (hits.length) {
+        fail(
+          "CONFLICT",
+          "This booking still conflicts with the current timetable or occupancy. Amend or cancel it first.",
+          409,
+          hits,
+        );
+      }
+      delete o.sourceConflict;
+      mutate(o, c);
+      changed.push(o);
+      audit(s, c, a, "conflictResolved", o.id, {
+        sourceGeneration: s.source.generation,
+      });
     } else if (op === "cancel" || op === "decide") {
       assert(
         Array.isArray(x.ids) &&
@@ -1007,6 +1234,18 @@ export const VenuesDomain = (() => {
       }
       if (p.overlapGroup !== undefined)
         v.overlapGroup = text(p.overlapGroup, 100);
+      if (p.classSlotCapacity !== undefined) {
+        assert(
+          p.classSlotCapacity === null ||
+            (Number.isInteger(p.classSlotCapacity) &&
+              p.classSlotCapacity >= 1 &&
+              p.classSlotCapacity <= 20),
+          "INVALID_SLOT_CAPACITY",
+          "Class slot capacity must be null (unknown) or a whole number from 1 to 20.",
+          400,
+        );
+        v.classSlotCapacity = p.classSlotCapacity;
+      }
       if (
         p.aliases !== undefined &&
         stable(p.aliases) !== stable(v.aliases || [])
@@ -1543,6 +1782,14 @@ export const VenuesDomain = (() => {
           (o) => o.status === "displaced" && scoped(o.venueId),
         ),
       ),
+      conflicted: copy(
+        s.occurrences.filter(
+          (o) =>
+            held(o) &&
+            o.sourceConflict?.status === "unresolved" &&
+            scoped(o.venueId),
+        ),
+      ),
       deliveryFailures: s.outbox
         .filter(
           (n) =>
@@ -1781,7 +2028,7 @@ export const VenuesDomain = (() => {
           unchangedDate(t.date, t.venueId)
         )
           t.sourceGeneration = s.source.generation;
-      changed = displace(s, c, system, "timetable", changedTransfers);
+      changed = flagTimetableConflicts(s, c, system);
       audit(s, c, system, "sourceActivated", s.source.generation);
       if (changed.length) s.revision++;
     }
