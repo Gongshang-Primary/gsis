@@ -1,6 +1,7 @@
 import defaults from "./defaults.mjs";
 import { googleConfigured } from "../../runtime/google-drive-credential.mjs";
 import { tableWorkbook, previewTableImport, applyTableImport } from "./table-import.mjs";
+import { previewBulkImport, applyBulkImport } from "./bulk-import.mjs";
 import {
   acquireSourcePin,
   releaseSourcePin,
@@ -41,6 +42,7 @@ const READS = new Set([
   "mutationReceipts",
   "tableWorkbook",
   "tableImportPreview",
+  "importEventsPreview",
 ]);
 const WRITES = new Set([
   "saveEvent",
@@ -67,6 +69,7 @@ const WRITES = new Set([
   "saveDayNote",
   "pullBirthdays",
   "tableImportApply",
+  "importEventsApply",
 ]);
 const EVENT_FIELDS = [
   "Year",
@@ -2226,13 +2229,17 @@ export async function handle(ctx) {
   }
   if (action === "tableWorkbook") return tableWorkbook(ctx, p);
   if (action === "tableImportPreview") return previewTableImport(ctx, p);
+  if (action === "importEventsPreview")
+    return previewBulkImport(ctx, p, { validateEvent });
   if (action === "calendarWipePreview") return externalWipePreview(ctx, p);
   if (action === "calendarWipeBatch") return externalWipeStatus(ctx, p);
   if (action === "archiveYearsPreview") return preview(ctx, "archive", p);
   need(WRITES.has(action), "NOT_FOUND", "Unknown Calendar operation.", 404);
   const op = await start(ctx, action, p);
-  if (op.state === "committed") return action === "generateYearStructure"
-    ? { ...op.receipt.result, receipt: op.receipt } : op.receipt.result;
+  if (op.state === "committed")
+    return action === "generateYearStructure" || action === "importEventsApply"
+      ? { ...op.receipt.result, receipt: op.receipt }
+      : op.receipt.result;
   need(
     op.state === "prepared",
     "OPERATION_ABORTED",
@@ -2246,6 +2253,13 @@ export async function handle(ctx) {
   )
     return eventMutation(ctx, op, action, p);
   if (action === "tableImportApply") return applyTableImport(ctx, op, p, { metadataPlan, finish });
+  if (action === "importEventsApply")
+    return applyBulkImport(ctx, op, p, {
+      validateEvent,
+      eventWrite,
+      syncIntents,
+      finish,
+    });
   if (META[action]) return metadataMutation(ctx, op, action, p);
   if (action === "saveYear") return saveYear(ctx, op, p);
   if (action === "publishVersion") return publishYear(ctx, op, p);
