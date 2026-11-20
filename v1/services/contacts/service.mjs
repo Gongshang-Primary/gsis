@@ -27,6 +27,10 @@ import {
   writeOrdinaryField,
 } from "./catalogues.mjs";
 import {
+  publishHrTermsFromDeploy,
+  readPublishedHrTerms,
+} from "./hr-terms-publish.mjs";
+import {
   birthdayIntents,
   dispatchContactsJobs,
   readCalendarBirthdays,
@@ -114,7 +118,7 @@ function canManage(p) {
 export function policy(method, path, body = {}) {
   if (
     (method === "GET" &&
-      ["/bootstrap", "/data", "/deployment", "/staff", "/diy"].includes(
+      ["/bootstrap", "/data", "/deployment", "/staff", "/diy", "/hr-terms"].includes(
         path,
       )) ||
     (method === "GET" && /^\/staff\/[^/]+$/.test(path))
@@ -807,6 +811,7 @@ export async function handle(ctx) {
   if (ctx.internal) {
     if (path === "/internal/membership-publication") return membershipPublication(ctx);
     if (path === "/internal/membership-apply") return applyMembershipPublication(ctx);
+    if (path === "/internal/hr-terms-publication") return publishHrTermsFromDeploy(ctx);
     if (path === "/internal/birthday-event") {
       fail(body.schoolId === env.SCHOOL_ID, "SCHOOL_MISMATCH", 403);
       const job = await one(
@@ -1264,6 +1269,9 @@ export async function handle(ctx) {
   if (path === "/save-receipt") return gridReceipt(ctx);
   if (["/save-data", "/save-diy"].includes(path) && Array.isArray(body.changes))
     return saveGrid(ctx);
+  if (method === "GET" && path === "/hr-terms") {
+    return readPublishedHrTerms(ctx);
+  }
   if (path === "/diy") {
     const options = { schoolDomain: env.HOSTED_DOMAIN },
       personRaw = publicStaff(
