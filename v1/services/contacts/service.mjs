@@ -1932,6 +1932,17 @@ export async function handle(ctx) {
           },
         });
         await resolveAdmission(env, env.DB, op, admission, r, now);
+        if (
+          accepted ||
+          publicationAuthority ||
+          Object.hasOwn(applyChanges, "active") ||
+          Object.hasOwn(applyChanges, "employmentActive")
+        ) {
+          await serviceCall(env, "core", "/internal/authority-cache/invalidate", {
+            schoolId: env.SCHOOL_ID,
+            staffId,
+          }).catch(() => undefined);
+        }
         return r;
       } catch (e) {
         if (
