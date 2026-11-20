@@ -1,5 +1,10 @@
 import {sealDecisionEvidence,recoverDecisionEvidence,recordFinalDenial} from "./evidence.mjs";
 import { driveConnection, internalHelperToken } from "./drive-connection.mjs";
+import {
+  handleCentralBackups,
+  runCentralBackupCycle,
+  centralBackupEnabled,
+} from "./drive-backup-orchestrator.mjs";
 import { authorizeContribution } from "./contributions.mjs";
 import { ApiError } from "../../runtime/errors.mjs";
 import {
@@ -729,6 +734,7 @@ export async function handle(ctx) {
   env.SERVICE_NAME ??= "core";
   if (ctx.internal && path === "/internal/google-helper-access") return internalHelperToken(ctx);
   if (!ctx.internal && path.startsWith("/admin/google-connection")) return driveConnection(ctx);
+  if (!ctx.internal && path.startsWith("/admin/backups")) return handleCentralBackups(ctx);
   if (ctx.internal) {
     if (path === "/internal/contribution-authority")
       return authorizeContribution(env, body, now);
@@ -1901,4 +1907,9 @@ export async function handle(ctx) {
     return result;
   }
   throw new ApiError("NOT_FOUND", 404, "Unknown Core operation.");
+}
+
+export async function scheduled({ env, now }) {
+  if (centralBackupEnabled(env)) return runCentralBackupCycle(env, now);
+  return { enabled: false, state: "disabled", processed: 0 };
 }

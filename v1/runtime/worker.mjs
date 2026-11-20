@@ -10,6 +10,15 @@ import { secretEquals, verifyWebhook } from "./providers.mjs";
 import { systemPolicy, systemHandle } from "./operations.mjs";
 import { outboxHealth } from "./jobs.mjs";
 import { runDriveBackups } from "./drive-backup-jobs.mjs";
+import { sha256Bytes } from "./drive-backup.mjs";
+import {
+  listBackupDatasets,
+  buildBackupDataset,
+  encodeBackupWorkbook,
+} from "./drive-backup-data.mjs";
+const MAX_BACKUP_ARTIFACT_BYTES = 8 * 1024 * 1024;
+const XLSX_MIME =
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 const DOMAINS = [
   "core",
   "contacts",
@@ -180,6 +189,100 @@ export function domainWorker(service, module) {
                   Date.now(),
                 );
             await resolveAdmission(env, env.DB, op, null, value, Date.now());
+          } else if (path === "/internal/backup-datasets") {
+            if (body.schoolId !== env.SCHOOL_ID)
+              throw new ApiError("SCHOOL_MISMATCH", 403);
+            const datasets = await listBackupDatasets(env);
+            value = {
+              owner: service,
+              schoolId: env.SCHOOL_ID,
+              datasets: datasets.map((d) => ({
+                id: d.id,
+                name: d.name,
+                mimeType: d.mimeType || XLSX_MIME,
+                extension: d.extension || "xlsx",
+                importable: !!d.importable,
+              })),
+            };
+          } else if (path === "/internal/backup-export") {
+            if (body.schoolId !== env.SCHOOL_ID)
+              throw new ApiError("SCHOOL_MISMATCH", 403);
+            const datasets = await listBackupDatasets(env);
+            const def = datasets.find((d) => d.id === body.dataset);
+            if (!def) throw new ApiError("BACKUP_DATASET_NOT_FOUND", 404);
+            const observedAt =
+              Number.isSafeInteger(body.now) && body.now > 0 ? body.now : now;
+            const source = await buildBackupDataset(env, def, observedAt);
+            const bytes =
+              source.bytes || (await encodeBackupWorkbook(source.book));
+            if (
+              !(bytes instanceof Uint8Array) ||
+              bytes.length > MAX_BACKUP_ARTIFACT_BYTES
+            )
+              throw new ApiError("DRIVE_BACKUP_BOUNDS", 413);
+            const sha256 = await sha256Bytes(bytes);
+            const ext = /^[a-z0-9]{1,12}$/.test(def.extension || "xlsx")
+              ? def.extension || "xlsx"
+              : "xlsx";
+            const safeDataset = String(def.id).replace(/[^A-Za-z0-9._-]/g, "_");
+            const artifactKey = `schools/${env.SCHOOL_ID}/central-backup/${safeDataset}/${sha256}.${ext}`;
+            if (!env.ARTIFACTS?.put)
+              throw new ApiError("STORAGE_UNAVAILABLE", 503);
+            await env.ARTIFACTS.put(artifactKey, bytes);
+            value = {
+              owner: service,
+              schoolId: env.SCHOOL_ID,
+              dataset: def.id,
+              name: def.name,
+              sourceDigest: source.sourceDigest,
+              sha256,
+              bytes: bytes.length,
+              artifactKey,
+              mimeType: def.mimeType || XLSX_MIME,
+              extension: ext,
+              importable: !!def.importable,
+              observedAt,
+            };
+          } else if (path === "/internal/backup-artifact") {
+            if (body.schoolId !== env.SCHOOL_ID)
+              throw new ApiError("SCHOOL_MISMATCH", 403);
+            const prefix = `schools/${env.SCHOOL_ID}/central-backup/`;
+            if (
+              typeof body.artifactKey !== "string" ||
+              !body.artifactKey.startsWith(prefix) ||
+              body.artifactKey.includes("..") ||
+              !/^schools\/[A-Za-z0-9._-]+\/central-backup\/[A-Za-z0-9._-]+\/[a-f0-9]{64}\.[a-z0-9]{1,12}$/.test(
+                body.artifactKey,
+              ) ||
+              typeof body.sha256 !== "string" ||
+              !/^[a-f0-9]{64}$/.test(body.sha256)
+            )
+              throw new ApiError("DRIVE_BACKUP_ARTIFACT_INVALID", 400);
+            if (!env.ARTIFACTS?.get)
+              throw new ApiError("STORAGE_UNAVAILABLE", 503);
+            const obj = await env.ARTIFACTS.get(body.artifactKey);
+            if (!obj) throw new ApiError("DRIVE_BACKUP_ARTIFACT_MISSING", 404);
+            if (obj.size > MAX_BACKUP_ARTIFACT_BYTES)
+              throw new ApiError("DRIVE_BACKUP_BOUNDS", 413);
+            const bytes = new Uint8Array(await obj.arrayBuffer());
+            if (
+              bytes.length > MAX_BACKUP_ARTIFACT_BYTES ||
+              (await sha256Bytes(bytes)) !== body.sha256
+            )
+              throw new ApiError("DRIVE_BACKUP_ARTIFACT_INTEGRITY", 409);
+            value = new Response(bytes, {
+              status: 200,
+              headers: {
+                "content-type":
+                  typeof body.mimeType === "string" && body.mimeType
+                    ? body.mimeType
+                    : "application/octet-stream",
+                "x-gsis-sha256": body.sha256,
+                "x-gsis-bytes": String(bytes.length),
+                "cache-control": "no-store",
+                "x-content-type-options": "nosniff",
+              },
+            });
           } else value = await (module.internal ?? module.handle)(ctx);
         } else {
           const system = path.startsWith("/system/");
