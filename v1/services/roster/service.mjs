@@ -1,4 +1,5 @@
 import { statisticsReport } from "./statistics.mjs";
+import { createRosterContact } from "./contact-create.mjs";
 import {updateCapacityWarnings,refreshCapacityMessage,refreshNewSummaries,capacityTemplateData} from "./capacity-notifications.mjs";
 import { forecastCapacity, layeredHealth } from "./capacity.mjs";
 import { allocationSnapshot } from "./allocation-snapshot.mjs";
@@ -167,6 +168,7 @@ const writes = new Set([
   "inboxReply",
   "inboxAssign",
   "inboxSetHandled",
+  "contactCreate",
 ]);
 const leaseOperations = new Map([
   ["acquireStaplerLock", "acquire"],
@@ -1772,6 +1774,8 @@ async function operations(ctx) {
     configRevision = await scopeRevision(ctx.env.DB, schoolId, "config"),
     loaded = await loadState(ctx.env.DB, schoolId, range, { recordIds: ids });
   loaded.state.revision = revision;
+  if (opName === "contactCreate")
+    return createRosterContact(ctx, { revision, date: range.from });
   if (opName === "receiptStatus") {
     const op = await operationStatus(
       ctx.env.DB,
