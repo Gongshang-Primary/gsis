@@ -11,6 +11,11 @@ import {
   prepareSaveAbsenceClashCheck,
   queueAbsenceIntakeClash,
 } from "./absence-clash.mjs";
+import {
+  handleDeliveryReviewOperation,
+  handleWhatsappMediaRoute,
+  handleWhatsappReportRoute,
+} from "./delivery-review.mjs";
 import Stapler from "../../../shared/roster-stapler.js";
 import {
   exportDrive,
@@ -107,6 +112,7 @@ const reads = new Set([
   "inboxTemplates",
   "archivedItem",
   "archiveItems",
+  "deliveryReview",
 ]);
 const ownWrites = new Set([
   "saveAbsence",
@@ -129,6 +135,7 @@ const adminWrites = new Set([
   "deleteNameBridge",
   "saveDailyEmploymentSettings",
   "prune",
+  "cancelPendingNotifications",
 ]);
 const stapleWrites = new Set([
   "createStapler",
@@ -177,6 +184,7 @@ const writes = new Set([
   "inboxAssign",
   "inboxSetHandled",
   "contactCreate",
+  "dismissDeliveryIssues",
 ]);
 const leaseOperations = new Map([
   ["acquireStaplerLock", "acquire"],
@@ -301,6 +309,18 @@ export function policy(method, path, body = {}) {
       action: "roster.read",
       write: false,
       resourceId: body.operationId,
+    };
+  if (path.startsWith("/whatsapp/reports/"))
+    return {
+      action: "roster.read",
+      write: false,
+      resourceId: path.slice("/whatsapp/reports/".length) || "report",
+    };
+  if (path.startsWith("/whatsapp/media/"))
+    return {
+      action: "roster.read",
+      write: false,
+      resourceId: path.slice("/whatsapp/media/".length) || "media",
     };
   throw new ApiError("UNKNOWN_OPERATION", 404, "Unknown Roster operation.");
 }
@@ -778,6 +798,10 @@ export async function handle(ctx) {
       audit: { dutyId: ctx.body.dutyId, reason: ctx.body.reason },
     });
   }
+  if (ctx.path.startsWith("/whatsapp/reports/"))
+    return handleWhatsappReportRoute(ctx);
+  if (ctx.path.startsWith("/whatsapp/media/"))
+    return handleWhatsappMediaRoute(ctx);
   if (ctx.path === "/layers") return layerSettings(ctx);
   if (["/upload", "/update", "/remove"].includes(ctx.path))
     return baselineWrite(ctx);
@@ -1792,6 +1816,14 @@ async function operations(ctx) {
       captureObservedQuotas,
       safeLegacyError,
     });
+  if (
+    [
+      "deliveryReview",
+      "dismissDeliveryIssues",
+      "cancelPendingNotifications",
+    ].includes(opName)
+  )
+    return handleDeliveryReviewOperation(ctx, opName, { prepared, commit });
   if (["statistics", "statisticsRPercent"].includes(opName)) return statisticsReport(ctx, opName, recordContext);
   const readonly = reads.has(opName) || opName === "read",
     range = requestedDates(opName === "capacityForecast" ? {...body, from: body.date || localDate(ctx.now), to: Allocation.addDays(Allocation.monday(body.date || localDate(ctx.now)), 6)} : body, ctx.now),
