@@ -1,56 +1,7 @@
 {
   "source": "PR177 follow-up ledger Section 2 at 429367ed23bf4edf8d10cbb575226c84c228474c",
   "review": "Missing-handler entries approved by Claude at bf2067c52bf7390b8651194022eb32791e8c086f; runtime-site pins require the Part C exact-head recheck. Allowances do not close findings. Job 3 removes F01/F02 only after real built-browser and Worker/D1 lock/save coverage; unrelated allowances remain open.",
-  "entries": [
-    {
-      "domain": "roster",
-      "path": "/backup-ledger",
-      "selector": "",
-      "name": "",
-      "ledger": "F09",
-      "reason": "The copied backup-ledger page call still targets the absent backup-ledger route."
-    },
-    {
-      "domain": "roster",
-      "path": "/backup-ledger",
-      "selector": "operation",
-      "name": "read",
-      "ledger": "F09",
-      "reason": "The copied backup-ledger read call still targets the absent backup-ledger route."
-    },
-    {
-      "domain": "roster",
-      "path": "/backup-ledger",
-      "selector": "operation",
-      "name": "restore",
-      "ledger": "F09",
-      "reason": "The copied backup-ledger restore call still targets the absent backup-ledger route."
-    },
-    {
-      "domain": "roster",
-      "path": "/backup-ledger",
-      "selector": "operation",
-      "name": "verify",
-      "ledger": "F09",
-      "reason": "The copied backup-ledger verify call still targets the absent backup-ledger route."
-    },
-    {
-      "domain": "roster",
-      "path": "/edge/archive",
-      "selector": "",
-      "name": "",
-      "ledger": "F10",
-      "reason": "The copied archive page and Roster archive loader fetch this absent route."
-    },
-    {
-      "domain": "roster",
-      "path": "/operations",
-      "selector": "operation",
-      "name": "archiveColdOutput",
-      "ledger": "F10",
-      "reason": "Additional caller confirmed in the same archive feature: the copied archive-confirm button submits this absent operation; not named individually in the ledger."
-    }
-  ],
+  "entries": [],
   "dynamicSource": "Claude PR178 note N2; exact built-source expression locations at reviewed bf2067c52bf7390b8651194022eb32791e8c086f, preserved on rebased main.",
   "dynamicCallSites": [
     {
