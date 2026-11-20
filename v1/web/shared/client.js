@@ -12,6 +12,7 @@
     readFlights = new Map();
   let session = null,
     sessionRead = null,
+    reliefSession = null,
     config = null,
     challenge = null,
     logoutOperationId = null,
@@ -34,6 +35,7 @@
     "/api/session",
     "/api/auth/session",
     "/api/auth/identity",
+    "/api/auth/relief",
     "/api/logout",
     "/api/auth/logout",
     "/api/auth/google",
@@ -68,6 +70,7 @@
   async function signedOut() {
     session = null;
     sessionRead = null;
+    reliefSession = null;
     pending.clear();
     revisions.clear();
     moduleCapabilities.clear();
@@ -221,6 +224,15 @@
   }
   async function logout() {
     const current = await getSession();
+    if (module === "lord" && reliefSession) {
+      await nativeFetch("/api/lord/auth/relief", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "same-origin",
+        body: JSON.stringify({ logout: true }),
+      }).catch(() => {});
+      reliefSession = null;
+    }
     if (!current) {
       await signedOut();
       return;
@@ -248,6 +260,7 @@
     logoutOperationId = null;
     await clearProtectedState();
     session = null;
+    reliefSession = null;
     pending.clear();
     revisions.clear();
     moduleCapabilities.clear();
@@ -271,8 +284,55 @@
       expiresAt: s.expiresAt,
     };
   }
+  async function readLordReliefSession() {
+    if (module !== "lord") return null;
+    const r = await nativeFetch("/api/lord/auth/relief", {
+      credentials: "same-origin",
+      cache: "no-store",
+    }).catch(() => null);
+    if (!r?.ok) return null;
+    const body = await r.json().catch(() => null);
+    if (!body?.ok || body.data?.authenticated !== true) {
+      reliefSession = null;
+      return null;
+    }
+    reliefSession = {
+      ...body.data.session,
+      csrfToken: body.data.csrfToken,
+      capabilities: ["lord.relief"],
+    };
+    return reliefSession;
+  }
   async function authRequest(url, init) {
     const route = url.pathname;
+    if (route === "/api/auth/relief") {
+      if (module !== "lord")
+        return response(
+          {
+            ok: false,
+            error: "Relief access is only available in LORD.",
+            code: "NOT_FOUND",
+          },
+          404,
+        );
+      const r = await nativeFetch("/api/lord/auth/relief", {
+        method: (init?.method || "POST").toUpperCase(),
+        headers: { "Content-Type": "application/json" },
+        credentials: "same-origin",
+        body: init?.body,
+      });
+      const body = await r
+        .json()
+        .catch(() => ({ ok: false, error: "Relief sign-in failed." }));
+      if (r.ok && body?.ok && body.data?.session) {
+        reliefSession = {
+          ...body.data.session,
+          csrfToken: body.data.csrfToken,
+          capabilities: ["lord.relief"],
+        };
+      }
+      return response(body, r.status);
+    }
     if (route.includes("config")) {
       const cfg = await getConfig();
       return response({
@@ -301,6 +361,15 @@
       );
     const s = await getSession(true);
     if (!s) {
+      const relief = await readLordReliefSession();
+      if (relief) {
+        return response({
+          ok: true,
+          data: { session: relief },
+          authenticated: true,
+          session: relief,
+        });
+      }
       await signedOut();
       return response(
         {
@@ -2197,7 +2266,9 @@
       activeEntry = null,
       lordGroupAttempt = false;
     if (method !== "GET" && method !== "HEAD") {
-      const current = await getSession();
+      const current =
+        (await getSession()) ||
+        (service === "lord" ? reliefSession || (await readLordReliefSession()) : null);
       if (!current) {
         await signedOut();
         return response(

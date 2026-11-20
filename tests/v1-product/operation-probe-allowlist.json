@@ -36,14 +36,6 @@
     },
     {
       "domain": "lord",
-      "path": "/auth/relief",
-      "selector": "",
-      "name": "",
-      "ledger": "F15",
-      "reason": "The copied LORD relief-sign-in flow still names this absent auth route."
-    },
-    {
-      "domain": "lord",
       "path": "/transaction",
       "selector": "action",
       "name": "backgroundack",
