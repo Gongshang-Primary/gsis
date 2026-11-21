@@ -275,3 +275,336 @@ refresh();
     for(const selector of ['#columnsHost table','#glossaryHost table'])window.GSISCoreTables?.register(selector,{});
   });
 })();
+
+// Authorized bulk event import (A16/T03) over importEventsPreview / importEventsApply.
+(function calendarBulkEventImports() {
+  const api = window.GSISV1;
+  if (!api) return;
+  let dialog, yearInput, fileInput, textInput, status, previewHost, previewBtn, confirmBtn, receiptBtn,
+    request = null, unresolved = false, busy = false, epoch = 0, storageKey = '';
+  const isAllowed = () => Boolean(api.capable('calendar.admin') || api.capable('admin'));
+  const setStatus = (text, error = false) => {
+    if (!status) return;
+    status.textContent = text;
+    status.classList.toggle('gsis-error', error);
+  };
+  function parseCsv(text) {
+    const rows = [];
+    let row = [], cell = '', inQuotes = false;
+    for (let i = 0; i < text.length; i++) {
+      const ch = text[i];
+      if (inQuotes) {
+        if (ch === '"' && text[i + 1] === '"') { cell += '"'; i++; }
+        else if (ch === '"') inQuotes = false;
+        else cell += ch;
+      } else if (ch === '"') {
+        inQuotes = true;
+      } else if (ch === ',') {
+        row.push(cell); cell = '';
+      } else if (ch === '\n' || ch === '\r') {
+        if (ch === '\r' && text[i + 1] === '\n') i++;
+        row.push(cell); cell = '';
+        if (row.some((c) => c.trim() !== '')) rows.push(row);
+        row = [];
+      } else {
+        cell += ch;
+      }
+    }
+    if (cell.length || row.length) {
+      row.push(cell);
+      if (row.some((c) => c.trim() !== '')) rows.push(row);
+    }
+    if (rows.length < 2) throw Error('Provide a header row and at least one event row.');
+    const headers = rows[0].map((h) => h.trim());
+    return rows.slice(1).map((cols) => {
+      const obj = {};
+      headers.forEach((h, idx) => {
+        if (!h) return;
+        const val = (cols[idx] ?? '').trim();
+        if (val !== '') obj[h] = val;
+      });
+      return obj;
+    });
+  }
+  function parseEvents(raw) {
+    const trimmed = String(raw || '').trim();
+    if (!trimmed) throw Error('Paste JSON or CSV event rows, or choose a file.');
+    if (trimmed.startsWith('[') || trimmed.startsWith('{')) {
+      const parsed = JSON.parse(trimmed);
+      const list = Array.isArray(parsed) ? parsed : parsed?.events;
+      if (!Array.isArray(list) || !list.length) throw Error('JSON must be a non-empty array of event objects (or { events: [...] }).');
+      return list;
+    }
+    return parseCsv(trimmed);
+  }
+  function clearPending() {
+    if (storageKey) sessionStorage.removeItem(storageKey);
+    unresolved = false;
+    request = null;
+    if (yearInput) yearInput.disabled = false;
+    if (fileInput) { fileInput.disabled = false; fileInput.value = ''; }
+    if (textInput) textInput.disabled = false;
+    if (previewBtn) previewBtn.disabled = false;
+    if (confirmBtn) { confirmBtn.disabled = true; confirmBtn.textContent = 'Confirm bulk import'; }
+    if (receiptBtn) receiptBtn.hidden = true;
+  }
+  function ensureDialog() {
+    if (dialog) return;
+    dialog = node('dialog');
+    dialog.id = 'calendarBulkImportDialog';
+    dialog.className = 'gsis-import-preview';
+    dialog.setAttribute('aria-label', 'Bulk import events');
+    dialog.append(
+      node('h2', 'Bulk import events'),
+      node('p', 'Preview JSON or CSV event rows before committing. Invalid rows must be corrected before import; all valid rows commit atomically.'),
+    );
+    const yearLabel = node('label', 'Target school year ');
+    yearInput = node('input');
+    yearInput.id = 'bulkImportYear';
+    yearInput.type = 'number';
+    yearInput.min = '2000';
+    yearInput.max = '2200';
+    yearLabel.append(yearInput);
+    const fileLabel = node('label', 'Load JSON or CSV file ');
+    fileInput = node('input');
+    fileInput.id = 'bulkImportFile';
+    fileInput.type = 'file';
+    fileInput.accept = '.json,.csv,text/csv,application/json';
+    fileInput.onchange = async () => {
+      const f = fileInput.files?.[0];
+      if (!f || unresolved) return;
+      textInput.value = await f.text();
+      invalidatePreview();
+    };
+    fileLabel.append(fileInput);
+    const textLabel = node('label', 'Event rows (JSON array or CSV)');
+    textInput = node('textarea');
+    textInput.id = 'bulkImportInput';
+    textInput.rows = 8;
+    textInput.style.width = '100%';
+    textInput.setAttribute('aria-label', 'Bulk import event rows');
+    textInput.addEventListener('input', invalidatePreview);
+    yearInput.addEventListener('input', invalidatePreview);
+    textLabel.append(textInput);
+    status = node('p');
+    status.id = 'bulkImportStatus';
+    status.setAttribute('role', 'status');
+    previewHost = node('div');
+    previewHost.id = 'bulkImportPreviewHost';
+    const actions = node('div', undefined, 'recovery-actions');
+    previewBtn = node('button', 'Preview import', 'secondary');
+    previewBtn.id = 'bulkImportPreviewBtn';
+    previewBtn.type = 'button';
+    previewBtn.onclick = runPreview;
+    confirmBtn = node('button', 'Confirm bulk import', 'primary');
+    confirmBtn.id = 'bulkImportConfirmBtn';
+    confirmBtn.type = 'button';
+    confirmBtn.disabled = true;
+    confirmBtn.onclick = runApply;
+    receiptBtn = node('button', 'Check original import receipt', 'secondary');
+    receiptBtn.id = 'bulkImportReceiptBtn';
+    receiptBtn.type = 'button';
+    receiptBtn.hidden = true;
+    receiptBtn.onclick = checkReceipt;
+    const closeBtn = node('button', 'Close', 'secondary');
+    closeBtn.type = 'button';
+    closeBtn.onclick = () => dialog.close();
+    actions.append(previewBtn, confirmBtn, receiptBtn, closeBtn);
+    dialog.append(yearLabel, fileLabel, textLabel, status, previewHost, actions);
+    document.body.append(dialog);
+  }
+  function invalidatePreview() {
+    if (unresolved) return;
+    request = null;
+    if (confirmBtn) confirmBtn.disabled = true;
+  }
+  function renderPreview(result) {
+    previewHost.replaceChildren();
+    if (result.errors?.length) {
+      const list = node('ul', undefined, 'bulk-import-errors');
+      for (const err of result.errors) {
+        const li = node('li', `Row ${err.row + 1} (${err.code}): ${err.message}`, 'gsis-error');
+        li.dataset.bulkImportError = String(err.row);
+        list.append(li);
+      }
+      previewHost.append(list);
+    }
+    if (result.rows?.length) {
+      const table = node('table');
+      table.dataset.noTableTools = '';
+      const head = table.createTHead().insertRow();
+      ['Row', 'Title', 'Start', 'End', 'Type', 'Status', 'Lane', 'Venues'].forEach((h) => head.append(node('th', h)));
+      const body = table.createTBody();
+      for (const row of result.rows) {
+        const tr = body.insertRow();
+        [row.row + 1, row.StaffTitle, row.StartDate, row.EndDate, row.EventType, row.Status, row.LaneID || '', row.VenueID || ''].forEach((v) => tr.insertCell().textContent = String(v ?? ''));
+      }
+      const scroll = node('div', undefined, 'gsis-core-scroll');
+      scroll.append(table);
+      previewHost.append(scroll);
+    }
+  }
+  async function openDialog() {
+    if (!isAllowed()) throw Error('Current Calendar administrator access is required.');
+    const session = await api.getSession();
+    storageKey = `gsis-calendar-bulk-import:${session.schoolId}:${session.user.accountId}`;
+    ensureDialog();
+    const stored = sessionStorage.getItem(storageKey);
+    if (stored) {
+      request = JSON.parse(stored);
+      unresolved = true;
+      yearInput.value = String(request.year);
+      textInput.value = JSON.stringify(request.events, null, 2);
+      yearInput.disabled = true;
+      fileInput.disabled = true;
+      textInput.disabled = true;
+      previewBtn.disabled = true;
+      confirmBtn.textContent = 'Retry original import';
+      confirmBtn.disabled = false;
+      receiptBtn.hidden = false;
+      setStatus('The original bulk import is unconfirmed. Check its receipt or retry using the same operation.');
+    } else {
+      const selectedYear = $('yearSelect')?.value || String(new Date().getFullYear());
+      if (!yearInput.value) yearInput.value = selectedYear;
+      previewHost.replaceChildren();
+      confirmBtn.disabled = true;
+      confirmBtn.textContent = 'Confirm bulk import';
+      receiptBtn.hidden = true;
+      setStatus('Enter or load event rows and click Preview import. No events are saved before confirmation.');
+    }
+    if (!dialog.open) dialog.showModal();
+  }
+  async function runPreview() {
+    if (unresolved || busy) return;
+    const ticket = ++epoch;
+    busy = true;
+    previewBtn.disabled = true;
+    confirmBtn.disabled = true;
+    request = null;
+    previewHost.replaceChildren();
+    setStatus('Validating event rows…');
+    try {
+      const year = Number(yearInput.value);
+      const events = parseEvents(textInput.value);
+      const result = await api.request('calendar', '/action', {
+        method: 'POST',
+        body: { action: 'importEventsPreview', payload: { year, events } },
+      });
+      if (ticket !== epoch) return;
+      renderPreview(result);
+      if (!result.valid) {
+        setStatus(`Found ${result.errorCount} validation error(s) in ${result.totalRows} row(s). Correct invalid rows and preview again.`, true);
+        return;
+      }
+      request = {
+        operationId: crypto.randomUUID(),
+        year: result.year,
+        events,
+        previewDigest: result.previewDigest,
+        expectedYearRevision: result.yearRevision,
+      };
+      confirmBtn.disabled = false;
+      confirmBtn.textContent = 'Confirm bulk import';
+      setStatus(`Preview ready: ${result.validCount} event(s) for ${result.year} (revision ${result.yearRevision}). Confirm to import atomically.`);
+    } catch (error) {
+      if (ticket === epoch) setStatus(`${error.message} No events were imported.`, true);
+    } finally {
+      if (ticket === epoch) {
+        busy = false;
+        previewBtn.disabled = unresolved;
+      }
+    }
+  }
+  async function runApply() {
+    if (!request || busy) return;
+    const ticket = epoch;
+    busy = true;
+    confirmBtn.disabled = true;
+    previewBtn.disabled = true;
+    yearInput.disabled = true;
+    fileInput.disabled = true;
+    textInput.disabled = true;
+    try {
+      sessionStorage.setItem(storageKey, JSON.stringify(request));
+      unresolved = true;
+      receiptBtn.hidden = false;
+      setStatus('Importing events…');
+      const result = await api.request('calendar', '/action', {
+        method: 'POST',
+        body: { action: 'importEventsApply', payload: request },
+      });
+      if (ticket !== epoch) return;
+      clearPending();
+      previewHost.replaceChildren();
+      setStatus(`Imported ${result.importedCount} event(s) for ${result.year}.`);
+      $('refreshCalendarBtn')?.click();
+    } catch (error) {
+      if (ticket !== epoch) return;
+      const statusCode = error?.status || error?.response?.status || 0;
+      if (statusCode === 400 || statusCode === 403 || statusCode === 409) {
+        clearPending();
+        setStatus(`${error.message} Preview again before importing.`, true);
+      } else {
+        setStatus(`${error.message} The original operation is retained. Check its receipt or retry with the same operation.`, true);
+        confirmBtn.textContent = 'Retry original import';
+        confirmBtn.disabled = false;
+      }
+    } finally {
+      if (ticket === epoch) busy = false;
+    }
+  }
+  async function checkReceipt() {
+    if (!request || busy) return;
+    const ticket = epoch;
+    receiptBtn.disabled = true;
+    try {
+      const result = await api.request('calendar', '/action', {
+        method: 'POST',
+        body: { action: 'eventMutationStatus', payload: { operationId: request.operationId } },
+      });
+      if (ticket !== epoch) return;
+      if (result.state === 'SAVED') {
+        clearPending();
+        previewHost.replaceChildren();
+        setStatus('The original bulk import committed.');
+        $('refreshCalendarBtn')?.click();
+      } else if (result.state === 'NOT_SAVED') {
+        clearPending();
+        setStatus('The original bulk import did not commit. Review and preview again.');
+      } else {
+        setStatus('The original bulk import is still unconfirmed. A retry uses its same operation identity.');
+      }
+    } catch (error) {
+      if (ticket === epoch) setStatus(`${error.message} The original operation is retained.`, true);
+    } finally {
+      if (ticket === epoch) receiptBtn.disabled = false;
+    }
+  }
+  function attachTrigger() {
+    const toolbar = document.querySelector('#weeklyHost .weekly-toolbar');
+    const existing = $('bulkImportEventsBtn');
+    if (!isAllowed()) {
+      existing?.remove();
+      return;
+    }
+    if (!toolbar || existing) return;
+    const btn = node('button', 'Bulk import events', 'secondary');
+    btn.id = 'bulkImportEventsBtn';
+    btn.type = 'button';
+    btn.onclick = () => openDialog().catch((err) => alert(err.message));
+    toolbar.append(btn);
+  }
+  new MutationObserver(() => queueMicrotask(attachTrigger)).observe(document.body, { childList: true, subtree: true });
+  api.getSession().then(attachTrigger).catch(() => {});
+  window.addEventListener('load', attachTrigger);
+  window.addEventListener('gsis:capabilities', attachTrigger);
+  window.addEventListener('gsis:clear-protected-state', () => {
+    epoch++;
+    dialog?.close();
+    dialog?.remove();
+    dialog = null;
+    clearPending();
+    storageKey = '';
+    $('bulkImportEventsBtn')?.remove();
+  });
+})();
