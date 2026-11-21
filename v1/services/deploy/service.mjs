@@ -68,6 +68,7 @@ const READ = new Set([
   "/health",
   "/access",
   "/layout-reference",
+  "/leases",
 ]);
 const WRITE = new Set([
   "/change",
@@ -863,7 +864,7 @@ async function bootstrap(ctx) {
     leases: requested
       ? await query(
           ctx.env.DB,
-          "SELECT scope AS key,holder AS actor,fence AS token,expires_at AS until FROM deploy_leases WHERE school_id=? AND version_id=? AND expires_at>?",
+          "SELECT scope AS key,holder AS actor,client_id AS clientId,fence AS token,expires_at AS until FROM deploy_leases WHERE school_id=? AND version_id=? AND expires_at>?",
           [school, requested, ctx.now],
         )
       : [],
@@ -2120,6 +2121,19 @@ export async function handle(ctx) {
   }
   if (["/bootstrap", "/sync", "/versions", "/tables", "/access"].includes(p))
     return bootstrap(ctx);
+  if (p === "/leases") {
+    const requested = b.versionId ? id(b.versionId) : null;
+    return {
+      versionId: requested,
+      leases: requested
+        ? await query(
+            ctx.env.DB,
+            "SELECT scope AS key,holder AS actor,client_id AS clientId,fence AS token,expires_at AS until FROM deploy_leases WHERE school_id=? AND version_id=? AND expires_at>?",
+            [school, requested, ctx.now],
+          )
+        : [],
+    };
+  }
   if (p === "/layout-reference") return layoutReferenceResponse();
   if (p === "/delta")
     return {
