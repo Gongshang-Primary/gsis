@@ -60,6 +60,7 @@ export const defaults = () => ({
   organisations: { dept: [], comm: [], plt: [], events: [], cca: [] },
   duties: [],
   teacherDrafts: {},
+  teacherDraftMeta: {},
   teacherNotes: {},
   levelExclusions: [],
   offload: Rules.migrate(null),
@@ -156,6 +157,7 @@ export function setMembershipValue(teacher, value) {
 }
 export function mergeContacts(doc, projection, {
   refreshMemberships = false,
+  preserveDraftFields = false,
   includeUnlisted = true,
   addStaffIds = [],
 } = {}) {
@@ -275,6 +277,9 @@ export function mergeContacts(doc, projection, {
       authority,
       fieldRevisions: p.fieldRevisions || {},
       contactsRevision: String(p.revision || projection.revision),
+      ...(p.basicNameProvenance
+        ? { basicNameProvenance: p.basicNameProvenance }
+        : {}),
       quality,
     };
     // Keep the version's actual ordinary planning choices separate from fresh
@@ -306,6 +311,10 @@ export function mergeContacts(doc, projection, {
     // planning list, including its unknown state, belongs to this saved version.
     const saved = previous.get(teacher.id);
     if (!refreshMemberships && saved) {
+      if (saved.planningProfile?.["Basic Name"]) {
+        teacher.ttbName = saved.ttbName || saved.name || teacher.ttbName;
+        teacher.name = teacher.ttbName;
+      }
       const value = membershipValue(saved);
       if (value === undefined) {
         if (teacher.deploymentTags) delete teacher.deploymentTags.Memberships;
@@ -344,18 +353,16 @@ export function mergeContacts(doc, projection, {
   }
   const map = new Map(people.map((p) => [p.id, p]));
   const oldIds = new Set(doc.teachers.map((t) => t.id));
-  const teacherDrafts = refreshMemberships ? Object.fromEntries(
-    Object.entries(doc.teacherDrafts || {}).map(([staffId, input]) => {
-      const value = { ...input };
-      // Duplication refreshes actual ordinary Role/Active for known Contacts
-      // identities. Keep draft-only people and every unrelated proposed field.
-      if (map.has(staffId)) { delete value.Role; delete value.Active; }
-      return [staffId, value];
-    }),
-  ) : doc.teacherDrafts;
+  // Copy known people from current Contacts. An explicit refresh in the same
+  // version keeps that version's saved edits, including their provenance.
+  const copyFromContacts = refreshMemberships && !preserveDraftFields;
+  const retainDraftOnly = (rows) => Object.fromEntries(
+    Object.entries(rows || {}).filter(([staffId]) => !map.has(staffId)),
+  );
   return projectPlanningNames(applyCatalogueLinks(applyRoleMemberships({
     ...doc,
-    teacherDrafts,
+    teacherDrafts: copyFromContacts ? retainDraftOnly(doc.teacherDrafts) : doc.teacherDrafts,
+    teacherDraftMeta: copyFromContacts ? retainDraftOnly(doc.teacherDraftMeta) : doc.teacherDraftMeta,
     teachers: [
       ...doc.teachers.map((t) =>
         map.has(t.id)
@@ -425,6 +432,7 @@ export function newPlanningVersion(source) {
   const doc = structuredClone(source);
   doc.teachers = [];
   doc.teacherDrafts = {};
+  doc.teacherDraftMeta = {};
   doc.teacherNotes = {};
   doc.removedTeachers = {};
   doc.assignments = [];
@@ -978,8 +986,9 @@ export function applyEdits(doc, edits, meta = {}) {
                   v.every((item) => typeof item === "string" && item.length <= 80)),
           "Invalid proposed field.",
         );
-        d.teacherDrafts[t.id][k] = v;
         if (k === "Basic Name" && typeof v === "string" && v.trim()) {
+          const current = d.teacherDrafts[t.id][k] ?? planningSnapshot(t)[k];
+          if (typeof current === "string" && current.trim() === v.trim()) continue;
           d.teacherDraftMeta ??= {};
           d.teacherDraftMeta[t.id] ??= {};
           d.teacherDraftMeta[t.id].basicNameProvenance = {
@@ -990,6 +999,7 @@ export function applyEdits(doc, edits, meta = {}) {
             operationId: meta?.operationId || null,
           };
         }
+        d.teacherDrafts[t.id][k] = v;
       }
       continue;
     }
