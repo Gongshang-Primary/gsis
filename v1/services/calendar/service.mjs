@@ -2482,6 +2482,108 @@ export async function internal(ctx) {
     });
     return dates({ ...ctx, principal }, ctx.body);
   }
+  if (ctx.path === "/internal/year-structure") {
+    need(
+      ctx.body.schoolId === ctx.env.SCHOOL_ID,
+      "SCHOOL_MISMATCH",
+      "Wrong school.",
+      403,
+    );
+    await inspectDecision(ctx.env, ctx.body.decisionId, {
+      schoolId: ctx.body.schoolId,
+      actions: [
+        "roster.read",
+        "roster.write",
+        "roster.admin",
+        "calendar.read",
+        "calendar.admin",
+      ],
+    });
+    const targetYear = Number(ctx.body.year);
+    need(
+      Number.isInteger(targetYear) && targetYear >= 2000 && targetYear <= 2099,
+      "INVALID_YEAR",
+      "Choose a valid four-digit school year.",
+      400,
+    );
+    const requestedYears = Array.isArray(ctx.body.years)
+      ? [
+          ...new Set(
+            ctx.body.years
+              .map(Number)
+              .filter((y) => Number.isInteger(y) && y >= 2000 && y <= 2099),
+          ),
+        ].slice(0, 4)
+      : [targetYear - 1, targetYear];
+    const minY = Math.min(...requestedYears);
+    const maxY = Math.max(...requestedYears);
+    const meta = await query(
+      ctx.env.DB,
+      "SELECT year, data_json FROM calendar_metadata WHERE school_id=? AND kind='yearStructure' AND year BETWEEN ? AND ? LIMIT 1000",
+      [ctx.body.schoolId, minY, maxY],
+    );
+    const termMap = new Map();
+    for (const row of meta) {
+      if (!requestedYears.includes(row.year)) continue;
+      const item = parse(row);
+      if (item.Kind !== "TERM_WEEK") continue;
+      const term = Number(item.Term);
+      if (!Number.isInteger(term) || term < 1 || term > 4) continue;
+      if (!isoDate(item.StartDate) || !isoDate(item.EndDate)) continue;
+      const key = `${row.year}:${term}`;
+      const existing = termMap.get(key);
+      if (!existing) {
+        termMap.set(key, {
+          year: row.year,
+          term,
+          label: `T${term}`,
+          from: item.StartDate,
+          to: item.EndDate,
+        });
+      } else {
+        if (item.StartDate < existing.from) existing.from = item.StartDate;
+        if (item.EndDate > existing.to) existing.to = item.EndDate;
+      }
+    }
+    const terms = [...termMap.values()].sort(
+      (a, b) => a.year - b.year || a.term - b.term,
+    );
+    const semesters = [];
+    for (const y of [...requestedYears].sort((a, b) => a - b)) {
+      const t1 = termMap.get(`${y}:1`),
+        t2 = termMap.get(`${y}:2`),
+        t3 = termMap.get(`${y}:3`),
+        t4 = termMap.get(`${y}:4`);
+      if (t1 && t2) {
+        semesters.push({
+          year: y,
+          semester: 1,
+          label: "S1",
+          from: t1.from,
+          to: t2.to,
+        });
+      }
+      if (t3 && t4) {
+        semesters.push({
+          year: y,
+          semester: 2,
+          label: "S2",
+          from: t3.from,
+          to: t4.to,
+        });
+      }
+    }
+    const basis = terms.length
+      ? "Uses Calendar TERM_WEEK records."
+      : "School term dates are unavailable; use an explicit date range.";
+    return {
+      year: targetYear,
+      terms,
+      semesters,
+      basis,
+      semesterBasis: basis,
+    };
+  }
   if (ctx.path === "/internal/source-status") {
     const op = await operationStatus(
       ctx.env.DB,

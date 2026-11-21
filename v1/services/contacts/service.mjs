@@ -840,7 +840,8 @@ export async function handle(ctx) {
           operationId,
           staffId: body.staffId,
           changes: { mobile: body.mobile },
-          fieldRevisions: { mobile: body.revision },
+          fieldRevisions:
+            body.revision !== undefined ? { mobile: body.revision } : {},
         };
       const p = await serviceCall(env, "core", "/internal/delegate", {
         sourceDecisionId: body.decisionId,
