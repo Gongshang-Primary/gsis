@@ -481,55 +481,8 @@ import { planningSnapshot, planningPerson, planningEligible, reportingRoot, repo
       };
     }
 
-    let activeCellLease = null, cellLeaseHeartbeat = null, liveLeasePoll = null;
-    async function acquireCellLease(cellScope) {
-      if (!token || !current || !api.capable("deploy.edit")) return null;
-      await releaseCellLease();
-      const scope = `${current}|${cellScope}`;
-      try {
-        const grant = await window.api("lease", {
-          versionId: current,
-          scope,
-          key: scope,
-          clientId,
-          revision: snapshotCache?.revision,
-          operationId: crypto.randomUUID(),
-        }, false);
-        activeCellLease = {
-          versionId: current,
-          scope,
-          key: scope,
-          clientId,
-          fence: grant.fence,
-          token: grant.token,
-        };
-        cellLeaseHeartbeat = setInterval(async () => {
-          if (!activeCellLease || activeCellLease.scope !== scope) return;
-          try {
-            const renewed = await window.api("lease", {
-              versionId: activeCellLease.versionId,
-              scope: activeCellLease.scope,
-              key: activeCellLease.key,
-              clientId,
-              fence: activeCellLease.fence,
-              operationId: crypto.randomUUID(),
-            }, false);
-            if (activeCellLease && activeCellLease.scope === scope) {
-              activeCellLease.fence = renewed.fence;
-              activeCellLease.token = renewed.token;
-            }
-          } catch {}
-        }, 25000);
-        return activeCellLease;
-      } catch {
-        return null;
-      }
-    }
-    async function releaseCellLease() {
-      clearInterval(cellLeaseHeartbeat);
-      cellLeaseHeartbeat = null;
-      const held = activeCellLease;
-      activeCellLease = null;
+    let activeCellLease = null, cellLeaseHeartbeat = null, liveLeasePoll = null, cellLeaseEpoch = 0;
+    async function releaseLeaseGrant(held) {
       if (!held || !token) return;
       try {
         await window.api("lease", {
@@ -544,6 +497,65 @@ import { planningSnapshot, planningPerson, planningEligible, reportingRoot, repo
         }, false);
       } catch {}
     }
+    async function acquireCellLease(cellScope) {
+      if (!token || !current || !api.capable("deploy.edit")) return null;
+      await releaseCellLease();
+      const myEpoch = ++cellLeaseEpoch;
+      const versionId = current;
+      const scope = `${versionId}|${cellScope}`;
+      try {
+        const grant = await window.api("lease", {
+          versionId,
+          scope,
+          key: scope,
+          clientId,
+          revision: snapshotCache?.revision,
+          operationId: crypto.randomUUID(),
+        }, false);
+        const held = {
+          versionId,
+          scope,
+          key: scope,
+          clientId,
+          fence: grant.fence,
+          token: grant.token,
+        };
+        if (myEpoch !== cellLeaseEpoch) {
+          await releaseLeaseGrant(held);
+          return null;
+        }
+        activeCellLease = held;
+        cellLeaseHeartbeat = setInterval(async () => {
+          if (!activeCellLease || activeCellLease.scope !== scope || myEpoch !== cellLeaseEpoch) return;
+          try {
+            const renewed = await window.api("lease", {
+              versionId: activeCellLease.versionId,
+              scope: activeCellLease.scope,
+              key: activeCellLease.key,
+              clientId,
+              fence: activeCellLease.fence,
+              operationId: crypto.randomUUID(),
+            }, false);
+            if (activeCellLease && activeCellLease.scope === scope && myEpoch === cellLeaseEpoch) {
+              activeCellLease.fence = renewed.fence;
+              activeCellLease.token = renewed.token;
+            }
+          } catch {}
+        }, 25000);
+        return activeCellLease;
+      } catch {
+        return null;
+      }
+    }
+    async function releaseCellLease() {
+      cellLeaseEpoch++;
+      clearInterval(cellLeaseHeartbeat);
+      cellLeaseHeartbeat = null;
+      const held = activeCellLease;
+      activeCellLease = null;
+      await releaseLeaseGrant(held);
+    }
+    window.addEventListener("pagehide", () => { releaseCellLease(); });
 
     function foreignCellLease(cellScope) {
       const now = Date.now();
@@ -701,20 +713,26 @@ import { planningSnapshot, planningPerson, planningEligible, reportingRoot, repo
     }
     if (typeof window.chooseTeacher === "function") {
       const originalChooseTeacher = window.chooseTeacher;
-      window.chooseTeacher = async (target, sub) => {
+      window.chooseTeacher = (target, sub) => {
         const lease = foreignCellLease(`cell:${target}:${sub}`) || foreignCellLease(`cell:${target}:${window.family ? window.family(sub) : sub}`);
         if (lease) return;
-        await acquireCellLease(`cell:${target}:${sub}`);
-        await originalChooseTeacher(target, sub);
+        const result = originalChooseTeacher(target, sub);
+        const scope = `cell:${target}:${sub}`;
         const cell = [...document.querySelectorAll("#content [data-target]")].find(b => b.dataset.target === target && b.dataset.sub === sub)?.closest("td");
         const wrap = cell?.querySelector(".search-select");
         if (wrap) {
+          acquireCellLease(scope).catch(() => {});
           wrap.addEventListener("toggle", () => {
             if (!wrap.open) releaseCellLease();
           });
-        } else {
-          await releaseCellLease();
+          wrap.addEventListener("change", () => {
+            releaseCellLease();
+          });
+          wrap.addEventListener("click", ev => {
+            if (ev.target?.closest?.('[role="option"]')) releaseCellLease();
+          });
         }
+        return result;
       };
     }
     if (typeof window.renameClass === "function") {
