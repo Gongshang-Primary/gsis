@@ -596,6 +596,12 @@ async function projection(env, body, principal, now, internal = false) {
           presentation[name] = directPresentation(name, selected.record);
       }
       x.ttbNameInputs = { nameSuffix: value("nameSuffix"), presentation };
+      x.basicNameProvenance = {
+        value: r.staff.basic_name,
+        changedAt: r.fields.basicName?.accepted_at ?? r.staff.created_at ?? null,
+        source: "contacts",
+        operationId: r.fields.basicName?.operation_id ?? null,
+      };
       x.fieldRevisions = Object.fromEntries(
         DEPLOY_FIELDS.filter((name) => r.fields[name]).map((name) => [
           name,

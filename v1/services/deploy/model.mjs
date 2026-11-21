@@ -60,6 +60,7 @@ export const defaults = () => ({
   organisations: { dept: [], comm: [], plt: [], events: [], cca: [] },
   duties: [],
   teacherDrafts: {},
+  teacherDraftMeta: {},
   teacherNotes: {},
   levelExclusions: [],
   offload: Rules.migrate(null),
@@ -260,6 +261,9 @@ export function mergeContacts(doc, projection, {
       authority,
       fieldRevisions: p.fieldRevisions || {},
       contactsRevision: String(p.revision || projection.revision),
+      ...(p.basicNameProvenance
+        ? { basicNameProvenance: p.basicNameProvenance }
+        : {}),
       quality,
     };
     // Keep the version's actual ordinary planning choices separate from fresh
@@ -269,6 +273,30 @@ export function mergeContacts(doc, projection, {
     teacher.planningProfile = planningSnapshot(
       !refreshMemberships && savedPlanning ? savedPlanning : teacher,
     );
+    if (!refreshMemberships && savedPlanning) {
+      // C18: Insulate existing draft version ordinary planning profile fields
+      // from automatic overwrite by subsequent Contacts edits.
+      for (const field of [
+        "Basic Name",
+        "Role",
+        "EO Appt Level",
+        "Appointment Status",
+        "Employment Modifier",
+        "Subject Modifier",
+        "MK Modifier",
+        "Active",
+      ]) {
+        if (
+          Object.hasOwn(teacher.planningProfile, field) &&
+          teacher.planningProfile[field] !== null
+        ) {
+          teacher.profile[field] = teacher.planningProfile[field];
+        }
+      }
+      if (savedPlanning.deploymentTags) {
+        teacher.deploymentTags = structuredClone(savedPlanning.deploymentTags);
+      }
+    }
     const excluded = [
       ...(active === false ? ["INACTIVE"] : []),
       ...(authority.eo?.value === false ? ["NON_EO"] : []),
@@ -777,7 +805,7 @@ const proposalFields = [
   "Subject Modifier",
   "Active",
 ];
-export function applyEdits(doc, edits) {
+export function applyEdits(doc, edits, meta = {}) {
   check(
     Array.isArray(edits) && edits.length > 0 && edits.length <= 500,
     "Use 1 to 500 edits.",
@@ -914,6 +942,17 @@ export function applyEdits(doc, edits) {
           "Invalid proposed field.",
         );
         d.teacherDrafts[t.id][k] = v;
+        if (k === "Basic Name") {
+          d.teacherDraftMeta ??= {};
+          d.teacherDraftMeta[t.id] ??= {};
+          d.teacherDraftMeta[t.id].basicNameProvenance = {
+            value: v,
+            changedAt: Number.isSafeInteger(meta?.now) ? meta.now : Date.now(),
+            source: "deploy",
+            actorId: meta?.actorId || null,
+            operationId: meta?.operationId || null,
+          };
+        }
       }
       continue;
     }

@@ -169,6 +169,7 @@ function flatten(doc) {
       [
         "teacherNotes",
         "teacherDrafts",
+        "teacherDraftMeta",
         "loads",
         "fortnight",
         "organisations",
@@ -1213,6 +1214,11 @@ async function save(
       next = applyEdits(
         loaded.doc,
         b.edits || [{ ...b, operation: b.operation }],
+        {
+          now: ctx.now,
+          actorId: ctx.principal.actorId,
+          operationId: op.operationId,
+        },
       );
   }
   // Explicitly adding a person again supersedes only that person's removal
@@ -2601,7 +2607,7 @@ export async function handle(ctx) {
       if (op.receipt) return op.receipt.result;
       const loaded = await loadVersion(ctx.env.DB, school, b.versionId),
         ref = await contacts(ctx),
-        next = mergeContacts(loaded.doc, ref);
+        next = mergeContacts(loaded.doc, ref, { refreshMemberships: true });
       let delta;
       try {
         delta = changesFor(school, b.versionId, loaded.rows, next);
