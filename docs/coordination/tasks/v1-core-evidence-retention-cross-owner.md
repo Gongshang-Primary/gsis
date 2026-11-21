@@ -30,3 +30,12 @@
 - v0.9 source and generated files (`roster-update/`, `public/`, `shared/`) — zero drift required.
 - Enabling `RETENTION_DELETE_ENABLED` (remains `"false"` in all configs).
 - Hosted F5 restore rehearsal, deployment, or live school data.
+
+## Claude follow-up (owner-directed takeover, 21 Nov 2026 SGT)
+
+Owner directed Claude to carry on Antigravity's PRs. Findings from `docs/coordination/review/v1-antigravity-pr263-273-claude-triage.md`, fixed here:
+
+1. Lost-response recovery: the stale-digest check ran before the stored receipt lookup, so a retry of a committed run returned `409 PREVIEW_CHANGED`. Core now returns the original receipt first when the operation already committed.
+2. A destructive run now requires the dry-run `previewDigest`. Before, omitting it skipped the stale-preview guard and deleted immediately (proved by the new test failing on the previous head).
+
+Tests: `TZ=Asia/Singapore node tests/v1-product-core-evidence-retention.mjs` passes; new cases cover the unbound destructive refusal and replay with the original digest. Deletion stays behind `RETENTION_DELETE_ENABLED`. Muse reviews the new exact head.

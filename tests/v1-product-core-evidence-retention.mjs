@@ -130,6 +130,19 @@ async function seedRetentionFixture(core, now) {
     assert.equal(health.status, 200);
     assert.equal(health.body.data.retentionDeletionEnabled, true);
 
+    // A destructive run without the confirmed dry-run digest is refused.
+    const unbound = await suite.request(admin, "core", "/admin/evidence/retention", {
+      method: "POST",
+      body: { operationId: "ret-exec-unbound", dryRun: false, retentionDays: 90, limit: 500 },
+    });
+    assert.equal(unbound.status, 409, JSON.stringify(unbound.body));
+    assert.equal(unbound.body.error?.code, "PREVIEW_CHANGED");
+    const execPreview = await suite.request(admin, "core", "/admin/evidence/retention", {
+      method: "POST",
+      body: { operationId: "ret-exec-preview", dryRun: true, retentionDays: 90, limit: 500 },
+    });
+    assert.equal(execPreview.status, 200, JSON.stringify(execPreview.body));
+    const execDigest = execPreview.body.data.previewDigest;
     const run1 = await suite.request(admin, "core", "/admin/evidence/retention", {
       method: "POST",
       body: {
@@ -137,6 +150,7 @@ async function seedRetentionFixture(core, now) {
         dryRun: false,
         retentionDays: 90,
         limit: 500,
+        previewDigest: execDigest,
       },
     });
     assert.equal(run1.status, 200, JSON.stringify(run1.body));
@@ -145,7 +159,8 @@ async function seedRetentionFixture(core, now) {
     assert.equal(run1.body.data.result.deleted.evidence, 1);
     assert.equal(run1.body.data.result.deleted.admissions, 2);
 
-    // Idempotent replay returns original receipt without re-deleting.
+    // A retry after a lost response, with the same operation and digest,
+    // returns the original receipt even though a fresh preview now differs.
     const replay = await suite.request(admin, "core", "/admin/evidence/retention", {
       method: "POST",
       body: {
@@ -153,6 +168,7 @@ async function seedRetentionFixture(core, now) {
         dryRun: false,
         retentionDays: 90,
         limit: 500,
+        previewDigest: execDigest,
       },
     });
     assert.equal(replay.status, 200, JSON.stringify(replay.body));

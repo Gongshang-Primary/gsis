@@ -1835,7 +1835,14 @@ export async function handle(ctx) {
         },
       };
     }
-    if (body.previewDigest !== undefined) {
+    // A committed operation returns its original receipt before any fresh
+    // preview comparison, so a retry after a lost response recovers it.
+    const prior =
+      typeof body.operationId === "string" && body.operationId
+        ? await operationStatus(env.DB, env.SCHOOL_ID, body.operationId)
+        : null;
+    if (!prior?.receipt) {
+      // A destructive run must name the dry-run preview it confirms.
       const digestMatches =
         typeof body.previewDigest === "string" &&
         (await secureEqual(body.previewDigest, previewDigest));
@@ -1857,9 +1864,7 @@ export async function handle(ctx) {
         dryRun: false,
         retentionDays,
         limit,
-        ...(body.previewDigest !== undefined
-          ? { previewDigest: body.previewDigest }
-          : {}),
+        previewDigest: body.previewDigest,
       },
       now,
       validUntil: principal.validUntil,
