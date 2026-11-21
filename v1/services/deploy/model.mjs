@@ -829,11 +829,16 @@ const proposalFields = [
   "Basic Name",
   "Role",
   "Appointment Status",
+  "Employment Arrangement",
+  "Employment Status",
+  "School Section",
+  "Personnel Category",
   "Employment Modifier",
   "Subject Modifier",
+  "MK Modifier",
   "Active",
 ];
-export function applyEdits(doc, edits) {
+export function applyEdits(doc, edits, meta = {}) {
   check(
     Array.isArray(edits) && edits.length > 0 && edits.length <= 500,
     "Use 1 to 500 edits.",
@@ -966,10 +971,25 @@ export function applyEdits(doc, edits) {
         check(
           k === "Active"
             ? typeof v === "boolean" || ["Y", "N"].includes(v)
-            : typeof v === "string" && v.length <= 160,
+            : v === null ||
+                (typeof v === "string" && v.length <= 160) ||
+                (Array.isArray(v) &&
+                  v.length <= 25 &&
+                  v.every((item) => typeof item === "string" && item.length <= 80)),
           "Invalid proposed field.",
         );
         d.teacherDrafts[t.id][k] = v;
+        if (k === "Basic Name" && typeof v === "string" && v.trim()) {
+          d.teacherDraftMeta ??= {};
+          d.teacherDraftMeta[t.id] ??= {};
+          d.teacherDraftMeta[t.id].basicNameProvenance = {
+            value: v,
+            changedAt: Number.isSafeInteger(meta?.now) ? meta.now : Date.now(),
+            source: "deploy",
+            actorId: meta?.actorId || null,
+            operationId: meta?.operationId || null,
+          };
+        }
       }
       continue;
     }

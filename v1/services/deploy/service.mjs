@@ -1,5 +1,6 @@
 import { choiceLists } from "./catalogue-links.mjs";
 import { buildHrTermsPublication } from "./hr-terms-publish.mjs";
+import { previewTTb } from "../../contacts/direct-fields.mjs";
 import {
   query,
   one,
@@ -170,6 +171,7 @@ function flatten(doc) {
       [
         "teacherNotes",
         "teacherDrafts",
+        "teacherDraftMeta",
         "loads",
         "fortnight",
         "organisations",
@@ -1222,7 +1224,27 @@ async function save(
       next = applyEdits(
         loaded.doc,
         b.edits || [{ ...b, operation: b.operation }],
+        {
+          now: ctx.now,
+          actorId: ctx.principal.actorId,
+          operationId: op.operationId,
+        },
       );
+      const beforeNames = new Map(
+        (before.teachers || []).map((t) => [t.id, String(t.ttbName || t.name || "").trim().toLowerCase()]),
+      );
+      for (const t of next.teachers || []) {
+        const afterName = String(t.ttbName || t.name || "").trim();
+        if (afterName && afterName.toLowerCase() !== beforeNames.get(t.id)) {
+          await assertNoCrossDraftTTbCollision(
+            ctx.env.DB,
+            school,
+            b.versionId,
+            t.id,
+            afterName,
+          );
+        }
+      }
   }
   // Explicitly adding a person again supersedes only that person's removal
   // marker; unrelated historical markers remain untouched.
@@ -2253,11 +2275,37 @@ export async function handle(ctx) {
       "CAPABILITY_DENIED",
       403,
     );
+    const basicName = text(b.basicName);
+    if (!b.existingStaffId) {
+      const modifiers = b.nameModifiers || {};
+      const preview = previewTTb({
+        basicName,
+        ...(b.nameSuffix ? { nameSuffix: text(b.nameSuffix, 80, true) } : {}),
+        ...(modifiers.role ? { role: modifiers.role } : {}),
+        ...(Array.isArray(modifiers.employmentTags)
+          ? { employmentTags: modifiers.employmentTags }
+          : {}),
+        ...(Array.isArray(modifiers.subjectTags)
+          ? { subjectTags: modifiers.subjectTags }
+          : {}),
+        ...(Array.isArray(modifiers.mkTags) ? { mkTags: modifiers.mkTags } : {}),
+      });
+      if (preview.available && preview.name) {
+        await assertNoCrossDraftTTbCollision(
+          ctx.env.DB,
+          school,
+          b.versionId || null,
+          null,
+          preview.name,
+          { draftOverridesOnly: true },
+        );
+      }
+    }
     return serviceCall(ctx.env, "contacts", "/internal/register-provisional", {
       schoolId: school,
       decisionId: ctx.principal.decisionId,
       operationId: id(b.operationId || b.requestId),
-      basicName: text(b.basicName),
+      basicName,
       ...(b.nameSuffix !== undefined
         ? { nameSuffix: text(b.nameSuffix, 80, true) }
         : {}),
@@ -2795,32 +2843,162 @@ export async function internal(ctx) {
   return value;
 }
 
+async function assertNoCrossDraftTTbCollision(
+  db,
+  schoolId,
+  excludeVersionId,
+  excludeStaffId,
+  candidateTtbName,
+  options = {},
+) {
+  const target = String(candidateTtbName || "").trim().toLowerCase();
+  if (!target) return;
+  const rows = await query(
+    db,
+    "SELECT r.version_id, r.scope, r.row_id, r.value FROM deploy_rows r JOIN deploy_versions v ON v.school_id=r.school_id AND v.id=r.version_id WHERE r.school_id=? AND v.deleted=0 AND r.scope IN ('teachers','teacherDrafts') AND (? IS NULL OR r.version_id<>?) LIMIT 10000",
+    [schoolId, excludeVersionId, excludeVersionId],
+  );
+  const byVersionStaff = new Map();
+  for (const row of rows) {
+    if (excludeStaffId && row.row_id === excludeStaffId) continue;
+    let parsed;
+    try {
+      parsed = JSON.parse(row.value);
+    } catch {
+      continue;
+    }
+    const key = `${row.version_id}\0${row.row_id}`;
+    const entry = byVersionStaff.get(key) || { teacher: null, draft: null };
+    if (row.scope === "teachers") entry.teacher = parsed;
+    else entry.draft = parsed;
+    byVersionStaff.set(key, entry);
+  }
+  for (const { teacher, draft } of byVersionStaff.values()) {
+    const names = [];
+    const existing = String(
+      teacher?.ttbName || teacher?.profile?.["TTb Name"] || teacher?.name || "",
+    )
+      .trim()
+      .toLowerCase();
+    if (!options.draftOverridesOnly && existing) {
+      names.push(existing);
+    }
+    if (draft) {
+      const draftBasic = String(
+        draft["Basic Name"] ?? teacher?.profile?.["Basic Name"] ?? "",
+      ).trim();
+      if (draftBasic) {
+        const split = (v) =>
+          Array.isArray(v)
+            ? v
+            : String(v || "")
+                .split(/[;,]/)
+                .map((s) => s.trim())
+                .filter(Boolean);
+        const derived = previewTTb({
+          basicName: draftBasic,
+          role: String(draft.Role ?? teacher?.profile?.Role ?? "").trim(),
+          employmentTags: split(
+            draft["Employment Modifier"] ??
+              teacher?.profile?.["Employment Modifier"],
+          ),
+          subjectTags: split(
+            draft["Subject Modifier"] ?? teacher?.profile?.["Subject Modifier"],
+          ),
+          mkTags: split(
+            draft["MK Modifier"] ?? teacher?.profile?.["MK Modifier"],
+          ),
+        });
+        const derivedLower =
+          derived.available && derived.name
+            ? derived.name.trim().toLowerCase()
+            : "";
+        if (!options.draftOverridesOnly || derivedLower !== existing) {
+          names.push(draftBasic.toLowerCase());
+          if (derivedLower) names.push(derivedLower);
+        }
+      }
+    }
+    if (names.includes(target)) {
+      check(
+        false,
+        "Another active Deploy draft already reserves this TTb Name. Use a distinct name or delete the conflicting draft.",
+        "DUPLICATE_TTB_NAME",
+        409,
+      );
+    }
+  }
+}
+
+function normalizeTagContributionValue(contactsField, value) {
+  if (contactsField === "employmentActive") {
+    return value === true || value === "Y";
+  }
+  if (["employmentTags", "subjectTags", "mkTags"].includes(contactsField)) {
+    if (value === null || value === "") return [];
+    if (Array.isArray(value)) {
+      return value.map((v) => String(v || "").trim()).filter(Boolean);
+    }
+    return String(value)
+      .split(/[;,]/)
+      .map((v) => v.trim())
+      .filter(Boolean);
+  }
+  if (value === null) return null;
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    return trimmed === "" ? null : trimmed;
+  }
+  return value;
+}
+
 function contributions(doc, publicationId, operationId, actorId, envelope = {}) {
   const fields = {
     "Basic Name": "basicName",
     Role: "role",
+    "EO Appt Level": "eoAppointmentLevel",
     "Appointment Status": "appointmentStatus",
+    "Employment Arrangement": "employmentArrangement",
+    "Employment Status": "employmentStatus",
+    "School Section": "schoolSection",
+    "Personnel Category": "personnelCategory",
     "Employment Modifier": "employmentTags",
     "Subject Modifier": "subjectTags",
+    "MK Modifier": "mkTags",
     Active: "employmentActive",
   };
+  const publishedAt = Number.isSafeInteger(envelope.publishedAt)
+    ? envelope.publishedAt
+    : doc.from
+      ? Date.parse(doc.from + "T00:00:00+08:00")
+      : null;
   const ordinary = Object.entries(doc.teacherDrafts || {}).flatMap(([staffId, values]) =>
     Object.entries(values)
       .filter(([field]) => Object.hasOwn(fields, field))
-      .map(([field, value]) => ({
-        staffId,
-        field: fields[field],
-        proposedValue:
-          field === "Active" ? value === true || value === "Y" : value,
-        acceptedBaseFieldRevision:
-          doc.teachers.find((t) => t.id === staffId)?.fieldRevisions?.[
-            fields[field]
-          ] ?? 0,
-        validFrom: doc.from ? Date.parse(doc.from + "T00:00:00+08:00") : null,
-        sourcePublicationId: publicationId,
-        sourceOperationId: operationId,
-        originalActorId: actorId,
-      })),
+      .map(([field, value]) => {
+        const contactsField = fields[field];
+        const basicNameChangedAt =
+          contactsField === "basicName"
+            ? doc.teacherDraftMeta?.[staffId]?.basicNameProvenance?.changedAt ?? null
+            : null;
+        return {
+          staffId,
+          field: contactsField,
+          proposedValue: normalizeTagContributionValue(contactsField, value),
+          acceptedBaseFieldRevision:
+            doc.teachers.find((t) => t.id === staffId)?.fieldRevisions?.[
+              contactsField
+            ] ?? 0,
+          directTagPublicationVersion: 1,
+          ...(Number.isSafeInteger(basicNameChangedAt)
+            ? { basicNameChangedAt }
+            : {}),
+          validFrom: publishedAt,
+          sourcePublicationId: publicationId,
+          sourceOperationId: operationId,
+          originalActorId: actorId,
+        };
+      }),
   );
   // This marker is part of the immutable payload. Never reinterpret historical
   // publications after a code upgrade, or turn unknown facts into empty lists.

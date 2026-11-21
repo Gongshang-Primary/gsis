@@ -1034,10 +1034,15 @@ export async function handle(ctx) {
       const allowedFields = [
         "basicName",
         "role",
+        "eoAppointmentLevel",
         "appointmentStatus",
         "employmentArrangement",
+        "employmentStatus",
+        "schoolSection",
+        "personnelCategory",
         "employmentTags",
         "subjectTags",
+        "mkTags",
         "employmentActive",
         "memberships",
       ];
