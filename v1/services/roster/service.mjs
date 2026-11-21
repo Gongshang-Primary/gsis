@@ -4,6 +4,7 @@ import {
   updateRosterContactMobile,
 } from "./contact-create.mjs";
 import {updateCapacityWarnings,refreshCapacityMessage,refreshNewSummaries,capacityTemplateData} from "./capacity-notifications.mjs";
+import { queueFinalRunOutcome } from "./final-run-notifications.mjs";
 import { forecastCapacity, layeredHealth } from "./capacity.mjs";
 import { allocationSnapshot } from "./allocation-snapshot.mjs";
 import { hasDatedReliefActivation, isReliefNotificationKind } from "./eligibility.mjs";
@@ -2935,6 +2936,7 @@ async function scheduledCommunication(ctx, slot) {
     );
   await updateCapacityWarnings(local, loaded, next, c, range.dates, revision);
   await refreshNewSummaries(local, loaded, next, c, revision);
+  queueFinalRunOutcome(next, c, body.tick);
   const op = await prepared(local, "roster.scheduled-notifications", body),
     quotaPlan = await captureObservedQuotas(local, loaded, next, c),
     change = await recordChanges(schoolId, loaded.before, next, loaded.records),
