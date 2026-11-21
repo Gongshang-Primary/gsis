@@ -692,8 +692,10 @@ export function validateWorkbook(
         planned = planningPerson(doc, t);
       const mapping = roleMapping({ ...next, teacherDrafts: { ...next.teacherDrafts,
         [s]: { ...next.teacherDrafts[s], Role: row.Role || "" } } }, t);
+      const referenceLevel = mapping?.[12] ?? roleMapping(doc, t)?.[12] ??
+        planned.profile["EO Appt Level"] ?? "";
       check(
-        (row["EO Appt Level"] || "") === (mapping ? mapping[12] : (planned.profile["EO Appt Level"] || "")),
+        (row["EO Appt Level"] || "") === referenceLevel,
         "EO appointment level is reference-only.",
       );
       next.teacherNotes[s] = text(row["Planner Notes"] || "", 4000, true);
