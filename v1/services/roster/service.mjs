@@ -34,6 +34,7 @@ import { webhookProof, processInbound } from "./inbound.mjs";
 import { external, externalProof, issueLink } from "./external.mjs";
 export { external };
 import Operations from "../../../shared/roster-operations.js";
+import { templateFor } from "./templates.mjs";
 import Roster from "../../../shared/roster.js";
 import Allocation from "../../../shared/roster-allocation.js";
 import { ApiError, requireValue, identifier } from "../../runtime/errors.mjs";
@@ -3069,24 +3070,6 @@ async function currentScheduledPrincipal(
     now,
   });
 }
-function templateFor(env, key, data) {
-  const configured = JSON.parse(env.WHATSAPP_TEMPLATES_JSON || "{}"),
-    t = Array.isArray(configured)
-      ? configured.find((t) => t.key === key)
-      : configured[key];
-  requireValue(t && typeof t.name === "string", "TEMPLATE_NOT_CONFIGURED", 503);
-  const parameters = (t.parameters || []).map((field) => ({
-    type: "text",
-    text: String(data[field] ?? "").slice(0, 1000),
-  }));
-  return {
-    name: t.name,
-    language: { code: t.language || "en" },
-    ...(parameters.length
-      ? { components: [{ type: "body", parameters }] }
-      : {}),
-  };
-}
 async function assertJobLease(env, job, now) {
   requireValue(
     await one(
@@ -3391,9 +3374,11 @@ export async function dispatchRosterJob(job, env, now = Date.now()) {
     }
     if(capacityMessage&&!await refreshCapacityMessage(ctx,loaded,c,payload,await scopeRevision(env.DB,schoolId,'day:'+payload.date)))
       return {state:'cancelled',code:'CAPACITY_WARNING_OBSOLETE_OR_UNVERIFIED'};
-    let link = null;
+    let link = null, linkToken = null;
     if (
       payload.kind === "mutual_request" ||
+      // Peer-change notices link to the recipient's own published duties.
+      payload.kind === "mutual_override" ||
       payload.data?.snapshotIds?.length ||
       payload.data?.dailyPublication ||
       payload.data?.communicationSnapshot
@@ -3405,6 +3390,7 @@ export async function dispatchRosterJob(job, env, now = Date.now()) {
         503,
       );
       link = env.PUBLIC_ORIGIN + "/roster/external/#token=" + issued.token;
+      linkToken = issued.token;
     }
     await assertJobLease(env, job, now);
     return dispatchProvider(env, {
@@ -3413,6 +3399,7 @@ export async function dispatchRosterJob(job, env, now = Date.now()) {
       template: templateFor(env, payload.data?.templateKey || payload.kind, {
         ...(capacityMessage?capacityTemplateData(env,payload,currentRecipient):(payload.data || {})),
         link,
+        linkToken,
       }),
       idempotencyKey: job.job_id,
     });

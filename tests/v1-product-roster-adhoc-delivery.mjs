@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import fixture from "./roster701-fixture.cjs";
 import { createDatabase } from "./v1-product/helpers.mjs";
 import { dispatchRosterJob } from "../v1/services/roster/service.mjs";
+import { templateFor } from "../v1/services/roster/templates.mjs";
 import { canonical, one } from "../v1/runtime/store.mjs";
 import { externalProof } from "../v1/services/roster/external.mjs";
 
@@ -186,6 +187,32 @@ try {
     payload: { date, to: "bob@example.invalid", subject: "Synthetic report" },
     changeState: state => { state.dailyEmploymentSettings.recipients = [{ staffId: "bob", emails: ["bob@example.invalid"] }]; },
   });
+  // v1 button templates (owner 21 Nov 2026): the dynamic URL button carries the
+  // same private token as the link; static buttons carry none; a token button
+  // never goes out without a token.
+  const baseTemplates = env.WHATSAPP_TEMPLATES_JSON, configured = JSON.parse(baseTemplates);
+  configured.relief_assignment = { name: "gsis_v1_relief_assignment", language: "en_GB", parameters: ["summary"], button: "token" };
+  configured.mutual_override = { name: "gsis_v1_relief_changed", language: "en_GB", parameters: ["summary"], button: "token" };
+  configured.stapler_request = { name: "gsis_v1_static", language: "en_GB", parameters: ["summary"], button: "static" };
+  env.WHATSAPP_TEMPLATES_JSON = JSON.stringify(configured);
+  const buttonSent = await run("relief_publication", { first: { ...inactive, active: true }, adhoc: [] });
+  assert.equal(buttonSent.result.state, "accepted");
+  const buttonBody = sends.at(-1).template, button = buttonBody.components.find(c => c.type === "button");
+  assert.equal(buttonBody.name, "gsis_v1_relief_assignment");
+  assert.deepEqual({ sub_type: button.sub_type, index: button.index }, { sub_type: "url", index: "0" });
+  assert.match(button.parameters[0].text, /^[A-Za-z0-9_-]{43}$/, "button carries the private token only");
+  const peerChange = await run("mutual_override", { first: { ...inactive, active: true }, adhoc: [], payload: { ...payloadFor("mutual_override"), data: { ...payloadFor("mutual_override").data, summary: "Your peer relief arrangement has changed." } } });
+  assert.equal(peerChange.result.state, "accepted", JSON.stringify(peerChange.result));
+  const peerButton = sends.at(-1).template.components.find(c => c.type === "button");
+  assert.equal(sends.at(-1).template.name, "gsis_v1_relief_changed");
+  assert.match(peerButton.parameters[0].text, /^[A-Za-z0-9_-]{43}$/, "peer-change notice now gets a private duties link");
+  // A token button on a message that has no private link is refused before any send.
+  assert.throws(() => templateFor({ WHATSAPP_TEMPLATES_JSON: JSON.stringify({ smc_attention: { name: "x", parameters: ["summary"], button: "token" } }) },
+    "smc_attention", { summary: "Synthetic", link: null, linkToken: null }), (e) => e.code === "TEMPLATE_LINK_UNAVAILABLE");
+  assert.throws(() => templateFor({ WHATSAPP_TEMPLATES_JSON: JSON.stringify({ k: { name: "x", button: "dynamic" } }) }, "k", {}), (e) => e.code === "TEMPLATE_BUTTON_INVALID");
+  const staticButton = templateFor({ WHATSAPP_TEMPLATES_JSON: JSON.stringify({ k: { name: "x", parameters: ["summary"], button: "static" } }) }, "k", { summary: "S" });
+  assert.deepEqual(staticButton.components, [{ type: "body", parameters: [{ type: "text", text: "S" }] }], "static button needs no parameter");
+  env.WHATSAPP_TEMPLATES_JSON = baseTemplates;
   const activeControl = await run("relief_publication", { first: { ...inactive, active: true }, adhoc: [] });
   assert.equal(activeControl.result.state, "accepted", "ordinary active recipient needs no ad hoc activation");
   console.log("PASS actual local Roster delivery: six relief kinds, current eligibility and source-bound duty/mutual links; date/period/deletion/identity/qualification/consent negatives and active-only non-relief boundaries; synthetic providers only");
