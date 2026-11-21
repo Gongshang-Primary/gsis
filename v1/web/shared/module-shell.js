@@ -73,6 +73,7 @@
     "Continuity exports and offline return":"roster-continuity",
     "Canonical Excel and publication receipts":"deploy-publication",
     "Layout-owned data":"layout-data",
+    "Timed timetable occupancy (aSc baseline)":"layout-timed-timetable",
     "LORD setup and inventory":"lord-settings",
     "Signage access":"signage",
   };
@@ -84,7 +85,7 @@
     if(kind === "roster-policy" && /System Config|My Relief Duties/.test(section)) return document.querySelector('#content [data-settings-body]') || document.getElementById("content");
     if(kind === "roster-continuity" && section === "System Config") return document.querySelector('#content [data-settings-body]') || document.getElementById("content");
     if(kind === "deploy-publication" && section === "Versions") return document.getElementById("content");
-    if(kind === "layout-data") return document.getElementById("tgView");
+    if(kind === "layout-data" || kind === "layout-timed-timetable") return document.getElementById("tgView");
     if((kind === "lord-settings" || kind === "signage") && suite.module === "overlord") return document.getElementById("settingsBody");
     return null;
   }
