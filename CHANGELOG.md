@@ -1,3 +1,27 @@
+# Pending hotfix: local Excel export recovery, 17 November 2026
+
+Model: Codex. Export the loaded local timetable and current local assignments even when D1 response revisions differ or exportContext is missing. All three exports make no online read, retain snapshot labels and privacy, and refuse incomplete timetable data. Owner/date-scoped complete views survive cache invalidation for offline export recovery; online writes remain gated on current verification. See `docs/coordination/tasks/roster-local-export-recovery.md`. Frontend-only extension; no deployment or live settings/data changes by Codex.
+
+# Pending hotfix: Combine with occupied activity, 17 November 2026
+
+Model: Codex. A timetabled teaching activity with a subject but no class label is now a valid Combine base. Ordinary relief still requires a blank period; blocked duties, attendance and identity checks remain. Blank class labels cannot bypass the one-additional-class limit. Existing lesson contents, zero-R combinations and request receipts are preserved. Owner deployment needs both Roster Workers and the Roster frontend ZIP; no Apps Script upload. See `docs/coordination/tasks/roster-combine-occupied-lesson-hotfix.md`. Not deployed by Codex.
+
+# Pending hotfix: D1 background Worker memory, 17 November 2026
+
+Model: Codex. Bound simultaneous materialized Roster mutations in the notification Worker with FIFO admission, retain independent provider sends and foreground cancellation, and remove redundant state copies during plan hydration/packing. Refused-before-start allocation work releases its cycle lease. System Health preserves busy/backoff/memory diagnostics and lease counters. Existing receipts, CAS guards, allocation rules, history and uncertain-send handling remain. See `docs/coordination/tasks/roster-d1-worker-memory-hotfix.md`. No deployment or live settings/data change performed by Codex.
+
+# Pending hotfix: received D1 report recovery, 16 November 2026
+
+Model: Codex. Resume captured absences in the capture Worker independently of remote notification wake acceptance, and retry retained work on authorized receipt checks. Existing leases and request receipts prevent duplicate application; delayed delivery uses the trusted capture date. Assign Relief refreshes after observed application when doing so preserves unsaved work. No live repair, configuration change, namespace migration or Apps Script change. See `docs/coordination/tasks/roster-received-report-recovery.md`. Not deployed.
+
+# Pending hotfix: public WhatsApp menu, 16 November 2026
+
+Model: Codex. The D1 WhatsApp handler displays the owner’s unmanned-number notice and five service choices to every sender. Only Urgent Message resolves staff identity; unique active and inactive Contacts roster records qualify. Unknown, ambiguous or changed identities cannot submit urgent text. Existing recipients, reply claims, duplicate suppression, rate limits and expiry remain. Worker-only behaviour; no Apps Script or Meta template/configuration change. See `docs/coordination/tasks/roster-whatsapp-public-menu.md`. Not deployed.
+
+# Pending hotfix: absence clash confirmation, 16 November 2026
+
+Model: Codex. The D1 Report Absence form accepts disjoint periods without a prompt. Overlapping reports show the current absence and require acknowledgement before an atomic replacement, retaining superseded records and completed work. Changed conflicts require fresh confirmation; request receipts prevent duplicate replacement after a lost response. D1/Pages and both Roster Workers only; no Apps Script change. See `docs/coordination/tasks/roster-absence-clash-confirm.md`. Not deployed.
+
 # Pending hotfix: activated ad hoc relief eligibility, 14 November 2026
 
 Model: Codex. Restore active-or-dated-ad-hoc eligibility after #38: manual/automatic relief, shared cover, daily reports and duty WhatsApp include activated inactive Contacts within their dates/periods. Truly inactive staff remain blocked. Dated labels read “ad hoc”; Contacts status and allocation rules are unchanged. See `docs/coordination/tasks/roster-adhoc-inactive-regression.md` and `docs/plans/2026-11-15-adhoc-hotfix-deploy-steps.md`. Not deployed.

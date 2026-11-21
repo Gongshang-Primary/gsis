@@ -4,7 +4,8 @@
 const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
 const src=fs.readFileSync('roster-update/public/roster-operations-ui.js','utf8');
 const start=src.indexOf(' function localExportSnapshot(s){'),end=src.indexOf('\n }\n',start)+3;assert(start>0&&end>start);
-const ctx={draftCopy:v=>v===undefined?v:structuredClone(v),draftFor:()=>null,draftWork:()=>false,dateText:d=>d,stamp:v=>v,
+// This focused projection test supplies the separately tested local-context builder.
+const ctx={localExportContext:s=>s.data.exportContext,draftCopy:v=>v===undefined?v:structuredClone(v),draftFor:()=>null,draftWork:()=>false,dateText:d=>d,stamp:v=>v,
  person:(s,id)=>s.data.people.find(p=>p.id===id)||{id,name:id||'Unknown teacher'},GSISRosterOperations:{publicDuty:()=>({assignedBy:'Auto-allocation'})}};
 vm.createContext(ctx);vm.runInContext(src.slice(start,end),ctx);
 const people=[{id:'nisha',name:'Nisha'},{id:'wl',name:'Wei Ling'},{id:'bob',name:'Bob Tan'}];

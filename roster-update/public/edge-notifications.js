@@ -3,6 +3,7 @@ import {sha256Hex} from './edge-deploy-sha256.js';
  * authoritative Roster D1 CAS; provider calls are never inside a transaction. */
 import {loadEdgeRoster,mutateEdgeRoster,buildEdgeRosterContext} from './edge-roster.js';
 import {GSISRosterOperations,GSISRosterInbox,GSiSEdgeNotifications} from './edge-roster-domain.js';
+import {edgeInboundMessage} from './edge-whatsapp-inbound.js';
 const transportOps=new Set(['claimNotifications','prepareNotification','prepareNotifications','notificationResult','notificationResults','notificationDelivery','notificationDeliveryBatch']);
 const inboxOps={inboxIngest:'ingest',inboxReplyPrepare:'prepare',inboxReplyResult:'replyResult',inboxDelivery:'delivery',inboxAlertPrepare:'alertPrepare',inboxAlertResult:'alertResult',inboxPendingDispatch:'pending'};
 const receiptOps=new Set(['notificationResult','notificationResults','notificationDelivery','notificationDeliveryBatch','inboxReplyResult','inboxAlertResult','inboxDelivery','inboundReplyResult','settlePeerMail','settleEmploymentMail']);
@@ -69,7 +70,7 @@ export async function edgeNotificationService(env,input){
  return service(env,input,(state,ctx)=>{
   if(transportOps.has(input.operation))return GSiSEdgeNotifications.transport(state,input,contacts(ctx),ctx.now);
   if(inboxOps[input.operation]){const inbox=GSISRosterInbox.validate(GSiSEdgeNotifications.inboxState(state)),result=GSISRosterInbox[inboxOps[input.operation]](inbox,inboxContext(state,ctx,true),input);GSiSEdgeNotifications.packInbox(state,inbox);return result;}
-  if(input.operation==='inboundMessage')return GSISRosterOperations.inboundMessage(state,{...ctx,service:true,inboxMode:input.inboxMode===true,urgentSMCIds:input.inboxMode?GSISRosterOperations.dutySMC(state,ctx,ctx.today):ctx.urgentSMCIds,uuid:()=>crypto.randomUUID()},input);
+  if(input.operation==='inboundMessage')return edgeInboundMessage(state,{...ctx,service:true,inboxMode:input.inboxMode===true,urgentSMCIds:input.inboxMode?GSISRosterOperations.dutySMC(state,ctx,ctx.today):ctx.urgentSMCIds,uuid:()=>crypto.randomUUID()},input);
   const event=state.inboundEvents.find(row=>row.id===input.receiptId&&row.replyClaimId===input.replyClaimId);
   if(!event)fail(409,'Incoming reply claim changed.');
   if(!['sent','failed','uncertain'].includes(input.state))fail(400,'Invalid reply status.');
