@@ -1205,6 +1205,12 @@ function transform(module,rel,text){
    text=replaceOnce(text,"    $('personForm').addEventListener('submit', async ev => {","    window.GSISV1.request('calendar','/accounts').then(result=>{const picker=$('personForm')?.elements.TargetAccountId;if(!picker)return;const accounts=result.accounts||result.rows||result;for(const account of accounts){const option=new Option(account.email+' · '+account.accountId,account.accountId);option.dataset.alias=account.email.split('@')[0];picker.append(option);}if(person?.accountId)picker.value=person.accountId;}).catch(error=>toast(error.message,true));\n    $('personForm').addEventListener('submit', async ev => {",'Calendar account lookup');
    text=replaceOnce(text,"          UserAlias: f.get('UserAlias'),","          UserAlias: form.elements.TargetAccountId.selectedOptions[0].dataset.alias, targetAccountId:f.get('TargetAccountId'),",'Calendar stable account binding');
    text=text.replace("String(f.get('UserAlias')).trim().toLowerCase()===String(person?.userAlias||'').toLowerCase()?expectedMetadataRevision:'missing'","String(f.get('TargetAccountId'))===String(person?.accountId||'')?expectedMetadataRevision:'missing'");
+   text=replaceOnce(
+    text,
+    "render();input.addEventListener('input',search);input.addEventListener('focus',search);input.addEventListener('blur',()=>setTimeout(close,100));",
+    "let closeTimer=0;const cancelClose=()=>{if(closeTimer){clearTimeout(closeTimer);closeTimer=0;}};render();input.addEventListener('input',()=>{cancelClose();search();});input.addEventListener('focus',()=>{cancelClose();search();});input.addEventListener('blur',()=>{cancelClose();closeTimer=setTimeout(()=>{closeTimer=0;if(document.activeElement!==input)close();},100);});",
+    'Calendar venue picker keeps suggestions open on blur + immediate refocus',
+   );
   }
   if(module.id==='roster')text=text.replaceAll('href="/archive.html"','href="/roster/archive.html"');
   if(module.id==='roster'&&rel==='roster-settings-ui.js'){
