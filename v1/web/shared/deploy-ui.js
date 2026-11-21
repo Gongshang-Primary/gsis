@@ -935,6 +935,65 @@ import { planningSnapshot, planningPerson, planningEligible, reportingRoot, repo
         return originalStopLive();
       };
     }
+    // Port #247/#245 readable assignment-review labels in v1 (yields cleanly if public/app.js already provides draftReviewTitle).
+    if (typeof window.draftReviewTitle !== "function" && typeof window.resolveQueue === "function") {
+      const formatReviewTitle = (projected, x, fallbackDoc) => {
+        if (x.operation === "addTG") return "Add teaching group " + x.name;
+        if (!["addTeacher", "removeTeacher"].includes(x.operation)) return queueKey(x);
+        const doc = projected || fallbackDoc || v() || {};
+        const teachers = doc.teachers || fallbackDoc?.teachers || [];
+        const classes = doc.classes || fallbackDoc?.classes || [];
+        const groups = doc.groups || fallbackDoc?.groups || [];
+        const teacher = teachers.find(t => t.id === x.teacher)?.name || "Unavailable teacher";
+        const cl = classes.find(c => (x.targetRef ? c.ref === x.targetRef : classKey(c) === x.target));
+        const group = groups.find(g => g.id === x.target);
+        const target = cl
+          ? (typeof window.classLabel === "function" ? classLabel(cl) : classKey(cl))
+          : (group?.name || "Unavailable class or teaching group");
+        return (
+          (x.operation === "addTeacher" ? "Assign " : "Remove ") +
+          teacher +
+          (x.operation === "addTeacher" ? " to " : " from ") +
+          target +
+          " · " +
+          (x.subject || "Subject unavailable")
+        );
+      };
+      const formatReviewValue = (x, value) =>
+        ["addTeacher", "removeTeacher"].includes(x.operation)
+          ? (typeof value === "boolean" ? (value ? "Assigned" : "Not assigned") : "Unavailable")
+          : JSON.stringify(value ?? null);
+      const originalResolveQueue = window.resolveQueue;
+      window.resolveQueue = async (...args) => {
+        const editsSnapshot = clone(typeof window.queuedEdits === "function" ? queuedEdits() : []);
+        const baseDoc = clone(draftBase || v() || {});
+        const result = await originalResolveQueue(...args);
+        const panel = document.querySelector("dialog[open] [data-review-content]");
+        if (panel && editsSnapshot.length) {
+          const ordered = typeof window.orderedClassDraftEdits === "function" ? orderedClassDraftEdits(editsSnapshot) : editsSnapshot;
+          const sections = [...panel.querySelectorAll(":scope > section")];
+          const projected = clone(baseDoc);
+          ordered.forEach((x, idx) => {
+            const sec = sections[idx];
+            if (!sec || !["addTeacher", "removeTeacher"].includes(x.operation)) return;
+            let before, after;
+            try {
+              before = draftDisplayValue(baseDoc, x);
+              projectEdit(projected, x);
+              after = draftDisplayValue(projected, x);
+            } catch {}
+            const h3 = sec.querySelector("h3");
+            if (h3) h3.textContent = formatReviewTitle(projected, x, baseDoc);
+            const pre = sec.querySelector("pre");
+            if (pre) {
+              pre.textContent =
+                "Saved: " + formatReviewValue(x, before) + "\nDraft: " + formatReviewValue(x, after ?? x);
+            }
+          });
+        }
+        return result;
+      };
+    }
     window.masterOptionsPage = (root) => {
       const lists = choiceLists(v()), editable = api.capable("deploy.edit");
       const note = document.createElement("p"); note.className = "hint";
