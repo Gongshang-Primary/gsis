@@ -877,6 +877,7 @@ export function validateWorkbook(
     );
     const parents = reportingLinks(doc), originalLinks = { ...parents },
       changedIds = new Set(), clearedOrphans = new Set();
+    const knownReportingStaff = new Set([...teacherMap.keys(), ...allowedIds]);
     for (const s of eligibleIds) {
       const a = h[s],
         b = fromColumns[s],
@@ -898,7 +899,7 @@ export function validateWorkbook(
           "New reporting relationships require currently eligible staff.",
         );
       }
-      if (!teacherMap.has(s) && !parents[s]) {
+      if (!knownReportingStaff.has(s) && !parents[s]) {
         // An incoming historical reference may project a missing parent row.
         // A blank projected row is not a new durable identity or graph edge.
         if (changedIds.has(s)) clearedOrphans.add(s);
@@ -917,7 +918,7 @@ export function validateWorkbook(
     const retainedStaff = new Map((doc.reporting?.staff || []).map(t => [t.id, t]));
     for (const t of reportingPeople.values()) {
       const prior = retainedStaff.get(t.id);
-      if (!teacherMap.has(t.id)) {
+      if (!knownReportingStaff.has(t.id)) {
         if (prior && changedIds.has(t.id) && Object.hasOwn(prior, "ro"))
           retainedStaff.set(t.id, { ...prior, ro: "" });
         continue;
@@ -938,7 +939,7 @@ export function validateWorkbook(
       ...doc.reporting,
       parents,
       officers,
-      roColumnIds: [...columnIds].filter(s => s && (teacherMap.has(s) || previousColumns.has(s))),
+      roColumnIds: [...columnIds].filter(s => s && (knownReportingStaff.has(s) || previousColumns.has(s))),
       staff: [...retainedStaff.values()],
     };
   }

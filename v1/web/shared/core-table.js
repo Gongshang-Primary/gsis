@@ -349,13 +349,18 @@
               state.sort?.column === i ? -state.sort.direction : 1;
             state.sort = { column: i, direction };
             const rows = dataRows(table);
-            rows.sort(
-              (a, b) =>
+            rows.sort((a, b) => {
+              const inactive =
+                Number(a.classList.contains("inactive")) -
+                Number(b.classList.contains("inactive"));
+              if (inactive) return inactive;
+              return (
                 text(a.cells[i]).localeCompare(text(b.cells[i]), undefined, {
                   numeric: true,
                   sensitivity: "base",
-                }) * direction,
-            );
+                }) * direction
+              );
+            });
             for (const row of rows) row.parentElement.append(row);
             [...head.cells].forEach((c) => c.removeAttribute("aria-sort"));
             cell.setAttribute(

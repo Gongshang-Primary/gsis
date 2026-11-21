@@ -1194,6 +1194,14 @@ async function save(
         : e.operation === "setReportingOfficer" ? [e.officer, e.value] : [],
     ).filter((staffId) => typeof staffId === "string" && staffId);
     loaded.doc = mergeContacts(before, ref, { includeUnlisted: false, addStaffIds: additions });
+    if (edits.some((e) => ["initReporting", "setReportingOfficer"].includes(e.operation))) {
+      const hydrated = mergeContacts(before, ref, { includeUnlisted: true });
+      Object.defineProperty(loaded.doc, "staffCatalog", {
+        value: hydrated.teachers,
+        enumerable: false,
+        configurable: true,
+      });
+    }
     extraDependencies = contactsDependencies(ref);
   }
   if (!next) {
@@ -1306,10 +1314,17 @@ async function save(
     },
   );
 }
-function workbookDocument(document, scope) {
-  return ["IP", "TG"].includes(scope)
-    ? canonicalTeachingDocument(document)
-    : document;
+function workbookDocument(document, scope, ref = null) {
+  if (["IP", "TG"].includes(scope)) return canonicalTeachingDocument(document);
+  if (scope === "Span of Control" && ref) {
+    const hydrated = mergeContacts(document, ref, { includeUnlisted: true });
+    Object.defineProperty(document, "staffCatalog", {
+      value: hydrated.teachers,
+      enumerable: false,
+      configurable: true,
+    });
+  }
+  return document;
 }
 function importStaffIds(workbook, matches = {}) {
   const ids = new Set();
@@ -1333,6 +1348,7 @@ async function previewImport(ctx) {
     mergeContacts(loaded.doc, ref, { includeUnlisted: false,
       addStaffIds: importStaffIds(b.workbook, b.matches) }),
     b.workbook?.metadata?.["Table Scope"],
+    ref,
   );
   const dependencyDigest = await digest(ref.dependencies || []);
   const validated = validateWorkbook(
@@ -1347,7 +1363,7 @@ async function previewImport(ctx) {
     validated.document,
     ref,
   );
-  const before = flatten(workbookDocument(saved, b.workbook?.metadata?.["Table Scope"])),
+  const before = flatten(workbookDocument(saved, b.workbook?.metadata?.["Table Scope"], ref)),
     after = flatten(validated.document),
     diff = { added: 0, removed: 0, changed: 0 };
   for (const k of new Set([...before.keys(), ...after.keys()]))
@@ -1426,6 +1442,7 @@ async function applyImport(ctx) {
     mergeContacts(loaded.doc, ref, { includeUnlisted: false,
       addStaffIds: importStaffIds(input.workbook, input.matches) }),
     input.workbook?.metadata?.["Table Scope"],
+    ref,
   );
   const validated = validateWorkbook(
     input.workbook,
@@ -2245,9 +2262,10 @@ export async function handle(ctx) {
   if (p === "/imports/preview") return previewImport(ctx);
   if (p === "/imports/apply") return applyImport(ctx);
   if (p === "/export") {
-    const { doc, version } = await loadVersion(ctx.env.DB, school, b.versionId);
+    const { doc, version } = await loadVersion(ctx.env.DB, school, b.versionId),
+      ref = await contacts(ctx);
     return exportWorkbook(
-      workbookDocument(mergeContacts(doc, await contacts(ctx), { includeUnlisted: false }), b.scope),
+      workbookDocument(mergeContacts(doc, ref, { includeUnlisted: false }), b.scope, ref),
       b.scope,
       school,
       version.revision,
