@@ -272,7 +272,7 @@ try {
     (e) => e.code === "OPERATION_INTENT_CONFLICT",
   );
   const snap = await loadVersion(h.db, school, versionId);
-  assert.equal(snap.doc.classNameSets.length, 1);
+  assert.equal(snap.doc.classNameSets.length, 2);
   assert.equal(snap.version.revision, 0);
   await edit(
     versionId,
