@@ -1497,6 +1497,54 @@ async function baselineWrite(ctx) {
     ],
   });
 }
+// v0.9 baseline (Code.gs contactCreate): a new inactive external relief contact
+// asks for review in Contacts. Owner 21 Nov 2026: Contacts Power Users only.
+// One message per recipient per operation; a retry replays the original receipt.
+async function queueContactReview(ctx, created, date) {
+  const op = await prepared(ctx, "roster.contactCreate", {
+    kind: "contact-review",
+    staffId: created.person.staffId,
+  });
+  if (op.receipt) return { ...op.receipt.result, receipt: op.receipt };
+  const schoolId = ctx.principal.schoolId,
+    holders = await serviceCall(ctx.env, "core", "/internal/contacts-power-users", {
+      decisionId: ctx.principal.decisionId,
+    }),
+    ids = Array.isArray(holders?.staffIds) ? holders.staffIds.filter((id) => typeof id === "string") : [],
+    refs = ids.length
+      ? await serviceCall(ctx.env, "contacts", "/internal/projection", {
+          schoolId,
+          decisionId: ctx.principal.decisionId,
+          purpose: "roster",
+          date,
+          staffIds: ids,
+        })
+      : { people: [] },
+    people = (refs.people || refs.staff || [])
+      .filter((p) => ids.includes(p.staffId || p.id))
+      .map((p) => ({ id: p.staffId || p.id, name: p.name || p.ttbName || "", active: p.active === true, mobile: p.mobile || "" })),
+    state = { outbox: [] },
+    qctx = { people, now: ctx.now, iso: new Date(ctx.now).toISOString(), uuid: () => crypto.randomUUID() },
+    summary = "New inactive external relief contact: " + created.person.name + ". Review permanent details in Contacts.",
+    requestDate = new Intl.DateTimeFormat("en-SG", { timeZone: "Asia/Singapore", day: "numeric", month: "short", year: "numeric" }).format(new Date(ctx.now)),
+    reviewUrl = /^https:\/\/[^\s/?#]+$/.test(ctx.env.PUBLIC_ORIGIN || "") ? ctx.env.PUBLIC_ORIGIN + "/contacts/" : "";
+  for (const person of people)
+    Operations.queue(state, qctx, "contact_review", person.id, date, {
+      templateKey: "contact_review",
+      summary,
+      staffId: created.person.staffId,
+      recipient_name: person.name,
+      request_date: requestDate,
+      contact_review_details: summary,
+      contacts_review_url: reviewUrl,
+    }, null, "contact-created:" + op.operationId + ":" + person.id);
+  const jobs = state.outbox.filter((j) => j.status === "queued");
+  return commit(ctx, op, {
+    result: { ...created, notificationsQueued: jobs.length },
+    audit: { kind: "contact-review", staffId: created.person.staffId, recipients: jobs.length },
+    outbox: jobs.map((j) => ({ id: j.id, type: "roster-notification", payload: j, dueAt: ctx.now })),
+  });
+}
 async function offlineEdits(ctx) {
   const schoolId = ctx.principal.schoolId,
     { row, value } = await daySource(
@@ -1870,8 +1918,11 @@ async function operations(ctx) {
     configRevision = await scopeRevision(ctx.env.DB, schoolId, "config"),
     loaded = await loadState(ctx.env.DB, schoolId, range, { recordIds: ids });
   loaded.state.revision = revision;
-  if (opName === "contactCreate")
-    return createRosterContact(ctx, { revision, date: range.from });
+  if (opName === "contactCreate") {
+    const created = await createRosterContact(ctx, { revision, date: range.from });
+    if (created?.saved !== true || body.staffId || body.existingStaffId) return created;
+    return queueContactReview(ctx, created, range.from);
+  }
   if (opName === "adHocUpdateMobile")
     return updateRosterContactMobile(ctx, { revision, date: range.from });
   if (opName === "receiptStatus") {
@@ -3382,6 +3433,13 @@ export async function dispatchRosterJob(job, env, now = Date.now()) {
       !c.projection.smcIds.includes(currentRecipient.id)
     )
       return { state: "cancelled", code: "SPONSOR_NO_LONGER_SMC" };
+    if (payload.kind === "contact_review") {
+      const holders = await serviceCall(env, "core", "/internal/contacts-power-users", {
+        decisionId: principal.decisionId,
+      });
+      if (!Array.isArray(holders?.staffIds) || !holders.staffIds.includes(currentRecipient.id))
+        return { state: "cancelled", code: "RECIPIENT_NO_LONGER_POWER_USER" };
+    }
     if (Operations.notificationCurrent(loaded.state, payload, now))
       return { state: "cancelled", code: "NOTIFICATION_OBSOLETE" };
     if (currentRecipient.active !== true) {
