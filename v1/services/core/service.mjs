@@ -1622,7 +1622,7 @@ export async function handle(ctx) {
         "SELECT scope,pin_id AS pinId,destination,operation_id AS operationId,created_at AS createdAt FROM source_pins WHERE school_id=? AND state='held' ORDER BY created_at LIMIT 100",
         [env.SCHOOL_ID],
       ),
-      retentionDeletionEnabled: false,
+      retentionDeletionEnabled: env.RETENTION_DELETE_ENABLED === "true",
     };
   if (
     (path === "/admin/evidence" || path.startsWith("/evidence/")) &&
@@ -1633,6 +1633,137 @@ export async function handle(ctx) {
       : new URL(request.url).searchParams.get("decisionId");
     fail(validId(id));
     return recoverDecisionEvidence(ctx, id);
+  }
+  if (path === "/admin/evidence/retention" && method === "POST") {
+    if (!principal?.capabilities.includes("admin") || principal.impersonating) {
+      throw new ApiError("CAPABILITY_DENIED", 403);
+    }
+    const dryRun = body.dryRun !== false;
+    const retentionDays =
+      body.retentionDays === undefined ? 90 : Number(body.retentionDays);
+    const limit = body.limit === undefined ? 500 : Number(body.limit);
+    fail(
+      Number.isSafeInteger(retentionDays) &&
+        retentionDays >= 30 &&
+        retentionDays <= 3650 &&
+        Number.isSafeInteger(limit) &&
+        limit >= 1 &&
+        limit <= 500,
+    );
+    const retentionEnabled = env.RETENTION_DELETE_ENABLED === "true";
+    if (!dryRun && !retentionEnabled) {
+      throw new ApiError(
+        "RETENTION_DISABLED",
+        409,
+        "Retention deletion is disabled (RETENTION_DELETE_ENABLED must be true).",
+      );
+    }
+    const cutoff = now - retentionDays * 86400000;
+    const eligibleEvidence = await query(
+      env.DB,
+      `SELECT e.decision_id FROM core_evidence e
+       WHERE e.school_id = ? AND e.valid_until < ? AND e.created_at < ?
+         AND NOT EXISTS (
+           SELECT 1 FROM product_admissions a
+           WHERE a.school_id = e.school_id AND a.decision_id = e.decision_id
+             AND a.state IN ('acquiring','ready','resolving')
+         )
+         AND NOT EXISTS (
+           SELECT 1 FROM source_pins p
+           WHERE p.school_id = e.school_id AND p.decision_id = e.decision_id
+             AND p.state = 'held'
+         )
+       ORDER BY e.valid_until ASC, e.decision_id ASC
+       LIMIT ?`,
+      [env.SCHOOL_ID, cutoff, cutoff, limit],
+    );
+    const eligibleAdmissions = await query(
+      env.DB,
+      `SELECT operation_id FROM product_admissions
+       WHERE school_id = ? AND state IN ('resolved','aborted') AND valid_until < ?
+       ORDER BY valid_until ASC, operation_id ASC
+       LIMIT ?`,
+      [env.SCHOOL_ID, cutoff, limit],
+    );
+    if (dryRun) {
+      return {
+        dryRun: true,
+        retentionDeletionEnabled: retentionEnabled,
+        retentionDays,
+        limit,
+        cutoff,
+        eligible: {
+          evidence: eligibleEvidence.length,
+          admissions: eligibleAdmissions.length,
+        },
+        deleted: {
+          evidence: 0,
+          admissions: 0,
+        },
+      };
+    }
+    const op = await prepareOperation(env.DB, {
+      schoolId: env.SCHOOL_ID,
+      actorId: principal.actorId,
+      operationId: body.operationId,
+      action: "core.admin",
+      intent: {
+        kind: "evidence-retention",
+        dryRun: false,
+        retentionDays,
+        limit,
+      },
+      now,
+      validUntil: principal.validUntil,
+      authorization: principal,
+    });
+    if (op.receipt) return op.receipt;
+    const writes = [];
+    for (const row of eligibleEvidence) {
+      writes.push(
+        {
+          sql: "DELETE FROM core_destination_receipts WHERE school_id=? AND decision_id=?",
+          args: [env.SCHOOL_ID, row.decision_id],
+        },
+        {
+          sql: "DELETE FROM core_evidence WHERE school_id=? AND decision_id=?",
+          args: [env.SCHOOL_ID, row.decision_id],
+        },
+      );
+    }
+    for (const row of eligibleAdmissions) {
+      writes.push({
+        sql: "DELETE FROM product_admissions WHERE school_id=? AND operation_id=? AND state IN ('resolved','aborted')",
+        args: [env.SCHOOL_ID, row.operation_id],
+      });
+    }
+    const admission = await admit(env, env.DB, op, principal, [], now);
+    const r = await commitOperation(env.DB, op, {
+      now,
+      admission,
+      writes,
+      result: {
+        dryRun: false,
+        retentionDeletionEnabled: true,
+        retentionDays,
+        limit,
+        cutoff,
+        deleted: {
+          evidence: eligibleEvidence.length,
+          admissions: eligibleAdmissions.length,
+        },
+      },
+      audit: {
+        kind: "evidence-retention",
+        retentionDays,
+        limit,
+        cutoff,
+        deletedEvidence: eligibleEvidence.length,
+        deletedAdmissions: eligibleAdmissions.length,
+      },
+    });
+    await resolveAdmission(env, env.DB, op, admission, r, now);
+    return r;
   }
   if (path === "/admin/service-grants" && method === "GET")
     return {
