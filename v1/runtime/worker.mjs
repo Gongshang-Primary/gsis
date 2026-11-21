@@ -127,7 +127,45 @@ export function domainWorker(service, module) {
               env.SCHOOL_ID,
               body.operationId,
             )) ?? { state: "unknown", operationId: body.operationId };
-          else if (path === "/internal/pins/cancellation") {
+          else if (path === "/internal/evidence-dependencies") {
+            const ids = Array.isArray(body?.decisionIds)
+              ? body.decisionIds
+                  .filter((id) => typeof id === "string" && id.length > 0 && id.length <= 160)
+                  .slice(0, 500)
+              : [];
+            if (!ids.length) {
+              value = { owner: service, protectedDecisionIds: [] };
+            } else {
+              const payload = JSON.stringify(ids);
+              const unresolved = await query(
+                env.DB,
+                `SELECT DISTINCT a.decision_id AS decisionId
+                 FROM product_admissions a
+                 WHERE a.school_id = ?
+                   AND a.state IN ('acquiring','ready','resolving')
+                   AND a.decision_id IN (SELECT value FROM json_each(?))`,
+                [env.SCHOOL_ID, payload],
+              );
+              const heldPins = await query(
+                env.DB,
+                `SELECT DISTINCT p.decision_id AS decisionId
+                 FROM source_pins p
+                 WHERE p.school_id = ?
+                   AND p.state = 'held'
+                   AND p.decision_id IN (SELECT value FROM json_each(?))`,
+                [env.SCHOOL_ID, payload],
+              );
+              value = {
+                owner: service,
+                protectedDecisionIds: [
+                  ...new Set([
+                    ...unresolved.map((r) => r.decisionId),
+                    ...heldPins.map((r) => r.decisionId),
+                  ]),
+                ],
+              };
+            }
+          } else if (path === "/internal/pins/cancellation") {
             const pin = await one(
               env.DB,
               "SELECT * FROM source_pins WHERE school_id=? AND pin_id=? AND state='held'",
