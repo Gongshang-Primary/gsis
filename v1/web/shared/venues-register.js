@@ -56,10 +56,10 @@ async function confirmPreview(input, host) {
     const result = node("div"); result.dataset.registerPreview = "";
     result.append(node("p", `${preview.created} new rooms; ${preview.updated} existing rooms. Nothing is saved yet. Existing booking policy and omitted rooms remain intact.`));
     const table = node("table"), header = node("tr");
-    for (const label of ["Permanent ID", "Unit", "Name", "Seating capacity", "Revision"]) header.append(node("th", label));
+    for (const label of ["Permanent ID", "Unit", "Name", "Seating capacity", "Class-slot capacity", "Revision"]) header.append(node("th", label));
     const head = node("thead"); head.append(header); table.append(head);
     const body = node("tbody");
-    for (const room of preview.venues) { const row = node("tr"); for (const value of [room.id, room.unit, room.name, room.capacity ?? "Unknown", room.revision]) row.append(node("td", value)); body.append(row); }
+    for (const room of preview.venues) { const row = node("tr"); for (const value of [room.id, room.unit, room.name, room.capacity ?? "Unknown", room.classSlotCapacity ?? "Unknown", room.revision]) row.append(node("td", value)); body.append(row); }
     table.append(body); result.append(table);
     result.append(button("Confirm register changes", () => save({operation: "importVenues", operationId: crypto.randomUUID(), venues: preview.venues})));
     host.append(result); status("Preview ready. Review every room before confirming.");
@@ -69,14 +69,15 @@ function editRoom(room) {
   const host = openDialog(room ? "Edit physical room" : "Add physical room");
   if (!host) return;
   const form = node("form"); form.className = "gsis-formrow";
-  const record = room ? structuredClone(room) : {id: crypto.randomUUID(), revision: 0, capacity: null};
+  const record = room ? structuredClone(room) : {id: crypto.randomUUID(), revision: 0, capacity: null, classSlotCapacity: 1};
   form.append(node("p", `Permanent ID: ${record.id}. ${room ? "Unit identity stays fixed." : "A new room starts unavailable for booking; set its policy in room settings."}`));
-  for (const [key, label] of [["unit", "Unit"], ["name", "Room name"], ["shortName", "Short name"], ["capacity", "Seating capacity (blank means unknown)"], ["capacityBasis", "Capacity basis"], ["notes", "Notes"]]) {
+  for (const [key, label] of [["unit", "Unit"], ["name", "Room name"], ["shortName", "Short name"], ["capacity", "Seating capacity (blank means unknown)"], ["capacityBasis", "Capacity basis"], ["classSlotCapacity", "Class-slot capacity (blank means unknown)"], ["notes", "Notes"]]) {
     const wrapper = node("label", label), field = node(key === "notes" ? "textarea" : "input");
     field.name = key; field.value = record[key] ?? ""; field.maxLength = key === "notes" ? 2000 : 300;
     if (["unit", "name"].includes(key)) field.required = true;
     if (key === "unit" && room) field.readOnly = true;
     if (key === "capacity") {field.type = "number"; field.min = "0"; field.max = "100000"; field.step = "1";}
+    if (key === "classSlotCapacity") {field.type = "number"; field.min = "1"; field.max = "20"; field.step = "1";}
     wrapper.append(field); form.append(wrapper);
   }
   const preview = node("button", "Preview room changes"); preview.type = "submit"; form.append(preview);
@@ -85,6 +86,7 @@ function editRoom(room) {
     event.preventDefault();
     const values = Object.fromEntries(new FormData(form));
     values.capacity = values.capacity === "" ? null : Number(values.capacity);
+    values.classSlotCapacity = values.classSlotCapacity === "" ? null : Number(values.classSlotCapacity);
     confirmPreview({venues: [{...record, ...values}]}, host).catch(error => status(error.message));
   };
   host.append(form);
@@ -161,11 +163,11 @@ async function mount(next) {
   const add = button("Add physical room", () => editRoom()); add.disabled = previewOnly; host.append(add);
   const table = node("table"); table.id = "v1PhysicalRooms";
   const head = node("thead"), header = node("tr");
-  for (const label of ["Unit", "Room name", "Seating capacity", "Permanent ID", "Edit"]) header.append(node("th", label)); head.append(header); table.append(head);
+  for (const label of ["Unit", "Room name", "Seating capacity", "Class-slot capacity", "Permanent ID", "Edit"]) header.append(node("th", label)); head.append(header); table.append(head);
   const body = node("tbody");
   for (const room of next.register.venues) {
     const row = node("tr");
-    for (const value of [room.unit, room.name, room.capacity ?? "Unknown", room.id]) row.append(node("td", value));
+    for (const value of [room.unit, room.name, room.capacity ?? "Unknown", room.classSlotCapacity ?? "Unknown", room.id]) row.append(node("td", value));
     const action = node("td"), edit = button("Edit " + room.unit, () => editRoom(room)); edit.disabled = previewOnly; action.append(edit); row.append(action); body.append(row);
   }
   table.append(body); const scroll = node("div"); scroll.className = "gsis-scroll"; scroll.append(table); host.append(scroll);
