@@ -131,6 +131,28 @@ import { planningSnapshot, planningPerson, planningEligible, reportingRoot, repo
     html body #content[data-view="Teachers"] tbody > tr[data-roster-teacher] :is(input,select,textarea):not(.dirty) {
       background:var(--row-band);color:inherit;
     }
+    html body #content[data-view="IP Deploy"] td.gsis-cell-collaborator {
+      outline:2.5px solid #e67e22 !important;
+      outline-offset:-2.5px;
+      background-color:rgba(230, 126, 34, 0.14) !important;
+      position:relative;
+    }
+    html body #content[data-view="IP Deploy"] td.gsis-cell-error {
+      outline:3px solid #c0392b !important;
+      outline-offset:-3px;
+      background-color:rgba(192, 57, 43, 0.08) !important;
+      position:relative;
+    }
+    html body #content[data-view="IP Deploy"] td.gsis-cell-error.gsis-cell-collaborator {
+      outline:3px solid #c0392b !important;
+      outline-offset:-3px;
+      box-shadow:inset 0 0 0 5px #e67e22 !important;
+      background-color:rgba(230, 126, 34, 0.16) !important;
+    }
+    html body #content[data-view="IP Deploy"] .chip.gsis-chip-duplicate-ft {
+      color:#c0392b !important;
+      font-weight:700;
+    }
   `;
   document.head.append(style);
   if (typeof settingsSections !== "undefined") {
@@ -454,6 +476,438 @@ import { planningSnapshot, planningPerson, planningEligible, reportingRoot, repo
       if (alwaysVisibleSaveViews.has(document.getElementById("content")?.dataset.view) && api.capable("deploy.edit"))
         document.getElementById("saveQueue").hidden = false;
     };
+
+    // UI01 / UR03 / UI03 / D08 / D09 / TV07:
+    // 1. Permit temporary duplicate FT assignments and temporary duplicate class names in draft without blocking input or displacing existing classes into (undefined), while blocking Save until resolved.
+    // 2. Highlight duplicate FT cells and duplicate/undefined class-name cells with thick red outlines and subtle red tint (.gsis-cell-error), colouring only duplicated FT teacher names red (.gsis-chip-duplicate-ft).
+    // 3. Acquire/renew/release cell-scoped leases when editing IP Deploy cells and poll active leases so other editors see an orange outline, translucent orange tint, hover identity, and cell lock (.gsis-cell-collaborator) without concealing red validation errors.
+    function findDuplicateFTMap(doc) {
+      const map = new Map();
+      if (!doc) return map;
+      for (const a of doc.assignments || []) {
+        if (a.subject !== "FT" || !a.teacher) continue;
+        if (!map.has(a.teacher)) map.set(a.teacher, []);
+        map.get(a.teacher).push(a.target);
+      }
+      for (const [teacherId, targets] of [...map.entries()]) {
+        if (new Set(targets).size <= 1) map.delete(teacherId);
+      }
+      return map;
+    }
+    function findDuplicateClassKeys(doc) {
+      const counts = new Map();
+      const refs = new Set();
+      if (!doc) return { keys: new Set(), refs };
+      const list = typeof window.classList === "function" ? window.classList() : (doc.classes || []);
+      for (const c of list) {
+        if (c.undefinedDraft || String(c.shortName || "").startsWith("__undefined_")) {
+          refs.add(c.ref);
+          continue;
+        }
+        const k = `${c.level}|${String(window.classCode ? window.classCode(c) : c.shortName).toLowerCase()}`;
+        const n = `${c.level}|name:${String(c.name || "").trim().toLowerCase()}`;
+        counts.set(k, [...(counts.get(k) || []), c]);
+        if (c.name) counts.set(n, [...(counts.get(n) || []), c]);
+      }
+      const keys = new Set();
+      for (const group of counts.values()) {
+        if (group.length > 1) {
+          for (const c of group) {
+            refs.add(c.ref);
+            keys.add(window.classKey ? window.classKey(c) : `${c.level}${c.shortName}`);
+          }
+        }
+      }
+      return { keys, refs };
+    }
+    if (typeof window.classRenameError === "function") {
+      const originalClassRenameError = window.classRenameError;
+      window.classRenameError = () => {
+        const doc = v();
+        const baseErr = originalClassRenameError();
+        if (baseErr) return baseErr;
+        if (!doc) return "";
+        const dupClasses = findDuplicateClassKeys(doc);
+        if (dupClasses.refs.size)
+          return `Resolve ${dupClasses.refs.size} duplicate class name(s) before Save to online.`;
+        const dupFT = findDuplicateFTMap(doc);
+        if (dupFT.size) {
+          const names = [...dupFT.keys()].map(id => doc.teachers?.find(t => t.id === id)?.name || id);
+          return `Resolve duplicate Form Teacher assignment(s) (${names.join(", ")}) before Save to online.`;
+        }
+        return "";
+      };
+    }
+    if (typeof window.queueClassRename === "function") {
+      // UR03 / D09: Choosing an occupied class name changes only the selected class; do not displace the existing class into (undefined).
+      window.queueClassRename = (c, name, shortName) => {
+        if (!token || !(kp() || admin())) return;
+        if (queueFlight) throw Error("Finish or retry the submitted save before editing again.");
+        if (!draftBase) draftBase = clone(v());
+        const old = cellQueue.find(x => x.operation === "renameClasses");
+        const rows = clone(old?.rows || []);
+        const added = cellQueue.find(x => x.operation === "addClass" && x.ref === c.ref);
+        if (added) {
+          Object.assign(added, { name, shortName, renamedDraft: true });
+          delete added.undefinedDraft;
+          const at = rows.findIndex(row => row.ref === c.ref);
+          if (at >= 0) rows.splice(at, 1);
+        } else {
+          const previous = rows.find(row => row.ref === c.ref);
+          const expected = previous?.expected || classMetadata(c);
+          const row = { ref: c.ref, level: String(c.level), name, shortName, expected };
+          if (previous) rows.splice(rows.indexOf(previous), 1, row);
+          else rows.push(row);
+        }
+        const edit = { operation: "renameClasses", rows, expected: rows.map(row => ({ ref: row.ref, ...row.expected })) };
+        if (old) {
+          if (rows.length) cellQueue.splice(cellQueue.indexOf(old), 1, edit);
+          else cellQueue.splice(cellQueue.indexOf(old), 1);
+        } else if (rows.length) {
+          cellQueue.push(edit);
+        }
+        viewEpoch++;
+        invalidatePendingProjection();
+        applyPendingProjection();
+        drawQueueStatus();
+      };
+    }
+    if (typeof window.queueCell === "function") {
+      const originalQueueCell = window.queueCell;
+      window.queueCell = x => {
+        if (x?.operation === "removeTeacher") {
+          const addedIdx = cellQueue.findIndex(
+            y =>
+              y.operation === "addTeacher" &&
+              (y.localId === x.assignmentId ||
+                (y.target === x.target && y.subject === x.subject && y.teacher === x.teacher)),
+          );
+          if (addedIdx >= 0) {
+            cellQueue.splice(addedIdx, 1);
+            viewEpoch++;
+            invalidatePendingProjection();
+            applyPendingProjection();
+            drawQueueStatus();
+            if (!document.querySelector("dialog")?.open && !inlineDraftEditor?.open) render();
+            return;
+          }
+        }
+        if (x?.operation === "addTeacher" && x.subject === "FT") {
+          if (!token || !(kp() || admin())) return;
+          if (queueFlight) { alert("Finish or retry the submitted save before editing again."); return; }
+          if (x.target && !x.targetRef) x.targetRef = classInfo(x.target)?.ref;
+          if (!draftBase) draftBase = clone(v());
+          x.localId = "pending-" + uid();
+          const earlier = cellQueue.find(y => queueKey(x) === queueKey(y));
+          if (earlier) Object.assign(earlier, x, { expected: earlier.expected });
+          else cellQueue.push(x);
+          viewEpoch++;
+          applyPendingProjection();
+          drawQueueStatus();
+          if (!document.querySelector("dialog")?.open && !inlineDraftEditor?.open) render();
+          return;
+        }
+        return originalQueueCell(x);
+      };
+    }
+
+    let activeCellLease = null, cellLeaseHeartbeat = null, liveLeasePoll = null, cellLeaseEpoch = 0;
+    async function releaseLeaseGrant(held) {
+      if (!held || !token) return;
+      try {
+        await window.api("lease", {
+          versionId: held.versionId,
+          scope: held.scope,
+          key: held.key,
+          clientId: held.clientId,
+          fence: held.fence,
+          token: held.token,
+          release: true,
+          operationId: crypto.randomUUID(),
+        }, false);
+      } catch {}
+    }
+    async function acquireCellLease(cellScope) {
+      if (!token || !current || !api.capable("deploy.edit")) return null;
+      await releaseCellLease();
+      const myEpoch = ++cellLeaseEpoch;
+      const versionId = current;
+      const scope = `${versionId}|${cellScope}`;
+      try {
+        const grant = await window.api("lease", {
+          versionId,
+          scope,
+          key: scope,
+          clientId,
+          revision: snapshotCache?.revision,
+          operationId: crypto.randomUUID(),
+        }, false);
+        const held = {
+          versionId,
+          scope,
+          key: scope,
+          clientId,
+          fence: grant.fence,
+          token: grant.token,
+        };
+        if (myEpoch !== cellLeaseEpoch) {
+          await releaseLeaseGrant(held);
+          return null;
+        }
+        activeCellLease = held;
+        cellLeaseHeartbeat = setInterval(async () => {
+          if (!activeCellLease || activeCellLease.scope !== scope || myEpoch !== cellLeaseEpoch) return;
+          try {
+            const renewed = await window.api("lease", {
+              versionId: activeCellLease.versionId,
+              scope: activeCellLease.scope,
+              key: activeCellLease.key,
+              clientId,
+              fence: activeCellLease.fence,
+              operationId: crypto.randomUUID(),
+            }, false);
+            if (activeCellLease && activeCellLease.scope === scope && myEpoch === cellLeaseEpoch) {
+              activeCellLease.fence = renewed.fence;
+              activeCellLease.token = renewed.token;
+            }
+          } catch {}
+        }, 25000);
+        return activeCellLease;
+      } catch {
+        return null;
+      }
+    }
+    async function releaseCellLease() {
+      cellLeaseEpoch++;
+      clearInterval(cellLeaseHeartbeat);
+      cellLeaseHeartbeat = null;
+      const held = activeCellLease;
+      activeCellLease = null;
+      await releaseLeaseGrant(held);
+    }
+    window.addEventListener("pagehide", () => { releaseCellLease(); });
+
+    function foreignCellLease(cellScope) {
+      const now = Date.now();
+      const fullKey = `${current}|${cellScope}`;
+      return (serverLeases || []).find(
+        l =>
+          (l.key === fullKey || l.key === cellScope) &&
+          l.until > now &&
+          (l.clientId ? l.clientId !== clientId : l.actor !== lastEmail),
+      ) || null;
+    }
+
+    function decorateIPDeployCells(root = document.getElementById("content")) {
+      if (!root || root.dataset.view !== "IP Deploy" || !v()) return;
+      const doc = v();
+      const dupFT = findDuplicateFTMap(doc);
+      const dupClasses = findDuplicateClassKeys(doc);
+
+      // 1. Decorate class-name cells (td.row-name) for duplicate/undefined errors and collaborator leases
+      for (const tr of root.querySelectorAll("tbody tr[data-row]")) {
+        const rowId = tr.dataset.row;
+        const nameCell = tr.querySelector("td.row-name");
+        if (nameCell) {
+          const cls = (typeof window.classList === "function" ? window.classList() : doc.classes || []).find(
+            c => (window.classKey ? window.classKey(c) : `${c.level}${c.shortName}`) === rowId || c.ref === nameCell.querySelector("[data-rename-class]")?.dataset.renameClass,
+          );
+          const isDupClass = !!(cls && (dupClasses.refs.has(cls.ref) || dupClasses.keys.has(rowId) || cls.undefinedDraft));
+          const lease = foreignCellLease(`cell:${rowId}:row-name`);
+          nameCell.classList.toggle("gsis-cell-error", isDupClass);
+          nameCell.classList.toggle("gsis-cell-collaborator", !!lease);
+          const messages = [];
+          if (isDupClass) {
+            const msg = cls?.undefinedDraft
+              ? `Undefined class name on P${cls.level}; choose a valid class name before saving.`
+              : `Duplicate class name ${rowId}; resolve duplicate class names before saving.`;
+            nameCell.dataset.validationError = msg;
+            messages.push(msg);
+          } else {
+            delete nameCell.dataset.validationError;
+          }
+          if (lease) {
+            nameCell.dataset.collaboratorActor = lease.actor;
+            messages.push(`${lease.actor} is editing this class name`);
+            const renameBtn = nameCell.querySelector("[data-rename-class]");
+            if (renameBtn) {
+              renameBtn.disabled = true;
+              renameBtn.title = `${lease.actor} is editing`;
+            }
+          } else {
+            delete nameCell.dataset.collaboratorActor;
+            const renameBtn = nameCell.querySelector("[data-rename-class]");
+            if (renameBtn && (kp() || admin())) {
+              renameBtn.disabled = false;
+              renameBtn.title = "Rename class and retain its teachers";
+            }
+          }
+          if (messages.length) {
+            nameCell.title = messages.join(" · ");
+            nameCell.setAttribute("aria-label", `${rowId}: ${messages.join(". ")}`);
+          }
+        }
+      }
+
+      // 2. Decorate assignment cells (td[data-cell]) for duplicate FT and collaborator leases
+      for (const cell of root.querySelectorAll("td.assignment[data-cell]")) {
+        const [rowId, col] = String(cell.dataset.cell || "").split("|");
+        if (!rowId || !col) continue;
+        const cellAssignments = (doc.assignments || []).filter(
+          a => a.target === rowId && (window.family ? window.family(a.subject) === col : a.subject === col),
+        );
+        const chips = [...cell.querySelectorAll(".chip")];
+        cellAssignments.forEach((a, idx) => {
+          const chip = chips[idx];
+          if (!chip) return;
+          if (!chip.querySelector("button[data-remove]") && (a.subject === "PAL" ? window.canEditPAL?.() : kp())) {
+            const rm = document.createElement("button");
+            rm.dataset.remove = a.id;
+            rm.setAttribute("aria-label", "Remove assignment");
+            rm.textContent = "×";
+            rm.onclick = () => {
+              window.queueCell({
+                operation: "removeTeacher",
+                subject: a.subject,
+                target: a.target,
+                assignmentId: a.id,
+                teacher: a.teacher,
+                expected: true,
+              });
+            };
+            chip.append(rm);
+          }
+        });
+        const messages = [];
+        let hasError = false;
+        if (col === "FT") {
+          const ftAssignments = cellAssignments.filter(a => a.subject === "FT");
+          const dupAssignments = ftAssignments.filter(a => dupFT.has(a.teacher));
+          hasError = dupAssignments.length > 0;
+          ftAssignments.forEach((a, idx) => {
+            const chip = chips[idx];
+            if (!chip) return;
+            const isDup = dupFT.has(a.teacher);
+            chip.classList.toggle("gsis-chip-duplicate-ft", isDup);
+            if (isDup) {
+              const teacherName = doc.teachers?.find(t => t.id === a.teacher)?.name || a.teacher;
+              const otherTargets = dupFT.get(a.teacher).filter(t => t !== rowId);
+              const detail = `${teacherName} is assigned as Form Teacher to multiple classes (${[rowId, ...otherTargets].join(", ")})`;
+              chip.title = detail;
+              messages.push(detail);
+            }
+          });
+        }
+        const cellSubjectsInCol = [...cell.querySelectorAll("button[data-target][data-sub]")].map(b => b.dataset.sub);
+        const scopesToCheck = [`cell:${rowId}:${col}`, ...cellSubjectsInCol.map(s => `cell:${rowId}:${s}`)];
+        const lease = scopesToCheck.map(foreignCellLease).find(Boolean) || null;
+        cell.classList.toggle("gsis-cell-error", hasError);
+        cell.classList.toggle("gsis-cell-collaborator", !!lease);
+        if (hasError) cell.dataset.validationError = messages.join("; ");
+        else delete cell.dataset.validationError;
+        if (lease) {
+          cell.dataset.collaboratorActor = lease.actor;
+          messages.push(`${lease.actor} is editing`);
+          for (const btn of cell.querySelectorAll("button[data-target],button[data-remove]")) {
+            btn.disabled = true;
+            btn.title = `${lease.actor} is editing`;
+            if (btn.hasAttribute("data-target")) btn.textContent = "Editing…";
+          }
+        } else {
+          delete cell.dataset.collaboratorActor;
+          for (const btn of cell.querySelectorAll("button[data-target]")) {
+            btn.disabled = false;
+            btn.removeAttribute("title");
+            btn.textContent = "+ teacher";
+          }
+          for (const btn of cell.querySelectorAll("button[data-remove]")) {
+            btn.disabled = false;
+          }
+        }
+        if (messages.length) {
+          cell.title = messages.join(" · ");
+          cell.setAttribute("aria-label", `${rowId} ${col}: ${messages.join(". ")}`);
+        } else {
+          cell.removeAttribute("title");
+          cell.removeAttribute("aria-label");
+        }
+      }
+    }
+
+    if (typeof window.matrix === "function") {
+      const originalMatrix = window.matrix;
+      window.matrix = root => {
+        originalMatrix(root);
+        decorateIPDeployCells(root);
+      };
+    }
+    if (typeof window.chooseTeacher === "function") {
+      const originalChooseTeacher = window.chooseTeacher;
+      window.chooseTeacher = (target, sub) => {
+        const lease = foreignCellLease(`cell:${target}:${sub}`) || foreignCellLease(`cell:${target}:${window.family ? window.family(sub) : sub}`);
+        if (lease) return;
+        const result = originalChooseTeacher(target, sub);
+        const scope = `cell:${target}:${sub}`;
+        const cell = [...document.querySelectorAll("#content [data-target]")].find(b => b.dataset.target === target && b.dataset.sub === sub)?.closest("td");
+        const wrap = cell?.querySelector(".search-select");
+        if (wrap) {
+          acquireCellLease(scope).catch(() => {});
+          wrap.addEventListener("toggle", () => {
+            if (!wrap.open) releaseCellLease();
+          });
+          wrap.addEventListener("change", () => {
+            releaseCellLease();
+          });
+          wrap.addEventListener("click", ev => {
+            if (ev.target?.closest?.('[role="option"]')) releaseCellLease();
+          });
+        }
+        return result;
+      };
+    }
+    if (typeof window.renameClass === "function") {
+      const originalRenameClass = window.renameClass;
+      window.renameClass = async ref => {
+        const c = (window.classList ? window.classList() : v()?.classes || []).find(x => x.ref === ref);
+        if (!c) return;
+        const rowId = window.classKey ? window.classKey(c) : `${c.level}${c.shortName}`;
+        if (foreignCellLease(`cell:${rowId}:row-name`)) return;
+        await acquireCellLease(`cell:${rowId}:row-name`);
+        originalRenameClass(ref);
+        const editor = window.inlineDraftEditor || document.querySelector("dialog[open]");
+        if (editor && typeof editor.close === "function") {
+          const origClose = editor.close;
+          editor.close = (...args) => {
+            releaseCellLease();
+            return origClose(...args);
+          };
+        }
+      };
+    }
+    async function pollActiveLeases() {
+      if (!token || !current || document.getElementById("content")?.dataset.view !== "IP Deploy") return;
+      try {
+        const res = await window.api("leases", { versionId: current }, false);
+        if (res && Array.isArray(res.leases)) {
+          serverLeases = res.leases;
+          decorateIPDeployCells(document.getElementById("content"));
+        }
+      } catch {}
+    }
+    window.connectLive = () => {
+      clearInterval(liveLeasePoll);
+      if (!token || !current) return;
+      liveLeasePoll = setInterval(pollActiveLeases, 2000);
+    };
+    const originalStopLive = window.stopLive;
+    if (typeof originalStopLive === "function") {
+      window.stopLive = () => {
+        clearInterval(liveLeasePoll);
+        liveLeasePoll = null;
+        releaseCellLease();
+        return originalStopLive();
+      };
+    }
     window.masterOptionsPage = (root) => {
       const lists = choiceLists(v()), editable = api.capable("deploy.edit");
       const note = document.createElement("p"); note.className = "hint";
