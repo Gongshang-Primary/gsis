@@ -282,9 +282,30 @@ function edgeClient(){
 }
 async function edgeCommandChange(input){
  const client=edgeClient();if(!client)throw Error('Command recovery is unavailable. Keep this draft.');
+ const original=client.rows.find(row=>row.requestId===input.requestId);
+ if(original){const result=await client.submit({...input,protocol:500,returnDelta:true},original.expectedRevision);if(result.queueReceipt?.afterRevision)edgeAppliedBases.set(input.versionId,result.queueReceipt.afterRevision);return result;}
+ let refreshedBase;
+ // Check the actual older command before creating a new dependent save. A
+ // refusal here has not submitted this draft and must not lock its inputs.
+ try{
+  const reconciled=await client.reconcile(input.requestId),ahead=client.rows.some(row=>row.receipt.state==='APPLIED'&&(row.receipt.afterRevision?.indexRevision>(snapshotCache?.globalRevision??-1)||row.receipt.afterRevision?.versionId===input.versionId&&row.receipt.afterRevision?.versionRevision>(snapshotCache?.revision??-1)));
+  if(reconciled||ahead){
+   const epoch=sessionEpoch,selected=current,data=await api('bootstrap',{versionId:input.versionId},false);
+   if(epoch!==sessionEpoch||selected!==current||!data.current||data.current.id!==input.versionId)throw Error('The session or version changed. Your new edits are retained.');
+   if(input.versionId!==current){
+    const observed=data.edgeQueueRevision||data.current.edgeQueueRevision;
+    refreshedBase={indexRevision:data.revision,versionId:input.versionId,versionRevision:data.versions?.find(row=>row.id===input.versionId)?.revision,commit:observed?.commit};
+    if(observed?.versionRevision!==refreshedBase.versionRevision)throw Error('The latest saved version could not be confirmed.');
+   }else{
+    const previousBase=draftBase;draftBase=null;
+    try{if(!acceptSnapshot(data))throw Error('The latest saved version could not be confirmed.');draftBase=queuedEdits().length?clone(v()):null;applyPendingProjection();if(queueFlight)queueFlight.baselineRevision=snapshotCache?.revision;}
+    catch(error){draftBase=previousBase;applyPendingProjection();throw error;}
+   }
+  }
+ }catch(error){error.notSubmitted=true;throw error;}
  const entry=state.versions.find(x=>x.id===input.versionId),selected=snapshotCache?.id===input.versionId,versionRevision=selected?snapshotCache.revision:entry?.revision,indexRevision=snapshotCache?.globalRevision??acceptedSnapshot?.revision,applied=edgeAppliedBases.get(input.versionId),observed=applied?.versionRevision===versionRevision?applied:entry?.edgeQueueRevision||{versionRevision:entry?.revision,commit:entry?.commit};
- if(!Number.isSafeInteger(indexRevision)||!Number.isSafeInteger(versionRevision)||observed.versionRevision!==versionRevision||typeof observed.commit!=='string')throw Error('Refresh the saved version before submitting this proposal. Your draft is retained.');
- const base={indexRevision,versionId:input.versionId,versionRevision,commit:observed.commit};
+ const base=refreshedBase||{indexRevision,versionId:input.versionId,versionRevision:observed.versionRevision===versionRevision?versionRevision:null,commit:observed.commit};
+ if(!Number.isSafeInteger(base.indexRevision)||!Number.isSafeInteger(base.versionRevision)||typeof base.commit!=='string')throw Object.assign(Error('Refresh the saved version before submitting this proposal. Your draft is retained.'),{notSubmitted:true});
  const result=await client.submit({...input,protocol:500,returnDelta:true},base);if(result.queueReceipt?.afterRevision)edgeAppliedBases.set(input.versionId,result.queueReceipt.afterRevision);return result;
 }
 async function api(action,input={},feedback,signal){
@@ -516,7 +537,8 @@ async function saveVersionNote(id){
   // Keep the existing delta cursor, so unrelated remote changes are still fetched.
  }catch(e){
   d.status=e.message+' Your note is retained.';
-  if(e.status>=400&&e.status<500){d.attempt=null;d.conflict=e.status===409;}
+  const rejected=edgeCommandProtocol===1?edgeClient()?.rows.find(row=>row.requestId===attempt.requestId)?.receipt.state==='REJECTED':e.status>=400&&e.status<500;
+  if(e.notSubmitted||rejected){d.attempt=null;d.conflict=e.status===409;}
  }finally{d.saving=false;updateVersionNoteControls(id);}
 }
 async function reviewVersionNote(id){
@@ -1166,13 +1188,19 @@ async function pumpQueue(retry=false){
  const resuming=!!queueFlight;
  if(!queueFlight){queueFlight={versionId:current,requestId:uid(),issuedAt:Date.now(),edits:cellQueue.splice(0)};queueFlight.wire=saveWireEdits(queueFlight.edits);queueFlight.baselineRevision=snapshotCache?.revision;}
  const actionTrace=beginUserAction('save'),flight=queueFlight,epoch=sessionEpoch;flight.running=true;queueError='';drawQueueStatus();const finish=beginLoading(el('content'),'Saving changes…');let committed=false,result;
+ const readReceipt=async()=>{
+  if(edgeCommandProtocol!==1)return api('receipt',{versionId:flight.versionId,requestId:flight.requestId},false);
+  const client=edgeClient(),row=client?.rows.find(row=>row.requestId===flight.requestId);if(!row)return {saved:false};
+  const result=await client.check(flight.requestId);return row.receipt.state==='APPLIED'?client.outcome(row,result):{...result,saved:false};
+ };
  try{
-  if(retry&&resuming)result=await api('receipt',{versionId:flight.versionId,requestId:flight.requestId},false);
+  if(retry&&resuming)result=await readReceipt();
   if(!result?.saved)result=await api('change',{operation:'saveDraft',versionId:flight.versionId,requestId:flight.requestId,issuedAt:flight.issuedAt,clientId,edits:flight.wire},false);
   if(epoch!==sessionEpoch)throw Error('Sign in with the same account to confirm this save.');if(!result.saved)throw Error('Save confirmation pending');committed=true;
  }catch(e){
-  if(![400,403,404,409].includes(e.status)){try{result=await api('receipt',{versionId:flight.versionId,requestId:flight.requestId},false);committed=!!result.saved;}catch(ignored){}}
-  if(!committed){flight.running=false;if([400,403,404,409].includes(e.status)){cellQueue=flight.edits;queueFlight=null;}queueError=e.message+' Draft retained.'+(queueFlight?' Check/retry uses the original save ID.':'');drawQueueStatus();}
+  if(!e.notSubmitted&&(edgeCommandProtocol===1||![400,403,404,409].includes(e.status))){try{result=await readReceipt();committed=!!result.saved;}catch(ignored){}}
+  const rejected=edgeCommandProtocol===1?edgeClient()?.rows.find(row=>row.requestId===flight.requestId)?.receipt.state==='REJECTED':[400,403,404,409].includes(e.status);
+  if(!committed){flight.running=false;if(e.notSubmitted||rejected){cellQueue=flight.edits;queueFlight=null;}queueError=e.message+' Draft retained.'+(queueFlight?' Check/retry uses the original save ID.':'');drawQueueStatus();}
  }finally{finish();}
  if(!committed){el('content').inert=!!queueFlight;finishUserAction(actionTrace,false);return;}actionTrace.acknowledgedMs=Date.now()-actionTrace.started;
  // Acknowledgement is final. No display failure may turn this back into a write failure.
@@ -1200,6 +1228,16 @@ function showSavedNotices(notices,version,email){
 function conflictNoticeHTML(conflicts){const alias=s=>String(s).replace(/@gsps\.edu\.sg$/i,'');return '<div class="conflict-list">'+conflicts.map(x=>'<p><strong>'+esc(x.where)+'</strong><br>'+esc(alias(x.overwrittenBy))+' → '+esc(alias(x.replacementBy))+'</p><pre>'+esc(JSON.stringify(x.overwrittenValue))+' → '+esc(JSON.stringify(x.replacementValue))+'</pre>').join('')+'</div>';}
 function showConflicts(conflicts,title){modal(title,'<p>The current saved values are in use. These notices describe which earlier values changed; unrelated edits were retained.</p>'+conflictNoticeHTML(conflicts),async()=>{});document.querySelector('#ok').textContent='Close'}
 
+function draftReviewTitle(d,x,saved=d){
+ if(!['addTeacher','removeTeacher'].includes(x.operation))return x.operation==='addTG'?'Add teaching group '+x.name:queueKey(x);
+ const teachers=[...(d.teachers||[]),...(saved.teachers||[])],classes=[...(d.classes||[]),...(saved.classes||[])],groups=[...(d.groups||[]),...(saved.groups||[])];
+ const teacher=teachers.find(t=>t.id===x.teacher)?.name||'Unavailable teacher',cl=classes.find(c=>x.targetRef?c.ref===x.targetRef:classKey(c)===x.target),group=groups.find(g=>g.id===x.target);
+ const target=cl?classLabel(cl):group?.name||'Unavailable class or teaching group';
+ return (x.operation==='addTeacher'?'Assign ':'Remove ')+teacher+(x.operation==='addTeacher'?' to ':' from ')+target+' · '+(x.subject||'Subject unavailable');
+}
+function draftReviewValue(x,value){
+ return ['addTeacher','removeTeacher'].includes(x.operation)?typeof value==='boolean'?(value?'Assigned':'Not assigned'):'Unavailable':JSON.stringify(value??null);
+}
 function draftDisplayValue(d,x){if(x.operation==='renameClasses')return x.rows.map(row=>({ref:row.ref,...classMetadata(d.classes.find(c=>c.ref===row.ref))}));if(x.operation==='clearVenueAssignments')return GSISVenueGroups.clearState(d);if(x.operation==='setSubjectType')return d.subjectTypes?.[x.subject]??null;if(x.operation==='setPAL')return d.pal||null;if(x.operation==='setReliefSettings')return d.relief||null;if(['initReporting','setReportingOfficer'].includes(x.operation))return GSISReporting.value(d,x);if(x.operation==='consolidateCCEEL')return GSISTGScope.state(d);if(x.operation==='setWorkload')return d.workload||null;if(['updateTG','removeTG','moveClassBlock','moveVenueGroup'].includes(x.operation))return GSISVenueGroups.state(d,x);if(x.operation==='setFortnight')return d.fortnight?.[x.row]?.[x.field]??'';if(x.operation==='setOrganisation')return d.organisations?.[x.kind]||GSISPlanning.groups(x.kind);if(x.operation==='setDuties')return d.duties||GSISPlanning.duties();if(x.operation==='setMembership')return d.membership||[];if(x.operation==='setMasterOptions')return d.masterOptions||{};
  if(x.operation==='setOffload')return d.offload||{tags:[],staff:{}};if(x.operation==='removeTeacherProfile')return d.teachers.find(t=>t.id===x.teacher)||null;if(x.operation==='setClassAbility')return d.classes.find(c=>c.ref===x.ref)?.ability||'';
  if(x.operation==='setTeacherField')return (d.teacherDrafts?.[x.teacher]||d.teachers.find(t=>t.id===x.teacher)?.profile||{})[x.field]||'';
@@ -1261,8 +1299,8 @@ async function resolveQueue(){
    for(const x of orderedClassDraftEdits(edits)){const index=edits.indexOf(x);
     let before,after,error='';
     try{before=draftDisplayValue(doc,x);projectEdit(projected,x);after=draftDisplayValue(projected,x);}catch(e){error=e.message;}
-    const title=x.operation==='addTG'?'Add teaching group '+x.name:queueKey(x);
-    rows.push('<section><h3>'+esc(title)+'</h3>'+(!flight&&x.operation==='addTG'?'<label>Teaching group name<input data-review-tg-name="'+index+'" maxlength="60" value="'+esc(x.name)+'"></label>':'')+(error?'<p role="alert">'+esc(error)+' Your draft is retained.</p>':'')+'<details><summary>Saved and draft values</summary><pre>'+esc('Saved: '+JSON.stringify(before??null)+'\nDraft: '+JSON.stringify(after??x))+'</pre></details></section>');
+    const title=draftReviewTitle(projected,x,doc);
+    rows.push('<section><h3>'+esc(title)+'</h3>'+(!flight&&x.operation==='addTG'?'<label>Teaching group name<input data-review-tg-name="'+index+'" maxlength="60" value="'+esc(x.name)+'"></label>':'')+(error?'<p role="alert">'+esc(error)+' Your draft is retained.</p>':'')+'<details><summary>Saved and draft values</summary><pre>'+esc('Saved: '+draftReviewValue(x,before)+'\nDraft: '+draftReviewValue(x,after??x))+'</pre></details></section>');
    }
    const canCorrect=!flight&&edits.some(x=>x.operation==='addTG');
    panel.innerHTML='<p role="status">Current saved values checked.</p><p>'+(canCorrect?'Correct any duplicate TG names below, then apply the corrections to your draft and save. Linked teacher assignments and your other edits are retained.':flight?'This save is unconfirmed. Retry checks the original save ID before sending it again.':'Your draft is retained. Retry sends these pending changes again.')+'</p>'+rows.join('');
