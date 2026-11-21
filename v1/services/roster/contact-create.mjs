@@ -48,8 +48,90 @@ function nameSimilarity(a, b) {
   return (2 * overlap) / (xs.size + ys.size);
 }
 
+export async function updateRosterContactMobile(ctx, { revision, date }) {
+  const { env, principal, body } = ctx;
+  const schoolId = principal.schoolId;
+  const operationId = String(body.operationId || body.requestId || "").trim();
+  requireValue(
+    /^[A-Za-z0-9][A-Za-z0-9_.:@-]{0,127}$/.test(operationId),
+    "INVALID_INPUT",
+    400,
+    "An operation ID is required.",
+  );
+  const staffId = String(body.staffId || body.existingStaffId || "").trim();
+  requireValue(
+    /^[A-Za-z0-9][A-Za-z0-9_.:@-]{0,127}$/.test(staffId),
+    "INVALID_INPUT",
+    400,
+    "Select an existing teacher from Contacts.",
+  );
+  const mobile = normalizeMobile(body.mobile);
+  requireValue(
+    /^[89]\d{7}$/.test(mobile),
+    "INVALID_INPUT",
+    400,
+    "Enter an eight-digit Singapore mobile number starting with 8 or 9.",
+  );
+
+  const projection = await serviceCall(env, "contacts", "/internal/projection", {
+    schoolId,
+    decisionId: principal.decisionId,
+    purpose: "roster",
+    date,
+  });
+  const people = projection.people || projection.staff || [];
+  const target = people.find((p) => (p.staffId || p.id) === staffId);
+  requireValue(
+    target,
+    "NOT_FOUND",
+    404,
+    "Selected teacher was not found in Contacts.",
+  );
+
+  const duplicate = people.find(
+    (p) => (p.staffId || p.id) !== staffId && normalizeMobile(p.mobile) === mobile,
+  );
+  if (duplicate) {
+    throw new ApiError(
+      "DUPLICATE_MOBILE",
+      409,
+      "That mobile number is already assigned to another staff member in Contacts.",
+    );
+  }
+
+  const updated = await serviceCall(env, "contacts", "/internal/update-mobile", {
+    schoolId,
+    decisionId: principal.decisionId,
+    operationId,
+    staffId,
+    mobile,
+    ...(Number.isSafeInteger(body.mobileRevision)
+      ? { revision: body.mobileRevision }
+      : {}),
+  });
+  const displayName = target.ttbName || target.name || "";
+  const basicName = target.basicName || target.name || displayName;
+  return {
+    saved: true,
+    person: {
+      id: staffId,
+      staffId,
+      name: displayName,
+      timetableName: displayName,
+      basicName,
+      mobile,
+      active: target.active === true,
+    },
+    revision,
+    receipt: updated?.receipt || updated || null,
+  };
+}
+
 export async function createRosterContact(ctx, { revision, date }) {
   const { env, principal, body } = ctx;
+  if (body.staffId || body.existingStaffId) {
+    return updateRosterContactMobile(ctx, { revision, date });
+  }
   const schoolId = principal.schoolId;
   const operationId = String(body.operationId || body.requestId || "").trim();
   requireValue(

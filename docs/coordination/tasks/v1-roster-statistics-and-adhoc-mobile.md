@@ -3,7 +3,7 @@
 - Task ID: `v1-roster-statistics-and-adhoc-mobile`
 - Model: `Antigravity`
 - Branch: `antigravity/v1-roster-statistics-and-adhoc-mobile`
-- Status: **Claimed for implementation**
+- Status: **Ready for Muse review**
 - Coordinator / Merger: `GPT` (ChatGPT)
 - Reviewer: `Muse` at the exact head
 - Base: `6461f4e2a78eb11ff9b6b254f775d68e12e48d52` (`v1.09` + follow-up changelogs)
@@ -18,10 +18,16 @@
 
 ## Scope
 1. **Calendar `/internal/year-structure` & Roster `statisticsCalendar` (`CI01`)**:
-   - Add `/internal/year-structure` in `v1/services/calendar/service.mjs` that derives Term (`T1`–`T4`) and Semester (`S1` = `T1..T2`, `S2` = `T3..T4`) date ranges from authoritative `calendar_metadata` `yearStructure` (`TERM_WEEK`) records without ever guessing dates when structure is absent.
-   - Update `statisticsCalendar` in `v1/services/roster/service.mjs` to query Calendar `/internal/year-structure` for `[year - 1, year]` and return `{ year, terms, semesters, basis, semesterBasis, revision }` matching `GSISRosterStatistics.preset("term" | "semester", today, calendar)`.
-2. **Contacts `/internal/roster-update-mobile` & Roster `adHocUpdateMobile` (`C12`–`C14`)**:
-   - Add `/internal/roster-update-mobile` in `v1/services/contacts/service.mjs` so Roster (`roster.write` / `roster.admin`) can enter or correct `mobile` on an existing Contacts staff record while keeping `basic_name`, `ttb_name`, and all other identity fields strictly read-only, enforcing the mandatory 8-digit Singapore mobile gate and duplicate-mobile check with idempotent operation receipts.
-   - Add `adHocUpdateMobile` (and `existingStaffId` mobile-update support) in `v1/services/roster/service.mjs` and `v1/services/roster/contact-create.mjs`.
+   - Added `/internal/year-structure` in `v1/services/calendar/service.mjs` deriving Term (`T1`–`T4`) and Semester (`S1`, `S2`) date ranges from authoritative `calendar_metadata` `yearStructure` (`TERM_WEEK`) records without guessing dates when structure is absent.
+   - Updated `statisticsCalendar` in `v1/services/roster/service.mjs` to query Calendar `/internal/year-structure` and return `{ year, terms, semesters, basis, semesterBasis, revision }`.
+2. **Contacts `/internal/update-mobile` & Roster `adHocUpdateMobile` (`C12`–`C14`)**:
+   - Fixed `fieldRevisions` in Contacts `/internal/update-mobile` (`v1/services/contacts/service.mjs`) to omit `undefined` `mobile` revision so `canonical(intent)` succeeds when Roster does not supply a prior field revision.
+   - Added `updateRosterContactMobile` (`adHocUpdateMobile` and `contactCreate` with `existingStaffId`) in `v1/services/roster/contact-create.mjs` and `v1/services/roster/service.mjs`, enforcing the mandatory 8-digit Singapore mobile gate, duplicate-mobile rejection, and read-only preservation of `Basic Name` and `TTb Name`.
 3. **Regression Test (`tests/v1-product-roster-statistics-and-adhoc-mobile.mjs`)**:
-   - End-to-end isolated Miniflare/D1 verification of `statisticsCalendar` (with and without Calendar `yearStructure`, verifying `GSISRosterStatistics.preset('term')` and `preset('semester')`), plus `adHocUpdateMobile` (mandatory mobile validation, duplicate-mobile rejection, read-only `basicName`/`ttbName` preservation, idempotent retry, and unauthorized caller denial).
+   - End-to-end isolated Miniflare/D1 verification.
+
+## Local Verification (`TZ=Asia/Singapore`)
+- `node tests/v1-product-roster-statistics-and-adhoc-mobile.mjs` — **PASS**
+- `npm run build && git diff --exit-code -- roster-update/ public/ shared/` — **PASS** (zero v0.9 drift)
+- `node scripts/v1/build.mjs && node scripts/v1/verify-build.mjs` — **PASS**
+- `git diff --check` — **PASS**
