@@ -15,6 +15,7 @@ import { canonical, digest } from "../v1/runtime/store.mjs";
 const schoolId = "synthetic-school";
 const suite = await productSuite();
 let browser;
+const heldReplies = [];
 try {
   const reader = await suite.seedAccount("layout-timed-reader", {
     capabilities: ["layout.read"],
@@ -26,6 +27,8 @@ try {
   const date = "2026-11-23";
   const start = Date.parse(`${date}T08:00:00+08:00`);
   const end = start + 30 * 60000;
+  const nextDate = "2026-11-24";
+  const nextStart = Date.parse(`${nextDate}T08:00:00+08:00`);
   const edition = {
     schemaVersion: 1,
     year,
@@ -61,6 +64,18 @@ try {
         sourceLabel: "ISH-1B",
         subject: "PE",
         className: "4B",
+        groupName: "",
+        slotDemand: 1,
+      },
+      {
+        venueId: "ish-1",
+        sourceId: "lesson-next-day",
+        date: nextDate,
+        start: nextStart,
+        end: nextStart + 30 * 60000,
+        sourceLabel: "ISH-1A",
+        subject: "Music",
+        className: "5C",
         groupName: "",
         slotDemand: 1,
       },
@@ -116,6 +131,17 @@ try {
   ]);
 
   const errors = [];
+  function holdReply(date, year = 2026) {
+    let release, ready;
+    const gate = new Promise((resolve) => { release = resolve; });
+    const reply = {
+      date, year, release, gate, claimed: false,
+      ready: new Promise((resolve) => { ready = resolve; }),
+      received: ready,
+    };
+    heldReplies.push(reply);
+    return reply;
+  }
   await context.route("**/*", async (route) => {
     const request = route.request(),
       url = new URL(request.url());
@@ -129,10 +155,22 @@ try {
     });
     const headers = Object.fromEntries(response.headers);
     delete headers["transfer-encoding"];
+    const body = Buffer.from(await response.arrayBuffer());
+    const held = url.pathname === "/api/layout/timetable" && heldReplies.find(
+      (reply) => !reply.claimed && reply.date === url.searchParams.get("date") &&
+        String(reply.year) === url.searchParams.get("year"),
+    );
+    if (held) {
+      held.claimed = true;
+      // The actual local owner has already produced this response. Only browser
+      // delivery is delayed; status/body/authentication are never fabricated.
+      held.received({ status: response.status, body: JSON.parse(body.toString()) });
+      await held.gate;
+    }
     await route.fulfill({
       status: response.status,
       headers,
-      body: Buffer.from(await response.arrayBuffer()),
+      body,
     });
   });
 
@@ -173,6 +211,75 @@ try {
   assert.match(cellText, /4B PE \[ISH-1B\]/);
   console.log("PASS Layout timed timetable UI renders single physical venue row with concurrent classes and raw ISH-1A/ISH-1B provenance independently of Deploy");
 
+  // Observe completion after the real transport and caller's promise reactions.
+  // A task boundary avoids a sleep-based assertion while preserving every
+  // request, returned value and error from GSISV1.request.
+  await page.evaluate(() => {
+    const request = GSISV1.request;
+    window.layoutTimedCompletions = [];
+    GSISV1.request = function (...args) {
+      const pending = request.apply(this, args);
+      if (args[0] !== "layout" || !args[1].startsWith("/timetable?")) return pending;
+      const complete = () => setTimeout(() => window.layoutTimedCompletions.push(args[1]), 0);
+      return pending.then(
+        (value) => { complete(); return value; },
+        (error) => { complete(); throw error; },
+      );
+    };
+  });
+  async function submitHeld(reply) {
+    await timedPanel.locator("[data-timed-year]").fill(String(reply.year));
+    await timedPanel.locator("[data-timed-date]").fill(reply.date);
+    await timedPanel.locator("[data-timed-load]").click();
+    return reply.ready;
+  }
+  async function releaseReply(reply) {
+    const path = `/timetable?year=${reply.year}&date=${reply.date}`;
+    const before = await page.evaluate((path) => window.layoutTimedCompletions.filter((x) => x === path).length, path);
+    reply.release();
+    await page.waitForFunction(({ path, before }) => window.layoutTimedCompletions.filter((x) => x === path).length > before, { path, before });
+  }
+  async function assertNextDate() {
+    assert.equal(await timedPanel.locator("[data-timed-date]").inputValue(), nextDate);
+    assert.equal(await timedPanel.locator('[data-timed-lesson="lesson-next-day"]').count(), 1,
+      "latest selected date keeps its own lesson after older response completes");
+    assert.equal(await timedPanel.locator('[data-timed-lesson="lesson-ish-1a"]').count(), 0);
+    assert.match(await timedPanel.locator("[data-layout-timed-table]").innerText(), /5C Music/);
+  }
+
+  const olderSuccess = holdReply(date), newerSuccess = holdReply(nextDate);
+  assert.equal((await submitHeld(olderSuccess)).status, 200);
+  assert.equal((await submitHeld(newerSuccess)).status, 200);
+  await releaseReply(newerSuccess);
+  await assertNextDate();
+  await releaseReply(olderSuccess);
+  await assertNextDate();
+  console.log("PASS reversed real owner successes retain the latest submitted date");
+
+  // An out-of-range year produces a genuine owner validation failure, held
+  // until a subsequent valid date has already rendered successfully.
+  const olderFailure = holdReply(date, 1999), afterFailure = holdReply(nextDate);
+  assert.equal((await submitHeld(olderFailure)).status, 400);
+  assert.equal((await submitHeld(afterFailure)).status, 200);
+  await releaseReply(afterFailure);
+  await assertNextDate();
+  const latestStatus = await timedPanel.locator("[data-timed-status]").innerText();
+  await releaseReply(olderFailure);
+  await assertNextDate();
+  assert.equal(await timedPanel.locator("[data-timed-status]").innerText(), latestStatus,
+    "an older failure cannot replace the current successful status");
+  assert.equal(await timedPanel.locator("[data-timed-status]").evaluate((el) => el.classList.contains("gsis-error")), false);
+  console.log("PASS stale real owner failure cannot replace a newer successful result or status");
+
+  const latestFailure = holdReply(date, 1999);
+  const failedResponse = await submitHeld(latestFailure);
+  assert.equal(failedResponse.status, 400);
+  await releaseReply(latestFailure);
+  assert.equal(await timedPanel.locator("[data-timed-status]").evaluate((el) => el.classList.contains("gsis-error")), true,
+    "the latest failure remains visible rather than being swallowed");
+  assert.equal(await timedPanel.locator("[data-timed-status]").innerText(), failedResponse.body.error.message);
+  await timedPanel.locator("[data-timed-year]").fill(String(year));
+
   // Verify uncovered date filter displays explicit uncovered message
   await timedPanel.locator("[data-timed-date]").fill("2026-12-01");
   await timedPanel.locator("[data-timed-load]").click();
@@ -184,8 +291,14 @@ try {
   assert.equal(await timedPanel.locator("[data-layout-timed-table]").count(), 0);
   console.log("PASS Layout timed timetable UI filters by date and flags uncovered dates");
 
+  const clearSuccess = holdReply(date), clearFailure = holdReply(nextDate, 1999);
+  assert.equal((await submitHeld(clearSuccess)).status, 200);
+  assert.equal((await submitHeld(clearFailure)).status, 400);
   // Verify gsis:clear-protected-state clears DOM and hides panel
-  await page.evaluate(() => dispatchEvent(new Event("gsis:clear-protected-state")));
+  await page.evaluate(() => {
+    window.retainedTimedPanel = document.querySelector("#v1LayoutTimetablePanel");
+    dispatchEvent(new Event("gsis:clear-protected-state"));
+  });
   assert.equal(await timedPanel.isHidden(), true);
   assert.equal(
     await page.evaluate(
@@ -195,11 +308,24 @@ try {
     ),
     "",
   );
+  const clearedText = (selector) => page.evaluate(
+    (selector) => window.retainedTimedPanel.querySelector(selector).textContent,
+    selector,
+  );
+  assert.equal(await clearedText("[data-timed-status]"), "");
+  await releaseReply(clearSuccess);
+  await releaseReply(clearFailure);
+  assert.equal(await timedPanel.isHidden(), true);
+  for (const selector of ["[data-timed-rows]", "[data-timed-meta]", "[data-timed-disagreements]", "[data-timed-status]"]) {
+    assert.equal(await clearedText(selector), "",
+      "late success or failure cannot restore cleared protected state: " + selector);
+  }
   assert.deepEqual(errors, []);
   console.log("PASS Layout timed timetable UI clears protected state on session change");
 
   await context.close();
 } finally {
+  for (const reply of heldReplies) reply.release();
   await browser?.close();
   await suite.close();
 }

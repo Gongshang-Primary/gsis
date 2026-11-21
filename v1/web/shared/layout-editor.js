@@ -397,6 +397,7 @@ timedPanel.querySelector("[data-timed-date]").value =
   new URLSearchParams(location.search).get("date") || "";
 
 let timedData = null;
+let timedReadEpoch = 0;
 const timedMessage = (value, error = false) => {
   const el = timedPanel.querySelector("[data-timed-status]");
   el.textContent = value;
@@ -563,19 +564,24 @@ function renderTimedTimetable() {
 }
 
 async function loadTimedTimetable() {
-  const ticket = securityEpoch;
+  const ticket = ++timedReadEpoch;
   const y = Number(timedPanel.querySelector("[data-timed-year]").value);
   const d = timedPanel.querySelector("[data-timed-date]").value.trim();
   const qs = new URLSearchParams({ year: String(y) });
   if (d) qs.set("date", d);
-  timedMessage("Loading timed timetable…");
-  const loaded = await api.request("layout", "/timetable?" + qs.toString());
-  if (ticket !== securityEpoch) return;
-  timedData = loaded;
+  timedData = null;
   renderTimedTimetable();
+  timedMessage("Loading timed timetable…");
+  try {
+    const loaded = await api.request("layout", "/timetable?" + qs.toString());
+    if (ticket !== timedReadEpoch) return;
+    timedData = loaded;
+    renderTimedTimetable();
+  } catch (error) {
+    if (ticket === timedReadEpoch) timedMessage(error.message, true);
+  }
 }
-timedPanel.querySelector("[data-timed-load]").onclick = () =>
-  loadTimedTimetable().catch((e) => timedMessage(e.message, true));
+timedPanel.querySelector("[data-timed-load]").onclick = loadTimedTimetable;
 
 function register() { window.GSISCoreTables?.register('table[data-layout-owned]', { exportAll, importAll: openImport }); }
 register(); window.addEventListener('load', register);
@@ -584,14 +590,15 @@ window.addEventListener('gsis:clear-protected-state', () => {
   if (recoveryKey) sessionStorage.removeItem(recoveryKey);
   recoveryKey = ''; unresolved = false;
   panel.querySelector('[data-rows]').replaceChildren(); panel.hidden = true;
+  timedReadEpoch++;
   timedData = null;
-  timedPanel.querySelector('[data-timed-rows]').replaceChildren();
-  timedPanel.querySelector('[data-timed-meta]').replaceChildren();
-  timedPanel.querySelector('[data-timed-disagreements]').replaceChildren();
+  renderTimedTimetable();
+  timedMessage("");
   timedPanel.hidden = true;
 });
 
 try {
+  const startupEpoch = securityEpoch;
   const session = await api.getSession();
   const canEdit = !!session && (api.capable("layout.edit") || api.capable("layout.admin"));
   const canRead = !!session && (canEdit || api.capable("layout.read") || api.capable("admin"));
@@ -603,7 +610,7 @@ try {
     await load();
   }
   if (!canRead) timedPanel.hidden = true;
-  else await loadTimedTimetable().catch((e) => timedMessage(e.message, true));
+  else if (startupEpoch === securityEpoch) await loadTimedTimetable();
 } catch (error) {
   message(error.message, true);
 }
