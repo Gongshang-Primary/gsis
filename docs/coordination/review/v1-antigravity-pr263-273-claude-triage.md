@@ -16,7 +16,7 @@ The `product` job in `.github/workflows/v1-build.yml` has `timeout-minutes: 30`.
 
 ## 3. Combined integration
 
-All eleven branches merge cleanly onto `main + #263` in any order tested (pairwise and stacked). `npm run build` leaves the production build unchanged. Full combined v1 suite result: see section 5.
+All eleven branches merge cleanly onto `main + #263` in any order tested (pairwise and stacked). `npm run build` leaves the production build unchanged. Full combined v1 suite: 187/187 passed (section 5).
 
 ## 4. Per-PR findings (for Muse and the builder)
 
@@ -38,7 +38,7 @@ All eleven branches merge cleanly onto `main + #263` in any order tested (pairwi
 
 - `npm ci`, `npm ci --prefix v1`, `npm run build`, `git diff --exit-code`: passed on the combined tree.
 - `node tests/v1-product-deploy-save-recovery-browser.mjs` on main: **fails** at line 1161 (reproduces CI).
-- `node scripts/v1/test.mjs` on main + all eleven branches: RESULT_PENDING
+- `node scripts/v1/test.mjs` on main + all eleven branches + Claude fixes `9d48f081`, `a28cb3bd` + CI cap (combined `b265dafc`): **187/187 product programs passed**, about 40 minutes on 4 CPUs. That is over the old 30-minute CI cap.
 - Not run: v0.9 Node/LORD suite (no v0.9 paths changed), hosted UAT, deployment.
 
 ## 6. Recommended order for GPT
