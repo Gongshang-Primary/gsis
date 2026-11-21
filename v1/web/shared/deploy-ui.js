@@ -1594,3 +1594,44 @@ function planningReportingPage(root) {
     };
   });
 }
+
+/* Contextual empty physical venue register guidance (B-V01) on Deploy Layout view. */
+(function deployEmptyVenueRegisterGuidance() {
+  function applyNotice(isEmpty) {
+    const content = document.getElementById("content");
+    if (!content) return;
+    const existing = content.querySelector("[data-venues-empty-guidance]");
+    if (!isEmpty) {
+      existing?.remove();
+      return;
+    }
+    if (existing) return;
+    const notice = document.createElement("div");
+    notice.className = "v1-notice";
+    notice.dataset.venuesEmptyGuidance = "true";
+    notice.setAttribute("role", "status");
+    const p = document.createElement("p");
+    p.textContent =
+      "No rooms are registered in the Venues physical register for this version yet. Add or import rooms in Venues Administration, then refresh Venues in Deploy to resume room assignment.";
+    const link = document.createElement("a");
+    link.href = "/venues/";
+    link.textContent = "Open Venues Administration";
+    notice.append(p, link);
+    content.prepend(notice);
+  }
+  function wrap() {
+    const orig = window.GSISrenderLayout;
+    if (typeof orig !== "function" || orig._bV01Wrapped) return;
+    const wrapped = function (svg, opts, ...rest) {
+      const res = orig.call(this, svg, opts, ...rest);
+      const rooms = Array.isArray(opts?.rooms) ? opts.rooms : [];
+      applyNotice(rooms.length === 0);
+      return res;
+    };
+    wrapped._bV01Wrapped = true;
+    window.GSISrenderLayout = wrapped;
+  }
+  wrap();
+  window.addEventListener("load", wrap);
+  document.addEventListener("DOMContentLoaded", wrap);
+})();
