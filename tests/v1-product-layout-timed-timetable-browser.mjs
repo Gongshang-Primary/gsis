@@ -141,13 +141,17 @@ try {
   page.on("pageerror", (e) => errors.push(e.message));
 
   await page.goto(`${origin}/layout/?year=${year}&date=${date}`);
+  await page.waitForFunction(() => !document.querySelector("body > details.gsis-panel"));
+  await page.locator("#tgTab").click();
   const timedPanel = page.locator("#v1LayoutTimetablePanel");
-  await timedPanel.locator("> summary").click();
+  if (!(await timedPanel.evaluate((el) => el.open))) {
+    await timedPanel.locator("> summary").click();
+  }
   await timedPanel.locator("[data-layout-timed-table]").waitFor();
 
   // Verify layout.read user sees Timed timetable panel while Layout-owned edit panel stays hidden
   assert.equal(await timedPanel.isVisible(), true);
-  assert.equal(await page.locator("details.gsis-panel").first().isHidden(), true);
+  assert.equal(await page.locator("#tgView details.gsis-panel").first().isHidden(), true);
 
   // Verify provenance shows zero Deploy planning copy independence (V20)
   const provenance = await timedPanel.locator("[data-timed-provenance]").innerText();
