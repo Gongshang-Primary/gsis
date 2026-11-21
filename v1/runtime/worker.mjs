@@ -5,7 +5,7 @@ import {
   resolveAdmission,
   serviceCall,
 } from "./security.mjs";
-import { digest, operationStatus, abortOperation, one } from "./store.mjs";
+import { digest, operationStatus, abortOperation, one, query } from "./store.mjs";
 import { secretEquals, verifyWebhook } from "./providers.mjs";
 import { systemPolicy, systemHandle } from "./operations.mjs";
 import { outboxHealth } from "./jobs.mjs";
@@ -193,16 +193,45 @@ export function domainWorker(service, module) {
             if (body.schoolId !== env.SCHOOL_ID)
               throw new ApiError("SCHOOL_MISMATCH", 403);
             const datasets = await listBackupDatasets(env);
+            let existingByDataset = new Map();
+            try {
+              const existing = await query(
+                env.DB,
+                "SELECT dataset,day,file_id,folder_id,source_digest,sha256,bytes,verified_at FROM drive_backup_files WHERE school_id=? AND state='verified' ORDER BY day DESC LIMIT 500",
+                [env.SCHOOL_ID],
+              );
+              for (const row of existing) {
+                if (!existingByDataset.has(row.dataset)) {
+                  existingByDataset.set(row.dataset, row);
+                }
+              }
+            } catch {
+              existingByDataset = new Map();
+            }
             value = {
               owner: service,
               schoolId: env.SCHOOL_ID,
-              datasets: datasets.map((d) => ({
-                id: d.id,
-                name: d.name,
-                mimeType: d.mimeType || XLSX_MIME,
-                extension: d.extension || "xlsx",
-                importable: !!d.importable,
-              })),
+              datasets: datasets.map((d) => {
+                const prior = existingByDataset.get(d.id);
+                return {
+                  id: d.id,
+                  name: d.name,
+                  mimeType: d.mimeType || XLSX_MIME,
+                  extension: d.extension || "xlsx",
+                  importable: !!d.importable,
+                  ...(prior
+                    ? {
+                        adoptedFileId: prior.file_id,
+                        adoptedFolderId: prior.folder_id,
+                        adoptedDay: prior.day,
+                        adoptedSourceDigest: prior.source_digest,
+                        adoptedSha256: prior.sha256,
+                        adoptedBytes: prior.bytes,
+                        adoptedVerifiedAt: prior.verified_at,
+                      }
+                    : {}),
+                };
+              }),
             };
           } else if (path === "/internal/backup-export") {
             if (body.schoolId !== env.SCHOOL_ID)
@@ -420,7 +449,10 @@ export function domainWorker(service, module) {
       // Catch-up rotates bounded owner datasets; daily verification is due at
       // 23:50 SGT and is completed by these resumable runs.
       const backupEnv = { ...bindings, SERVICE_NAME: service };
-      if (bindings.DRIVE_BACKUP_ENABLED === "true") {
+      if (
+        bindings.DRIVE_BACKUP_ENABLED === "true" &&
+        bindings.CENTRAL_DRIVE_BACKUP_ENABLED !== "true"
+      ) {
         const task = runDriveBackups(backupEnv, Date.now()).catch(() => undefined);
         if (execution?.waitUntil) execution.waitUntil(task); else await task;
       }

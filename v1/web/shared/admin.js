@@ -181,6 +181,90 @@ async function downloadBackup(domain, backupId, key) {
   link.click();
   setTimeout(() => URL.revokeObjectURL(href), 60000);
 }
+async function renderCentralDriveBackupHealth(host) {
+  const section = document.createElement("section");
+  section.id = "centralDriveBackupHealth";
+  section.className = "gsis-panel";
+  const title = document.createElement("h3");
+  title.textContent = "Central Google Drive Backup";
+  const summary = document.createElement("p");
+  summary.dataset.centralBackupSummary = "";
+  summary.textContent = "Checking central backup status…";
+  const actionRow = document.createElement("div");
+  actionRow.className = "gsis-actions";
+  const runBtn = document.createElement("button");
+  runBtn.type = "button";
+  runBtn.dataset.centralBackupRun = "";
+  runBtn.textContent = "Run backup cycle now";
+  const runStatus = document.createElement("span");
+  runStatus.setAttribute("role", "status");
+  runStatus.dataset.centralBackupStatus = "";
+  actionRow.append(runBtn, runStatus);
+  const tableHost = document.createElement("div");
+  tableHost.className = "gsis-scroll";
+  section.append(title, summary, actionRow, tableHost);
+  host.append(section);
+
+  async function refreshCentral() {
+    tableHost.replaceChildren();
+    try {
+      const data = await api.request("core", "/admin/backups/health");
+      summary.textContent =
+        `State: ${data.state || "unknown"} · Daily check: ${data.dailyCheck || "23:50 Asia/Singapore"}` +
+        (data.lastRunAt ? ` · Last run: ${new Date(data.lastRunAt).toISOString()}` : " · Not yet run") +
+        (data.lastError ? ` · Last error: ${data.lastError}` : "");
+      const datasets = data.datasets || [];
+      if (!datasets.length) {
+        const empty = document.createElement("p");
+        empty.textContent = "No central backup datasets registered yet.";
+        tableHost.append(empty);
+        return;
+      }
+      const table = document.createElement("table");
+      table.dataset.centralBackupTable = "";
+      const head = table.createTHead().insertRow();
+      for (const h of ["Owner", "Dataset", "Name", "Status", "Verified Day", "Last Error"]) {
+        const th = document.createElement("th");
+        th.textContent = h;
+        head.append(th);
+      }
+      const tbody = table.createTBody();
+      for (const ds of datasets) {
+        const tr = tbody.insertRow();
+        cell(tr, ds.owner || "");
+        cell(tr, ds.dataset || "");
+        cell(tr, ds.name || "");
+        cell(tr, ds.status || "");
+        cell(tr, ds.latestJob?.day || "—");
+        cell(tr, ds.lastError || "");
+      }
+      tableHost.append(table);
+    } catch (error) {
+      summary.className = "gsis-error";
+      summary.textContent = error.message;
+    }
+  }
+
+  runBtn.onclick = async () => {
+    runBtn.disabled = true;
+    runStatus.textContent = "Running bounded backup cycle…";
+    try {
+      const out = await api.request("core", "/admin/backups/run-cycle", {
+        method: "POST",
+        body: { operationId: `admin-backup-cycle-${Date.now()}` },
+      });
+      runStatus.textContent = `Cycle finished: ${out.state || "ok"} (processed: ${out.processed ?? 0}).`;
+      await refreshCentral();
+    } catch (error) {
+      runStatus.textContent = error.message;
+    } finally {
+      runBtn.disabled = false;
+    }
+  };
+
+  await refreshCentral();
+}
+
 async function health() {
   const domains = [
     "core",
@@ -194,6 +278,7 @@ async function health() {
   ];
   $("healthRows").replaceChildren();
   await renderGoogleConnection($("healthRows"));
+  await renderCentralDriveBackupHealth($("healthRows"));
   await Promise.all(
     domains.map(async (domain) => {
       const section = document.createElement("section");
