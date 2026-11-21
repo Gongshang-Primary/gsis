@@ -2557,32 +2557,103 @@ export async function handle(ctx) {
       "CAPABILITY_DENIED",
       403,
     );
+    const versionId = id(b.versionId);
+    await loadVersion(ctx.env.DB, school, versionId);
     const archive = await one(
       ctx.env.DB,
       "SELECT hidden_before FROM deploy_audit_display WHERE school_id=? AND actor_id=?",
       [school, ctx.principal.actorId],
     );
+    const hiddenBefore = b.includeArchived ? 0 : archive?.hidden_before || 0;
+    const formatAuditRow = (r) => {
+      const details = JSON.parse(r.details);
+      const hasFieldDiff =
+        details?.before !== undefined || details?.after !== undefined;
+      return {
+        id: r.id,
+        operationId: r.operationId,
+        at: r.at,
+        actor: details?.actorLabel || r.actor,
+        originalActor: r.actor,
+        action: details?.operationLabel || r.action,
+        capabilityAction: r.action,
+        details,
+        hasFieldDiff,
+      };
+    };
+    const requestedDetail = b.detailId ?? b.eventId;
+    if (requestedDetail !== undefined && requestedDetail !== null && requestedDetail !== "") {
+      const detailId = id(requestedDetail);
+      const row = await one(
+        ctx.env.DB,
+        "SELECT event_id AS id,operation_id AS operationId,actor_id AS actor,action,recorded_at AS at,details_json AS details FROM product_audit WHERE school_id=? AND event_id=? AND (json_extract(details_json,'$.version')=? OR json_extract(details_json,'$.versionId')=?)",
+        [school, detailId, versionId, versionId],
+      );
+      check(
+        row,
+        "Audit event not found for this version.",
+        "AUDIT_EVENT_NOT_FOUND",
+        404,
+      );
+      const formatted = formatAuditRow(row);
+      const historicalNotice = {
+        recorded: false,
+        note: "Before/after field values were not recorded for this historical audit event.",
+        metadata: formatted.details,
+      };
+      return {
+        versionId,
+        event: {
+          ...formatted,
+          before: formatted.hasFieldDiff
+            ? (formatted.details.before ?? null)
+            : historicalNotice,
+          after: formatted.hasFieldDiff
+            ? (formatted.details.after ?? null)
+            : historicalNotice,
+        },
+      };
+    }
+    const pageSize =
+      b.limit !== undefined ? finite(Number(b.limit), 1, 40) : 40;
     let at = Number.MAX_SAFE_INTEGER,
       event = "";
     if (b.cursor) {
-      const parts = String(b.cursor).split("|");
-      at = finite(Number(parts[0]), 0, Number.MAX_SAFE_INTEGER);
-      event = parts.slice(1).join("|");
+      const raw = String(b.cursor);
+      const sep = raw.indexOf("|");
+      check(sep > 0 && sep < raw.length - 1, "Invalid audit cursor.", "INVALID_CURSOR", 400);
+      at = finite(Number(raw.slice(0, sep)), 0, Number.MAX_SAFE_INTEGER);
+      event = raw.slice(sep + 1);
+      check(event.length > 0 && event.length <= 200, "Invalid audit cursor.", "INVALID_CURSOR", 400);
     }
+    const totalRow = await one(
+      ctx.env.DB,
+      "SELECT COUNT(*) AS total FROM product_audit WHERE school_id=? AND (json_extract(details_json,'$.version')=? OR json_extract(details_json,'$.versionId')=?) AND recorded_at>=?",
+      [school, versionId, versionId, hiddenBefore],
+    );
+    const total = Number(totalRow?.total || 0);
     const rows = await query(
       ctx.env.DB,
-      "SELECT event_id AS id,actor_id AS actor,action,recorded_at AS at,details_json AS details FROM product_audit WHERE school_id=? AND (recorded_at<? OR (recorded_at=? AND event_id<?)) AND recorded_at>=? ORDER BY recorded_at DESC,event_id DESC LIMIT 40",
+      "SELECT event_id AS id,operation_id AS operationId,actor_id AS actor,action,recorded_at AS at,details_json AS details FROM product_audit WHERE school_id=? AND (json_extract(details_json,'$.version')=? OR json_extract(details_json,'$.versionId')=?) AND recorded_at>=? AND (recorded_at<? OR (recorded_at=? AND event_id<?)) ORDER BY recorded_at DESC,event_id DESC LIMIT ?",
       [
         school,
+        versionId,
+        versionId,
+        hiddenBefore,
         at,
         at,
         event,
-        b.includeArchived ? 0 : archive?.hidden_before || 0,
+        pageSize + 1,
       ],
     );
+    const hasMore = rows.length > pageSize;
+    const pageRows = hasMore ? rows.slice(0, pageSize) : rows;
     return {
-      events: rows.map((r) => ({ ...r, details: JSON.parse(r.details) })),
-      cursor: rows.length === 40 ? rows.at(-1).at + "|" + rows.at(-1).id : null,
+      versionId,
+      total,
+      archiveScope: "school-admin",
+      events: pageRows.map(formatAuditRow),
+      cursor: hasMore ? pageRows.at(-1).at + "|" + pageRows.at(-1).id : null,
     };
   }
 
