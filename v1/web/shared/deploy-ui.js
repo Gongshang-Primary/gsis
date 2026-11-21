@@ -254,9 +254,36 @@ import { planningSnapshot, planningPerson, planningEligible, reportingRoot, repo
     window.eligibleTeacher = teacher => planningEligible(v(), teacher);
     window.activeGroupTeachers = () => v().teachers.filter(teacher => planningEligible(v(), teacher))
       .map(teacher => planningPerson(v(), teacher)).sort((a, b) => natural(a.name, b.name));
-    // This exported predicate serves Deploy selectors. The embedded calculation
-    // closure and accepted authority/capacity fields are deliberately unchanged.
+    // Selectors and planning reports share version eligibility. The default
+    // teaching calculator and operational relief evidence keep their own basis.
     window.GSISTeachingRules.eligible = teacher => planningEligible(incomingDocument || v(), teacher);
+    window.workloadData = () => {
+      const version = v();
+      const doc = {
+        ...version,
+        teachers: version.teachers.map(teacher => ({ ...plannerTeacher(teacher), name: teacher.name })),
+      };
+      return window.GSISWorkload.analyse(
+        doc,
+        teacher => window.GSISTeachingRules.calculate(
+          teacher, doc.offload, candidate => planningEligible(version, candidate),
+        ),
+        doc.relief === undefined ? doc.reliefResults?.targetSettings : doc.relief,
+      );
+    };
+    const basis = "Planning estimate from this version. Relief quotas (R) use accepted Contacts evidence.";
+    for (const name of ["renderWorkload", "renderWorkloadStats", "renderWorkloadSummary"]) {
+      const renderView = window[name];
+      window[name] = root => {
+        renderView(root);
+        const note = document.createElement("p");
+        note.className = "hint";
+        note.dataset.workloadBasis = "";
+        note.textContent = basis;
+        root.prepend(note);
+        for (const table of root.querySelectorAll("table")) table.dataset.reportBasis = basis;
+      };
+    }
     const originalTeacherNotes = window.teacherNotesPage;
     function teacherAppointmentRank(doc, teacher) {
       if (!teacher?.active) return teacher?.activeKnown === false ? 3 : 4;

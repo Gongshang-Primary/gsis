@@ -463,6 +463,7 @@
             "Export Kind": "Visible report — not an import template",
             Module: window.GSISV1?.module || "",
             "Exported At": new Date().toISOString(),
+            ...(table.dataset.reportBasis ? { "Calculation Basis": table.dataset.reportBasis } : {}),
           },
           sheets: { Report: { columns, rows } },
         });

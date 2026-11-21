@@ -802,6 +802,8 @@ function updateDeployTeachingEligibility(source) {
  let body=source.slice(engine.start,node.start)+"function eligible(t){return t.teachingEligibility?.state==='eligible';}"+source.slice(node.end,engine.end);
  body=replaceOnce(body,"if(Array.isArray(catalogue)){p['EO Appt Level']=rule?String(rule.level||''):'';out.groups=rule?memberships(rule.role,rule.level,rule.groups):[];}","out.groups=(live&&live.groups||t.groups||[]).slice();out.authority=live&&live.authority||t.authority||{};out.teachingEligibility=(live||t).teachingEligibility||{state:'unavailable',reasons:['Current Contacts eligibility is unavailable.']};",'Accepted Contacts facts remain authoritative');
  body=replaceOnce(body,"out.active=p.Active==='Y';","out.active=(live||t).active===true;",'Deploy proposed Active cannot promote accepted employment activity');
+ body=replaceOnce(body,"function calculate(t,catalogue){","function calculate(t,catalogue,eligibility=eligible){",'Supply an explicit planning eligibility policy to the browser calculator');
+ body=replaceOnce(body,"if(!eligible(t))return {eligible:false","if(!eligibility(t))return {eligible:false",'Keep the default accepted evidence policy');
  body=replaceOnce(body,'return {memberships:memberships,resolve:resolve,eligible:eligible,',legacyClassification+'return {memberships:memberships,resolve:resolve,classificationEligible:classificationEligible,eligible:eligible,','Separate catalogue classification from current teacher eligibility');
  return source.slice(0,engine.start)+body+source.slice(engine.end);
 }
