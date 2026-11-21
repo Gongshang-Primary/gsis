@@ -772,7 +772,6 @@ export function validateDocument(doc) {
 const proposalFields = [
   "Basic Name",
   "Role",
-  "EO Appt Level",
   "Appointment Status",
   "Employment Arrangement",
   "Employment Status",

@@ -70,7 +70,7 @@ try {
     scope: "teachers",
     leaseFence: lease1.fence,
     edits: [
-      { operation: "setTeacherField", teacher: staffId, field: "EO Appt Level", value: "SEO1" },
+      { operation: "setTeacherField", teacher: staffId, field: "Employment Arrangement", value: "Contract" },
       { operation: "setTeacherField", teacher: staffId, field: "MK Modifier", value: "MK" },
       { operation: "setTeacherField", teacher: staffId, field: "Subject Modifier", value: "" },
       { operation: "setTeacherField", teacher: staffId, field: "Appointment Status", value: "" },
@@ -112,13 +112,13 @@ try {
         .all()
     ).results.map((r) => [r.field, { state: r.state, value: unwrap(JSON.parse(r.value_json)) }]),
   );
-  assert.equal(fieldsAfter.eoAppointmentLevel?.value, "SEO1");
+  assert.equal(fieldsAfter.employmentArrangement?.value, "Contract");
   assert.deepEqual(fieldsAfter.mkTags?.value, ["MK"]);
   assert.deepEqual(fieldsAfter.subjectTags?.value, []);
   assert.equal(fieldsAfter.appointmentStatus?.value, null);
   assert.equal(fieldsAfter.employmentActive?.value, false);
   assert.equal(fieldsAfter.basicName?.value, "Tan Deploy Newer");
-  console.log("PASS C04/C05/C08-C10: Deploy publish applies EO Appt Level, MK Modifier, blank-clears, bidirectional Active Y->N, and Basic Name directly to Contacts");
+  console.log("PASS C04/C05/C08-C10: Deploy publish applies Employment Arrangement, MK Modifier, blank-clears, bidirectional Active Y->N, and Basic Name directly to Contacts");
 
   // 3. Basic Name timestamp conflict: Contacts edited AFTER Deploy draft edit -> Contacts wins!
   const v2 = await suite.call(admin, "deploy", "/versions/create", {

@@ -2266,6 +2266,7 @@ export async function handle(ctx) {
           b.versionId || null,
           null,
           preview.name,
+          { draftOverridesOnly: true },
         );
       }
     }
@@ -2816,6 +2817,7 @@ async function assertNoCrossDraftTTbCollision(
   excludeVersionId,
   excludeStaffId,
   candidateTtbName,
+  options = {},
 ) {
   const target = String(candidateTtbName || "").trim().toLowerCase();
   if (!target) return;
@@ -2846,13 +2848,14 @@ async function assertNoCrossDraftTTbCollision(
     )
       .trim()
       .toLowerCase();
-    if (existing) names.push(existing);
+    if (!options.draftOverridesOnly && existing) {
+      names.push(existing);
+    }
     if (draft) {
       const draftBasic = String(
         draft["Basic Name"] ?? teacher?.profile?.["Basic Name"] ?? "",
       ).trim();
       if (draftBasic) {
-        names.push(draftBasic.toLowerCase());
         const split = (v) =>
           Array.isArray(v)
             ? v
@@ -2874,8 +2877,13 @@ async function assertNoCrossDraftTTbCollision(
             draft["MK Modifier"] ?? teacher?.profile?.["MK Modifier"],
           ),
         });
-        if (derived.available && derived.name) {
-          names.push(derived.name.trim().toLowerCase());
+        const derivedLower =
+          derived.available && derived.name
+            ? derived.name.trim().toLowerCase()
+            : "";
+        if (!options.draftOverridesOnly || derivedLower !== existing) {
+          names.push(draftBasic.toLowerCase());
+          if (derivedLower) names.push(derivedLower);
         }
       }
     }
