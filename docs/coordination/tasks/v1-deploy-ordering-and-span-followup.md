@@ -16,6 +16,7 @@
 - `v1/services/deploy/model.mjs`
 - `v1/services/deploy/service.mjs`
 - `v1/services/deploy/workbooks.mjs`
+- `tests/v1-product-deploy-layout-and-teachers-browser.mjs`
 - `tests/v1-product-deploy-ordering-and-span-browser.mjs`
 
 ## DEP-21-001 — Teachers row order and fill

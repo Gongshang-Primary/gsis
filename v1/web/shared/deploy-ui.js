@@ -122,6 +122,9 @@ import { planningSnapshot, planningPerson, planningEligible, reportingRoot, repo
     html body #content[data-view="Teachers"] tbody > tr:nth-child(even of [data-roster-teacher]:not([hidden])) {
       --row-band:#e8f0f5;
     }
+    html body #content[data-view="Teachers"] tbody > tr[data-roster-teacher].inactive {
+      --row-band:#e4e7ea !important;
+    }
     html body #content[data-view="Teachers"] tbody > tr[data-roster-teacher] > :is(td,th) {
       background:var(--row-band) !important;color:#193448 !important;
     }
@@ -233,6 +236,16 @@ import { planningSnapshot, planningPerson, planningEligible, reportingRoot, repo
     // closure and accepted authority/capacity fields are deliberately unchanged.
     window.GSISTeachingRules.eligible = teacher => planningEligible(incomingDocument || v(), teacher);
     const originalTeacherNotes = window.teacherNotesPage;
+    function teacherAppointmentRank(doc, teacher) {
+      if (!teacher?.active) return teacher?.activeKnown === false ? 3 : 4;
+      const projected = planningPerson(doc, teacher);
+      const role = projected.profile?.Role || projected.role || "";
+      const level = projected.profile?.["EO Appt Level"] || "";
+      const group = window.GSISTeachingRules?.group?.(role, level) || "";
+      if (group === "HOD") return 0;
+      if (group === "Jnr KP") return 1;
+      return 2;
+    }
     window.teacherNotesPage = root => {
       originalTeacherNotes(root);
       // Accepted capacity remains visible, but is not the version's picker rule.
@@ -247,9 +260,111 @@ import { planningSnapshot, planningPerson, planningEligible, reportingRoot, repo
           hint.textContent = hint.textContent.replace(
             "Making a teacher inactive clears their deployment allocations when saved.",
             "Inactive staff are unavailable for new assignments; saved allocations are retained until explicitly removed.");
+      const doc = v();
+      const body = root.querySelector("table tbody");
+      if (doc && body) {
+        const rosterById = new Map((window.teacherRoster?.() || []).map(t => [t.id, t]));
+        const trs = [...body.querySelectorAll("tr[data-roster-teacher]")];
+        trs.forEach((tr, index) => {
+          tr.dataset.initialIndex = String(index);
+          const person = rosterById.get(tr.dataset.rosterTeacher) || doc.teachers?.find(t => t.id === tr.dataset.rosterTeacher);
+          const projected = person ? planningPerson(doc, person) : null;
+          const confirmedInactive = projected ? (projected.activeKnown && !projected.active) : tr.classList.contains("inactive");
+          tr.classList.toggle("inactive", confirmedInactive);
+          tr.dataset.activityState = !projected || !projected.activeKnown ? "unknown" : projected.active ? "active" : "inactive";
+          tr.dataset.appointmentRank = String(teacherAppointmentRank(doc, projected || person));
+        });
+        if (!window.sorts?.Teachers) {
+          trs.sort((a, b) =>
+            Number(a.dataset.appointmentRank) - Number(b.dataset.appointmentRank) ||
+            Number(a.dataset.initialIndex) - Number(b.dataset.initialIndex));
+          trs.forEach(tr => body.append(tr));
+        }
+      }
     };
-    window.GSISReporting.staff = doc => reportingStaff(doc, { retainHistorical: true });
-    window.GSISReporting.snapshot = doc => reportingStaff(doc);
+    const SINGLE_LETTER_SUFFIX_ORDER = ["P", "T", "I", "R", "C", "H", "G", "K"];
+    const TWO_LETTER_SUFFIX_ORDER = ["Gc", "Gt", "P", "Rs", "Rp", "I", "D", "E", "K"];
+    const rawClassesForDoc = doc =>
+      doc?.classes || (doc?.venues || []).filter(r => r.form).map(r => ({ shortName: r.form, level: r.form.match(/^\d+/)?.[0], name: "" }));
+    const suffixForClass = c => {
+      const s = String(c?.shortName || "");
+      const l = String(c?.level || "");
+      return /^\d/.test(s) && l && s.startsWith(l) ? s.slice(l.length) : s;
+    };
+    function versionUsesTwoLetterScheme(doc) {
+      const classes = rawClassesForDoc(doc).filter(c => !c?.undefinedDraft && !String(c?.shortName || "").startsWith("__undefined_"));
+      return classes.some(c => suffixForClass(c).length >= 2);
+    }
+    function suffixRankForDoc(doc, suffix) {
+      const order = versionUsesTwoLetterScheme(doc) ? TWO_LETTER_SUFFIX_ORDER : SINGLE_LETTER_SUFFIX_ORDER;
+      const code = String(suffix || "").trim();
+      const idx = order.findIndex(item => item.toLowerCase() === code.toLowerCase());
+      return idx >= 0 ? idx : order.length;
+    }
+    if (typeof window.classList === "function") {
+      const originalClassList = window.classList;
+      window.classList = () => {
+        const list = originalClassList();
+        const doc = v();
+        if (!doc || !Array.isArray(list)) return list;
+        return list
+          .map((c, index) => ({ c, index }))
+          .sort((a, b) => {
+            const la = Number(a.c?.level) || 0, lb = Number(b.c?.level) || 0;
+            if (la !== lb) return la - lb;
+            const ra = suffixRankForDoc(doc, suffixForClass(a.c));
+            const rb = suffixRankForDoc(doc, suffixForClass(b.c));
+            if (ra !== rb) return ra - rb;
+            return a.index - b.index;
+          })
+          .map(entry => entry.c);
+      };
+    }
+    if (typeof window.compareClass === "function") {
+      const originalCompareClass = window.compareClass;
+      window.compareClass = (a, b) => {
+        const doc = v();
+        const ma = /^(\d+)([A-Za-z][A-Za-z0-9_-]*)$/.exec(String(a || "").trim());
+        const mb = /^(\d+)([A-Za-z][A-Za-z0-9_-]*)$/.exec(String(b || "").trim());
+        if (doc && ma && mb) {
+          const la = Number(ma[1]), lb = Number(mb[1]);
+          if (la !== lb) return la - lb;
+          const ra = suffixRankForDoc(doc, ma[2]), rb = suffixRankForDoc(doc, mb[2]);
+          if (ra !== rb) return ra - rb;
+        }
+        return originalCompareClass(a, b);
+      };
+    }
+    if (typeof window.selectedClassNameSet === "function") {
+      window.selectedClassNameSet = () => {
+        const sets = window.classNameSets();
+        const doc = v();
+        const explicit = window.classSetSelections?.[window.current];
+        let set = sets.find(s => s.id === explicit);
+        if (!set && doc && versionUsesTwoLetterScheme(doc)) {
+          set = sets.find(s => s.pairs?.some(([, short]) => String(short || "").length >= 2));
+        }
+        set = set || sets.find(s => s.id === "new") || sets[0];
+        if (!set || !doc) return set;
+        const order = set.pairs?.some(([, short]) => String(short || "").length >= 2) || versionUsesTwoLetterScheme(doc)
+          ? TWO_LETTER_SUFFIX_ORDER
+          : SINGLE_LETTER_SUFFIX_ORDER;
+        const rank = short => {
+          const idx = order.findIndex(item => item.toLowerCase() === String(short || "").toLowerCase());
+          return idx >= 0 ? idx : order.length;
+        };
+        return {
+          ...set,
+          pairs: (set.pairs || [])
+            .map((pair, index) => ({ pair, index }))
+            .sort((a, b) => rank(a.pair[1]) - rank(b.pair[1]) || a.index - b.index)
+            .map(entry => entry.pair),
+        };
+      };
+    }
+    const currentStaffCatalog = () => typeof staffCatalog !== "undefined" ? staffCatalog : null;
+    window.GSISReporting.staff = doc => reportingStaff(doc, { retainHistorical: true, catalog: currentStaffCatalog() });
+    window.GSISReporting.snapshot = doc => reportingStaff(doc, { catalog: currentStaffCatalog() });
     window.GSISReporting.value = (doc, edit) => edit.operation === "initReporting"
       ? doc.reporting || null : reportingLinks(doc)[edit.officer] || "";
     window.GSISReporting.assign = assignPlanningReporting;
@@ -548,7 +663,8 @@ import { planningSnapshot, planningPerson, planningEligible, reportingRoot, repo
 
 // A local draft projection only; the owner validates and persists this edit.
 function assignPlanningReporting(doc, id, ro) {
-  const people = reportingStaff(doc, { retainHistorical: true });
+  const catalog = typeof staffCatalog !== "undefined" ? staffCatalog : null;
+  const people = reportingStaff(doc, { retainHistorical: true, catalog });
   const person = people.find((row) => row.id === id),
     links = reportingLinks(doc);
   if (!person)
@@ -582,7 +698,7 @@ function assignPlanningReporting(doc, id, ro) {
   }
   doc.reporting = {
     ...doc.reporting,
-    staff: (doc.reporting?.staff || reportingStaff(doc)).map(person =>
+    staff: (doc.reporting?.staff || reportingStaff(doc, { catalog })).map(person =>
       person.id === id && Object.hasOwn(person, "ro") ? { ...person, ro } : person),
     parents,
     officers,
@@ -638,7 +754,10 @@ function planningReportingPage(root) {
   const doc = v(),
     links = reportingLinks(doc),
     conflicts = reportingConflicts(doc),
-    people = reportingStaff(doc, { retainHistorical: true }),
+    people = reportingStaff(doc, {
+      retainHistorical: true,
+      catalog: typeof staffCatalog !== "undefined" ? staffCatalog : null,
+    }),
     by = new Map(people.map((p) => [p.id, p])),
     officers = people.filter((p) => !reportingRoot(doc, p) || links[p.id]),
     children = (id) =>

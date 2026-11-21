@@ -133,8 +133,16 @@ export function reportingConflicts(doc) {
 }
 
 /** Retained excluded relationships remain inspectable; they are never new choices. */
-export function reportingStaff(doc, { retainHistorical = false } = {}) {
+export function reportingStaff(doc, { retainHistorical = false, catalog = null } = {}) {
   const people = new Map((doc?.teachers || []).filter(p => p.id).map(p => [p.id, p]));
+  const removed = doc?.removedTeachers || {};
+  const extra = catalog instanceof Map ? [...catalog.values()]
+    : Array.isArray(catalog) ? catalog
+    : Array.isArray(doc?.staffCatalog) ? doc.staffCatalog : [];
+  for (const person of extra) {
+    if (person?.id && !people.has(person.id) && !removed[person.id])
+      people.set(person.id, person);
+  }
   const links = reportingLinks(doc);
   const conflicts = reportingConflicts(doc);
   const linked = new Set([...Object.keys(links), ...Object.values(links).filter(Boolean),
