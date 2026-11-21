@@ -1,6 +1,6 @@
 # v1 WhatsApp button templates: drafts for Meta submission
 
-Project: v1. Model: Claude. 21 Nov 2026. Status: **draft, not submitted**. Submission needs the owner's go-ahead.
+Project: v1. Model: Claude. 21 Nov 2026. Status: **submitted 21 Nov 2026 on owner instruction ("Submit all 10"); all PENDING Meta review, category UTILITY.** Nothing was sent to anyone.
 
 Owner decisions (21 Nov 2026): button versions in v1 now; new templates using the v1 address **https://gsis.gsps.edu.sg** (not the v0.9 hosts); evening summary uses the approved `gsis_relief_evening_v2` wording (no button, no new template).
 
@@ -57,3 +57,20 @@ Body: `*Your timetable for today has changed*\n\nHi {{1}}, your timetable for to
 ## Until approval
 
 v1 keeps the approved link-in-body versions (`*_v1`) for routes 2–9 and must not use the v0.9 button templates, whose fixed URLs point at the v0.9 hosts. For routes 1 and 10, v1 uses `gsis_relief_request_v1` and `gsis_timetable_updated_v1` (both APPROVED, link in body) until the new ones are approved.
+
+## Submission record (21 Nov 2026)
+
+| Name | Meta template ID | State at submission |
+| --- | --- | --- |
+| gsis_v1_relief_request | 1665470368578133 | PENDING |
+| gsis_v1_relief_changed | 1645520940586028 | PENDING |
+| gsis_v1_contact_review | 1170072542117257 | PENDING |
+| gsis_v1_relief_assignment | 1172529062127628 | PENDING |
+| gsis_v1_relief_updated | 3256714774522340 | PENDING |
+| gsis_v1_relief_reminder | 2311196459674631 | PENDING |
+| gsis_v1_relief_unacknowledged | 1205342768583239 | PENDING |
+| gsis_v1_relief_urgent | 2140936916521447 | PENDING |
+| gsis_v1_relief_urgent_smc | 1625548885229398 | PENDING |
+| gsis_v1_timetable_updated | 2208482650072271 | PENDING |
+
+Dynamic button example value: `review-example-not-a-valid-private-link`. Check approval with the read-only template lookup before activating any of them in v1.
