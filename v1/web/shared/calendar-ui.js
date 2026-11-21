@@ -283,7 +283,6 @@ refresh();
   let dialog, yearInput, fileInput, textInput, status, previewHost, previewBtn, confirmBtn, receiptBtn,
     request = null, unresolved = false, busy = false, epoch = 0, storageKey = '';
   const isAllowed = () => Boolean(api.capable('calendar.admin') || api.capable('admin'));
-  const call = (action, payload) => api.request('calendar', '/action', { method: 'POST', body: { action, payload } });
   const setStatus = (text, error = false) => {
     if (!status) return;
     status.textContent = text;
@@ -487,7 +486,10 @@ refresh();
     try {
       const year = Number(yearInput.value);
       const events = parseEvents(textInput.value);
-      const result = await call('importEventsPreview', { year, events });
+      const result = await api.request('calendar', '/action', {
+        method: 'POST',
+        body: { action: 'importEventsPreview', payload: { year, events } },
+      });
       if (ticket !== epoch) return;
       renderPreview(result);
       if (!result.valid) {
@@ -527,7 +529,10 @@ refresh();
       unresolved = true;
       receiptBtn.hidden = false;
       setStatus('Importing events…');
-      const result = await call('importEventsApply', request);
+      const result = await api.request('calendar', '/action', {
+        method: 'POST',
+        body: { action: 'importEventsApply', payload: request },
+      });
       if (ticket !== epoch) return;
       clearPending();
       previewHost.replaceChildren();
@@ -553,7 +558,10 @@ refresh();
     const ticket = epoch;
     receiptBtn.disabled = true;
     try {
-      const result = await call('eventMutationStatus', { operationId: request.operationId });
+      const result = await api.request('calendar', '/action', {
+        method: 'POST',
+        body: { action: 'eventMutationStatus', payload: { operationId: request.operationId } },
+      });
       if (ticket !== epoch) return;
       if (result.state === 'SAVED') {
         clearPending();
