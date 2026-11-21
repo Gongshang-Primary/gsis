@@ -87,11 +87,12 @@ try {
   const tInsulated = bootAfterContactsEdit.current.teachers.find(
     (t) => t.id === staffId,
   );
-  assert.equal(tInsulated.profile["Basic Name"], "Tan Original");
-  assert.equal(tInsulated.profile.Role, "T");
-  assert.equal(tInsulated.profile["EO Appt Level"], "GEO3");
-  assert.equal(tInsulated.profile["Subject Modifier"], "PE");
-  // Contacts provenance & authority remain live
+  assert.equal(tInsulated.planningProfile["Basic Name"], "Tan Original");
+  assert.equal(tInsulated.planningProfile.Role, "T");
+  assert.equal(tInsulated.planningProfile["EO Appt Level"], "GEO3");
+  assert.equal(tInsulated.planningProfile["Subject Modifier"], "PE");
+  // Contacts provenance, live profile, & authority remain live
+  assert.equal(tInsulated.profile["Basic Name"], "Tan Updated In Contacts");
   assert.equal(tInsulated.basicNameProvenance?.value, "Tan Updated In Contacts");
   assert.equal(tInsulated.basicNameProvenance?.source, "contacts");
   assert.equal(tInsulated.authority?.eo?.value, true);
@@ -148,10 +149,10 @@ try {
     versionId: v2.versionId,
   });
   const tV2 = bootV2.current.teachers.find((t) => t.id === staffId);
-  assert.equal(tV2.profile["Basic Name"], "Tan Updated In Contacts");
-  assert.equal(tV2.profile.Role, "ST");
-  assert.equal(tV2.profile["EO Appt Level"], "SEO1");
-  assert.equal(tV2.profile["Subject Modifier"], "Art");
+  assert.equal(tV2.planningProfile["Basic Name"], "Tan Updated In Contacts");
+  assert.equal(tV2.planningProfile.Role, "ST");
+  assert.equal(tV2.planningProfile["EO Appt Level"], "SEO1");
+  assert.equal(tV2.planningProfile["Subject Modifier"], "Art");
   console.log("PASS Duplicate refreshes ordinary planning fields from Contacts while keeping V1 insulated");
 
   // 7. Explicit acceptContacts on V1 refreshes V1 from Contacts
@@ -175,10 +176,10 @@ try {
   const tV1Refreshed = bootV1Refreshed.current.teachers.find(
     (t) => t.id === staffId,
   );
-  assert.equal(tV1Refreshed.profile["Basic Name"], "Tan Updated In Contacts");
-  assert.equal(tV1Refreshed.profile.Role, "ST");
-  assert.equal(tV1Refreshed.profile["EO Appt Level"], "SEO1");
-  assert.equal(tV1Refreshed.profile["Subject Modifier"], "Art");
+  assert.equal(tV1Refreshed.planningProfile["Basic Name"], "Tan Updated In Contacts");
+  assert.equal(tV1Refreshed.planningProfile.Role, "ST");
+  assert.equal(tV1Refreshed.planningProfile["EO Appt Level"], "SEO1");
+  assert.equal(tV1Refreshed.planningProfile["Subject Modifier"], "Art");
   console.log("PASS Explicit acceptContacts refreshes V1 ordinary planning fields from Contacts");
 } finally {
   await suite.close();

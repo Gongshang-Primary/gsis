@@ -273,30 +273,6 @@ export function mergeContacts(doc, projection, {
     teacher.planningProfile = planningSnapshot(
       !refreshMemberships && savedPlanning ? savedPlanning : teacher,
     );
-    if (!refreshMemberships && savedPlanning) {
-      // C18: Insulate existing draft version ordinary planning profile fields
-      // from automatic overwrite by subsequent Contacts edits.
-      for (const field of [
-        "Basic Name",
-        "Role",
-        "EO Appt Level",
-        "Appointment Status",
-        "Employment Modifier",
-        "Subject Modifier",
-        "MK Modifier",
-        "Active",
-      ]) {
-        if (
-          Object.hasOwn(teacher.planningProfile, field) &&
-          teacher.planningProfile[field] !== null
-        ) {
-          teacher.profile[field] = teacher.planningProfile[field];
-        }
-      }
-      if (savedPlanning.deploymentTags) {
-        teacher.deploymentTags = structuredClone(savedPlanning.deploymentTags);
-      }
-    }
     const excluded = [
       ...(active === false ? ["INACTIVE"] : []),
       ...(authority.eo?.value === false ? ["NON_EO"] : []),
