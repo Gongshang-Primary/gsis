@@ -6,6 +6,8 @@ Sources: `notification-worker/template-contracts.json` (exact approved wording),
 
 **Rules for every message (v0.9, kept in v1 through the shared domain):** master switch `WHATSAPP_ENABLED`; per-type activation; quiet hours 21:30–05:45 for scheduled and routine messages (explicit SMC actions, emergency absences and urgent forwards still go); rechecked just before sending (still current, recipient active with a valid mobile, template approved with the exact wording); one key per message, so repeats do not resend.
 
+Owner decisions on each template: [WHATSAPP_TEMPLATE_REVIEW_2026-11-21.md](WHATSAPP_TEMPLATE_REVIEW_2026-11-21.md). Meta states below come from the repo; the live check in that review supersedes them.
+
 ## Summary
 
 | # | Key | Template | Recipient | When | v0.9 activation (6 Nov) | v1 code path |
@@ -33,7 +35,7 @@ Sources: `notification-worker/template-contracts.json` (exact approved wording),
 | 21 | `stapler_decision` | `gsis_timetable_access_v1` | Teacher (+ sponsor) | Immediate | On | Queued (shared domain) |
 | 22 | `system_alert` | `gsis_system_alert_v1` | Admins only | Event (pending) | Off / pending | Shared domain; off until Meta approval |
 | 23 | `lse_notice` | `gsis_lse_notice_v1` | Duty SMC | Planned | Off / pending | Queued (shared domain + v1 service) |
-| 24 | `inbox_alert` | `gsis_inbox_new_message_v1` | Duty SMC | Immediate | Separate switch `WHATSAPP_INBOX_ALERTS_ENABLED` | **Missing in v1: baseline gap** |
+| 24 | `inbox_alert` | `gsis_inbox_new_message_v1` | Duty SMC | Immediate | Separate switch `WHATSAPP_INBOX_ALERTS_ENABLED` | Not on Meta; never sent in v0.9. Not a baseline gap (owner: build as improvement) |
 
 ## Each template
 
@@ -554,7 +556,7 @@ Sample:
 - **Trigger (v0.9):** A message arrives in the school WhatsApp inbox. Separate switch WHATSAPP_INBOX_ALERTS_ENABLED.
 - **Timing:** Immediate
 - **Meta state:** defined in roster-update/public/_worker.js
-- **v1:** **Missing in v1: baseline gap**
+- **v1:** Not on Meta; never sent in v0.9. Not a baseline gap (owner: build as improvement)
 - **Fields:** `duty_smc_name`, `sender_name`, `roster_status_url`
 
 Sample:
