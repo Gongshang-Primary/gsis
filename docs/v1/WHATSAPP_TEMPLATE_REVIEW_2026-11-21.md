@@ -52,3 +52,10 @@ Project: v1. Owner decisions, recorded by Claude, template by template. Each ite
 | W6 | Refresh template contract states | Housekeeping | Update repo states to match the live Meta check above |
 
 No template was created, edited or sent during this review.
+
+## Follow-up decisions (21 Nov 2026, later)
+
+- **W3 needs no code.** v1 never queues `system_alert`: the shared helper is never called and v1 supplies no admin recipients. Recorded as done by evidence.
+- **Correction:** `gsis_relief_evening_v2` is not a button version; it is different wording with no button. Owner chose the **v2 wording** for template 10.
+- **Buttons and addresses:** approved v2 buttons have fixed v0.9 URLs (`roster.gsps.edu.sg/external.html#…`, `contacts.gsps.edu.sg/`). Owner chose **new v1 templates** at **https://gsis.gsps.edu.sg**. Drafts: [WHATSAPP_V1_BUTTON_TEMPLATES_DRAFT.md](WHATSAPP_V1_BUTTON_TEMPLATES_DRAFT.md). Until approved, v1 uses the approved link-in-body versions, including `gsis_relief_request_v1` and `gsis_timetable_updated_v1` for routes 1 and 19.
+- W1 shipped as PR #276.
