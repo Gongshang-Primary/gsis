@@ -1396,13 +1396,18 @@ function diffAuditEntry(beforeVal, afterVal) {
       ...Object.keys(beforeVal),
       ...Object.keys(afterVal),
     ])) {
-      if (canonical(beforeVal[key]) === canonical(afterVal[key])) continue;
-      beforeOut[key] = beforeVal[key] ?? null;
-      afterOut[key] = afterVal[key] ?? null;
+      const bVal = beforeVal[key] === undefined ? null : beforeVal[key];
+      const aVal = afterVal[key] === undefined ? null : afterVal[key];
+      if (canonical(bVal) === canonical(aVal)) continue;
+      beforeOut[key] = bVal;
+      afterOut[key] = aVal;
     }
     return { beforeVal: beforeOut, afterVal: afterOut };
   }
-  return { beforeVal, afterVal };
+  return {
+    beforeVal: beforeVal === undefined ? null : beforeVal,
+    afterVal: afterVal === undefined ? null : afterVal,
+  };
 }
 function labelForOperations(b, preview) {
   if (preview) {
