@@ -846,7 +846,8 @@ export async function handle(ctx) {
           operationId,
           staffId: body.staffId,
           changes: { mobile: body.mobile },
-          fieldRevisions: { mobile: body.revision },
+          fieldRevisions:
+            body.revision !== undefined ? { mobile: body.revision } : {},
         };
       const p = await serviceCall(env, "core", "/internal/delegate", {
         sourceDecisionId: body.decisionId,
@@ -1039,10 +1040,15 @@ export async function handle(ctx) {
       const allowedFields = [
         "basicName",
         "role",
+        "eoAppointmentLevel",
         "appointmentStatus",
         "employmentArrangement",
+        "employmentStatus",
+        "schoolSection",
+        "personnelCategory",
         "employmentTags",
         "subjectTags",
+        "mkTags",
         "employmentActive",
         "memberships",
       ];
@@ -1938,6 +1944,17 @@ export async function handle(ctx) {
           },
         });
         await resolveAdmission(env, env.DB, op, admission, r, now);
+        if (
+          accepted ||
+          publicationAuthority ||
+          Object.hasOwn(applyChanges, "active") ||
+          Object.hasOwn(applyChanges, "employmentActive")
+        ) {
+          await serviceCall(env, "core", "/internal/authority-cache/invalidate", {
+            schoolId: env.SCHOOL_ID,
+            staffId,
+          }).catch(() => undefined);
+        }
         return r;
       } catch (e) {
         if (

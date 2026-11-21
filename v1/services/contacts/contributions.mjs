@@ -40,6 +40,38 @@ export async function processContribution(job, env) {
     contribution = JSON.parse(row.proposal_json),
     operationId = `apply-${await digest(id)}`;
   try {
+    if (
+      row.field === "basicName" &&
+      Number.isSafeInteger(contribution.basicNameChangedAt)
+    ) {
+      const currentBasic = await one(
+        env.DB,
+        "SELECT accepted_at FROM contacts_fields WHERE school_id=? AND staff_id=? AND field='basicName'",
+        [env.SCHOOL_ID, row.staff_id],
+      );
+      if (
+        Number.isSafeInteger(currentBasic?.accepted_at) &&
+        currentBasic.accepted_at > contribution.basicNameChangedAt
+      ) {
+        await statement(
+          env.DB,
+          "UPDATE contacts_contributions SET state='superseded',outcome_json=? WHERE school_id=? AND contribution_id=? AND state='pending'",
+          [
+            canonical({
+              code: "CONTACTS_BASIC_NAME_NEWER",
+              checkedAt: Date.now(),
+              contactsChangedAt: currentBasic.accepted_at,
+              deployChangedAt: contribution.basicNameChangedAt,
+              message:
+                "Contacts Basic Name was edited more recently than this Deploy draft.",
+            }),
+            env.SCHOOL_ID,
+            id,
+          ],
+        ).run();
+        return { state: "accepted", providerId: id };
+      }
+    }
     validateValue(row.field, JSON.parse(row.value_json));
     const { principal, intent } = await serviceCall(
       env,

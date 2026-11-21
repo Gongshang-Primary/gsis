@@ -1,5 +1,8 @@
 import { statisticsReport } from "./statistics.mjs";
-import { createRosterContact } from "./contact-create.mjs";
+import {
+  createRosterContact,
+  updateRosterContactMobile,
+} from "./contact-create.mjs";
 import {updateCapacityWarnings,refreshCapacityMessage,refreshNewSummaries,capacityTemplateData} from "./capacity-notifications.mjs";
 import { forecastCapacity, layeredHealth } from "./capacity.mjs";
 import { allocationSnapshot } from "./allocation-snapshot.mjs";
@@ -187,6 +190,7 @@ const writes = new Set([
   "inboxAssign",
   "inboxSetHandled",
   "contactCreate",
+  "adHocUpdateMobile",
   "dismissDeliveryIssues",
 ]);
 const leaseOperations = new Map([
@@ -1868,6 +1872,8 @@ async function operations(ctx) {
   loaded.state.revision = revision;
   if (opName === "contactCreate")
     return createRosterContact(ctx, { revision, date: range.from });
+  if (opName === "adHocUpdateMobile")
+    return updateRosterContactMobile(ctx, { revision, date: range.from });
   if (opName === "receiptStatus") {
     const op = await operationStatus(
       ctx.env.DB,
@@ -1901,14 +1907,31 @@ async function operations(ctx) {
       ),
     };
   if (opName === "statisticsCalendar") {
-    const report = await dutiesReport(
-      ctx.env.DB,
-      schoolId,
-      body,
-      ctx.principal,
-      ctx.now,
-    );
-    return { ...report, revision, rows: report.totals };
+    const targetYear =
+      Number(body.year) || Number(localDate(ctx.now).slice(0, 4));
+    if (ctx.env.CALENDAR) {
+      const cal = await serviceCall(
+        ctx.env,
+        "calendar",
+        "/internal/year-structure",
+        {
+          schoolId,
+          decisionId: ctx.principal.decisionId,
+          year: targetYear,
+        },
+      );
+      return { ...cal, revision };
+    }
+    const unavailable =
+      "School term dates are unavailable; use an explicit date range.";
+    return {
+      year: targetYear,
+      terms: [],
+      semesters: [],
+      basis: unavailable,
+      semesterBasis: unavailable,
+      revision,
+    };
   }
   if (opName.startsWith("inbox")) return inbox(ctx, opName);
   if (["archiveItems", "archivedItem"].includes(opName)) {

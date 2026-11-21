@@ -331,9 +331,12 @@ try {
   assert.deepEqual(await stored(), sourceSaved, "Duplication never rewrites its source");
   assert.equal(duplicate.teacherDrafts[ids.ordinary]?.Role, undefined);
   assert.equal(duplicate.teacherDrafts[ids.ordinary]?.Active, undefined);
-  assert.equal(duplicate.teacherDrafts[ids.ordinary]["Subject Modifier"], "Synthetic Specialty");
-  assert.equal(planningPerson(duplicate, duplicate.teachers.find(t => t.id === ids.ordinary)).active, true);
-  assert.equal(planningPerson(duplicate, duplicate.teachers.find(t => t.id === ids.ordinary)).role, "Teacher");
+  assert.equal(duplicate.teacherDrafts[ids.ordinary]?.["Subject Modifier"], undefined);
+  const duplicatePerson = planningPerson(duplicate, duplicate.teachers.find(t => t.id === ids.ordinary));
+  assert.equal(duplicatePerson.active, true);
+  assert.equal(duplicatePerson.role, "Teacher");
+  assert.notEqual(duplicatePerson.profile["Subject Modifier"], "Synthetic Specialty",
+    "Duplicate refreshes Contacts-backed subject modifiers and leaves the source override intact");
   assert.deepEqual(duplicate.teacherDrafts[draftOnlyId], draftOnlyInput);
   assert(duplicate.teachers.some(t => t.id === draftOnlyId), "The source-only stable identity is retained");
   assert.equal(duplicate.teacherDrafts[ids.unknown]?.Active, undefined);

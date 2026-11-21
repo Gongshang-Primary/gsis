@@ -149,11 +149,13 @@ try {
   assert.deepEqual(colours.head[0], colours.head[1], "TTb heading matches its adjacent dark header");
   assert.notEqual(colours.head[0].background, colours.filter, "filter row keeps its separate pale fill");
   const assertBands = async () => {
-    const bands = await teacherTable.locator("tbody [data-roster-teacher]:visible").evaluateAll(rows => rows.map(row =>
-      [...row.cells].map(cell => getComputedStyle(cell).backgroundColor)));
-    for (const [index, cells] of bands.entries()) {
-      const expected = index % 2 ? "rgb(232, 240, 245)" : "rgb(255, 255, 255)";
-      assert(cells.every(value => value === expected), "visible row " + index + " and frozen cells retain normal bands");
+    const bands = await teacherTable.locator("tbody [data-roster-teacher]:visible").evaluateAll(rows => rows.map(row => ({
+      inactive: row.classList.contains("inactive"),
+      cells: [...row.cells].map(cell => getComputedStyle(cell).backgroundColor),
+    })));
+    for (const [index, { inactive, cells }] of bands.entries()) {
+      const expected = inactive ? "rgb(228, 231, 234)" : index % 2 ? "rgb(232, 240, 245)" : "rgb(255, 255, 255)";
+      assert(cells.every(value => value === expected), "visible row " + index + " and frozen cells retain expected band/inactive fill");
     }
   };
   await assertBands();
@@ -161,7 +163,7 @@ try {
   assert.match(await row("Inactive").innerText(), /Inactive/);
   assert.match(await row("Unknown").innerText(), /Activity unknown/);
   assert(await row("Inactive").getAttribute("class").then(value => value.includes("inactive")));
-  assert(await row("Unknown").getAttribute("class").then(value => value.includes("inactive")));
+  assert(await row("Unknown").getAttribute("class").then(value => !value.includes("inactive")));
   assert.equal(await teacherTable.locator(".gsis-core-sort").count(), 0);
   const teacherSort = () => teacherTable.locator("thead tr").first().locator("th").first().locator(".sort-button");
   await teacherSort().click(); await settle(); await assertBands();

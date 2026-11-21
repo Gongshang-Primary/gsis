@@ -1,11 +1,23 @@
-# v1 Deploy ordering and Span of Control changelog
+# v1 Deploy ordering and Span of Control changelog (`DEP-21-001`, `DEP-21-002`, `DEP-21-003`)
 
-Model: Codex. Recorded 21 November 2026, 01:41 SGT.
+- Task ID: `v1-deploy-ordering-and-span-followup`
+- Model: `Antigravity` (originally recorded by `Model: Codex` on 21 November 2026, 01:41 SGT)
+- Branch: `antigravity/v1-deploy-ordering-and-span-followup`
+- Status: **Claimed for implementation**
+- Coordinator / Merger: `GPT` (ChatGPT)
+- Reviewer: `Muse` at the exact head
+- Reference baseline: v1.09 `e107b5ed62db6cfa2c59f61367902bb2f8957f9e` (`origin/main` `6461f4e2a78eb11ff9b6b254f775d68e12e48d52`) and v0.9.9y `d9d180ced16d32c836a94d67d9cff8d3030eb21d`.
 
-- Status: **Queued for implementation**. Scope of this update is this changelog record only.
-- Owner/model: Codex. v1 coordinator: ChatGPT. Reviewer for implementation: Muse at the exact head.
-- Reference baseline: v1.09 `e107b5ed62db6cfa2c59f61367902bb2f8957f9e` and v0.9.9y `d9d180ced16d32c836a94d67d9cff8d3030eb21d`.
-- Refresh current main and active ownership before claiming product files. The existing Deploy group/duty and save-recovery PRs are separate.
+## Files Claimed
+- `docs/coordination/tasks/v1-deploy-ordering-and-span-followup.md`
+- `v1/web/shared/deploy-ui.js`
+- `v1/web/shared/deploy-eligibility.mjs`
+- `v1/web/shared/core-table.js`
+- `v1/services/deploy/model.mjs`
+- `v1/services/deploy/service.mjs`
+- `v1/services/deploy/workbooks.mjs`
+- `tests/v1-product-deploy-layout-and-teachers-browser.mjs`
+- `tests/v1-product-deploy-ordering-and-span-browser.mjs`
 
 ## DEP-21-001 — Teachers row order and fill
 

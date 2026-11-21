@@ -5,6 +5,12 @@ import {
   runCentralBackupCycle,
   centralBackupEnabled,
 } from "./drive-backup-orchestrator.mjs";
+import {
+  computeAuthorityCacheExpiry,
+  getCachedAuthority,
+  setCachedAuthority,
+  invalidateAuthorityCache,
+} from "./auth-cache.mjs";
 import { authorizeContribution } from "./contributions.mjs";
 import { ApiError } from "../../runtime/errors.mjs";
 import {
@@ -331,50 +337,62 @@ export async function authorizeCore(env, input, now = Date.now()) {
       401,
       "An administrator must link your staff identity.",
     );
-    const evaluationId = crypto.randomUUID();
-    const reader = createContactsReader({
-      schoolId: env.SCHOOL_ID,
-      clock: () => Math.max(now, Date.now()),
-      readCurrent: async (q) => {
-        // This Core-only query still proves the user session; common secret alone is insufficient.
-        const r = await serviceCall(env, "contacts", "/internal/authority", {
-          query: q,
-          sessionToken: input.sessionToken,
-        });
-        observation = r;
-        return r.read;
-      },
-    });
-    const q = {
-      schemaVersion: 1,
+    const cacheScope = {
       schoolId: env.SCHOOL_ID,
       staffId: target.staff_id,
-      profile: "authority",
-      evaluationId,
+      sessionId: s.session_id,
     };
-    const read = await reader.readAcceptedFacts(q);
-    fail(
-      read.kind === "current",
-      read.code === "STALE_EVIDENCE"
-        ? "AUTHORITY_CHANGED"
-        : "AUTHORITY_UNAVAILABLE",
-      read.code === "STALE_EVIDENCE" ? 409 : 503,
-      "Contacts authority could not be verified.",
-    );
-    observation.validated = read;
-    fail(
-      observation.active === true,
-      "AUTHORITY_EVIDENCE_MISSING",
-      403,
-      "Required authority records are incomplete or inactive.",
-    );
-    const selected = ["smc", "eo", "schoolLeader"].map((k) => read.fields[k]);
-    fail(
-      selected.every((f) => f.record?.state === "accepted"),
-      "AUTHORITY_EVIDENCE_MISSING",
-      403,
-      "Required authority records are incomplete.",
-    );
+    const cached = !d.write ? getCachedAuthority(env.DB, cacheScope, now) : null;
+    let read;
+    if (cached) {
+      observation = cached.observation;
+      read = cached.read;
+    } else {
+      const evaluationId = crypto.randomUUID();
+      const reader = createContactsReader({
+        schoolId: env.SCHOOL_ID,
+        clock: () => Math.max(now, Date.now()),
+        readCurrent: async (q) => {
+          // This Core-only query still proves the user session; common secret alone is insufficient.
+          const r = await serviceCall(env, "contacts", "/internal/authority", {
+            query: q,
+            sessionToken: input.sessionToken,
+          });
+          observation = r;
+          return r.read;
+        },
+      });
+      const q = {
+        schemaVersion: 1,
+        schoolId: env.SCHOOL_ID,
+        staffId: target.staff_id,
+        profile: "authority",
+        evaluationId,
+      };
+      read = await reader.readAcceptedFacts(q);
+      fail(
+        read.kind === "current",
+        read.code === "STALE_EVIDENCE"
+          ? "AUTHORITY_CHANGED"
+          : "AUTHORITY_UNAVAILABLE",
+        read.code === "STALE_EVIDENCE" ? 409 : 503,
+        "Contacts authority could not be verified.",
+      );
+      observation.validated = read;
+      fail(
+        observation.active === true,
+        "AUTHORITY_EVIDENCE_MISSING",
+        403,
+        "Required authority records are incomplete or inactive.",
+      );
+      const selected = ["smc", "eo", "schoolLeader"].map((k) => read.fields[k]);
+      fail(
+        selected.every((f) => f.record?.state === "accepted"),
+        "AUTHORITY_EVIDENCE_MISSING",
+        403,
+        "Required authority records are incomplete.",
+      );
+    }
     const value = (k) =>
       read.fields[k].state === "effective" &&
       read.fields[k].record.value === true;
@@ -391,6 +409,20 @@ export async function authorizeCore(env, input, now = Date.now()) {
         caps.add("deploy.edit");
         caps.add("deploy.publish");
       }
+    }
+    if (!cached && !d.write && value("smc") && caps.has(d.action)) {
+      const expiresAt = computeAuthorityCacheExpiry(
+        observation,
+        read,
+        s.expires_at,
+        now,
+      );
+      setCachedAuthority(
+        env.DB,
+        cacheScope,
+        { read, observation, expiresAt },
+        now,
+      );
     }
     authority = read;
   }
@@ -484,6 +516,29 @@ export async function authorizeCore(env, input, now = Date.now()) {
     };
     const providerReader = {
       readAcceptedFacts: async (q) => {
+        if (
+          !d.write &&
+          caps.has(d.action) &&
+          authority &&
+          authority.fields?.smc?.state === "effective" &&
+          authority.fields?.smc?.record?.value === true &&
+          q.staffId === target.staff_id
+        ) {
+          const ts = Math.max(now, Date.now());
+          const reused = {
+            ...authority,
+            observation: {
+              ...authority.observation,
+              evaluationId: q.evaluationId,
+              requestedAt: ts,
+              asOf: ts,
+              receivedAt: ts,
+              effectiveAt: ts,
+            },
+          };
+          authority = reused;
+          return reused;
+        }
         const fresh = createContactsReader({
           schoolId: env.SCHOOL_ID,
           clock: () => Math.max(now, Date.now()),
@@ -739,6 +794,20 @@ export async function handle(ctx) {
     if (path === "/internal/contribution-authority")
       return authorizeContribution(env, body, now);
     if (path === "/internal/authorize") return authorizeCore(env, body, now);
+    if (path === "/internal/authority-cache/invalidate") {
+      fail(
+        !body.schoolId || body.schoolId === env.SCHOOL_ID,
+        "SCHOOL_MISMATCH",
+        403,
+        "School does not match.",
+      );
+      return invalidateAuthorityCache(env.DB, {
+        schoolId: env.SCHOOL_ID,
+        staffId: typeof body.staffId === "string" ? body.staffId : undefined,
+        sessionId:
+          typeof body.sessionId === "string" ? body.sessionId : undefined,
+      });
+    }
     if (path === "/internal/delegate") return delegateDecision(env, body, now);
     if (path === "/internal/session-proof") {
       const r = await readAccount(env, body.sessionToken, now);
@@ -1622,7 +1691,7 @@ export async function handle(ctx) {
         "SELECT scope,pin_id AS pinId,destination,operation_id AS operationId,created_at AS createdAt FROM source_pins WHERE school_id=? AND state='held' ORDER BY created_at LIMIT 100",
         [env.SCHOOL_ID],
       ),
-      retentionDeletionEnabled: false,
+      retentionDeletionEnabled: env.RETENTION_DELETE_ENABLED === "true",
     };
   if (
     (path === "/admin/evidence" || path.startsWith("/evidence/")) &&
@@ -1633,6 +1702,137 @@ export async function handle(ctx) {
       : new URL(request.url).searchParams.get("decisionId");
     fail(validId(id));
     return recoverDecisionEvidence(ctx, id);
+  }
+  if (path === "/admin/evidence/retention" && method === "POST") {
+    if (!principal?.capabilities.includes("admin") || principal.impersonating) {
+      throw new ApiError("CAPABILITY_DENIED", 403);
+    }
+    const dryRun = body.dryRun !== false;
+    const retentionDays =
+      body.retentionDays === undefined ? 90 : Number(body.retentionDays);
+    const limit = body.limit === undefined ? 500 : Number(body.limit);
+    fail(
+      Number.isSafeInteger(retentionDays) &&
+        retentionDays >= 30 &&
+        retentionDays <= 3650 &&
+        Number.isSafeInteger(limit) &&
+        limit >= 1 &&
+        limit <= 500,
+    );
+    const retentionEnabled = env.RETENTION_DELETE_ENABLED === "true";
+    if (!dryRun && !retentionEnabled) {
+      throw new ApiError(
+        "RETENTION_DISABLED",
+        409,
+        "Retention deletion is disabled (RETENTION_DELETE_ENABLED must be true).",
+      );
+    }
+    const cutoff = now - retentionDays * 86400000;
+    const eligibleEvidence = await query(
+      env.DB,
+      `SELECT e.decision_id FROM core_evidence e
+       WHERE e.school_id = ? AND e.valid_until < ? AND e.created_at < ?
+         AND NOT EXISTS (
+           SELECT 1 FROM product_admissions a
+           WHERE a.school_id = e.school_id AND a.decision_id = e.decision_id
+             AND a.state IN ('acquiring','ready','resolving')
+         )
+         AND NOT EXISTS (
+           SELECT 1 FROM source_pins p
+           WHERE p.school_id = e.school_id AND p.decision_id = e.decision_id
+             AND p.state = 'held'
+         )
+       ORDER BY e.valid_until ASC, e.decision_id ASC
+       LIMIT ?`,
+      [env.SCHOOL_ID, cutoff, cutoff, limit],
+    );
+    const eligibleAdmissions = await query(
+      env.DB,
+      `SELECT operation_id FROM product_admissions
+       WHERE school_id = ? AND state IN ('resolved','aborted') AND valid_until < ?
+       ORDER BY valid_until ASC, operation_id ASC
+       LIMIT ?`,
+      [env.SCHOOL_ID, cutoff, limit],
+    );
+    if (dryRun) {
+      return {
+        dryRun: true,
+        retentionDeletionEnabled: retentionEnabled,
+        retentionDays,
+        limit,
+        cutoff,
+        eligible: {
+          evidence: eligibleEvidence.length,
+          admissions: eligibleAdmissions.length,
+        },
+        deleted: {
+          evidence: 0,
+          admissions: 0,
+        },
+      };
+    }
+    const op = await prepareOperation(env.DB, {
+      schoolId: env.SCHOOL_ID,
+      actorId: principal.actorId,
+      operationId: body.operationId,
+      action: "core.admin",
+      intent: {
+        kind: "evidence-retention",
+        dryRun: false,
+        retentionDays,
+        limit,
+      },
+      now,
+      validUntil: principal.validUntil,
+      authorization: principal,
+    });
+    if (op.receipt) return op.receipt;
+    const writes = [];
+    for (const row of eligibleEvidence) {
+      writes.push(
+        {
+          sql: "DELETE FROM core_destination_receipts WHERE school_id=? AND decision_id=?",
+          args: [env.SCHOOL_ID, row.decision_id],
+        },
+        {
+          sql: "DELETE FROM core_evidence WHERE school_id=? AND decision_id=?",
+          args: [env.SCHOOL_ID, row.decision_id],
+        },
+      );
+    }
+    for (const row of eligibleAdmissions) {
+      writes.push({
+        sql: "DELETE FROM product_admissions WHERE school_id=? AND operation_id=? AND state IN ('resolved','aborted')",
+        args: [env.SCHOOL_ID, row.operation_id],
+      });
+    }
+    const admission = await admit(env, env.DB, op, principal, [], now);
+    const r = await commitOperation(env.DB, op, {
+      now,
+      admission,
+      writes,
+      result: {
+        dryRun: false,
+        retentionDeletionEnabled: true,
+        retentionDays,
+        limit,
+        cutoff,
+        deleted: {
+          evidence: eligibleEvidence.length,
+          admissions: eligibleAdmissions.length,
+        },
+      },
+      audit: {
+        kind: "evidence-retention",
+        retentionDays,
+        limit,
+        cutoff,
+        deletedEvidence: eligibleEvidence.length,
+        deletedAdmissions: eligibleAdmissions.length,
+      },
+    });
+    await resolveAdmission(env, env.DB, op, admission, r, now);
+    return r;
   }
   if (path === "/admin/service-grants" && method === "GET")
     return {
@@ -1892,7 +2092,11 @@ export async function handle(ctx) {
       admission,
     });
     await resolveAdmission(env, env.DB, op, admission, result, now);
-    if (path === "/logout")
+    if (path === "/logout") {
+      invalidateAuthorityCache(env.DB, {
+        schoolId: env.SCHOOL_ID,
+        sessionId: principal.sessionId,
+      });
       return Response.json(
         { ok: true, data: result },
         {
@@ -1904,6 +2108,17 @@ export async function handle(ctx) {
           },
         },
       );
+    }
+    for (const sid of new Set(
+      [target?.staff_id, body.staffId].filter(
+        (v) => typeof v === "string" && v,
+      ),
+    )) {
+      invalidateAuthorityCache(env.DB, {
+        schoolId: env.SCHOOL_ID,
+        staffId: sid,
+      });
+    }
     return result;
   }
   throw new ApiError("NOT_FOUND", 404, "Unknown Core operation.");

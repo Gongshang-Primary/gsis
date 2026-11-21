@@ -227,8 +227,8 @@ export function exportWorkbook(
             "Subject Modifier",
           ].map(
             (k) =>
-              doc.teacherDrafts?.[t.id]?.[k] ??
-              (k === "Role" ? planned.profile.Role : t.profile?.[k]) ??
+              (k === "EO Appt Level" ? roleMapping(doc, t)?.[12] : undefined) ??
+              planned.profile[k] ??
               (k === "Basic Name" ? t.name : ""),
           ),
           planned.activeKnown ? planned.active : null,
@@ -693,7 +693,7 @@ export function validateWorkbook(
       const mapping = roleMapping({ ...next, teacherDrafts: { ...next.teacherDrafts,
         [s]: { ...next.teacherDrafts[s], Role: row.Role || "" } } }, t);
       check(
-        (row["EO Appt Level"] || "") === (mapping ? mapping[12] : (t.profile?.["EO Appt Level"] || "")),
+        (row["EO Appt Level"] || "") === (mapping ? mapping[12] : (planned.profile["EO Appt Level"] || "")),
         "EO appointment level is reference-only.",
       );
       next.teacherNotes[s] = text(row["Planner Notes"] || "", 4000, true);
@@ -707,7 +707,7 @@ export function validateWorkbook(
           base =
             field === "Active"
               ? (planned.activeKnown ? planned.active : null)
-              : ((field === "Role" ? planned.profile.Role : t.profile?.[field]) ?? (field === "Basic Name" ? t.name : ""));
+              : (planned.profile[field] ?? (field === "Basic Name" ? t.name : ""));
         if (v !== base) {
           next.teacherDrafts[s] ??= {};
           next.teacherDrafts[s][field] = v;
@@ -877,6 +877,7 @@ export function validateWorkbook(
     );
     const parents = reportingLinks(doc), originalLinks = { ...parents },
       changedIds = new Set(), clearedOrphans = new Set();
+    const knownReportingStaff = new Set([...teacherMap.keys(), ...allowedIds]);
     for (const s of eligibleIds) {
       const a = h[s],
         b = fromColumns[s],
@@ -898,7 +899,7 @@ export function validateWorkbook(
           "New reporting relationships require currently eligible staff.",
         );
       }
-      if (!teacherMap.has(s) && !parents[s]) {
+      if (!knownReportingStaff.has(s) && !parents[s]) {
         // An incoming historical reference may project a missing parent row.
         // A blank projected row is not a new durable identity or graph edge.
         if (changedIds.has(s)) clearedOrphans.add(s);
@@ -917,7 +918,7 @@ export function validateWorkbook(
     const retainedStaff = new Map((doc.reporting?.staff || []).map(t => [t.id, t]));
     for (const t of reportingPeople.values()) {
       const prior = retainedStaff.get(t.id);
-      if (!teacherMap.has(t.id)) {
+      if (!knownReportingStaff.has(t.id)) {
         if (prior && changedIds.has(t.id) && Object.hasOwn(prior, "ro"))
           retainedStaff.set(t.id, { ...prior, ro: "" });
         continue;
@@ -938,7 +939,7 @@ export function validateWorkbook(
       ...doc.reporting,
       parents,
       officers,
-      roColumnIds: [...columnIds].filter(s => s && (teacherMap.has(s) || previousColumns.has(s))),
+      roColumnIds: [...columnIds].filter(s => s && (knownReportingStaff.has(s) || previousColumns.has(s))),
       staff: [...retainedStaff.values()],
     };
   }

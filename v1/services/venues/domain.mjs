@@ -1537,6 +1537,7 @@ export const VenuesDomain = (() => {
       "open",
       "close",
       "capacity",
+      "classSlotCapacity",
       "features",
       "bufferMinutes",
       "overlapGroup",

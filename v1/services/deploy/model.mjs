@@ -84,6 +84,21 @@ export const defaults = () => ({
         ["Kindness", "K"],
       ],
     },
+    {
+      id: "two-letter",
+      name: "Values (two-letter)",
+      pairs: [
+        ["Graciousness", "Gc"],
+        ["Gratitude", "Gt"],
+        ["Prudence", "P"],
+        ["Resilience", "Rs"],
+        ["Respect", "Rp"],
+        ["Integrity", "I"],
+        ["Diligence", "D"],
+        ["Empathy", "E"],
+        ["Kindness", "K"],
+      ],
+    },
   ],
   fortnight: {},
   workload: { categories: {} },
@@ -142,6 +157,7 @@ export function setMembershipValue(teacher, value) {
 }
 export function mergeContacts(doc, projection, {
   refreshMemberships = false,
+  preserveDraftFields = false,
   includeUnlisted = true,
   addStaffIds = [],
 } = {}) {
@@ -295,6 +311,10 @@ export function mergeContacts(doc, projection, {
     // planning list, including its unknown state, belongs to this saved version.
     const saved = previous.get(teacher.id);
     if (!refreshMemberships && saved) {
+      if (saved.planningProfile?.["Basic Name"]) {
+        teacher.ttbName = saved.ttbName || saved.name || teacher.ttbName;
+        teacher.name = teacher.ttbName;
+      }
       const value = membershipValue(saved);
       if (value === undefined) {
         if (teacher.deploymentTags) delete teacher.deploymentTags.Memberships;
@@ -333,18 +353,16 @@ export function mergeContacts(doc, projection, {
   }
   const map = new Map(people.map((p) => [p.id, p]));
   const oldIds = new Set(doc.teachers.map((t) => t.id));
-  const teacherDrafts = refreshMemberships ? Object.fromEntries(
-    Object.entries(doc.teacherDrafts || {}).map(([staffId, input]) => {
-      const value = { ...input };
-      // Duplication refreshes actual ordinary Role/Active for known Contacts
-      // identities. Keep draft-only people and every unrelated proposed field.
-      if (map.has(staffId)) { delete value.Role; delete value.Active; }
-      return [staffId, value];
-    }),
-  ) : doc.teacherDrafts;
+  // Copy known people from current Contacts. An explicit refresh in the same
+  // version keeps that version's saved edits, including their provenance.
+  const copyFromContacts = refreshMemberships && !preserveDraftFields;
+  const retainDraftOnly = (rows) => Object.fromEntries(
+    Object.entries(rows || {}).filter(([staffId]) => !map.has(staffId)),
+  );
   return projectPlanningNames(applyCatalogueLinks(applyRoleMemberships({
     ...doc,
-    teacherDrafts,
+    teacherDrafts: copyFromContacts ? retainDraftOnly(doc.teacherDrafts) : doc.teacherDrafts,
+    teacherDraftMeta: copyFromContacts ? retainDraftOnly(doc.teacherDraftMeta) : doc.teacherDraftMeta,
     teachers: [
       ...doc.teachers.map((t) =>
         map.has(t.id)
@@ -414,6 +432,7 @@ export function newPlanningVersion(source) {
   const doc = structuredClone(source);
   doc.teachers = [];
   doc.teacherDrafts = {};
+  doc.teacherDraftMeta = {};
   doc.teacherNotes = {};
   doc.removedTeachers = {};
   doc.assignments = [];
@@ -450,6 +469,47 @@ function retainedGroupReference(kind, before, after, field, index) {
 function legacyOccurrence(rows, index) {
   const row = rows[index];
   return rows.slice(0, index + 1).filter(value => value.role === row.role && value.teacher === row.teacher).length;
+}
+function groupMemberCounts(group) {
+  const counts = new Map();
+  const add = (staffId) => {
+    if (typeof staffId === "string" && staffId) {
+      counts.set(staffId, (counts.get(staffId) || 0) + 1);
+    }
+  };
+  for (const field of ["slots", "additionalDeputies", "tls"]) {
+    for (const staffId of group?.[field] || []) add(staffId);
+  }
+  for (const row of group?.legacyLeadership || []) add(row?.teacher);
+  return counts;
+}
+function tlAppointmentEligible(doc, teacher) {
+  if (!planningEligible(doc, teacher)) return false;
+  const draft = doc?.teacherDrafts?.[teacher.id];
+  const raw =
+    draft && Object.hasOwn(draft, "EO Appt Level")
+      ? draft["EO Appt Level"]
+      : teacher.planningProfile?.["EO Appt Level"] ??
+        teacher.profile?.["EO Appt Level"] ??
+        teacher.deploymentTags?.["EO Appt Level"] ??
+        teacher.authority?.eoAppointmentLevel?.value ??
+        teacher.eoAppointmentLevel ??
+        "";
+  return ["ST", "LT", "MTT"].includes(String(raw ?? "").trim());
+}
+function dutyIntervalsOverlap(a, b) {
+  return a.start < b.end && b.start < a.end;
+}
+function retainedDutyOverlap(oldDuties, a, b, day, staffId) {
+  const oldA = (oldDuties || []).find((row) => row.id === a.id);
+  const oldB = (oldDuties || []).find((row) => row.id === b.id);
+  return !!(
+    oldA &&
+    oldB &&
+    oldA.teachers?.[day] === staffId &&
+    oldB.teachers?.[day] === staffId &&
+    dutyIntervalsOverlap(oldA, oldB)
+  );
 }
 function planningBindings(document, original = document) {
   const doc = canonicalTeachingDocument(document, original);
@@ -777,8 +837,13 @@ const proposalFields = [
   "Basic Name",
   "Role",
   "Appointment Status",
+  "Employment Arrangement",
+  "Employment Status",
+  "School Section",
+  "Personnel Category",
   "Employment Modifier",
   "Subject Modifier",
+  "MK Modifier",
   "Active",
 ];
 export function applyEdits(doc, edits, meta = {}) {
@@ -914,11 +979,16 @@ export function applyEdits(doc, edits, meta = {}) {
         check(
           k === "Active"
             ? typeof v === "boolean" || ["Y", "N"].includes(v)
-            : typeof v === "string" && v.length <= 160,
+            : v === null ||
+                (typeof v === "string" && v.length <= 160) ||
+                (Array.isArray(v) &&
+                  v.length <= 25 &&
+                  v.every((item) => typeof item === "string" && item.length <= 80)),
           "Invalid proposed field.",
         );
-        d.teacherDrafts[t.id][k] = v;
-        if (k === "Basic Name") {
+        if (k === "Basic Name" && typeof v === "string" && v.trim()) {
+          const current = d.teacherDrafts[t.id][k] ?? planningSnapshot(t)[k];
+          if (typeof current === "string" && current.trim() === v.trim()) continue;
           d.teacherDraftMeta ??= {};
           d.teacherDraftMeta[t.id] ??= {};
           d.teacherDraftMeta[t.id].basicNameProvenance = {
@@ -929,6 +999,7 @@ export function applyEdits(doc, edits, meta = {}) {
             operationId: meta?.operationId || null,
           };
         }
+        d.teacherDrafts[t.id][k] = v;
       }
       continue;
     }
@@ -1279,8 +1350,13 @@ export function applyEdits(doc, edits, meta = {}) {
             for (const [index, staffId] of g[field].entries()) {
               if (!staffId) continue;
               const retained = retainedGroupReference(e.kind, previousGroup, g, field, index);
-              check(retained || planningEligible(d, d.teachers.find(t => t.id === staffId)),
+              const teacher = d.teachers.find(t => t.id === staffId);
+              check(retained || planningEligible(d, teacher),
                 "Choose an active eligible teacher for a new group assignment.", "TEACHING_ELIGIBILITY_REQUIRED", 409);
+              if (e.kind === "dept" && field === "tls") {
+                check(retained || tlAppointmentEligible(d, teacher),
+                  "Department TLs must be active eligible ST, LT or MTT teachers.", "TL_ELIGIBILITY_REQUIRED", 409);
+              }
             }
           }
           if (Object.hasOwn(g, "legacyLeadership")) {
@@ -1293,6 +1369,16 @@ export function applyEdits(doc, edits, meta = {}) {
                 planningEligible(d, d.teachers.find(t => t.id === row.teacher)),
               "Choose an active eligible teacher for a new group assignment.", "TEACHING_ELIGIBILITY_REQUIRED", 409);
           }
+          const priorCounts = groupMemberCounts(previousGroup);
+          for (const [staffId, count] of groupMemberCounts(g).entries()) {
+            const priorCount = priorCounts.get(staffId) || 0;
+            check(
+              count <= 1 || (priorCount >= 2 && count <= priorCount),
+              "A teacher may appear only once within a group.",
+              "DUPLICATE_GROUP_MEMBER",
+              409,
+            );
+          }
         }
         if (e.kind === "dept") check(departmentChangeConflicts(old, value).length === 0,
           "A teacher cannot be added to another department. Move the teacher or review retained memberships.",
@@ -1302,6 +1388,7 @@ export function applyEdits(doc, edits, meta = {}) {
       if (source === "setDuties") {
         check(Array.isArray(value) && value.length <= 200, "Invalid duties.");
         unique(value, (x) => id(x.id), "duty");
+        const assignedByDayStaff = new Map();
         for (const x of value) {
           check(
             /^\d\d:\d\d$/.test(x.start) &&
@@ -1317,9 +1404,24 @@ export function applyEdits(doc, edits, meta = {}) {
             "Invalid duty assignment.",
           );
           const previousDuty = old.find(row => row.id === x.id);
-          for (const [day, staffId] of Object.entries(x.teachers)) if (staffId)
+          for (const [day, staffId] of Object.entries(x.teachers)) if (staffId) {
             check(previousDuty?.teachers?.[day] === staffId || planningEligible(d, d.teachers.find(t => t.id === staffId)),
               "Choose an active eligible teacher for a new duty assignment.", "TEACHING_ELIGIBILITY_REQUIRED", 409);
+            const bucketKey = `${day}|${staffId}`;
+            const priorList = assignedByDayStaff.get(bucketKey) || [];
+            for (const other of priorList) {
+              if (dutyIntervalsOverlap(x, other)) {
+                check(
+                  retainedDutyOverlap(old, x, other, day, staffId),
+                  "Duty intervals overlap for the same teacher on the same weekday.",
+                  "DUTY_OVERLAP_CONFLICT",
+                  409,
+                );
+              }
+            }
+            priorList.push(x);
+            assignedByDayStaff.set(bucketKey, priorList);
+          }
         }
         d.duties = value;
       }
