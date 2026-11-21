@@ -34,3 +34,9 @@
 
 - v0.9 source and generated files (`roster-update/`, `public/`, `shared/`) — zero drift required.
 - Deployment, live school data, or live switches.
+
+## Claude follow-up (owner-directed takeover, 21 Nov 2026 SGT)
+
+Finding from `docs/coordination/review/v1-antigravity-pr263-273-claude-triage.md`, fixed here: `workloadAliasView` renamed load keys (`PE`→`PHE`, `Science`→`Sci`) but not level-wide group subjects. `shared/workload.js isFormSubject` compares group subjects by exact spelling, so a level-wide `PE` group stopped covering its level's class cells and class demand could be counted on top of the group. The derived view now gives groups the same canonical subject; saved rows are unchanged.
+
+Tests (TZ=Asia/Singapore): `tests/v1-product-deploy-workload-sci-alias.mjs` case 6 fails before and passes after. Also passed: deploy-loads, deploy-workbooks, deploy-fortnight-browser, deploy-workload-planning-browser, deploy-compact-refresh-browser, table-deploy-settings, roster-accounting. Muse reviews the new exact head.

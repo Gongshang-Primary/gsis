@@ -134,5 +134,12 @@ export function workloadAliasView(doc) {
     }
     workload = { ...workload, categories };
   }
-  return { ...doc, loads, workload };
+  // shared/workload.js compares level-wide group subjects by exact spelling when
+  // it decides whether class cells are already covered by the group. Give groups
+  // the same canonical spelling as the loads, or form demand is counted twice.
+  const canonicalOf = new Map(CANONICAL_LOAD_PAIRS.map(([canonicalKey, altKey]) => [altKey, canonicalKey]));
+  const groups = Array.isArray(doc.groups)
+    ? doc.groups.map((g) => (g && canonicalOf.has(g.subject) ? { ...g, subject: canonicalOf.get(g.subject) } : g))
+    : doc.groups;
+  return { ...doc, loads, workload, groups };
 }

@@ -116,6 +116,24 @@ function makeDoc(loads6, assignmentSubject = "Sci") {
   assert.deepEqual(doc.loads["6"], { Science: 6 }, "raw loads unchanged");
 }
 
+// 6. A level-wide PE group still covers its level's class cells after PE -> PHE,
+// so class-level demand is not counted on top of the group.
+{
+  const doc = makeDoc({ PE: 3 }, "PE");
+  doc.classes.push({ ref: "c-6b", level: "6", name: "6B", shortName: "6B" });
+  doc.groups = [{ id: "g-pe6", name: "P6 PE", code: "PE6", level: "6", levelWide: true, subject: "PE", weeklyPeriods: 3 }];
+  doc.assignments = [{ id: "a-pe", teacher: "t-sci", target: "g-pe6", subject: "PE" }];
+  doc.workload = { categories: { PE: "Teaching", PHE: "Teaching" } };
+  const raw = planningView(doc);
+  const view = workloadAliasView(raw);
+  assert.equal(Workload.isFormSubject(raw, "6", "PE"), false, "raw: level-wide group covers PE");
+  assert.equal(Workload.isFormSubject(view, "6", "PHE"), false, "alias view: level-wide group still covers PHE");
+  const rawRow = Workload.analyse(raw, (t) => Rules.calculate(t, raw.offload)).rows.find((r) => r.teacher.id === "t-sci");
+  const row = Workload.analyse(view, (t) => Rules.calculate(t, view.offload)).rows.find((r) => r.teacher.id === "t-sci");
+  assert.equal(row.Teaching, rawRow.Teaching, "alias view keeps the group teacher's load");
+  assert.equal(doc.groups[0].subject, "PE", "raw group subject unchanged");
+}
+
 console.log(
-  "PASS Deploy Workload Sci/Science alias resolution: alias match, exact key, missing load, conflicting aliases refusal, and non-mutating derived view.",
+  "PASS Deploy Workload Sci/Science alias resolution: alias match, exact key, missing load, conflicting aliases refusal, level-wide group coverage, and non-mutating derived view.",
 );
