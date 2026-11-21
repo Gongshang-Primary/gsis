@@ -319,9 +319,24 @@ import { planningSnapshot, planningPerson, planningEligible, reportingRoot, repo
       ? (doc.membership || []) : edit.operation === "setTeacherMemberships"
         ? valueOf(doc, edit.teacher) : originalDisplay(doc, edit);
     const originalStatus = window.drawQueueStatus;
+    const alwaysVisibleSaveViews = new Set([
+      "Membership",
+      "HR Terms",
+      "Dept",
+      "Committees",
+      "CCAs",
+      "PLT",
+      "Events",
+      "Duty",
+      "Dept Settings",
+      "Committee Settings",
+      "CCA Settings",
+      "PLT Settings",
+      "Events Settings",
+    ]);
     window.drawQueueStatus = () => {
       originalStatus();
-      if (["Membership", "HR Terms"].includes(document.getElementById("content")?.dataset.view) && api.capable("deploy.edit"))
+      if (alwaysVisibleSaveViews.has(document.getElementById("content")?.dataset.view) && api.capable("deploy.edit"))
         document.getElementById("saveQueue").hidden = false;
     };
     window.masterOptionsPage = (root) => {
