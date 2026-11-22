@@ -227,8 +227,8 @@ export function exportWorkbook(
             "Subject Modifier",
           ].map(
             (k) =>
-              doc.teacherDrafts?.[t.id]?.[k] ??
-              (k === "Role" ? planned.profile.Role : t.profile?.[k]) ??
+              (k === "EO Appt Level" ? roleMapping(doc, t)?.[12] : undefined) ??
+              planned.profile[k] ??
               (k === "Basic Name" ? t.name : ""),
           ),
           planned.activeKnown ? planned.active : null,
@@ -692,8 +692,10 @@ export function validateWorkbook(
         planned = planningPerson(doc, t);
       const mapping = roleMapping({ ...next, teacherDrafts: { ...next.teacherDrafts,
         [s]: { ...next.teacherDrafts[s], Role: row.Role || "" } } }, t);
+      const referenceLevel = mapping?.[12] ?? roleMapping(doc, t)?.[12] ??
+        planned.profile["EO Appt Level"] ?? "";
       check(
-        (row["EO Appt Level"] || "") === (mapping ? mapping[12] : (t.profile?.["EO Appt Level"] || "")),
+        (row["EO Appt Level"] || "") === referenceLevel,
         "EO appointment level is reference-only.",
       );
       next.teacherNotes[s] = text(row["Planner Notes"] || "", 4000, true);
@@ -707,7 +709,7 @@ export function validateWorkbook(
           base =
             field === "Active"
               ? (planned.activeKnown ? planned.active : null)
-              : ((field === "Role" ? planned.profile.Role : t.profile?.[field]) ?? (field === "Basic Name" ? t.name : ""));
+              : (planned.profile[field] ?? (field === "Basic Name" ? t.name : ""));
         if (v !== base) {
           next.teacherDrafts[s] ??= {};
           next.teacherDrafts[s][field] = v;
