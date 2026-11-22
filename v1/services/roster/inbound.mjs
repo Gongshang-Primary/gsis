@@ -114,6 +114,37 @@ export async function webhookProof(ctx) {
     expiresAt: event.at + 86400000,
   };
 }
+// Owner decision 21 Nov 2026 (W5): a free-text message from a known staff member
+// that waits in the Roster inbox alerts the duty SMC. Menu taps get their own
+// automatic reply and urgent messages are already forwarded, so neither alerts.
+// Once per sender per day; sent even in quiet hours (owner: bypass quiet hours).
+// Queue only once the approved template is mapped, so unconfigured deployments
+// do not build up failing jobs.
+export function inboxAlertConfigured(env) {
+  try {
+    const t = JSON.parse(env.WHATSAPP_TEMPLATES_JSON || "{}");
+    return Array.isArray(t) ? t.some((x) => x?.key === "inbox_alert") : Object.hasOwn(t, "inbox_alert");
+  } catch {
+    return false;
+  }
+}
+export function queueInboxAlert(next, c, date, event, result) {
+  if (result?.duplicate || result?.reply?.action !== "menu" || event.buttonId) return 0;
+  const text = typeof event.text === "string" ? event.text.trim() : "";
+  if (!text || /^[1-5]$/.test(text)) return 0;
+  const sender = c.people.find((p) => p.id === next.inboundEvents?.find((e) => e.id === event.id)?.staffId),
+    senderName = sender?.name || "a staff member",
+    before = next.outbox.length;
+  for (const id of Operations.dutySMC(next, c, date))
+    Operations.queue(next, c, "smc_alert", id, date, {
+      templateKey: "inbox_alert",
+      audience: "duty-smc",
+      summary: "New school WhatsApp message from " + senderName + " is waiting in the Roster inbox.",
+      senderName,
+      inboxMessageId: "whatsapp:" + event.id,
+    }, null, "inbox-alert:" + date + ":" + String(event.sender) + ":" + id);
+  return next.outbox.length - before;
+}
 export async function processInbound(
   job,
   env,
@@ -192,6 +223,28 @@ export async function processInbound(
           now,
         ],
       ).run();
+      // Unknown sender free text also alerts the duty SMC (owner 22 Nov 2026).
+      if (inboxAlertConfigured(env) && reply.action === "menu" && !event.buttonId && typeof event.text === "string" && event.text.trim()) {
+        const number = Operations.mobile(event.sender), date = localDate(now);
+        await statement(
+          env.DB,
+          "INSERT OR IGNORE INTO product_outbox(school_id,job_id,operation_id,type,payload_json,state,due_at,updated_at) VALUES(?,?,?,?,?,'queued',?,?)",
+          [
+            env.SCHOOL_ID,
+            "inbox-alert-unknown:" + date + ":" + number,
+            body.operationId,
+            "roster-inbox-alert",
+            canonical({
+              date,
+              sender: number,
+              senderName: "an unknown number ending " + number.slice(-4),
+              inboxMessageId: "whatsapp:" + event.id,
+            }),
+            now,
+            now,
+          ],
+        ).run();
+      }
       return { state: "delivered", providerId: replyJobId };
     }
     throw err;
@@ -223,6 +276,7 @@ export async function processInbound(
         selection: event.buttonId || undefined,
       },
     ),
+    alerted = inboxAlertConfigured(env) ? queueInboxAlert(next, c, date, event, result) : 0,
     changes = await recordChanges(
       env.SCHOOL_ID,
       loaded.before,
@@ -296,6 +350,7 @@ export async function processInbound(
       eventId,
       staffId: principal.staffId,
       action: result.reply?.action || "recorded",
+      inboxAlerts: alerted,
     },
     outbox,
   });

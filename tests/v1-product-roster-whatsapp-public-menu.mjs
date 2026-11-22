@@ -34,6 +34,7 @@ const suite = await productSuite({
     WHATSAPP_PHONE_NUMBER_ID: phoneId,
     WHATSAPP_ACCESS_TOKEN: "synthetic-wa-token",
     PUBLIC_ORIGIN: origin,
+    WHATSAPP_TEMPLATES_JSON: JSON.stringify({ inbox_alert: { name: "gsis_v1_inbox_new_message", language: "en_GB", parameters: ["duty_smc_name", "senderName"], button: "static" } }),
   },
   providerFetch: async (request) => {
     const url = new URL(request.url);
@@ -121,6 +122,13 @@ try {
     ),
     "unknown sender receives exact 5-item public menu: " + JSON.stringify(sentMessages),
   );
+  // Unknown-sender free text queues one inbox-alert fan-out per sender per day (owner 22 Nov 2026).
+  const fanJobs = async () => (await (await suite.db("roster")).prepare(
+    "SELECT job_id,payload_json FROM product_outbox WHERE type='roster-inbox-alert'").all()).results;
+  const afterHi = await fanJobs();
+  assert.equal(afterHi.length, 1, "free text from an unknown sender alerts the duty SMC");
+  assert.match(afterHi[0].job_id, /^inbox-alert-unknown:\d{4}-\d\d-\d\d:6598765432$/);
+  assert.equal(JSON.parse(afterHi[0].payload_json).senderName, "an unknown number ending 5432");
 
   // 3. Unknown sender selects "3" -> receives School Layout link.
   const r2 = await postWhatsAppMessage("wamid.in.2", "6598765432", "3");
@@ -150,14 +158,16 @@ try {
     "unknown sender refused Urgent Message: " + JSON.stringify(sentMessages),
   );
   const rosterDb = await suite.db("roster");
-  const smcJobs = (
+  const urgentJobs = (
     await rosterDb
       .prepare(
-        "SELECT COUNT(*) AS n FROM product_outbox WHERE type='roster-notification'",
+        "SELECT COUNT(*) AS n FROM product_outbox WHERE type='roster-notification' AND json_extract(payload_json,'$.kind')='urgent_forward'",
       )
       .first()
   ).n;
-  assert.equal(smcJobs, 0, "unknown sender cannot queue any duty-SMC notification");
+  assert.equal(urgentJobs, 0, "unknown sender cannot queue an urgent forward");
+  // Menu numbers ("3", "2") get automatic replies and add no further inbox alert.
+  assert.equal((await fanJobs()).length, 1, "still one inbox alert for this sender today");
 
   console.log(
     "PASS v1 Roster public WhatsApp menu (#182 port): unknown senders receive 5-item notice & public links while Urgent Message stays strictly restricted",

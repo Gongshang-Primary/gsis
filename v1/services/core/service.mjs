@@ -1124,6 +1124,33 @@ export async function handle(ctx) {
         })),
       };
     }
+    // Roster asks who reviews a new external relief contact (owner 21 Nov 2026:
+    // Contacts Power Users only). Explicit grants only: Global Admin is not included.
+    if (path === "/internal/contacts-power-users") {
+      const r = await one(
+        env.DB,
+        "SELECT descriptor_json,valid_until FROM core_evidence WHERE school_id=? AND decision_id=?",
+        [env.SCHOOL_ID, body.decisionId],
+      );
+      fail(r && r.valid_until > now, "AUTHORITY_CHANGED", 409);
+      fail(
+        JSON.parse(r.descriptor_json).service === "roster",
+        "SERVICE_DENIED",
+        403,
+      );
+      const rows = await query(
+        env.DB,
+        `SELECT DISTINCT a.staff_id AS staffId FROM core_grants g
+         JOIN core_accounts a ON a.school_id=g.school_id AND a.account_id=g.account_id
+         WHERE g.school_id=? AND g.capability IN ('contacts.powerUser','contacts.manage')
+           AND g.valid_from<=? AND (g.valid_until IS NULL OR g.valid_until>?)
+           AND a.suspended=0 AND a.staff_id IS NOT NULL
+         ORDER BY a.staff_id LIMIT 513`,
+        [env.SCHOOL_ID, now, now],
+      );
+      fail(rows.length <= 512, "ACCOUNT_BOUNDS", 413);
+      return { staffIds: rows.map((row) => row.staffId) };
+    }
     if (path === "/internal/job-authority") {
       fail(
         body.schoolId === env.SCHOOL_ID &&
@@ -1728,9 +1755,10 @@ export async function handle(ctx) {
       );
     }
     const cutoff = now - retentionDays * 86400000;
-    const eligibleEvidence = await query(
+    const candidateEvidence = await query(
       env.DB,
-      `SELECT e.decision_id FROM core_evidence e
+      `SELECT e.decision_id, e.created_at, e.valid_until, e.event_json, e.principal_json
+       FROM core_evidence e
        WHERE e.school_id = ? AND e.valid_until < ? AND e.created_at < ?
          AND NOT EXISTS (
            SELECT 1 FROM product_admissions a
@@ -1746,6 +1774,54 @@ export async function handle(ctx) {
        LIMIT ?`,
       [env.SCHOOL_ID, cutoff, cutoff, limit],
     );
+    const protectedMap = new Map();
+    const unknownOwners = [];
+    if (candidateEvidence.length) {
+      const candidateIds = candidateEvidence.map((r) => r.decision_id);
+      const owners = [
+        "contacts",
+        "deploy",
+        "roster",
+        "calendar",
+        "lord",
+        "venues",
+        "layout",
+      ];
+      for (const owner of owners) {
+        try {
+          const resp = await serviceCall(
+            env,
+            owner,
+            "/internal/evidence-dependencies",
+            { decisionIds: candidateIds },
+          );
+          if (!Array.isArray(resp?.protectedDecisionIds)) {
+            unknownOwners.push(owner);
+            continue;
+          }
+          for (const decisionId of resp.protectedDecisionIds) {
+            if (!protectedMap.has(decisionId)) {
+              protectedMap.set(decisionId, `unresolved-owner-dependency:${owner}`);
+            }
+          }
+        } catch {
+          unknownOwners.push(owner);
+        }
+      }
+      if (unknownOwners.length) {
+        for (const decisionId of candidateIds) {
+          if (!protectedMap.has(decisionId)) {
+            protectedMap.set(
+              decisionId,
+              `owner-status-unknown:${unknownOwners.join(",")}`,
+            );
+          }
+        }
+      }
+    }
+    const eligibleEvidence = candidateEvidence.filter(
+      (row) => !protectedMap.has(row.decision_id),
+    );
     const eligibleAdmissions = await query(
       env.DB,
       `SELECT operation_id FROM product_admissions
@@ -1754,6 +1830,19 @@ export async function handle(ctx) {
        LIMIT ?`,
       [env.SCHOOL_ID, cutoff, limit],
     );
+    const previewDigest = await digest({
+      schemaVersion: 1,
+      schoolId: env.SCHOOL_ID,
+      retentionDays,
+      limit,
+      evidenceIds: eligibleEvidence.map((r) => r.decision_id),
+      admissionIds: eligibleAdmissions.map((r) => r.operation_id),
+    });
+    const protectedSummary = {
+      count: protectedMap.size,
+      unknownOwners,
+      reasons: Object.fromEntries(protectedMap),
+    };
     if (dryRun) {
       return {
         dryRun: true,
@@ -1761,6 +1850,8 @@ export async function handle(ctx) {
         retentionDays,
         limit,
         cutoff,
+        previewDigest,
+        protected: protectedSummary,
         eligible: {
           evidence: eligibleEvidence.length,
           admissions: eligibleAdmissions.length,
@@ -1770,6 +1861,25 @@ export async function handle(ctx) {
           admissions: 0,
         },
       };
+    }
+    // A committed operation returns its original receipt before any fresh
+    // preview comparison, so a retry after a lost response recovers it.
+    const prior =
+      typeof body.operationId === "string" && body.operationId
+        ? await operationStatus(env.DB, env.SCHOOL_ID, body.operationId)
+        : null;
+    if (!prior?.receipt) {
+      // A destructive run must name the dry-run preview it confirms.
+      const digestMatches =
+        typeof body.previewDigest === "string" &&
+        (await secureEqual(body.previewDigest, previewDigest));
+      if (!digestMatches) {
+        throw new ApiError(
+          "PREVIEW_CHANGED",
+          409,
+          "Retention preview is stale or dependencies changed. Run dryRun preview again before deleting.",
+        );
+      }
     }
     const op = await prepareOperation(env.DB, {
       schoolId: env.SCHOOL_ID,
@@ -1781,12 +1891,30 @@ export async function handle(ctx) {
         dryRun: false,
         retentionDays,
         limit,
+        previewDigest: body.previewDigest,
       },
       now,
       validUntil: principal.validUntil,
       authorization: principal,
     });
     if (op.receipt) return op.receipt;
+    const compactDecisions = eligibleEvidence.map((row) => {
+      let ev = {},
+        pr = {};
+      try {
+        ev = JSON.parse(row.event_json || "{}");
+      } catch {}
+      try {
+        pr = JSON.parse(row.principal_json || "{}");
+      } catch {}
+      return {
+        decisionId: row.decision_id,
+        actorId: pr.actorId || ev.actorId || null,
+        action: pr.action || ev.action || null,
+        createdAt: row.created_at,
+        outcome: ev.outcome || "authorized",
+      };
+    });
     const writes = [];
     for (const row of eligibleEvidence) {
       writes.push(
@@ -1817,6 +1945,8 @@ export async function handle(ctx) {
         retentionDays,
         limit,
         cutoff,
+        previewDigest,
+        protected: protectedSummary,
         deleted: {
           evidence: eligibleEvidence.length,
           admissions: eligibleAdmissions.length,
@@ -1827,8 +1957,11 @@ export async function handle(ctx) {
         retentionDays,
         limit,
         cutoff,
+        previewDigest,
         deletedEvidence: eligibleEvidence.length,
         deletedAdmissions: eligibleAdmissions.length,
+        protectedCount: protectedMap.size,
+        compactDecisions,
       },
     });
     await resolveAdmission(env, env.DB, op, admission, r, now);

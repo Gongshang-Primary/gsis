@@ -1896,7 +1896,7 @@ async function refreshReferences(ctx, input) {
       ],
       seen = new Set();
     for (const r of data.staff) {
-      if (typeof r.active !== "boolean")
+      if (r.active !== null && typeof r.active !== "boolean")
         fail(
           "REFERENCE_UNAVAILABLE",
           "Contacts returned unverified activity evidence.",

@@ -366,7 +366,7 @@ try {
   const foreign = { ...principal, schoolId: "foreign" };
   await assert.rejects(
     call("/snapshot?year=2026", {}, "GET", foreign),
-    (e) => e.code === "SNAPSHOT_UNAVAILABLE",
+    (e) => e.code === "SNAPSHOT_NOT_INITIALIZED",
   );
   console.log(
     "PASS Layout actual D1/R2: authenticated owned edits, public narrow projection, wrong-year/field/school rejection, conflicting writes, workbook preview/atomic apply, storage failure preserves head, immutable history and restart.",
