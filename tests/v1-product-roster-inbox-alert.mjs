@@ -48,10 +48,12 @@ const alerts = (s) => s.outbox.filter((j) => j.data?.templateKey === "inbox_aler
   const { f, now } = setup("22:00");
   assert.equal(inbound(f, now).alerted, 1, "bypasses quiet hours");
 }
-// 3. Menu tap: no alert.
+// 3. Menu buttons and typed menu numbers do not create inbox alerts.
 {
   const { f, now } = setup("10:00");
   assert.equal(inbound(f, now, { buttonId: "gsis_layout", text: "" }).alerted, 0);
+  for (const text of ["1", " 2 ", "3", "4", "5"])
+    assert.equal(inbound(f, now, { text }).alerted, 0, "menu number " + text + " does not alert");
 }
 // 4. Urgent message text (after the Urgent prompt): forwarded, not an inbox alert.
 {

@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import fixture from "./roster701-fixture.cjs";
 import { createDatabase } from "./v1-product/helpers.mjs";
 import { dispatchRosterJob } from "../v1/services/roster/service.mjs";
+import { templateFor } from "../v1/services/roster/templates.mjs";
 import { canonical, one } from "../v1/runtime/store.mjs";
 import { externalProof } from "../v1/services/roster/external.mjs";
 
@@ -32,7 +33,7 @@ f.state.requests.push(
 const original = structuredClone(f.state);
 const inactive = { staffId: "bob", id: "bob", name: "Bob", active: false, eo: true, mobile: "6592345678", employment: "Full-time", groups: [] };
 const active = { staffId: "alice", id: "alice", name: "Alice", active: true, eo: true, mobile: "6591234567", groups: [] };
-let firstPerson, currentPerson, currentState, projectionReads, onCurrent, sends = [], sequence = 0;
+let firstPerson, currentPerson, currentState, projectionReads, onCurrent, sends = [], sequence = 0, powerUsers = [];
 const reply = data => Response.json({ ok: true, data });
 const env = {
   SCHOOL_ID: schoolId, SERVICE_NAME: "roster", GSIS_SECRET: "synthetic-suite-secret",
@@ -49,6 +50,10 @@ const env = {
     if (!body.staffIds && onCurrent) await onCurrent();
     const person = body.staffIds ? firstPerson : currentPerson;
     return reply({ schoolId, revision: "contacts-" + projectionReads, asOf: now, people: [active, ...(person ? [person] : [])].filter(p => !body.staffIds || body.staffIds.includes(p.staffId)), smcIds: ["alice"], dependencies: [] });
+  } },
+  CORE: { async fetch(request) {
+    assert.equal(new URL(request.url).pathname, "/internal/contacts-power-users");
+    return reply({ staffIds: powerUsers });
   } },
   CALENDAR: { async fetch(request) {
     const body = await request.json();
@@ -186,6 +191,44 @@ try {
     payload: { date, to: "bob@example.invalid", subject: "Synthetic report" },
     changeState: state => { state.dailyEmploymentSettings.recipients = [{ staffId: "bob", emails: ["bob@example.invalid"] }]; },
   });
+  // Contact review (owner 21 Nov 2026): only a current Contacts Power User receives it.
+  const reviewPayload = () => ({ kind: "contact_review", recipientId: "bob", date, createdAt: new Date(now).toISOString(), expiresAt: now + 86400000,
+    data: { templateKey: "contact_review", summary: "New inactive external relief contact: Synthetic (SRE). Review permanent details in Contacts." } });
+  powerUsers = ["bob"];
+  const reviewSent = await run("contact_review", { first: { ...inactive, active: true }, adhoc: [], payload: reviewPayload() });
+  assert.equal(reviewSent.result.state, "accepted", "a current Power User receives the contact review");
+  assert.equal(reviewSent.sent, 1);
+  powerUsers = [];
+  const reviewRevoked = await run("contact_review", { first: { ...inactive, active: true }, adhoc: [], payload: reviewPayload() });
+  assert.equal(reviewRevoked.result.state, "cancelled", "a recipient who lost Power User is not messaged");
+  assert.equal(reviewRevoked.result.code, "RECIPIENT_NO_LONGER_POWER_USER");
+  assert.equal(reviewRevoked.sent, 0);
+  // v1 button templates (owner 21 Nov 2026): the dynamic URL button carries the
+  // same private token as the link; static buttons carry none; a token button
+  // never goes out without a token.
+  const baseTemplates = env.WHATSAPP_TEMPLATES_JSON, configured = JSON.parse(baseTemplates);
+  configured.relief_assignment = { name: "gsis_v1_relief_assignment", language: "en_GB", parameters: ["summary"], button: "token" };
+  configured.mutual_override = { name: "gsis_v1_relief_changed", language: "en_GB", parameters: ["summary"], button: "token" };
+  configured.stapler_request = { name: "gsis_v1_static", language: "en_GB", parameters: ["summary"], button: "static" };
+  env.WHATSAPP_TEMPLATES_JSON = JSON.stringify(configured);
+  const buttonSent = await run("relief_publication", { first: { ...inactive, active: true }, adhoc: [] });
+  assert.equal(buttonSent.result.state, "accepted");
+  const buttonBody = sends.at(-1).template, button = buttonBody.components.find(c => c.type === "button");
+  assert.equal(buttonBody.name, "gsis_v1_relief_assignment");
+  assert.deepEqual({ sub_type: button.sub_type, index: button.index }, { sub_type: "url", index: "0" });
+  assert.match(button.parameters[0].text, /^[A-Za-z0-9_-]{43}$/, "button carries the private token only");
+  const peerChange = await run("mutual_override", { first: { ...inactive, active: true }, adhoc: [], payload: { ...payloadFor("mutual_override"), data: { ...payloadFor("mutual_override").data, summary: "Your peer relief arrangement has changed." } } });
+  assert.equal(peerChange.result.state, "accepted", JSON.stringify(peerChange.result));
+  const peerButton = sends.at(-1).template.components.find(c => c.type === "button");
+  assert.equal(sends.at(-1).template.name, "gsis_v1_relief_changed");
+  assert.match(peerButton.parameters[0].text, /^[A-Za-z0-9_-]{43}$/, "peer-change notice now gets a private duties link");
+  // A token button on a message that has no private link is refused before any send.
+  assert.throws(() => templateFor({ WHATSAPP_TEMPLATES_JSON: JSON.stringify({ smc_attention: { name: "x", parameters: ["summary"], button: "token" } }) },
+    "smc_attention", { summary: "Synthetic", link: null, linkToken: null }), (e) => e.code === "TEMPLATE_LINK_UNAVAILABLE");
+  assert.throws(() => templateFor({ WHATSAPP_TEMPLATES_JSON: JSON.stringify({ k: { name: "x", button: "dynamic" } }) }, "k", {}), (e) => e.code === "TEMPLATE_BUTTON_INVALID");
+  const staticButton = templateFor({ WHATSAPP_TEMPLATES_JSON: JSON.stringify({ k: { name: "x", parameters: ["summary"], button: "static" } }) }, "k", { summary: "S" });
+  assert.deepEqual(staticButton.components, [{ type: "body", parameters: [{ type: "text", text: "S" }] }], "static button needs no parameter");
+  env.WHATSAPP_TEMPLATES_JSON = baseTemplates;
   // Unknown sender inbox alert (owner 22 Nov 2026): the fan-out job queues one
   // inbox_alert per current duty SMC, once per sender per day.
   const fanPayload = { date, sender: "6599990000", senderName: "an unknown number ending 0000", inboxMessageId: "whatsapp:wamid.unknown1" };
@@ -200,6 +243,28 @@ try {
   assert.equal(fanned[0].data.templateKey, "inbox_alert");
   assert.equal(fanned[0].data.senderName, "an unknown number ending 0000");
   assert.equal(fan.sent, 0, "the fan-out itself sends nothing");
+  env.WHATSAPP_TEMPLATES_JSON = JSON.stringify({
+    ...JSON.parse(baseTemplates),
+    inbox_alert: { name: "gsis_v1_inbox_new_message", language: "en_GB", parameters: ["duty_smc_name", "senderName"], button: "static" },
+  });
+  for (const senderName of ["Synthetic known sender", fanned[0].data.senderName]) {
+    const payload = { ...fanned[0], data: { ...fanned[0].data, senderName } };
+    const alert = await run("smc_alert", { payload, adhoc: [], changeState: withDuty });
+    assert.equal(alert.result.state, "accepted", "inbox alert to the current duty SMC is accepted");
+    assert.equal(alert.sent, 1);
+    assert.equal(sends.at(-1).to, active.mobile);
+    assert.deepEqual(sends.at(-1).template.components, [{
+      type: "body",
+      parameters: [{ type: "text", text: active.name }, { type: "text", text: senderName }],
+    }], "inbox alert uses the two approved body fields in order");
+  }
+  const reassignedDuty = await run("smc_alert", {
+    payload: structuredClone(fanned[0]), adhoc: [], changeState: state => { state.smcDutyRoster = []; },
+  });
+  assert.equal(reassignedDuty.result.code, "RECIPIENT_NO_LONGER_DUTY_SMC");
+  assert.equal(reassignedDuty.result.state, "cancelled");
+  assert.equal(reassignedDuty.sent, 0);
+  env.WHATSAPP_TEMPLATES_JSON = baseTemplates;
   const activeControl = await run("relief_publication", { first: { ...inactive, active: true }, adhoc: [] });
   assert.equal(activeControl.result.state, "accepted", "ordinary active recipient needs no ad hoc activation");
   console.log("PASS actual local Roster delivery: six relief kinds, current eligibility and source-bound duty/mutual links; date/period/deletion/identity/qualification/consent negatives and active-only non-relief boundaries; synthetic providers only");

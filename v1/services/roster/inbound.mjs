@@ -130,7 +130,8 @@ export function inboxAlertConfigured(env) {
 }
 export function queueInboxAlert(next, c, date, event, result) {
   if (result?.duplicate || result?.reply?.action !== "menu" || event.buttonId) return 0;
-  if (typeof event.text !== "string" || !event.text.trim()) return 0;
+  const text = typeof event.text === "string" ? event.text.trim() : "";
+  if (!text || /^[1-5]$/.test(text)) return 0;
   const sender = c.people.find((p) => p.id === next.inboundEvents?.find((e) => e.id === event.id)?.staffId),
     senderName = sender?.name || "a staff member",
     before = next.outbox.length;
