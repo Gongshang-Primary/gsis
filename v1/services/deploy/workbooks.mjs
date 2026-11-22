@@ -12,7 +12,7 @@ import {
 import { membershipValue, setMembershipValue } from "./model.mjs";
 import { ROLE_COLUMNS, normalizeRoleMemberships, applyRoleMemberships, checkManagedMemberships, roleMapping } from "./role-memberships.mjs";
 import { HR_CHOICE_FIELDS, choiceLists, normalizeHRChoices, applyCatalogueLinks } from "./catalogue-links.mjs";
-import { planningPerson, reportingStaff, reportingLinks, reportingRoot, reportingConflicts } from "../../web/shared/deploy-eligibility.mjs";
+import { planningPerson, projectPlanningNames, reportingStaff, reportingLinks, reportingRoot, reportingConflicts } from "../../web/shared/deploy-eligibility.mjs";
 import { departmentChangeConflicts } from "../../web/shared/deploy-departments.mjs";
 export const SCHEMAS = Object.freeze({
   IP: {
@@ -390,7 +390,7 @@ export function validateWorkbook(
   doc,
   schoolId,
   revision,
-  { matches = {} } = {},
+  { matches = {}, meta = {} } = {},
 ) {
   plain(wb);
   const m = wb.metadata;
@@ -711,12 +711,25 @@ export function validateWorkbook(
               ? (planned.activeKnown ? planned.active : null)
               : (planned.profile[field] ?? (field === "Basic Name" ? t.name : ""));
         if (v !== base) {
+          if (field === "Basic Name" && typeof v === "string" && v.trim()) {
+            if (typeof base === "string" && base.trim() === v.trim()) continue;
+            next.teacherDraftMeta ??= {};
+            next.teacherDraftMeta[s] ??= {};
+            next.teacherDraftMeta[s].basicNameProvenance = {
+              value: v,
+              changedAt: Number.isSafeInteger(meta?.now) ? meta.now : Date.now(),
+              source: "deploy",
+              actorId: meta?.actorId || null,
+              operationId: meta?.operationId || null,
+            };
+          }
           next.teacherDrafts[s] ??= {};
           next.teacherDrafts[s][field] = v;
           proposals.push({ staffId: s, field, value: v });
         }
       }
     }
+    if (proposals.length) projectPlanningNames(next);
   }
   if (scope === "HR Terms") {
     unique(r["HR Terms"], row => row.Field, "HR field");

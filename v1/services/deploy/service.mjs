@@ -1230,21 +1230,21 @@ async function save(
           operationId: op.operationId,
         },
       );
-      const beforeNames = new Map(
-        (before.teachers || []).map((t) => [t.id, String(t.ttbName || t.name || "").trim().toLowerCase()]),
+  }
+  const beforeNames = new Map(
+    (before.teachers || []).map((t) => [t.id, String(t.ttbName || t.name || "").trim().toLowerCase()]),
+  );
+  for (const t of next.teachers || []) {
+    const afterName = String(t.ttbName || t.name || "").trim();
+    if (afterName && afterName.toLowerCase() !== beforeNames.get(t.id)) {
+      await assertNoCrossDraftTTbCollision(
+        ctx.env.DB,
+        school,
+        b.versionId,
+        t.id,
+        afterName,
       );
-      for (const t of next.teachers || []) {
-        const afterName = String(t.ttbName || t.name || "").trim();
-        if (afterName && afterName.toLowerCase() !== beforeNames.get(t.id)) {
-          await assertNoCrossDraftTTbCollision(
-            ctx.env.DB,
-            school,
-            b.versionId,
-            t.id,
-            afterName,
-          );
-        }
-      }
+    }
   }
   // Explicitly adding a person again supersedes only that person's removal
   // marker; unrelated historical markers remain untouched.
@@ -1564,7 +1564,14 @@ async function previewImport(ctx) {
     loaded.doc,
     ctx.principal.schoolId,
     loaded.version.revision,
-    { matches: b.matches || {} },
+    {
+      matches: b.matches || {},
+      meta: {
+        now: ctx.now,
+        actorId: ctx.principal.actorId,
+        operationId: b.operationId || null,
+      },
+    },
   );
   validated.document = validateTeachingBindings(
     loaded.doc,
@@ -1657,7 +1664,14 @@ async function applyImport(ctx) {
     loaded.doc,
     ctx.principal.schoolId,
     loaded.version.revision,
-    { matches: input.matches },
+    {
+      matches: input.matches,
+      meta: {
+        now: ctx.now,
+        actorId: ctx.principal.actorId,
+        operationId: op.operationId,
+      },
+    },
   );
   return save(ctx, {
     document: validated.document,
@@ -3223,6 +3237,18 @@ function contributions(doc, publicationId, operationId, actorId, envelope = {}) 
     "MK Modifier": "mkTags",
     Active: "employmentActive",
   };
+  const copiedTagFields = {
+    Role: "role",
+    "EO Appt Level": "eoAppointmentLevel",
+    "Appointment Status": "appointmentStatus",
+    "Employment Arrangement": "employmentArrangement",
+    "Employment Status": "employmentStatus",
+    "School Section": "schoolSection",
+    "Personnel Category": "personnelCategory",
+    "Employment Modifier": "employmentTags",
+    "Subject Modifier": "subjectTags",
+    "MK Modifier": "mkTags",
+  };
   const publishedAt = Number.isSafeInteger(envelope.publishedAt)
     ? envelope.publishedAt
     : doc.from
@@ -3233,9 +3259,15 @@ function contributions(doc, publicationId, operationId, actorId, envelope = {}) 
       .filter(([field]) => Object.hasOwn(fields, field))
       .map(([field, value]) => {
         const contactsField = fields[field];
-        const basicNameChangedAt =
+        const basicNameProvenance =
           contactsField === "basicName"
-            ? doc.teacherDraftMeta?.[staffId]?.basicNameProvenance?.changedAt ?? null
+            ? doc.teacherDraftMeta?.[staffId]?.basicNameProvenance ?? null
+            : null;
+        const basicNameChangedAt = basicNameProvenance?.changedAt ?? null;
+        const basicNameOperationId =
+          typeof basicNameProvenance?.operationId === "string" &&
+          basicNameProvenance.operationId
+            ? basicNameProvenance.operationId
             : null;
         return {
           staffId,
@@ -3249,6 +3281,7 @@ function contributions(doc, publicationId, operationId, actorId, envelope = {}) 
           ...(Number.isSafeInteger(basicNameChangedAt)
             ? { basicNameChangedAt }
             : {}),
+          ...(basicNameOperationId ? { basicNameOperationId } : {}),
           validFrom: publishedAt,
           sourcePublicationId: publicationId,
           sourceOperationId: operationId,
@@ -3256,10 +3289,55 @@ function contributions(doc, publicationId, operationId, actorId, envelope = {}) 
         };
       }),
   );
+  // C08: for any copied deployment tag not explicitly overridden in teacherDrafts,
+  // publish the version's copied value whenever current Contacts has drifted from
+  // the version's copied snapshot.
+  const copiedOrdinary = (doc.teachers || []).flatMap((t) => {
+    const copied = t.copiedDeploymentTags;
+    if (!copied || typeof copied !== "object") return [];
+    const draft = doc.teacherDrafts?.[t.id] || {};
+    const currentTags = t.deploymentTags || {};
+    return Object.entries(copied)
+      .filter(
+        ([label]) =>
+          Object.hasOwn(copiedTagFields, label) && !Object.hasOwn(draft, label),
+      )
+      .flatMap(([label, copiedVal]) => {
+        const contactsField = copiedTagFields[label];
+        const proposedValue = normalizeTagContributionValue(
+          contactsField,
+          copiedVal,
+        );
+        const currentDefined = Object.hasOwn(currentTags, label);
+        const currentNormalized = currentDefined
+          ? normalizeTagContributionValue(contactsField, currentTags[label])
+          : undefined;
+        if (
+          currentDefined &&
+          canonical(currentNormalized) === canonical(proposedValue)
+        ) {
+          return [];
+        }
+        return [
+          {
+            staffId: t.id,
+            field: contactsField,
+            proposedValue,
+            acceptedBaseFieldRevision: t.fieldRevisions?.[contactsField] ?? 0,
+            directTagPublicationVersion: 1,
+            validFrom: publishedAt,
+            sourcePublicationId: publicationId,
+            sourceOperationId: operationId,
+            originalActorId: actorId,
+          },
+        ];
+      });
+  });
+  const allOrdinary = ordinary.concat(copiedOrdinary);
   // This marker is part of the immutable payload. Never reinterpret historical
   // publications after a code upgrade, or turn unknown facts into empty lists.
-  if (envelope.membershipPublicationVersion !== 1) return ordinary;
-  return ordinary.concat(doc.teachers.flatMap(t => {
+  if (envelope.membershipPublicationVersion !== 1) return allOrdinary;
+  return allOrdinary.concat(doc.teachers.flatMap(t => {
     const authority = envelope.authorityPublicationVersion === 1 ? authorityValue(doc, t) : null;
     if (!authority && !Object.hasOwn(t.deploymentTags || {}, "Memberships")) return [];
     return [{

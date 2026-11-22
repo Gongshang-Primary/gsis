@@ -46,13 +46,26 @@ export async function processContribution(job, env) {
     ) {
       const currentBasic = await one(
         env.DB,
-        "SELECT accepted_at FROM contacts_fields WHERE school_id=? AND staff_id=? AND field='basicName'",
+        "SELECT accepted_at, operation_id FROM contacts_fields WHERE school_id=? AND staff_id=? AND field='basicName'",
         [env.SCHOOL_ID, row.staff_id],
       );
-      if (
+      const deployOpId =
+        typeof contribution.basicNameOperationId === "string" &&
+        contribution.basicNameOperationId
+          ? contribution.basicNameOperationId
+          : typeof contribution.sourceOperationId === "string"
+            ? contribution.sourceOperationId
+            : "";
+      const contactsOpId =
+        typeof currentBasic?.operation_id === "string"
+          ? currentBasic.operation_id
+          : "";
+      const contactsWins =
         Number.isSafeInteger(currentBasic?.accepted_at) &&
-        currentBasic.accepted_at > contribution.basicNameChangedAt
-      ) {
+        (currentBasic.accepted_at > contribution.basicNameChangedAt ||
+          (currentBasic.accepted_at === contribution.basicNameChangedAt &&
+            contactsOpId > deployOpId));
+      if (contactsWins) {
         await statement(
           env.DB,
           "UPDATE contacts_contributions SET state='superseded',outcome_json=? WHERE school_id=? AND contribution_id=? AND state='pending'",
@@ -62,6 +75,12 @@ export async function processContribution(job, env) {
               checkedAt: Date.now(),
               contactsChangedAt: currentBasic.accepted_at,
               deployChangedAt: contribution.basicNameChangedAt,
+              ...(currentBasic.accepted_at === contribution.basicNameChangedAt
+                ? {
+                    contactsOperationId: contactsOpId,
+                    deployOperationId: deployOpId,
+                  }
+                : {}),
               message:
                 "Contacts Basic Name was edited more recently than this Deploy draft.",
             }),

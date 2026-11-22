@@ -145,6 +145,11 @@ const deploymentTagFields = {
   "School Section": "schoolSection",
   "Personnel Category": "personnelCategory",
 };
+function copiedTagSnapshot(deploymentTags) {
+  if (!deploymentTags || typeof deploymentTags !== "object") return null;
+  const entries = Object.entries(deploymentTags).filter(([label]) => label !== "Memberships");
+  return entries.length ? Object.fromEntries(entries) : {};
+}
 // Absence is unknown; null is an explicit Contacts clear; [] is a known empty list.
 export function membershipValue(teacher) {
   if (!Object.hasOwn(teacher.deploymentTags || {}, "Memberships")) return undefined;
@@ -310,6 +315,12 @@ export function mergeContacts(doc, projection, {
     // Eligibility always uses current Contacts evidence. Only the ordinary
     // planning list, including its unknown state, belongs to this saved version.
     const saved = previous.get(teacher.id);
+    if (fields) {
+      const copied = !refreshMemberships && saved
+        ? saved.copiedDeploymentTags
+        : copiedTagSnapshot(deploymentTags);
+      if (copied) teacher.copiedDeploymentTags = structuredClone(copied);
+    }
     if (!refreshMemberships && saved) {
       if (saved.planningProfile?.["Basic Name"]) {
         teacher.ttbName = saved.ttbName || saved.name || teacher.ttbName;
