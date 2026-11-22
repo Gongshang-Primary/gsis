@@ -64,11 +64,11 @@ No template was created, edited or sent during this review.
 
 | ID | Status |
 | --- | --- |
-| W1 contact review | PR #276 |
-| W2 final-run split | PR #278 |
+| W1 contact review | #276 merged. Creating an inactive external contact queues review for Contacts Power Users. |
+| W2 final-run split | #278 merged. The completed 06:29 run queues one outcome alert per date. |
 | W3 retire system_alert | Done; no code needed (v1 never queues it) |
-| W4 buttons | PR #277 (code); 10 `gsis_v1_*` templates submitted, PENDING |
-| W5 inbox alert | PR #279; `gsis_v1_inbox_new_message` submitted (ID 1798304818089770), PENDING; owner chose to bypass quiet hours |
+| W4 buttons | #277 merged. Ten `gsis_v1_*` templates were submitted and recorded as PENDING. |
+| W5 inbox alert | #279 merged. Free-text inbox messages from known and unknown senders can alert the duty SMC once per sender per date, including during quiet hours. Menu responses and urgent forwards are excluded. The submission used `gsis_v1_inbox_new_message` (ID 1798304818089770) and was recorded as PENDING. |
 | W6 contract states | Done in v1 docs only. `notification-worker/template-contracts.json` feeds frozen v0.9 outputs, so it stays unchanged; live states are in the Meta check above |
 
 Activation of every new or newly used template is a deployment configuration step after Meta approval, mapped in `WHATSAPP_TEMPLATES_JSON` with parameters in body order.

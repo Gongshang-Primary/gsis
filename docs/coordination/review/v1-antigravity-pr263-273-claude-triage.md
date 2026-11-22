@@ -4,6 +4,11 @@ Project: **v1**. Model: Claude. Role in this pass: owner-directed triage of ever
 
 Base: main `166d06e9` (after #261). Handoff source: draft #262, `docs/v1/ANTIGRAVITY_REPAIR_HANDOFF_2026-11-21.md`.
 
+## Integration update (22 Nov 2026, Model: Codex)
+
+- #263 fixed the Deploy recovery browser fixture. #274 raised the Product CI job cap to 60 minutes. #280 limited the v0.9 regression shards to changes outside the v1 scope. [Fixture fix](https://github.com/Gongshang-Primary/gsis/pull/263) · [Job cap](https://github.com/Gongshang-Primary/gsis/pull/274) · [CI scope](https://github.com/Gongshang-Primary/gsis/pull/280)
+- #264–#273 merged after Muse approved their exact heads and Product CI passed. #264 merged before #266. The CI results and push restriction below describe the original triage. [Merge history](https://github.com/Gongshang-Primary/gsis/compare/166d06e9...af9595f2)
+
 ## 1. Main is red; #263 is the gate
 
 `tests/v1-product-deploy-save-recovery-browser.mjs:1161` fails on main `166d06e9` (reproduced locally: Review shows "Unavailable teacher … Unavailable class"). Every other Antigravity PR fails CI by exactly this one program (`176/177`, `177/178`). #263 fixes the test fixture by seeding the class and teacher through the real API, and its own CI is green.

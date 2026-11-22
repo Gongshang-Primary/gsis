@@ -51,11 +51,11 @@ Owner decisions on each template: [WHATSAPP_TEMPLATE_REVIEW_2026-11-21.md](WHATS
 Sample:
 
 > *Peer Relief Arrangement*
-> 
+>
 > Hi Ms Tan Mei Ling, Mr Goh Kok Wah has requested on https://roster.gsps.edu.sg that you cover his/her lesson(s) on Thu 26 Nov 2026: P3-P4 EL, 4 Integrity.
-> 
+>
 > Accept or reject using this link: [private link].
-> 
+>
 > Thank you.
 
 ### 2. `mutual_override` (gsis_relief_changed_v1)
@@ -70,13 +70,13 @@ Sample:
 Sample:
 
 > *Peer Relief Arrangement Updated*
-> 
+>
 > Hi Ms Tan Mei Ling, Relief Team has changed the peer relief arrangement for Thu 26 Nov 2026.
-> 
+>
 > P5 Math 3 Kindness moved to P6 (10:40).
-> 
+>
 > View the published arrangement here: [private link].
-> 
+>
 > Thank you.
 
 ### 3. `contact_review` (gsis_contact_review_v1)
@@ -91,17 +91,17 @@ Sample:
 Sample:
 
 > *Contact Details for Ad Hoc External Relief*
-> 
+>
 > Hi Ms Tan Mei Ling.
-> 
+>
 > On https://roster.gsps.edu.sg, contact details for an ad hoc external relief teacher were added or updated on Thu 26 Nov 2026.
-> 
+>
 > Please review these details as a Contacts Admin:
-> 
+>
 > Mdm Rahimah (ad hoc relief), mobile +65 9xxx xxxx
-> 
+>
 > Review and confirm the details in Contacts: https://contacts.gsps.edu.sg.
-> 
+>
 > Thank you.
 
 ### 4. `relief_assignment` (gsis_relief_assignment_v1)
@@ -116,13 +116,13 @@ Sample:
 Sample:
 
 > *Relief Assignment*
-> 
+>
 > Hi Ms Tan Mei Ling, Relief Team has assigned you relief duties on Thu 26 Nov 2026.
-> 
+>
 > P3-P4 EL, 4 Integrity, Room 3-04
-> 
+>
 > View the relief instructions and acknowledge your duties here: [private link].
-> 
+>
 > Thank you.
 
 ### 5. `relief_updated` (gsis_relief_updated_v1)
@@ -137,13 +137,13 @@ Sample:
 Sample:
 
 > *Relief Assignment Updated*
-> 
+>
 > Hi Ms Tan Mei Ling, Relief Team has changed your relief duties for Thu 26 Nov 2026.
-> 
+>
 > Cancelled: P3 EL 4 Integrity. New: P6 Math 3 Kindness, Room 2-01.
-> 
+>
 > View your updated timetable and acknowledge the change here: [private link].
-> 
+>
 > Thank you.
 
 ### 6. `relief_reminder` (gsis_relief_reminder_v1)
@@ -158,13 +158,13 @@ Sample:
 Sample:
 
 > *Relief Duty Reminder*
-> 
+>
 > Hi Ms Tan Mei Ling, your relief duty on Thu 26 Nov 2026 starts in 20 minutes and has not been acknowledged in Roster.
-> 
+>
 > P3 (08:50) EL, 4 Integrity, Room 3-04
-> 
+>
 > View the relief instructions and acknowledge your duty here: [private link].
-> 
+>
 > Thank you.
 
 ### 7. `relief_unacknowledged` (gsis_relief_unacknowledged_v1)
@@ -179,15 +179,15 @@ Sample:
 Sample:
 
 > *Relief Duty Not Acknowledged*
-> 
+>
 > Hi Mr Lim Wei Jie, Ms Tan Mei Ling has not acknowledged the relief duty on Thu 26 Nov 2026.
-> 
+>
 > P3 08:50, 4 Integrity, Room 3-04
-> 
+>
 > The lesson starts in 10 minutes. Please contact the teacher and confirm cover.
-> 
+>
 > View the current status here: https://roster.gsps.edu.sg.
-> 
+>
 > Thank you.
 
 ### 8. `relief_urgent` (gsis_relief_urgent_v1)
@@ -202,13 +202,13 @@ Sample:
 Sample:
 
 > *Urgent Relief Assignment*
-> 
+>
 > Hi Ms Tan Mei Ling, Relief Team has assigned you a relief duty on Thu 26 Nov 2026 that starts in 15 minutes.
-> 
+>
 > P3 08:50, 4 Integrity, Room 3-04
-> 
+>
 > Please view the relief instructions and acknowledge your duty now: [private link].
-> 
+>
 > Thank you.
 
 ### 9. `relief_urgent_smc` (gsis_relief_urgent_smc_v1)
@@ -223,15 +223,15 @@ Sample:
 Sample:
 
 > *Urgent Relief Cover*
-> 
+>
 > Hi Mr Lim Wei Jie, Ms Tan Mei Ling has been assigned relief on Thu 26 Nov 2026. The lesson starts in 15 minutes.
-> 
+>
 > P3 08:50, 4 Integrity, Room 3-04
-> 
+>
 > The duty has not yet been acknowledged. Please check that cover is confirmed.
-> 
+>
 > View the current status here: https://roster.gsps.edu.sg.
-> 
+>
 > Thank you.
 
 ### 10. `relief_evening` (gsis_relief_evening_v1)
@@ -246,15 +246,15 @@ Sample:
 Sample:
 
 > *Relief Planning Update*
-> 
+>
 > Hi Mr Lim Wei Jie, here is the relief planning update for Thu 26 Nov 2026.
-> 
+>
 > 3 absent teachers. 11 periods have planned cover; 1 uncovered (P7).
-> 
+>
 > These allocations are drafts pending publication.
-> 
+>
 > Review the plan here: https://roster.gsps.edu.sg.
-> 
+>
 > Thank you.
 
 ### 11. `relief_morning` (gsis_relief_morning_v1)
@@ -269,17 +269,17 @@ Sample:
 Sample:
 
 > *Morning Relief Summary*
-> 
+>
 > Hi Mr Lim Wei Jie, here is the relief summary for Thu 26 Nov 2026.
-> 
+>
 > 1 new absence overnight; 1 cancellation. 12 periods covered; 0 uncovered.
-> 
+>
 > Relief Health: 86.0%
-> 
+>
 > These allocations are drafts pending publication.
-> 
+>
 > Review the plan here: https://roster.gsps.edu.sg.
-> 
+>
 > Thank you.
 
 ### 12. `absence_update` (gsis_absence_update_v1)
@@ -294,13 +294,13 @@ Sample:
 Sample:
 
 > *New Absence Update*
-> 
+>
 > Hi Mr Lim Wei Jie, 2 new absence(s) have been reported for Thu 26 Nov 2026 since the previous update.
-> 
+>
 > 4 more periods need cover. Manual allocation is required.
-> 
+>
 > Review the latest allocation and publication status here: https://roster.gsps.edu.sg.
-> 
+>
 > Thank you.
 
 ### 13. `relief_manual_review` (gsis_relief_manual_review_v1)
@@ -315,14 +315,14 @@ Sample:
 Sample:
 
 > *Relief Allocation Requires Review*
-> 
+>
 > Hi Mr Lim Wei Jie, please review the relief plan for Thu 26 Nov 2026.
-> 
+>
 > The final scheduled allocation run is complete.
 > 2 periods remain uncovered: P2 3 Kindness, P7 5 Respect.
-> 
+>
 > Please allocate the remaining cover and publish the relief plan here: https://roster.gsps.edu.sg.
-> 
+>
 > Thank you.
 
 ### 14. `capacity_warning` (gsis_relief_capacity_warning_v1)
@@ -337,15 +337,15 @@ Sample:
 Sample:
 
 > *Relief Capacity Warning*
-> 
+>
 > Hi Mr Lim Wei Jie, relief capacity for Thu 26 Nov 2026 needs your attention.
-> 
+>
 > P2 has 1 eligible relief teacher left; P7 has none.
-> 
+>
 > Relief Health: 86.0%
-> 
+>
 > Review the affected periods in Roster: https://roster.gsps.edu.sg.
-> 
+>
 > Please consider external ad hoc relief where needed. External staff are not activated automatically.
 
 ### 15. `relief_final` (gsis_relief_final_v1)
@@ -360,15 +360,15 @@ Sample:
 Sample:
 
 > *Final Draft Relief Allocation*
-> 
+>
 > Hi Mr Lim Wei Jie, the final scheduled relief allocation for Thu 26 Nov 2026 is complete.
-> 
+>
 > 3 absent teachers. 12 periods have planned cover; 0 uncovered.
-> 
+>
 > Relief Health: 86.0%
-> 
+>
 > Review and publish the draft in Roster: https://roster.gsps.edu.sg.
-> 
+>
 > Thank you.
 
 ### 16. `conditional_relief_instruction` (gsis_relief_instruction_v1)
@@ -383,19 +383,19 @@ Sample:
 Sample:
 
 > *Instructions for relief lesson*
-> 
+>
 > Hi Ms Tan Mei Ling, please note the following instructions for your assigned relief lesson at Gongshang Primary School.
-> 
+>
 > Class: 4 Integrity
 > Date: Thu 26 Nov 2026
 > Period and time: P3, 08:50-09:20
-> 
+>
 > Lesson instructions:
 > If wet weather, use the classroom; worksheets are on the teacher's desk.
-> 
+>
 > For clarification, please contact Mr Goh Kok Wah, the absent teacher:
 > +65 9xxx xxxx
-> 
+>
 > Thank you.
 
 ### 17. `urgent_forward` (gsis_urgent_forward_v1)
@@ -410,14 +410,14 @@ Sample:
 Sample:
 
 > *Urgent Message to Relief Team*
-> 
+>
 > Hi Ms Tan Mei Ling, a staff member has sent this urgent message:
-> 
+>
 > I am stuck on the CTE, will be 20 min late for P1.
-> 
+>
 > From: Mr Goh Kok Wah
 > Contact: +65 9xxx xxxx
-> 
+>
 > Please contact the sender directly. This message does not create an absence report or confirm relief cover.
 
 ### 18. `smc_attention` (gsis_relief_attention_v2)
@@ -432,15 +432,15 @@ Sample:
 Sample:
 
 > *School Relief Allocation Requires Action*
-> 
+>
 > Hi Mr Lim Wei Jie, you are on SMC relief duty at Gongshang Primary School on Thu 26 Nov 2026.
-> 
+>
 > The following issue has been recorded in the teacher relief allocation for your duty date:
-> 
+>
 > The final scheduled optimisation has NOT completed. Review the last valid draft and allocate the remaining cover.
-> 
+>
 > Please review the affected lessons and confirm or correct their teacher coverage in Roster: https://roster.gsps.edu.sg.
-> 
+>
 > Thank you.
 
 ### 19. `stapler_timetable` (gsis_timetable_updated_v1)
@@ -455,15 +455,15 @@ Sample:
 Sample:
 
 > *Your timetable for today has changed*
-> 
+>
 > Hi Ms Tan Mei Ling, your timetable for today, Thu 26 Nov 2026, has updates.
-> 
+>
 > Specifically, the changes are:
 > P5 Math 3 Kindness moved to P6 (10:40).
-> 
+>
 > View your updated timetable alongside your usual timetable:
 > [private link]
-> 
+>
 > Thank you.
 > GSiS Roster
 
@@ -479,12 +479,12 @@ Sample:
 Sample:
 
 > *Request to plan Suspended Timetable*
-> 
+>
 > Hi Ms Tan Mei Ling, Mr Goh Kok Wah has requested your approval to plan and publish a suspended timetable for Thu 26 Nov 2026.
-> 
+>
 > Please review the request and approve or reject it here:
 > https://roster.gsps.edu.sg
-> 
+>
 > Thank you.
 
 ### 21. `stapler_decision` (gsis_timetable_access_v1)
@@ -499,15 +499,15 @@ Sample:
 Sample:
 
 > *Suspended timetable request outcome*
-> 
+>
 > Mr Goh Kok Wah made a request to plan a suspended timetable for Thu 26 Nov 2026.
-> 
+>
 > The request has been reviewed and the outcome is:
 > P5 Math 3 Kindness moved to P6 (10:40).
-> 
+>
 > View the request and decision here:
 > https://roster.gsps.edu.sg
-> 
+>
 > Thank you.
 
 ### 22. `system_alert` (gsis_system_alert_v1)
@@ -522,15 +522,15 @@ Sample:
 Sample:
 
 > *GSiS System Alert*
-> 
+>
 > Hi Ms Tan Mei Ling, this system alert is for GSiS Admins.
-> 
+>
 > Date: Thu 26 Nov 2026
-> 
+>
 > Issue: The final scheduled optimisation has NOT completed. Review the last valid draft and allocate the remaining cover.
-> 
+>
 > Open System Health to review: https://roster.gsps.edu.sg.
-> 
+>
 > Thank you.
 
 ### 23. `lse_notice` (gsis_lse_notice_v1)
@@ -545,9 +545,9 @@ Sample:
 Sample:
 
 > *Leave School Early*
-> 
+>
 > Hi Mr Lim Wei Jie, Mr Goh Kok Wah has applied for LSE on Thu 26 Nov 2026.
-> 
+>
 > For info, thank you!
 
 ### 24. `inbox_alert` (gsis_inbox_new_message_v1)
@@ -562,7 +562,7 @@ Sample:
 Sample:
 
 > *New School WhatsApp Message*
-> 
+>
 > Hi Mr Lim Wei Jie, a new message from Mr Goh Kok Wah is waiting in the GSiS WhatsApp Inbox.
-> 
+>
 > Open Roster to review and reply: https://roster.gsps.edu.sg.
