@@ -1466,20 +1466,39 @@ async function preview(ctx, kind, p) {
     "Split the archive into smaller year ranges.",
     413,
   );
+  const placeholders = years.map(() => "?").join(",");
+  const metaRows = await query(
+    ctx.env.DB,
+    "SELECT kind,record_id,year,revision FROM calendar_metadata WHERE school_id=? AND kind IN ('yearStructure','dayNotes') AND year IN(" +
+      placeholders +
+      ") ORDER BY kind,year,record_id LIMIT ?",
+    [s, ...years, MAX_EVENTS + 1],
+  );
+  const yearStructureCount = metaRows.filter(
+    (m) => m.kind === "yearStructure",
+  ).length;
+  const dayNotesCount = metaRows.filter((m) => m.kind === "dayNotes").length;
   const payload = {
     kind,
     schoolId: s,
     actorId: ctx.principal.actorId,
     years: rows.map((r) => ({ year: r.year, revision: r.revision })),
     events,
+    metadata: metaRows,
   };
+  const previewDigest = await digest(payload);
   return {
     preview: payload,
-    digest: await digest(payload),
+    digest: previewDigest,
+    previewDigest,
     counts: {
       years: rows.length,
       events: events.length,
       Events: events.length,
+      yearStructure: yearStructureCount,
+      YearStructure: yearStructureCount,
+      dayNotes: dayNotesCount,
+      DayNotes: dayNotesCount,
     },
     selections: rows.map((r) => ({ year: r.year, status: r.status })),
     fileName: `GSiS Calendar archive ${years.join("-")}.json`,
