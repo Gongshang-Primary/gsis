@@ -224,11 +224,27 @@ function render() {
 }
 async function load() {
   const ticket = securityEpoch;
-  const loaded = await api.request("layout", "/owned-data?year=" + year());
-  if (ticket !== securityEpoch) return;
-  snapshot = loaded;
-  render();
-  message("Layout " + year() + " revision " + snapshot.revision);
+  try {
+    const loaded = await api.request("layout", "/owned-data?year=" + year());
+    if (ticket !== securityEpoch) return;
+    snapshot = loaded;
+    render();
+    message("Layout " + year() + " revision " + snapshot.revision);
+  } catch (error) {
+    if (ticket !== securityEpoch) return;
+    if (error?.code === "SNAPSHOT_NOT_INITIALIZED") {
+      snapshot = null;
+      panel.querySelector("[data-rows]").replaceChildren();
+      const initialDetails = panel.querySelector("[data-initial-source]")?.closest("details");
+      if (initialDetails && !initialDetails.hidden) initialDetails.open = true;
+      message(
+        `No Layout snapshot exists for ${year()} yet. Use Initial source setup below to import the first timetable/Layout snapshot, or publish from Deploy.`,
+        false,
+      );
+      return;
+    }
+    throw error;
+  }
 }
 panel.querySelector("[data-load]").onclick = () =>
   load().catch((e) => message(e.message, true));
