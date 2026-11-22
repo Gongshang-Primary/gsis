@@ -176,12 +176,17 @@ try {
     assert.equal(mapped.staffMapping["Tan Guidance"], staffId);
     assert.deepEqual(mapped.venueMapping["Hall A"], ["v-hall-a"]);
 
-    console.log(
-      "PASS Venues empty-register guidance (B-V01): Deploy and Roster show setup guidance linking to /venues/ when empty, and resume normal selection with guidance cleared after seeding.",
-    );
   } finally {
-    await browser?.close();
+    try {
+      // Finish dispatchFetch calls before closing Chromium and the Worker fixture.
+      await context.unrouteAll({ behavior: "wait" });
+    } finally {
+      await browser?.close();
+    }
   }
 } finally {
   await suite.close();
 }
+console.log(
+  "PASS Venues empty-register guidance (B-V01): Deploy and Roster show setup guidance linking to /venues/ when empty, and resume normal selection with guidance cleared after seeding.",
+);
