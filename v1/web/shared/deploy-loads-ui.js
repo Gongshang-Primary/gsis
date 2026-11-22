@@ -1,4 +1,4 @@
-import { parseLoad, planningView, loadRows, fortnightRows, legacyFormUsed } from "./deploy-loads.mjs";
+import { parseLoad, planningView, workloadAliasView, loadRows, fortnightRows, legacyFormUsed } from "./deploy-loads.mjs";
 
 const subjectLoadOrder = [
   "EL", "LSP", "FEL", "RRP", "SDR", "MATH", "LSM", "FMA", "CL", "ML", "TL",
@@ -17,7 +17,7 @@ function install() {
   const derived = new WeakSet();
   const view = doc => {
     if (!doc || derived.has(doc)) return doc;
-    const result = planningView(doc);
+    const result = workloadAliasView(planningView(doc));
     derived.add(result);
     return result;
   };

@@ -9,7 +9,7 @@ import PAL from "../../../shared/pal.js";
 import VenueGroups from "../../../shared/venue-groups.js";
 import AscExport from "../../../shared/asc-export.js";
 import { STANDARD_SUBJECTS, parseLoad, storedLoad, knownLoadSubject, readLoad, isReferenceSubject,
-  validSubject, planningView, parseSplit, storedSplit } from "../../web/shared/deploy-loads.mjs";
+  validSubject, planningView, workloadAliasView, parseSplit, storedSplit } from "../../web/shared/deploy-loads.mjs";
 import {
   check,
   id,
@@ -605,7 +605,7 @@ export function validateTeachingBindings(
   return normalized;
 }
 export function calculate(doc, contacts) {
-  const source = mergeContacts(planningView(doc), contacts, { includeUnlisted: false });
+  const source = mergeContacts(workloadAliasView(planningView(doc)), contacts, { includeUnlisted: false });
   const accepted = {
     ...source,
     teachers: source.teachers.map((t) => ({ ...t, profile: { ...t.profile } })),
