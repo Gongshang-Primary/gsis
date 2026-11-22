@@ -1124,6 +1124,33 @@ export async function handle(ctx) {
         })),
       };
     }
+    // Roster asks who reviews a new external relief contact (owner 21 Nov 2026:
+    // Contacts Power Users only). Explicit grants only: Global Admin is not included.
+    if (path === "/internal/contacts-power-users") {
+      const r = await one(
+        env.DB,
+        "SELECT descriptor_json,valid_until FROM core_evidence WHERE school_id=? AND decision_id=?",
+        [env.SCHOOL_ID, body.decisionId],
+      );
+      fail(r && r.valid_until > now, "AUTHORITY_CHANGED", 409);
+      fail(
+        JSON.parse(r.descriptor_json).service === "roster",
+        "SERVICE_DENIED",
+        403,
+      );
+      const rows = await query(
+        env.DB,
+        `SELECT DISTINCT a.staff_id AS staffId FROM core_grants g
+         JOIN core_accounts a ON a.school_id=g.school_id AND a.account_id=g.account_id
+         WHERE g.school_id=? AND g.capability IN ('contacts.powerUser','contacts.manage')
+           AND g.valid_from<=? AND (g.valid_until IS NULL OR g.valid_until>?)
+           AND a.suspended=0 AND a.staff_id IS NOT NULL
+         ORDER BY a.staff_id LIMIT 513`,
+        [env.SCHOOL_ID, now, now],
+      );
+      fail(rows.length <= 512, "ACCOUNT_BOUNDS", 413);
+      return { staffIds: rows.map((row) => row.staffId) };
+    }
     if (path === "/internal/job-authority") {
       fail(
         body.schoolId === env.SCHOOL_ID &&
