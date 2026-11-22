@@ -2,7 +2,7 @@ name: Isolated v1 product
 on:
   pull_request:
     paths:
-      ["v1/**", "scripts/v1/**", "tests/v1-product*", ".github/workflows/v1-*"]
+      ["v1/**", "scripts/v1/**", "tests/v1-*", ".github/workflows/v1-*"]
   workflow_dispatch:
 permissions:
   contents: read
@@ -12,7 +12,7 @@ concurrency:
 jobs:
   product:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 60
     env:
       TZ: Asia/Singapore
     steps:
@@ -29,6 +29,12 @@ jobs:
       - run: npm run build
       - name: Production build remains unchanged
         run: git diff --exit-code
+      - name: v1 contract tests (moved from the v0.9 regression shards)
+        run: |
+          for f in tests/v1-*.mjs; do
+            case "$f" in tests/v1-product-*) continue ;; esac
+            node "$f"
+          done
       - run: node scripts/v1/test.mjs
       - run: node scripts/v1/build.mjs
       - name: Validate all generated Worker configurations without uploading
