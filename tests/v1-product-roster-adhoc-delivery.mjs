@@ -75,7 +75,7 @@ function payloadFor(kind) {
 }
 async function seed(state) {
   const statements = [h.db.prepare("DELETE FROM roster_records"), h.db.prepare("DELETE FROM product_outbox")];
-  for (const collection of ["adhoc", "assignments", "publicationSnapshots", "requests", "staplerPlans", "dailyPublicationStates", "dailyEmploymentSettings", "dailyEmploymentSnapshots"]) {
+  for (const collection of ["adhoc", "assignments", "publicationSnapshots", "requests", "staplerPlans", "dailyPublicationStates", "dailyEmploymentSettings", "dailyEmploymentSnapshots", "smcDutyRoster"]) {
     const value = state[collection];
     const kind = Array.isArray(value) ? "array" : collection === "dailyPublicationStates" ? "map" : "value";
     const entries = kind === "array" ? value.map((row, i) => [row.id || String(i), row]) : kind === "map" ? Object.entries(value) : [["settings", value]];
@@ -186,6 +186,20 @@ try {
     payload: { date, to: "bob@example.invalid", subject: "Synthetic report" },
     changeState: state => { state.dailyEmploymentSettings.recipients = [{ staffId: "bob", emails: ["bob@example.invalid"] }]; },
   });
+  // Unknown sender inbox alert (owner 22 Nov 2026): the fan-out job queues one
+  // inbox_alert per current duty SMC, once per sender per day.
+  const fanPayload = { date, sender: "6599990000", senderName: "an unknown number ending 0000", inboxMessageId: "whatsapp:wamid.unknown1" };
+  const withDuty = state => { state.smcDutyRoster = [{ id: "duty-" + date, date, staffIds: ["alice"] }]; };
+  const fan = await run("unused", { type: "roster-inbox-alert", payload: { ...fanPayload }, adhoc: [], changeState: withDuty });
+  assert.equal(fan.result.state, "delivered");
+  assert.equal(fan.result.code, "INBOX_ALERT_FANNED_OUT");
+  const fanned = (await h.db.prepare("SELECT job_id,payload_json FROM product_outbox WHERE type='roster-notification'").all()).results.map(r => ({ ...JSON.parse(r.payload_json), jobId: r.job_id }));
+  assert.equal(fanned.length, 1, "one alert for the one duty SMC");
+  assert.equal(fanned[0].jobId, "inbox-alert:" + date + ":6599990000:alice");
+  assert.equal(fanned[0].recipientId, "alice");
+  assert.equal(fanned[0].data.templateKey, "inbox_alert");
+  assert.equal(fanned[0].data.senderName, "an unknown number ending 0000");
+  assert.equal(fan.sent, 0, "the fan-out itself sends nothing");
   const activeControl = await run("relief_publication", { first: { ...inactive, active: true }, adhoc: [] });
   assert.equal(activeControl.result.state, "accepted", "ordinary active recipient needs no ad hoc activation");
   console.log("PASS actual local Roster delivery: six relief kinds, current eligibility and source-bound duty/mutual links; date/period/deletion/identity/qualification/consent negatives and active-only non-relief boundaries; synthetic providers only");

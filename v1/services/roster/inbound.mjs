@@ -222,6 +222,28 @@ export async function processInbound(
           now,
         ],
       ).run();
+      // Unknown sender free text also alerts the duty SMC (owner 22 Nov 2026).
+      if (inboxAlertConfigured(env) && reply.action === "menu" && !event.buttonId && typeof event.text === "string" && event.text.trim()) {
+        const number = Operations.mobile(event.sender), date = localDate(now);
+        await statement(
+          env.DB,
+          "INSERT OR IGNORE INTO product_outbox(school_id,job_id,operation_id,type,payload_json,state,due_at,updated_at) VALUES(?,?,?,?,?,'queued',?,?)",
+          [
+            env.SCHOOL_ID,
+            "inbox-alert-unknown:" + date + ":" + number,
+            body.operationId,
+            "roster-inbox-alert",
+            canonical({
+              date,
+              sender: number,
+              senderName: "an unknown number ending " + number.slice(-4),
+              inboxMessageId: "whatsapp:" + event.id,
+            }),
+            now,
+            now,
+          ],
+        ).run();
+      }
       return { state: "delivered", providerId: replyJobId };
     }
     throw err;
