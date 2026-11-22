@@ -175,10 +175,14 @@ try {
     const mapped = await mappingPromiseSeeded;
     assert.equal(mapped.staffMapping["Tan Guidance"], staffId);
     assert.deepEqual(mapped.venueMapping["Hall A"], ["v-hall-a"]);
-
+    // Roster can still be loading toolbar images after confirming the mapping.
+    await page.waitForFunction(() =>
+      Array.from(document.images).every((image) => image.complete),
+    );
   } finally {
     try {
-      // Finish dispatchFetch calls before closing Chromium and the Worker fixture.
+      // Stop new requests, then finish the Worker calls that are already in flight.
+      for (const page of context.pages()) await page.goto("about:blank");
       await context.unrouteAll({ behavior: "wait" });
     } finally {
       await browser?.close();

@@ -22,6 +22,6 @@ Dispatch the existing `main`-only full deployment and hand off at `gsis-v1-owner
 
 ## Release test repair (22 November 2026, 22:17 SGT)
 
-Both Product CI attempts at `bfbda08f` passed 189 of 190 programs. The Venues guidance assertions passed, then a pending browser route failed when its local Worker connection closed during teardown. Drain the Playwright routes before closing the browser and local Worker, using the same approach as the Venues navigation and deep-link tests. Keep the feature assertions. Verify the new exact head in CI and hand the test change to Muse for review. [Failed CI attempts](https://github.com/Gongshang-Primary/gsis/actions/runs/45025967990)
+Both Product CI attempts at `bfbda08f` passed 189 of 190 programs. The Venues guidance assertions passed, then a pending browser route failed when its local Worker connection closed during teardown. Draining alone still raced with late Roster toolbar images in local Chromium. The test now waits for those images to finish, stops the document, drains the routes and closes Chromium before the Worker. It logs success after cleanup. All original feature assertions and the test timeout are retained. Five isolated runs completed successfully with this sequence. Verify the new exact head in CI and hand the test change to Muse for review. [Failed CI attempts](https://github.com/Gongshang-Primary/gsis/actions/runs/45025967990)
 
 The owner clarified that release label changes do not need a dedicated PR. PR #281 now covers the test repair needed to clear release CI.
