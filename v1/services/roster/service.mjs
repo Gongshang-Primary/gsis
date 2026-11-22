@@ -2915,6 +2915,7 @@ export async function scheduled(ctx) {
       "roster-notification",
       "roster-inbox-reply",
       "roster-public-menu-reply",
+      "roster-inbox-alert",
       "roster-venues-complete",
       "roster-layout-timed",
       "roster-burrows",
@@ -3346,6 +3347,31 @@ export async function dispatchRosterJob(job, env, now = Date.now()) {
       idempotencyKey: job.job_id,
     });
   }
+  if (job.type === "roster-inbox-alert") {
+    // Unknown sender (owner 22 Nov 2026): fan out one inbox alert per current
+    // duty SMC. Deterministic job IDs keep it once per sender per day.
+    const date = payload.date,
+      principal = await currentScheduledPrincipal(env, schoolId, "roster.notify", "dispatch:" + job.job_id,
+        { jobId: job.job_id, operationId: "dispatch:" + job.job_id }, date, now),
+      range = requestedDates({ from: date, to: date }, now),
+      loaded = await loadState(env.DB, schoolId, range),
+      c = await context({ env, principal, now, body: { date, operation: "dailyNotify" } }, loaded, range),
+      scratch = { outbox: [] };
+    for (const id of Operations.dutySMC(loaded.state, c, date))
+      Operations.queue(scratch, c, "smc_alert", id, date, {
+        templateKey: "inbox_alert",
+        audience: "duty-smc",
+        summary: "New school WhatsApp message from " + payload.senderName + " is waiting in the Roster inbox.",
+        senderName: payload.senderName,
+        inboxMessageId: payload.inboxMessageId,
+      }, null, "inbox-alert:" + date + ":" + payload.sender + ":" + id);
+    await assertJobLease(env, job, now);
+    for (const j of scratch.outbox.filter((x) => x.status === "queued"))
+      await statement(env.DB,
+        "INSERT OR IGNORE INTO product_outbox(school_id,job_id,operation_id,type,payload_json,state,due_at,updated_at) VALUES(?,?,?,?,?,'queued',?,?)",
+        [schoolId, j.key, job.operation_id, "roster-notification", canonical(j), now, now]).run();
+    return { state: "delivered", code: "INBOX_ALERT_FANNED_OUT" };
+  }
   const action = "roster.notify",
     body = { jobId: job.job_id, operationId: "dispatch:" + job.job_id },
     principal = await currentScheduledPrincipal(
@@ -3452,12 +3478,14 @@ export async function dispatchRosterJob(job, env, now = Date.now()) {
       link = env.PUBLIC_ORIGIN + "/roster/external/#token=" + issued.token;
       linkToken = issued.token;
     }
+    const templateKey = payload.data?.templateKey || payload.kind;
     await assertJobLease(env, job, now);
     return dispatchProvider(env, {
       provider: "whatsapp",
       to: currentRecipient.mobile,
-      template: templateFor(env, payload.data?.templateKey || payload.kind, {
+      template: templateFor(env, templateKey, {
         ...(capacityMessage?capacityTemplateData(env,payload,currentRecipient):(payload.data || {})),
+        ...(templateKey === "inbox_alert" ? { duty_smc_name: currentRecipient.name } : {}),
         link,
         linkToken,
       }),

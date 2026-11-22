@@ -80,7 +80,7 @@ function payloadFor(kind) {
 }
 async function seed(state) {
   const statements = [h.db.prepare("DELETE FROM roster_records"), h.db.prepare("DELETE FROM product_outbox")];
-  for (const collection of ["adhoc", "assignments", "publicationSnapshots", "requests", "staplerPlans", "dailyPublicationStates", "dailyEmploymentSettings", "dailyEmploymentSnapshots"]) {
+  for (const collection of ["adhoc", "assignments", "publicationSnapshots", "requests", "staplerPlans", "dailyPublicationStates", "dailyEmploymentSettings", "dailyEmploymentSnapshots", "smcDutyRoster"]) {
     const value = state[collection];
     const kind = Array.isArray(value) ? "array" : collection === "dailyPublicationStates" ? "map" : "value";
     const entries = kind === "array" ? value.map((row, i) => [row.id || String(i), row]) : kind === "map" ? Object.entries(value) : [["settings", value]];
@@ -228,6 +228,42 @@ try {
   assert.throws(() => templateFor({ WHATSAPP_TEMPLATES_JSON: JSON.stringify({ k: { name: "x", button: "dynamic" } }) }, "k", {}), (e) => e.code === "TEMPLATE_BUTTON_INVALID");
   const staticButton = templateFor({ WHATSAPP_TEMPLATES_JSON: JSON.stringify({ k: { name: "x", parameters: ["summary"], button: "static" } }) }, "k", { summary: "S" });
   assert.deepEqual(staticButton.components, [{ type: "body", parameters: [{ type: "text", text: "S" }] }], "static button needs no parameter");
+  env.WHATSAPP_TEMPLATES_JSON = baseTemplates;
+  // Unknown sender inbox alert (owner 22 Nov 2026): the fan-out job queues one
+  // inbox_alert per current duty SMC, once per sender per day.
+  const fanPayload = { date, sender: "6599990000", senderName: "an unknown number ending 0000", inboxMessageId: "whatsapp:wamid.unknown1" };
+  const withDuty = state => { state.smcDutyRoster = [{ id: "duty-" + date, date, staffIds: ["alice"] }]; };
+  const fan = await run("unused", { type: "roster-inbox-alert", payload: { ...fanPayload }, adhoc: [], changeState: withDuty });
+  assert.equal(fan.result.state, "delivered");
+  assert.equal(fan.result.code, "INBOX_ALERT_FANNED_OUT");
+  const fanned = (await h.db.prepare("SELECT job_id,payload_json FROM product_outbox WHERE type='roster-notification'").all()).results.map(r => ({ ...JSON.parse(r.payload_json), jobId: r.job_id }));
+  assert.equal(fanned.length, 1, "one alert for the one duty SMC");
+  assert.equal(fanned[0].jobId, "inbox-alert:" + date + ":6599990000:alice");
+  assert.equal(fanned[0].recipientId, "alice");
+  assert.equal(fanned[0].data.templateKey, "inbox_alert");
+  assert.equal(fanned[0].data.senderName, "an unknown number ending 0000");
+  assert.equal(fan.sent, 0, "the fan-out itself sends nothing");
+  env.WHATSAPP_TEMPLATES_JSON = JSON.stringify({
+    ...JSON.parse(baseTemplates),
+    inbox_alert: { name: "gsis_v1_inbox_new_message", language: "en_GB", parameters: ["duty_smc_name", "senderName"], button: "static" },
+  });
+  for (const senderName of ["Synthetic known sender", fanned[0].data.senderName]) {
+    const payload = { ...fanned[0], data: { ...fanned[0].data, senderName } };
+    const alert = await run("smc_alert", { payload, adhoc: [], changeState: withDuty });
+    assert.equal(alert.result.state, "accepted", "inbox alert to the current duty SMC is accepted");
+    assert.equal(alert.sent, 1);
+    assert.equal(sends.at(-1).to, active.mobile);
+    assert.deepEqual(sends.at(-1).template.components, [{
+      type: "body",
+      parameters: [{ type: "text", text: active.name }, { type: "text", text: senderName }],
+    }], "inbox alert uses the two approved body fields in order");
+  }
+  const reassignedDuty = await run("smc_alert", {
+    payload: structuredClone(fanned[0]), adhoc: [], changeState: state => { state.smcDutyRoster = []; },
+  });
+  assert.equal(reassignedDuty.result.code, "RECIPIENT_NO_LONGER_DUTY_SMC");
+  assert.equal(reassignedDuty.result.state, "cancelled");
+  assert.equal(reassignedDuty.sent, 0);
   env.WHATSAPP_TEMPLATES_JSON = baseTemplates;
   const activeControl = await run("relief_publication", { first: { ...inactive, active: true }, adhoc: [] });
   assert.equal(activeControl.result.state, "accepted", "ordinary active recipient needs no ad hoc activation");
