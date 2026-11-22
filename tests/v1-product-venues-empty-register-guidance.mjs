@@ -175,13 +175,22 @@ try {
     const mapped = await mappingPromiseSeeded;
     assert.equal(mapped.staffMapping["Tan Guidance"], staffId);
     assert.deepEqual(mapped.venueMapping["Hall A"], ["v-hall-a"]);
-
-    console.log(
-      "PASS Venues empty-register guidance (B-V01): Deploy and Roster show setup guidance linking to /venues/ when empty, and resume normal selection with guidance cleared after seeding.",
+    // Roster can still be loading toolbar images after confirming the mapping.
+    await page.waitForFunction(() =>
+      Array.from(document.images).every((image) => image.complete),
     );
   } finally {
-    await browser?.close();
+    try {
+      // Stop new requests, then finish the Worker calls that are already in flight.
+      for (const page of context.pages()) await page.goto("about:blank");
+      await context.unrouteAll({ behavior: "wait" });
+    } finally {
+      await browser?.close();
+    }
   }
 } finally {
   await suite.close();
 }
+console.log(
+  "PASS Venues empty-register guidance (B-V01): Deploy and Roster show setup guidance linking to /venues/ when empty, and resume normal selection with guidance cleared after seeding.",
+);
