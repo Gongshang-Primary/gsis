@@ -59,3 +59,16 @@ No template was created, edited or sent during this review.
 - **Correction:** `gsis_relief_evening_v2` is not a button version; it is different wording with no button. Owner chose the **v2 wording** for template 10.
 - **Buttons and addresses:** approved v2 buttons have fixed v0.9 URLs (`roster.gsps.edu.sg/external.html#…`, `contacts.gsps.edu.sg/`). Owner chose **new v1 templates** at **https://gsis.gsps.edu.sg**. Drafts: [WHATSAPP_V1_BUTTON_TEMPLATES_DRAFT.md](WHATSAPP_V1_BUTTON_TEMPLATES_DRAFT.md). Until approved, v1 uses the approved link-in-body versions, including `gsis_relief_request_v1` and `gsis_timetable_updated_v1` for routes 1 and 19.
 - W1 shipped as PR #276.
+
+## Work status (22 Nov 2026)
+
+| ID | Status |
+| --- | --- |
+| W1 contact review | PR #276 |
+| W2 final-run split | PR #278 |
+| W3 retire system_alert | Done; no code needed (v1 never queues it) |
+| W4 buttons | PR #277 (code); 10 `gsis_v1_*` templates submitted, PENDING |
+| W5 inbox alert | PR #279; `gsis_v1_inbox_new_message` submitted (ID 1798304818089770), PENDING; owner chose to bypass quiet hours |
+| W6 contract states | Done in v1 docs only. `notification-worker/template-contracts.json` feeds frozen v0.9 outputs, so it stays unchanged; live states are in the Meta check above |
+
+Activation of every new or newly used template is a deployment configuration step after Meta approval, mapped in `WHATSAPP_TEMPLATES_JSON` with parameters in body order.
