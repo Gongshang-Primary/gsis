@@ -33,7 +33,7 @@ f.state.requests.push(
 const original = structuredClone(f.state);
 const inactive = { staffId: "bob", id: "bob", name: "Bob", active: false, eo: true, mobile: "6592345678", employment: "Full-time", groups: [] };
 const active = { staffId: "alice", id: "alice", name: "Alice", active: true, eo: true, mobile: "6591234567", groups: [] };
-let firstPerson, currentPerson, currentState, projectionReads, onCurrent, sends = [], sequence = 0;
+let firstPerson, currentPerson, currentState, projectionReads, onCurrent, sends = [], sequence = 0, powerUsers = [];
 const reply = data => Response.json({ ok: true, data });
 const env = {
   SCHOOL_ID: schoolId, SERVICE_NAME: "roster", GSIS_SECRET: "synthetic-suite-secret",
@@ -50,6 +50,10 @@ const env = {
     if (!body.staffIds && onCurrent) await onCurrent();
     const person = body.staffIds ? firstPerson : currentPerson;
     return reply({ schoolId, revision: "contacts-" + projectionReads, asOf: now, people: [active, ...(person ? [person] : [])].filter(p => !body.staffIds || body.staffIds.includes(p.staffId)), smcIds: ["alice"], dependencies: [] });
+  } },
+  CORE: { async fetch(request) {
+    assert.equal(new URL(request.url).pathname, "/internal/contacts-power-users");
+    return reply({ staffIds: powerUsers });
   } },
   CALENDAR: { async fetch(request) {
     const body = await request.json();
@@ -187,6 +191,18 @@ try {
     payload: { date, to: "bob@example.invalid", subject: "Synthetic report" },
     changeState: state => { state.dailyEmploymentSettings.recipients = [{ staffId: "bob", emails: ["bob@example.invalid"] }]; },
   });
+  // Contact review (owner 21 Nov 2026): only a current Contacts Power User receives it.
+  const reviewPayload = () => ({ kind: "contact_review", recipientId: "bob", date, createdAt: new Date(now).toISOString(), expiresAt: now + 86400000,
+    data: { templateKey: "contact_review", summary: "New inactive external relief contact: Synthetic (SRE). Review permanent details in Contacts." } });
+  powerUsers = ["bob"];
+  const reviewSent = await run("contact_review", { first: { ...inactive, active: true }, adhoc: [], payload: reviewPayload() });
+  assert.equal(reviewSent.result.state, "accepted", "a current Power User receives the contact review");
+  assert.equal(reviewSent.sent, 1);
+  powerUsers = [];
+  const reviewRevoked = await run("contact_review", { first: { ...inactive, active: true }, adhoc: [], payload: reviewPayload() });
+  assert.equal(reviewRevoked.result.state, "cancelled", "a recipient who lost Power User is not messaged");
+  assert.equal(reviewRevoked.result.code, "RECIPIENT_NO_LONGER_POWER_USER");
+  assert.equal(reviewRevoked.sent, 0);
   // v1 button templates (owner 21 Nov 2026): the dynamic URL button carries the
   // same private token as the link; static buttons carry none; a token button
   // never goes out without a token.
