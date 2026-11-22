@@ -12,8 +12,33 @@ concurrency:
   group: gsis-verify-${{ github.ref }}
   cancel-in-progress: true
 jobs:
+  # Owner 22 Nov 2026: v1-only changes do not run the v0.9 regression shards.
+  # A push is v1-only when every file changed since main is a v1 path or a v1 or
+  # coordination document. Anything else, including shared/, runs every shard.
+  scope:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      v1only: ${{ steps.scope.outputs.v1only }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - id: scope
+        run: |
+          git fetch --no-tags origin main
+          base=$(git merge-base origin/main HEAD)
+          changed=$(git diff --name-only "$base" HEAD)
+          other=$(printf '%s\n' "$changed" | grep -vE '^(v1/|scripts/v1/|tests/v1-|docs/v1/|docs/coordination/|\.github/workflows/v1-)' | grep -v '^$' || true)
+          if [ -n "$changed" ] && [ -z "$other" ]; then v1only=true; else v1only=false; fi
+          echo "v1only=$v1only" >> "$GITHUB_OUTPUT"
+          echo "v1-only change: $v1only"
+          [ -z "$other" ] || printf 'Non-v1 paths:\n%s\n' "$other"
   regression-shards:
     name: Regression shard ${{ matrix.shard }}/4
+    needs: scope
+    if: ${{ needs.scope.outputs.v1only != 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 45
     strategy:
@@ -64,7 +89,7 @@ jobs:
         run: npm test
   # Preserve the existing required check. Failed, cancelled or skipped shards stay red.
   full-suite:
-    needs: regression-shards
+    needs: [scope, regression-shards]
     if: ${{ always() }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -72,7 +97,13 @@ jobs:
       - name: Require every regression shard
         env:
           SHARD_RESULT: ${{ needs.regression-shards.result }}
+          SCOPE_RESULT: ${{ needs.scope.result }}
+          V1_ONLY: ${{ needs.scope.outputs.v1only }}
         run: |
+          if [ "$SCOPE_RESULT" = 'success' ] && [ "$V1_ONLY" = 'true' ] && [ "$SHARD_RESULT" = 'skipped' ]; then
+            echo "v1-only change: v0.9 regression shards not required (v1 product workflow covers it)."
+            exit 0
+          fi
           if [ "$SHARD_RESULT" != 'success' ]; then
             echo "Regression shards did not all succeed: $SHARD_RESULT" >&2
             exit 1
