@@ -6,7 +6,7 @@
 - **Branch** `codex/v1-deploy-duty-recess-parity`
 - **Base before claim** `016e03675756520b260e724b7c7e63be0bbc3256`
 - **Owner request** Work on the outstanding v1 items, including DEP-23-001.
-- **Exact scope** This task record, `v1/web/shared/deploy-duty-ui.js`, `v1/web/shared/deploy-ui.js`, and `tests/v1-product-deploy-duty-recess-browser.mjs`.
+- **Exact scope** This task record, `v1/web/shared/deploy-duty-ui.js`, `v1/web/shared/deploy-ui.js`, `tests/v1-product-deploy-duty-recess-browser.mjs`, and `tests/v1-product-tables.mjs`.
 - **Evidence** [Duty UAT ledger at its documentation head](https://github.com/Gongshang-Primary/gsis/blob/014b2af6f4a64aa171f30e5b7a32a0b86116d100/docs/v1/DEPLOY_DUTY_UAT_2026-11-23.md)
 
 Align equivalent weekday Recess duties in the Deploy Duty screen and print view. Keep the original duty ID, weekday, timing and assignment for every editable occurrence. Preserve same-day duplicates, visible timing exceptions, unscheduled days, permission checks and normal save and reload behavior.
@@ -32,6 +32,7 @@ All commands use `TZ=Asia/Singapore`. Browser commands additionally use `GSIS_BR
 | `npm run build` | Pass: canonical 18 components, no tracked generated drift. |
 | `node scripts/v1/build-web.mjs` | Pass: 332 assets, nine modules. |
 | `node tests/v1-product-deploy-duty-recess-browser.mjs` | Pass: seven groups, 12.734 seconds; actual isolated Workers/D1 and Chromium. |
+| `node tests/v1-product-tables.mjs` | Pass: empty Deploy route mock serves `/v1/shared/deploy-duty-ui.js` imported by `deploy-ui.js`. |
 | `node tests/v1-product-deploy-planning-save-controls-browser.mjs` | Pass: four groups, including all six planning pages, ordinary saves, original-save recovery and read-only controls. |
 | `node tests/v1-product-deploy-group-duty-validation.mjs` | Pass: group duplicate checks, Dept leadership eligibility, same-day overlapping/adjacent duty intervals, blanks and retained historical repairs. |
 | `node scripts/v1/test.mjs --list` | Pass: the new file is discovered among 192 programs; the 45-second per-program limit is unchanged. |
