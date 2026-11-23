@@ -7,8 +7,8 @@ const require=createRequire(import.meta.url),fixture=require('./roster701-fixtur
 const worker=await import(toWorkerModuleURL('data:text/javascript;base64,'+Buffer.from(fs.readFileSync('roster-update/public/_worker.js','utf8')).toString('base64')));
 const env={WHATSAPP_ENABLED:'true',WHATSAPP_MENU_ENABLED:'true',WHATSAPP_CURRENT_RELIEF_URL:'https://roster.diveanalytics.com/',WHATSAPP_PHONE_NUMBER_ID:'123456789',WHATSAPP_ACCOUNT_ID:'223456789',WHATSAPP_API_VERSION:'v23.0',WHATSAPP_ACCESS_TOKEN:'private-access-'.repeat(8),WHATSAPP_APP_SECRET:'private-app-'.repeat(8),GSIS_SECRET:'private-service-'.repeat(8),APPS_SCRIPT_URL:'https://script.google.com/macros/s/test/exec',ROSTER_PUBLIC_ORIGIN:'https://roster.example.test'};
 const to='6591234567',rows=worker.menuReply({to,action:'menu'},env).interactive.action.sections[0].rows;
-assert.deepEqual(rows[0],{id:'gsis_report_absence',title:'Report Absence',description:'Open the current relief system'});
-assert.deepEqual(rows.slice(1).map(r=>[r.id,r.title]),[['gsis_urgent','Urgent Message'],['gsis_layout','School Layout'],['gsis_devices','Collect / Return ICT'],['gsis_office','Call General Office']]);
+assert.deepEqual(rows[0],{id:'gsis_report_absence',title:'1. Report Absence',description:'Open the current relief system'});
+assert.deepEqual(rows.slice(1).map(r=>[r.id,r.title]),[['gsis_urgent','2. Urgent Message'],['gsis_layout','3. School Layout'],['gsis_devices','4. Collect / Return ICT'],['gsis_office','5. Call General Office']]);
 assert.equal(worker.menuReply({to,action:'report-absence'},env).text.body,'Report Absence: https://roster.diveanalytics.com/');
 for(const value of [undefined,'','http://roster.diveanalytics.com/','javascript:alert(1)','https://private:secret@roster.diveanalytics.com/','https://roster.diveanalytics.com/#secret']){
  const response=worker.menuReply({to,action:'report-absence'},{...env,WHATSAPP_CURRENT_RELIEF_URL:value});
@@ -57,7 +57,7 @@ async function webhook(message,settings=env){
 const message={id:'wamid.relief_selection',from:to,timestamp:String(Math.floor(Date.now()/1000)),type:'interactive',interactive:{list_reply:{id:rows[0].id,title:rows[0].title}}};
 assert.equal((await webhook(message)).status,200);
 assert.deepEqual(operations,['inboxIngest','inboundMessage','inboundReplyResult']);
-assert.equal(retained[0].text,'Report Absence');assert.equal(sent[0].text.body,'Report Absence: https://roster.diveanalytics.com/');
+assert.equal(retained[0].text,'1. Report Absence');assert.equal(sent[0].text.body,'Report Absence: https://roster.diveanalytics.com/');
 assert.equal(f.state.absences.length,0);assert.equal(f.state.assignments.length,0);
 assert.equal((await webhook(message)).status,200);assert.equal(sent.length,1,'Duplicate webhook must not send the link again.');
 f=serviceFixture();operations.length=0;
@@ -70,7 +70,7 @@ operations.length=0;
 assert.equal((await webhook({...message,id:'wamid.menu_disabled'},{...env,WHATSAPP_MENU_ENABLED:'false'})).status,200);
 assert.deepEqual(operations,['inboxIngest']);assert.equal(sent.length,before);
 f=serviceFixture();
-await webhook({...message,id:'wamid.urgent_prompt',interactive:{list_reply:{id:'gsis_urgent',title:'Urgent Message'}}});
+await webhook({...message,id:'wamid.urgent_prompt',interactive:{list_reply:{id:'gsis_urgent',title:'2. Urgent Message'}}});
 await webhook({...message,id:'wamid.urgent_body',type:'text',text:{body:'Please call me urgently.'}});
 assert.match(sent.at(-1).text.body,/WhatsApp forwarding is queued/,'sender is told what the urgent path actually queued');
 assert.equal(f.state.outbox.filter(job=>job.kind==='urgent_forward').length,1);

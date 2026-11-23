@@ -44,6 +44,16 @@ export function projectPlanningNames(doc) {
   return doc;
 }
 
+const ORDINARY_PLANNING_FIELDS = [
+  "Basic Name",
+  "Role",
+  "EO Appt Level",
+  "Appointment Status",
+  "Employment Modifier",
+  "Subject Modifier",
+  "MK Modifier",
+];
+
 /** Capture only actual ordinary version values, never a fabricated Active=true.
  * The explicit refresh flag is used by the existing create/duplicate contract. */
 export function planningSnapshot(teacher) {
@@ -55,9 +65,11 @@ export function planningSnapshot(teacher) {
   else if (own(profile, "Active")) result.Active = profile.Active;
   else if (teacher?.activeKnown !== false && activity(teacher?.active) !== null)
     result.Active = activity(teacher.active) ? "Y" : "N";
-  if (own(previous, "Role")) result.Role = previous.Role;
-  else if (own(profile, "Role")) result.Role = profile.Role;
-  else if (own(teacher, "role")) result.Role = teacher.role;
+  for (const field of ORDINARY_PLANNING_FIELDS) {
+    if (own(previous, field)) result[field] = previous[field];
+    else if (own(profile, field)) result[field] = profile[field];
+    else if (field === "Role" && own(teacher, "role")) result.Role = teacher.role;
+  }
   return result;
 }
 
@@ -133,8 +145,16 @@ export function reportingConflicts(doc) {
 }
 
 /** Retained excluded relationships remain inspectable; they are never new choices. */
-export function reportingStaff(doc, { retainHistorical = false } = {}) {
+export function reportingStaff(doc, { retainHistorical = false, catalog = null } = {}) {
   const people = new Map((doc?.teachers || []).filter(p => p.id).map(p => [p.id, p]));
+  const removed = doc?.removedTeachers || {};
+  const extra = catalog instanceof Map ? [...catalog.values()]
+    : Array.isArray(catalog) ? catalog
+    : Array.isArray(doc?.staffCatalog) ? doc.staffCatalog : [];
+  for (const person of extra) {
+    if (person?.id && !people.has(person.id) && !removed[person.id])
+      people.set(person.id, person);
+  }
   const links = reportingLinks(doc);
   const conflicts = reportingConflicts(doc);
   const linked = new Set([...Object.keys(links), ...Object.values(links).filter(Boolean),

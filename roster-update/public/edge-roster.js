@@ -13,6 +13,7 @@ function gsisApiSecret(env){
 /* GSIS_API_SECRET_END */
 // Roster operational authority. D1 owns mutable records; R2 owns immutable models.
 import {GSiSEdgeStore,GSiSRosterImport,GSiSRosterMirror} from './edge-store.js';
+import {runRosterMutation} from './edge-roster-admission.js';
 import {GSISRoster,GSISRosterOperations,GSISRosterAllocation,GSISRosterStapler,GSISRosterStatistics} from './edge-roster-domain.js';
 import {edgeRosterContextFromReferences,edgeRosterNeedsQuota} from './edge-roster-context.js';
 import {rosterOperationsPreparedCheck_,rosterOperationsDeletionCheck_,rosterOperationsAttachDayToken_,rosterOperationsBatchMerge_,rosterOperationsBatchAudit_,rosterOperationsDayToken_} from './edge-roster-policy.js';
@@ -29,6 +30,7 @@ import {readAbsenceTransportRecord,publicAbsenceTransportReceipt,readAbsenceTran
 import {readQuietMode} from '../../shared/roster-quiet-mode.js';
 import {queueRosterImport,rosterImportRunnerStatus,drainRosterImports} from './edge-roster-import-runner.js';
 import {readRosterCutoverFreeze,beginRosterCutoverFreeze,cancelRosterCutoverFreeze,syncRosterCutoverFreeze} from '../../shared/roster-cutover-freeze.js';
+import {previewAbsenceClash,applyAbsenceClash} from './edge-absence-clash.js';
 const clone=value=>structuredClone(value), textEncoder=new TextEncoder(), modelFlights=new Map();
 const fail=(status,code,message)=>{throw Object.assign(Error(message),{status,code});};
 const packedAuditEvidence=new WeakMap();
@@ -64,9 +66,35 @@ async function objectRead(env,reference){if(!reference?.key||!reference.digest)f
 async function objectWrite(env,kind,id,value){const json=JSON.stringify(value),digest=sha256Hex(json),key='gsis/roster/'+kind+'/'+encodeURIComponent(id)+'/'+digest+'.json.gz';const stream=new Blob([json]).stream().pipeThrough(new CompressionStream('gzip'));await bucket(env).put(key,await new Response(stream).arrayBuffer(),{httpMetadata:{contentType:'application/gzip'},customMetadata:{digest,kind,schema:'1'}});return {key,digest,encoding:'gzip-json-v1'};}
 export async function readEdgeRosterModel(env,entry){if(!entry)return null;const ref=entry.modelObject||{key:entry.modelObjectKey,digest:entry.modelDigest,encoding:'gzip-json-v1'},key=JSON.stringify([entry.id,ref.key,ref.digest]);if(modelFlights.has(key))return modelFlights.get(key);const flight=objectRead(env,ref).then(GSISRoster.validate).catch(error=>{modelFlights.delete(key);throw error;});modelFlights.set(key,flight);if(modelFlights.size>24)modelFlights.delete(modelFlights.keys().next().value);return flight;}
 export async function readEdgeRosterRegister(env){return open(env,'roster-register');}
-async function hydrate(env,state,dates){const out=clone(storedAuditState(state)),wanted=dates?new Set(dates):null;await Promise.all([...(out.staplerPlans||[]),...(out.staplerArchives||[])].filter(row=>!wanted||wanted.has(row.date)).map(async row=>{for(const key of ['draft','published','confirmedPlan'])if(row[key]?.edgeObject===true)row[key]=await objectRead(env,row[key]);}));return out;}
-async function pack(env,state,original){const out=clone(storedAuditState(state)),prior=new Map([...(original?.staplerPlans||[]),...(original?.staplerArchives||[])].map(row=>[row.id||row.date,row]));for(const row of [...(out.staplerPlans||[]),...(out.staplerArchives||[])])for(const field of ['draft','published','confirmedPlan'])if(row[field]&&!row[field].edgeObject){const digest=sha256Hex(JSON.stringify(row[field])),ref=prior.get(row.id||row.date)?.[field];if(ref?.edgeObject&&ref.digest===digest)row[field]=ref;else row[field]={edgeObject:true,...await objectWrite(env,'stapler',(row.id||row.date)+'/'+field,row[field])};}return out;}
-export async function loadEdgeRoster(env,{hydrate:expand=false,dates,includeInbox=false}={}){const loaded=await open(env,'roster',true,includeInbox?undefined:{excludeCollections:['inboxThreads','inboxMessages','inboxAudit','inboxReceipts','inboxDeliveryEvents','inboxAlerts']});if(!loaded.state)fail(503,'ROSTER_STATE_MISSING','Roster migration has no operational records.');return {...loaded,rawState:loaded.state,state:expand?await hydrateAuditEvidence(await hydrate(env,loaded.state,dates),dates):clone(loaded.state)};}
+// Callers own their working state. Expanding or packing plan fields needs only
+// replacement rows, not another copy of every retained audit and receipt.
+async function hydrate(env,state,dates){
+ const out=storedAuditState(state),wanted=dates?new Set(dates):null;
+ await Promise.all(['staplerPlans','staplerArchives'].map(async collection=>{
+  if(!out[collection])return;
+  out[collection]=await Promise.all(out[collection].map(async row=>{
+   if(wanted&&!wanted.has(row.date))return row;
+   const fields=['draft','published','confirmedPlan'].filter(key=>row[key]?.edgeObject===true);if(!fields.length)return row;
+   const next={...row};for(const key of fields)next[key]=await objectRead(env,row[key]);return next;
+  }));
+ }));return out;
+}
+async function pack(env,state,original){
+ const out=storedAuditState(state),prior=new Map([...(original?.staplerPlans||[]),...(original?.staplerArchives||[])].map(row=>[row.id||row.date,row]));
+ for(const collection of ['staplerPlans','staplerArchives']){
+  const rows=out[collection]||[];let replacements;
+  for(let i=0;i<rows.length;i++){
+   const row=rows[i];let next;
+   for(const field of ['draft','published','confirmedPlan'])if(row[field]&&!row[field].edgeObject){
+    const digest=sha256Hex(JSON.stringify(row[field])),ref=prior.get(row.id||row.date)?.[field];next||={...row};
+    next[field]=ref?.edgeObject&&ref.digest===digest?ref:{edgeObject:true,...await objectWrite(env,'stapler',(row.id||row.date)+'/'+field,row[field])};
+   }
+   if(next){replacements||=rows.slice();replacements[i]=next;}
+  }
+  if(replacements)out[collection]=replacements;
+ }return out;
+}
+export async function loadEdgeRoster(env,{hydrate:expand=false,dates,includeInbox=false}={}){const loaded=await open(env,'roster',true,includeInbox?undefined:{excludeCollections:['inboxThreads','inboxMessages','inboxAudit','inboxReceipts','inboxDeliveryEvents','inboxAlerts']});if(!loaded.state)fail(503,'ROSTER_STATE_MISSING','Roster migration has no operational records.');const state=clone(loaded.state);return {...loaded,rawState:loaded.state,state:expand?await hydrateAuditEvidence(await hydrate(env,state,dates),dates):state};}
 function actorContacts(refs,who){const contacts=clone(refs.contacts),people=contacts?.rosterPeople;if(!Array.isArray(people)||!Array.isArray(contacts.rosterSMCIds)||!Array.isArray(contacts.rosterAdminIds))fail(503,'ROSTER_AUTHORITY_MISSING','Refresh the trusted Contacts directory.');if(who?.service===true){contacts.user={rosterStaffId:null,rosterSMC:true,rosterAdmin:true};return contacts;}const email=String(who?.email||'').toLowerCase(),matches=people.filter(p=>[p.email,...(p.emails||[])].some(value=>String(value||'').toLowerCase()===email));if(matches.length!==1)fail(403,'ROSTER_PERSON_UNVERIFIED','Your school account is not uniquely linked in Contacts.');const person=matches[0];contacts.user={rosterStaffId:person.id,rosterSMC:contacts.rosterSMCIds.includes(person.id),rosterAdmin:contacts.rosterAdminIds.includes(person.id)};return contacts;}
 export async function readEdgeRosterReferences(env,{allowExpired=false}={}){const loaded=await open(env,'roster-references'),refs=loaded.state;if(!refs?.contacts)fail(503,'ROSTER_REFERENCES_MISSING','Refresh the trusted Roster references.');const maxAge=Math.min(3600000,Math.max(60000,Number(env.ROSTER_AUTHORITY_MAX_AGE_SECONDS||900)*1000));if(!allowExpired&&(!Number.isFinite(refs.contactsCheckedAt)||Date.now()-refs.contactsCheckedAt>maxAge))fail(503,'ROSTER_AUTHORITY_STALE','Contacts permissions need a background refresh. Your retained report can be retried safely.');return {...refs,headRevision:loaded.revision};}
 function inputDates(input,state,today){const values=[input.date||today,...(input.dates||[])];if(input.from&&input.to){let from=GSISRoster.date(input.from),to=GSISRoster.date(input.to);if(to<from||Date.parse(to)-Date.parse(from)>365*86400000)fail(400,'ROSTER_DATE_RANGE','Select no more than one full school year.');for(let n=Date.parse(from);n<=Date.parse(to);n+=86400000)values.push(new Date(n).toISOString().slice(0,10));}for(const key of ['actualDate','newDate'])if(input[key])values.push(input[key]);for(const id of [input.id,input.absenceId,...(input.ids||[]),...(input.absenceIds||[])]){const row=state.absences?.find(x=>x.id===id)||state.requests?.find(x=>x.id===id);if(row)values.push(row.date);}return [...new Set(values.map(GSISRoster.date))];}
@@ -89,7 +117,12 @@ export async function buildEdgeRosterContext(env,state,input={},who={service:tru
 function legacyCommandDigest(command){const value=clone(command);for(const key of ['calendarByDate','trustedNow','notificationsReady','lseNoticeEnabled','schedulerAvailable'])delete value[key];return sha256Hex(JSON.stringify(value));}
 function canonicalCommand(command){const value=clone(command);for(const key of ['calendarByDate','calendarCache','trustedNow','trustedIntakeAt','notificationsReady','lseNoticeEnabled','schedulerAvailable'])delete value[key];return value;}
 function validRequest(id){if(typeof id!=='string'||! /^[A-Za-z0-9_-]{8,160}$/.test(id))fail(400,'ROSTER_REQUEST_ID','A stable save request ID is required.');}
-export async function mutateEdgeRoster(env,{actor,requestId,command,who,apply,needsContext=true,domainChanged=needsContext,beforeCommit,allowDuringQuiesce=false,contextInput}){
+export async function mutateEdgeRoster(env,options){
+ const work=()=>mutateEdgeRosterState(env,options);
+ // Reduced domain harnesses omit module imports; deployed modules always bind admission.
+ return typeof runRosterMutation==='function'?runRosterMutation(env,work):work();
+}
+async function mutateEdgeRosterState(env,{actor,requestId,command,who,apply,needsContext=true,domainChanged=needsContext,beforeCommit,allowDuringQuiesce=false,contextInput}){
  validRequest(requestId);const digest=await GSiSEdgeStore.digest(canonicalCommand(command)),identity=who||{service:true,email:actor||'roster-service'};actor=actor||identity.email;
  const allocating=['autoAllocate','optimise','scheduledRoster'].includes(command.operation);
  let clockRetries=0,preparationMs=0;
@@ -151,8 +184,9 @@ async function operations(env,input,who,runId=null){const p={...input,operation:
  if(op==='timetableBatch'){const {edgeTimetableBatch}=await import('./edge-timetable-cache.js');return edgeTimetableBatch(env,p,who);}
  if(op==='nextSchoolDay'){const refs=await readEdgeRosterReferences(env),today=edgeRosterClock().today;for(let n=1;n<=62;n++){const date=GSISRosterAllocation.addDays(today,n),value=refs.calendarByDate?.[date];if(value?.available!==true)return {today,date:null,available:false,message:'The next school day has not been verified.'};if(value.schoolDay)return {today,date,available:true};}return {today,date:null,available:false};}
  if(op==='contactCreate')return createEdgeContact(env,p,who);
+ if(op==='read'&&p.view==='absenceClash'){const loaded=await loadEdgeRoster(env),ctx=await buildEdgeRosterContext(env,loaded.state,{...p,operation:'saveAbsence',_edgeAttendance:true},who);return previewAbsenceClash(loaded.state,ctx,p);}
  if(op==='read'&&p.view==='intakeReview')return reviewEdgeIntake(env,p,who);
- if(op==='resolveAbsenceIntake'&&['merge','keep'].includes(p.resolution))return resolveEdgeIntake(env,p,who);
+ if(op==='resolveAbsenceIntake'&&['merge','keep','replace'].includes(p.resolution))return resolveEdgeIntake(env,p,who);
  if(['retryAbsenceIntake','resolveAbsenceIntake'].includes(op))return manageEdgeIntake(env,p,who);
  if(op==='receiptStatus'){const command=p.command;if(!command)fail(400,'ROSTER_RECEIPT_COMMAND','Supply the original save command.');const loaded=await loadEdgeRoster(env,{hydrate:false});await buildEdgeRosterContext(env,loaded.state,{operation:'receiptStatus'},who);const receipt=await loaded.store.receipt(who.email,command.requestId,await GSiSEdgeStore.digest(canonicalCommand(command)));if(receipt)return {...await receiptResult(env,loaded.state,receipt.result),accepted:true,replayed:true,found:true};const legacy=loaded.state.receipts?.find(row=>row.id===command.requestId);if(legacy){if(legacy.actor!==who.email||legacy.digest!==legacyCommandDigest(command))fail(409,'ROSTER_LEGACY_RECEIPT_CONFLICT','This save request already exists with different content.');return {...legacy.result,accepted:true,receiptOnly:true,requestId:command.requestId,acceptedAt:legacy.at,revision:legacy.revision,found:true,replayed:true};}const applied=(loaded.state.edgeAbsenceReceipts||[]).find(row=>row.id===command.requestId&&row.actor===who.email);if(applied){if(await GSiSEdgeStore.digest(canonicalCommand(applied.command))!==await GSiSEdgeStore.digest(canonicalCommand(command)))fail(409,'ROSTER_RECEIPT_CONFLICT','This report has different original content.');return {...await receiptResult(env,loaded.state,{requestId:command.requestId}),found:true,replayed:true};}return {accepted:false,confirmation:'unconfirmed',found:false,requestId:command.requestId};}
  if(['acquireStaplerLock','renewStaplerLock','releaseStaplerLock'].includes(op))return staplerLease(env,p,who);
@@ -181,7 +215,7 @@ async function operations(env,input,who,runId=null){const p={...input,operation:
   const before=state.outbox.length,copyCommand={...p,revision:state.revision};delete copyCommand.intake;delete copyCommand.ownArrangementsByStaffDate;
   if(attendance){ctx.attendanceOnly=true;ctx.intakeDeduplicate=p.intake===true&&!!input.trustedIntakeAt;ctx.intakeRequestId=p.requestId;if(input.trustedIntakeAt)ctx.reportedAt=input.trustedIntakeAt;}else if(op==='requestMutual')copyCommand.proposalOnly=true;
   const merge=rosterOperationsBatchMerge_(state,ctx,copyCommand);if(op==='reliefBatch')ctx.draftBatch=true;
-  const changed=merge.changes&&!merge.command.commands.length?{savedIds:[]}:GSISRosterOperations.apply(state,ctx,merge.command);
+  const changed=merge.changes&&!merge.command.commands.length?{savedIds:[]}:(attendance&&p.absenceClashToken!==undefined?applyAbsenceClash(state,ctx,merge.command):GSISRosterOperations.apply(state,ctx,merge.command));
   if(merge.changes){const cells=GSISRosterOperations.cellDecisions(state,p.date,merge.changes.map(change=>change.demandId));changed.changes=merge.changes.map(change=>({...change,after:cells[change.demandId]}));rosterOperationsBatchAudit_(state,ctx,p,changed.changes);}
   if(attendance)retainEdgeAttendance(state,ctx,p,who,changed);
   if(!attendance&&!['requestMutual','publish','notifyDaily'].includes(op))GSISRosterOperations.refreshStaplerNotifications(state,ctx,before);if(runId){const run=state.edgeAllocatorRuns[p.date];Object.assign(run,{state:'completed',canCancel:false,updatedAt:ctx.iso});run.log.push({seq:run.log.length+1,at:ctx.iso,message:changed.paused?'No new allocation accepted. '+changed.reason:'Allocation draft saved. Current human decisions were retained.'});for(const message of GSISRosterOperations.allocationPriorityLog(state,run))run.log.push({seq:run.log.length+1,at:ctx.iso,message});changed.allocatorRun=run;}
@@ -195,6 +229,7 @@ async function operations(env,input,who,runId=null){const p={...input,operation:
  if(result.affectedDomains?.some(domain=>['suspended','publication'].includes(domain)))await scheduleTimetable(env,{stage:'suspended',dates:result.affectedDates,revision:result.revision});return result;
 }
 function attachPlanTag(result,who,p){
+ if(result&&p.operation==='read'&&['report','reportForm','entry'].includes(p.view))result={...result,absenceClashSupported:true};
  if(result?.plan){const {status,revision,...content}=result.plan,tag='stapler-content-v1:'+sha256Hex(JSON.stringify([1,who.email,result.viewMode,content]));result={...result,planContentTag:tag,planStatus:status,planRevision:revision,...(p.operation==='confirmStapler'&&p.knownPlanContentTag===tag?{plan:null,planUnchanged:true}:{})};}
  if(result&&Object.hasOwn(result,'comparisonTiles')){const comparison=Object.fromEntries(['comparisonAvailable','comparisonBaselineId','comparisonIssues','comparisonGhosts','comparisonTiles','comparisonDifferences'].map(key=>[key,result[key]])),tag='stapler-comparison-v1:'+sha256Hex(JSON.stringify([1,who.email,result.viewMode,comparison]));result={...result,comparisonContentTag:tag,...(p.operation==='confirmStapler'&&p.knownComparisonContentTag===tag?{comparisonUnchanged:true,comparisonTiles:null,comparisonGhosts:null,comparisonIssues:null,comparisonDifferences:null}:{})};}return result;
 }
@@ -549,27 +584,30 @@ function edgeIntakeProjection(state,ctx,command){
 }
 function edgeIntakeToken(state,row){return sha256Hex(JSON.stringify([1,state.revision,row.namespace,row.actor,row.request_id,row.digest,row.attempts,row.state,state.absences,state.assignments,state.requests]));}
 async function reviewEdgeIntake(env,p,who){
- const loaded=await loadEdgeRoster(env,{hydrate:false}),ctx=await buildEdgeRosterContext(env,loaded.state,{operation:'currentDuty'},who),manager=ctx.user.smc||ctx.user.admin;if(!manager)fail(403,'ROSTER_SMC_REQUIRED','SMC or Admin access is required to review this report.');const row=await readAbsenceTransportRecord(env,who,{requestId:p.intakeRequestId,all:true});
+ const loaded=await loadEdgeRoster(env,{hydrate:false}),ctx=await buildEdgeRosterContext(env,loaded.state,{operation:'currentDuty'},who),manager=ctx.user.smc||ctx.user.admin;const row=await readAbsenceTransportRecord(env,who,{requestId:p.intakeRequestId,all:!!manager});
  if(!row)fail(404,'ROSTER_INTAKE_MISSING','This received report is unavailable.');const command=JSON.parse(row.command);if(command.operation!=='saveAbsence')fail(400,'ROSTER_INTAKE_KIND','Review this colleague proposal in My Relief Duties.');
- const projection=edgeIntakeProjection(loaded.state,ctx,command);
- return {...publicAbsenceTransportReceipt(row),...projection,readOnly:true,checkedAt:ctx.iso,registerRevision:loaded.state.revision,overlapToken:edgeIntakeToken(loaded.state,row),...(projection.overlaps.length?{failureCode:'ABSENCE_OVERLAP'}:{}),resolutionOptions:manager&&row.state==='needsReview'?['merge','keep','edit']:[]};
+ if(!manager&&!command.absenceClashToken)fail(403,'ROSTER_SMC_REQUIRED','SMC or Admin access is required to review this report.');
+ const projection=edgeIntakeProjection(loaded.state,ctx,command),replacement=command.absenceClashToken?previewAbsenceClash(loaded.state,await buildEdgeRosterContext(env,loaded.state,{...command,operation:'saveAbsence',_edgeAttendance:true},who),command):null;
+ return {...publicAbsenceTransportReceipt(row),...(replacement?{replacementToken:replacement.token}:{} ),...projection,readOnly:true,checkedAt:ctx.iso,registerRevision:loaded.state.revision,overlapToken:edgeIntakeToken(loaded.state,row),...(projection.overlaps.length?{failureCode:'ABSENCE_OVERLAP'}:{}),resolutionOptions:row.state==='needsReview'?(replacement?['replace','keep']:manager?['merge','keep','edit']:[]):[]};
 }
 async function resolveEdgeIntake(env,p,who){
  validRequest(p.requestId);if(p.confirm!==true||typeof p.overlapToken!=='string'||! /^[a-f0-9]{64}$/.test(p.overlapToken))fail(400,'ROSTER_INTAKE_CONFIRM','Review the current overlaps and confirm your choice.');
- const loaded=await loadEdgeRoster(env,{hydrate:false}),auth=await buildEdgeRosterContext(env,loaded.state,{operation:'currentDuty'},who);if(!auth.user.smc&&!auth.user.admin)fail(403,'ROSTER_SMC_REQUIRED','SMC or Admin access is required.');
- const original=await readAbsenceTransportRecord(env,who,{requestId:p.intakeRequestId,all:true});if(!original)fail(404,'ROSTER_INTAKE_MISSING','This received report is unavailable.');const command=JSON.parse(original.command);if(command.operation!=='saveAbsence')fail(400,'ROSTER_INTAKE_KIND','Only absence reports support this resolution.');
+ const loaded=await loadEdgeRoster(env,{hydrate:false}),auth=await buildEdgeRosterContext(env,loaded.state,{operation:'currentDuty'},who),manager=auth.user.smc||auth.user.admin;
+ const original=await readAbsenceTransportRecord(env,who,{requestId:p.intakeRequestId,all:!!manager});if(!original)fail(404,'ROSTER_INTAKE_MISSING','This received report is unavailable.');const command=JSON.parse(original.command);if(command.operation!=='saveAbsence')fail(400,'ROSTER_INTAKE_KIND','Only absence reports support this resolution.');
+ if(!manager&&(!command.absenceClashToken||!['replace','keep'].includes(p.resolution)))fail(403,'ROSTER_SMC_REQUIRED','Only the reporter or SMC can confirm this replacement.');
  const reason=typeof p.reason==='string'?p.reason.trim():'';if(!reason||reason.length>1000)fail(400,'ROSTER_INTAKE_REASON','Enter a reason of no more than 1000 characters.');
- const result=await mutateEdgeRoster(env,{actor:who.email,who,requestId:p.requestId,command:p,contextInput:()=>p.resolution==='merge'?{...command,_edgeAttendance:false}:{operation:'currentDuty'},async apply(state,ctx){
-  if(!ctx.user.smc&&!ctx.user.admin)fail(403,'ROSTER_SMC_REQUIRED','SMC or Admin access is required.');const row=await readAbsenceTransportRecord(env,who,{requestId:p.intakeRequestId,all:true});
+ const result=await mutateEdgeRoster(env,{actor:who.email,who,requestId:p.requestId,command:p,contextInput:()=>['merge','replace'].includes(p.resolution)?{...command,_edgeAttendance:false}:{operation:'currentDuty'},async apply(state,ctx){
+  const currentManager=ctx.user.smc||ctx.user.admin;const row=await readAbsenceTransportRecord(env,who,{requestId:p.intakeRequestId,all:!!currentManager});
+  if(!currentManager&&(!row||row.actor!==who.email||!command.absenceClashToken||!['replace','keep'].includes(p.resolution)))fail(403,'ROSTER_SMC_REQUIRED','Only the reporter or SMC can confirm this replacement.');
   if(!row||row.state!=='needsReview'||edgeIntakeToken(state,row)!==p.overlapToken)fail(409,'ROSTER_INTAKE_REVIEW_CHANGED','The report or saved absences changed. Open Review report again before deciding.');
-  ctx.absenceTransportResolution={namespace:row.namespace,actor:row.actor,requestId:row.request_id,digest:row.digest,attempts:row.attempts,nextState:p.resolution==='merge'?'forwarded':'withdrawn',reason};
+  ctx.absenceTransportResolution={namespace:row.namespace,actor:row.actor,requestId:row.request_id,digest:row.digest,attempts:row.attempts,nextState:['merge','replace'].includes(p.resolution)?'forwarded':'withdrawn',reason};
   const resolution={action:p.resolution,at:ctx.iso,by:who.email,reason};
   if(p.resolution==='keep'){GSISRosterOperations.essentialDecisionAudit(state,ctx,'absence-intake-keep',{intakeRequestId:row.request_id,reason});return {...publicAbsenceTransportReceipt(row),intakeState:'withdrawn',transportState:'withdrawn',reasonCode:'SMC_KEEP_EXISTING',resolution};}
   if(GSISRosterOperations.absenceDates(command).some(date=>date<ctx.today))fail(403,'ROSTER_INTAKE_PAST','Past absence entries are read only. Keep the saved entry or arrange SMC follow-up.');
   const applyCommand={...command,revision:state.revision};for(const key of ['intake','ownArrangementsByStaffDate'])delete applyCommand[key];
   ctx.attendanceOnly=true;ctx.resubmission=true;ctx.resubmissionChoice='keep';ctx.reportedAt=ctx.iso;
-  const changed=GSISRosterOperations.apply(state,ctx,applyCommand);retainEdgeAttendance(state,ctx,command,JSON.parse(row.identity),changed);
-  GSISRosterOperations.essentialDecisionAudit(state,ctx,'absence-intake-merge',{intakeRequestId:row.request_id,savedIds:changed.savedIds,reason});
+  const changed=p.resolution==='replace'?applyAbsenceClash(state,ctx,{...applyCommand,absenceClashToken:p.replacementToken,confirmAbsenceReplacement:true}):GSISRosterOperations.apply(state,ctx,applyCommand);retainEdgeAttendance(state,ctx,command,JSON.parse(row.identity),changed);
+  GSISRosterOperations.essentialDecisionAudit(state,ctx,p.resolution==='replace'?'absence-intake-replace':'absence-intake-merge',{intakeRequestId:row.request_id,savedIds:changed.savedIds,reason});
   const {actor,command:retained,...receipt}=edgeIntakeEntries(state).find(entry=>entry.requestId===row.request_id);return {...receipt,resolution,affectedDomains:['operations']};
  }});
  // Attendance-only decisions do not change the published occupancy source.
@@ -617,7 +655,7 @@ function personalCompletion(state,staffId,today,now=Date.now()){return GSISRoste
 
 function hasInstructionDraft(value){if(value===undefined)return false;if(!value||typeof value!=='object'||Array.isArray(value))return true;return Object.values(value).some(row=>typeof row==='string'?row.trim().length>0:hasInstructionDraft(row));}
 
-function recordOnly(p){return ['previewStaplerMigration','migrateStaplerPlans','previewTimetableReconcile','confirmTimetableReconcile'].includes(p.operation)||p.operation==='read'&&['timetableReview','staplerMigration','timetableReconcile'].includes(p.view)||['publish','dailyNotify','notifyDaily','createStapler','importStapler'].includes(p.operation)||simpleOps.has(p.operation)||['saveCustomInstruction','deleteCustomInstruction','setCustomInstructionEnabled','systemConfig','saveSystemConfig','nameBridges','saveNameBridge','deleteNameBridge','sendDailyEmploymentReport'].includes(p.operation)||p.operation==='read'&&(['reportForm','schoolAbsences','teacherDailyUpdate','dailyNotify','mine','duties','prune','notificationReadiness','dutyRoster','systemConfig','nameBridges','dailyEmployment','staplerDates','custom','intake','currentDuty'].includes(p.view)||p.compact===true&&['report','entry'].includes(p.view));}
+function recordOnly(p){return ['previewStaplerMigration','migrateStaplerPlans','previewTimetableReconcile','confirmTimetableReconcile'].includes(p.operation)||p.operation==='read'&&['timetableReview','staplerMigration','timetableReconcile','absenceClash'].includes(p.view)||['publish','dailyNotify','notifyDaily','createStapler','importStapler'].includes(p.operation)||simpleOps.has(p.operation)||['saveCustomInstruction','deleteCustomInstruction','setCustomInstructionEnabled','systemConfig','saveSystemConfig','nameBridges','saveNameBridge','deleteNameBridge','sendDailyEmploymentReport'].includes(p.operation)||p.operation==='read'&&(['reportForm','schoolAbsences','teacherDailyUpdate','dailyNotify','mine','duties','prune','notificationReadiness','dutyRoster','systemConfig','nameBridges','dailyEmployment','staplerDates','custom','intake','currentDuty'].includes(p.view)||p.compact===true&&['report','entry'].includes(p.view));}
 function reconcileOperationalState(state,ctx,readTriggered=false){
  return GSISRosterOperations.reconcileOperational(state,ctx,readTriggered);
 }
@@ -705,7 +743,7 @@ export async function dailyOutputsEdgeRoster(env,options={}){
    const refs=await readEdgeRosterReferences(env),calendar=refs.calendarByDate?.[date];if(calendar?.available!==true)fail(503,'DAILY_OUTPUT_CALENDAR','The school date is not verified.');
    ctx={edgeGuards:[{scope:'roster-references',revision:refs.headRevision,mode:'active'}]};
    if(calendar.schoolDay===true){
-    const workbookState=await hydrate(env,state,[date]);ctx=await buildEdgeRosterContext(env,workbookState,{operation:'exportDaily',date,fullTeachers:true,dailyDrive:true});
+    const workbookState=await hydrate(env,clone(storedAuditState(state)),[date]);ctx=await buildEdgeRosterContext(env,workbookState,{operation:'exportDaily',date,fullTeachers:true,dailyDrive:true});
     const daily=await sanitizeBackup(GSISRosterOperations.read(workbookState,{...ctx,iso:new Date(now).toISOString()},{operation:'exportDaily',date,fullTeachers:true,dailyDrive:true}));daily.timetableName=daily.teacherSummary.staplerStatus==='baseline'?(ctx.timetableEntries.find(e=>e.id===ctx.days[date]?.id)?.name||'Baseline timetable'):'Stapler plan';
     const book=RosterExport.dailyTeacherWorkbook(daily,{final,packageFiles:GSISExcel.packageFiles}),bytes=new Uint8Array(await book.blob.arrayBuffer());files.unshift({kind:'excel',bytes,records:book.records});
    }else if(!text)return {schoolDay:false};

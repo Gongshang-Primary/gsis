@@ -5,7 +5,7 @@ import {
   resolveAdmission,
   serviceCall,
 } from "./security.mjs";
-import { digest, operationStatus, abortOperation, one } from "./store.mjs";
+import { digest, operationStatus, abortOperation, one, query } from "./store.mjs";
 import { secretEquals, verifyWebhook } from "./providers.mjs";
 import { systemPolicy, systemHandle } from "./operations.mjs";
 import { outboxHealth } from "./jobs.mjs";
@@ -127,7 +127,45 @@ export function domainWorker(service, module) {
               env.SCHOOL_ID,
               body.operationId,
             )) ?? { state: "unknown", operationId: body.operationId };
-          else if (path === "/internal/pins/cancellation") {
+          else if (path === "/internal/evidence-dependencies") {
+            const ids = Array.isArray(body?.decisionIds)
+              ? body.decisionIds
+                  .filter((id) => typeof id === "string" && id.length > 0 && id.length <= 160)
+                  .slice(0, 500)
+              : [];
+            if (!ids.length) {
+              value = { owner: service, protectedDecisionIds: [] };
+            } else {
+              const payload = JSON.stringify(ids);
+              const unresolved = await query(
+                env.DB,
+                `SELECT DISTINCT a.decision_id AS decisionId
+                 FROM product_admissions a
+                 WHERE a.school_id = ?
+                   AND a.state IN ('acquiring','ready','resolving')
+                   AND a.decision_id IN (SELECT value FROM json_each(?))`,
+                [env.SCHOOL_ID, payload],
+              );
+              const heldPins = await query(
+                env.DB,
+                `SELECT DISTINCT p.decision_id AS decisionId
+                 FROM source_pins p
+                 WHERE p.school_id = ?
+                   AND p.state = 'held'
+                   AND p.decision_id IN (SELECT value FROM json_each(?))`,
+                [env.SCHOOL_ID, payload],
+              );
+              value = {
+                owner: service,
+                protectedDecisionIds: [
+                  ...new Set([
+                    ...unresolved.map((r) => r.decisionId),
+                    ...heldPins.map((r) => r.decisionId),
+                  ]),
+                ],
+              };
+            }
+          } else if (path === "/internal/pins/cancellation") {
             const pin = await one(
               env.DB,
               "SELECT * FROM source_pins WHERE school_id=? AND pin_id=? AND state='held'",
@@ -193,16 +231,45 @@ export function domainWorker(service, module) {
             if (body.schoolId !== env.SCHOOL_ID)
               throw new ApiError("SCHOOL_MISMATCH", 403);
             const datasets = await listBackupDatasets(env);
+            let existingByDataset = new Map();
+            try {
+              const existing = await query(
+                env.DB,
+                "SELECT dataset,day,file_id,folder_id,source_digest,sha256,bytes,verified_at FROM drive_backup_files WHERE school_id=? AND state='verified' ORDER BY day DESC LIMIT 500",
+                [env.SCHOOL_ID],
+              );
+              for (const row of existing) {
+                if (!existingByDataset.has(row.dataset)) {
+                  existingByDataset.set(row.dataset, row);
+                }
+              }
+            } catch {
+              existingByDataset = new Map();
+            }
             value = {
               owner: service,
               schoolId: env.SCHOOL_ID,
-              datasets: datasets.map((d) => ({
-                id: d.id,
-                name: d.name,
-                mimeType: d.mimeType || XLSX_MIME,
-                extension: d.extension || "xlsx",
-                importable: !!d.importable,
-              })),
+              datasets: datasets.map((d) => {
+                const prior = existingByDataset.get(d.id);
+                return {
+                  id: d.id,
+                  name: d.name,
+                  mimeType: d.mimeType || XLSX_MIME,
+                  extension: d.extension || "xlsx",
+                  importable: !!d.importable,
+                  ...(prior
+                    ? {
+                        adoptedFileId: prior.file_id,
+                        adoptedFolderId: prior.folder_id,
+                        adoptedDay: prior.day,
+                        adoptedSourceDigest: prior.source_digest,
+                        adoptedSha256: prior.sha256,
+                        adoptedBytes: prior.bytes,
+                        adoptedVerifiedAt: prior.verified_at,
+                      }
+                    : {}),
+                };
+              }),
             };
           } else if (path === "/internal/backup-export") {
             if (body.schoolId !== env.SCHOOL_ID)
@@ -420,7 +487,10 @@ export function domainWorker(service, module) {
       // Catch-up rotates bounded owner datasets; daily verification is due at
       // 23:50 SGT and is completed by these resumable runs.
       const backupEnv = { ...bindings, SERVICE_NAME: service };
-      if (bindings.DRIVE_BACKUP_ENABLED === "true") {
+      if (
+        bindings.DRIVE_BACKUP_ENABLED === "true" &&
+        bindings.CENTRAL_DRIVE_BACKUP_ENABLED !== "true"
+      ) {
         const task = runDriveBackups(backupEnv, Date.now()).catch(() => undefined);
         if (execution?.waitUntil) execution.waitUntil(task); else await task;
       }

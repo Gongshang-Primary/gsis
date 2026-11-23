@@ -3,6 +3,7 @@ import {recordJobHealth,safeHealthError} from '../shared/edge-health.js';
 import {assertRecoveryWritable} from '../shared/edge-recovery.js';
 import {rosterRecoveryEnvironment,resolveRosterAuthorityEnvironment} from '../shared/roster-recovery-profile.js';
 import {runAllocationCycle} from './allocation-cycle.js';
+import {withRosterMutationAdmission} from '../roster-update/public/edge-roster-admission.js';
 import {readQuietMode} from '../shared/roster-quiet-mode.js';
 import {readRosterCutoverFreeze} from '../shared/roster-cutover-freeze.js';
 // Test harnesses load this file with its imports removed; treat quiet mode as off there.
@@ -84,6 +85,7 @@ async function catchUpAllocationAudit(env){
 export default {
  async scheduled(event,env,ctx){
   env=(typeof resolveRosterAuthorityEnvironment==='function'?await resolveRosterAuthorityEnvironment(env):rosterRecoveryEnvironment(env));
+  if(typeof withRosterMutationAdmission==='function')env=withRosterMutationAdmission(env);
   ctx.waitUntil((async()=>{
    try{writable(env);}catch(error){console.error(JSON.stringify({event:'roster-scheduled-paused',...safeError(error)}));return;}
    if(env.WHATSAPP_DIAGNOSTICS_ENABLED==='true'){
@@ -135,6 +137,7 @@ export default {
  },
  async queue(batch,env){
   env=(typeof resolveRosterAuthorityEnvironment==='function'?await resolveRosterAuthorityEnvironment(env):rosterRecoveryEnvironment(env));
+  if(typeof withRosterMutationAdmission==='function')env=withRosterMutationAdmission(env);
   try{writable(env);}catch(error){console.error(JSON.stringify({event:'roster-queue-paused',...safeError(error)}));batch.retryAll({delaySeconds:300});return;}
   const backupMessages=batch.messages.filter(message=>message.body?.purpose==='gsis-roster-backup-wake-v1'),importMessages=batch.messages.filter(message=>message.body?.purpose==='gsis-roster-import-wake-v1'),supported=batch.messages.filter(message=>message.body?.purpose==='gsis-notification-wake-v1'),unsupported=batch.messages.filter(message=>!['gsis-notification-wake-v1','gsis-roster-import-wake-v1','gsis-roster-backup-wake-v1'].includes(message.body?.purpose));
   if(importMessages.length){

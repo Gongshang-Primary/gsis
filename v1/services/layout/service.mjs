@@ -247,9 +247,9 @@ async function current(ctx, y, { empty = false, revision } = {}) {
   if (!head) {
     if (empty) return { head: null, snapshot: layoutData.empty(y) };
     fail(
-      "SNAPSHOT_UNAVAILABLE",
-      "No verified Layout snapshot exists for this year.",
-      503,
+      "SNAPSHOT_NOT_INITIALIZED",
+      "No Layout snapshot has been imported for this year yet. Import an initial Layout snapshot to set up this year.",
+      404,
     );
   }
   let row = await one(

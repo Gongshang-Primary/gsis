@@ -638,6 +638,16 @@ export async function dispatchPeerMail(env){
 }
 
 async function wakeAbsenceIntake(env){
+ if(edgeRosterEnabled(env)){
+  // A queued wake proves neither delivery nor that the consumer shares this
+  // capture namespace. Progress one retained command here as well. Both paths
+  // claim through the same durable lease; neither can double-apply a receipt.
+  const [wake,local]=await Promise.allSettled([enqueueNotificationWake(env),forwardAbsenceTransport(env,{limit:1,budgetMs:20000,concurrency:1})]);
+  if(local.status==='rejected')throw local.reason;
+  if(wake.status==='rejected')throw wake.reason;
+  if(!wake.value.queued)await serviceBackend(env,{operation:'processEdgePeerProposals',limit:1});
+  return;
+ }
  const wake=await enqueueNotificationWake(env);
  // HTTP work is only a best-effort accelerator. Cron/Queue owns continuation;
  // its durable D1/journal lease survives an interrupted waitUntil invocation.
@@ -729,9 +739,14 @@ export async function absenceTransportRoute(req,input,env,who,traceId,ctx){
    if(result&&!result.ok&&result.status<500)return json(result,result.status||403);
    if(!result?.ok&&input.scope!=='mine')return json({ok:false,error:'School-wide received reports require a current SMC permission check.'},503);
    const data=result?.data||{entries:[],user:{smc:false,admin:false},processingStatusUnavailable:true},all=data.user?.smc===true||data.user?.admin===true;
-   const transport=await readAbsenceTransport(env,who,{all,date:input.date,scope:input.scope,includeForwarded:!result?.ok});return json({ok:true,data:mergeAbsenceIntake(data,transport)});
+   const transport=await readAbsenceTransport(env,who,{all,date:input.date,scope:input.scope,includeForwarded:!result?.ok});
+   // The authenticated reader can resume a stranded capture in its original
+   // Worker context. Return the observed receipt; only a later confirmed read
+   // may describe it as applied. Existing leases and retry backoff still apply.
+   if(edgeRosterEnabled(env)&&result?.ok&&transport?.pendingCaptureCount>0)wake();
+   return json({ok:true,data:mergeAbsenceIntake(data,transport)});
   }
-  if(edgeRosterEnabled(env)&&input.operation==='resolveAbsenceIntake'&&['merge','keep'].includes(input.resolution))return null;
+  if(edgeRosterEnabled(env)&&input.operation==='resolveAbsenceIntake'&&['merge','keep','replace'].includes(input.resolution))return null;
   if(['retryAbsenceIntake','resolveAbsenceIntake'].includes(input.operation)&&env.GSIS_JOBS){
    const auth=(await backend(env,'rosterOperations',{operation:'read',view:'intake',scope:'mine'},who,traceId)).result;if(!auth.ok)return json(auth,auth.status||403);
    const all=auth.data?.user?.smc===true||auth.data?.user?.admin===true,resolving=input.operation==='resolveAbsenceIntake';
@@ -1301,7 +1316,7 @@ export function menuReply(reply,env){
   case 'urgent-confirm':return text('Your urgent message has been recorded for the Relief Team in Roster. WhatsApp forwarding is queued; delivery or action is not yet confirmed. Please call the school directly if immediate help is needed.');
   case 'inbox-urgent-confirm':return text('Your urgent message has been recorded in the school WhatsApp Inbox for the current duty SMC. Delivery or action is not yet confirmed. Please call the school directly if immediate help is needed.');
   case 'urgent-no-recipient':return text('Your message was recorded, but no eligible Relief Team recipients are configured. Please contact the school directly.');
-  case 'unknown':return text('This number could not be matched uniquely to an active staff or engaged relief teacher record. Contact the school directly; no staff records have been shared.');
+  case 'unknown':return text('Urgent Message is available only to staff or engaged relief teachers whose number matches one school record. Please call the school directly.');
   case 'unsupported':return text('Please type your urgent message as text. Voice notes, pictures and attachments are not forwarded.');
   case 'rate-limited':return text('Please wait a minute before sending another menu request. For urgent help, call the school directly.');
   case 'report-absence':return safeLink(env.WHATSAPP_CURRENT_RELIEF_URL,'Report Absence');
@@ -1313,7 +1328,7 @@ export function menuReply(reply,env){
    // A contact phone (without wa_id) exposes the ordinary telephone number, not a WhatsApp call endpoint.
    return {...base,type:'contacts',contacts:[{name:{formatted_name:'Gongshang Primary General Office',first_name:'General Office'},org:{company:'Gongshang Primary School'},phones:[{phone:number,type:'WORK'}]}]};
   }
-  default:return {...base,type:'interactive',interactive:{type:'list',body:{text:'Gongshang Primary · Choose an action.'},action:{button:'School contact menu',sections:[{title:'School services',rows:[{id:'gsis_report_absence',title:'Report Absence',description:'Open the current relief system'},{id:'gsis_urgent',title:'Urgent Message',description:'Type a message for the Relief Team'},{id:'gsis_layout',title:'School Layout'},{id:'gsis_devices',title:'Collect / Return ICT',description:'Open the LORD device portal'},{id:'gsis_office',title:'Call General Office',description:'Use the ordinary telephone number'}]}]}}};
+  default:return {...base,type:'interactive',interactive:{type:'list',body:{text:'*This number is no longer actively manned by staff member*\n\nGongshang Primary WhatsApp Notifier. Please select an action:'},action:{button:'School contact menu',sections:[{title:'School services',rows:[{id:'gsis_report_absence',title:'1. Report Absence',description:'Open the current relief system'},{id:'gsis_urgent',title:'2. Urgent Message',description:'Type a message for the Relief Team'},{id:'gsis_layout',title:'3. School Layout'},{id:'gsis_devices',title:'4. Collect / Return ICT',description:'Open the LORD device portal'},{id:'gsis_office',title:'5. Call General Office',description:'Use the ordinary telephone number'}]}]}}};
  }
 }
 const INBOX_ALERT_TEMPLATE={name:'gsis_inbox_new_message_v1',language:'en_GB',body:'*New School WhatsApp Message*\n\nHi {{1}}, a new message from {{2}} is waiting in the GSiS WhatsApp Inbox.\n\nOpen Roster to review and reply: {{3}}.'};
@@ -1617,6 +1632,7 @@ function absenceTransportCommand_(input,origin){
  for(const [key,max] of [['reasonDetail',500],['remarks',2000]])if(input[key]!==undefined)out[key]=absenceTransportText_(input[key],max,true);
  for(const key of ['fullDay','selectAll','reliefRequired','instructionsNA','receiptOnly'])if(input[key]!==undefined){if(typeof input[key]!=='boolean')absenceTransportInvalid_();out[key]=input[key];}
  for(const key of ['revision','expectedStaplerRevision'])if(input[key]!==undefined){if(!Number.isSafeInteger(input[key])||input[key]<0)absenceTransportInvalid_();out[key]=input[key];}
+ if(input.absenceClashToken!==undefined){if(out.operation!=='saveAbsence'||typeof input.absenceClashToken!=='string'||! /^[a-f0-9]{64}$/.test(input.absenceClashToken)||typeof input.confirmAbsenceReplacement!=='boolean')absenceTransportInvalid_();out.absenceClashToken=input.absenceClashToken;out.confirmAbsenceReplacement=input.confirmAbsenceReplacement;}
  if(input.staffIds!==undefined){if(!Array.isArray(input.staffIds)||!input.staffIds.length||input.staffIds.length>150||new Set(input.staffIds).size!==input.staffIds.length)absenceTransportInvalid_();out.staffIds=input.staffIds.map(id=>absenceTransportText_(id));}
  if(input.dates!==undefined){if(!Array.isArray(input.dates)||!input.dates.length||input.dates.length>366)absenceTransportInvalid_();out.dates=input.dates.map(absenceTransportDate_);}
  if(input.periods!==undefined){if(!Array.isArray(input.periods)||input.periods.length>40||input.periods.some(p=>!Number.isInteger(p)||p<0||p>=40)||new Set(input.periods).size!==input.periods.length)absenceTransportInvalid_();out.periods=input.periods.slice();}

@@ -177,15 +177,27 @@ export async function authorizeContribution(env, input, now) {
     sourcePublicationId: input.source.publicationId,
     contributionId: input.contributionId,
   };
-  if ((match.field === "memberships" && match.membershipPublicationVersion === 1) || authorityPublication) {
-    fail(Number.isSafeInteger(proof.sequence) && proof.sequence > 0 &&
-      Number.isSafeInteger(match.validFrom), "PUBLICATION_UNVERIFIED");
-    // The immutable publication deliberately overwrites earlier ordinary
-    // Memberships. Contacts still guards its current field revision and the
-    // pinned publication frontier; the old draft-copy revision is not a veto.
+  if (
+    (match.field === "memberships" && match.membershipPublicationVersion === 1) ||
+    authorityPublication ||
+    match.directTagPublicationVersion === 1
+  ) {
+    fail(
+      Number.isSafeInteger(proof.sequence) &&
+        proof.sequence > 0 &&
+        (match.directTagPublicationVersion === 1
+          ? match.validFrom == null || Number.isSafeInteger(match.validFrom)
+          : Number.isSafeInteger(match.validFrom)),
+      "PUBLICATION_UNVERIFIED",
+    );
     delete intent.fieldRevisions;
-    intent.membershipPublicationVersion = 1;
-    intent.membershipPublicationSequence = proof.sequence;
+    if (
+      (match.field === "memberships" && match.membershipPublicationVersion === 1) ||
+      authorityPublication
+    ) {
+      intent.membershipPublicationVersion = 1;
+      intent.membershipPublicationSequence = proof.sequence;
+    }
   }
   if (authorityPublication) {
     intent.changes = authorityTuple(match.proposedValue);
@@ -196,10 +208,15 @@ export async function authorizeContribution(env, input, now) {
     authorityPublication || [
       "basicName",
       "role",
+      "eoAppointmentLevel",
       "appointmentStatus",
       "employmentArrangement",
+      "employmentStatus",
+      "schoolSection",
+      "personnelCategory",
       "employmentTags",
       "subjectTags",
+      "mkTags",
       "employmentActive",
       "memberships",
     ].includes(match.field),

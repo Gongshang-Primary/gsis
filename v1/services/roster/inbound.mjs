@@ -1,5 +1,5 @@
 import Operations from "../../../shared/roster-operations.js";
-import { canonical, digest, one } from "../../runtime/store.mjs";
+import { canonical, digest, one, statement } from "../../runtime/store.mjs";
 import { requireValue } from "../../runtime/errors.mjs";
 import {
   loadState,
@@ -8,6 +8,66 @@ import {
   scopeChange,
   localDate,
 } from "./repository.mjs";
+
+export const WHATSAPP_PUBLIC_MENU_TEXT =
+  "*This number is no longer actively manned by staff member*\n\n" +
+  "Gongshang Primary WhatsApp Notifier. Please select an action:\n\n" +
+  "1. Report Absence\n" +
+  "2. Urgent Message\n" +
+  "3. School Layout\n" +
+  "4. Collect / Return ICT\n" +
+  "5. Call General Office";
+
+export function publicMenuReplyFor(rawText, selection, origin) {
+  const token = String(selection || rawText || "").trim().toLowerCase();
+  if (token === "1" || token === "report-absence" || token === "report absence") {
+    return {
+      action: "report-absence",
+      text: "Report your absence at " + origin + "/roster/#report",
+    };
+  }
+  if (token === "2" || token === "urgent" || token === "urgent message") {
+    return {
+      action: "urgent-restricted",
+      text:
+        "Urgent Message is restricted to registered school staff and engaged relief teachers. Please contact the General Office directly.\n\n" +
+        WHATSAPP_PUBLIC_MENU_TEXT,
+    };
+  }
+  if (token === "3" || token === "layout" || token === "school layout") {
+    return {
+      action: "layout",
+      text: "School layout: " + origin + "/layout/",
+    };
+  }
+  if (
+    token === "4" ||
+    token === "devices" ||
+    token === "ict" ||
+    token === "collect / return ict"
+  ) {
+    return {
+      action: "devices",
+      text: "Collect / Return ICT (LORD): " + origin + "/lord/",
+    };
+  }
+  if (
+    token === "5" ||
+    token === "office" ||
+    token === "call general office" ||
+    token === "general office"
+  ) {
+    return {
+      action: "office",
+      text: "Please contact the General Office through its usual contact channel.",
+    };
+  }
+  return {
+    action: "menu",
+    text: WHATSAPP_PUBLIC_MENU_TEXT,
+  };
+}
+
 export async function webhookProof(ctx) {
   const { env, body, now } = ctx,
     row = await one(
@@ -54,6 +114,37 @@ export async function webhookProof(ctx) {
     expiresAt: event.at + 86400000,
   };
 }
+// Owner decision 21 Nov 2026 (W5): a free-text message from a known staff member
+// that waits in the Roster inbox alerts the duty SMC. Menu taps get their own
+// automatic reply and urgent messages are already forwarded, so neither alerts.
+// Once per sender per day; sent even in quiet hours (owner: bypass quiet hours).
+// Queue only once the approved template is mapped, so unconfigured deployments
+// do not build up failing jobs.
+export function inboxAlertConfigured(env) {
+  try {
+    const t = JSON.parse(env.WHATSAPP_TEMPLATES_JSON || "{}");
+    return Array.isArray(t) ? t.some((x) => x?.key === "inbox_alert") : Object.hasOwn(t, "inbox_alert");
+  } catch {
+    return false;
+  }
+}
+export function queueInboxAlert(next, c, date, event, result) {
+  if (result?.duplicate || result?.reply?.action !== "menu" || event.buttonId) return 0;
+  const text = typeof event.text === "string" ? event.text.trim() : "";
+  if (!text || /^[1-5]$/.test(text)) return 0;
+  const sender = c.people.find((p) => p.id === next.inboundEvents?.find((e) => e.id === event.id)?.staffId),
+    senderName = sender?.name || "a staff member",
+    before = next.outbox.length;
+  for (const id of Operations.dutySMC(next, c, date))
+    Operations.queue(next, c, "smc_alert", id, date, {
+      templateKey: "inbox_alert",
+      audience: "duty-smc",
+      summary: "New school WhatsApp message from " + senderName + " is waiting in the Roster inbox.",
+      senderName,
+      inboxMessageId: "whatsapp:" + event.id,
+    }, null, "inbox-alert:" + date + ":" + String(event.sender) + ":" + id);
+  return next.outbox.length - before;
+}
 export async function processInbound(
   job,
   env,
@@ -76,14 +167,89 @@ export async function processInbound(
     "WEBHOOK_AUTHORITY_NOT_CONFIGURED",
     503,
   );
-  const principal = await env.CORE_WEBHOOK.authorizeEvent({
+  const origin = env.PUBLIC_ORIGIN;
+  requireValue(
+    /^https:\/\/[^\s/?#]+$/.test(origin || ""),
+    "PUBLIC_ORIGIN_NOT_CONFIGURED",
+    503,
+  );
+  let principal;
+  try {
+    principal = await env.CORE_WEBHOOK.authorizeEvent({
       schoolId: env.SCHOOL_ID,
       eventId,
       operationId: body.operationId,
       bodyDigest: await digest(body),
       now,
-    }),
-    ctx = { env, principal, now, body },
+    });
+  } catch (err) {
+    if (err?.code === "RECIPIENT_UNMATCHED") {
+      // Public WhatsApp menu (#182): show the 5-item notice/menu to any sender
+      // without an identity gate, while keeping Urgent Message strictly restricted.
+      const reply = publicMenuReplyFor(event.text, event.buttonId, origin);
+      const replyJobId = "public-menu-reply:" + eventId;
+      await statement(
+        env.DB,
+        "UPDATE roster_inbox SET state='open',revision=revision+1,payload_json=? WHERE school_id=? AND message_id=? AND staff_id IS NULL",
+        [
+          canonical({
+            provider: "whatsapp",
+            sender: event.sender,
+            text: event.text,
+            buttonId: event.buttonId,
+            identityVerified: false,
+            actionState: reply.action,
+          }),
+          env.SCHOOL_ID,
+          "whatsapp:" + event.id,
+        ],
+      ).run();
+      await statement(
+        env.DB,
+        "INSERT OR IGNORE INTO product_outbox(school_id,job_id,operation_id,type,payload_json,state,due_at,updated_at) VALUES(?,?,?,?,?,'queued',?,?)",
+        [
+          env.SCHOOL_ID,
+          replyJobId,
+          body.operationId,
+          "roster-public-menu-reply",
+          canonical({
+            to: event.sender,
+            text: reply.text,
+            action: reply.action,
+            inReplyTo: "whatsapp:" + event.id,
+            publicMenu: true,
+          }),
+          now,
+          now,
+        ],
+      ).run();
+      // Unknown sender free text also alerts the duty SMC (owner 22 Nov 2026).
+      if (inboxAlertConfigured(env) && reply.action === "menu" && !event.buttonId && typeof event.text === "string" && event.text.trim()) {
+        const number = Operations.mobile(event.sender), date = localDate(now);
+        await statement(
+          env.DB,
+          "INSERT OR IGNORE INTO product_outbox(school_id,job_id,operation_id,type,payload_json,state,due_at,updated_at) VALUES(?,?,?,?,?,'queued',?,?)",
+          [
+            env.SCHOOL_ID,
+            "inbox-alert-unknown:" + date + ":" + number,
+            body.operationId,
+            "roster-inbox-alert",
+            canonical({
+              date,
+              sender: number,
+              senderName: "an unknown number ending " + number.slice(-4),
+              inboxMessageId: "whatsapp:" + event.id,
+            }),
+            now,
+            now,
+          ],
+        ).run();
+      }
+      return { state: "delivered", providerId: replyJobId };
+    }
+    throw err;
+  }
+  const ctx = { env, principal, now, body },
     date = localDate(now),
     scope = "day:" + date,
     revision = await scopeRevision(env.DB, env.SCHOOL_ID, scope),
@@ -110,6 +276,7 @@ export async function processInbound(
         selection: event.buttonId || undefined,
       },
     ),
+    alerted = inboxAlertConfigured(env) ? queueInboxAlert(next, c, date, event, result) : 0,
     changes = await recordChanges(
       env.SCHOOL_ID,
       loaded.before,
@@ -134,22 +301,13 @@ export async function processInbound(
       "whatsapp:" + event.id,
     ],
   });
-  const origin = env.PUBLIC_ORIGIN;
-  requireValue(
-    /^https:\/\/[^\s/?#]+$/.test(origin || ""),
-    "PUBLIC_ORIGIN_NOT_CONFIGURED",
-    503,
-  );
   const text = {
-    menu:
-      "GSiS: report an absence or view your duties at " +
-      origin +
-      "/roster/. Reply using the available menu to send an urgent message to duty SMC.",
+    menu: WHATSAPP_PUBLIC_MENU_TEXT,
     "report-absence": "Report your absence at " + origin + "/roster/#report",
     layout: "School layout: " + origin + "/layout/",
-    devices: "Device bookings: " + origin + "/lord/",
+    devices: "Collect / Return ICT (LORD): " + origin + "/lord/",
     office:
-      "Please contact the school office through its usual contact channel.",
+      "Please contact the General Office through its usual contact channel.",
     "urgent-prompt":
       "Reply with your urgent message. It will be sent to the current duty SMC.",
     "urgent-confirm":
@@ -192,6 +350,7 @@ export async function processInbound(
       eventId,
       staffId: principal.staffId,
       action: result.reply?.action || "recorded",
+      inboxAlerts: alerted,
     },
     outbox,
   });

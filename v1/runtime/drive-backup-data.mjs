@@ -217,6 +217,15 @@ export async function listBackupDatasets(env) {
       importable: true,
     }));
   }
+  if (owner === "core") {
+    return [
+      {
+        id: "access-and-backup-manifest",
+        name: "Access and Backup Manifest",
+        importable: false,
+      },
+    ];
+  }
   return [];
 }
 function readableSheet(columns, rows) {
@@ -280,6 +289,99 @@ export async function buildBackupDataset(env, dataset, now = Date.now()) {
     )[0].results;
     const book = await metadataWorkbook(rows, school, dataset.id);
     return { sourceDigest: await digest(book), book, importable: true };
+  }
+  if (owner === "core" && dataset.id === "access-and-backup-manifest") {
+    // Explicit allowlist of safe non-secret Core metadata. Never export sessions,
+    // OAuth tokens, PKCE verifiers, google_connections, or raw security evidence.
+    const accounts = await query(
+      env.DB,
+      "SELECT account_id,email,staff_id,suspended,revision,created_at FROM core_accounts WHERE school_id=? ORDER BY account_id LIMIT ?",
+      [school, MAX_ROWS + 1],
+    );
+    const grants = await query(
+      env.DB,
+      "SELECT account_id,capability,valid_from,valid_until FROM core_grants WHERE school_id=? ORDER BY account_id,capability LIMIT ?",
+      [school, MAX_ROWS + 1],
+    );
+    const serviceGrants = await query(
+      env.DB,
+      "SELECT service,capability,enabled,revision,valid_from,valid_until FROM core_service_grants WHERE school_id=? ORDER BY service,capability LIMIT ?",
+      [school, MAX_ROWS + 1],
+    );
+    let backupDatasets = [];
+    try {
+      backupDatasets = await query(
+        env.DB,
+        "SELECT owner,dataset,name,folder_id,status,verified_digest,remote_verified_at,last_error FROM core_backup_datasets WHERE school_id=? ORDER BY owner,dataset LIMIT ?",
+        [school, MAX_ROWS + 1],
+      );
+    } catch {
+      backupDatasets = [];
+    }
+    requireValue(
+      accounts.length <= MAX_ROWS &&
+        grants.length <= MAX_ROWS &&
+        serviceGrants.length <= MAX_ROWS &&
+        backupDatasets.length <= MAX_ROWS,
+      "DRIVE_BACKUP_SOURCE_BOUNDS",
+      413,
+    );
+    const book = {
+      metadata: {
+        schemaVersion: 1,
+        owner: "core",
+        schoolId: school,
+        dataset: dataset.id,
+        mode: "read-only",
+      },
+      sheets: {
+        Accounts: {
+          columns: ["Account ID", "Email", "Staff ID", "Suspended", "Revision", "Created At"],
+          rows: accounts.map((a) => [
+            a.account_id,
+            a.email,
+            a.staff_id || "",
+            !!a.suspended,
+            a.revision ?? 0,
+            a.created_at ?? null,
+          ]),
+        },
+        Grants: {
+          columns: ["Account ID", "Capability", "Valid From", "Valid Until"],
+          rows: grants.map((g) => [
+            g.account_id,
+            g.capability,
+            g.valid_from ?? null,
+            g.valid_until ?? null,
+          ]),
+        },
+        ServiceGrants: {
+          columns: ["Service", "Capability", "Enabled", "Revision", "Valid From", "Valid Until"],
+          rows: serviceGrants.map((g) => [
+            g.service,
+            g.capability,
+            !!g.enabled,
+            g.revision ?? 0,
+            g.valid_from ?? null,
+            g.valid_until ?? null,
+          ]),
+        },
+        BackupDatasets: {
+          columns: ["Owner", "Dataset", "Name", "Folder ID", "Status", "Verified Digest", "Remote Verified At", "Last Error"],
+          rows: backupDatasets.map((d) => [
+            d.owner,
+            d.dataset,
+            d.name,
+            d.folder_id,
+            d.status || "",
+            d.verified_digest || "",
+            d.remote_verified_at ?? null,
+            d.last_error || "",
+          ]),
+        },
+      },
+    };
+    return { sourceDigest: await digest(book), book, importable: false };
   }
   if (owner === "contacts" && dataset.id === "staff")
     return contactsWorkbook(env, now);

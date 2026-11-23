@@ -399,7 +399,7 @@ var GSISRosterOperations=(()=>{
   if(peerReservation(s,ctx,person.id,d,ps))fail(409,'This colleague already has a peer arrangement awaiting approval in a selected period.');
   const ids=new Set(ds.map(row=>row.id)),own=A.effectiveAssignments(s).filter(a=>a.date===d&&source.ids.has(a.staffId)&&!a.noRelief&&!ids.has(a.demandId));
   if(input.combination===true){
-   if(ds.length!==1)fail(400,'Combine one lesson and period at a time.');const dem=ds[0],cell=source.t?.cells[dem.period]||['','','',''],ordinary=own.find(a=>a.period===dem.period&&!a.combination&&!a.repurposedDuty),base=A.isClassLesson(cell)?{subject:cell[0],className:cell[1],venue:cell[2],groupName:cell[3]}:ordinary||null,sameClass=!!base&&A.norm(base.className)===A.norm(dem.className);
+   if(ds.length!==1)fail(400,'Combine one lesson and period at a time.');const dem=ds[0],cell=source.t?.cells[dem.period]||['','','',''],ordinary=own.find(a=>a.period===dem.period&&!a.combination&&!a.repurposedDuty),base=A.isClassLesson(cell)?{subject:cell[0],className:cell[1],venue:cell[2],groupName:cell[3]}:ordinary||null,sameClass=!!A.norm(base?.className)&&!!A.norm(dem.className)&&A.norm(base.className)===A.norm(dem.className);
    if(!reliefActive(s,ctx,person,d,dem.period)||!base||!sameClass&&own.some(a=>a.period===dem.period&&a.combination&&!a.sameClass))fail(409,'This colleague cannot combine that class during this period.');
    if(input.expectedRecipientCell!==undefined&&JSON.stringify(cell)!==JSON.stringify(input.expectedRecipientCell))fail(409,'The colleague’s lesson changed. Review this class combination.');
    return {combineBase:base,sameClass};

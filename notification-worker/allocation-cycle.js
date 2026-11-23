@@ -3,7 +3,7 @@
 export const ALLOCATION_CYCLE_LEASE_MS=9*60000;
 export const ALLOCATION_CYCLE_BACKOFF_MS=5*60000;
 const schemas=new WeakMap(),id='scheduledRoster';
-const busyCodes=new Set(['SKIPPED_BUSY','ALLOCATION_BUSY','ALLOCATION_IN_PROGRESS','ALLOCATION_UNCONFIRMED']);
+const busyCodes=new Set(['SKIPPED_BUSY','ALLOCATION_BUSY','ALLOCATION_IN_PROGRESS','ALLOCATION_UNCONFIRMED','ROSTER_MEMORY_BUSY']);
 const object=value=>value!==null&&typeof value==='object'&&!Array.isArray(value);
 function storageError(){return Object.assign(Error('Scheduled allocation control is unavailable.'),{code:'ALLOCATION_CYCLE_STORAGE',status:503});}
 function checked(result){if(!result||result.success===false)throw storageError();return result;}

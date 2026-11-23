@@ -76,6 +76,20 @@ window.GSISV1RosterMapping = async function (model) {
       select.onchange = () => { result.staffMapping[name] = select.value; remember(); };
       label.append(select); form.append(label);
     }
+    if (venues.length && !rooms.length) {
+      const notice = element("div");
+      notice.className = "v1-notice";
+      notice.dataset.venuesEmptyGuidance = "true";
+      notice.setAttribute("role", "status");
+      const msg = element(
+        "p",
+        "No rooms are registered in the Venues physical register yet. Add or import rooms in Venues Administration before mapping timetable room labels, or keep labels unmapped for now.",
+      );
+      const link = element("a", "Open Venues Administration");
+      link.href = "/venues/";
+      notice.append(msg, link);
+      form.append(notice);
+    }
     for (const name of venues) {
       const label = element("label", name), select = element("select"), keep = element("input"), keepLabel = element("label", "Keep label unmapped");
       select.multiple = true; select.size = Math.min(5, Math.max(2, rooms.length));

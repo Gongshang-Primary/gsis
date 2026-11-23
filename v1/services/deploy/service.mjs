@@ -1,5 +1,6 @@
 import { choiceLists } from "./catalogue-links.mjs";
 import { buildHrTermsPublication } from "./hr-terms-publish.mjs";
+import { previewTTb } from "../../contacts/direct-fields.mjs";
 import {
   query,
   one,
@@ -68,6 +69,7 @@ const READ = new Set([
   "/health",
   "/access",
   "/layout-reference",
+  "/leases",
 ]);
 const WRITE = new Set([
   "/change",
@@ -169,6 +171,7 @@ function flatten(doc) {
       [
         "teacherNotes",
         "teacherDrafts",
+        "teacherDraftMeta",
         "loads",
         "fortnight",
         "organisations",
@@ -863,7 +866,7 @@ async function bootstrap(ctx) {
     leases: requested
       ? await query(
           ctx.env.DB,
-          "SELECT scope AS key,holder AS actor,fence AS token,expires_at AS until FROM deploy_leases WHERE school_id=? AND version_id=? AND expires_at>?",
+          "SELECT scope AS key,holder AS actor,client_id AS clientId,fence AS token,expires_at AS until FROM deploy_leases WHERE school_id=? AND version_id=? AND expires_at>?",
           [school, requested, ctx.now],
         )
       : [],
@@ -1194,6 +1197,14 @@ async function save(
         : e.operation === "setReportingOfficer" ? [e.officer, e.value] : [],
     ).filter((staffId) => typeof staffId === "string" && staffId);
     loaded.doc = mergeContacts(before, ref, { includeUnlisted: false, addStaffIds: additions });
+    if (edits.some((e) => ["initReporting", "setReportingOfficer"].includes(e.operation))) {
+      const hydrated = mergeContacts(before, ref, { includeUnlisted: true });
+      Object.defineProperty(loaded.doc, "staffCatalog", {
+        value: hydrated.teachers,
+        enumerable: false,
+        configurable: true,
+      });
+    }
     extraDependencies = contactsDependencies(ref);
   }
   if (!next) {
@@ -1213,7 +1224,27 @@ async function save(
       next = applyEdits(
         loaded.doc,
         b.edits || [{ ...b, operation: b.operation }],
+        {
+          now: ctx.now,
+          actorId: ctx.principal.actorId,
+          operationId: op.operationId,
+        },
       );
+  }
+  const beforeNames = new Map(
+    (before.teachers || []).map((t) => [t.id, String(t.ttbName || t.name || "").trim().toLowerCase()]),
+  );
+  for (const t of next.teachers || []) {
+    const afterName = String(t.ttbName || t.name || "").trim();
+    if (afterName && afterName.toLowerCase() !== beforeNames.get(t.id)) {
+      await assertNoCrossDraftTTbCollision(
+        ctx.env.DB,
+        school,
+        b.versionId,
+        t.id,
+        afterName,
+      );
+    }
   }
   // Explicitly adding a person again supersedes only that person's removal
   // marker; unrelated historical markers remain untouched.
@@ -1297,19 +1328,211 @@ async function save(
     },
     {
       dependencies: extraDependencies,
-      audit: {
-        versionId: b.versionId,
-        scope,
-        changedRows: delta.changedRows,
-        previewId: preview?.id || null,
-      },
+      audit: buildSaveAudit(ctx, op, b, loaded, next, delta, scope, preview),
     },
   );
 }
-function workbookDocument(document, scope) {
-  return ["IP", "TG"].includes(scope)
-    ? canonicalTeachingDocument(document)
-    : document;
+const AUDIT_OP_LABELS = Object.freeze({
+  setLoad: "Update subject load",
+  addSubject: "Add subject",
+  addLevel: "Add level",
+  addClass: "Add class",
+  updateClass: "Update class",
+  renameClasses: "Rename classes",
+  setClassAbility: "Update class ability",
+  deleteClass: "Delete class",
+  addTeacher: "Assign teacher",
+  removeTeacher: "Remove teacher",
+  setTeacherField: "Update teacher profile",
+  upsertTeacherProfile: "Update teacher profile",
+  setTeacherNote: "Update teacher note",
+  setTeacherMemberships: "Update teacher memberships",
+  setRoleMemberships: "Update role memberships",
+  setHRChoices: "Update HR choices",
+  addTG: "Add teaching group",
+  updateTG: "Update teaching group",
+  removeTG: "Remove teaching group",
+  moveTG: "Move teaching group",
+  moveClass: "Move class",
+  clearVenueAssignments: "Clear venue assignments",
+  moveVenueGroup: "Move venue group",
+  moveClassBlock: "Move class block",
+  setLevelExclusions: "Update exclusions",
+  setExclusionCell: "Update exclusions",
+  setOffload: "Update offload",
+  setReliefSettings: "Update relief settings",
+  setWorkload: "Update workload",
+  setSubjectType: "Update subject type",
+  setFortnight: "Update fortnight",
+  setOrganisation: "Update organisation",
+  setDuties: "Update duties",
+  setAscExportSettings: "Update aSc export settings",
+  patchPlanning: "Update planning settings",
+  initReporting: "Initialise reporting",
+  setReportingOfficer: "Update reporting officer",
+  upsertClassNameSet: "Update class name set",
+  deleteClassNameSet: "Delete class name set",
+  saveVersionNote: "Save version note",
+  metadata: "Update version metadata",
+});
+const MAX_AUDIT_ENTRIES = 20;
+const MAX_AUDIT_BYTES = 12 * 1024;
+function parseAuditValue(raw) {
+  if (raw === undefined || raw === null) return null;
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return raw;
+  }
+}
+function isPlainObject(value) {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+function diffAuditEntry(beforeVal, afterVal) {
+  if (isPlainObject(beforeVal) && isPlainObject(afterVal)) {
+    const beforeOut = {},
+      afterOut = {};
+    for (const key of new Set([
+      ...Object.keys(beforeVal),
+      ...Object.keys(afterVal),
+    ])) {
+      const bVal = beforeVal[key] === undefined ? null : beforeVal[key];
+      const aVal = afterVal[key] === undefined ? null : afterVal[key];
+      if (canonical(bVal) === canonical(aVal)) continue;
+      beforeOut[key] = bVal;
+      afterOut[key] = aVal;
+    }
+    return { beforeVal: beforeOut, afterVal: afterOut };
+  }
+  return {
+    beforeVal: beforeVal === undefined ? null : beforeVal,
+    afterVal: afterVal === undefined ? null : afterVal,
+  };
+}
+function labelForOperations(b, preview) {
+  if (preview) {
+    return {
+      operationLabel: "Import workbook",
+      operations: ["importWorkbook"],
+      editCount: 1,
+    };
+  }
+  if (b.operation === "saveVersionNote") {
+    return {
+      operationLabel: AUDIT_OP_LABELS.saveVersionNote,
+      operations: ["saveVersionNote"],
+      editCount: 1,
+    };
+  }
+  const edits = Array.isArray(b.edits) && b.edits.length ? b.edits : [b];
+  const ops = edits
+    .map((e) => (typeof e?.operation === "string" ? e.operation : ""))
+    .filter(Boolean);
+  const uniqueLabels = [];
+  for (const opName of ops) {
+    const label = AUDIT_OP_LABELS[opName] || opName;
+    if (!uniqueLabels.includes(label)) uniqueLabels.push(label);
+  }
+  let operationLabel = uniqueLabels[0] || "Save planning changes";
+  if (edits.length > 1) {
+    const summary = uniqueLabels.join(", ");
+    const full = `Batch edit (${edits.length} edits)${summary ? `: ${summary}` : ""}`;
+    operationLabel = full.length > 160 ? `${full.slice(0, 157)}...` : full;
+  }
+  return {
+    operationLabel,
+    operations: ops.slice(0, MAX_AUDIT_ENTRIES),
+    editCount: edits.length,
+  };
+}
+function buildSaveAudit(ctx, op, b, loaded, next, delta, scope, preview) {
+  const { operationLabel, operations, editCount } = labelForOperations(
+    b,
+    preview,
+  );
+  const actorLabel =
+    typeof ctx.principal?.email === "string" && ctx.principal.email.trim()
+      ? ctx.principal.email.trim()
+      : null;
+  const oldMap = new Map(
+    (loaded.rows || []).map((row) => [`${row.scope}\0${row.row_id}`, row.value]),
+  );
+  const nextMap = flatten(next);
+  const before = {},
+    after = {};
+  let capturedChanges = 0,
+    omittedChanges = 0,
+    bytes = 0,
+    truncated = false;
+  const pushEntry = (entryKey, prevVal, nextVal) => {
+    if (capturedChanges >= MAX_AUDIT_ENTRIES) {
+      omittedChanges += 1;
+      truncated = true;
+      return;
+    }
+    const diff = diffAuditEntry(prevVal, nextVal);
+    const entryBytes = new TextEncoder().encode(
+      canonical({ k: entryKey, b: diff.beforeVal, a: diff.afterVal }),
+    ).byteLength;
+    if (bytes + entryBytes > MAX_AUDIT_BYTES) {
+      omittedChanges += 1;
+      truncated = true;
+      return;
+    }
+    before[entryKey] = diff.beforeVal;
+    after[entryKey] = diff.afterVal;
+    capturedChanges += 1;
+    bytes += entryBytes;
+  };
+  for (const metaKey of ["name", "from", "to", "notes"]) {
+    const prevMeta = loaded.doc?.[metaKey] ?? "";
+    const nextMeta = next?.[metaKey] ?? "";
+    if (prevMeta !== nextMeta) {
+      pushEntry(`meta:${metaKey}`, prevMeta, nextMeta);
+    }
+  }
+  for (const key of new Set([...oldMap.keys(), ...nextMap.keys()])) {
+    const prior = oldMap.get(key),
+      value = nextMap.get(key);
+    if (prior === value) continue;
+    const [rowScope, rowId] = key.split("\0");
+    if (rowScope === "_orders") continue;
+    pushEntry(
+      `${rowScope}:${rowId}`,
+      parseAuditValue(prior),
+      parseAuditValue(value),
+    );
+  }
+  return {
+    versionId: b.versionId,
+    scope,
+    changedRows: delta.changedRows,
+    previewId: preview?.id || null,
+    operationId: op.operationId,
+    originalActor: ctx.principal.actorId,
+    actorLabel,
+    capabilityAction: op.action,
+    operationLabel,
+    operations,
+    editCount,
+    before,
+    after,
+    capturedChanges,
+    omittedChanges,
+    truncated,
+  };
+}
+function workbookDocument(document, scope, ref = null) {
+  if (["IP", "TG"].includes(scope)) return canonicalTeachingDocument(document);
+  if (scope === "Span of Control" && ref) {
+    const hydrated = mergeContacts(document, ref, { includeUnlisted: true });
+    Object.defineProperty(document, "staffCatalog", {
+      value: hydrated.teachers,
+      enumerable: false,
+      configurable: true,
+    });
+  }
+  return document;
 }
 function importStaffIds(workbook, matches = {}) {
   const ids = new Set();
@@ -1333,6 +1556,7 @@ async function previewImport(ctx) {
     mergeContacts(loaded.doc, ref, { includeUnlisted: false,
       addStaffIds: importStaffIds(b.workbook, b.matches) }),
     b.workbook?.metadata?.["Table Scope"],
+    ref,
   );
   const dependencyDigest = await digest(ref.dependencies || []);
   const validated = validateWorkbook(
@@ -1340,14 +1564,21 @@ async function previewImport(ctx) {
     loaded.doc,
     ctx.principal.schoolId,
     loaded.version.revision,
-    { matches: b.matches || {} },
+    {
+      matches: b.matches || {},
+      meta: {
+        now: ctx.now,
+        actorId: ctx.principal.actorId,
+        operationId: b.operationId || null,
+      },
+    },
   );
   validated.document = validateTeachingBindings(
     loaded.doc,
     validated.document,
     ref,
   );
-  const before = flatten(workbookDocument(saved, b.workbook?.metadata?.["Table Scope"])),
+  const before = flatten(workbookDocument(saved, b.workbook?.metadata?.["Table Scope"], ref)),
     after = flatten(validated.document),
     diff = { added: 0, removed: 0, changed: 0 };
   for (const k of new Set([...before.keys(), ...after.keys()]))
@@ -1426,13 +1657,21 @@ async function applyImport(ctx) {
     mergeContacts(loaded.doc, ref, { includeUnlisted: false,
       addStaffIds: importStaffIds(input.workbook, input.matches) }),
     input.workbook?.metadata?.["Table Scope"],
+    ref,
   );
   const validated = validateWorkbook(
     input.workbook,
     loaded.doc,
     ctx.principal.schoolId,
     loaded.version.revision,
-    { matches: input.matches },
+    {
+      matches: input.matches,
+      meta: {
+        now: ctx.now,
+        actorId: ctx.principal.actorId,
+        operationId: op.operationId,
+      },
+    },
   );
   return save(ctx, {
     document: validated.document,
@@ -2120,6 +2359,19 @@ export async function handle(ctx) {
   }
   if (["/bootstrap", "/sync", "/versions", "/tables", "/access"].includes(p))
     return bootstrap(ctx);
+  if (p === "/leases") {
+    const requested = b.versionId ? id(b.versionId) : null;
+    return {
+      versionId: requested,
+      leases: requested
+        ? await query(
+            ctx.env.DB,
+            "SELECT scope AS key,holder AS actor,client_id AS clientId,fence AS token,expires_at AS until FROM deploy_leases WHERE school_id=? AND version_id=? AND expires_at>?",
+            [school, requested, ctx.now],
+          )
+        : [],
+    };
+  }
   if (p === "/layout-reference") return layoutReferenceResponse();
   if (p === "/delta")
     return {
@@ -2222,11 +2474,37 @@ export async function handle(ctx) {
       "CAPABILITY_DENIED",
       403,
     );
+    const basicName = text(b.basicName);
+    if (!b.existingStaffId) {
+      const modifiers = b.nameModifiers || {};
+      const preview = previewTTb({
+        basicName,
+        ...(b.nameSuffix ? { nameSuffix: text(b.nameSuffix, 80, true) } : {}),
+        ...(modifiers.role ? { role: modifiers.role } : {}),
+        ...(Array.isArray(modifiers.employmentTags)
+          ? { employmentTags: modifiers.employmentTags }
+          : {}),
+        ...(Array.isArray(modifiers.subjectTags)
+          ? { subjectTags: modifiers.subjectTags }
+          : {}),
+        ...(Array.isArray(modifiers.mkTags) ? { mkTags: modifiers.mkTags } : {}),
+      });
+      if (preview.available && preview.name) {
+        await assertNoCrossDraftTTbCollision(
+          ctx.env.DB,
+          school,
+          b.versionId || null,
+          null,
+          preview.name,
+          { draftOverridesOnly: true },
+        );
+      }
+    }
     return serviceCall(ctx.env, "contacts", "/internal/register-provisional", {
       schoolId: school,
       decisionId: ctx.principal.decisionId,
       operationId: id(b.operationId || b.requestId),
-      basicName: text(b.basicName),
+      basicName,
       ...(b.nameSuffix !== undefined
         ? { nameSuffix: text(b.nameSuffix, 80, true) }
         : {}),
@@ -2245,9 +2523,10 @@ export async function handle(ctx) {
   if (p === "/imports/preview") return previewImport(ctx);
   if (p === "/imports/apply") return applyImport(ctx);
   if (p === "/export") {
-    const { doc, version } = await loadVersion(ctx.env.DB, school, b.versionId);
+    const { doc, version } = await loadVersion(ctx.env.DB, school, b.versionId),
+      ref = await contacts(ctx);
     return exportWorkbook(
-      workbookDocument(mergeContacts(doc, await contacts(ctx), { includeUnlisted: false }), b.scope),
+      workbookDocument(mergeContacts(doc, ref, { includeUnlisted: false }), b.scope, ref),
       b.scope,
       school,
       version.revision,
@@ -2477,32 +2756,103 @@ export async function handle(ctx) {
       "CAPABILITY_DENIED",
       403,
     );
+    const versionId = id(b.versionId);
+    await loadVersion(ctx.env.DB, school, versionId);
     const archive = await one(
       ctx.env.DB,
       "SELECT hidden_before FROM deploy_audit_display WHERE school_id=? AND actor_id=?",
       [school, ctx.principal.actorId],
     );
+    const hiddenBefore = b.includeArchived ? 0 : archive?.hidden_before || 0;
+    const formatAuditRow = (r) => {
+      const details = JSON.parse(r.details);
+      const hasFieldDiff =
+        details?.before !== undefined || details?.after !== undefined;
+      return {
+        id: r.id,
+        operationId: r.operationId,
+        at: r.at,
+        actor: details?.actorLabel || r.actor,
+        originalActor: r.actor,
+        action: details?.operationLabel || r.action,
+        capabilityAction: r.action,
+        details,
+        hasFieldDiff,
+      };
+    };
+    const requestedDetail = b.detailId ?? b.eventId;
+    if (requestedDetail !== undefined && requestedDetail !== null && requestedDetail !== "") {
+      const detailId = id(requestedDetail);
+      const row = await one(
+        ctx.env.DB,
+        "SELECT event_id AS id,operation_id AS operationId,actor_id AS actor,action,recorded_at AS at,details_json AS details FROM product_audit WHERE school_id=? AND event_id=? AND (json_extract(details_json,'$.version')=? OR json_extract(details_json,'$.versionId')=?)",
+        [school, detailId, versionId, versionId],
+      );
+      check(
+        row,
+        "Audit event not found for this version.",
+        "AUDIT_EVENT_NOT_FOUND",
+        404,
+      );
+      const formatted = formatAuditRow(row);
+      const historicalNotice = {
+        recorded: false,
+        note: "Before/after field values were not recorded for this historical audit event.",
+        metadata: formatted.details,
+      };
+      return {
+        versionId,
+        event: {
+          ...formatted,
+          before: formatted.hasFieldDiff
+            ? (formatted.details.before ?? null)
+            : historicalNotice,
+          after: formatted.hasFieldDiff
+            ? (formatted.details.after ?? null)
+            : historicalNotice,
+        },
+      };
+    }
+    const pageSize =
+      b.limit !== undefined ? finite(Number(b.limit), 1, 40) : 40;
     let at = Number.MAX_SAFE_INTEGER,
       event = "";
     if (b.cursor) {
-      const parts = String(b.cursor).split("|");
-      at = finite(Number(parts[0]), 0, Number.MAX_SAFE_INTEGER);
-      event = parts.slice(1).join("|");
+      const raw = String(b.cursor);
+      const sep = raw.indexOf("|");
+      check(sep > 0 && sep < raw.length - 1, "Invalid audit cursor.", "INVALID_CURSOR", 400);
+      at = finite(Number(raw.slice(0, sep)), 0, Number.MAX_SAFE_INTEGER);
+      event = raw.slice(sep + 1);
+      check(event.length > 0 && event.length <= 200, "Invalid audit cursor.", "INVALID_CURSOR", 400);
     }
+    const totalRow = await one(
+      ctx.env.DB,
+      "SELECT COUNT(*) AS total FROM product_audit WHERE school_id=? AND (json_extract(details_json,'$.version')=? OR json_extract(details_json,'$.versionId')=?) AND recorded_at>=?",
+      [school, versionId, versionId, hiddenBefore],
+    );
+    const total = Number(totalRow?.total || 0);
     const rows = await query(
       ctx.env.DB,
-      "SELECT event_id AS id,actor_id AS actor,action,recorded_at AS at,details_json AS details FROM product_audit WHERE school_id=? AND (recorded_at<? OR (recorded_at=? AND event_id<?)) AND recorded_at>=? ORDER BY recorded_at DESC,event_id DESC LIMIT 40",
+      "SELECT event_id AS id,operation_id AS operationId,actor_id AS actor,action,recorded_at AS at,details_json AS details FROM product_audit WHERE school_id=? AND (json_extract(details_json,'$.version')=? OR json_extract(details_json,'$.versionId')=?) AND recorded_at>=? AND (recorded_at<? OR (recorded_at=? AND event_id<?)) ORDER BY recorded_at DESC,event_id DESC LIMIT ?",
       [
         school,
+        versionId,
+        versionId,
+        hiddenBefore,
         at,
         at,
         event,
-        b.includeArchived ? 0 : archive?.hidden_before || 0,
+        pageSize + 1,
       ],
     );
+    const hasMore = rows.length > pageSize;
+    const pageRows = hasMore ? rows.slice(0, pageSize) : rows;
     return {
-      events: rows.map((r) => ({ ...r, details: JSON.parse(r.details) })),
-      cursor: rows.length === 40 ? rows.at(-1).at + "|" + rows.at(-1).id : null,
+      versionId,
+      total,
+      archiveScope: "school-admin",
+      events: pageRows.map(formatAuditRow),
+      cursor: hasMore ? pageRows.at(-1).at + "|" + pageRows.at(-1).id : null,
     };
   }
 
@@ -2601,7 +2951,7 @@ export async function handle(ctx) {
       if (op.receipt) return op.receipt.result;
       const loaded = await loadVersion(ctx.env.DB, school, b.versionId),
         ref = await contacts(ctx),
-        next = mergeContacts(loaded.doc, ref);
+        next = mergeContacts(loaded.doc, ref, { refreshMemberships: true, preserveDraftFields: true });
       let delta;
       try {
         delta = changesFor(school, b.versionId, loaded.rows, next);
@@ -2763,37 +3113,231 @@ export async function internal(ctx) {
   return value;
 }
 
+async function assertNoCrossDraftTTbCollision(
+  db,
+  schoolId,
+  excludeVersionId,
+  excludeStaffId,
+  candidateTtbName,
+  options = {},
+) {
+  const target = String(candidateTtbName || "").trim().toLowerCase();
+  if (!target) return;
+  const rows = await query(
+    db,
+    "SELECT r.version_id, r.scope, r.row_id, r.value FROM deploy_rows r JOIN deploy_versions v ON v.school_id=r.school_id AND v.id=r.version_id WHERE r.school_id=? AND v.deleted=0 AND r.scope IN ('teachers','teacherDrafts') AND (? IS NULL OR r.version_id<>?) LIMIT 10000",
+    [schoolId, excludeVersionId, excludeVersionId],
+  );
+  const byVersionStaff = new Map();
+  for (const row of rows) {
+    if (excludeStaffId && row.row_id === excludeStaffId) continue;
+    let parsed;
+    try {
+      parsed = JSON.parse(row.value);
+    } catch {
+      continue;
+    }
+    const key = `${row.version_id}\0${row.row_id}`;
+    const entry = byVersionStaff.get(key) || { teacher: null, draft: null };
+    if (row.scope === "teachers") entry.teacher = parsed;
+    else entry.draft = parsed;
+    byVersionStaff.set(key, entry);
+  }
+  for (const { teacher, draft } of byVersionStaff.values()) {
+    const names = [];
+    const existing = String(
+      teacher?.ttbName || teacher?.profile?.["TTb Name"] || teacher?.name || "",
+    )
+      .trim()
+      .toLowerCase();
+    if (!options.draftOverridesOnly && existing) {
+      names.push(existing);
+    }
+    if (draft) {
+      const draftBasic = String(
+        draft["Basic Name"] ?? teacher?.profile?.["Basic Name"] ?? "",
+      ).trim();
+      if (draftBasic) {
+        const split = (v) =>
+          Array.isArray(v)
+            ? v
+            : String(v || "")
+                .split(/[;,]/)
+                .map((s) => s.trim())
+                .filter(Boolean);
+        const derived = previewTTb({
+          basicName: draftBasic,
+          role: String(draft.Role ?? teacher?.profile?.Role ?? "").trim(),
+          employmentTags: split(
+            draft["Employment Modifier"] ??
+              teacher?.profile?.["Employment Modifier"],
+          ),
+          subjectTags: split(
+            draft["Subject Modifier"] ?? teacher?.profile?.["Subject Modifier"],
+          ),
+          mkTags: split(
+            draft["MK Modifier"] ?? teacher?.profile?.["MK Modifier"],
+          ),
+        });
+        const derivedLower =
+          derived.available && derived.name
+            ? derived.name.trim().toLowerCase()
+            : "";
+        if (!options.draftOverridesOnly || derivedLower !== existing) {
+          names.push(draftBasic.toLowerCase());
+          if (derivedLower) names.push(derivedLower);
+        }
+      }
+    }
+    if (names.includes(target)) {
+      check(
+        false,
+        "Another active Deploy draft already reserves this TTb Name. Use a distinct name or delete the conflicting draft.",
+        "DUPLICATE_TTB_NAME",
+        409,
+      );
+    }
+  }
+}
+
+function normalizeTagContributionValue(contactsField, value) {
+  if (contactsField === "employmentActive") {
+    return value === true || value === "Y";
+  }
+  if (["employmentTags", "subjectTags", "mkTags"].includes(contactsField)) {
+    if (value === null || value === "") return [];
+    if (Array.isArray(value)) {
+      return value.map((v) => String(v || "").trim()).filter(Boolean);
+    }
+    return String(value)
+      .split(/[;,]/)
+      .map((v) => v.trim())
+      .filter(Boolean);
+  }
+  if (value === null) return null;
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    return trimmed === "" ? null : trimmed;
+  }
+  return value;
+}
+
 function contributions(doc, publicationId, operationId, actorId, envelope = {}) {
   const fields = {
     "Basic Name": "basicName",
     Role: "role",
+    "EO Appt Level": "eoAppointmentLevel",
     "Appointment Status": "appointmentStatus",
+    "Employment Arrangement": "employmentArrangement",
+    "Employment Status": "employmentStatus",
+    "School Section": "schoolSection",
+    "Personnel Category": "personnelCategory",
     "Employment Modifier": "employmentTags",
     "Subject Modifier": "subjectTags",
+    "MK Modifier": "mkTags",
     Active: "employmentActive",
   };
+  const copiedTagFields = {
+    Role: "role",
+    "EO Appt Level": "eoAppointmentLevel",
+    "Appointment Status": "appointmentStatus",
+    "Employment Arrangement": "employmentArrangement",
+    "Employment Status": "employmentStatus",
+    "School Section": "schoolSection",
+    "Personnel Category": "personnelCategory",
+    "Employment Modifier": "employmentTags",
+    "Subject Modifier": "subjectTags",
+    "MK Modifier": "mkTags",
+  };
+  const publishedAt = Number.isSafeInteger(envelope.publishedAt)
+    ? envelope.publishedAt
+    : doc.from
+      ? Date.parse(doc.from + "T00:00:00+08:00")
+      : null;
   const ordinary = Object.entries(doc.teacherDrafts || {}).flatMap(([staffId, values]) =>
     Object.entries(values)
       .filter(([field]) => Object.hasOwn(fields, field))
-      .map(([field, value]) => ({
-        staffId,
-        field: fields[field],
-        proposedValue:
-          field === "Active" ? value === true || value === "Y" : value,
-        acceptedBaseFieldRevision:
-          doc.teachers.find((t) => t.id === staffId)?.fieldRevisions?.[
-            fields[field]
-          ] ?? 0,
-        validFrom: doc.from ? Date.parse(doc.from + "T00:00:00+08:00") : null,
-        sourcePublicationId: publicationId,
-        sourceOperationId: operationId,
-        originalActorId: actorId,
-      })),
+      .map(([field, value]) => {
+        const contactsField = fields[field];
+        const basicNameProvenance =
+          contactsField === "basicName"
+            ? doc.teacherDraftMeta?.[staffId]?.basicNameProvenance ?? null
+            : null;
+        const basicNameChangedAt = basicNameProvenance?.changedAt ?? null;
+        const basicNameOperationId =
+          typeof basicNameProvenance?.operationId === "string" &&
+          basicNameProvenance.operationId
+            ? basicNameProvenance.operationId
+            : null;
+        return {
+          staffId,
+          field: contactsField,
+          proposedValue: normalizeTagContributionValue(contactsField, value),
+          acceptedBaseFieldRevision:
+            doc.teachers.find((t) => t.id === staffId)?.fieldRevisions?.[
+              contactsField
+            ] ?? 0,
+          directTagPublicationVersion: 1,
+          ...(Number.isSafeInteger(basicNameChangedAt)
+            ? { basicNameChangedAt }
+            : {}),
+          ...(basicNameOperationId ? { basicNameOperationId } : {}),
+          validFrom: publishedAt,
+          sourcePublicationId: publicationId,
+          sourceOperationId: operationId,
+          originalActorId: actorId,
+        };
+      }),
   );
+  // C08: for any copied deployment tag not explicitly overridden in teacherDrafts,
+  // publish the version's copied value whenever current Contacts has drifted from
+  // the version's copied snapshot.
+  const copiedOrdinary = (doc.teachers || []).flatMap((t) => {
+    const copied = t.copiedDeploymentTags;
+    if (!copied || typeof copied !== "object") return [];
+    const draft = doc.teacherDrafts?.[t.id] || {};
+    const currentTags = t.deploymentTags || {};
+    return Object.entries(copied)
+      .filter(
+        ([label]) =>
+          Object.hasOwn(copiedTagFields, label) && !Object.hasOwn(draft, label),
+      )
+      .flatMap(([label, copiedVal]) => {
+        const contactsField = copiedTagFields[label];
+        const proposedValue = normalizeTagContributionValue(
+          contactsField,
+          copiedVal,
+        );
+        const currentDefined = Object.hasOwn(currentTags, label);
+        const currentNormalized = currentDefined
+          ? normalizeTagContributionValue(contactsField, currentTags[label])
+          : undefined;
+        if (
+          currentDefined &&
+          canonical(currentNormalized) === canonical(proposedValue)
+        ) {
+          return [];
+        }
+        return [
+          {
+            staffId: t.id,
+            field: contactsField,
+            proposedValue,
+            acceptedBaseFieldRevision: t.fieldRevisions?.[contactsField] ?? 0,
+            directTagPublicationVersion: 1,
+            validFrom: publishedAt,
+            sourcePublicationId: publicationId,
+            sourceOperationId: operationId,
+            originalActorId: actorId,
+          },
+        ];
+      });
+  });
+  const allOrdinary = ordinary.concat(copiedOrdinary);
   // This marker is part of the immutable payload. Never reinterpret historical
   // publications after a code upgrade, or turn unknown facts into empty lists.
-  if (envelope.membershipPublicationVersion !== 1) return ordinary;
-  return ordinary.concat(doc.teachers.flatMap(t => {
+  if (envelope.membershipPublicationVersion !== 1) return allOrdinary;
+  return allOrdinary.concat(doc.teachers.flatMap(t => {
     const authority = envelope.authorityPublicationVersion === 1 ? authorityValue(doc, t) : null;
     if (!authority && !Object.hasOwn(t.deploymentTags || {}, "Memberships")) return [];
     return [{

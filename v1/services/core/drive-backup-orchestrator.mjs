@@ -22,6 +22,11 @@ import {
   singaporeDay,
 } from "../../runtime/drive-backup.mjs";
 import { lastDailyCheck } from "../../runtime/drive-backup-jobs.mjs";
+import {
+  listBackupDatasets,
+  buildBackupDataset,
+  encodeBackupWorkbook,
+} from "../../runtime/drive-backup-data.mjs";
 
 export const BACKUP_OWNERS = [
   "contacts",
@@ -152,6 +157,19 @@ async function fencedRun(env, token, now, sql, args = []) {
 }
 
 async function streamOwnerArtifact(env, owner, { artifactKey, sha256, bytes, mimeType }) {
+  if (owner === "core") {
+    requireValue(env.ARTIFACTS?.get, "STORAGE_UNAVAILABLE", 503);
+    const obj = await env.ARTIFACTS.get(artifactKey);
+    requireValue(obj, "DRIVE_BACKUP_ARTIFACT_MISSING", 404);
+    const raw = new Uint8Array(await obj.arrayBuffer());
+    requireValue(raw.length <= MAX_ARTIFACT_BYTES, "DRIVE_BACKUP_BOUNDS", 413);
+    requireValue(
+      raw.length === bytes && (await sha256Bytes(raw)) === sha256,
+      "DRIVE_BACKUP_ARTIFACT_INTEGRITY",
+      409,
+    );
+    return raw;
+  }
   const binding = env[owner.toUpperCase()];
   requireValue(binding?.fetch && env.GSIS_SECRET, "DEPENDENCY_UNAVAILABLE", 503);
   let response;
@@ -206,6 +224,41 @@ async function streamOwnerArtifact(env, owner, { artifactKey, sha256, bytes, mim
 }
 
 async function exportOwnerDataset(env, dataset, now) {
+  if (dataset.owner === "core") {
+    const coreEnv = { ...env, SERVICE_NAME: "core" };
+    const datasets = await listBackupDatasets(coreEnv);
+    const def = datasets.find((d) => d.id === dataset.dataset);
+    requireValue(def, "BACKUP_DATASET_NOT_FOUND", 404);
+    const source = await buildBackupDataset(coreEnv, def, now);
+    const bytes = source.bytes || (await encodeBackupWorkbook(source.book));
+    requireValue(
+      bytes instanceof Uint8Array && bytes.length <= MAX_ARTIFACT_BYTES,
+      "DRIVE_BACKUP_BOUNDS",
+      413,
+    );
+    const sha256 = await sha256Bytes(bytes);
+    const ext = /^[a-z0-9]{1,12}$/.test(def.extension || "xlsx")
+      ? def.extension || "xlsx"
+      : "xlsx";
+    const safeDataset = String(def.id).replace(/[^A-Za-z0-9._-]/g, "_");
+    const artifactKey = `schools/${env.SCHOOL_ID}/central-backup/${safeDataset}/${sha256}.${ext}`;
+    requireValue(env.ARTIFACTS?.put, "STORAGE_UNAVAILABLE", 503);
+    await env.ARTIFACTS.put(artifactKey, bytes);
+    return {
+      owner: "core",
+      schoolId: env.SCHOOL_ID,
+      dataset: def.id,
+      name: def.name,
+      sourceDigest: source.sourceDigest,
+      sha256,
+      bytes: bytes.length,
+      artifactKey,
+      mimeType: def.mimeType || XLSX_MIME,
+      extension: ext,
+      importable: !!def.importable,
+      observedAt: now,
+    };
+  }
   try {
     return await serviceCall(env, dataset.owner, "/internal/backup-export", {
       schoolId: env.SCHOOL_ID,
@@ -1106,6 +1159,166 @@ export async function handleCentralBackups(ctx) {
     });
     await resolveAdmission(env, env.DB, op, admission, receipt, now);
     return { ...receipt.result, receipt };
+  }
+
+  if (path === "/admin/backups/discover") {
+    const requestedOwners = Array.isArray(body.owners) && body.owners.length
+      ? body.owners.filter((o) => BACKUP_OWNERS.includes(o))
+      : BACKUP_OWNERS;
+    const register = body.register === true;
+    const driveId = register ? String(body.driveId || "") : "";
+    const rootId = register ? String(body.rootId || "") : "";
+    const folderByOwner =
+      body.folderByOwner && typeof body.folderByOwner === "object"
+        ? body.folderByOwner
+        : {};
+    if (register) {
+      requireValue(
+        VALID_DRIVE_ID.test(driveId) && VALID_DRIVE_ID.test(rootId),
+        "DRIVE_BACKUP_ID",
+        400,
+      );
+    }
+    const discovered = [];
+    const errors = [];
+    for (const owner of requestedOwners) {
+      try {
+        const res =
+          owner === "core"
+            ? {
+                datasets: (
+                  await listBackupDatasets({ ...env, SERVICE_NAME: "core" })
+                ).map((d) => ({
+                  id: d.id,
+                  name: d.name,
+                  mimeType: d.mimeType || XLSX_MIME,
+                  extension: d.extension || "xlsx",
+                  importable: !!d.importable,
+                })),
+              }
+            : await serviceCall(env, owner, "/internal/backup-datasets", {
+                schoolId: env.SCHOOL_ID,
+              });
+        for (const ds of res?.datasets || []) {
+          const entry = {
+            owner,
+            dataset: ds.id,
+            name: ds.name,
+            mimeType: ds.mimeType || XLSX_MIME,
+            extension: ds.extension || "xlsx",
+            importable: !!ds.importable,
+            adoptedFileId: ds.adoptedFileId || null,
+            adoptedDay: ds.adoptedDay || null,
+            adoptedSourceDigest: ds.adoptedSourceDigest || null,
+            adoptedSha256: ds.adoptedSha256 || null,
+            adoptedBytes: ds.adoptedBytes ?? null,
+            adoptedVerifiedAt: ds.adoptedVerifiedAt ?? null,
+            registered: false,
+            adopted: false,
+          };
+          if (register) {
+            const folderId = String(
+              folderByOwner[owner] || ds.adoptedFolderId || rootId,
+            );
+            if (VALID_DRIVE_ID.test(folderId) && VALID_ID.test(entry.dataset)) {
+              const hasAdoption =
+                entry.adoptedFileId &&
+                VALID_DRIVE_ID.test(entry.adoptedFileId) &&
+                entry.adoptedDay &&
+                /^\d{4}-\d{2}-\d{2}$/.test(entry.adoptedDay) &&
+                entry.adoptedSha256;
+              const adoptedDigest =
+                entry.adoptedSourceDigest || entry.adoptedSha256 || null;
+              const adoptedVerifiedAt =
+                Number.isSafeInteger(entry.adoptedVerifiedAt) &&
+                entry.adoptedVerifiedAt > 0
+                  ? entry.adoptedVerifiedAt
+                  : now;
+              await run(
+                env.DB,
+                `INSERT INTO core_backup_datasets(
+                  school_id,owner,dataset,name,folder_id,drive_id,root_id,mime_type,extension,importable,
+                  status,source_digest,verified_digest,remote_verified_at,updated_at
+                ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                ON CONFLICT(school_id,owner,dataset) DO UPDATE SET
+                  name=excluded.name,
+                  folder_id=excluded.folder_id,
+                  drive_id=excluded.drive_id,
+                  root_id=excluded.root_id,
+                  mime_type=excluded.mime_type,
+                  extension=excluded.extension,
+                  importable=excluded.importable,
+                  source_digest=COALESCE(core_backup_datasets.source_digest,excluded.source_digest),
+                  verified_digest=COALESCE(core_backup_datasets.verified_digest,excluded.verified_digest),
+                  remote_verified_at=COALESCE(core_backup_datasets.remote_verified_at,excluded.remote_verified_at),
+                  updated_at=excluded.updated_at`,
+                [
+                  env.SCHOOL_ID,
+                  owner,
+                  entry.dataset,
+                  entry.name,
+                  folderId,
+                  driveId,
+                  rootId,
+                  entry.mimeType,
+                  entry.extension,
+                  entry.importable ? 1 : 0,
+                  hasAdoption ? "current" : "never-backed-up",
+                  hasAdoption ? adoptedDigest : null,
+                  hasAdoption ? adoptedDigest : null,
+                  hasAdoption ? adoptedVerifiedAt : null,
+                  now,
+                ],
+              );
+              if (hasAdoption) {
+                await run(
+                  env.DB,
+                  `INSERT OR IGNORE INTO core_backup_jobs(
+                    school_id,owner,dataset,day,operation_id,generation,state,
+                    file_id,folder_id,drive_id,root_id,file_name,mime_type,
+                    source_digest,target_sha256,target_bytes,remote_verified_at,created_at,updated_at
+                  ) VALUES(?,?,?,?,?,1,'verified',?,?,?,?,?,?,?,?,?,?,?,?)`,
+                  [
+                    env.SCHOOL_ID,
+                    owner,
+                    entry.dataset,
+                    entry.adoptedDay,
+                    `adopted:${owner}:${entry.dataset}:${entry.adoptedDay}`,
+                    entry.adoptedFileId,
+                    folderId,
+                    driveId,
+                    rootId,
+                    centralFileName(
+                      entry.adoptedDay,
+                      owner,
+                      entry.name,
+                      entry.extension,
+                    ),
+                    entry.mimeType,
+                    adoptedDigest,
+                    entry.adoptedSha256,
+                    entry.adoptedBytes ?? null,
+                    adoptedVerifiedAt,
+                    now,
+                    now,
+                  ],
+                );
+              }
+              entry.registered = true;
+              entry.adopted = !!hasAdoption;
+            }
+          }
+          discovered.push(entry);
+        }
+      } catch (err) {
+        errors.push({ owner, code: err?.code || "DISCOVERY_FAILED", message: err?.message || "Discovery failed." });
+      }
+    }
+    return {
+      owners: requestedOwners,
+      discovered,
+      errors,
+    };
   }
 
   if (path === "/admin/backups/run-cycle") {

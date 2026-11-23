@@ -1116,6 +1116,190 @@ try {
   console.log(
     "PASS delayed direct-form completion cannot close a replacement modal.",
   );
+
+  // #245 Regression Handoff Scenario 6: Review of queued addTeacher / removeTeacher edits shows
+  // escaped human-readable teacher, class/TG, subject labels and Assigned / Not assigned wording,
+  // while genuinely missing references display Unavailable teacher.
+  const createdStaff = await suite.call(actor, "contacts", "/staff/create", {
+    operationId: "review-create-teacher",
+    basicName: "Tan <Escaped> Teacher",
+    employmentActive: true,
+    schoolSection: "Primary",
+  });
+  const reviewStaffId = createdStaff.result?.staffId || createdStaff.staffId;
+  await suite.call(actor, "contacts", `/staff/${reviewStaffId}/accept`, {
+    operationId: "review-accept-eo",
+    field: "eo",
+    value: true,
+    revision: 0,
+    ownerReviewReference: "Synthetic review fixture",
+  });
+  const reviewVersionId = activeVersion;
+  const bootForReview0 = await suite.call(actor, "deploy", "/bootstrap", {
+    versionId: reviewVersionId,
+  });
+  const acceptLease = await suite.call(actor, "deploy", "/lease", {
+    operationId: "review-lease-accept-contacts",
+    versionId: reviewVersionId,
+    scope: "meta",
+    clientId: "review-fixture-client",
+  });
+  await suite.call(actor, "deploy", "/change", {
+    operationId: "review-accept-contacts",
+    versionId: reviewVersionId,
+    revision: bootForReview0.current.revision,
+    scope: "meta",
+    clientId: "review-fixture-client",
+    leaseFence: acceptLease.fence,
+    operation: "acceptContacts",
+  });
+  const bootForReview = await suite.call(actor, "deploy", "/bootstrap", {
+    versionId: reviewVersionId,
+  });
+  const reviewLease = await suite.call(actor, "deploy", "/lease", {
+    operationId: "review-lease-class",
+    versionId: reviewVersionId,
+    scope: "meta",
+    clientId: "review-fixture-client",
+  });
+  await suite.call(actor, "deploy", "/change", {
+    operationId: "review-add-class",
+    versionId: reviewVersionId,
+    revision: bootForReview.current.revision,
+    scope: "meta",
+    clientId: "review-fixture-client",
+    leaseFence: reviewLease.fence,
+    operation: "saveDraft",
+    edits: [
+      {
+        operation: "addClass",
+        ref: "cls-review-1",
+        level: "1",
+        name: "Graciousness",
+        shortName: "Gc",
+        expected: null,
+      },
+    ],
+  });
+  await page.evaluate(() => GSISV1.clearProtectedState());
+  await page.reload();
+  await page.waitForFunction(() => !!current && !!v());
+  await page.locator("#version").selectOption(reviewVersionId);
+  await page.waitForFunction(
+    ([vid, sid]) =>
+      current === vid &&
+      !!v()?.classes?.some((c) => c.ref === "cls-review-1") &&
+      !!v()?.teachers?.some((t) => t.id === sid),
+    [reviewVersionId, reviewStaffId],
+  );
+  const reviewCheck = await page.evaluate(async (sid) => {
+    const doc = v();
+    const cls = doc.classes.find((c) => c.ref === "cls-review-1");
+    const target = classKey(cls);
+    queueCell({
+      operation: "addTeacher",
+      target,
+      targetRef: cls.ref,
+      subject: "EL",
+      level: cls.level,
+      teacher: sid,
+      expected: false,
+    });
+    queueCell({
+      operation: "addTeacher",
+      target,
+      targetRef: cls.ref,
+      subject: "Math",
+      level: cls.level,
+      teacher: "staff-genuinely-missing",
+      expected: false,
+    });
+    await resolveQueue();
+    const headings = [...document.querySelectorAll("dialog[open] [data-review-content] section h3")].map(
+      (n) => n.textContent,
+    );
+    const pres = [...document.querySelectorAll("dialog[open] [data-review-content] section pre")].map(
+      (n) => n.textContent,
+    );
+    const hasRawTag = document.querySelector("dialog[open] [data-review-content] escaped") !== null;
+    document.querySelector("dialog[open]")?.close();
+    discardDrafts();
+    return { headings, pres, hasRawTag, teacherId: sid, target };
+  }, reviewStaffId);
+  assert.equal(reviewCheck.hasRawTag, false, "display text must be escaped, never parsed as HTML");
+  assert(
+    reviewCheck.headings.some(
+      (h) => h.includes("Assign Tan <Escaped> Teacher to ") && h.includes("· EL"),
+    ),
+    "Review heading shows readable teacher/class/subject label: " + JSON.stringify(reviewCheck.headings),
+  );
+  assert(
+    reviewCheck.headings.some(
+      (h) => h.includes("Assign Unavailable teacher to ") && h.includes("· Math"),
+    ),
+    "Review heading shows Unavailable teacher for genuinely missing ID: " + JSON.stringify(reviewCheck.headings),
+  );
+  assert(
+    reviewCheck.headings.every((h) => !h.includes(reviewCheck.teacherId)),
+    "Review heading does not expose opaque staffId",
+  );
+  assert(
+    reviewCheck.pres.some(
+      (p) => p.includes("Saved: Not assigned") && p.includes("Draft: Assigned"),
+    ),
+    "Review pre shows Assigned/Not assigned wording: " + JSON.stringify(reviewCheck.pres),
+  );
+  console.log(
+    "PASS #245/#247 readable assignment-review labels show persisted teacher/class/subject, Unavailable fallback, and Assigned/Not assigned with escaped text.",
+  );
+
+  // #245 Regression Handoff Scenario 1: Unrelated retained old pending operation + fresh Deploy edits
+  // encountering a pre-dispatch refusal keeps all new edits editable, clears queueFlight, creates no
+  // phantom pending entry, and sends zero /lease or /change requests.
+  await page.evaluate(async (sid) => {
+    const doc = v();
+    const cls = doc.classes.find((c) => c.ref === "cls-review-1");
+    const target = classKey(cls);
+    queueCell({
+      operation: "addTeacher",
+      target,
+      targetRef: cls.ref,
+      subject: "EL",
+      level: cls.level,
+      teacher: sid,
+      expected: false,
+    });
+  }, reviewStaffId);
+  const requestsBeforeUnsent = requests.length;
+  const unsentState = await page.evaluate(async () => {
+    const origSetItem = Storage.prototype.setItem;
+    Storage.prototype.setItem = () => {
+      throw new DOMException("Synthetic quota full", "QuotaExceededError");
+    };
+    try {
+      await pumpQueue();
+    } finally {
+      Storage.prototype.setItem = origSetItem;
+    }
+    return {
+      flight: queueFlight,
+      queuedCount: queuedEdits().length,
+      pendingDeploy: GSISV1.pending().filter((e) => e.service === "deploy" && !e.terminal).length,
+    };
+  });
+  assert.equal(unsentState.flight, null, "definitely-unsent refusal must not lock queueFlight");
+  assert.equal(unsentState.queuedCount, 1, "new draft edits remain editable in cellQueue");
+  assert.equal(unsentState.pendingDeploy, 0, "no phantom pending deploy operation created");
+  assert.equal(
+    requests.length,
+    requestsBeforeUnsent,
+    "pre-dispatch refusal sends zero /lease or /change requests",
+  );
+  await page.evaluate(() => discardDrafts());
+  console.log(
+    "PASS #245 Scenario 1: pre-dispatch refusal keeps fresh Deploy edits editable with zero phantom operations or network writes.",
+  );
+
   assert.deepEqual(errors, []);
 } finally {
   await browser?.close();

@@ -224,11 +224,27 @@ function render() {
 }
 async function load() {
   const ticket = securityEpoch;
-  const loaded = await api.request("layout", "/owned-data?year=" + year());
-  if (ticket !== securityEpoch) return;
-  snapshot = loaded;
-  render();
-  message("Layout " + year() + " revision " + snapshot.revision);
+  try {
+    const loaded = await api.request("layout", "/owned-data?year=" + year());
+    if (ticket !== securityEpoch) return;
+    snapshot = loaded;
+    render();
+    message("Layout " + year() + " revision " + snapshot.revision);
+  } catch (error) {
+    if (ticket !== securityEpoch) return;
+    if (error?.code === "SNAPSHOT_NOT_INITIALIZED") {
+      snapshot = null;
+      panel.querySelector("[data-rows]").replaceChildren();
+      const initialDetails = panel.querySelector("[data-initial-source]")?.closest("details");
+      if (initialDetails && !initialDetails.hidden) initialDetails.open = true;
+      message(
+        `No Layout snapshot exists for ${year()} yet. Use Initial source setup below to import the first timetable/Layout snapshot, or publish from Deploy.`,
+        false,
+      );
+      return;
+    }
+    throw error;
+  }
 }
 panel.querySelector("[data-load]").onclick = () =>
   load().catch((e) => message(e.message, true));
@@ -385,6 +401,204 @@ importReceipt.onclick = async () => {
   } catch (error) { if(ticket === securityEpoch) importMessage(error.message + ' The original operation is retained.', true); }
   finally { importReceipt.disabled = false; }
 };
+const timedPanel = document.createElement("details");
+timedPanel.id = "v1LayoutTimetablePanel";
+timedPanel.className = "gsis-panel";
+timedPanel.innerHTML =
+  '<summary>Timed timetable occupancy (aSc baseline)</summary><p>Physical venue occupancy adopted from the aSc timetable baseline. Each physical venue appears once per row with concurrent classes and raw timetable room labels. Untimed Deploy classroom planning remains separate and unchanged.</p><div class="gsis-formrow"><label>Year<input data-timed-year type="number" min="2000" max="2100"></label><label>Date (optional)<input data-timed-date type="date"></label><button type="button" data-timed-load>Load timed timetable</button></div><p data-timed-status role="status"></p><div data-timed-meta></div><div data-timed-disagreements></div><div class="gsis-scroll" data-timed-rows></div>';
+document.body.append(timedPanel);
+timedPanel.querySelector("[data-timed-year]").value =
+  new URLSearchParams(location.search).get("year") || new Date().getFullYear();
+timedPanel.querySelector("[data-timed-date]").value =
+  new URLSearchParams(location.search).get("date") || "";
+
+let timedData = null;
+let timedReadEpoch = 0;
+const timedMessage = (value, error = false) => {
+  const el = timedPanel.querySelector("[data-timed-status]");
+  el.textContent = value;
+  el.classList.toggle("gsis-error", error);
+};
+const formatSgtTime = (ms) =>
+  new Intl.DateTimeFormat("en-SG", {
+    timeZone: "Asia/Singapore",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(new Date(Number(ms)));
+
+function renderTimedTimetable() {
+  const host = timedPanel.querySelector("[data-timed-rows]");
+  const metaHost = timedPanel.querySelector("[data-timed-meta]");
+  const disagreeHost = timedPanel.querySelector("[data-timed-disagreements]");
+  if (host.previousElementSibling?.classList.contains("gsis-core-tools"))
+    host.previousElementSibling.remove();
+  host.replaceChildren();
+  metaHost.replaceChildren();
+  disagreeHost.replaceChildren();
+  if (!timedData) return;
+
+  if (!timedData.timedSource) {
+    timedMessage(
+      `No aSc timed timetable baseline adopted for ${timedData.year}. Untimed Deploy classroom layout remains unaffected.`,
+    );
+    return;
+  }
+
+  const ts = timedData.timedSource;
+  const meta = document.createElement("p");
+  meta.dataset.timedProvenance = "";
+  const cov = ts.coverage
+    ? `${ts.coverage.from} to ${ts.coverage.to}`
+    : "coverage unknown";
+  const planningNote = timedData.planningSource
+    ? `Deploy planning copy rev ${timedData.planningSource.revision} (separate)`
+    : "No Deploy planning copy loaded (independent)";
+  meta.textContent = `Source: ${ts.sourceDomain} (${ts.sourceKind}) · seq ${ts.sequence} · rev ${ts.revision} · Coverage: ${cov} · ${planningNote}`;
+  metaHost.append(meta);
+
+  if (Array.isArray(timedData.disagreements) && timedData.disagreements.length) {
+    const notice = document.createElement("p");
+    notice.dataset.timedDisagreementsNotice = "";
+    notice.textContent =
+      "Planning/timetable differences (non-blocking): " +
+      timedData.disagreements
+        .map(
+          (d) =>
+            `${d.venueId}${d.sourceLabels?.length ? ` [${d.sourceLabels.join(", ")}]` : ""} (${d.kind})`,
+        )
+        .join("; ");
+    disagreeHost.append(notice);
+  }
+
+  if (!timedData.covered) {
+    timedMessage(
+      `Date ${timedData.date || ""} is outside adopted aSc coverage (${cov}).`,
+    );
+    return;
+  }
+
+  const venues = timedData.venues || [];
+  if (!venues.length) {
+    timedMessage(
+      `Adopted aSc timetable has no scheduled venue lessons for ${timedData.date || timedData.year}.`,
+    );
+    return;
+  }
+
+  // Collect distinct time slots across all physical venues
+  const slotMap = new Map();
+  const multiDate = !timedData.date &&
+    new Set(venues.flatMap((v) => (v.lessons || []).map((l) => l.date))).size > 1;
+  for (const v of venues) {
+    for (const l of v.lessons || []) {
+      const key = `${l.date}|${l.start}|${l.end}`;
+      if (!slotMap.has(key)) {
+        slotMap.set(key, {
+          key,
+          date: l.date,
+          start: l.start,
+          end: l.end,
+          label: `${multiDate ? l.date + " " : ""}${formatSgtTime(l.start)}–${formatSgtTime(l.end)}`,
+        });
+      }
+    }
+  }
+  const slots = [...slotMap.values()].sort(
+    (a, b) => a.start - b.start || a.end - b.end || a.date.localeCompare(b.date),
+  );
+
+  const table = document.createElement("table");
+  table.dataset.layoutTimedTable = "";
+  const headRow = table.createTHead().insertRow();
+  for (const title of ["Physical venue", "Raw aSc room labels"]) {
+    const th = document.createElement("th");
+    th.scope = "col";
+    th.textContent = title;
+    headRow.append(th);
+  }
+  for (const slot of slots) {
+    const th = document.createElement("th");
+    th.scope = "col";
+    th.dataset.timedSlotHeader = slot.key;
+    th.textContent = slot.label;
+    headRow.append(th);
+  }
+
+  const tbody = table.createTBody();
+  for (const v of venues) {
+    const tr = tbody.insertRow();
+    tr.dataset.timedVenueRow = v.venueId;
+
+    const tdVenue = document.createElement("th");
+    tdVenue.scope = "row";
+    tdVenue.textContent = v.name && v.name !== v.venueId ? `${v.name} (${v.venueId})` : v.venueId;
+    tr.append(tdVenue);
+
+    const tdLabels = tr.insertCell();
+    tdLabels.dataset.timedRawLabels = v.venueId;
+    tdLabels.textContent = (v.sourceLabels || []).join(", ") || "—";
+
+    const bySlot = new Map();
+    for (const l of v.lessons || []) {
+      const key = `${l.date}|${l.start}|${l.end}`;
+      if (!bySlot.has(key)) bySlot.set(key, []);
+      bySlot.get(key).push(l);
+    }
+
+    for (const slot of slots) {
+      const td = tr.insertCell();
+      td.dataset.timedCell = `${v.venueId}|${slot.key}`;
+      const lessons = bySlot.get(slot.key) || [];
+      if (!lessons.length) {
+        td.textContent = "—";
+        continue;
+      }
+      const totalSlots = lessons.reduce((sum, l) => sum + (Number(l.slotDemand) || 1), 0);
+      if (lessons.length > 1 || totalSlots > 1) {
+        const badge = document.createElement("div");
+        badge.dataset.timedConcurrentCount = String(lessons.length);
+        badge.style.fontWeight = "600";
+        badge.textContent = `${lessons.length} concurrent classes (${totalSlots} slots)`;
+        td.append(badge);
+      }
+      for (const l of lessons) {
+        const item = document.createElement("div");
+        item.dataset.timedLesson = l.sourceId || "";
+        const parts = [l.className || l.groupName, l.subject].filter(Boolean).join(" ");
+        const rawTag = l.sourceLabel ? ` [${l.sourceLabel}]` : "";
+        item.textContent = (parts || l.sourceId || "Lesson") + rawTag;
+        td.append(item);
+      }
+    }
+  }
+
+  host.append(table);
+  timedMessage(
+    `Showing ${venues.length} physical venue${venues.length === 1 ? "" : "s"} across ${slots.length} time slot${slots.length === 1 ? "" : "s"}.`,
+  );
+}
+
+async function loadTimedTimetable() {
+  const ticket = ++timedReadEpoch;
+  const y = Number(timedPanel.querySelector("[data-timed-year]").value);
+  const d = timedPanel.querySelector("[data-timed-date]").value.trim();
+  const qs = new URLSearchParams({ year: String(y) });
+  if (d) qs.set("date", d);
+  timedData = null;
+  renderTimedTimetable();
+  timedMessage("Loading timed timetable…");
+  try {
+    const loaded = await api.request("layout", "/timetable?" + qs.toString());
+    if (ticket !== timedReadEpoch) return;
+    timedData = loaded;
+    renderTimedTimetable();
+  } catch (error) {
+    if (ticket === timedReadEpoch) timedMessage(error.message, true);
+  }
+}
+timedPanel.querySelector("[data-timed-load]").onclick = loadTimedTimetable;
+
 function register() { window.GSISCoreTables?.register('table[data-layout-owned]', { exportAll, importAll: openImport }); }
 register(); window.addEventListener('load', register);
 window.addEventListener('gsis:clear-protected-state', () => {
@@ -392,18 +606,27 @@ window.addEventListener('gsis:clear-protected-state', () => {
   if (recoveryKey) sessionStorage.removeItem(recoveryKey);
   recoveryKey = ''; unresolved = false;
   panel.querySelector('[data-rows]').replaceChildren(); panel.hidden = true;
+  timedReadEpoch++;
+  timedData = null;
+  renderTimedTimetable();
+  timedMessage("");
+  timedPanel.hidden = true;
 });
 
 try {
+  const startupEpoch = securityEpoch;
   const session = await api.getSession();
-  if (!session || !(api.capable("layout.edit") || api.capable("layout.admin")))
-    panel.hidden = true;
+  const canEdit = !!session && (api.capable("layout.edit") || api.capable("layout.admin"));
+  const canRead = !!session && (canEdit || api.capable("layout.read") || api.capable("admin"));
+  if (!canEdit) panel.hidden = true;
   else {
     recoveryKey = 'gsis-layout-import:' + session.schoolId + ':' + session.user.accountId;
     const pending = sessionStorage.getItem(recoveryKey);
     if (pending) { importRequest = JSON.parse(pending); unresolved = true; }
     await load();
   }
+  if (!canRead) timedPanel.hidden = true;
+  else if (startupEpoch === securityEpoch) await loadTimedTimetable();
 } catch (error) {
   message(error.message, true);
 }

@@ -596,6 +596,12 @@ async function projection(env, body, principal, now, internal = false) {
           presentation[name] = directPresentation(name, selected.record);
       }
       x.ttbNameInputs = { nameSuffix: value("nameSuffix"), presentation };
+      x.basicNameProvenance = {
+        value: r.staff.basic_name,
+        changedAt: r.fields.basicName?.accepted_at ?? r.staff.created_at ?? null,
+        source: "contacts",
+        operationId: r.fields.basicName?.operation_id ?? null,
+      };
       x.fieldRevisions = Object.fromEntries(
         DEPLOY_FIELDS.filter((name) => r.fields[name]).map((name) => [
           name,
@@ -840,7 +846,8 @@ export async function handle(ctx) {
           operationId,
           staffId: body.staffId,
           changes: { mobile: body.mobile },
-          fieldRevisions: { mobile: body.revision },
+          fieldRevisions:
+            body.revision !== undefined ? { mobile: body.revision } : {},
         };
       const p = await serviceCall(env, "core", "/internal/delegate", {
         sourceDecisionId: body.decisionId,
@@ -1033,10 +1040,15 @@ export async function handle(ctx) {
       const allowedFields = [
         "basicName",
         "role",
+        "eoAppointmentLevel",
         "appointmentStatus",
         "employmentArrangement",
+        "employmentStatus",
+        "schoolSection",
+        "personnelCategory",
         "employmentTags",
         "subjectTags",
+        "mkTags",
         "employmentActive",
         "memberships",
       ];
@@ -1932,6 +1944,17 @@ export async function handle(ctx) {
           },
         });
         await resolveAdmission(env, env.DB, op, admission, r, now);
+        if (
+          accepted ||
+          publicationAuthority ||
+          Object.hasOwn(applyChanges, "active") ||
+          Object.hasOwn(applyChanges, "employmentActive")
+        ) {
+          await serviceCall(env, "core", "/internal/authority-cache/invalidate", {
+            schoolId: env.SCHOOL_ID,
+            staffId,
+          }).catch(() => undefined);
+        }
         return r;
       } catch (e) {
         if (

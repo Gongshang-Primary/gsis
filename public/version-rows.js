@@ -32,7 +32,8 @@ async function saveVersionNote(id){
   // Keep the existing delta cursor, so unrelated remote changes are still fetched.
  }catch(e){
   d.status=e.message+' Your note is retained.';
-  if(e.status>=400&&e.status<500){d.attempt=null;d.conflict=e.status===409;}
+  const rejected=edgeCommandProtocol===1?edgeClient()?.rows.find(row=>row.requestId===attempt.requestId)?.receipt.state==='REJECTED':e.status>=400&&e.status<500;
+  if(e.notSubmitted||rejected){d.attempt=null;d.conflict=e.status===409;}
  }finally{d.saving=false;updateVersionNoteControls(id);}
 }
 async function reviewVersionNote(id){
