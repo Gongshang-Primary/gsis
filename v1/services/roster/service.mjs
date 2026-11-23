@@ -4,6 +4,7 @@ import {
   updateRosterContactMobile,
 } from "./contact-create.mjs";
 import {updateCapacityWarnings,refreshCapacityMessage,refreshNewSummaries,capacityTemplateData} from "./capacity-notifications.mjs";
+import { queueFinalRunOutcome } from "./final-run-notifications.mjs";
 import { forecastCapacity, layeredHealth } from "./capacity.mjs";
 import { allocationSnapshot } from "./allocation-snapshot.mjs";
 import { hasDatedReliefActivation, isReliefNotificationKind } from "./eligibility.mjs";
@@ -34,6 +35,7 @@ import { webhookProof, processInbound } from "./inbound.mjs";
 import { external, externalProof, issueLink } from "./external.mjs";
 export { external };
 import Operations from "../../../shared/roster-operations.js";
+import { templateFor } from "./templates.mjs";
 import Roster from "../../../shared/roster.js";
 import Allocation from "../../../shared/roster-allocation.js";
 import { ApiError, requireValue, identifier } from "../../runtime/errors.mjs";
@@ -1497,6 +1499,54 @@ async function baselineWrite(ctx) {
     ],
   });
 }
+// v0.9 baseline (Code.gs contactCreate): a new inactive external relief contact
+// asks for review in Contacts. Owner 21 Nov 2026: Contacts Power Users only.
+// One message per recipient per operation; a retry replays the original receipt.
+async function queueContactReview(ctx, created, date) {
+  const op = await prepared(ctx, "roster.contactCreate", {
+    kind: "contact-review",
+    staffId: created.person.staffId,
+  });
+  if (op.receipt) return { ...op.receipt.result, receipt: op.receipt };
+  const schoolId = ctx.principal.schoolId,
+    holders = await serviceCall(ctx.env, "core", "/internal/contacts-power-users", {
+      decisionId: ctx.principal.decisionId,
+    }),
+    ids = Array.isArray(holders?.staffIds) ? holders.staffIds.filter((id) => typeof id === "string") : [],
+    refs = ids.length
+      ? await serviceCall(ctx.env, "contacts", "/internal/projection", {
+          schoolId,
+          decisionId: ctx.principal.decisionId,
+          purpose: "roster",
+          date,
+          staffIds: ids,
+        })
+      : { people: [] },
+    people = (refs.people || refs.staff || [])
+      .filter((p) => ids.includes(p.staffId || p.id))
+      .map((p) => ({ id: p.staffId || p.id, name: p.name || p.ttbName || "", active: p.active === true, mobile: p.mobile || "" })),
+    state = { outbox: [] },
+    qctx = { people, now: ctx.now, iso: new Date(ctx.now).toISOString(), uuid: () => crypto.randomUUID() },
+    summary = "New inactive external relief contact: " + created.person.name + ". Review permanent details in Contacts.",
+    requestDate = new Intl.DateTimeFormat("en-SG", { timeZone: "Asia/Singapore", day: "numeric", month: "short", year: "numeric" }).format(new Date(ctx.now)),
+    reviewUrl = /^https:\/\/[^\s/?#]+$/.test(ctx.env.PUBLIC_ORIGIN || "") ? ctx.env.PUBLIC_ORIGIN + "/contacts/" : "";
+  for (const person of people)
+    Operations.queue(state, qctx, "contact_review", person.id, date, {
+      templateKey: "contact_review",
+      summary,
+      staffId: created.person.staffId,
+      recipient_name: person.name,
+      request_date: requestDate,
+      contact_review_details: summary,
+      contacts_review_url: reviewUrl,
+    }, null, "contact-created:" + op.operationId + ":" + person.id);
+  const jobs = state.outbox.filter((j) => j.status === "queued");
+  return commit(ctx, op, {
+    result: { ...created, notificationsQueued: jobs.length },
+    audit: { kind: "contact-review", staffId: created.person.staffId, recipients: jobs.length },
+    outbox: jobs.map((j) => ({ id: j.id, type: "roster-notification", payload: j, dueAt: ctx.now })),
+  });
+}
 async function offlineEdits(ctx) {
   const schoolId = ctx.principal.schoolId,
     { row, value } = await daySource(
@@ -1870,8 +1920,11 @@ async function operations(ctx) {
     configRevision = await scopeRevision(ctx.env.DB, schoolId, "config"),
     loaded = await loadState(ctx.env.DB, schoolId, range, { recordIds: ids });
   loaded.state.revision = revision;
-  if (opName === "contactCreate")
-    return createRosterContact(ctx, { revision, date: range.from });
+  if (opName === "contactCreate") {
+    const created = await createRosterContact(ctx, { revision, date: range.from });
+    if (created?.saved !== true || body.staffId || body.existingStaffId) return created;
+    return queueContactReview(ctx, created, range.from);
+  }
   if (opName === "adHocUpdateMobile")
     return updateRosterContactMobile(ctx, { revision, date: range.from });
   if (opName === "receiptStatus") {
@@ -2861,6 +2914,8 @@ export async function scheduled(ctx) {
     [
       "roster-notification",
       "roster-inbox-reply",
+      "roster-public-menu-reply",
+      "roster-inbox-alert",
       "roster-venues-complete",
       "roster-layout-timed",
       "roster-burrows",
@@ -2934,6 +2989,7 @@ async function scheduledCommunication(ctx, slot) {
     );
   await updateCapacityWarnings(local, loaded, next, c, range.dates, revision);
   await refreshNewSummaries(local, loaded, next, c, revision);
+  queueFinalRunOutcome(next, c, body.tick);
   const op = await prepared(local, "roster.scheduled-notifications", body),
     quotaPlan = await captureObservedQuotas(local, loaded, next, c),
     change = await recordChanges(schoolId, loaded.before, next, loaded.records),
@@ -3067,24 +3123,6 @@ async function currentScheduledPrincipal(
     resourceId,
     now,
   });
-}
-function templateFor(env, key, data) {
-  const configured = JSON.parse(env.WHATSAPP_TEMPLATES_JSON || "{}"),
-    t = Array.isArray(configured)
-      ? configured.find((t) => t.key === key)
-      : configured[key];
-  requireValue(t && typeof t.name === "string", "TEMPLATE_NOT_CONFIGURED", 503);
-  const parameters = (t.parameters || []).map((field) => ({
-    type: "text",
-    text: String(data[field] ?? "").slice(0, 1000),
-  }));
-  return {
-    name: t.name,
-    language: { code: t.language || "en" },
-    ...(parameters.length
-      ? { components: [{ type: "body", parameters }] }
-      : {}),
-  };
 }
 async function assertJobLease(env, job, now) {
   requireValue(
@@ -3287,6 +3325,53 @@ export async function dispatchRosterJob(job, env, now = Date.now()) {
       idempotencyKey: job.job_id,
     });
   }
+  if (job.type === "roster-public-menu-reply") {
+    const inbound = await one(
+      env.DB,
+      "SELECT * FROM roster_inbox WHERE school_id=? AND message_id=?",
+      [schoolId, payload.inReplyTo],
+    );
+    if (
+      !inbound ||
+      Operations.mobile(JSON.parse(inbound.payload_json).sender) !==
+        Operations.mobile(payload.to) ||
+      now - inbound.received_at >= 86400000
+    )
+      return { state: "cancelled", code: "INBOX_REPLY_WINDOW_CLOSED" };
+    await assertJobLease(env, job, now);
+    return dispatchProvider(env, {
+      provider: "whatsapp",
+      to: payload.to,
+      text: payload.text,
+      recentInboundAt: inbound.received_at,
+      idempotencyKey: job.job_id,
+    });
+  }
+  if (job.type === "roster-inbox-alert") {
+    // Unknown sender (owner 22 Nov 2026): fan out one inbox alert per current
+    // duty SMC. Deterministic job IDs keep it once per sender per day.
+    const date = payload.date,
+      principal = await currentScheduledPrincipal(env, schoolId, "roster.notify", "dispatch:" + job.job_id,
+        { jobId: job.job_id, operationId: "dispatch:" + job.job_id }, date, now),
+      range = requestedDates({ from: date, to: date }, now),
+      loaded = await loadState(env.DB, schoolId, range),
+      c = await context({ env, principal, now, body: { date, operation: "dailyNotify" } }, loaded, range),
+      scratch = { outbox: [] };
+    for (const id of Operations.dutySMC(loaded.state, c, date))
+      Operations.queue(scratch, c, "smc_alert", id, date, {
+        templateKey: "inbox_alert",
+        audience: "duty-smc",
+        summary: "New school WhatsApp message from " + payload.senderName + " is waiting in the Roster inbox.",
+        senderName: payload.senderName,
+        inboxMessageId: payload.inboxMessageId,
+      }, null, "inbox-alert:" + date + ":" + payload.sender + ":" + id);
+    await assertJobLease(env, job, now);
+    for (const j of scratch.outbox.filter((x) => x.status === "queued"))
+      await statement(env.DB,
+        "INSERT OR IGNORE INTO product_outbox(school_id,job_id,operation_id,type,payload_json,state,due_at,updated_at) VALUES(?,?,?,?,?,'queued',?,?)",
+        [schoolId, j.key, job.operation_id, "roster-notification", canonical(j), now, now]).run();
+    return { state: "delivered", code: "INBOX_ALERT_FANNED_OUT" };
+  }
   const action = "roster.notify",
     body = { jobId: job.job_id, operationId: "dispatch:" + job.job_id },
     principal = await currentScheduledPrincipal(
@@ -3359,6 +3444,13 @@ export async function dispatchRosterJob(job, env, now = Date.now()) {
       !c.projection.smcIds.includes(currentRecipient.id)
     )
       return { state: "cancelled", code: "SPONSOR_NO_LONGER_SMC" };
+    if (payload.kind === "contact_review") {
+      const holders = await serviceCall(env, "core", "/internal/contacts-power-users", {
+        decisionId: principal.decisionId,
+      });
+      if (!Array.isArray(holders?.staffIds) || !holders.staffIds.includes(currentRecipient.id))
+        return { state: "cancelled", code: "RECIPIENT_NO_LONGER_POWER_USER" };
+    }
     if (Operations.notificationCurrent(loaded.state, payload, now))
       return { state: "cancelled", code: "NOTIFICATION_OBSOLETE" };
     if (currentRecipient.active !== true) {
@@ -3368,9 +3460,11 @@ export async function dispatchRosterJob(job, env, now = Date.now()) {
     }
     if(capacityMessage&&!await refreshCapacityMessage(ctx,loaded,c,payload,await scopeRevision(env.DB,schoolId,'day:'+payload.date)))
       return {state:'cancelled',code:'CAPACITY_WARNING_OBSOLETE_OR_UNVERIFIED'};
-    let link = null;
+    let link = null, linkToken = null;
     if (
       payload.kind === "mutual_request" ||
+      // Peer-change notices link to the recipient's own published duties.
+      payload.kind === "mutual_override" ||
       payload.data?.snapshotIds?.length ||
       payload.data?.dailyPublication ||
       payload.data?.communicationSnapshot
@@ -3382,14 +3476,18 @@ export async function dispatchRosterJob(job, env, now = Date.now()) {
         503,
       );
       link = env.PUBLIC_ORIGIN + "/roster/external/#token=" + issued.token;
+      linkToken = issued.token;
     }
+    const templateKey = payload.data?.templateKey || payload.kind;
     await assertJobLease(env, job, now);
     return dispatchProvider(env, {
       provider: "whatsapp",
       to: currentRecipient.mobile,
-      template: templateFor(env, payload.data?.templateKey || payload.kind, {
+      template: templateFor(env, templateKey, {
         ...(capacityMessage?capacityTemplateData(env,payload,currentRecipient):(payload.data || {})),
+        ...(templateKey === "inbox_alert" ? { duty_smc_name: currentRecipient.name } : {}),
         link,
+        linkToken,
       }),
       idempotencyKey: job.job_id,
     });
