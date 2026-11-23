@@ -1,4 +1,5 @@
 import { planningSnapshot, planningPerson, planningEligible, reportingRoot, reportingStaff, reportingLinks, reportingConflicts, hasReportingEdge, projectPlanningNames } from "./deploy-eligibility.mjs";
+import { installDutyProjection } from "./deploy-duty-ui.js";
 
 /* Empty-data navigation mirrors the v0.9 taxonomy without pretending a draft exists. */
 (function () {
@@ -207,6 +208,7 @@ import { planningSnapshot, planningPerson, planningEligible, reportingRoot, repo
     return values;
   }
   function install() {
+    installDutyProjection(() => v()?.duties);
     if (!api || typeof window.membershipPage !== "function") return;
     const matrixStyle = document.createElement("style");
     matrixStyle.textContent = 'html body #content table[data-role-membership] .gsis-core-filter input{width:50px!important;min-width:0!important;max-width:100%!important}html body #content table[data-role-membership] input[data-member-col="0"],html body #content table[data-role-membership] .gsis-core-filter th:first-child input{width:140px!important;max-width:140px!important}html body #content table[data-role-membership] input[data-member-col="1"],html body #content table[data-role-membership] .gsis-core-filter th:nth-child(2) input{width:280px!important;max-width:280px!important}html body #content table[data-role-membership] input[data-member-col="12"]{width:130px!important;max-width:130px!important}table[data-role-membership] thead tr:first-child th:first-child{background:#1e4a5c;color:#fff}';
