@@ -1,6 +1,6 @@
 # Deploy relief quota explanations
 
-- **Status** Claimed on 23 November 2026, 11:35 SGT
+- **Status** Local browser verification passed on 23 November 2026. Product CI and Muse review are pending.
 - **Builder** Codex
 - **Reviewer** Muse at the exact head
 - **Branch** `codex/v1-deploy-relief-quota-reasons`
@@ -12,3 +12,25 @@
 Expose the reason an individual relief quota is unavailable in Ledger and Stats, including missing accepted eligibility and pending or stale calculations. Preserve the saved quota, the complete-group Stats average and accepted Contacts and publication rules. The synthetic shared calculator returns numbers for sufficient inputs. The hosted cause remains unverified.
 
 Use the built Deploy browser, real local Workers and D1 to show a missing prerequisite and then restore it. Verify numeric zero, a complete category average, pending and stale messages, consistent values with Relief Settings and read-only reporting. Exclude live data access, changes to eligibility policy, provider activity and deployment.
+
+## Diagnosis and change
+
+The accepted claim is `d0ff8f5d6e8386295af04a4beaf4318402cc321e`. A synthetic saved version with two active teachers returned R = 47 for the teacher with accepted EO evidence and an unavailable quota for the teacher without it. Ledger displayed the numeric result and `Unavailable`; Stats withheld the category average. The regression first failed on that built source because Ledger offered no explanation.
+
+Ledger and Stats now identify the unavailable quotas in the selected version and show the calculation reason from Deploy. They also identify which accepted activity, EO or school-section evidence is missing when the projection carries those reasons. A pending calculation asks the planner to save and a stale calculation asks them to refresh. The list covers the version, including applicable rows outside the current table filter.
+
+On the same fixture, accepting the missing EO evidence through Contacts produced R = 0 for the second teacher and a complete group average of 23.5. Ledger and Relief Settings displayed the zero. This change reads the existing calculation and evidence. The browser does not compute R or grant eligibility. The accepted Contacts basis, publication rules, group-average rule and workbook results are unchanged.
+
+## Verification
+
+All commands ran with `TZ=Asia/Singapore`. The browser programs used local Chromium and isolated Workers/D1.
+
+| Check | Result |
+| --- | --- |
+| `node tests/v1-product-deploy-relief-quota-browser.mjs` | Pass. Reproduced the missing explanation at baseline. Verified the blocked and complete cases in Ledger, Stats and Relief Settings, pending and stale instructions, no browser errors and identical saved version data after the report reads. |
+| `node tests/v1-product-deploy-workload-planning-browser.mjs` | Pass, four groups. Planning eligibility, workbook basis and accepted relief/publication boundaries. |
+| `node tests/v1-product-deploy-saved-teacher-membership.mjs` | Pass, five groups. Adjacent historical-version and Contacts candidate separation regression for #212. |
+| Canonical build, v1 build and v1 build verification | Pass. All 18 canonical components regenerated with no tracked drift. All nine isolated Wrangler dry runs and the local migration upgrade passed. |
+| Syntax, diff whitespace and product test discovery | Pass. |
+
+The hosted version and returned prerequisite that caused the owner's screenshot remain unverified. Hosted reproduction needs the same saved version/revision and its actual Deploy result. No live records were read or changed. The rollback removes the v1 report module and its script inclusion. No migration or data rollback is required.
