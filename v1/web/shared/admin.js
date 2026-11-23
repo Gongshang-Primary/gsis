@@ -419,6 +419,208 @@ $("evidenceForm").onsubmit = async (event) => {
     $("evidenceResult").textContent = error.message;
   }
 };
+const retentionInitialEpoch = api.saveStatus().contextEpoch;
+let retentionEpoch = retentionInitialEpoch,
+  retentionGeneration = 0,
+  retentionAllowed = false,
+  retentionBusy = false,
+  retentionAbort = null;
+function clearRetentionPreview() {
+  retentionGeneration++;
+  retentionAllowed = retentionBusy = false;
+  retentionAbort?.abort();
+  retentionAbort = null;
+  // The suite shell may already have removed the protected Toolbox content.
+  const button = $("retentionEstimate"),
+    message = $("retentionStatus");
+  if (button) button.disabled = true;
+  $("retentionResults")?.replaceChildren();
+  if (message)
+    message.textContent =
+      "Account context changed. Reload to request an estimate.";
+}
+window.addEventListener("gsis:save-status", () => {
+  const epoch = api.saveStatus().contextEpoch;
+  if (epoch !== retentionEpoch) {
+    retentionEpoch = epoch;
+    clearRetentionPreview();
+  }
+});
+window.addEventListener("gsis:clear-protected-state", clearRetentionPreview);
+function retentionText(tag, text) {
+  const element = document.createElement(tag);
+  element.textContent = text;
+  return element;
+}
+function validateRetentionPreview(value, days) {
+  const count = (n) => Number.isSafeInteger(n) && n >= 0 && n <= 500;
+  const owners = [
+    "contacts",
+    "deploy",
+    "roster",
+    "calendar",
+    "lord",
+    "venues",
+    "layout",
+  ];
+  const protectedRows = value?.protected;
+  const reasons = protectedRows?.reasons;
+  const entries =
+    reasons && typeof reasons === "object" && !Array.isArray(reasons)
+      ? Object.entries(reasons)
+      : null;
+  if (
+    value?.dryRun !== true ||
+    value.retentionDays !== days ||
+    value.limit !== 500 ||
+    typeof value.retentionDeletionEnabled !== "boolean" ||
+    !Number.isSafeInteger(value.cutoff) ||
+    value.cutoff <= 0 ||
+    !/^[a-f0-9]{64}$/.test(value.previewDigest || "") ||
+    !count(value.eligible?.evidence) ||
+    !count(value.eligible?.admissions) ||
+    !count(protectedRows?.count) ||
+    value.eligible.evidence + protectedRows.count > 500 ||
+    !Array.isArray(protectedRows.unknownOwners) ||
+    protectedRows.unknownOwners.length > owners.length ||
+    new Set(protectedRows.unknownOwners).size !==
+      protectedRows.unknownOwners.length ||
+    protectedRows.unknownOwners.some((owner) => !owners.includes(owner)) ||
+    !entries ||
+    entries.length !== protectedRows.count ||
+    entries.some(
+      ([id, reason]) =>
+        !id ||
+        id.length > 160 ||
+        typeof reason !== "string" ||
+        !reason ||
+        reason.length > 300,
+    ) ||
+    value.deleted?.evidence !== 0 ||
+    value.deleted?.admissions !== 0
+  )
+    throw Error(
+      "The preview response is incomplete or invalid. No counts are shown for this window.",
+    );
+  return entries;
+}
+function showRetentionPreview(value, days, entries) {
+  const section = document.createElement("section");
+  section.dataset.retentionDays = String(days);
+  const unknown = value.protected.unknownOwners;
+  const atLimit =
+    value.eligible.evidence + value.protected.count === 500 ||
+    value.eligible.admissions === 500;
+  const incomplete = unknown.length > 0 || atLimit;
+  section.dataset.retentionState = incomplete ? "incomplete" : "complete";
+  section.append(
+    retentionText("h4", days === 365 ? "One year (365 days)" : "90 days"),
+  );
+  section.append(
+    retentionText(
+      "p",
+      `Detailed evidence: ${unknown.length ? "Unavailable — owner checks incomplete" : value.eligible.evidence}. ` +
+        `Expired terminal Core admissions: ${value.eligible.admissions}. ` +
+        `Protected evidence in this scan: ${value.protected.count}.`,
+    ),
+  );
+  section.append(
+    retentionText(
+      "p",
+      "Cutoff: " +
+        new Date(value.cutoff).toLocaleString("en-SG", {
+          timeZone: "Asia/Singapore",
+        }) +
+        " SGT. Evidence must have both creation and validity dates before this cutoff.",
+    ),
+  );
+  if (unknown.length) {
+    const warning = retentionText(
+      "p",
+      "Incomplete assessment: owner status unavailable for " +
+        unknown.join(", ") +
+        ". Candidate evidence remains protected; this is not a zero-candidate result.",
+    );
+    warning.className = "gsis-error";
+    section.append(warning);
+  }
+  if (atLimit)
+    section.append(
+      retentionText(
+        "p",
+        "Scan limit reached. Additional candidates may exist beyond this batch.",
+      ),
+    );
+  if (entries.length) {
+    const details = document.createElement("details");
+    details.append(retentionText("summary", "Protection reasons in this scan"));
+    const list = document.createElement("ul");
+    for (const [id, reason] of entries) {
+      const item = retentionText("li", id + ": " + reason);
+      item.className = "gsis-code";
+      list.append(item);
+    }
+    details.append(list);
+    section.append(details);
+  }
+  $("retentionResults").append(section);
+  return incomplete;
+}
+$("retentionEstimate").onclick = async () => {
+  if (!retentionAllowed || retentionBusy) return;
+  retentionBusy = true;
+  const generation = ++retentionGeneration;
+  const current = () =>
+    retentionAllowed &&
+    generation === retentionGeneration &&
+    retentionEpoch === api.saveStatus().contextEpoch;
+  retentionAbort = new AbortController();
+  $("retentionEstimate").disabled = true;
+  $("retentionResults").replaceChildren();
+  $("retentionStatus").textContent = "Reading bounded candidate counts…";
+  let incomplete = false;
+  try {
+    for (const days of [90, 365]) {
+      try {
+        const value = await api.request("core", "/admin/evidence/retention", {
+          method: "POST",
+          signal: retentionAbort.signal,
+          body: {
+            operationId: crypto.randomUUID(),
+            dryRun: true,
+            retentionDays: days,
+            limit: 500,
+          },
+        });
+        if (!current()) return;
+        const entries = validateRetentionPreview(value, days);
+        incomplete = showRetentionPreview(value, days, entries) || incomplete;
+      } catch (error) {
+        if (!current()) return;
+        incomplete = true;
+        const section = document.createElement("section");
+        section.dataset.retentionDays = String(days);
+        section.dataset.retentionState = "error";
+        section.className = "gsis-error";
+        section.append(
+          retentionText("h4", days === 365 ? "One year (365 days)" : "90 days"),
+          retentionText("p", "Estimate unavailable. " + error.message),
+        );
+        $("retentionResults").append(section);
+      }
+    }
+    if (current())
+      $("retentionStatus").textContent = incomplete
+        ? "Assessment incomplete. Review each window below. No records were removed."
+        : "Both bounded previews received. No records were removed.";
+  } finally {
+    if (current()) {
+      retentionBusy = false;
+      retentionAbort = null;
+      $("retentionEstimate").disabled = false;
+    }
+  }
+};
 try {
   const session = await api.getSession();
   if (!session) {
@@ -430,6 +632,8 @@ try {
     status("Current Core permissions govern every action.");
     await loadAccounts();
     await completeGoogleConnection();
+    retentionAllowed = retentionInitialEpoch === api.saveStatus().contextEpoch;
+    if (retentionAllowed) $("retentionEstimate").disabled = false;
     openSection(location.hash.slice(1));
     window.addEventListener("hashchange",()=>openSection(location.hash.slice(1)));
   }
