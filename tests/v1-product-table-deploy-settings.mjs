@@ -49,12 +49,12 @@ const browser = await chromium.launch({
 try {
   const page = await browser.newPage();
   // The production adapter is an ES module sharing the real period policy.
-  // Serve both unchanged files on one intercepted origin, rather than treating
-  // the adapter as a classic inline script or stripping its imports.
+  // Serve the adapter and its dependencies on one intercepted origin.
   const origin = "https://deploy-settings.example.invalid";
   const modules = new Map(await Promise.all([
     "v1/web/shared/deploy-ui-tables.js",
     "v1/web/shared/deploy-loads.mjs",
+    "v1/web/shared/deploy-workload-settings-ui.js",
   ].map(async path => ["/v1/shared/" + path.split("/").at(-1), await read(path)])));
   await page.route("**/*", async route => {
     const url = new URL(route.request().url());
@@ -220,10 +220,8 @@ try {
     }
   }
   // Exercise the actual dialog, XLSX parser and existing lease/change/receipt sequence.
-  const ui = await browser.newPage(),
-    files = new Map();
-  for (const name of ["deploy-ui-tables.js", "deploy-loads.mjs", "workbooks.mjs"])
-    files.set("/v1/shared/" + name, await read("v1/web/shared/" + name));
+  const ui = await browser.newPage(), files = new Map(modules);
+  files.set("/v1/shared/workbooks.mjs", await read("v1/web/shared/workbooks.mjs"));
   files.set(
     "/roster/jszip.min.js",
     await read("roster-update/public/jszip.min.js"),
@@ -234,14 +232,18 @@ try {
       contentType: files.has(path) ? "text/javascript" : "text/html",
       body:
         files.get(path) ||
-        '<select id="version"><option value="version-test">Plan</option></select><main id="content" data-view="Load Settings"></main>',
+        '<select id="version"><option value="version-test">Plan</option></select><main id="content" data-view="Load Settings"><table></table></main>',
     });
   });
   await ui.goto("https://settings.invalid/deploy/");
   await ui.evaluate((d) => {
     window.doc = d;
     window.calls = [];
-    window.GSISCoreTables = { register: (_, a) => (window.adapter = a) };
+    window.GSISCoreTables = {
+      register(selector, contract) {
+        if (document.querySelector(selector)) window.adapter = contract;
+      },
+    };
     window.GSISV1 = {
       capable: () => true,
       getSession: async () => ({
