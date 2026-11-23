@@ -405,6 +405,10 @@
   }
   function readOnlyRequest(path, body) {
     if (!body) return true;
+    // Core still authorizes and audits this POST; a preview has no cleanup
+    // operation or terminal receipt to put in the pending-write map.
+    if (path === "/api/core/admin/evidence/retention")
+      return body.dryRun === true;
     const name = body.operation || body.action || path.split("/").at(-1);
     return new Set([
       "bootstrap",
