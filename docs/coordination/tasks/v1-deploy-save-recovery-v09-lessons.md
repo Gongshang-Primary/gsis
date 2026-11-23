@@ -1,5 +1,19 @@
 # V1 Deploy: lessons from the v0.9 pending-save hotfix
 
+## Disposition — 23 November 2026 (Asia/Singapore)
+
+This reconciliation uses main [`b952c7e4`](https://github.com/Gongshang-Primary/gsis/commit/b952c7e402323c53c6ae3ad834a6c52552842378) and preserves the original audit below. It supersedes the old forward-looking handoff, not its pinned observations. PR #245's prior documentation head was `8967055dfc2bbbbf3d4b6cf05f3545b5a5f2d64b`.
+
+- The actionable readable-label and pre-dispatch-refusal regression work merged in [#260](https://github.com/Gongshang-Primary/gsis/pull/260), commit [`3160da94`](https://github.com/Gongshang-Primary/gsis/commit/3160da940976f66c8b69522225fc510763b811cb). This audit is not an outstanding duplicate implementation claim.
+- A later combined-main failure came from Review fixtures that existed only in the browser working copy. [#263](https://github.com/Gongshang-Primary/gsis/pull/263), merged at [`ab195175`](https://github.com/Gongshang-Primary/gsis/commit/ab195175f268b93ccb1ca4ee91d57db10962d05f), persists the teacher and class through the real synthetic owner paths before Review. It retains the genuine-missing-reference fallback and the recovery assertions. [Muse's exact-head review](../review/pr263-muse-review.md) records 17 passing groups at `31be52c85f8ebd410b8c23dadba28c23c3ea5ea1`; that historical result is not a test run of this documentation head.
+- No new v1 defect or product change is claimed by this reconciliation. The distinctions between unsent, uncertain, committed and aborted operations below remain the evidence to preserve in later changes. Merged source alone does not establish which hosted version a user exercised.
+
+The existing one-file scope is unchanged. The local branch incorporates the pinned main with a non-force merge; only this document differs from that main. Documentation scope, retained historical text, relative links and `git diff --check` were checked. No application test, build, new CI run, hosted UAT, deployment or live-data operation was performed for this update. Official T1B-01/T1B-02 remain **Not tested**; F5 remains **OPEN**.
+
+Under the [current owner directive](../OWNER_DIRECTIVES.md), Muse reviews the new exact head and GPT/Codex is the merger. No exact-head approval is claimed for this update. The older Claude-review wording below is retained solely as history. This local reconciliation does not publish or merge the PR.
+
+## Historical audit — 20 November 2026 (preserved)
+
 Model: Codex. Owner requested on 20 November 2026, Asia/Singapore: “mirror the findings over to v1 in case such a flaw in logic is there too”.
 
 This is a separate v1 read-only audit and handoff. No v1 product change, live request, deployment or data change is claimed. V1 coordinator: ChatGPT. Any subsequent v1 implementation has its own claim, branch, scope and Claude review.
