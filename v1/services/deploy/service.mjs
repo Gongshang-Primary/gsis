@@ -30,6 +30,7 @@ import { ApiError } from "../../runtime/errors.mjs";
 import { drainOutbox } from "../../runtime/jobs.mjs";
 import { exportDrive, reconcileDrive } from "./exports.mjs";
 import { rosterWorkload } from "./roster-workload.mjs";
+import { calculatePlanningRelief } from "./planning-relief.mjs";
 import { check, id, text, finite, plain } from "./validation.mjs";
 import {
   defaults,
@@ -149,6 +150,7 @@ function flatten(doc) {
         "publication",
         "publishedRevision",
         "reliefResults",
+        "planningReliefResults",
         "reliefAdmin",
         "conflictNotices",
       ].includes(scope)
@@ -248,6 +250,7 @@ function cleanIntent(body) {
     "authority",
     "auditPaged",
     "reliefResults",
+    "planningReliefResults",
     "returnDelta",
     "since",
     "knownCatalogueHash",
@@ -768,6 +771,7 @@ async function bootstrap(ctx) {
   let doc = requested
     ? (await loadVersion(ctx.env.DB, school, requested)).doc
     : null;
+  const planningReliefResults = doc ? calculatePlanningRelief(doc) : null;
   let projection = null,
     staffCatalog = doc?.teachers || [],
     referenceError = null;
@@ -842,6 +846,7 @@ async function bootstrap(ctx) {
       status: "draft",
       publication: status?.publication || "Saved draft",
       publishedRevision: status?.publishedRevision ?? null,
+      planningReliefResults,
     });
   }
   const caps = ctx.principal.capabilities;
