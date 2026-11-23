@@ -828,6 +828,17 @@ function updateDeployContactsReports(source){
  for(const [start,end,body] of edits.sort((a,b)=>b[0]-a[0]))source=source.slice(0,start)+body+source.slice(end);
  return source;
 }
+function addDeployPlanningRelief(source){
+ const ledgerInputs="const subjects=summary?w.subjects.filter(s=>!GSISWorkload.isPD(s)):w.subjects,relief=reliefResultData();";
+ source=replaceOnce(source,ledgerInputs,ledgerInputs+"\n const planningRelief=window.GSISV1PlanningRelief?.();","Read the saved planning R alongside Ledger R");
+ const acceptedColumn="['R',r=>wlNumber(relief.byTeacher[r.teacher.id]?.quota)],";
+ source=replaceOnce(source,acceptedColumn,acceptedColumn+"['Planning R (estimate)',r=>wlNumber(planningRelief?.quota(r.teacher.id))],","Separate editable plan estimates from accepted results");
+ const statsInputs="function workloadReference(w){\n const relief=reliefResultData();";
+ source=replaceOnce(source,statsInputs,statsInputs+"\n const planningRelief=window.GSISV1PlanningRelief?.();","Read the saved planning R for Stats");
+ const statsValue="const stat=(c,kind)=>{if(kind==='Teacher headcount')";
+ source=replaceOnce(source,statsValue,"const stat=(c,kind)=>{if(kind==='Planning R (average)')return wlNumber(planningRelief?.average(c.rows));if(kind==='Teacher headcount')","Average complete planning R categories");
+ return replaceOnce(source,"'R (average)','Teacher headcount'","'R (average)','Planning R (average)','Teacher headcount'","Add the planning R estimate row to Stats");
+}
 function updateDeploy(source){
  source=replaceOnce(source,"fetch('/api/campus-map',{method:'POST',headers:{'Content-Type':'application/json',...(token==='session'?{}:{Authorization:'Bearer '+token})},body:'{}',signal:AbortSignal.timeout(30000)})","fetch('/deploy/campus-base.svg',{credentials:'omit',signal:AbortSignal.timeout(30000)})",'Deploy Layout reads its existing static campus drawing');
  source=replaceOnce(source,"async function edgeCommandSend(input){\n const epoch=sessionEpoch,{r,body}=await requestJSON('/api/commands',{method:'POST',headers:{'Content-Type':'application/json',...(token==='session'?{}:{Authorization:'Bearer '+token})},body:JSON.stringify(input)});\n if(epoch!==sessionEpoch)throw Error('Session changed. Sign in before checking the retained command.');if(!r.ok||!body.ok){if(r.status===401)expired();const error=Error(body.error||'Command outcome unavailable. Keep the original request ID.');error.status=body.status||r.status;error.code=body.code;error.queueReceipt=body.data?.queueReceipt;throw error;}return body.data;\n}","async function edgeCommandSend(){\n throw Error('Deploy v1 writes directly to D1 without the legacy Apps Script command queue.');\n\n}",'Deploy removes obsolete Apps Script /api/commands caller');
@@ -876,6 +887,7 @@ function updateDeploy(source){
  if(!publication)throw Error('Visual baseline changed: Deploy publication flow');
  source=source.slice(0,publication.start)+`async function reviewTeacherPublication(){if(queuedEdits().length||unsavedDraft||editing||busy){alert('Save or discard drafts before publishing.');return;}if(!window.GSISV1.capable('deploy.publish')){alert('Current Deploy publication access is required.');return;}await window.GSISV1Publication.open({versionId:current,revision:snapshotCache?.revision,name:v()?.name,onCommitted:()=>refresh(true)});}`+source.slice(publication.end);
  source=updateDeployContactsReports(source);
+ source=addDeployPlanningRelief(source);
  source+=`\nwindow.addEventListener('gsis:clear-protected-state',()=>{stopLive();sessionEpoch++;clearInterval(pollTimer);clearInterval(leaseTimer);clearTimeout(queueTimer);token='';state={versions:[]};current='';snapshotCache=null;acceptedSnapshot=null;staffCatalog=new Map();roleCatalogue=[];cellQueue=[];queueFlight=null;draftBase=null;editing=null;unsavedDraft=false;busy=false;acquiring=false;versionCreateAttempt=null;versionNoteDrafts.clear();exclusionEdits.clear();if(inlineDraftEditor){inlineDraftEditor.open=false;inlineDraftEditor.remove();inlineDraftEditor=null;}el('content').replaceChildren();el('nav').replaceChildren();controls();});`;
  return source;
 }
