@@ -1,5 +1,6 @@
 /* Additional Deploy workbook scopes use the existing atomic /change owner contract. */
 import { parseLoad, storedLoad, parseSplit, loadRows, fortnightRows } from "./deploy-loads.mjs";
+import { installWorkloadSettingsView } from "./deploy-workload-settings-ui.js";
 
 (function () {
   "use strict";
@@ -737,14 +738,29 @@ import { parseLoad, storedLoad, parseSplit, loadRows, fortnightRows } from "./de
   }
   function register() {
     const selector = views
-      .map((view) => '#content[data-view="' + view + '"] table')
+      .map((view) =>
+        '#content[data-view="' + view + '"] ' +
+        (view === "Workload Settings" ? ".workload-settings table" : "table"),
+      )
       .join(",");
     window.GSISCoreTables?.register(selector, {
       exportAll,
       importAll: openImport,
     });
+    window.GSISCoreTables?.register(
+      '#content[data-view="Workload Settings"] table[data-workload-settings-subjects]',
+      { exportAll },
+    );
   }
   window.GSISDeploySettingTables = { workbook, validate };
+  const installWorkloadView = () =>
+    installWorkloadSettingsView(
+      (doc) => sheets(doc, "Workload Settings").Workload.rows,
+      () => api.capable("deploy.edit"),
+    );
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", installWorkloadView, { once: true });
+  } else installWorkloadView();
   register();
   window.addEventListener("load", register);
   window.addEventListener("gsis:tables-ready", register);
