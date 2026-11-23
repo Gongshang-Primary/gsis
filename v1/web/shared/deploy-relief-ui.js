@@ -7,10 +7,10 @@ const missingEvidence = {
 function quotaDiagnostics(doc, rows) {
   if (!doc || !rows.length) return null;
   const projection = doc.reliefResults;
-  const status = projection?.stale
-    ? "Refresh to update relief quotas."
-    : projection?.pending
-      ? "Save changes to update relief quotas."
+  const status = projection?.pending
+    ? "Save changes to update relief quotas."
+    : projection?.stale
+      ? "Refresh to update relief quotas."
       : !projection
         ? "Refresh to load relief quotas."
         : "";

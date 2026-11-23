@@ -17,7 +17,7 @@ Use the built Deploy browser, real local Workers and D1 to show a missing prereq
 
 The accepted claim is `d0ff8f5d6e8386295af04a4beaf4318402cc321e`. A synthetic saved version with two active teachers returned R = 47 for the teacher with accepted EO evidence and an unavailable quota for the teacher without it. Ledger displayed the numeric result and `Unavailable`; Stats withheld the category average. The regression first failed on that built source because Ledger offered no explanation.
 
-Ledger and Stats now identify the unavailable quotas in the selected version and show the calculation reason from Deploy. They also identify which accepted activity, EO or school-section evidence is missing when the projection carries those reasons. A pending calculation asks the planner to save and a stale calculation asks them to refresh. The list covers the version, including applicable rows outside the current table filter.
+Ledger and Stats now identify the unavailable quotas in the selected version and show the calculation reason from Deploy. They also identify which accepted activity, EO or school-section evidence is missing when the projection carries those reasons. A pending calculation asks the planner to save. A stale result asks them to refresh once any pending changes are saved. The list covers the version, including applicable rows outside the current table filter.
 
 On the same fixture, accepting the missing EO evidence through Contacts produced R = 0 for the second teacher and a complete group average of 23.5. Ledger and Relief Settings displayed the zero. This change reads the existing calculation and evidence. The browser does not compute R or grant eligibility. The accepted Contacts basis, publication rules, group-average rule and workbook results are unchanged.
 
@@ -32,5 +32,7 @@ All commands ran with `TZ=Asia/Singapore`. The browser programs used local Chrom
 | `node tests/v1-product-deploy-saved-teacher-membership.mjs` | Pass, five groups. Adjacent historical-version and Contacts candidate separation regression for #212. |
 | Canonical build, v1 build and v1 build verification | Pass. All 18 canonical components regenerated with no tracked drift. All nine isolated Wrangler dry runs and the local migration upgrade passed. |
 | Syntax, diff whitespace and product test discovery | Pass. |
+
+The combined Duty and relief browser checks passed on a clean integration of both branches. A follow-up test set pending and stale together. The first relief implementation offered Refresh even though the native refresh path leaves queued edits in place. The test now verifies that Save takes precedence, and the built browser passes all three flag combinations.
 
 The hosted version and returned prerequisite that caused the owner's screenshot remain unverified. Hosted reproduction needs the same saved version/revision and its actual Deploy result. No live records were read or changed. The rollback removes the v1 report module and its script inclusion. No migration or data rollback is required.

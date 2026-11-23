@@ -93,16 +93,17 @@ try {
   assert.equal(await statsAverage().innerText(), "Unavailable");
   await expectMissingEvidence();
 
-  for (const [flag, message] of [
-    ["pending", /Save changes to update relief quotas/i],
-    ["stale", /Refresh to update relief quotas/i],
+  for (const [flags, message] of [
+    [{ pending: true }, /Save changes to update relief quotas/i],
+    [{ stale: true }, /Refresh to update relief quotas/i],
+    [{ pending: true, stale: true }, /Save changes to update relief quotas/i],
   ]) {
-    await page.evaluate(flag => {
+    await page.evaluate(flags => {
       delete v().reliefResults.pending;
       delete v().reliefResults.stale;
-      v().reliefResults[flag] = true;
+      Object.assign(v().reliefResults, flags);
       render(true);
-    }, flag);
+    }, flags);
     assert.match(await diagnostics.innerText(), message);
   }
 
