@@ -75,6 +75,13 @@ export function removeCalendarLegacyQueueAndPushCallers(source) {
     jobsReplacement,
     "Calendar legacy /calendar-jobs",
   );
+  next = replaceBlock(
+    next,
+    "  function loadEventEditAuthor(event) {",
+    "\n  function visibleEventTitleHtml(e) {",
+    "  function loadEventEditAuthor(){}",
+    "Calendar Apps Script receipt attribution",
+  );
   const pushReplacement = [
     "  function startCalendarChangeStream(){}",
     "  async function drainCalendarChanges(){}",
