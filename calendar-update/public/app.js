@@ -287,7 +287,7 @@
   }
 
   async function api(action, payload = {}) {
-    const isRead=['calendarPreflight','healthCheck','calendarReconciliationPreview','runSelfTests','calendarWipePreview','archiveYearsPreview','eventMutationStatus','calendarSyncStatus','mutationReceipts'].includes(action);
+    const isRead=['eventEditAuthor','calendarPreflight','healthCheck','calendarReconciliationPreview','runSelfTests','calendarWipePreview','archiveYearsPreview','eventMutationStatus','calendarSyncStatus','mutationReceipts'].includes(action);
     const duringPublication = ['publishVersion','startSyncYear','syncYearBatch','pullBirthdays'].includes(action);
     if(!isRead && !isCalendarEditable(duringPublication))throw new Error('Refresh verification, publication, sync or save recovery must finish before editing.');
     if(EVENT_MUTATIONS.has(action) && pendingEventJob(action==='saveEvent'?payload.event?.EventID:payload.eventId))throw new Error('This event has an unresolved Calendar job. Check its exact receipt before editing it again.');
@@ -940,6 +940,38 @@
     return `day ${day}/${total}`;
   }
 
+  function eventAuthorName(identity) {
+    const alias = String(identity || '').trim();
+    if (!alias) return 'Not recorded';
+    if (alias.startsWith('CONTACTS-BIRTHDAY-V1|') || alias === 'system:contacts-birthdays') return 'Contacts birthday import';
+    const person = (state.data.people || []).find(row => row.userAlias === alias || row.accountId === alias);
+    if (person?.displayName) return person.displayName;
+    if (alias === state.data.actor.userAlias && state.data.actor.displayName) return state.data.actor.displayName;
+    return alias.replace(/@gsps\.edu\.sg$/i, '').replace(/[._]+/g, ' ').replace(/\b[a-z]/g, letter => letter.toUpperCase());
+  }
+
+  function eventCreatorHtml(event) {
+    if (!event?.EventID || event._calendarJobId) return '';
+    return `<div class="event-time">Created by ${esc(eventAuthorName(event.CreatedBy))}</div>`;
+  }
+
+  function eventAttributionHtml(event) {
+    if (!event?.EventID || event._calendarJobId) return '';
+    // The v1 event stores the committing account in UpdatedBy. In Sheets,
+    // publication can overwrite that column, so verify the event receipt.
+    const editor = window.GSISV1 ? eventAuthorName(event.UpdatedBy) :
+      event.LastMutationID ? 'Checking…' : 'Not recorded';
+    return eventCreatorHtml(event) + `<div class="event-time">Last event edit by <span data-event-editor>${esc(editor)}</span></div>`;
+  }
+
+  function loadEventEditAuthor(event) {
+    const label = $('modalHost')?.querySelector('[data-event-editor]');
+    if (!label || window.GSISV1 || !event?.LastMutationID) return;
+    api('eventEditAuthor', {eventId: event.EventID, operationId: event.LastMutationID})
+      .then(result => { label.textContent = eventAuthorName(result.userAlias); })
+      .catch(() => { label.textContent = 'Unavailable'; });
+  }
+
   function visibleEventTitleHtml(e) {
     const generated =
       isGeneratedStructureEvent(e);
@@ -1036,7 +1068,7 @@
       `data-event-id="${esc(e.EventID)}" data-segment-date="${esc(rowDate)}" ` +
       `${privileged ? 'role="button" tabindex="0" ' : ''}` +
       `${state.data.actor.isAdmin && !e._calendarJobId && !pendingEventJob(e.EventID) ? 'draggable="true"' : ''}>` +
-      `${title}${time}${calendarJobBadge(e)}</div>`
+      `${title}${time}${eventCreatorHtml(e)}${calendarJobBadge(e)}</div>`
     );
   }
 
@@ -1231,7 +1263,7 @@
       `${state.data.actor.isAdmin || state.data.actor.isParentPublisher ? 'role="button" tabindex="0" ' : ''}` +
       `${state.data.actor.isAdmin && !e._calendarJobId && !pendingEventJob(e.EventID) ? 'draggable="true"' : ''}>` +
       `<span class="week-lane">${esc(laneText)}:</span> ` +
-      `${title}${suffix}${calendarJobBadge(e)}` +
+      `${title}${suffix}${eventCreatorHtml(e)}${calendarJobBadge(e)}` +
       `</div>`
     );
   }
@@ -4231,6 +4263,7 @@
       <div class="modal-head"><h3>${event ? 'Edit Event' : 'Add Event'}</h3><button class="close-x" data-close>&times;</button></div>
       <form id="eventForm">
         <div class="modal-body">
+          ${eventAttributionHtml(reviewBaseline)}
           <div class="form-grid">
             <div class="field"><label>Year</label><select name="Year">${years.map(y => `<option value="${esc(y.Year)}">${esc(y.Year)}</option>`).join('')}</select></div>
             <div class="field"><label>Visibility</label><select name="Status"><option value="HIDDEN">Hidden</option><option value="PUBLISHED">Published</option></select></div>
@@ -4267,6 +4300,7 @@
         </div>
       </form>
     `);
+    loadEventEditAuthor(reviewBaseline);
 
     const form = $('eventForm');
     const venuePicker=bindCalendarVenuePicker(form);
@@ -4704,6 +4738,7 @@
         <div class="modal-body">
           <div class="card">
             <strong>[${esc(e.OwnerTag)}] ${esc(e.StaffTitle)}</strong>
+            ${eventAttributionHtml(e)}
             <div style="color:var(--muted);margin-top:5px">${esc(eventDateLabel(e))}</div>
           </div>
           <div class="form-grid">
@@ -4719,6 +4754,7 @@
         </div>
       </form>
     `);
+    loadEventEditAuthor(e);
 
     if (inlineConflict) {
       const saveButton = $('parentForm').querySelector('button[type="submit"]');

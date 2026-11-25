@@ -942,6 +942,10 @@ function dispatchCore_(action, actor, payload, requestId) {
       requireAdmin_(roles);
       return apiMutationReceipts_(actor,payload);
 
+    case 'eventEditAuthor':
+      requireParentEditor_(roles);
+      return calendarEventEditAuthor_(payload);
+
     case 'eventMutationStatus':
       if (payload.action === 'saveParentSide') requireParentEditor_(roles); else requireAdmin_(roles);
       return apiEventMutationStatus_(actor, payload);
@@ -9377,6 +9381,21 @@ function apiMutationReceipts_(actor,payload){
     const settled=new Set(checked.filter(r=>r.state!=='UNKNOWN').map(r=>r.operationId));
     return {checkedAt:isoNow_(),checked,receipts:rows.filter(r=>!settled.has(r.OperationID)).map(r=>({operationId:r.OperationID,state:r.State,ageMs:staleMutationAge_(r),event:r.EventID,user:r.UserAlias,createdAt:r.CreatedAt,action:r.Action}))};
   },true,payload.check!==true);
+}
+
+// Publication updates UpdatedBy on hidden events. Use the event's durable
+// mutation marker to identify the editor whose content actually landed.
+function calendarEventEditAuthor_(payload) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const hit = findRowByKey_(ss.getSheetByName(CALV2.SHEETS.EVENTS), 'EventID', String(payload.eventId || ''));
+  const event = hit && hit.object;
+  if (!event || event.DeletedAt || !event.LastMutationID || event.LastMutationID !== payload.operationId) return {userAlias: ''};
+  const receipt = mutationLookup_(ss.getSheetByName(CALV2.SHEETS.MUTATIONS), event.LastMutationID);
+  const record = receipt && receipt.object;
+  if (!record || !['COMMITTED','DISPATCHED'].includes(record.State)) return {userAlias: ''};
+  const eventEdit = record.EventID === event.EventID && ['saveEvent','saveParentSide','relocateEvent'].includes(record.Action);
+  const birthdayImport = record.Action === 'pullBirthdays' && record.EventID === 'YEAR:' + event.Year && calendarBirthdayOwner_(event);
+  return {userAlias: eventEdit || birthdayImport ? record.UserAlias : ''};
 }
 
 function apiEventMutationStatus_(actor, payload) {

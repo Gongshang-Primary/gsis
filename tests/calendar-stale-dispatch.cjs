@@ -93,3 +93,25 @@ test('Publish repairs a matching event receipt to COMMITTED without a stale-fail
   assert.equal(h.sandbox.mutationLookup_(h.sheets.get('MutationLog'), record.OperationID).object.State, 'COMMITTED');
   assert.equal(h.sandbox.tableObjects_(h.sheets.get('AuditLog')).filter(row => row.Action === 'STALE_DISPATCH').length, 0);
 });
+
+test('the creator and last event editor survive a publication by another account', () => {
+  const h = healthy();
+  const original = h.call('saveEvent', {
+    event: {...h.event('E3'), EventID: '', CreatedBy: 'forged', UpdatedBy: 'forged'},
+    operationId: crypto.randomUUID()
+  });
+  assert.equal(original.CreatedBy, 'admin');
+  const operationId = crypto.randomUUID();
+  h.call('saveParentSide', {eventId: original.EventID, expectedRevision: original._revision,
+    ParentEnabled: 'Yes', ParentTitle: 'Revised', operationId}, 'publisher');
+  h.call('publishVersion', {year: 2027, operationId: crypto.randomUUID()});
+  const event = h.event(original.EventID);
+  assert.equal(event.UpdatedBy, 'admin');
+  assert.equal(event.CreatedBy, 'admin');
+  const input = {eventId: event.EventID, operationId};
+  assert.equal(h.call('eventEditAuthor', input).userAlias, 'publisher');
+  assert.equal(h.call('eventEditAuthor', input, 'publisher').userAlias, 'publisher');
+  assert.throws(() => h.call('eventEditAuthor', input, 'teacher'), error => error.code === 'FORBIDDEN');
+  assert.equal(h.call('eventEditAuthor', {...input, eventId: 'E3'}).userAlias, '');
+  assert.equal(h.call('eventEditAuthor', {...input, operationId: crypto.randomUUID()}).userAlias, '');
+});

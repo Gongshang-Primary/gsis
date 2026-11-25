@@ -1,6 +1,6 @@
 # calendar-pending-write-autoclear: one unknown-outcome save blocks Publish and Sync for the whole year (v0.9 HOTFIX)
 
-- Status: claimed (v0.9 hotfix; owner 25 Nov: "wish for v0.9 hotfix", after the 20 Nov freeze)
+- Status: implemented; awaiting exact-head review (v0.9 hotfix; owner 25 Nov: "wish for v0.9 hotfix", after the 20 Nov freeze)
 - Branch: `codex/calendar-pending-write-autoclear` from `07b4ead55668459a49815794ae527255662134d5`.
 - Owner/model: Codex. Reviewer: Claude. Mirror in v1 Calendar afterwards.
 
@@ -26,6 +26,12 @@ Publish and sync check pending receipts under the Calendar writer lock. A matchi
 
 The synthetic baseline reproduced three failures: Publish stayed blocked at ten minutes, the error omitted the editor and deadline, and sync skipped an expired save. The matching-event recovery check already passed. After the fix all 15 stale dispatch tests, 10 sync isolation tests, 15 publication tests and 63 native Sheets tests passed. The current-session recovery fixture now creates its fresh pending receipt using the harness clock.
 
-Owner deployment file: `Calendar_Backend_v0.9.9.gs`. The existing Pages client displays the backend message. Update the existing Calendar Apps Script deployment after review. To roll back, restore the previous Calendar script version. No live sheet, setting, provider call or deployment was used to verify this change.
+The existing Pages client displays the pending-save message. See the expanded deployment inventory below. No live sheet, setting, provider call or deployment was used to verify this change.
 
 Claude reviews the exact v0.9 PR head. The v1 Calendar mirror follows that review.
+
+## Owner addition, 25 Nov: identify who committed the event
+
+Saved event cards in Events and Weekly show their original creator. The event and parent-side edit forms also show the last event editor. Apps Script authenticates the read and verifies the current event's mutation ID against its receipt. This avoids naming the person who published the year as the author of an earlier event edit. Older events without evidence show “Not recorded”. Birthday source markers are displayed as “Contacts birthday import”. Queued proposals and new forms do not assert a creator.
+
+For this expanded hotfix the owner deployment files are `Calendar_Backend_v0.9.9.gs` and `Calendar_Frontend_v0.9.9.zip` (includes the Pages Worker). Update the backend first, then Calendar Pages. Rollback uses the previous versions of both. The v1 web build inherits the event attribution UI and uses the native event's saved editor field.
