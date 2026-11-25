@@ -19,3 +19,13 @@
 
 ## Out of scope
 Sync speed and batch size, the change-push worker, and live sheet edits. Release as a v0.9 Calendar-only hotfix: Calendar backend plus Calendar Pages if the message changes.
+
+## Implementation and handoff (25 Nov)
+
+Publish and sync check pending receipts under the Calendar writer lock. A matching event mutation marker repairs the receipt to COMMITTED. After ten minutes a dropped event save fails with one STALE_DISPATCH audit and the original editor can redo it. A fresh event save identifies the editor, event and Singapore retry time. Ambiguous year publications retain their existing fence. Sync counts a blocked event and processes eligible neighbours.
+
+The synthetic baseline reproduced three failures: Publish stayed blocked at ten minutes, the error omitted the editor and deadline, and sync skipped an expired save. The matching-event recovery check already passed. After the fix all 15 stale dispatch tests, 10 sync isolation tests, 15 publication tests and 63 native Sheets tests passed. The current-session recovery fixture now creates its fresh pending receipt using the harness clock.
+
+Owner deployment file: `Calendar_Backend_v0.9.9.gs`. The existing Pages client displays the backend message. Update the existing Calendar Apps Script deployment after review. To roll back, restore the previous Calendar script version. No live sheet, setting, provider call or deployment was used to verify this change.
+
+Claude reviews the exact v0.9 PR head. The v1 Calendar mirror follows that review.

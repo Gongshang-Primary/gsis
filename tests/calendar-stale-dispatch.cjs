@@ -52,3 +52,44 @@ test('lost stale receipt write retries without duplicating its landed audit',()=
 });
 
 test('failed creation with no landed event still reaches its original user',()=>{const h=makeHarness(),{record}=stuck(h,'saveEvent','NEVER-CREATED');h.advanceClock(3600001);h.call('mutationReceipts',{check:true,operationId:record.OperationID});const notices=h.call('bootstrap',{year:2026}).mutationFailures;assert.equal(notices.length,1);assert.equal(notices[0].current,null);assert.match(notices[0].message,/NEVER-CREATED/);assert.equal(h.call('bootstrap',{year:2026},'publisher').mutationFailures.length,0);});
+
+test('Publish itself clears a ten-minute-old dropped creation and audits it once', () => {
+  const h = healthy();
+  const {record} = stuck(h, 'saveEvent', 'NEW-EVENT');
+  h.advanceClock(10 * 60 * 1000);
+  const publish = () => h.call('publishVersion', {year: 2027, operationId: crypto.randomUUID()});
+  assert.equal(publish().year, 2027);
+  const receipt = h.sandbox.mutationLookup_(h.sheets.get('MutationLog'), record.OperationID).object;
+  assert.equal(receipt.State, 'FAILED');
+  assert.match(JSON.parse(receipt.ErrorJSON).message, /NEW-EVENT did not apply\. Please redo it/);
+  publish();
+  const audits = h.sandbox.tableObjects_(h.sheets.get('AuditLog')).filter(row => row.Action === 'STALE_DISPATCH');
+  assert.deepEqual(Array.from(audits, row => row.RequestID), [record.OperationID]);
+});
+
+test('Publish names the owner, event, save time and ten-minute deadline while the save is fresh', () => {
+  const h = healthy();
+  const {record} = stuck(h, 'saveEvent', 'NEW-EVENT');
+  const created = Date.parse(record.CreatedAt);
+  const clock = ms => h.sandbox.Utilities.formatDate(new Date(ms), 'Asia/Singapore', 'HH:mm');
+  record.UserAlias = 'sample.editor';
+  h.seed('MutationLog', [record]);
+  h.advanceClock(9 * 60 * 1000);
+  assert.throws(() => h.call('publishVersion', {year: 2027, operationId: crypto.randomUUID()}), error => {
+    assert.equal(error.code, 'PENDING_EVENT_WRITE');
+    assert.equal(error.message, "Waiting for Sample Editor's save to NEW-EVENT (" + clock(created) +
+      ') to settle; this clears by ' + clock(created + 600000) + ' SGT. Try again then.');
+    return true;
+  });
+  assert.equal(h.sandbox.mutationLookup_(h.sheets.get('MutationLog'), record.OperationID).object.State, 'DISPATCHED');
+});
+
+test('Publish repairs a matching event receipt to COMMITTED without a stale-failure audit', () => {
+  const h = healthy();
+  const {record} = stuck(h);
+  h.seed('Events', [{...h.base, LastMutationID: record.OperationID}]);
+  h.advanceClock(10 * 60 * 1000);
+  assert.equal(h.call('publishVersion', {year: 2027, operationId: crypto.randomUUID()}).year, 2027);
+  assert.equal(h.sandbox.mutationLookup_(h.sheets.get('MutationLog'), record.OperationID).object.State, 'COMMITTED');
+  assert.equal(h.sandbox.tableObjects_(h.sheets.get('AuditLog')).filter(row => row.Action === 'STALE_DISPATCH').length, 0);
+});

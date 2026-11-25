@@ -70,7 +70,7 @@ test('current-session recovery preserves 20 prior creates and 30 historical erro
  assert.equal(current.counts.staffCreates,20);assert.equal(h.api.live(h.calendarId).length,20);
  const source=h.sheets.get('Events'),stateColumn=source.values[0].indexOf('StaffSyncState');
  for(let index=20;index<50;index++)source.values[index+1][stateColumn]='ERROR';
- const journal=h.sheets.get('MutationLog'),receipt={OperationID:'Q-original-uncertain-save',UserAlias:'admin',Action:'saveEvent',PayloadHash:'original-payload-hash',State:'DISPATCHED',EventID:'Q-EVENT-80',CreatedAt:'2026-10-28T02:00:00Z',UpdatedAt:'2026-10-28T02:00:00Z'};
+ const journal=h.sheets.get('MutationLog'),receipt={OperationID:'Q-original-uncertain-save',UserAlias:'admin',Action:'saveEvent',PayloadHash:'original-payload-hash',State:'DISPATCHED',EventID:'Q-EVENT-80',CreatedAt:h.sandbox.isoNow_(),UpdatedAt:h.sandbox.isoNow_()};
  journal.values.push(journal.values[0].map(key=>receipt[key]||''));const receiptBefore=JSON.stringify(journal.values.at(-1)),blockedBefore=JSON.stringify(source.values[81]);
  const saved=h.sandbox.readCalendarSyncSession_();saved.failedIds=Array.from({length:30},(_,i)=>'Q-EVENT-'+(i+20));saved.counts.errors=saved.failedIds.map(eventId=>({eventId,target:'staff',error:'Run upgradeCalendarToRC19() once in Apps Script before using Calendar writes.'}));saved.processedTotal=50;saved.remaining=31;saved.actionableRemaining=30;saved.blockedEvents=[{eventId:'Q-EVENT-80',code:'PENDING_EVENT_WRITE'}];h.sandbox.writeCalendarSyncSession_(saved);
  const firstRun=saved.syncRunId,writesBefore=h.api.calls.filter(call=>['Events.insert','Events.update','Events.remove'].includes(call.method)).length;
