@@ -124,7 +124,7 @@ try {
     month: "2-digit",
     day: "2-digit",
   }).format(new Date());
-  const coverageTo = futureDate(33);
+  const coverageTo = new Date(Date.parse(date) + 30 * 86400000).toISOString().slice(0, 10);
   const rosterDb = await suite.db("roster");
   await rosterDb
     .prepare(

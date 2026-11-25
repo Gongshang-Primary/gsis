@@ -1,6 +1,7 @@
 # calendar-pending-write-autoclear: one unknown-outcome save blocks Publish and Sync for the whole year (v0.9 HOTFIX)
 
-- Status: proposed (v0.9 hotfix; owner 25 Nov: "wish for v0.9 hotfix", after the 20 Nov freeze)
+- Status: implemented; awaiting exact-head review (v0.9 hotfix; owner 25 Nov: "wish for v0.9 hotfix", after the 20 Nov freeze)
+- Branch: `codex/calendar-pending-write-autoclear` from `07b4ead55668459a49815794ae527255662134d5`.
 - Owner/model: Codex. Reviewer: Claude. Mirror in v1 Calendar afterwards.
 
 ## Evidence (Claude, read of GSPS-CoE via Drive, 25 Nov ~16:05 SGT)
@@ -18,3 +19,25 @@
 
 ## Out of scope
 Sync speed and batch size, the change-push worker, and live sheet edits. Release as a v0.9 Calendar-only hotfix: Calendar backend plus Calendar Pages if the message changes.
+
+## Implementation and handoff (25 Nov)
+
+Publish and sync check pending receipts under the Calendar writer lock. A matching event mutation marker repairs the receipt to COMMITTED. After ten minutes a dropped event save fails with one STALE_DISPATCH audit and the original editor can redo it. A fresh event save identifies the editor, event and Singapore retry time. Ambiguous year publications retain their existing fence. Sync counts a blocked event and processes eligible neighbours.
+
+The synthetic baseline reproduced three failures: Publish stayed blocked at ten minutes, the error omitted the editor and deadline, and sync skipped an expired save. The matching-event recovery check already passed. After the fix all 15 stale dispatch tests, 10 sync isolation tests, 15 publication tests and 63 native Sheets tests passed. The current-session recovery fixture now creates its fresh pending receipt using the harness clock.
+
+The existing Pages client displays the pending-save message. See the expanded deployment inventory below. No live sheet, setting, provider call or deployment was used to verify this change.
+
+Claude reviews the exact v0.9 PR head. The v1 Calendar mirror follows that review.
+
+## Owner addition, 25 Nov: identify who committed the event
+
+Saved event cards in Events and Weekly show their original creator. The event and parent-side edit forms also show the last event editor. Apps Script authenticates the read and verifies the current event's mutation ID against its receipt. This avoids naming the person who published the year as the author of an earlier event edit. Older events without evidence show “Not recorded”. Birthday source markers are displayed as “Contacts birthday import”. Queued proposals and new forms do not assert a creator.
+
+For this expanded hotfix the owner deployment files are `Calendar_Backend_v0.9.9.gs` and `Calendar_Frontend_v0.9.9.zip` (includes the Pages Worker). Update the backend first, then Calendar Pages. Rollback uses the previous versions of both. The v1 web build inherits the event attribution UI and requires an explicit `LastEventEditor` from v1. Its existing `saveParentSide` writes the timestamp without updating the actor. Verify the actual receipt for historical records and correct that path in the mirror after Claude reviews this head.
+
+The v1 web builder strips the Sheets-only attribution lookup and the operation inventory pins follow the same two Calendar runtime calls at their new lines. The local browser/Worker probe exercised 407 operations with zero missing handlers. An isolated D1 probe reproduced the v1 parent-edit attribution issue and confirmed an unrelated prepared save does not block year publication.
+
+CI run 45575849449 also exposed a pre-existing Venues browser fixture issue at main 07b4ead5: its selected workday is 30 Nov and the 30-day coverage requested by the browser ends 30 Dec, while the fixture ends 28 Dec. The same test timed out on untouched main. A temporary fixture ending 30 days after the selected workday passed all three original browser scenarios.
+
+Owner confirmed both the original creator and the last event editor for v0.9 and v1, and approved the one-line Venues test-fixture correction. The fixture now covers 30 days after its selected booking date, including when that date rolls forward over a weekend. All booking, conflict and capacity assertions are retained.

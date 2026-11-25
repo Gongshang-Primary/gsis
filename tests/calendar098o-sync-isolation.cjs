@@ -16,5 +16,23 @@ test('a new per-event blocker before provider dispatch is isolated without ERROR
 test('a blocker during provider lookup is checked again at the final write boundary',()=>{const h=setup(2),s=h.start(),before=JSON.stringify(h.sheets.get('Events').values[1]),id=crypto.randomUUID();let lookups=0,savedReceipt;h.api.setFault((stage,call)=>{if(stage==='after'&&call.method==='Calendars.get'&&++lookups===2){pending(h,'E1',id);savedReceipt=JSON.stringify(journal(h,id));}});const r=h.call('syncYearBatch',{syncRunId:s.syncRunId});assert(lookups>=2);assert.equal(r.writes,1);assert.equal(r.blockedCount,1);assert.equal(r.counts.errors.length,0);assert.equal(r.processedTotal,1);assert.equal(JSON.stringify(h.sheets.get('Events').values[1]),before);assert.equal(JSON.stringify(journal(h,id)),savedReceipt);assert.equal(h.api.live(h.calendarId).length,1);assert.equal(sourceWrites(h).length,1);assert.equal(h.api.calls.filter(call=>call.method==='Events.get').length,0,'A source blocker is not a provider duplicate to probe or retry');});
 test('a per-event blocker after a provider write prevents only its source acknowledgement',()=>{const h=setup(2);let injected=false;h.api.setFault((stage,call)=>{if(stage==='after'&&call.method==='Events.insert'&&!injected){injected=true;pending(h,'E1');}});const s=h.start(),r=h.call('syncYearBatch',{syncRunId:s.syncRunId});assert.equal(r.writes,2);assert.equal(r.processedTotal,2);assert.equal(r.counts.errors.length,0);assert.equal(r.blockedCount,1);assert.equal(h.event('E1').StaffSyncState,'PENDING_SYNC');assert.equal(h.event('E2').StaffSyncState,'SYNCED');assert.equal(h.api.live(h.calendarId).length,2);});
 test('a year-level pending publication still fences the whole sync before provider work',()=>{const h=setup();pending(h,'YEAR:2026');assert.throws(()=>h.start(),e=>e.code==='PENDING_EVENT_WRITE');assert.equal(sourceWrites(h).length,0);assert.equal(h.sandbox.readCalendarSyncSession_(),null);});
+test('sync settles an expired save, skips a fresh save and sends only the ready events', () => {
+  const h = setup(), expired = crypto.randomUUID(), fresh = crypto.randomUUID();
+  pending(h, 'E1', expired);
+  h.advanceClock(10 * 60 * 1000);
+  pending(h, 'E2', fresh);
+  const run = h.start();
+  const result = h.call('syncYearBatch', {syncRunId: run.syncRunId});
+  assert.equal(result.completed, true);
+  assert.equal(result.blockedCount, 1);
+  assert.deepEqual(Array.from(result.blockedEvents, row => row.eventId), ['E2']);
+  assert.equal(result.processedTotal, 2);
+  assert.equal(sourceWrites(h).length, 2);
+  assert.equal(h.event('E1').StaffSyncState, 'SYNCED');
+  assert.equal(h.event('E2').StaffSyncState, 'PENDING_SYNC');
+  assert.equal(h.event('E3').StaffSyncState, 'SYNCED');
+  assert.equal(journal(h, expired).State, 'FAILED');
+  assert.equal(journal(h, fresh).State, 'DISPATCHED');
+});
 require('node:fs').mkdirSync('verification',{recursive:true});require('node:fs').writeFileSync('verification/098o-calendar-isolation.json',JSON.stringify({total:tests.length,passed:tests.filter(x=>x.ok).length,tests},null,2));console.log(JSON.stringify({total:tests.length,passed:tests.filter(x=>x.ok).length}));process.exitCode=tests.some(x=>!x.ok)?1:0;
 

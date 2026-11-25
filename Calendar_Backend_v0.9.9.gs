@@ -942,6 +942,10 @@ function dispatchCore_(action, actor, payload, requestId) {
       requireAdmin_(roles);
       return apiMutationReceipts_(actor,payload);
 
+    case 'eventEditAuthor':
+      requireParentEditor_(roles);
+      return calendarEventEditAuthor_(payload);
+
     case 'eventMutationStatus':
       if (payload.action === 'saveParentSide') requireParentEditor_(roles); else requireAdmin_(roles);
       return apiEventMutationStatus_(actor, payload);
@@ -6933,7 +6937,7 @@ function apiSyncYearBatch_(actor, payload, requestId) {
         // blocking unrelated claimed items. Year-wide fences still stop all.
         const blocked=withCalendarCoordinationLock_(()=>{
           rc18AssertNoPendingEvent_('','','','publication');
-          return rc18PendingEventWrites_().some(row=>row.eventId===String(item.object.EventID));
+          return rc18PendingEventWrites_(row => row.eventId === String(item.object.EventID)).length > 0;
         });
         if(blocked){outcomes.push({eventId:String(item.object.EventID),blocked:true});continue;}
         const result = syncTarget_(calendar, session.target, item.object,
@@ -9073,7 +9077,7 @@ function calendarWriteLock_(){
  let acquiredAt=0;
  const release=()=>{
   if(acquiredAt)io.metrics.lockHoldMs=Number(io.metrics.lockHoldMs||0)+Date.now()-acquiredAt;
-  acquiredAt=0;io.writeCache=null;lock.releaseLock();
+  acquiredAt=0;io.writerLockHeld=false;io.writeCache=null;lock.releaseLock();
  };
  return {
   tryLock(ms){
@@ -9081,6 +9085,7 @@ function calendarWriteLock_(){
    io.metrics.lockWaitMs=Number(io.metrics.lockWaitMs||0)+Date.now()-started;
    if(!granted)return false;
    acquiredAt=Date.now();
+   io.writerLockHeld=true;
    // A delayed reader can refill shared caches after a writer invalidates them.
    // Revalidate from a fresh request-local snapshot while this lock is held.
    io.writeCache={};io.tables={};io.lookups={};io.nativeRanges={};io.calendarSourceLinks=null;
@@ -9109,8 +9114,8 @@ function withRC17WriteLock_(work, allowPendingPublication, sheetReadOnly) {
   finally {io.lockDepth--;try{if(!sheetReadOnly)SpreadsheetApp.flush();}finally{lock.releaseLock();}}
 }
 
-// Only audited Sheet-read/Properties-only scopes use this helper: sync status,
-// source fences, and provider lease/pause coordination. They retain every lock,
+// Sync status and provider lease coordination avoid an unconditional Sheet flush.
+// Source fences can also repair receipts; each journal write flushes itself. They retain every lock,
 // fresh role check and cache reset. Source settlement, durable Calendar links,
 // claim paths that can finalise, and normal mutations keep the default flush.
 function withCalendarCoordinationLock_(work) {
@@ -9317,10 +9322,12 @@ function rc17DefaultTimes_(lane, schedule, shift) {
   return {start:timeText_(row.DefaultStartTime),end:timeText_(row.DefaultEndTime)};
 }
 
-const CALENDAR_STALE_DISPATCH_MS = 60*60*1000;
+// Apps Script stops an execution after six minutes. Ten minutes allows for
+// the writer lock and receipt persistence before checking whether the write landed.
+const CALENDAR_STALE_DISPATCH_MS = 10 * 60 * 1000;
 function staleMutationAge_(record){const created=Date.parse(record.CreatedAt);return Number.isFinite(created)?Math.max(0,Date.now()-created):null;}
 function failStaleMutation_(log,record,current,actor){
-  if(!rc18IO_().lockDepth)throw mutationError_('LOCK_REQUIRED','Receipt resolution requires the Calendar writer lock.',409,true);
+  if(!rc18IO_().writerLockHeld)throw mutationError_('LOCK_REQUIRED','Receipt resolution requires the Calendar writer lock.',409,true);
   const label=current?.StaffTitle||record.EventID,when=String(record.CreatedAt||'');
   const error={code:'STALE_DISPATCH',message:'Your save on '+when+' to '+label+' did not apply. Please redo it.',status:409,current:current?eventForClient_(current):null};
   const next=Object.assign({},record,{State:'FAILED',ErrorJSON:JSON.stringify(error)});
@@ -9347,7 +9354,7 @@ function resolvePublicationReceipt_(log,record,actor){
 }
 function resolveMutationRecord_(log, record, actor) {
   if (!['PREPARED','DISPATCHED'].includes(record.State)) return mutationOutcome_(record);
-  if(!rc18IO_().lockDepth)throw mutationError_('LOCK_REQUIRED','Receipt resolution requires the Calendar writer lock.',409,true);
+  if(!rc18IO_().writerLockHeld)throw mutationError_('LOCK_REQUIRED','Receipt resolution requires the Calendar writer lock.',409,true);
   record=Object.assign({},record);
   if(String(record.EventID).startsWith('YEAR:'))return record.Action==='publishVersion'?resolvePublicationReceipt_(log,record,actor):mutationOutcome_(record);
   const hit = findRowByKey_(SpreadsheetApp.getActiveSpreadsheet().getSheetByName(CALV2.SHEETS.EVENTS),'EventID',record.EventID);
@@ -9374,6 +9381,21 @@ function apiMutationReceipts_(actor,payload){
     const settled=new Set(checked.filter(r=>r.state!=='UNKNOWN').map(r=>r.operationId));
     return {checkedAt:isoNow_(),checked,receipts:rows.filter(r=>!settled.has(r.OperationID)).map(r=>({operationId:r.OperationID,state:r.State,ageMs:staleMutationAge_(r),event:r.EventID,user:r.UserAlias,createdAt:r.CreatedAt,action:r.Action}))};
   },true,payload.check!==true);
+}
+
+// Publication updates UpdatedBy on hidden events. Use the event's durable
+// mutation marker to identify the editor whose content actually landed.
+function calendarEventEditAuthor_(payload) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const hit = findRowByKey_(ss.getSheetByName(CALV2.SHEETS.EVENTS), 'EventID', String(payload.eventId || ''));
+  const event = hit && hit.object;
+  if (!event || event.DeletedAt || !event.LastMutationID || event.LastMutationID !== payload.operationId) return {userAlias: ''};
+  const receipt = mutationLookup_(ss.getSheetByName(CALV2.SHEETS.MUTATIONS), event.LastMutationID);
+  const record = receipt && receipt.object;
+  if (!record || !['COMMITTED','DISPATCHED'].includes(record.State)) return {userAlias: ''};
+  const eventEdit = record.EventID === event.EventID && ['saveEvent','saveParentSide','relocateEvent'].includes(record.Action);
+  const birthdayImport = record.Action === 'pullBirthdays' && record.EventID === 'YEAR:' + event.Year && calendarBirthdayOwner_(event);
+  return {userAlias: eventEdit || birthdayImport ? record.UserAlias : ''};
 }
 
 function apiEventMutationStatus_(actor, payload) {
@@ -9586,7 +9608,7 @@ function rc18Find_(sheet,key,value,insensitive) {
 /** A timed-out source write can remain uncertain after the ScriptLock.
  * Search unresolved journal states, not every past edit of this event. When
  * none exist, avoid loading completed receipt history for this check. */
-function rc18PendingEventWrites_() {
+function rc18PendingEventWrites_(matches) {
   const log=SpreadsheetApp.getActiveSpreadsheet().getSheetByName(CALV2.SHEETS.MUTATIONS);
   if(!log)return [];
   const headers=rc18Headers_(log),ec=headers.indexOf('EventID')+1,sc=headers.indexOf('State')+1,oc=headers.indexOf('OperationID')+1;
@@ -9606,19 +9628,47 @@ function rc18PendingEventWrites_() {
     const offset=n-g[0];
     rows.push({eventId:String((values[i*2][offset]||[])[0]||''),operationId:String((values[i*2+1][offset]||[])[0]||'')});
   }});
-  return rows;
-}
-function rc18AssertNoPendingEvent_(eventId, exceptOperationId, year, anyEvent) {
-  const wanted=String(eventId),except=String(exceptOperationId||'');
-  rc18PendingEventWrites_().forEach(row=>{
-    const pendingId=row.eventId;
-    const anyMatch=anyEvent==='publication' ? pendingId.indexOf('YEAR:')===0 : !!anyEvent;
-    if((anyMatch || (wanted && pendingId===wanted) || (year && pendingId==='YEAR:'+Number(year))) &&
-       row.operationId!==except) {
-      if(rc18IO_().lockDepth){const log=mutationSheet_(),hit=mutationLookup_(log,row.operationId);if(hit&&resolveMutationRecord_(log,hit.object).state!=='UNKNOWN')return;}
-      throw mutationError_('PENDING_EVENT_WRITE','An earlier save or publication still has an unknown outcome. Check the original operation before making another change. This proposal has not been applied.',409,true);
+  const candidates = matches ? rows.filter(matches) : rows;
+  if (!candidates.length) return [];
+  // Sync also checks before acquiring its manual writer lock. Re-read after
+  // acquisition so a receipt settled in the meantime cannot be failed.
+  if (!rc18IO_().writerLockHeld) {
+    return withRC17WriteLock_(() => rc18PendingEventWrites_(matches), true);
+  }
+  const unresolved = [];
+  for (const row of candidates) {
+    const hit = mutationLookup_(log, row.operationId);
+    if (!hit || hit.object.State !== 'DISPATCHED') {
+      throw mutationError_('RECEIPT_CHANGED', 'The pending save changed during the check. Refresh and try again.', 409, true);
     }
+    if (resolveMutationRecord_(log, hit.object).state === 'UNKNOWN') {
+      unresolved.push({eventId: row.eventId, operationId: row.operationId, record: hit.object});
+    }
+  }
+  return unresolved;
+}
+
+function rc18AssertNoPendingEvent_(eventId, exceptOperationId, year, anyEvent) {
+  const wanted = String(eventId), except = String(exceptOperationId || '');
+  const [blocking] = rc18PendingEventWrites_(row => {
+    const anyMatch = anyEvent === 'publication' ? row.eventId.startsWith('YEAR:') : !!anyEvent;
+    return row.operationId !== except && (anyMatch || (wanted && row.eventId === wanted) ||
+      (year && row.eventId === 'YEAR:' + Number(year)));
   });
+  if (!blocking) return;
+  const record = blocking.record, created = Date.parse(record.CreatedAt);
+  const owner = aliasToDisplayName_(record.UserAlias) || 'another editor';
+  const action = record.Action === 'publishVersion' ? 'publication of ' : 'save to ';
+  let message = 'Waiting for ' + owner + "'s " + action + blocking.eventId;
+  if (Number.isFinite(created) && Date.now() < created + CALENDAR_STALE_DISPATCH_MS) {
+    const time = ms => Utilities.formatDate(new Date(ms), CALV2.TZ, 'HH:mm');
+    message += ' (' + time(created) + ') to settle; ' +
+      (blocking.eventId.startsWith('YEAR:') ? 'check its outcome at ' : 'this clears by ') +
+      time(created + CALENDAR_STALE_DISPATCH_MS) + ' SGT. Try again then.';
+  } else {
+    message += ' to settle. Ask an administrator to check the original operation.';
+  }
+  throw mutationError_('PENDING_EVENT_WRITE', message, 409, true);
 }
 
 function rc18ReadTable_(sheet) {
