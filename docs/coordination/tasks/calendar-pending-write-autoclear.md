@@ -1,6 +1,7 @@
 # calendar-pending-write-autoclear: one unknown-outcome save blocks Publish and Sync for the whole year (v0.9 HOTFIX)
 
-- Status: proposed (v0.9 hotfix; owner 25 Nov: "wish for v0.9 hotfix", after the 20 Nov freeze)
+- Status: claimed (v0.9 hotfix; owner 25 Nov: "wish for v0.9 hotfix", after the 20 Nov freeze)
+- Branch: `codex/calendar-pending-write-autoclear` from `07b4ead55668459a49815794ae527255662134d5`.
 - Owner/model: Codex. Reviewer: Claude. Mirror in v1 Calendar afterwards.
 
 ## Evidence (Claude, read of GSPS-CoE via Drive, 25 Nov ~16:05 SGT)
