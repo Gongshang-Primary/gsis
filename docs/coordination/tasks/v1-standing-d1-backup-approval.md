@@ -2,7 +2,7 @@
 
 - **Model / owner** Codex, coordination documentation
 - **Reviewer** Muse
-- **Status** Claimed
+- **Status** Ready for documentation review
 - **Updated** 23 November 2026, Asia/Singapore
 - **Branch** `codex/v1-standing-d1-backup-approval`
 - **Base** `80f9347edd86f0c1cfcef66e045a1c5f379424b8`
@@ -13,3 +13,7 @@ During the v1.12 release, the owner approved full schema-and-data backups of all
 Apply the approval only after an owner request to deploy to the GitHub gate. Preserve exact release and resource checks, fresh backup verification, Contacts last, CI and the protected GitHub approval step. The owner approves the GitHub gate. Keep export payloads and signed URLs private.
 
 The documentation change adds one directive and preserves all earlier directives. Workflow changes, data edits, retention changes and new destinations are outside this claim.
+
+## Verification
+
+The change adds one dated directive to the existing register. Removing that row reproduces the previous register byte for byte. The only paths changed from the release base are the directive register and this task record. `git diff --check` passed. This documentation change requires no application tests. The standing approval applies immediately by the owner’s instruction.
