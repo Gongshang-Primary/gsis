@@ -957,9 +957,9 @@
 
   function eventAttributionHtml(event) {
     if (!event?.EventID || event._calendarJobId) return '';
-    // The v1 event stores the committing account in UpdatedBy. In Sheets,
-    // publication can overwrite that column, so verify the event receipt.
-    const editor = window.GSISV1 ? eventAuthorName(event.UpdatedBy) :
+    // Never infer edit authorship from UpdatedBy: Sheets publication can
+    // overwrite it, and historical v1 parent edits can retain a previous actor.
+    const editor = window.GSISV1 ? eventAuthorName(event.LastEventEditor) :
       event.LastMutationID ? 'Checking…' : 'Not recorded';
     return eventCreatorHtml(event) + `<div class="event-time">Last event edit by <span data-event-editor>${esc(editor)}</span></div>`;
   }
