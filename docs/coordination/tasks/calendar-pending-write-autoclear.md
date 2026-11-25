@@ -39,3 +39,5 @@ For this expanded hotfix the owner deployment files are `Calendar_Backend_v0.9.9
 The v1 web builder strips the Sheets-only attribution lookup and the operation inventory pins follow the same two Calendar runtime calls at their new lines. The local browser/Worker probe exercised 407 operations with zero missing handlers. An isolated D1 probe reproduced the v1 parent-edit attribution issue and confirmed an unrelated prepared save does not block year publication.
 
 CI run 45575849449 also exposed a pre-existing Venues browser fixture issue at main 07b4ead5: its selected workday is 30 Nov and the 30-day coverage requested by the browser ends 30 Dec, while the fixture ends 28 Dec. The same test timed out on untouched main. A temporary fixture ending 30 days after the selected workday passed all three original browser scenarios.
+
+Owner confirmed both the original creator and the last event editor for v0.9 and v1, and approved the one-line Venues test-fixture correction. The fixture now covers 30 days after its selected booking date, including when that date rolls forward over a weekend. All booking, conflict and capacity assertions are retained.
