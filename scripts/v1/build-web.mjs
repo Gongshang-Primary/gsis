@@ -840,6 +840,13 @@ function addDeployPlanningRelief(source){
  return replaceOnce(source,"'R (average)','Teacher headcount'","'R (average)','Planning R (average)','Teacher headcount'","Add the planning R estimate row to Stats");
 }
 function updateDeploy(source){
+ // v0.9 grants live in the Contacts workbook. v1 needs a Core-owned grant API.
+ const grantsPanel=parse(source,{ecmaVersion:'latest',sourceType:'script'}).body.find(n=>n.type==='FunctionDeclaration'&&n.id?.name==='deployPowerUsersPanel');
+ if(grantsPanel){
+  source=source.slice(0,grantsPanel.start)+source.slice(grantsPanel.end);
+  source=replaceOnce(source,"if(tab==='Power Users')deployPowerUsersPanel(root);",'','Remove v0.9 grant controls from v1 Deploy');
+  source=replaceOnce(source,"'Offload','HR Terms','Power Users']","'Offload','HR Terms']",'v1 HR navigation uses Core-owned grants');
+ }
  source=replaceOnce(source,"fetch('/api/campus-map',{method:'POST',headers:{'Content-Type':'application/json',...(token==='session'?{}:{Authorization:'Bearer '+token})},body:'{}',signal:AbortSignal.timeout(30000)})","fetch('/deploy/campus-base.svg',{credentials:'omit',signal:AbortSignal.timeout(30000)})",'Deploy Layout reads its existing static campus drawing');
  source=replaceOnce(source,"async function edgeCommandSend(input){\n const epoch=sessionEpoch,{r,body}=await requestJSON('/api/commands',{method:'POST',headers:{'Content-Type':'application/json',...(token==='session'?{}:{Authorization:'Bearer '+token})},body:JSON.stringify(input)});\n if(epoch!==sessionEpoch)throw Error('Session changed. Sign in before checking the retained command.');if(!r.ok||!body.ok){if(r.status===401)expired();const error=Error(body.error||'Command outcome unavailable. Keep the original request ID.');error.status=body.status||r.status;error.code=body.code;error.queueReceipt=body.data?.queueReceipt;throw error;}return body.data;\n}","async function edgeCommandSend(){\n throw Error('Deploy v1 writes directly to D1 without the legacy Apps Script command queue.');\n\n}",'Deploy removes obsolete Apps Script /api/commands caller');
  source=replaceOnce(source,'return [...byId.values()].filter(t=>!t.active||eligibleTeacher(t));','return [...byId.values()].filter(t=>!t.active||eligibleTeacher(t)||t.orphan||(v().assignments||[]).some(a=>a.teacher===t.id)||Object.hasOwn(v().teacherNotes||{},t.id)||Object.hasOwn(v().teacherDrafts||{},t.id));','Teachers inventory retains historical references independently of new choices');

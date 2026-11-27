@@ -16,7 +16,7 @@ function gsisRequireBackendRole_(required){
 }
 function gsisRequireBackendAction_(action){
  const roster=['rosterProfile','rosterRead','rosterUpload','rosterUpdate','rosterOperations','rosterInbox','rosterService'];
- const deploy=['deployEdge','bootstrap','sync','lease','change','active','access','receipt','delta','relief','auditPage','versionNote','publishReview','acknowledgeNotices','landmarkUnit','landmarkSearch','campusProfile','renameCampusUnit','publicLayout','publicCampus'];
+ const deploy=['deployPowerUsers','deployEdge','bootstrap','sync','lease','change','active','access','receipt','delta','relief','auditPage','versionNote','publishReview','acknowledgeNotices','landmarkUnit','landmarkSearch','campusProfile','renameCampusUnit','publicLayout','publicCampus'];
  if(!roster.includes(action)&&!deploy.includes(action))throw Object.assign(Error('Unknown backend action.'),{status:404});
  return gsisRequireBackendRole_(roster.includes(action)?'roster':'deploy');
 }

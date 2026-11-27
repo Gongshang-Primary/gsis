@@ -20,7 +20,7 @@ function deployEdgeForward_(action,input,identity){
 function deployEdgeAdapter_(req){
  gsisRequireBackendRole_('deploy');const p=req.input||{},allowed=['export','fence','contacts','layoutRead','layoutHandoff'];if(!allowed.includes(p.operation))error_(400,'Unknown Deploy Google adapter operation.');
  if(p.operation==='contacts'){
-  if(!['deploySnapshot','deployPublishReview','approveDeployTeachers','applyDeployCatalogues','roleTruthTable','saveRoleTruthTable'].includes(p.contactAction))error_(400,'Unsupported Contacts adapter action');
+  if(!['deploySnapshot','deployPublishReview','approveDeployTeachers','applyDeployCatalogues','roleTruthTable','saveRoleTruthTable','deployPowerUsers'].includes(p.contactAction))error_(400,'Unsupported Contacts adapter action');
   return contacts_(req.identity,false,p.contactAction,p.contactInput||{});
  }
  const c=contacts_(req.identity,false,'deploySnapshot',{authorityOnly:true});auth_(c,p.operation==='layoutRead'?'either':'Admin');
