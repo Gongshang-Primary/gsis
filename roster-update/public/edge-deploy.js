@@ -40,6 +40,7 @@ async function physicalRegistry(env,fresh=false){
 }
 
 async function contacts(env,action,input,identity){
+ if(action==='deploySnapshot')input={...input,deployEditorAccess:true};
  const result=env.CONTACTS_APPS_SCRIPT_URL&&gsisApiSecret(env)?await signed(env.CONTACTS_APPS_SCRIPT_URL,gsisApiSecret(env),{action,input,identity}):await adapter(env,'contacts',{contactAction:action,contactInput:input},identity);
  if(['approveDeployTeachers','applyDeployCatalogues','saveRoleTruthTable'].includes(action))try{await env.GSIS_JOBS.prepare('DELETE FROM gsis_deploy_authority').run();}catch(ignore){}
  return result;
@@ -64,7 +65,7 @@ async function context(env,identity,action,input,ctx){
    await db.prepare('INSERT INTO gsis_deploy_authority(identity_key,verified_at,snapshot_json) VALUES(?,?,?) ON CONFLICT(identity_key) DO UPDATE SET verified_at=excluded.verified_at,snapshot_json=excluded.snapshot_json WHERE excluded.verified_at>=gsis_deploy_authority.verified_at').bind(key,checkedAt,JSON.stringify(value)).run();return value;
   })().finally(()=>flights.delete(key));flights.set(key,flight);return flight;
  };
- const force=action==='publishReview'||action==='change'&&['publish','acceptContacts','create'].includes(input.operation)||input.freshContacts||input.reviewContacts;
+ const force=previous?.user?.roles?.length===0||previous?.user?.deployPowerUser===true||action==='publishReview'||action==='change'&&['publish','acceptContacts','create'].includes(input.operation)||input.freshContacts||input.reviewContacts;
  if(!force&&previous&&cached.verified_at<=Date.now()&&Date.now()-cached.verified_at<AUTHORITY_MAX_AGE){validate(previous);if(Date.now()-cached.verified_at>=AUTHORITY_MAX_AGE/2&&ctx?.waitUntil)ctx.waitUntil(refresh().catch(()=>{}));return previous;}
  return refresh();
 }
@@ -87,7 +88,7 @@ export async function edgeDeployDispatch(env,action,input,identity,ctx){
  const store=storeFor(env);await store.ensure();const head=await store.head();
  if(head.mode!=='active')fail(503,'Deploy D1 authority is not active. Complete the verified migration before opening this service.','DEPLOY_EDGE_NOT_ACTIVE');
  if(action==='deployEdgeAdmin')return edgeDeployAdmin(env,input,identity);
- if(['roleTruthTable','saveRoleTruthTable'].includes(action))return contacts(env,action,input,identity);
+ if(['deployPowerUsers','roleTruthTable','saveRoleTruthTable'].includes(action))return contacts(env,action,input,identity);
  const c=await context(env,identity,action,input,ctx),requestId=requestKey(action,input),digest=await commandDigest(action,input),writer=['change','lease','acknowledgeNotices'].includes(action);
  if(writer&&requestId){const previous=await store.receipt(identity.email,requestId,digest);if(previous)return {...previous.result,duplicate:true};}
  const responses=new Map();responses.set(JSON.stringify(['contacts','deploySnapshot',{authorityOnly:false},identity.email]),c);

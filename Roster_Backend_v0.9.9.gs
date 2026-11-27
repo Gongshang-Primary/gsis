@@ -573,6 +573,7 @@ function contacts_(identity,authorityOnly,action='deploySnapshot',input=null){
  rosterStage_('contacts-config');
  const p=props_(),url=p.getProperty('CONTACTS_API_URL'),key=gsisApiSecret_();if(!url||!/^https:\/\/script\.google\.com\/macros\/s\/[^/]+\/exec$/.test(url)||!key||key.length<32)error_(503,'Configure Contacts API connection in Deploy Script Properties.');
  const request={...(input||{authorityOnly:!!authorityOnly})},conditional=action==='deploySnapshot'&&!authorityOnly&&!request.authorityOnly&&request.readOnly===true,namespace=hash_([url]);
+ if(action==='deploySnapshot'&&gsisBackendKind_()==='deploy'&&!['campusProfile','renameCampusUnit'].includes(deployTrace_?.action))request.deployEditorAccess=true;
  // Browser cursors bind version-owned HR context; this independent cache binds Contacts source data.
  const cached=conditional?contactsCatalogueCache_(namespace,null):null;delete request.knownCatalogueHash;if(cached)request.knownCatalogueHash=cached.hash;
  const fetchSnapshot=part=>{
@@ -637,6 +638,7 @@ function doPost(e){
   if(req.action==='deployEdge'&&req.input?.operation==='physicalRegistry'){gsisRequireBackendRole_('deploy');return out_({ok:true,data:liveLandmarkRegistry_()});}
   deployTrace_.phase='request-identity';
   if(!req.identity||! /^[^@\s]+@gsps\.edu\.sg$/.test(req.identity.email||'')||!req.identity.subject)error_(401,'Invalid identity');
+  if(req.action==='deployPowerUsers')return out_({ok:true,data:contacts_(req.identity,false,req.action,req.input)});
   if(req.action==='deployEdge')return out_({ok:true,data:deployEdgeAdapter_(req)});
   if(req.action==='change'&&req.input?.protocol!==500)error_(409,'Update the frontend to v0.9.9 and reload before saving.');
   // Published data is already available to every verified school identity. Avoid a Contacts callback.
@@ -8457,7 +8459,7 @@ function gsisRequireBackendRole_(required){
 }
 function gsisRequireBackendAction_(action){
  const roster=['rosterProfile','rosterRead','rosterUpload','rosterUpdate','rosterOperations','rosterInbox','rosterService'];
- const deploy=['deployEdge','bootstrap','sync','lease','change','active','access','receipt','delta','relief','auditPage','versionNote','publishReview','acknowledgeNotices','landmarkUnit','landmarkSearch','campusProfile','renameCampusUnit','publicLayout','publicCampus'];
+ const deploy=['deployPowerUsers','deployEdge','bootstrap','sync','lease','change','active','access','receipt','delta','relief','auditPage','versionNote','publishReview','acknowledgeNotices','landmarkUnit','landmarkSearch','campusProfile','renameCampusUnit','publicLayout','publicCampus'];
  if(!roster.includes(action)&&!deploy.includes(action))throw Object.assign(Error('Unknown backend action.'),{status:404});
  return gsisRequireBackendRole_(roster.includes(action)?'roster':'deploy');
 }
@@ -10447,7 +10449,7 @@ function deployEdgeForward_(action,input,identity){
 function deployEdgeAdapter_(req){
  gsisRequireBackendRole_('deploy');const p=req.input||{},allowed=['export','fence','contacts','layoutRead','layoutHandoff'];if(!allowed.includes(p.operation))error_(400,'Unknown Deploy Google adapter operation.');
  if(p.operation==='contacts'){
-  if(!['deploySnapshot','deployPublishReview','approveDeployTeachers','applyDeployCatalogues','roleTruthTable','saveRoleTruthTable'].includes(p.contactAction))error_(400,'Unsupported Contacts adapter action');
+  if(!['deploySnapshot','deployPublishReview','approveDeployTeachers','applyDeployCatalogues','roleTruthTable','saveRoleTruthTable','deployPowerUsers'].includes(p.contactAction))error_(400,'Unsupported Contacts adapter action');
   return contacts_(req.identity,false,p.contactAction,p.contactInput||{});
  }
  const c=contacts_(req.identity,false,'deploySnapshot',{authorityOnly:true});auth_(c,p.operation==='layoutRead'?'either':'Admin');

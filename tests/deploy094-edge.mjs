@@ -19,6 +19,20 @@ const ctx={waitUntil(p){background.push(p);}};
 const calls=[];globalThis.fetch=async (url,options)=>{const request=JSON.parse(JSON.parse(options.body).payload);calls.push(request);if(request.action==='deployEdge'&&request.input.operation==='contacts')return Response.json({ok:true,data:request.input.contactAction==='deploySnapshot'?{...context,user:{...context.user,email:request.identity.email}}:{saved:true}});if(request.input.operation==='physicalRegistry')return Response.json({ok:true,data:null});if(request.input.operation==='layoutHandoff')return Response.json({ok:true,data:{status:'complete'}});throw Error('Unexpected adapter call');};
 const send=(action,input)=>edgeDeployDispatch(env,action,input,identity,ctx);
 const boot=await send('bootstrap',{});assert.equal(boot.current.id,created.versionId);assert.equal(boot.current.name,'2026 Test');
+const editor={email:'editor@gsps.edu.sg',subject:'synthetic-editor'};
+const adminFetch=globalThis.fetch;let granted=true;
+globalThis.fetch=async(url,options)=>{
+ const command=JSON.parse(JSON.parse(options.body).payload);
+ if(command.identity?.subject===editor.subject&&command.input?.contactAction==='deploySnapshot'){
+  assert.equal(command.input.contactInput.deployEditorAccess,true);
+  return Response.json({ok:true,data:{...context,user:{email:editor.email,roles:granted?['KP']:[],deployPowerUser:granted}}});
+ }
+ return adminFetch(url,options);
+};
+assert.equal((await edgeDeployDispatch(env,'bootstrap',{},editor,ctx)).user.deployPowerUser,true);
+granted=false;
+await assert.rejects(edgeDeployDispatch(env,'bootstrap',{},editor,ctx),e=>e.status===403);
+globalThis.fetch=adminFetch;
 const firstFetchCount=calls.length;await send('sync',{versionId:created.versionId});assert.equal(calls.length,firstFetchCount,'verified warm reads use D1 Contacts snapshot without a GAS call');
 sql.prepare('UPDATE gsis_deploy_authority SET verified_at=?').run(Date.now()-61000);const workingFetch=globalThis.fetch;globalThis.fetch=async()=>{throw Object.assign(Error('Contacts unavailable'),{status:503});};await assert.rejects(send('bootstrap',{}),/Contacts unavailable/);globalThis.fetch=workingFetch;await send('bootstrap',{});assert.ok(calls.length>firstFetchCount,'expired permission snapshots must be refreshed');
 const note={operation:'saveVersionNote',versionId:created.versionId,notes:'Reviewed',expected:'',issuedAt:Date.now(),requestId:crypto.randomUUID(),clientId:'test'};

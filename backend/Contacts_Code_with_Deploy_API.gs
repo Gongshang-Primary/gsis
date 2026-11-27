@@ -151,7 +151,8 @@ function doPost(e) {
     if(req.action==='recoverSave'){try{return reply_({ok:true,data:recoverContactSave_(ss,req)});}finally{invalidateDeployReadCache_();}}
     // Authority reads depend only on admin_users, not an unrelated directory transaction.
     // They remain uncached and run only after signature, expiry and school identity checks.
-    if(req.action==='deploySnapshot'&&req.input?.authorityOnly===true&&!req.input?.palAuthority&&!req.input?.rosterAuthority&&!req.input?.rosterDirectory&&req.input?.rosterProjection!=='staplerDates')return reply_({ok:true,data:{user:contactAuthority_(ss,req.identity)}});
+    if(req.action==='deploySnapshot'&&req.input?.authorityOnly===true&&!req.input?.deployEditorAccess&&!req.input?.palAuthority&&!req.input?.rosterAuthority&&!req.input?.rosterDirectory&&req.input?.rosterProjection!=='staplerDates')return reply_({ok:true,data:{user:contactAuthority_(ss,req.identity)}});
+    if(req.action==='deployPowerUsers')return reply_({ok:true,data:deployPowerUsers_(ss,req)});
     if(req.action==='calendarBirthdays')return reply_({ok:true,data:contactViewRead_(ss,req,()=>calendarContactBirthdays_(ss,req))});
     // Viewing never acquires a writer lock or attempts recovery. Source snapshots
     // keep unconfirmed fields out of staff reads; current access is read live.
@@ -265,6 +266,79 @@ function setKP_(ss,req){
   } finally {lock.releaseLock();}
 }
 
+// Deploy-specific grants are keyed by permanent Staff ID. The Contacts access table
+// continues to decide Contacts permissions and who can administer this panel.
+const deployGrantSheet_='deploy_power_users';
+const deployGrantHeaders_=['Staff ID','Enabled','Revision','Updated By','Updated At'];
+function deployGrants_(ss){
+ const sheet=ss.getSheetByName(deployGrantSheet_);
+ if(!sheet||!sheet.getLastRow())return new Map();
+ const t=readContactTable_(ss,deployGrantSheet_);
+ if(t.headers.join('|')!==deployGrantHeaders_.join('|'))throw fault_(503,'Check the Deploy Power Users register.');
+ const grants=new Map();
+ for(const row of t.rows){
+  const id=row['Staff ID'];if(!id)continue;
+  if(grants.has(id)||!['Y','N'].includes(row.Enabled)||!row.Revision)throw fault_(503,'Check the Deploy Power Users register.');
+  grants.set(id,row);
+ }
+ return grants;
+}
+function deployGrantDirectory_(ss){
+ const rows=table_(ss,'contacts').rows.filter(r=>r['Staff ID']);
+ const byId=new Map(),byEmail=new Map();
+ for(const row of rows){
+  const id=row['Staff ID'],email=email_(row['GSPS Alias (@gsps.edu.sg)'],'gsps.edu.sg').toLowerCase();
+  const person={id,email,name:row['TTb Name']||id,active:row.Active==='Y'};
+  byId.set(id,byId.has(id)?null:person);
+  if(email)byEmail.set(email,byEmail.has(email)?null:person);
+ }
+ return {byId,byEmail};
+}
+function deployGrantEligible_(person,directory){
+ return !!person&&person.active&&/^[^@\s]+@gsps\.edu\.sg$/.test(person.email)&&directory.byId.get(person.id)===person&&directory.byEmail.get(person.email)===person;
+}
+function applyDeployEditorAccess_(ss,user){
+ if(user.roles.includes('Admin')){user.canManageDeployPowerUsers=true;return;}
+ if(user.roles.includes('KP'))return;
+ const grants=deployGrants_(ss);
+ if(!grants.size)return;
+ if(contactViewStatus_?.pending)throw fault_(503,'Contacts must confirm staff eligibility before granting Deploy access.');
+ const directory=deployGrantDirectory_(ss),person=directory.byEmail.get(user.email.toLowerCase());
+ if(deployGrantEligible_(person,directory)&&grants.get(person.id)?.Enabled==='Y'){
+  user.roles=['KP'];user.deployPowerUser=true;
+ }
+}
+function deployPowerUsers_(ss,req){
+ const input=req.input||{},writing=input.operation==='set';
+ if(!writing&&input.operation!=='list')throw fault_(400,'Choose a Power User action.');
+ const lock=writing?LockService.getScriptLock():null;
+ if(lock&&!contactLock_(lock,5000))throw fault_(503,'Another update is in progress. Refresh and retry.');
+ try{
+  if(writing)contactWriterReady_({identity:req.identity,action:'deployPowerUsers',input:{}});
+  if(!contactAuthority_(ss,req.identity).roles.includes('Admin'))throw fault_(403,'Only Admins can manage Deploy Power Users.');
+  const directory=deployGrantDirectory_(ss),grants=deployGrants_(ss);
+  if(!writing){
+   const staff=[];
+   for(const id of new Set([...directory.byId.keys(),...grants.keys()])){
+    const p=directory.byId.get(id),grant=grants.get(id),enabled=grant?.Enabled==='Y';
+    if(enabled||deployGrantEligible_(p,directory))staff.push({id,name:p?.name||id,enabled,revision:grant?.Revision||'new'});
+   }
+   return {staff};
+  }
+  const id=input.staffId,enabled=input.enabled,current=grants.get(id);
+  if(typeof id!=='string'||!id||typeof enabled!=='boolean')throw fault_(400,'Choose a staff member and an access setting.');
+  if(input.revision!==(current?.Revision||'new'))throw fault_(409,'This grant changed. Refresh the list before editing it.');
+  if(enabled&&!deployGrantEligible_(directory.byId.get(id),directory))throw fault_(400,'Choose active staff with a unique school account.');
+  if(enabled===(current?.Enabled==='Y'))return {enabled,revision:current?.Revision||'new'};
+  const sheet=ss.getSheetByName(deployGrantSheet_)||ss.insertSheet(deployGrantSheet_);
+  if(!sheet.getLastRow())sheet.appendRow(deployGrantHeaders_);
+  const revision=Utilities.getUuid(),rowNumber=current?current._row:sheet.getLastRow()+1;
+  if(rowNumber>sheet.getMaxRows())sheet.insertRowsAfter(sheet.getMaxRows(),20);
+  GSISSheets.write(ss,[{sheet,writes:[{row:rowNumber,col:1,values:[[id,enabled?'Y':'N',revision,req.identity.email,new Date().toISOString()]]}]}],false);
+  contactFlush_();return {enabled,revision};
+ }finally{if(lock)lock.releaseLock();}
+}
+
 // Additive Deploy integration: minimal staff data and current actor authority.
 // Cache only the common read payload. Current authority is always read separately.
 function deployReadCacheKey_(){const p=PropertiesService.getScriptProperties();return 'deploy-staff-v2:'+String(p.getProperty('DEPLOY_READ_EPOCH')||'initial')+':'+String(p.getProperty('CONTACTS_DATA_EPOCH')||'initial');}
@@ -294,6 +368,7 @@ function deploySnapshot_(ss,identity,input={}){
  const datesOnly=input.authorityOnly===true&&input.rosterProjection==='staplerDates';
  if((datesOnly||input.rosterAuthority===true||input.rosterDirectory===true)&&contactCacheEnabled_)contactPrefetchRosterDirectory_(ss,'rosterAuthorityBatch');
  const user=contactAuthority_(ss,identity);
+ if(input.deployEditorAccess===true&&!datesOnly&&!input.rosterAuthority&&!input.rosterDirectory)applyDeployEditorAccess_(ss,user);
  if(user.roles.includes('Admin'))user.palEditor=true;
  else if(user.roles.includes('KP')&&(input.authorityOnly!==true||input.palAuthority===true)){
   if(input.palAuthority===true&&contactViewStatus_?.pending)throw fault_(503,'Contacts changes are pending. Retry PAL editing after they complete.');

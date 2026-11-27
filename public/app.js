@@ -337,10 +337,11 @@ function acceptSnapshot(data){
  }
  if(doc){GSISPlanning.init(doc);if(doc.membership)roleCatalogue=doc.membership.map(r=>({role:r[0],level:r[12],groups:['SL','SC','SMC','KP','TL','SDT','CMT','SAT','Support','MK'].filter((k,i)=>r[i+2]==='1')}));}if(doc)doc.teachers=(doc.teachers||[]).map(t=>GSISTeachingRules.resolve(t,roleCatalogue.length?roleCatalogue:undefined,staffCatalog.get(t.id),doc.teacherDrafts?.[t.id]));
  const prior=JSON.stringify({version:previous,catalog:state.versions.map(x=>[x.id,x.name,x.status]),leases:serverLeases,role});
+ manageDeployPowerUsers=data.user.canManageDeployPowerUsers===true;
  role=data.user.roles.join('+')||'Teacher';palEditor=data.user.palEditor===true;lastEmail=data.user.email;serverLeases=data.leases||[];
  state.versions=data.versions.map(x=>doc&&x.id===doc.id?doc:x);
  snapshotCache=doc&&data.cacheKey?{id:doc.id,key:data.cacheKey,revision:data.versions.find(x=>x.id===doc.id)?.revision,globalRevision:data.revision}:null;
- el('user').textContent=data.user.email.replace(/@gsps\.edu\.sg$/i,'')+' · '+role.split('+').map(r=>r==='KP'?'SMC':r).join('+');
+ el('user').textContent=data.user.email.replace(/@gsps\.edu\.sg$/i,'')+' · '+role.split('+').map(r=>r==='KP'?(data.user.deployPowerUser?'Deploy Power User':'SMC'):r).join('+');
  if(doc){
   current=doc.id;SEED.layout=doc.layout||[];restoreClassDraft();
   const next=JSON.stringify({version:v(),catalog:state.versions.map(x=>[x.id,x.name,x.status]),leases:serverLeases,role});
@@ -655,7 +656,38 @@ const family=s=>Object.keys(languageFamilies).find(k=>languageFamilies[k].includ
 function abilityBadge(value){return ['HA','MA','LA'].includes(value)?'<span class="ability-badge '+value+'" title="'+({HA:'High ability',MA:'Mixed ability',LA:'Low ability'}[value])+'">'+value+'</span>':''}
 const natural=(a,b)=>String(a??'').localeCompare(String(b??''),undefined,{numeric:true,sensitivity:'base'});
 const sorts={};
-const settingsSections={'Program Settings':['Classes','Venues','PAL','Load Settings','Subject Type','Fortnight Split','Dept Settings','Committee Settings','CCA Settings','PLT Settings','Events Settings'],'HR Settings':['Span of Control','Teachers','Level Exclusions','Membership','Offload','HR Terms']},lastSettingsPage={};
+let manageDeployPowerUsers=false;
+const settingsSections={'Program Settings':['Classes','Venues','PAL','Load Settings','Subject Type','Fortnight Split','Dept Settings','Committee Settings','CCA Settings','PLT Settings','Events Settings'],'HR Settings':['Span of Control','Teachers','Level Exclusions','Membership','Offload','HR Terms','Power Users']},lastSettingsPage={};
+function deployPowerUsersPanel(root){
+ const panel=document.createElement('section');root.append(panel);
+ panel.innerHTML='<h2>Deploy Power Users</h2><p>Give additional staff the same Deploy editing access as SMC members.</p><label>Staff member <select></select></label> <button type="button" data-grant>Grant access</button><ul></ul><p data-grant-status role="status"></p>';
+ const select=panel.querySelector('select'),grant=panel.querySelector('button'),list=panel.querySelector('ul'),status=panel.querySelector('[role=status]');
+ let staff=[];
+ async function refresh(message=''){
+  status.textContent='Loading staff…';select.disabled=grant.disabled=true;list.replaceChildren();
+  try{
+   const result=await api('deployPowerUsers',{operation:'list'},false);
+   staff=result.staff.sort((a,b)=>natural(a.name,b.name));select.replaceChildren(new Option('Choose staff…',''));
+   for(const person of staff){
+    if(!person.enabled){select.add(new Option(person.name,person.id));continue;}
+    const item=document.createElement('li');item.append(person.name+' ',button('Remove access',()=>save(person,false)));list.append(item);
+   }
+   select.disabled=false;status.textContent=message|| (list.children.length?'':'No additional Power Users assigned.');
+  }catch(e){status.textContent=e.message;list.append(button('Refresh',()=>refresh()));}
+ }
+ async function save(person,enabled){
+  if(!person)return;
+  panel.inert=true;
+  try{
+   await api('deployPowerUsers',{operation:'set',staffId:person.id,enabled,revision:person.revision},false);
+   await refresh((enabled?'Granted access to ':'Removed access for ')+person.name+'.');
+  }catch(e){await refresh(e.message);}
+  finally{panel.inert=false;}
+ }
+ select.onchange=()=>{grant.disabled=!select.value;};
+ grant.onclick=()=>save(staff.find(p=>p.id===select.value),true);
+ refresh();
+}
 function navLabel(t){return {'Level Exclusions':'Exclusions','Load Settings':'Subject Load','Dept Settings':'Dept','Committee Settings':'Committee','CCA Settings':'CCA','PLT Settings':'PLT','Events Settings':'Events'}[t]||t;}
 const alignedProgramPages=new Set(['Load Settings','Dept Settings','Committee Settings','CCA Settings','PLT Settings','Events Settings']);
 function alignProgramCell(cell){
@@ -668,7 +700,7 @@ for(const event of ['input','change'])document.addEventListener(event,e=>{const 
 let workloadReturnTab='Workload';
 function selectDeployTab(next){if(inlineDraftEditor?.open){if(tab===next)return;if(!inlineDraftEditor.requestLeave())return;}if(unsavedDraft||editing||acquiring||busy||exclusionEdits.size){alert('Finish the current edit first.');return;}if(next==='Workload Settings')workloadReturnTab=tab;tab=next;render();}
 function renderDeployNavigation(){
- const privileged=kp()||admin(),allowed=t=>t==='Venues'?admin():privileged||!['Span of Control','Teachers','Level Exclusions','Membership','HR Terms','Offload','Dept Settings','Committee Settings','CCA Settings','PLT Settings','Events Settings'].includes(t);
+ const privileged=kp()||admin(),allowed=t=>t==='Power Users'?admin()&&manageDeployPowerUsers:t==='Venues'?admin():privileged||!['Span of Control','Teachers','Level Exclusions','Membership','HR Terms','Offload','Dept Settings','Committee Settings','CCA Settings','PLT Settings','Events Settings'].includes(t);
  const parent=Object.keys(settingsSections).find(k=>settingsSections[k].includes(tab));if(parent)lastSettingsPage[parent]=tab;
  const nav=el('nav');nav.replaceChildren();
  const groups=[['IP Deploy','Dept','Committees','CCAs','PLT','Events','Duty'],['Workload','Stats','Ledger','Duty Cards','Classes & TGs','Layout'],['Program Settings',...(privileged?['Relief Settings']:[]),...(privileged?['HR Settings','Workload Settings','Versions']:[])],...(privileged?[['ASC Export']]:[]),...(admin()?[['Audit']]:[])];
@@ -694,13 +726,17 @@ function render(patch=false){const renderStarted=Date.now();
  el('levels').innerHTML='<option value="">All levels</option>'+options(Object.keys(v().loads).map(x=>[x,'P'+x]),level);
  el('tag').textContent=publicationText(v());if(!patch)el('nav').innerHTML='';
  if(!(kp()||admin())&&['Span of Control','HR Terms','Teachers','Membership','Offload','Level Exclusions','ASC Export','Workload Settings','Dept Settings','Committee Settings','CCA Settings','PLT Settings','Events Settings'].includes(tab))tab='IP Deploy';
+ if(tab==='Power Users'&&(!admin()||!manageDeployPowerUsers))tab='IP Deploy';
  if(['Audit','Venues'].includes(tab)&&!admin())tab='IP Deploy';
  if(!patch)renderDeployNavigation();
  el('manageVersions')?.remove();
 
  if(['Span of Control','HR Terms','Teachers','Membership','Offload','Level Exclusions'].includes(tab)&&!(kp()||admin()))tab='IP Deploy';
+ if(tab==='Power Users'&&(!admin()||!manageDeployPowerUsers))tab='IP Deploy';
  if(['Audit','Venues'].includes(tab)&&!admin())tab='IP Deploy';
+ if(tab==='Power Users'&&patch&&priorView===tab)return;
  const root=patch?document.createElement('main'):el('content');root.dataset.view=tab;if(!patch)root.innerHTML='';
+ if(tab==='Power Users')deployPowerUsersPanel(root);
  if(tab==='Span of Control')reportingPage(root);if(tab==='IP Deploy')matrix(root);if(tab==='Stats')renderWorkloadStats(root);if(tab==='Ledger')teachers(root);if(tab==='Workload')renderWorkload(root);if(tab==='Workload Settings')workloadSettings(root);if(tab==='Relief Settings')renderReliefSettings(root);if(tab==='PAL')renderPAL(root);if(tab==='HR Terms')masterOptionsPage(root);if(tab==='Membership')membershipPage(root);if(groupTabs[tab])groupPage(root,groupTabs[tab],tab.endsWith('Settings'));if(tab==='Duty')dutyPage(root);if(tab==='Fortnight Split')fortnightPage(root);if(tab==='Duty Cards')dutyCardsPage(root);if(tab==='Teachers')teacherNotesPage(root);if(tab==='Offload')offloadPage(root);if(tab==='Load Settings')settings(root);if(tab==='Subject Type')subjectTypesPage(root);if(tab==='Classes')classesPage(root);if(tab==='Venues')venuesPage(root);if(tab==='Classes & TGs')classesAndGroupsPage(root);if(tab==='Level Exclusions')exclusionPage(root);if(tab==='Versions')versions(root);if(tab==='ASC Export')renderAscExport(root);if(tab==='Audit')audit(root);if(tab==='Layout')layout(root);if(!patch&&priorView!==tab)root.scrollTop=0;
  if(!['IP Deploy','Dept','Committees','CCAs','PLT','Events','Fortnight Split','Duty','Workload Settings'].includes(tab)){sortedRows(root);wireSort(root)}
  el('viewFilters').hidden=!['IP Deploy','Ledger','Teachers','Classes','Level Exclusions','Load Settings'].includes(tab);el('levels').hidden=['Ledger','Level Exclusions','Teachers','Classes'].includes(tab);
